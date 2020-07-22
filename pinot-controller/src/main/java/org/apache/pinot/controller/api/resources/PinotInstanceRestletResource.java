@@ -31,6 +31,7 @@ import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
+import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -176,5 +177,23 @@ public class PinotInstanceRestletResource {
           "Failed to drop instance " + instanceName + " - " + response.getMessage(), Response.Status.CONFLICT);
     }
     return new SuccessResponse("Successfully dropped instance");
+  }
+
+  @PUT
+  @Path("/instances/{instanceName}")
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Update the specified instance", consumes = MediaType.APPLICATION_JSON, notes = "Update specified instance with given instance config")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal error")})
+  public SuccessResponse updateInstance(
+      @ApiParam(value = "Instance name", required = true, example = "Server_a.b.com_20000 | Broker_my.broker.com_30000") @PathParam("instanceName") String instanceName,
+      Instance instance) {
+    LOGGER.info("Instance update request received for instance: {}", instanceName);
+    PinotResourceManagerResponse response = pinotHelixResourceManager.updateInstance(instanceName, instance);
+    if (!response.isSuccessful()) {
+      throw new ControllerApplicationException(LOGGER, "Failure to update instance. Reason: " + response.getMessage(),
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    return new SuccessResponse("Instance successfully updated");
   }
 }

@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.api.events;
 
 import org.apache.commons.configuration.Configuration;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,16 +28,16 @@ public abstract class MetadataEventNotifierFactory {
   public static final Logger LOGGER = LoggerFactory.getLogger(MetadataEventNotifierFactory.class);
   public static final String METADATA_EVENT_CLASS_CONFIG = "factory.class";
 
-  public abstract void init(Configuration configuration);
+  public abstract void init(PinotConfiguration configuration);
 
   public abstract MetadataEventNotifier create();
 
-  public static MetadataEventNotifierFactory loadFactory(Configuration configuration) {
+  public static MetadataEventNotifierFactory loadFactory(PinotConfiguration configuration) {
     MetadataEventNotifierFactory metadataEventNotifierFactory;
-    String metadataEventNotifierClassName = configuration.getString(METADATA_EVENT_CLASS_CONFIG);
-    if (metadataEventNotifierClassName == null) {
-      metadataEventNotifierClassName = DefaultMetadataEventNotifierFactory.class.getName();
-    }
+
+    String metadataEventNotifierClassName =
+        configuration.getProperty(METADATA_EVENT_CLASS_CONFIG, DefaultMetadataEventNotifierFactory.class.getName());
+
     try {
       LOGGER.info("Instantiating metadata event notifier factory class {}", metadataEventNotifierClassName);
       metadataEventNotifierFactory =

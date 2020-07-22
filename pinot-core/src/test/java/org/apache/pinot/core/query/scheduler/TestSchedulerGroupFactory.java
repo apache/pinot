@@ -18,11 +18,12 @@
  */
 package org.apache.pinot.core.query.scheduler;
 
+import static org.testng.Assert.assertNull;
+
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.commons.configuration.Configuration;
 
-import static org.testng.Assert.assertNull;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 class TestSchedulerGroupFactory implements SchedulerGroupFactory {
@@ -30,7 +31,7 @@ class TestSchedulerGroupFactory implements SchedulerGroupFactory {
   ConcurrentHashMap<String, TestSchedulerGroup> groupMap = new ConcurrentHashMap<>();
 
   @Override
-  public SchedulerGroup create(Configuration config, String groupName) {
+  public SchedulerGroup create(PinotConfiguration config, String groupName) {
     numCalls.incrementAndGet();
     assertNull(groupMap.get(groupName));
     TestSchedulerGroup group = new TestSchedulerGroup(groupName);

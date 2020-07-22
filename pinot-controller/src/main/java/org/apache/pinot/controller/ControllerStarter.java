@@ -23,23 +23,28 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.configuration.Configuration;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.api.listeners.ControllerChangeListener;
+import org.apache.helix.model.ClusterConstraints;
+import org.apache.helix.model.ConstraintItem;
 import org.apache.helix.model.MasterSlaveSMD;
+import org.apache.helix.model.Message;
 import org.apache.helix.task.TaskDriver;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.function.FunctionRegistry;
@@ -77,6 +82,7 @@ import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
 import org.apache.pinot.core.periodictask.PeriodicTask;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
@@ -97,6 +103,7 @@ public class ControllerStarter implements ServiceStartable {
   private static final Long DATA_DIRECTORY_MISSING_VALUE = 1000000L;
   private static final Long DATA_DIRECTORY_EXCEPTION_VALUE = 1100000L;
   private static final String METADATA_EVENT_NOTIFIER_PREFIX = "metadata.event.notifier";
+  private static final String MAX_STATE_TRANSITIONS_PER_INSTANCE =  "MaxStateTransitionsPerInstance";
 
   private final ControllerConf _config;
   private final List<ListenerConfig> _listenerConfigs;
@@ -174,7 +181,7 @@ public class ControllerStarter implements ServiceStartable {
 
   private void inferHostnameIfNeeded(ControllerConf config) {
     if (config.getControllerHost() == null) {
-      if (config.getBoolean(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false)) {
+      if (config.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false)) {
         final String inferredHostname = NetUtil.getHostnameOrAddress();
         if (inferredHostname != null) {
           config.setControllerHost(inferredHostname);
@@ -198,8 +205,23 @@ public class ControllerStarter implements ServiceStartable {
     // from ZooKeeper). Setting flapping time window to a small value can avoid this from happening. Helix ignores the
     // non-positive value, so set the default value as 1.
     System.setProperty(SystemPropertyKeys.FLAPPING_TIME_WINDOW, _config
-        .getString(CommonConstants.Helix.CONFIG_OF_CONTROLLER_FLAPPING_TIME_WINDOW_MS,
+        .getProperty(CommonConstants.Helix.CONFIG_OF_CONTROLLER_FLAPPING_TIME_WINDOW_MS,
             CommonConstants.Helix.DEFAULT_FLAPPING_TIME_WINDOW_MS));
+  }
+
+  private void setupHelixClusterConstraints() {
+    String maxStateTransitions = _config
+        .getProperty(CommonConstants.Helix.CONFIG_OF_HELIX_INSTANCE_MAX_STATE_TRANSITIONS,
+            CommonConstants.Helix.DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS);
+    Map<ClusterConstraints.ConstraintAttribute, String> constraintAttributes = new HashMap<>();
+    constraintAttributes.put(ClusterConstraints.ConstraintAttribute.INSTANCE, ".*");
+    constraintAttributes
+        .put(ClusterConstraints.ConstraintAttribute.MESSAGE_TYPE, Message.MessageType.STATE_TRANSITION.name());
+    ConstraintItem constraintItem = new ConstraintItem(constraintAttributes, maxStateTransitions);
+
+    _helixControllerManager.getClusterManagmentTool()
+        .setConstraint(_helixClusterName, ClusterConstraints.ConstraintType.MESSAGE_CONSTRAINT,
+            MAX_STATE_TRANSITIONS_PER_INSTANCE, constraintItem);
   }
 
   public PinotHelixResourceManager getHelixResourceManager() {
@@ -248,7 +270,7 @@ public class ControllerStarter implements ServiceStartable {
   }
 
   @Override
-  public Configuration getConfig() {
+  public PinotConfiguration getConfig() {
     return _config;
   }
 
@@ -296,6 +318,9 @@ public class ControllerStarter implements ServiceStartable {
         () -> _controllerMetrics.addMeteredGlobalValue(ControllerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
 
     _serviceStatusCallbackList.add(generateServiceStatusCallback(_helixControllerManager));
+
+    // setup up constraint
+    setupHelixClusterConstraints();
   }
 
   private void setUpPinotController() {
@@ -454,9 +479,9 @@ public class ControllerStarter implements ServiceStartable {
   }
 
   private void initPinotFSFactory() {
-    Configuration pinotFSConfig = _config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
     LOGGER.info("Initializing PinotFSFactory");
-    PinotFSFactory.init(pinotFSConfig);
+    
+    PinotFSFactory.init(_config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY));
   }
 
   private void initControllerFilePathProvider() {
@@ -469,7 +494,7 @@ public class ControllerStarter implements ServiceStartable {
   }
 
   private void initSegmentFetcherFactory() {
-    Configuration segmentFetcherFactoryConfig =
+    PinotConfiguration segmentFetcherFactoryConfig =
         _config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
     LOGGER.info("Initializing SegmentFetcherFactory");
     try {
@@ -480,7 +505,7 @@ public class ControllerStarter implements ServiceStartable {
   }
 
   private void initPinotCrypterFactory() {
-    Configuration pinotCrypterConfig = _config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
+    PinotConfiguration pinotCrypterConfig = _config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
     LOGGER.info("Initializing PinotCrypterFactory");
     try {
       PinotCrypterFactory.init(pinotCrypterConfig);
@@ -657,7 +682,7 @@ public class ControllerStarter implements ServiceStartable {
     }
 
     conf.setControllerVipHost("localhost");
-    conf.setControllerVipProtocol("http");
+    conf.setControllerVipProtocol(CommonConstants.HTTP_PROTOCOL);
     conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
     conf.setOfflineSegmentIntervalCheckerFrequencyInSeconds(3600);
     conf.setRealtimeSegmentValidationFrequencyInSeconds(3600);

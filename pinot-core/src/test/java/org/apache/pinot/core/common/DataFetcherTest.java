@@ -19,6 +19,7 @@
 package org.apache.pinot.core.common;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -26,19 +27,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.MetricFieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.StringUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -47,124 +48,188 @@ import org.testng.annotations.Test;
 
 
 public class DataFetcherTest {
-  private static final String SEGMENT_NAME = "dataFetcherTestSegment";
-  private static final String INDEX_DIR_PATH = FileUtils.getTempDirectoryPath() + File.separator + SEGMENT_NAME;
+  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "DataFetcherTest");
+  private static final long RANDOM_SEED = System.currentTimeMillis();
+  private static final Random RANDOM = new Random(RANDOM_SEED);
+  private static final String ERROR_MESSAGE = "Random seed: " + RANDOM_SEED;
   private static final int NUM_ROWS = 1000;
-  private static final String DIMENSION_NAME = "dimension";
-  private static final String INT_METRIC_NAME = "int_metric";
-  private static final String LONG_METRIC_NAME = "long_metric";
-  private static final String FLOAT_METRIC_NAME = "float_metric";
-  private static final String DOUBLE_METRIC_NAME = "double_metric";
-  private static final String NO_DICT_INT_METRIC_NAME = "no_dict_int_metric";
-  private static final String NO_DICT_LONG_METRIC_NAME = "no_dict_long_metric";
-  private static final String NO_DICT_FLOAT_METRIC_NAME = "no_dict_float_metric";
-  private static final String NO_DICT_DOUBLE_METRIC_NAME = "no_dict_double_metric";
+  private static final int MAX_VALUE = 1000000;
+  private static final String INT_COLUMN = "int";
+  private static final String LONG_COLUMN = "long";
+  private static final String FLOAT_COLUMN = "float";
+  private static final String DOUBLE_COLUMN = "double";
+  private static final String STRING_COLUMN = "string";
+  private static final String BYTES_COLUMN = "bytes";
+  private static final String HEX_STRING_COLUMN = "hex_string";
+  private static final String NO_DICT_INT_COLUMN = "no_dict_int";
+  private static final String NO_DICT_LONG_COLUMN = "no_dict_long";
+  private static final String NO_DICT_FLOAT_COLUMN = "no_dict_float";
+  private static final String NO_DICT_DOUBLE_COLUMN = "no_dict_double";
+  private static final String NO_DICT_STRING_COLUMN = "no_dict_string";
+  private static final String NO_DICT_BYTES_COLUMN = "no_dict_bytes";
+  private static final String NO_DICT_HEX_STRING_COLUMN = "no_dict_hex_string";
   private static final int MAX_STEP_LENGTH = 5;
 
-  private final long _randomSeed = System.currentTimeMillis();
-  private final Random _random = new Random(_randomSeed);
-  private final String _errorMessage = "Random seed is: " + _randomSeed;
-  private final String[] _dimensionValues = new String[NUM_ROWS];
-  private final int[] _intMetricValues = new int[NUM_ROWS];
-  private final long[] _longMetricValues = new long[NUM_ROWS];
-  private final float[] _floatMetricValues = new float[NUM_ROWS];
-  private final double[] _doubleMetricValues = new double[NUM_ROWS];
+  private final int[] _values = new int[NUM_ROWS];
+  private IndexSegment _indexSegment;
   private DataFetcher _dataFetcher;
 
   @BeforeClass
   private void setup()
       throws Exception {
-    List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
+    FileUtils.deleteDirectory(TEMP_DIR);
 
-    // Generate random dimension and metric values.
+    // Generate random values
+    List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
-      double randomDouble = _random.nextDouble();
-      String randomDoubleString = String.valueOf(randomDouble);
-      _dimensionValues[i] = randomDoubleString;
-      _intMetricValues[i] = (int) randomDouble;
-      _longMetricValues[i] = (long) randomDouble;
-      _floatMetricValues[i] = (float) randomDouble;
-      _doubleMetricValues[i] = randomDouble;
-      HashMap<String, Object> map = new HashMap<>();
-      map.put(DIMENSION_NAME, _dimensionValues[i]);
-      map.put(INT_METRIC_NAME, _intMetricValues[i]);
-      map.put(LONG_METRIC_NAME, _longMetricValues[i]);
-      map.put(FLOAT_METRIC_NAME, _floatMetricValues[i]);
-      map.put(DOUBLE_METRIC_NAME, _doubleMetricValues[i]);
-      map.put(NO_DICT_INT_METRIC_NAME, _intMetricValues[i]);
-      map.put(NO_DICT_LONG_METRIC_NAME, _longMetricValues[i]);
-      map.put(NO_DICT_FLOAT_METRIC_NAME, _floatMetricValues[i]);
-      map.put(NO_DICT_DOUBLE_METRIC_NAME, _doubleMetricValues[i]);
-      GenericRow genericRow = new GenericRow();
-      genericRow.init(map);
-      rows.add(genericRow);
+      int value = RANDOM.nextInt(MAX_VALUE);
+      _values[i] = value;
+      GenericRow row = new GenericRow();
+      row.putValue(INT_COLUMN, value);
+      row.putValue(NO_DICT_INT_COLUMN, value);
+      row.putValue(LONG_COLUMN, (long) value);
+      row.putValue(NO_DICT_LONG_COLUMN, (long) value);
+      row.putValue(FLOAT_COLUMN, (float) value);
+      row.putValue(NO_DICT_FLOAT_COLUMN, (float) value);
+      row.putValue(DOUBLE_COLUMN, (double) value);
+      row.putValue(NO_DICT_DOUBLE_COLUMN, (double) value);
+      String stringValue = Integer.toString(value);
+      row.putValue(STRING_COLUMN, stringValue);
+      row.putValue(NO_DICT_STRING_COLUMN, stringValue);
+      byte[] bytesValue = StringUtils.encodeUtf8(stringValue);
+      row.putValue(BYTES_COLUMN, bytesValue);
+      row.putValue(NO_DICT_BYTES_COLUMN, bytesValue);
+      String hexStringValue = BytesUtils.toHexString(bytesValue);
+      row.putValue(HEX_STRING_COLUMN, hexStringValue);
+      row.putValue(NO_DICT_HEX_STRING_COLUMN, hexStringValue);
+      rows.add(row);
     }
 
-    // Create an index segment with the random dimension and metric values.
-    final Schema schema = new Schema();
-    schema.addField(new DimensionFieldSpec(DIMENSION_NAME, FieldSpec.DataType.STRING, true));
-    schema.addField(new MetricFieldSpec(INT_METRIC_NAME, FieldSpec.DataType.INT));
-    schema.addField(new MetricFieldSpec(LONG_METRIC_NAME, FieldSpec.DataType.LONG));
-    schema.addField(new MetricFieldSpec(FLOAT_METRIC_NAME, FieldSpec.DataType.FLOAT));
-    schema.addField(new MetricFieldSpec(DOUBLE_METRIC_NAME, FieldSpec.DataType.DOUBLE));
-
-    schema.addField(new MetricFieldSpec(NO_DICT_INT_METRIC_NAME, FieldSpec.DataType.INT));
-    schema.addField(new MetricFieldSpec(NO_DICT_LONG_METRIC_NAME, FieldSpec.DataType.LONG));
-    schema.addField(new MetricFieldSpec(NO_DICT_FLOAT_METRIC_NAME, FieldSpec.DataType.FLOAT));
-    schema.addField(new MetricFieldSpec(NO_DICT_DOUBLE_METRIC_NAME, FieldSpec.DataType.DOUBLE));
-
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
-
+    // Create the segment
+    String tableName = "testTable";
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setNoDictionaryColumns(
+        Arrays.asList(NO_DICT_INT_COLUMN, NO_DICT_LONG_COLUMN, NO_DICT_FLOAT_COLUMN, NO_DICT_DOUBLE_COLUMN,
+            NO_DICT_STRING_COLUMN, NO_DICT_BYTES_COLUMN, NO_DICT_HEX_STRING_COLUMN)).build();
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(tableName).addSingleValueDimension(INT_COLUMN, DataType.INT)
+            .addSingleValueDimension(LONG_COLUMN, DataType.LONG).addSingleValueDimension(FLOAT_COLUMN, DataType.FLOAT)
+            .addSingleValueDimension(DOUBLE_COLUMN, DataType.DOUBLE)
+            .addSingleValueDimension(STRING_COLUMN, DataType.STRING)
+            .addSingleValueDimension(BYTES_COLUMN, DataType.BYTES)
+            .addSingleValueDimension(HEX_STRING_COLUMN, DataType.STRING)
+            .addSingleValueDimension(NO_DICT_INT_COLUMN, DataType.INT)
+            .addSingleValueDimension(NO_DICT_LONG_COLUMN, DataType.LONG)
+            .addSingleValueDimension(NO_DICT_FLOAT_COLUMN, DataType.FLOAT)
+            .addSingleValueDimension(NO_DICT_DOUBLE_COLUMN, DataType.DOUBLE)
+            .addSingleValueDimension(NO_DICT_STRING_COLUMN, DataType.STRING)
+            .addSingleValueDimension(NO_DICT_BYTES_COLUMN, DataType.BYTES)
+            .addSingleValueDimension(NO_DICT_HEX_STRING_COLUMN, DataType.STRING).build();
+    String segmentName = "testSegment";
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
-    FileUtils.deleteQuietly(new File(INDEX_DIR_PATH));
-    config.setOutDir(INDEX_DIR_PATH);
-    config.setSegmentName(SEGMENT_NAME);
-    config.setRawIndexCreationColumns(Arrays
-        .asList(NO_DICT_INT_METRIC_NAME, NO_DICT_LONG_METRIC_NAME, NO_DICT_FLOAT_METRIC_NAME,
-            NO_DICT_DOUBLE_METRIC_NAME));
-
+    config.setOutDir(TEMP_DIR.getPath());
+    config.setSegmentName(segmentName);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(config, new GenericRowRecordReader(rows));
     driver.build();
 
-    IndexSegment indexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR_PATH, SEGMENT_NAME), ReadMode.heap);
-
+    _indexSegment = ImmutableSegmentLoader.load(new File(TEMP_DIR, segmentName), ReadMode.mmap);
     Map<String, DataSource> dataSourceMap = new HashMap<>();
-    for (String column : indexSegment.getPhysicalColumnNames()) {
-      dataSourceMap.put(column, indexSegment.getDataSource(column));
+    for (String column : _indexSegment.getPhysicalColumnNames()) {
+      dataSourceMap.put(column, _indexSegment.getDataSource(column));
     }
-    // Get a data fetcher for the index segment.
     _dataFetcher = new DataFetcher(dataSourceMap);
   }
 
   @Test
-  public void testFetchSingleIntValues() {
-    testFetchSingleIntValues(INT_METRIC_NAME);
-    testFetchSingleIntValues(NO_DICT_INT_METRIC_NAME);
+  public void testFetchIntValues() {
+    testFetchIntValues(INT_COLUMN);
+    testFetchIntValues(LONG_COLUMN);
+    testFetchIntValues(FLOAT_COLUMN);
+    testFetchIntValues(DOUBLE_COLUMN);
+    testFetchIntValues(STRING_COLUMN);
+    testFetchIntValues(NO_DICT_INT_COLUMN);
+    testFetchIntValues(NO_DICT_LONG_COLUMN);
+    testFetchIntValues(NO_DICT_FLOAT_COLUMN);
+    testFetchIntValues(NO_DICT_DOUBLE_COLUMN);
+    testFetchIntValues(NO_DICT_STRING_COLUMN);
   }
 
   @Test
-  public void testFetchSingleLongValues() {
-    testFetchSingleLongValues(LONG_METRIC_NAME);
-    testFetchSingleLongValues(NO_DICT_LONG_METRIC_NAME);
+  public void testFetchLongValues() {
+    testFetchLongValues(INT_COLUMN);
+    testFetchLongValues(LONG_COLUMN);
+    testFetchLongValues(FLOAT_COLUMN);
+    testFetchLongValues(DOUBLE_COLUMN);
+    testFetchLongValues(STRING_COLUMN);
+    testFetchLongValues(NO_DICT_INT_COLUMN);
+    testFetchLongValues(NO_DICT_LONG_COLUMN);
+    testFetchLongValues(NO_DICT_FLOAT_COLUMN);
+    testFetchLongValues(NO_DICT_DOUBLE_COLUMN);
+    testFetchLongValues(NO_DICT_STRING_COLUMN);
   }
 
   @Test
-  public void testFetchSingleFloatValues() {
-    testFetchSingleFloatValues(FLOAT_METRIC_NAME);
-    testFetchSingleFloatValues(NO_DICT_FLOAT_METRIC_NAME);
+  public void testFetchFloatValues() {
+    testFetchFloatValues(INT_COLUMN);
+    testFetchFloatValues(LONG_COLUMN);
+    testFetchFloatValues(FLOAT_COLUMN);
+    testFetchFloatValues(DOUBLE_COLUMN);
+    testFetchFloatValues(STRING_COLUMN);
+    testFetchFloatValues(NO_DICT_INT_COLUMN);
+    testFetchFloatValues(NO_DICT_LONG_COLUMN);
+    testFetchFloatValues(NO_DICT_FLOAT_COLUMN);
+    testFetchFloatValues(NO_DICT_DOUBLE_COLUMN);
+    testFetchFloatValues(NO_DICT_STRING_COLUMN);
   }
 
   @Test
-  public void testFetchSingleDoubleValues() {
-    testFetchSingleDoubleValues(DOUBLE_METRIC_NAME);
-    testFetchSingleDoubleValues(NO_DICT_DOUBLE_METRIC_NAME);
+  public void testFetchDoubleValues() {
+    testFetchDoubleValues(INT_COLUMN);
+    testFetchDoubleValues(LONG_COLUMN);
+    testFetchDoubleValues(FLOAT_COLUMN);
+    testFetchDoubleValues(DOUBLE_COLUMN);
+    testFetchDoubleValues(STRING_COLUMN);
+    testFetchDoubleValues(NO_DICT_INT_COLUMN);
+    testFetchDoubleValues(NO_DICT_LONG_COLUMN);
+    testFetchDoubleValues(NO_DICT_FLOAT_COLUMN);
+    testFetchDoubleValues(NO_DICT_DOUBLE_COLUMN);
+    testFetchDoubleValues(NO_DICT_STRING_COLUMN);
   }
 
-  public void testFetchSingleIntValues(String column) {
+  @Test
+  public void testFetchStringValues() {
+    testFetchStringValues(INT_COLUMN);
+    testFetchStringValues(LONG_COLUMN);
+    testFetchStringValues(FLOAT_COLUMN);
+    testFetchStringValues(DOUBLE_COLUMN);
+    testFetchStringValues(STRING_COLUMN);
+    testFetchStringValues(NO_DICT_INT_COLUMN);
+    testFetchStringValues(NO_DICT_LONG_COLUMN);
+    testFetchStringValues(NO_DICT_FLOAT_COLUMN);
+    testFetchStringValues(NO_DICT_DOUBLE_COLUMN);
+    testFetchStringValues(NO_DICT_STRING_COLUMN);
+  }
+
+  @Test
+  public void testFetchBytesValues() {
+    testFetchBytesValues(BYTES_COLUMN);
+    testFetchBytesValues(HEX_STRING_COLUMN);
+    testFetchBytesValues(NO_DICT_BYTES_COLUMN);
+    testFetchBytesValues(NO_DICT_HEX_STRING_COLUMN);
+  }
+
+  @Test
+  public void testFetchHexStringValues() {
+    testFetchHexStringValues(BYTES_COLUMN);
+    testFetchHexStringValues(HEX_STRING_COLUMN);
+    testFetchBytesValues(NO_DICT_BYTES_COLUMN);
+    testFetchBytesValues(NO_DICT_HEX_STRING_COLUMN);
+  }
+
+  public void testFetchIntValues(String column) {
     int[] docIds = new int[NUM_ROWS];
     int length = 0;
-    for (int i = _random.nextInt(MAX_STEP_LENGTH); i < NUM_ROWS; i += _random.nextInt(MAX_STEP_LENGTH) + 1) {
+    for (int i = RANDOM.nextInt(MAX_STEP_LENGTH); i < NUM_ROWS; i += RANDOM.nextInt(MAX_STEP_LENGTH) + 1) {
       docIds[length++] = i;
     }
 
@@ -172,14 +237,14 @@ public class DataFetcherTest {
     _dataFetcher.fetchIntValues(column, docIds, length, intValues);
 
     for (int i = 0; i < length; i++) {
-      Assert.assertEquals(intValues[i], _intMetricValues[docIds[i]], _errorMessage);
+      Assert.assertEquals(intValues[i], _values[docIds[i]], ERROR_MESSAGE);
     }
   }
 
-  public void testFetchSingleLongValues(String column) {
+  public void testFetchLongValues(String column) {
     int[] docIds = new int[NUM_ROWS];
     int length = 0;
-    for (int i = _random.nextInt(MAX_STEP_LENGTH); i < NUM_ROWS; i += _random.nextInt(MAX_STEP_LENGTH) + 1) {
+    for (int i = RANDOM.nextInt(MAX_STEP_LENGTH); i < NUM_ROWS; i += RANDOM.nextInt(MAX_STEP_LENGTH) + 1) {
       docIds[length++] = i;
     }
 
@@ -187,14 +252,14 @@ public class DataFetcherTest {
     _dataFetcher.fetchLongValues(column, docIds, length, longValues);
 
     for (int i = 0; i < length; i++) {
-      Assert.assertEquals(longValues[i], _longMetricValues[docIds[i]], _errorMessage);
+      Assert.assertEquals((int) longValues[i], _values[docIds[i]], ERROR_MESSAGE);
     }
   }
 
-  public void testFetchSingleFloatValues(String column) {
+  public void testFetchFloatValues(String column) {
     int[] docIds = new int[NUM_ROWS];
     int length = 0;
-    for (int i = _random.nextInt(MAX_STEP_LENGTH); i < NUM_ROWS; i += _random.nextInt(MAX_STEP_LENGTH) + 1) {
+    for (int i = RANDOM.nextInt(MAX_STEP_LENGTH); i < NUM_ROWS; i += RANDOM.nextInt(MAX_STEP_LENGTH) + 1) {
       docIds[length++] = i;
     }
 
@@ -202,14 +267,14 @@ public class DataFetcherTest {
     _dataFetcher.fetchFloatValues(column, docIds, length, floatValues);
 
     for (int i = 0; i < length; i++) {
-      Assert.assertEquals(floatValues[i], _floatMetricValues[docIds[i]], _errorMessage);
+      Assert.assertEquals((int) floatValues[i], _values[docIds[i]], ERROR_MESSAGE);
     }
   }
 
-  public void testFetchSingleDoubleValues(String column) {
+  public void testFetchDoubleValues(String column) {
     int[] docIds = new int[NUM_ROWS];
     int length = 0;
-    for (int i = _random.nextInt(MAX_STEP_LENGTH); i < NUM_ROWS; i += _random.nextInt(MAX_STEP_LENGTH) + 1) {
+    for (int i = RANDOM.nextInt(MAX_STEP_LENGTH); i < NUM_ROWS; i += RANDOM.nextInt(MAX_STEP_LENGTH) + 1) {
       docIds[length++] = i;
     }
 
@@ -217,28 +282,60 @@ public class DataFetcherTest {
     _dataFetcher.fetchDoubleValues(column, docIds, length, doubleValues);
 
     for (int i = 0; i < length; i++) {
-      Assert.assertEquals(doubleValues[i], _doubleMetricValues[docIds[i]], _errorMessage);
+      Assert.assertEquals((int) doubleValues[i], _values[docIds[i]], ERROR_MESSAGE);
     }
   }
 
-  @Test
-  public void testFetchSingleStringValues() {
+  public void testFetchStringValues(String column) {
     int[] docIds = new int[NUM_ROWS];
     int length = 0;
-    for (int i = _random.nextInt(MAX_STEP_LENGTH); i < NUM_ROWS; i += _random.nextInt(MAX_STEP_LENGTH) + 1) {
+    for (int i = RANDOM.nextInt(MAX_STEP_LENGTH); i < NUM_ROWS; i += RANDOM.nextInt(MAX_STEP_LENGTH) + 1) {
       docIds[length++] = i;
     }
 
     String[] stringValues = new String[length];
-    _dataFetcher.fetchStringValues(DIMENSION_NAME, docIds, length, stringValues);
+    _dataFetcher.fetchStringValues(column, docIds, length, stringValues);
 
     for (int i = 0; i < length; i++) {
-      Assert.assertEquals(stringValues[i], _dimensionValues[docIds[i]], _errorMessage);
+      Assert.assertEquals((int) Double.parseDouble(stringValues[i]), _values[docIds[i]], ERROR_MESSAGE);
+    }
+  }
+
+  public void testFetchBytesValues(String column) {
+    int[] docIds = new int[NUM_ROWS];
+    int length = 0;
+    for (int i = RANDOM.nextInt(MAX_STEP_LENGTH); i < NUM_ROWS; i += RANDOM.nextInt(MAX_STEP_LENGTH) + 1) {
+      docIds[length++] = i;
+    }
+
+    byte[][] bytesValues = new byte[length][];
+    _dataFetcher.fetchBytesValues(column, docIds, length, bytesValues);
+
+    for (int i = 0; i < length; i++) {
+      Assert.assertEquals(StringUtils.decodeUtf8(bytesValues[i]), Integer.toString(_values[docIds[i]]), ERROR_MESSAGE);
+    }
+  }
+
+  public void testFetchHexStringValues(String column) {
+    int[] docIds = new int[NUM_ROWS];
+    int length = 0;
+    for (int i = RANDOM.nextInt(MAX_STEP_LENGTH); i < NUM_ROWS; i += RANDOM.nextInt(MAX_STEP_LENGTH) + 1) {
+      docIds[length++] = i;
+    }
+
+    String[] hexStringValues = new String[length];
+    _dataFetcher.fetchStringValues(column, docIds, length, hexStringValues);
+
+    for (int i = 0; i < length; i++) {
+      Assert.assertEquals(StringUtils.decodeUtf8(BytesUtils.toBytes(hexStringValues[i])),
+          Integer.toString(_values[docIds[i]]), ERROR_MESSAGE);
     }
   }
 
   @AfterClass
-  public void cleanUp() {
-    FileUtils.deleteQuietly(new File(INDEX_DIR_PATH));
+  public void tearDown()
+      throws IOException {
+    _indexSegment.destroy();
+    FileUtils.deleteDirectory(TEMP_DIR);
   }
 }

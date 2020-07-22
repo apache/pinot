@@ -56,7 +56,6 @@ public class LongToIdMap extends BaseValueToIdMap {
 
   @Override
   public String getString(int id) {
-    assert id < _idToValueMap.size();
-    return (Long.valueOf(_idToValueMap.getLong(id)).toString());
+    return Long.toString(getLong(id));
   }
 }

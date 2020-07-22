@@ -23,15 +23,10 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
-import java.util.Random;
+
 
 public class FileUtils {
   private FileUtils() {
-  }
-  private static final Random RANDOM = new Random();
-
-  public static String getRandomFileName() {
-    return StringUtil.join("-", "tmp", String.valueOf(System.currentTimeMillis()), Long.toString(RANDOM.nextLong()));
   }
 
   /**

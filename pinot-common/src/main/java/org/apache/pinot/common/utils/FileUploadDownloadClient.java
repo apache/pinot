@@ -97,8 +97,8 @@ public class FileUploadDownloadClient implements Closeable {
   public static final int GET_REQUEST_SOCKET_TIMEOUT_MS = 5 * 1000; // 5 seconds
   public static final int DELETE_REQUEST_SOCKET_TIMEOUT_MS = 10 * 1000; // 10 seconds
 
-  private static final String HTTP = "http";
-  private static final String HTTPS = "https";
+  private static final String HTTP = CommonConstants.HTTP_PROTOCOL;
+  private static final String HTTPS = CommonConstants.HTTPS_PROTOCOL;
   private static final String SCHEMA_PATH = "/schemas";
   private static final String OLD_SEGMENT_PATH = "/segments";
   private static final String SEGMENT_PATH = "/v2/segments";

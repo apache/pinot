@@ -34,6 +34,7 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -1068,6 +1069,8 @@ public class SegmentCompletionManager {
       _state = State.COMMITTING;
       // In case of splitCommit, the segment is uploaded to a unique file name indicated by segmentLocation,
       // so we need to move the segment file to its permanent location first before committing the metadata.
+      // The committingSegmentDescriptor is then updated with the permanent segment location to be saved in metadata
+      // store.
       if (isSplitCommit) {
         try {
           _segmentManager.commitSegmentFile(_realtimeTableName, committingSegmentDescriptor);
@@ -1078,6 +1081,13 @@ public class SegmentCompletionManager {
         }
       }
       try {
+        // Convert to a controller uri if the segment location uses local file scheme.
+        if (CommonConstants.Segment.LOCAL_SEGMENT_SCHEME
+            .equalsIgnoreCase(URIUtils.getUri(committingSegmentDescriptor.getSegmentLocation()).getScheme())) {
+          committingSegmentDescriptor.setSegmentLocation(URIUtils
+              .constructDownloadUrl(_controllerVipUrl, TableNameBuilder.extractRawTableName(_realtimeTableName),
+                  _segmentName.getSegmentName()));
+        }
         _segmentManager.commitSegmentMetadata(_realtimeTableName, committingSegmentDescriptor);
       } catch (Exception e) {
         LOGGER

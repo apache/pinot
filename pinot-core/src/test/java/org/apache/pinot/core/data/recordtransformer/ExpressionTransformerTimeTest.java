@@ -19,10 +19,13 @@
 package org.apache.pinot.core.data.recordtransformer;
 
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -42,20 +45,21 @@ public class ExpressionTransformerTimeTest {
 
     // all combinations of timespec, and values in the incoming outgoing
     Schema pinotSchema;
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTimeSpecTransformer").build();
 
     // 1] only incoming defined - doesn't create DefaultTimeSpecEvaluator. Incoming value used as is.
     pinotSchema = new Schema.SchemaBuilder()
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "incoming"), null).build();
 
     // correct value for incoming - use incoming
-    expressionTransformer = new ExpressionTransformer(pinotSchema);
+    expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
     GenericRow genericRow = new GenericRow();
     genericRow.putValue("incoming", validMillis);
     expressionTransformer.transform(genericRow);
     Assert.assertEquals(genericRow.getValue("incoming"), validMillis);
 
     // incorrect value - use whatever is
-    expressionTransformer = new ExpressionTransformer(pinotSchema);
+    expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
     genericRow = new GenericRow();
     genericRow.putValue("incoming", -1);
     expressionTransformer.transform(genericRow);
@@ -67,14 +71,14 @@ public class ExpressionTransformerTimeTest {
             new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time")).build();
 
     // correct value - use incoming
-    expressionTransformer = new ExpressionTransformer(pinotSchema);
+    expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
     genericRow = new GenericRow();
     genericRow.putValue("time", validMillis);
     expressionTransformer.transform(genericRow);
     Assert.assertEquals(genericRow.getValue("time"), validMillis);
 
     // incorrect value - use whatever is
-    expressionTransformer = new ExpressionTransformer(pinotSchema);
+    expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
     genericRow = new GenericRow();
     genericRow.putValue("time", -1);
     expressionTransformer.transform(genericRow);
@@ -85,7 +89,7 @@ public class ExpressionTransformerTimeTest {
       pinotSchema = new Schema.SchemaBuilder()
           .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time"),
               new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.HOURS, "time")).build();
-      new ExpressionTransformer(pinotSchema);
+      new ExpressionTransformer(tableConfig, pinotSchema);
       Assert.fail();
     } catch (Exception e) {
       // expected
@@ -97,21 +101,21 @@ public class ExpressionTransformerTimeTest {
             new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.HOURS, "outgoing")).build();
 
     // only valid incoming value exists - convert using DefaultTimeSpecEvaluator
-    expressionTransformer = new ExpressionTransformer(pinotSchema);
+    expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
     genericRow = new GenericRow();
     genericRow.putValue("incoming", validMillis);
     expressionTransformer.transform(genericRow);
     Assert.assertEquals(genericRow.getValue("outgoing"), validHours);
 
     // only valid outgoing value exists - Never invokes transformation using DefaultTimeSpecEvaluator, as outgoing already present
-    expressionTransformer = new ExpressionTransformer(pinotSchema);
+    expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
     genericRow = new GenericRow();
     genericRow.putValue("outgoing", validHours);
     expressionTransformer.transform(genericRow);
     Assert.assertEquals(genericRow.getValue("outgoing"), validHours);
 
     // only invalid incoming value exists - exception when validating
-    expressionTransformer = new ExpressionTransformer(pinotSchema);
+    expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
     genericRow = new GenericRow();
     genericRow.putValue("incoming", -1);
     try {
@@ -122,14 +126,14 @@ public class ExpressionTransformerTimeTest {
     }
 
     // only invalid outgoing value exists - Never invokes transformation using DefaultTimeSpecEvaluator, as outgoing already present
-    expressionTransformer = new ExpressionTransformer(pinotSchema);
+    expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
     genericRow = new GenericRow();
     genericRow.putValue("outgoing", -1);
     expressionTransformer.transform(genericRow);
     Assert.assertEquals(genericRow.getValue("outgoing"), -1);
 
     // both valid incoming and outgoing exist - Never invokes transformation using DefaultTimeSpecEvaluator, as outgoing already present
-    expressionTransformer = new ExpressionTransformer(pinotSchema);
+    expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
     genericRow = new GenericRow();
     genericRow.putValue("incoming", validMillis);
     genericRow.putValue("outgoing", validHours);
@@ -137,7 +141,7 @@ public class ExpressionTransformerTimeTest {
     Assert.assertEquals(genericRow.getValue("outgoing"), validHours);
 
     // invalid incoming, valid outgoing - Never invokes transformation using DefaultTimeSpecEvaluator, as outgoing already present
-    expressionTransformer = new ExpressionTransformer(pinotSchema);
+    expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
     genericRow = new GenericRow();
     genericRow.putValue("incoming", -1);
     genericRow.putValue("outgoing", validHours);
@@ -145,7 +149,7 @@ public class ExpressionTransformerTimeTest {
     Assert.assertEquals(genericRow.getValue("outgoing"), validHours);
 
     // valid incoming, invalid outgoing - Never invokes transformation using DefaultTimeSpecEvaluator, as outgoing already present
-    expressionTransformer = new ExpressionTransformer(pinotSchema);
+    expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
     genericRow = new GenericRow();
     genericRow.putValue("incoming", validMillis);
     genericRow.putValue("outgoing", -1);
@@ -153,7 +157,7 @@ public class ExpressionTransformerTimeTest {
     Assert.assertEquals(genericRow.getValue("outgoing"), -1);
 
     // invalid incoming and outgoing - Never invokes transformation using DefaultTimeSpecEvaluator, as outgoing already present
-    expressionTransformer = new ExpressionTransformer(pinotSchema);
+    expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
     genericRow = new GenericRow();
     genericRow.putValue("incoming", -1);
     genericRow.putValue("outgoing", -1);
@@ -164,7 +168,7 @@ public class ExpressionTransformerTimeTest {
     // When incoming and outgoing spec are the same, any time format should work
     pinotSchema = new Schema.SchemaBuilder().addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS,
         TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT.toString(), "time"), null).build();
-    expressionTransformer = new ExpressionTransformer(pinotSchema);
+    expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
     genericRow = new GenericRow();
     genericRow.putValue("time", 20180101);
     expressionTransformer.transform(genericRow);

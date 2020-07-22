@@ -25,13 +25,14 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
-import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -39,7 +40,9 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.I0Itec.zkclient.serialize.BytesPushThroughSerializer;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ClusterMessagingService;
@@ -52,6 +55,9 @@ import org.apache.helix.InstanceType;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.PropertyKey.Builder;
 import org.apache.helix.ZNRecord;
+import org.apache.helix.manager.zk.ZkAsyncCallbacks;
+import org.apache.helix.manager.zk.client.HelixZkClient;
+import org.apache.helix.manager.zk.client.SharedZkClientFactory;
 import org.apache.helix.model.CurrentState;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
@@ -71,6 +77,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.BrokerResourceStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
@@ -194,7 +201,6 @@ public class PinotHelixResourceManager {
 
     // Add instance group tag for controller
     addInstanceGroupTagIfNeeded();
-
     _segmentDeletionManager = new SegmentDeletionManager(_dataDir, _helixAdmin, _helixClusterName, _propertyStore);
     ZKMetadataProvider.setClusterTenantIsolationEnabled(_propertyStore, _isSingleTenantCluster);
     _tableCache = new TableCache(_propertyStore);
@@ -362,6 +368,21 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Update a given instance for the specified Instance ID
+   */
+  public synchronized PinotResourceManagerResponse updateInstance(String instanceIdToUpdate, Instance newInstance) {
+    if (getHelixInstanceConfig(instanceIdToUpdate) == null) {
+      return PinotResourceManagerResponse.failure("Instance " + instanceIdToUpdate + " does not exists");
+    } else {
+      InstanceConfig newConfig = InstanceUtils.toHelixInstanceConfig(newInstance);
+      if (!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceIdToUpdate), newConfig)) {
+        return PinotResourceManagerResponse.failure("Unable to update instance: " + instanceIdToUpdate);
+      }
+      return PinotResourceManagerResponse.SUCCESS;
+    }
+  }
+
+  /**
    * Tenant related APIs
    */
   // TODO: move tenant related APIs here
@@ -458,6 +479,18 @@ public class PinotHelixResourceManager {
   public String getActualColumnName(String tableName, String columnName) {
     return _tableCache.getActualColumnName(tableName, columnName);
   }
+
+  /**
+   * Given a table name in any case, returns crypter class name defined in table config
+   * @param tableName table name in any case
+   * @return crypter class name
+   */
+  public String getCrypterClassNameFromTableConfig(String tableName) {
+    TableConfig tableConfig = _tableCache.getTableConfig(tableName);
+    Preconditions.checkNotNull(tableConfig, "Table config is not available for table '%s'", tableName);
+    return tableConfig.getValidationConfig().getCrypterClassName();
+  }
+
   /**
    * Table related APIs
    */
@@ -1016,9 +1049,13 @@ public class PinotHelixResourceManager {
    */
   public void addTable(TableConfig tableConfig)
       throws IOException {
-    if (isSingleTenantCluster()) {
-      tableConfig
-          .setTenantConfig(new TenantConfig(TagNameUtils.DEFAULT_TENANT_NAME, TagNameUtils.DEFAULT_TENANT_NAME, null));
+    TenantConfig tenantConfig = tableConfig.getTenantConfig();
+    String brokerTag = tenantConfig.getBroker();
+    String serverTag = tenantConfig.getServer();
+    if (brokerTag == null || serverTag == null) {
+      String newBrokerTag = brokerTag == null ? TagNameUtils.DEFAULT_TENANT_NAME : brokerTag;
+      String newServerTag = serverTag == null ? TagNameUtils.DEFAULT_TENANT_NAME : serverTag;
+      tableConfig.setTenantConfig(new TenantConfig(newBrokerTag, newServerTag, tenantConfig.getTagOverrideConfig()));
     }
     validateTableTenantConfig(tableConfig);
 
@@ -1097,8 +1134,8 @@ public class PinotHelixResourceManager {
     }
 
     LOGGER.info("Updating BrokerResource IdealState for table: {}", tableNameWithType);
-    String brokerTag = TagNameUtils.extractBrokerTag(tableConfig.getTenantConfig());
-    List<String> brokers = HelixHelper.getInstancesWithTag(_helixZkManager, brokerTag);
+    List<String> brokers =
+        HelixHelper.getInstancesWithTag(_helixZkManager, TagNameUtils.extractBrokerTag(tableConfig.getTenantConfig()));
     HelixHelper.updateIdealState(_helixZkManager, Helix.BROKER_RESOURCE_INSTANCE, idealState -> {
       assert idealState != null;
       idealState.getRecord().getMapFields()
@@ -1140,6 +1177,30 @@ public class PinotHelixResourceManager {
             "Failed to find instances with tag: " + tag + " for table: " + tableNameWithType);
       }
     }
+  }
+
+  public ZNRecord readZKData(String path) {
+    return _helixDataAccessor.getBaseDataAccessor().get(path, null, -1);
+  }
+
+  public List<String> getZKChildren(String path) {
+    return _helixDataAccessor.getBaseDataAccessor().getChildNames(path, -1);
+  }
+
+  public Map<String, Stat> getZKChildrenStats(String path) {
+    List<String> childNames = _helixDataAccessor.getBaseDataAccessor().getChildNames(path, -1);
+    List<String> childPaths =
+        childNames.stream().map(name -> (path + "/" + name).replaceAll("//", "/")).collect(Collectors.toList());
+    Stat[] stats = _helixDataAccessor.getBaseDataAccessor().getStats(childPaths, -1);
+    Map<String, Stat> statsMap = new LinkedHashMap<>(childNames.size());
+    for (int i = 0; i < childNames.size(); i++) {
+      statsMap.put(childNames.get(i), stats[i]);
+    }
+    return statsMap;
+  }
+
+  public Stat getZKStat(String path) {
+    return _helixDataAccessor.getBaseDataAccessor().getStat(path, -1);
   }
 
   public static class InvalidTableConfigException extends RuntimeException {
@@ -2030,10 +2091,6 @@ public class PinotHelixResourceManager {
    */
   public boolean instanceExists(String instanceName) {
     return getHelixInstanceConfig(instanceName) != null;
-  }
-
-  public boolean isSingleTenantCluster() {
-    return _isSingleTenantCluster;
   }
 
   /**

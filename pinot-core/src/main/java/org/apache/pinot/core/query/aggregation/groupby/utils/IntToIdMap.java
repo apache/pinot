@@ -56,7 +56,6 @@ public class IntToIdMap extends BaseValueToIdMap {
 
   @Override
   public String getString(int id) {
-    assert id < _idToValueMap.size();
-    return (Integer.valueOf(_idToValueMap.getInt(id)).toString());
+    return Integer.toString(getInt(id));
   }
 }

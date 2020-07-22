@@ -109,7 +109,7 @@ public class FilterPlanNode implements PlanNode {
           DataSource dataSource = _indexSegment.getDataSource(lhs.getIdentifier());
           switch (predicate.getType()) {
             case TEXT_MATCH:
-              return new TextMatchFilterOperator(dataSource.getInvertedIndex(),
+              return new TextMatchFilterOperator(dataSource.getTextIndex(),
                   ((TextMatchPredicate) predicate).getValue(), _numDocs);
             case IS_NULL:
               NullValueVectorReader nullValueVector = dataSource.getNullValueVector();

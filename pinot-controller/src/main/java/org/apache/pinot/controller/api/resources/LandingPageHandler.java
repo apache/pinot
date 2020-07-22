@@ -31,12 +31,12 @@ import org.slf4j.LoggerFactory;
 public class LandingPageHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(LandingPageHandler.class);
 
-  // We configure this static resource as jersey handler because all our APIs are at "/"
+  // We configure this webapp resource as jersey handler because all our APIs are at "/"
   // So, the framework does not serve base index.html page correctly. See ControllerAdminApiApplication
   // for more details.
   @GET
   @Produces(MediaType.TEXT_HTML)
   public InputStream getIndexPage() {
-    return getClass().getClassLoader().getResourceAsStream("static/index.html");
+    return getClass().getClassLoader().getResourceAsStream("webapp/index.html");
   }
 }

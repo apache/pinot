@@ -19,7 +19,9 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.collect.Lists;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -31,8 +33,10 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.util.SchemaUtils;
+import org.apache.pinot.spi.config.table.IngestionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -76,16 +80,14 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
         .addMultiValueDimension(STRING_KEY_MAP_FIELD_NAME + SchemaUtils.MAP_KEY_COLUMN_SUFFIX, DataType.STRING)
         .addMultiValueDimension(STRING_KEY_MAP_FIELD_NAME + SchemaUtils.MAP_VALUE_COLUMN_SUFFIX, DataType.INT)
         .addMultiValueDimension(INT_KEY_MAP_FIELD_NAME + SchemaUtils.MAP_KEY_COLUMN_SUFFIX, DataType.INT)
-        .addMultiValueDimension(INT_KEY_MAP_FIELD_NAME + SchemaUtils.MAP_VALUE_COLUMN_SUFFIX, DataType.INT).build();
-    FieldSpec stringKeyMapJsonStrFieldSpec =
-        new DimensionFieldSpec(STRING_KEY_MAP_STR_FIELD_NAME, DataType.STRING, true);
-    stringKeyMapJsonStrFieldSpec.setTransformFunction("toJsonMapStr(" + STRING_KEY_MAP_FIELD_NAME + ")");
-    schema.addField(stringKeyMapJsonStrFieldSpec);
-    FieldSpec intKeyMapJsonStrFieldSpec = new DimensionFieldSpec(INT_KEY_MAP_STR_FIELD_NAME, DataType.STRING, true);
-    intKeyMapJsonStrFieldSpec.setTransformFunction("toJsonMapStr(" + INT_KEY_MAP_FIELD_NAME + ")");
-    schema.addField(intKeyMapJsonStrFieldSpec);
-    addSchema(schema);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).build();
+        .addMultiValueDimension(INT_KEY_MAP_FIELD_NAME + SchemaUtils.MAP_VALUE_COLUMN_SUFFIX, DataType.INT)
+        .addSingleValueDimension(STRING_KEY_MAP_STR_FIELD_NAME, DataType.STRING)
+        .addSingleValueDimension(INT_KEY_MAP_STR_FIELD_NAME, DataType.STRING).build();
+    List<TransformConfig> transformConfigs = Lists.newArrayList(
+        new TransformConfig(STRING_KEY_MAP_STR_FIELD_NAME, "toJsonMapStr(" + STRING_KEY_MAP_FIELD_NAME + ")"),
+        new TransformConfig(INT_KEY_MAP_STR_FIELD_NAME, "toJsonMapStr(" + INT_KEY_MAP_FIELD_NAME + ")"));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName)
+        .setIngestionConfig(new IngestionConfig(null, transformConfigs)).build();
     addTableConfig(tableConfig);
 
     // Create and upload segments

@@ -64,7 +64,7 @@ public abstract class BaseQueriesTest {
    * <p>Use this to test a single operator.
    */
   @SuppressWarnings({"rawtypes", "unchecked"})
-  protected <T extends Operator> T getOperatorForQuery(String pqlQuery) {
+  protected <T extends Operator> T getOperatorForPqlQuery(String pqlQuery) {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromPQL(pqlQuery);
     return (T) PLAN_MAKER.makeSegmentPlanNode(getIndexSegment(), queryContext).run();
   }
@@ -74,8 +74,27 @@ public abstract class BaseQueriesTest {
    * <p>Use this to test a single operator.
    */
   @SuppressWarnings("rawtypes")
-  protected <T extends Operator> T getOperatorForQueryWithFilter(String pqlQuery) {
-    return getOperatorForQuery(pqlQuery + getFilter());
+  protected <T extends Operator> T getOperatorForPqlQueryWithFilter(String pqlQuery) {
+    return getOperatorForPqlQuery(pqlQuery + getFilter());
+  }
+
+  /**
+   * Run SQL query on single index segment.
+   * <p>Use this to test a single operator.
+   */
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  protected <T extends Operator> T getOperatorForSqlQuery(String sqlQuery) {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(sqlQuery);
+    return (T) PLAN_MAKER.makeSegmentPlanNode(getIndexSegment(), queryContext).run();
+  }
+
+  /**
+   * Run SQL query with hard-coded filter on single index segment.
+   * <p>Use this to test a single operator.
+   */
+  @SuppressWarnings("rawtypes")
+  protected <T extends Operator> T getOperatorForSqlQueryWithFilter(String sqlQuery) {
+    return getOperatorForSqlQuery(sqlQuery + getFilter());
   }
 
   /**

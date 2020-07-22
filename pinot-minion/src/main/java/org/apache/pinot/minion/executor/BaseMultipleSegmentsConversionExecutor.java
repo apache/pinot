@@ -24,8 +24,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
-import javax.annotation.Nonnull;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicNameValuePair;
@@ -60,12 +60,12 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
    * @return a list of segment conversion result
    * @throws Exception
    */
-  protected abstract List<SegmentConversionResult> convert(@Nonnull PinotTaskConfig pinotTaskConfig,
-      @Nonnull List<File> originalIndexDir, @Nonnull File workingDir)
+  protected abstract List<SegmentConversionResult> convert(PinotTaskConfig pinotTaskConfig, List<File> originalIndexDir,
+      File workingDir)
       throws Exception;
 
   @Override
-  public List<SegmentConversionResult> executeTask(@Nonnull PinotTaskConfig pinotTaskConfig)
+  public List<SegmentConversionResult> executeTask(PinotTaskConfig pinotTaskConfig)
       throws Exception {
     String taskType = pinotTaskConfig.getTaskType();
     Map<String, String> configs = pinotTaskConfig.getConfigs();
@@ -78,7 +78,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     LOGGER.info("Start executing {} on table: {}, input segments: {} with downloadURLs: {}, uploadURL: {}", taskType,
         tableNameWithType, inputSegmentNames, downloadURLString, uploadURL);
 
-    File tempDataDir = new File(new File(MINION_CONTEXT.getDataDir(), taskType), "tmp-" + System.nanoTime());
+    File tempDataDir = new File(new File(MINION_CONTEXT.getDataDir(), taskType), "tmp-" + UUID.randomUUID());
     Preconditions.checkState(tempDataDir.mkdirs());
 
     try {
@@ -91,10 +91,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
 
         // Un-tar the segment file
         File segmentDir = new File(tempDataDir, "segmentDir_" + i);
-        TarGzCompressionUtils.unTar(tarredSegmentFile, segmentDir);
-        File[] files = segmentDir.listFiles();
-        Preconditions.checkState(files != null && files.length == 1);
-        File indexDir = files[0];
+        File indexDir = TarGzCompressionUtils.untar(tarredSegmentFile, segmentDir).get(0);
         inputSegmentFiles.add(indexDir);
       }
 
@@ -109,14 +106,13 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
 
       int numOutputSegments = segmentConversionResults.size();
       List<File> tarredSegmentFiles = new ArrayList<>(numOutputSegments);
-      for (int i = 0; i < numOutputSegments; i++) {
+      for (SegmentConversionResult segmentConversionResult : segmentConversionResults) {
         // Tar the converted segment
-        SegmentConversionResult segmentConversionResult = segmentConversionResults.get(i);
         File convertedIndexDir = segmentConversionResult.getFile();
-        File convertedTarredSegmentFile = new File(TarGzCompressionUtils
-            .createTarGzOfDirectory(convertedIndexDir.getPath(),
-                new File(convertedTarredSegmentDir, segmentConversionResult.getSegmentName()).getPath()));
-        tarredSegmentFiles.add(convertedTarredSegmentFile);
+        File convertedSegmentTarFile = new File(convertedTarredSegmentDir,
+            segmentConversionResult.getSegmentName() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+        TarGzCompressionUtils.createTarGzFile(convertedIndexDir, convertedSegmentTarFile);
+        tarredSegmentFiles.add(convertedSegmentTarFile);
       }
 
       // Check whether the task get cancelled before uploading the segment

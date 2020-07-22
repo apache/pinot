@@ -55,7 +55,7 @@ Trying out Batch quickstart demo
 To run the demo with compiled code:
   ``bin/quick-start-batch.sh``
 
-Once the Pinot cluster is running, you can query it by going to http://localhost:9000/query/
+Once the Pinot cluster is running, you can query it by going to http://localhost:9000
 
 You can also use the REST API to query Pinot, as well as the Java client. As this is outside of the scope of this
 introduction, the reference documentation to use the Pinot client APIs is in the :doc:`client_api` section.

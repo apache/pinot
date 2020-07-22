@@ -37,6 +37,7 @@ import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -124,7 +125,7 @@ public class ColumnMetadata {
     // Set min/max value if available.
     String minString = config.getString(getKeyFor(column, MIN_VALUE), null);
     String maxString = config.getString(getKeyFor(column, MAX_VALUE), null);
-    if ((minString != null) && (maxString != null)) {
+    if (minString != null && maxString != null) {
       switch (dataType) {
         case INT:
           builder.setMinValue(Integer.valueOf(minString));
@@ -145,6 +146,10 @@ public class ColumnMetadata {
         case STRING:
           builder.setMinValue(minString);
           builder.setMaxValue(maxString);
+          break;
+        case BYTES:
+          builder.setMinValue(BytesUtils.toByteArray(minString));
+          builder.setMaxValue(BytesUtils.toByteArray(maxString));
           break;
         default:
           throw new IllegalStateException("Unsupported data type: " + dataType + " for column: " + column);

@@ -81,5 +81,5 @@ We can finally check data availability, e.g. by using pinot's built-in query con
 If you're running a local pinot-quickstart image via docker the URL should be:
 
 ```
-http://localhost:9000/query#
+http://localhost:9000#
 ```

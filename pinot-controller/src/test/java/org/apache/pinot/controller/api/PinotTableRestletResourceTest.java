@@ -20,7 +20,6 @@ package org.apache.pinot.controller.api;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.pinot.common.utils.StringUtil;
@@ -62,9 +61,9 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   public void setUp()
       throws Exception {
     startZk();
-    ControllerConf config = getDefaultControllerConfiguration();
-    config.setTableMinReplicas(MIN_NUM_REPLICAS);
-    startController(config);
+    Map<String, Object> properties = getDefaultControllerConfiguration();
+    properties.put(ControllerConf.TABLE_MIN_REPLICAS, MIN_NUM_REPLICAS);
+    startController(properties);
     _createTableUrl = _controllerRequestURLBuilder.forTableCreate();
 
     addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKER_INSTANCES, true);
@@ -92,6 +91,17 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     try {
       sendPostRequest(_createTableUrl, offlineTableConfigJson.toString());
       Assert.fail("Creation of an OFFLINE table with two underscores in the table name does not fail");
+    } catch (IOException e) {
+      // Expected 400 Bad Request
+      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+    }
+
+    offlineTableConfig = _offlineBuilder.build();
+    offlineTableConfigJson = (ObjectNode) offlineTableConfig.toJsonNode();
+    offlineTableConfigJson.put(TableConfig.TABLE_NAME_KEY, "bad.table.with.dot");
+    try {
+      sendPostRequest(_createTableUrl, offlineTableConfigJson.toString());
+      Assert.fail("Creation of an OFFLINE table with dot in the table name does not fail");
     } catch (IOException e) {
       // Expected 400 Bad Request
       Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));

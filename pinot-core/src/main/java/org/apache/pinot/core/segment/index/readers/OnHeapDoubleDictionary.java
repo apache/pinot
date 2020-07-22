@@ -21,6 +21,7 @@ package org.apache.pinot.core.segment.index.readers;
 import it.unimi.dsi.fastutil.doubles.Double2IntOpenHashMap;
 import java.util.Arrays;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
@@ -62,6 +63,11 @@ public class OnHeapDoubleDictionary extends OnHeapDictionary {
     double doubleValue = Double.parseDouble(stringValue);
     int index = _valToDictId.get(doubleValue);
     return (index != NULL_VALUE_INDEX) ? index : Arrays.binarySearch(_dictIdToVal, doubleValue);
+  }
+
+  @Override
+  public DataType getValueType() {
+    return DataType.DOUBLE;
   }
 
   @Override

@@ -26,12 +26,11 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
-import org.apache.pinot.core.io.util.FixedBitIntReaderWriter;
 import org.apache.pinot.core.io.util.FixedBitIntReaderWriterV2;
 import org.apache.pinot.core.io.util.PinotDataBitSet;
 import org.apache.pinot.core.io.util.PinotDataBitSetV2;
-import org.apache.pinot.core.io.writer.impl.v1.FixedBitSingleValueWriter;
+import org.apache.pinot.core.io.writer.impl.FixedBitSVForwardIndexWriter;
+import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -46,6 +45,7 @@ import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
+
 
 @Fork(1)
 @State(Scope.Benchmark)
@@ -77,25 +77,25 @@ public class BenchmarkPinotDataBitSet {
   PinotDataBuffer _pinotDataBuffer2;
   private PinotDataBitSet _bitSet2;
   private PinotDataBitSetV2 _bitSet2Fast;
-  private FixedBitSingleValueReader _bit2Reader;
+  private FixedBitSVForwardIndexReader _bit2Reader;
   private FixedBitIntReaderWriterV2 _bit2ReaderFast;
 
   PinotDataBuffer _pinotDataBuffer4;
   private PinotDataBitSet _bitSet4;
   private PinotDataBitSetV2 _bitSet4Fast;
-  private FixedBitSingleValueReader _bit4Reader;
+  private FixedBitSVForwardIndexReader _bit4Reader;
   private FixedBitIntReaderWriterV2 _bit4ReaderFast;
 
   PinotDataBuffer _pinotDataBuffer8;
   private PinotDataBitSet _bitSet8;
   private PinotDataBitSetV2 _bitSet8Fast;
-  private FixedBitSingleValueReader _bit8Reader;
+  private FixedBitSVForwardIndexReader _bit8Reader;
   private FixedBitIntReaderWriterV2 _bit8ReaderFast;
 
   PinotDataBuffer _pinotDataBuffer16;
   private PinotDataBitSet _bitSet16;
   private PinotDataBitSetV2 _bitSet16Fast;
-  private FixedBitSingleValueReader _bit16Reader;
+  private FixedBitSVForwardIndexReader _bit16Reader;
   private FixedBitIntReaderWriterV2 _bit16ReaderFast;
 
   int[] unpacked = new int[32];
@@ -108,13 +108,15 @@ public class BenchmarkPinotDataBitSet {
   int[] unpackedWithGaps = new int[NUM_DOCIDS_WITH_GAPS];
 
   @Setup(Level.Trial)
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     generateRawFile();
     generateBitEncodedFwdIndex();
   }
 
   @TearDown(Level.Trial)
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     rawFile2.delete();
     rawFile4.delete();
     rawFile8.delete();
@@ -139,10 +141,10 @@ public class BenchmarkPinotDataBitSet {
     BufferedWriter bw16 = new BufferedWriter(new FileWriter(rawFile16));
     Random r = new Random();
     for (int i = 0; i < ROWS; i++) {
-      rawValues2[i] =  r.nextInt(CARDINALITY_2_BITS);
-      rawValues4[i] =  r.nextInt(CARDINALITY_4_BITS);
-      rawValues8[i] =  r.nextInt(CARDINALITY_8_BITS);
-      rawValues16[i] =  r.nextInt(CARDINALITY_16_BITS);
+      rawValues2[i] = r.nextInt(CARDINALITY_2_BITS);
+      rawValues4[i] = r.nextInt(CARDINALITY_4_BITS);
+      rawValues8[i] = r.nextInt(CARDINALITY_8_BITS);
+      rawValues16[i] = r.nextInt(CARDINALITY_16_BITS);
       bw2.write("" + rawValues2[i]);
       bw2.write("\n");
       bw4.write("" + rawValues4[i]);
@@ -158,7 +160,8 @@ public class BenchmarkPinotDataBitSet {
     bw16.close();
   }
 
-  private void generateBitEncodedFwdIndex() throws Exception {
+  private void generateBitEncodedFwdIndex()
+      throws Exception {
     generateFwdIndexHelper(rawFile2, twoBitEncodedFile, 2);
     generateFwdIndexHelper(rawFile4, fourBitEncodedFile, 4);
     generateFwdIndexHelper(rawFile8, eightBitEncodedFile, 8);
@@ -168,25 +171,25 @@ public class BenchmarkPinotDataBitSet {
     _bitSet2Fast = PinotDataBitSetV2.createBitSet(_pinotDataBuffer2, 2);
     _bit2ReaderFast = new FixedBitIntReaderWriterV2(_pinotDataBuffer2, ROWS, 2);
     _bitSet2 = new PinotDataBitSet(_pinotDataBuffer2);
-    _bit2Reader = new FixedBitSingleValueReader(_pinotDataBuffer2, ROWS, 2);
+    _bit2Reader = new FixedBitSVForwardIndexReader(_pinotDataBuffer2, ROWS, 2);
 
     _pinotDataBuffer4 = PinotDataBuffer.loadBigEndianFile(fourBitEncodedFile);
     _bitSet4Fast = PinotDataBitSetV2.createBitSet(_pinotDataBuffer4, 4);
     _bit4ReaderFast = new FixedBitIntReaderWriterV2(_pinotDataBuffer4, ROWS, 4);
     _bitSet4 = new PinotDataBitSet(_pinotDataBuffer4);
-    _bit4Reader = new FixedBitSingleValueReader(_pinotDataBuffer4, ROWS, 4);
+    _bit4Reader = new FixedBitSVForwardIndexReader(_pinotDataBuffer4, ROWS, 4);
 
     _pinotDataBuffer8 = PinotDataBuffer.loadBigEndianFile(eightBitEncodedFile);
     _bitSet8Fast = PinotDataBitSetV2.createBitSet(_pinotDataBuffer8, 8);
     _bit8ReaderFast = new FixedBitIntReaderWriterV2(_pinotDataBuffer8, ROWS, 8);
     _bitSet8 = new PinotDataBitSet(_pinotDataBuffer8);
-    _bit8Reader = new FixedBitSingleValueReader(_pinotDataBuffer8, ROWS, 8);
+    _bit8Reader = new FixedBitSVForwardIndexReader(_pinotDataBuffer8, ROWS, 8);
 
     _pinotDataBuffer16 = PinotDataBuffer.loadBigEndianFile(sixteenBitEncodedFile);
     _bitSet16Fast = PinotDataBitSetV2.createBitSet(_pinotDataBuffer16, 16);
     _bit16ReaderFast = new FixedBitIntReaderWriterV2(_pinotDataBuffer16, ROWS, 16);
     _bitSet16 = new PinotDataBitSet(_pinotDataBuffer16);
-    _bit16Reader = new FixedBitSingleValueReader(_pinotDataBuffer16, ROWS, 16);
+    _bit16Reader = new FixedBitSVForwardIndexReader(_pinotDataBuffer16, ROWS, 16);
 
     docIdsWithGaps[0] = 0;
     for (int i = 1; i < NUM_DOCIDS_WITH_GAPS; i++) {
@@ -194,15 +197,15 @@ public class BenchmarkPinotDataBitSet {
     }
   }
 
-  private void generateFwdIndexHelper(File rawFile, File encodedFile, int numBits) throws Exception {
+  private void generateFwdIndexHelper(File rawFile, File encodedFile, int numBits)
+      throws Exception {
     BufferedReader bfr = new BufferedReader(new FileReader(rawFile));
-    FixedBitSingleValueWriter fixedBitSingleValueWriter = new FixedBitSingleValueWriter(encodedFile, ROWS, numBits);
+    FixedBitSVForwardIndexWriter forwardIndexWriter = new FixedBitSVForwardIndexWriter(encodedFile, ROWS, numBits);
     String line;
-    int rowId = 0;
     while ((line = bfr.readLine()) != null) {
-      fixedBitSingleValueWriter.setInt(rowId++, Integer.parseInt(line));
+      forwardIndexWriter.putDictId(Integer.parseInt(line));
     }
-    fixedBitSingleValueWriter.close();
+    forwardIndexWriter.close();
   }
 
   // 2-bit: test single integer decode in a contiguous manner one docId at a time
@@ -253,7 +256,7 @@ public class BenchmarkPinotDataBitSet {
   @BenchmarkMode(Mode.Throughput)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public void twoBitBulkWithGaps() {
-    _bit2Reader.readValues(docIdsWithGaps, 0, NUM_DOCIDS_WITH_GAPS, unpackedWithGaps, 0);
+    _bit2Reader.readDictIds(docIdsWithGaps, NUM_DOCIDS_WITH_GAPS, unpackedWithGaps, null);
   }
 
   // 2-bit: test multi integer decode for a set of monotonically
@@ -336,7 +339,7 @@ public class BenchmarkPinotDataBitSet {
   @BenchmarkMode(Mode.Throughput)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public void fourBitBulkWithGaps() {
-    _bit4Reader.readValues(docIdsWithGaps, 0, NUM_DOCIDS_WITH_GAPS, unpackedWithGaps, 0);
+    _bit4Reader.readDictIds(docIdsWithGaps, NUM_DOCIDS_WITH_GAPS, unpackedWithGaps, null);
   }
 
   // 4-bit: test multi integer decode for a set of monotonically
@@ -419,7 +422,7 @@ public class BenchmarkPinotDataBitSet {
   @BenchmarkMode(Mode.Throughput)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public void eightBitBulkWithGaps() {
-    _bit8Reader.readValues(docIdsWithGaps, 0, NUM_DOCIDS_WITH_GAPS, unpackedWithGaps, 0);
+    _bit8Reader.readDictIds(docIdsWithGaps, NUM_DOCIDS_WITH_GAPS, unpackedWithGaps, null);
   }
 
   // 8-bit: test multi integer decode for a set of monotonically
@@ -502,7 +505,7 @@ public class BenchmarkPinotDataBitSet {
   @BenchmarkMode(Mode.Throughput)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public void sixteenBitBulkWithGaps() {
-    _bit16Reader.readValues(docIdsWithGaps, 0, NUM_DOCIDS_WITH_GAPS, unpackedWithGaps, 0);
+    _bit16Reader.readDictIds(docIdsWithGaps, NUM_DOCIDS_WITH_GAPS, unpackedWithGaps, null);
   }
 
   // 16-bit: test multi integer decode for a set of monotonically
@@ -539,8 +542,9 @@ public class BenchmarkPinotDataBitSet {
 
   public static void main(String[] args)
       throws Exception {
-    ChainedOptionsBuilder opt = new OptionsBuilder().include(BenchmarkPinotDataBitSet.class.getSimpleName())
-        .warmupIterations(1).measurementIterations(3);
+    ChainedOptionsBuilder opt =
+        new OptionsBuilder().include(BenchmarkPinotDataBitSet.class.getSimpleName()).warmupIterations(1)
+            .measurementIterations(3);
     new Runner(opt.build()).run();
   }
 }

@@ -97,8 +97,8 @@ public class ORCRecordReader implements RecordReader {
         if (category == TypeDescription.Category.LIST) {
           // Multi-value field
           TypeDescription.Category childCategory = fieldType.getChildren().get(0).getCategory();
-          Preconditions.checkState(isSupportedSingleValueType(childCategory), "Illegal multi-value field type: %s",
-              childCategory);
+          Preconditions.checkState(isSupportedSingleValueType(childCategory), "Illegal multi-value field type: %s (field %s)",
+              childCategory, field);
           // NOTE: LIST is stored as 2 vectors
           int fieldId = fieldType.getId();
           orcReaderInclude[fieldId] = true;
@@ -108,10 +108,10 @@ public class ORCRecordReader implements RecordReader {
           List<TypeDescription> children = fieldType.getChildren();
           TypeDescription.Category keyCategory = children.get(0).getCategory();
           Preconditions
-              .checkState(isSupportedSingleValueType(keyCategory), "Illegal map key field type: %s", keyCategory);
+              .checkState(isSupportedSingleValueType(keyCategory), "Illegal map key field type: %s (field %s)", keyCategory, field);
           TypeDescription.Category valueCategory = children.get(1).getCategory();
           Preconditions
-              .checkState(isSupportedSingleValueType(valueCategory), "Illegal map value field type: %s", valueCategory);
+              .checkState(isSupportedSingleValueType(valueCategory), "Illegal map value field type: %s (field %s)", valueCategory, field);
           // NOTE: MAP is stored as 3 vectors
           int fieldId = fieldType.getId();
           orcReaderInclude[fieldId] = true;
@@ -120,11 +120,11 @@ public class ORCRecordReader implements RecordReader {
         } else {
           // Single-value field
           Preconditions
-              .checkState(isSupportedSingleValueType(category), "Illegal single-value field type: %s", category);
+              .checkState(isSupportedSingleValueType(category), "Illegal single-value field type: %s (field %s)", category, field);
           orcReaderInclude[fieldType.getId()] = true;
         }
+        _includeOrcFields[i] = true;
       }
-      _includeOrcFields[i] = true;
     }
 
     _orcRecordReader = orcReader.rows(new Reader.Options().include(orcReaderInclude));
@@ -186,7 +186,7 @@ public class ORCRecordReader implements RecordReader {
           int length = (int) listColumnVector.lengths[rowId];
           List<Object> values = new ArrayList<>(length);
           for (int j = 0; j < length; j++) {
-            Object value = extractSingleValue(listColumnVector.child, offset + j, childCategory);
+            Object value = extractSingleValue(field, listColumnVector.child, offset + j, childCategory);
             // NOTE: Only keep non-null values
             // TODO: Revisit
             if (value != null) {
@@ -216,8 +216,8 @@ public class ORCRecordReader implements RecordReader {
           Map<Object, Object> map = new HashMap<>();
           for (int j = 0; j < length; j++) {
             int childRowId = offset + j;
-            Object key = extractSingleValue(mapColumnVector.keys, childRowId, keyCategory);
-            Object value = extractSingleValue(mapColumnVector.values, childRowId, valueCategory);
+            Object key = extractSingleValue(field, mapColumnVector.keys, childRowId, keyCategory);
+            Object value = extractSingleValue(field, mapColumnVector.values, childRowId, valueCategory);
             map.put(key, value);
           }
           reuse.putValue(field, map);
@@ -226,7 +226,7 @@ public class ORCRecordReader implements RecordReader {
         }
       } else {
         // Single-value field
-        reuse.putValue(field, extractSingleValue(_rowBatch.cols[i], _nextRowId, category));
+        reuse.putValue(field, extractSingleValue(field, _rowBatch.cols[i], _nextRowId, category));
       }
     }
 
@@ -238,7 +238,7 @@ public class ORCRecordReader implements RecordReader {
   }
 
   @Nullable
-  private static Object extractSingleValue(ColumnVector columnVector, int rowId, TypeDescription.Category category) {
+  private static Object extractSingleValue(String field, ColumnVector columnVector, int rowId, TypeDescription.Category category) {
     if (columnVector.isRepeating) {
       rowId = 0;
     }
@@ -324,7 +324,7 @@ public class ORCRecordReader implements RecordReader {
         }
       default:
         // Unsupported types
-        throw new IllegalStateException("Unsupported field type: " + category);
+        throw new IllegalStateException("Unsupported field type: " + category + " for field: " + field);
     }
   }
 

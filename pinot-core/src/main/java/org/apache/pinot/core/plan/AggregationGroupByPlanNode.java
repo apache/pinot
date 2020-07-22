@@ -93,7 +93,8 @@ public class AggregationGroupByPlanNode implements PlanNode {
 
     Set<ExpressionContext> expressionsToTransform =
         AggregationFunctionUtils.collectExpressionsToTransform(_aggregationFunctions, _groupByExpressions);
-    _transformPlanNode = new TransformPlanNode(_indexSegment, queryContext, expressionsToTransform);
+    _transformPlanNode =
+        new TransformPlanNode(_indexSegment, queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL);
     _starTreeTransformPlanNode = null;
   }
 

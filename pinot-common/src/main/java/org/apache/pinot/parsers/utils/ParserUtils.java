@@ -54,6 +54,8 @@ public class ParserUtils {
     FILTER_OPERATOR_MAP.put(FilterKind.IN, FilterOperator.IN);
     FILTER_OPERATOR_MAP.put(FilterKind.NOT_IN, FilterOperator.NOT_IN);
     FILTER_OPERATOR_MAP.put(FilterKind.REGEXP_LIKE, FilterOperator.REGEXP_LIKE);
+    FILTER_OPERATOR_MAP.put(FilterKind.IS_NULL, FilterOperator.IS_NULL);
+    FILTER_OPERATOR_MAP.put(FilterKind.IS_NOT_NULL, FilterOperator.IS_NOT_NULL);
     FILTER_OPERATOR_MAP.put(FilterKind.TEXT_MATCH, FilterOperator.TEXT_MATCH);
   }
 
@@ -67,6 +69,18 @@ public class ParserUtils {
   public static FilterOperator getFilterType(Expression expression) {
     String operator = expression.getFunctionCall().getOperator();
     return filterKindToOperator(FilterKind.valueOf(operator));
+  }
+
+  /**
+   * Utility method that returns the {@link FilterKind} for a given expression.
+   * Assumes that the passed in expression is a filter expression.
+   *
+   * @param expression Expression for which to get the filter type
+   * @return Filter Kind for the given Expression.
+   */
+  public static FilterKind getFilterKind(Expression expression) {
+    String operator = expression.getFunctionCall().getOperator();
+    return FilterKind.valueOf(operator);
   }
 
   /**

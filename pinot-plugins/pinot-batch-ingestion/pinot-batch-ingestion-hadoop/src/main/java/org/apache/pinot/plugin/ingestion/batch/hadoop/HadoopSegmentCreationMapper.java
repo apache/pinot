@@ -21,6 +21,7 @@ package org.apache.pinot.plugin.ingestion.batch.hadoop;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.net.URI;
+import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -65,14 +66,14 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
     String segmentGenerationJobSpecStr = _jobConf.get(SEGMENT_GENERATION_JOB_SPEC);
     _spec = yaml.loadAs(segmentGenerationJobSpecStr, SegmentGenerationJobSpec.class);
     LOGGER.info("Segment generation job spec : {}", segmentGenerationJobSpecStr);
-    _localTempDir = new File(FileUtils.getTempDirectory(), "pinot-" + System.currentTimeMillis());
+    _localTempDir = new File(FileUtils.getTempDirectory(), "pinot-" + UUID.randomUUID());
 
     // Load Pinot Plugins copied from Distributed cache.
     File localPluginsTarFile = new File(PINOT_PLUGINS_TAR_GZ);
     if (localPluginsTarFile.exists()) {
       File pluginsDirFile = new File(PINOT_PLUGINS_DIR);
       try {
-        TarGzCompressionUtils.unTar(localPluginsTarFile, pluginsDirFile);
+        TarGzCompressionUtils.untar(localPluginsTarFile, pluginsDirFile);
       } catch (Exception e) {
         LOGGER.error("Failed to untar local Pinot plugins tarball file [{}]", localPluginsTarFile, e);
         throw new RuntimeException(e);
@@ -163,7 +164,7 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
       String segmentTarFileName = segmentName + Constants.TAR_GZ_FILE_EXT;
       File localSegmentTarFile = new File(localOutputTempDir, segmentTarFileName);
       LOGGER.info("Tarring segment from: {} to: {}", localSegmentDir, localSegmentTarFile);
-      TarGzCompressionUtils.createTarGzOfDirectory(localSegmentDir.getPath(), localSegmentTarFile.getPath());
+      TarGzCompressionUtils.createTarGzFile(localSegmentDir, localSegmentTarFile);
       long uncompressedSegmentSize = FileUtils.sizeOf(localSegmentDir);
       long compressedSegmentSize = FileUtils.sizeOf(localSegmentTarFile);
       LOGGER.info("Size for segment: {}, uncompressed: {}, compressed: {}", segmentName,

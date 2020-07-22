@@ -21,6 +21,7 @@ package org.apache.pinot.core.segment.index.readers;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import java.util.Arrays;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
@@ -62,6 +63,11 @@ public class OnHeapLongDictionary extends OnHeapDictionary {
     long longValue = Long.parseLong(stringValue);
     int index = _valToDictId.get(longValue);
     return (index != NULL_VALUE_INDEX) ? index : Arrays.binarySearch(_dictIdToVal, longValue);
+  }
+
+  @Override
+  public DataType getValueType() {
+    return DataType.LONG;
   }
 
   @Override

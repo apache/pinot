@@ -18,12 +18,19 @@
  */
 package org.apache.pinot.core.startree.v2;
 
+import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.MetadataKey.DIMENSIONS_SPLIT_ORDER;
+import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.MetadataKey.FUNCTION_COLUMN_PAIRS;
+import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.MetadataKey.MAX_LEAF_RECORDS;
+import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS;
+import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.MetadataKey.TOTAL_DOCS;
+
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import org.apache.commons.configuration.Configuration;
+import java.util.stream.Collectors;
 
-import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.MetadataKey.*;
+import org.apache.commons.configuration.Configuration;
 
 
 /**
@@ -51,14 +58,15 @@ public class StarTreeV2Metadata {
   @SuppressWarnings("unchecked")
   public StarTreeV2Metadata(Configuration metadataProperties) {
     _numDocs = metadataProperties.getInt(TOTAL_DOCS);
-    _dimensionsSplitOrder = metadataProperties.getList(DIMENSIONS_SPLIT_ORDER);
+    _dimensionsSplitOrder = Arrays.stream(metadataProperties.getStringArray(DIMENSIONS_SPLIT_ORDER)).collect(Collectors.toList());
     _functionColumnPairs = new HashSet<>();
     for (Object functionColumnPair : metadataProperties.getList(FUNCTION_COLUMN_PAIRS)) {
       _functionColumnPairs.add(AggregationFunctionColumnPair.fromColumnName((String) functionColumnPair));
     }
     _maxLeafRecords = metadataProperties.getInt(MAX_LEAF_RECORDS);
     _skipStarNodeCreationForDimensions =
-        new HashSet<>(metadataProperties.getList(SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS));
+        new HashSet<>(Arrays.stream(metadataProperties.getStringArray(SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS))
+            .collect(Collectors.toList()));
   }
 
   public int getNumDocs() {

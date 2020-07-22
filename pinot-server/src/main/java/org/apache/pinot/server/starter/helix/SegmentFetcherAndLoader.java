@@ -18,11 +18,12 @@
  */
 package org.apache.pinot.server.starter.helix;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
+import java.util.UUID;
 import java.util.concurrent.locks.Lock;
+
 import javax.annotation.Nullable;
-import org.apache.commons.configuration.Configuration;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -37,9 +38,12 @@ import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.crypt.PinotCrypter;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Preconditions;
 
 
 public class SegmentFetcherAndLoader {
@@ -50,14 +54,14 @@ public class SegmentFetcherAndLoader {
 
   private final InstanceDataManager _instanceDataManager;
 
-  public SegmentFetcherAndLoader(Configuration config, InstanceDataManager instanceDataManager)
+  public SegmentFetcherAndLoader(PinotConfiguration config, InstanceDataManager instanceDataManager)
       throws Exception {
     _instanceDataManager = instanceDataManager;
 
-    Configuration pinotFSConfig = config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
-    Configuration segmentFetcherFactoryConfig =
+    PinotConfiguration pinotFSConfig = config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
+    PinotConfiguration segmentFetcherFactoryConfig =
         config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
-    Configuration pinotCrypterConfig = config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
+    PinotConfiguration pinotCrypterConfig = config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
 
     PinotFSFactory.init(pinotFSConfig);
     SegmentFetcherFactory.init(segmentFetcherFactoryConfig);
@@ -181,7 +185,7 @@ public class SegmentFetcherAndLoader {
   private String downloadSegmentToLocal(String uri, PinotCrypter crypter, String tableName, String segmentName)
       throws Exception {
     File tempDir = new File(new File(_instanceDataManager.getSegmentFileDirectory(), tableName),
-        "tmp_" + segmentName + "_" + System.nanoTime());
+        "tmp-" + segmentName + "-" + UUID.randomUUID());
     FileUtils.forceMkdir(tempDir);
     File tempDownloadFile = new File(tempDir, segmentName + ENCODED_SUFFIX);
     File tempTarFile = new File(tempDir, segmentName + TAR_GZ_SUFFIX);
@@ -200,11 +204,7 @@ public class SegmentFetcherAndLoader {
 
       // If an exception is thrown when untarring, it means the tar file is broken OR not found after the retry.
       // Thus, there's no need to retry again.
-      TarGzCompressionUtils.unTar(tempTarFile, tempSegmentDir);
-
-      File[] files = tempSegmentDir.listFiles();
-      Preconditions.checkState(files != null && files.length == 1);
-      File tempIndexDir = files[0];
+      File tempIndexDir = TarGzCompressionUtils.untar(tempTarFile, tempSegmentDir).get(0);
 
       File indexDir = new File(new File(_instanceDataManager.getSegmentDataDirectory(), tableName), segmentName);
       if (indexDir.exists()) {

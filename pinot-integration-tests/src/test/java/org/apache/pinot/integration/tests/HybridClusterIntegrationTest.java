@@ -18,18 +18,19 @@
  */
 package org.apache.pinot.integration.tests;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.commons.configuration.Configuration;
+import java.util.Map;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -37,6 +38,8 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import com.fasterxml.jackson.databind.JsonNode;
 
 
 /**
@@ -47,14 +50,6 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   private static final String TENANT_NAME = "TestTenant";
   private static final int NUM_OFFLINE_SEGMENTS = 8;
   private static final int NUM_REALTIME_SEGMENTS = 6;
-
-  protected int getNumOfflineSegments() {
-    return NUM_OFFLINE_SEGMENTS;
-  }
-
-  protected int getNumRealtimeSegments() {
-    return NUM_REALTIME_SEGMENTS;
-  }
 
   @Override
   protected String getBrokerTenant() {
@@ -67,7 +62,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   }
 
   @Override
-  protected void overrideServerConf(Configuration configuration) {
+  protected void overrideServerConf(PinotConfiguration configuration) {
     configuration.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_RELOAD_CONSUMING_SEGMENT, true);
   }
 
@@ -80,8 +75,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     startHybridCluster();
 
     List<File> avroFiles = getAllAvroFiles();
-    List<File> offlineAvroFiles = getOfflineAvroFiles(avroFiles);
-    List<File> realtimeAvroFiles = getRealtimeAvroFiles(avroFiles);
+    List<File> offlineAvroFiles = getOfflineAvroFiles(avroFiles, NUM_OFFLINE_SEGMENTS);
+    List<File> realtimeAvroFiles = getRealtimeAvroFiles(avroFiles, NUM_REALTIME_SEGMENTS);
 
     // Create and upload the schema and table config
     Schema schema = createSchema();
@@ -115,48 +110,17 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     startKafka();
 
     // Start the Pinot cluster
-    ControllerConf config = getDefaultControllerConfiguration();
-    config.setTenantIsolationEnabled(false);
-    startController(config);
+    Map<String, Object> properties = getDefaultControllerConfiguration();
+    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
+
+    startController(properties);
+    
     startBroker();
     startServers(2);
 
     // Create tenants
     createBrokerTenant(TENANT_NAME, 1);
     createServerTenant(TENANT_NAME, 1, 1);
-  }
-
-  protected List<File> getAllAvroFiles()
-      throws Exception {
-    // Unpack the Avro files
-    int numSegments = unpackAvroData(_tempDir).size();
-
-    // Avro files has to be ordered as time series data
-    List<File> avroFiles = new ArrayList<>(numSegments);
-    for (int i = 1; i <= numSegments; i++) {
-      avroFiles.add(new File(_tempDir, "On_Time_On_Time_Performance_2014_" + i + ".avro"));
-    }
-
-    return avroFiles;
-  }
-
-  protected List<File> getOfflineAvroFiles(List<File> avroFiles) {
-    int numOfflineSegments = getNumOfflineSegments();
-    List<File> offlineAvroFiles = new ArrayList<>(numOfflineSegments);
-    for (int i = 0; i < numOfflineSegments; i++) {
-      offlineAvroFiles.add(avroFiles.get(i));
-    }
-    return offlineAvroFiles;
-  }
-
-  protected List<File> getRealtimeAvroFiles(List<File> avroFiles) {
-    int numSegments = avroFiles.size();
-    int numRealtimeSegments = getNumRealtimeSegments();
-    List<File> realtimeAvroFiles = new ArrayList<>(numRealtimeSegments);
-    for (int i = numSegments - numRealtimeSegments; i < numSegments; i++) {
-      realtimeAvroFiles.add(avroFiles.get(i));
-    }
-    return realtimeAvroFiles;
   }
 
   @Test

@@ -26,10 +26,36 @@
     }
   }
 
+  .col-xs-2 {
+    &.no-padding {
+      padding-left: 0px;
+      padding-right: 0px;
+    }
+  }
+
+  .col-xs-4 {
+    &.no-padding {
+      padding-left: 0px;
+      padding-right: 0px;
+    }
+  }
+
   .col-xs-12 {
     &.no-padding {
       padding-left: 0px;
       padding-right: 0px;
+    }
+
+    &.margin-top {
+      margin-top: 12px;
+      padding-left: 24px;
+      padding-right: 24px;
+    }
+
+    &.preview {
+      margin-top: 12px;
+      padding-left: 24px;
+      padding-right: 24px;
     }
   }
 }

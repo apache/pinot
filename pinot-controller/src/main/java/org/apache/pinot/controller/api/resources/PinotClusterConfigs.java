@@ -58,6 +58,17 @@ public class PinotClusterConfigs {
   PinotHelixResourceManager pinotHelixResourceManager;
 
   @GET
+  @Path("/cluster/info")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get cluster Info", notes = "Get cluster Info")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")})
+  public String getClusterInfo() {
+    ObjectNode ret = JsonUtils.newObjectNode();
+    ret.put("clusterName", pinotHelixResourceManager.getHelixClusterName());
+    return ret.toString();
+  }
+
+  @GET
   @Path("/cluster/configs")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List cluster configurations", notes = "List cluster level configurations")
@@ -94,9 +105,11 @@ public class PinotClusterConfigs {
       }
       return new SuccessResponse("Updated cluster config.");
     } catch (IOException e) {
-      throw new ControllerApplicationException(LOGGER, "Error converting request to cluster config.", Response.Status.BAD_REQUEST, e);
+      throw new ControllerApplicationException(LOGGER, "Error converting request to cluster config.",
+          Response.Status.BAD_REQUEST, e);
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, "Failed to update cluster config.", Response.Status.INTERNAL_SERVER_ERROR, e);
+      throw new ControllerApplicationException(LOGGER, "Failed to update cluster config.",
+          Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 

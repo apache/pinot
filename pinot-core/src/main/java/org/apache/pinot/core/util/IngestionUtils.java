@@ -19,11 +19,14 @@
 package org.apache.pinot.core.util;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.data.function.FunctionEvaluator;
 import org.apache.pinot.core.data.function.FunctionEvaluatorFactory;
 import org.apache.pinot.spi.config.table.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -67,12 +70,24 @@ public class IngestionUtils {
    * Extracts the fields needed by a RecordExtractor from given {@link IngestionConfig}
    */
   private static void extractFieldsFromIngestionConfig(@Nullable IngestionConfig ingestionConfig, Set<String> fields) {
-    if (ingestionConfig != null && ingestionConfig.getFilterConfig() != null) {
-      String filterFunction = ingestionConfig.getFilterConfig().getFilterFunction();
-      if (filterFunction != null) {
-        FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(filterFunction);
-        if (functionEvaluator != null) {
-          fields.addAll(functionEvaluator.getArguments());
+    if (ingestionConfig != null) {
+      FilterConfig filterConfig = ingestionConfig.getFilterConfig();
+      if (filterConfig != null) {
+        String filterFunction = filterConfig.getFilterFunction();
+        if (filterFunction != null) {
+          FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(filterFunction);
+          if (functionEvaluator != null) {
+            fields.addAll(functionEvaluator.getArguments());
+          }
+        }
+      }
+      List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
+      if (transformConfigs != null) {
+        for (TransformConfig transformConfig : transformConfigs) {
+          FunctionEvaluator expressionEvaluator =
+              FunctionEvaluatorFactory.getExpressionEvaluator(transformConfig.getTransformFunction());
+          fields.addAll(expressionEvaluator.getArguments());
+          fields.add(transformConfig.getColumnName()); // add the column itself too, so that if it is already transformed, we won't transform again
         }
       }
     }

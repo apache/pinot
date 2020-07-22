@@ -27,9 +27,10 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import org.apache.commons.configuration.Configuration;
+
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,7 +54,7 @@ public abstract class PinotFS implements Closeable, Serializable {
    * Initializes the configurations specific to that filesystem. For instance, any security related parameters can be
    * initialized here and will not be logged.
    */
-  public abstract void init(Configuration config);
+  public abstract void init(PinotConfiguration config);
 
   /**
    * Creates a new directory. If parent directories are not created, it will create them.

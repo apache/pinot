@@ -25,24 +25,23 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.utils.Pairs.IntPair;
 import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReader;
+import org.apache.pinot.core.segment.index.readers.SortedIndexReader;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.SortedDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.OfflineDictionaryBasedRangePredicateEvaluator;
 
 
-@SuppressWarnings("rawtypes")
 public class SortedIndexBasedFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "SortedIndexBasedFilterOperator";
 
   private final PredicateEvaluator _predicateEvaluator;
-  private final SortedIndexReader _sortedIndexReader;
+  private final SortedIndexReader<?> _sortedIndexReader;
   private final int _numDocs;
 
   SortedIndexBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {
     _predicateEvaluator = predicateEvaluator;
-    _sortedIndexReader = (SortedIndexReader) dataSource.getInvertedIndex();
+    _sortedIndexReader = (SortedIndexReader<?>) dataSource.getInvertedIndex();
     _numDocs = numDocs;
   }
 

@@ -28,7 +28,6 @@ import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import javax.annotation.Nonnull;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
@@ -151,7 +150,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   }
 
   @Override
-  public void generateKeysForBlock(@Nonnull TransformBlock transformBlock, @Nonnull int[] groupKeys) {
+  public void generateKeysForBlock(TransformBlock transformBlock, int[] groupKeys) {
     // Fetch dictionary ids in the given block for all group-by columns
     for (int i = 0; i < _numGroupByExpressions; i++) {
       BlockValSet blockValueSet = transformBlock.getBlockValueSet(_groupByExpressions[i]);
@@ -162,7 +161,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   }
 
   @Override
-  public void generateKeysForBlock(@Nonnull TransformBlock transformBlock, @Nonnull int[][] groupKeys) {
+  public void generateKeysForBlock(TransformBlock transformBlock, int[][] groupKeys) {
     // Fetch dictionary ids in the given block for all group-by columns
     for (int i = 0; i < _numGroupByExpressions; i++) {
       BlockValSet blockValueSet = transformBlock.getBlockValueSet(_groupByExpressions[i]);
@@ -194,7 +193,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
      * @param numDocs Number of documents inside the block
      * @param outGroupIds Buffer for group id results
      */
-    void processSingleValue(int numDocs, @Nonnull int[] outGroupIds);
+    void processSingleValue(int numDocs, int[] outGroupIds);
 
     /**
      * Process a block of documents for case with multi-valued group-by columns.
@@ -202,7 +201,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
      * @param numDocs Number of documents inside the block
      * @param outGroupIds Buffer for group id results
      */
-    void processMultiValue(int numDocs, @Nonnull int[][] outGroupIds);
+    void processMultiValue(int numDocs, int[][] outGroupIds);
 
     /**
      * Get the upper bound of group id (exclusive) inside the holder.
@@ -219,7 +218,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     private final boolean[] _flags = new boolean[_globalGroupIdUpperBound];
 
     @Override
-    public void processSingleValue(int numDocs, @Nonnull int[] outGroupIds) {
+    public void processSingleValue(int numDocs, int[] outGroupIds) {
       for (int i = 0; i < numDocs; i++) {
         int groupId = 0;
         for (int j = _numGroupByExpressions - 1; j >= 0; j--) {
@@ -231,7 +230,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
 
     @Override
-    public void processMultiValue(int numDocs, @Nonnull int[][] outGroupIds) {
+    public void processMultiValue(int numDocs, int[][] outGroupIds) {
       for (int i = 0; i < numDocs; i++) {
         int[] groupIds = getIntRawKeys(i);
         for (int groupId : groupIds) {
@@ -251,7 +250,6 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
       return _flags;
     }
 
-    @Nonnull
     @Override
     public Iterator<GroupKey> iterator() {
       return new Iterator<GroupKey>() {
@@ -301,7 +299,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
 
     @Override
-    public void processSingleValue(int numDocs, @Nonnull int[] outGroupIds) {
+    public void processSingleValue(int numDocs, int[] outGroupIds) {
       for (int i = 0; i < numDocs; i++) {
         int rawKey = 0;
         for (int j = _numGroupByExpressions - 1; j >= 0; j--) {
@@ -312,7 +310,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
 
     @Override
-    public void processMultiValue(int numDocs, @Nonnull int[][] outGroupIds) {
+    public void processMultiValue(int numDocs, int[][] outGroupIds) {
       for (int i = 0; i < numDocs; i++) {
         int[] groupIds = getIntRawKeys(i);
         int length = groupIds.length;
@@ -344,7 +342,6 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
       return _rawKeyToGroupIdMap;
     }
 
-    @Nonnull
     @Override
     public Iterator<GroupKey> iterator() {
       return new Iterator<GroupKey>() {
@@ -490,7 +487,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
 
     @Override
-    public void processSingleValue(int numDocs, @Nonnull int[] outGroupIds) {
+    public void processSingleValue(int numDocs, int[] outGroupIds) {
       for (int i = 0; i < numDocs; i++) {
         long rawKey = 0L;
         for (int j = _numGroupByExpressions - 1; j >= 0; j--) {
@@ -501,7 +498,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
 
     @Override
-    public void processMultiValue(int numDocs, @Nonnull int[][] outGroupIds) {
+    public void processMultiValue(int numDocs, int[][] outGroupIds) {
       for (int i = 0; i < numDocs; i++) {
         long[] rawKeys = getLongRawKeys(i);
         int length = rawKeys.length;
@@ -534,7 +531,6 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
       return _rawKeyToGroupIdMap;
     }
 
-    @Nonnull
     @Override
     public Iterator<GroupKey> iterator() {
       return new Iterator<GroupKey>() {
@@ -644,12 +640,12 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
    */
   private String getGroupKey(long rawKey) {
     int cardinality = _cardinalities[0];
-    StringBuilder groupKeyBuilder = new StringBuilder(_dictionaries[0].get((int) (rawKey % cardinality)).toString());
+    StringBuilder groupKeyBuilder = new StringBuilder(_dictionaries[0].getStringValue((int) (rawKey % cardinality)));
     rawKey /= cardinality;
     for (int i = 1; i < _numGroupByExpressions; i++) {
       groupKeyBuilder.append(GroupKeyGenerator.DELIMITER);
       cardinality = _cardinalities[i];
-      groupKeyBuilder.append(_dictionaries[i].get((int) (rawKey % cardinality)));
+      groupKeyBuilder.append(_dictionaries[i].getStringValue((int) (rawKey % cardinality)));
       rawKey /= cardinality;
     }
     return groupKeyBuilder.toString();
@@ -671,7 +667,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
 
     @Override
-    public void processSingleValue(int numDocs, @Nonnull int[] outGroupIds) {
+    public void processSingleValue(int numDocs, int[] outGroupIds) {
       for (int i = 0; i < numDocs; i++) {
         int[] dictIds = new int[_numGroupByExpressions];
         for (int j = 0; j < _numGroupByExpressions; j++) {
@@ -682,7 +678,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
 
     @Override
-    public void processMultiValue(int numDocs, @Nonnull int[][] outGroupIds) {
+    public void processMultiValue(int numDocs, int[][] outGroupIds) {
       for (int i = 0; i < numDocs; i++) {
         IntArray[] rawKeys = getIntArrayRawKeys(i);
         int length = rawKeys.length;
@@ -715,7 +711,6 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
       return _rawKeyToGroupIdMap;
     }
 
-    @Nonnull
     @Override
     public Iterator<GroupKey> iterator() {
       return new Iterator<GroupKey>() {
@@ -828,10 +823,10 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
    * @return String group key
    */
   private String getGroupKey(IntArray rawKey) {
-    StringBuilder groupKeyBuilder = new StringBuilder(_dictionaries[0].get(rawKey._elements[0]).toString());
+    StringBuilder groupKeyBuilder = new StringBuilder(_dictionaries[0].getStringValue(rawKey._elements[0]));
     for (int i = 1; i < _numGroupByExpressions; i++) {
       groupKeyBuilder.append(GroupKeyGenerator.DELIMITER);
-      groupKeyBuilder.append(_dictionaries[i].get(rawKey._elements[i]));
+      groupKeyBuilder.append(_dictionaries[i].getStringValue(rawKey._elements[i]));
     }
     return groupKeyBuilder.toString();
   }
@@ -839,6 +834,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   /**
    * Drop un-necessary checks for highest performance.
    */
+  @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
   private static class IntArray {
     public int[] _elements;
 
@@ -855,7 +851,6 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
       return result;
     }
 
-    @SuppressWarnings({"Contract", "EqualsWhichDoesntCheckParameterClass"})
     @Override
     public boolean equals(Object obj) {
       int[] that = ((IntArray) obj)._elements;

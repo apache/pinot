@@ -21,8 +21,6 @@ package org.apache.pinot.broker.broker;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.configuration.BaseConfiguration;
-import org.apache.commons.configuration.Configuration;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
@@ -35,6 +33,7 @@ import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -44,10 +43,11 @@ import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -75,9 +75,11 @@ public class HelixBrokerStarterTest extends ControllerTest {
     startZk();
     startController();
 
-    Configuration brokerConf = new BaseConfiguration();
-    brokerConf.addProperty(Helix.KEY_OF_BROKER_QUERY_PORT, 18099);
-    _brokerStarter = new HelixBrokerStarter(brokerConf, getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR);
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, 18099);
+    
+    _brokerStarter =
+        new HelixBrokerStarter(new PinotConfiguration(properties), getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR);
     _brokerStarter.start();
 
     addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKERS - 1, true);
@@ -163,6 +165,16 @@ public class HelixBrokerStarterTest extends ControllerTest {
     String newOfflineTableName = TableNameBuilder.OFFLINE.tableNameWithType(newRawTableName);
     TableConfig newTableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(newRawTableName).setBrokerTenant("testBroker").build();
+    try {
+      _helixResourceManager.addTable(newTableConfig);
+      Assert.fail("Table creation should fail as testBroker does not exist");
+    } catch (PinotHelixResourceManager.InvalidTableConfigException e) {
+      // expected
+    }
+
+    // Add a new table with same broker tenant
+    newTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(newRawTableName)
+        .setServerTenant(TagNameUtils.DEFAULT_TENANT_NAME).build();
     _helixResourceManager.addTable(newTableConfig);
 
     // Broker tenant should be overridden to DefaultTenant

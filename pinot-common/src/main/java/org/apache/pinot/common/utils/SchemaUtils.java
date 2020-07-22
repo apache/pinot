@@ -81,7 +81,7 @@ public class SchemaUtils {
     Preconditions.checkNotNull(schemaName);
 
     try {
-      URL url = new URL("http", host, port, "/schemas/" + schemaName);
+      URL url = new URL(CommonConstants.HTTP_PROTOCOL, host, port, "/schemas/" + schemaName);
       GetMethod httpGet = new GetMethod(url.toString());
       try {
         int responseCode = HTTP_CLIENT.executeMethod(httpGet);
@@ -116,7 +116,7 @@ public class SchemaUtils {
     Preconditions.checkNotNull(schema);
 
     try {
-      URL url = new URL("http", host, port, "/schemas");
+      URL url = new URL(CommonConstants.HTTP_PROTOCOL, host, port, "/schemas");
       PostMethod httpPost = new PostMethod(url.toString());
       try {
         Part[] parts = {new StringPart(schema.getSchemaName(), schema.toSingleLineJsonString())};
@@ -150,7 +150,7 @@ public class SchemaUtils {
     Preconditions.checkNotNull(schemaName);
 
     try {
-      URL url = new URL("http", host, port, "/schemas/" + schemaName);
+      URL url = new URL(CommonConstants.HTTP_PROTOCOL, host, port, "/schemas/" + schemaName);
       DeleteMethod httpDelete = new DeleteMethod(url.toString());
       try {
         int responseCode = HTTP_CLIENT.executeMethod(httpDelete);

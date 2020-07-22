@@ -19,10 +19,31 @@
 
 -->
 
-Updating the docs:
-1. Edit or add files as needed.
-2. Run "make html"
-3. Open _build/html/index.html in your favorite browser and ensure contents and links work correctly.
+# ThirdEye Documentation
 
-NOTE:
-You may see some differences locally as the version of sphinx-build on your local host might not be the same as the one used in readthedocs.io for building the pinot website docs.
+This directory contains the documentation for ThirdEye. It is available online at https://thirdeye.readthedocs.io. 
+
+### Building docs
+
+The documentation is built using the [sphinx](https://www.sphinx-doc.org/) framework.
+
+If you have python/pip, you can install the dependencies using the command below.
+```
+pip3 install -r requirements.txt
+``` 
+
+Build docs using
+```
+make html
+```
+The rendered html can be found at `_build/html/index.html`
+
+### Updating docs
+1. Edit or add files as needed.
+2. Build using `make livedocs`.
+3. Open `_build/html/index.html` in your favorite browser. The page should auto-update with your changes.
+4. Ensure the contents and links work correctly
+5. Submit a PR!
+
+
+> NOTE: You may see some differences locally as the version of `sphinx-build` on your local host might not be the same as the one used in [readthedocs.io](https://readthedocs.io) for building the pinot website docs.

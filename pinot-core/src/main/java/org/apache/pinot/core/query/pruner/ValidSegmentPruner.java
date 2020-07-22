@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.core.query.pruner;
 
-import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
@@ -30,7 +30,7 @@ import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
  */
 public class ValidSegmentPruner implements SegmentPruner {
   @Override
-  public void init(Configuration config) {
+  public void init(PinotConfiguration config) {
 
   }
 

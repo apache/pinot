@@ -18,13 +18,15 @@
  */
 package org.apache.pinot.core.segment.index.loader.columnminmaxvalue;
 
-import com.clearspring.analytics.util.Preconditions;
+import com.google.common.base.Preconditions;
+import java.io.FileOutputStream;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.readers.BytesDictionary;
 import org.apache.pinot.core.segment.index.readers.DoubleDictionary;
 import org.apache.pinot.core.segment.index.readers.FloatDictionary;
 import org.apache.pinot.core.segment.index.readers.IntDictionary;
@@ -80,7 +82,8 @@ public class ColumnMinMaxValueGenerator {
       throws Exception {
     // Skip column without dictionary or with min/max value already set
     ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(columnName);
-    if ((!columnMetadata.hasDictionary()) || (columnMetadata.getMinValue() != null)) {
+    if (!columnMetadata.hasDictionary() || columnMetadata.getMinValue() != null
+        || columnMetadata.getMaxValue() != null) {
       return;
     }
 
@@ -119,8 +122,17 @@ public class ColumnMinMaxValueGenerator {
       case STRING:
         try (StringDictionary stringDictionary = new StringDictionary(dictionaryBuffer, length,
             columnMetadata.getColumnMaxLength(), (byte) columnMetadata.getPaddingCharacter())) {
-          SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName, stringDictionary.get(0),
-              stringDictionary.get(length - 1));
+          SegmentColumnarIndexCreator
+              .addColumnMinMaxValueInfo(_segmentProperties, columnName, stringDictionary.getStringValue(0),
+                  stringDictionary.getStringValue(length - 1));
+        }
+        break;
+      case BYTES:
+        try (BytesDictionary bytesDictionary = new BytesDictionary(dictionaryBuffer, length,
+            columnMetadata.getColumnMaxLength())) {
+          SegmentColumnarIndexCreator
+              .addColumnMinMaxValueInfo(_segmentProperties, columnName, bytesDictionary.getStringValue(0),
+                  bytesDictionary.getStringValue(length - 1));
         }
         break;
       default:
@@ -133,7 +145,11 @@ public class ColumnMinMaxValueGenerator {
   private void saveMetadata()
       throws Exception {
     if (_minMaxValueAdded) {
-      _segmentProperties.save();
+      // Commons Configuration 1.10 does not support file path containing '%'. 
+      // Explicitly providing the output stream for the file bypasses the problem. 
+      try (FileOutputStream fileOutputStream = new FileOutputStream(_segmentProperties.getFile())) {
+        _segmentProperties.save(fileOutputStream);
+      }
     }
   }
 }

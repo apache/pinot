@@ -19,7 +19,10 @@
 package org.apache.pinot.spi.crypt;
 
 import java.io.File;
-import org.apache.commons.configuration.Configuration;
+import java.io.IOException;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,17 +34,27 @@ public class NoOpPinotCrypter implements PinotCrypter {
   public static final Logger LOGGER = LoggerFactory.getLogger(NoOpPinotCrypter.class);
 
   @Override
-  public void init(Configuration config) {
+  public void init(PinotConfiguration config) {
 
   }
 
   @Override
   public void encrypt(File decryptedFile, File encryptedFile) {
-    return;
+    try {
+      FileUtils.copyFile(decryptedFile, encryptedFile);
+    } catch (IOException e) {
+      LOGGER.warn("Could not encrypt file");
+      FileUtils.deleteQuietly(encryptedFile);
+    }
   }
 
   @Override
   public void decrypt(File encryptedFile, File decryptedFile) {
-    return;
+    try {
+      FileUtils.copyFile(encryptedFile, decryptedFile);
+    } catch (IOException e) {
+      LOGGER.warn("Could not decrypt file");
+      FileUtils.deleteQuietly(decryptedFile);
+    }
   }
 }

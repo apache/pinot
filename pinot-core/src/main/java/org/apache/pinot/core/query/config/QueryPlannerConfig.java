@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.query.config;
 
-import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
@@ -29,10 +29,10 @@ import org.apache.commons.configuration.ConfigurationException;
  */
 public class QueryPlannerConfig {
 
-  private Configuration _queryPlannerConfig;
+  private PinotConfiguration _queryPlannerConfig;
   private static String[] REQUIRED_KEYS = {};
 
-  public QueryPlannerConfig(Configuration queryPlannerConfig)
+  public QueryPlannerConfig(PinotConfiguration queryPlannerConfig)
       throws ConfigurationException {
     _queryPlannerConfig = queryPlannerConfig;
     checkRequiredKeys();
@@ -48,6 +48,6 @@ public class QueryPlannerConfig {
   }
 
   public String getQueryPlannerType() {
-    return _queryPlannerConfig.getString("type");
+    return _queryPlannerConfig.getProperty("type");
   }
 }

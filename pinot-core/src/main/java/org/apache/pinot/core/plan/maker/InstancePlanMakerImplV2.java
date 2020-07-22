@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
+import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.plan.AggregationGroupByOrderByPlanNode;
 import org.apache.pinot.core.plan.AggregationGroupByPlanNode;
@@ -35,6 +36,7 @@ import org.apache.pinot.core.plan.MetadataBasedAggregationPlanNode;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.plan.SelectionPlanNode;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.config.QueryExecutorConfig;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.FunctionContext;
@@ -84,8 +86,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
    */
   public InstancePlanMakerImplV2(QueryExecutorConfig queryExecutorConfig) {
     _maxInitialResultHolderCapacity = queryExecutorConfig.getConfig()
-        .getInt(MAX_INITIAL_RESULT_HOLDER_CAPACITY_KEY, DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
-    _numGroupsLimit = queryExecutorConfig.getConfig().getInt(NUM_GROUPS_LIMIT, DEFAULT_NUM_GROUPS_LIMIT);
+        .getProperty(MAX_INITIAL_RESULT_HOLDER_CAPACITY_KEY, DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
+    _numGroupsLimit = queryExecutorConfig.getConfig().getProperty(NUM_GROUPS_LIMIT, DEFAULT_NUM_GROUPS_LIMIT);
     Preconditions.checkState(_maxInitialResultHolderCapacity <= _numGroupsLimit,
         "Invalid configuration: maxInitialResultHolderCapacity: %d must be smaller or equal to numGroupsLimit: %d",
         _maxInitialResultHolderCapacity, _numGroupsLimit);
@@ -156,7 +158,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   /**
    * Returns {@code true} if the given aggregation-only without filter QueryContext can be solved with dictionary,
    * {@code false} otherwise.
-   * <p>Aggregations supported: MIN, MAX, MINMAXRANGE
+   * <p>Aggregations supported: MIN, MAX, MINMAXRANGE, DISTINCTCOUNT
    */
   @VisibleForTesting
   static boolean isFitForDictionaryBasedPlan(QueryContext queryContext, IndexSegment indexSegment) {
@@ -164,16 +166,21 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     for (ExpressionContext expression : selectExpressions) {
       FunctionContext function = expression.getFunction();
       String functionName = function.getFunctionName();
-      if (!functionName.equals("min") && !functionName.equals("max") && !functionName.equals("minmaxrange")) {
+      if (!AggregationFunctionUtils.isFitForDictionaryBasedComputation(functionName)) {
         return false;
       }
+
       ExpressionContext argument = function.getArguments().get(0);
       if (argument.getType() != ExpressionContext.Type.IDENTIFIER) {
         return false;
       }
       String column = argument.getIdentifier();
       Dictionary dictionary = indexSegment.getDataSource(column).getDictionary();
-      if (dictionary == null || !dictionary.isSorted()) {
+      if (dictionary == null) {
+        return false;
+      }
+      // NOTE: DISTINCTCOUNT does not require sorted dictionary
+      if (!dictionary.isSorted() && !functionName.equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNT.name())) {
         return false;
       }
     }

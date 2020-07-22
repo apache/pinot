@@ -70,8 +70,8 @@ public final class DateTimeFieldSpec extends FieldSpec {
     super(name, dataType, true);
     Preconditions.checkNotNull(name);
     Preconditions.checkNotNull(dataType);
-    Preconditions.checkArgument(DateTimeFormatSpec.isValidFormat(format));
-    Preconditions.checkArgument(DateTimeGranularitySpec.isValidGranularity(granularity));
+    DateTimeFormatSpec.validateFormat(format);
+    DateTimeGranularitySpec.validateGranularity(granularity);
 
     _format = format;
     _granularity = granularity;

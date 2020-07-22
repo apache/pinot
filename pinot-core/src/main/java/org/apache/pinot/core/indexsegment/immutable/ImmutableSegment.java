@@ -19,7 +19,7 @@
 package org.apache.pinot.core.indexsegment.immutable;
 
 import org.apache.pinot.core.indexsegment.IndexSegment;
-import org.apache.pinot.core.io.reader.DataFileReader;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 
@@ -40,7 +40,7 @@ public interface ImmutableSegment extends IndexSegment {
    * @param column Column name
    * @return Forward index for the given column
    */
-  DataFileReader getForwardIndex(String column);
+  ForwardIndexReader getForwardIndex(String column);
 
   /**
    * Returns the inverted index for the given column.

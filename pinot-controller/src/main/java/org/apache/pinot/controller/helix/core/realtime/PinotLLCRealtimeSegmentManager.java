@@ -49,6 +49,7 @@ import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -355,10 +356,16 @@ public class PinotLLCRealtimeSegmentManager {
    * This method moves the segment file from another location to its permanent location.
    * When splitCommit is enabled, segment file is uploaded to the segmentLocation in the committingSegmentDescriptor,
    * and we need to move the segment file to its permanent location before committing the segment metadata.
+   * Modifies the segment location in committingSegmentDescriptor to the uri which the segment is moved to
+   * unless committingSegmentDescriptor has a peer download uri scheme in segment location.
    */
   public void commitSegmentFile(String realtimeTableName, CommittingSegmentDescriptor committingSegmentDescriptor)
       throws Exception {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
+    if (isPeerSegmentDownloadScheme(committingSegmentDescriptor)) {
+      LOGGER.info("No moving needed for segment on peer servers: {}", committingSegmentDescriptor.getSegmentLocation());
+      return;
+    }
 
     String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
     String segmentName = committingSegmentDescriptor.getSegmentName();
@@ -387,6 +394,12 @@ public class PinotLLCRealtimeSegmentManager {
     } catch (Exception e) {
       LOGGER.warn("Caught exception while deleting temporary segment files for segment: {}", segmentName, e);
     }
+    committingSegmentDescriptor.setSegmentLocation(uriToMoveTo.toString());
+  }
+
+  private boolean isPeerSegmentDownloadScheme(CommittingSegmentDescriptor committingSegmentDescriptor) {
+    return !(committingSegmentDescriptor == null) && !(committingSegmentDescriptor.getSegmentLocation() == null) &&
+        committingSegmentDescriptor.getSegmentLocation().toLowerCase().startsWith("peer://");
   }
 
   /**
@@ -485,9 +498,10 @@ public class PinotLLCRealtimeSegmentManager {
     // TODO Issue 5953 remove the long parsing once metadata is set correctly.
     committingSegmentZKMetadata.setEndOffset(committingSegmentDescriptor.getNextOffset());
     committingSegmentZKMetadata.setStatus(Status.DONE);
-    committingSegmentZKMetadata.setDownloadUrl(URIUtils
-        .constructDownloadUrl(_controllerConf.generateVipUrl(), TableNameBuilder.extractRawTableName(realtimeTableName),
-            segmentName));
+    // If the download url set by the server is a peer download url format with peer scheme, put
+    // METADATA_URI_FOR_PEER_DOWNLOAD in zk; otherwise just use the location in the descriptor.
+    committingSegmentZKMetadata.setDownloadUrl(isPeerURL(committingSegmentDescriptor.getSegmentLocation())
+        ? CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD : committingSegmentDescriptor.getSegmentLocation());
     committingSegmentZKMetadata.setCrc(Long.valueOf(segmentMetadata.getCrc()));
     committingSegmentZKMetadata.setStartTime(segmentMetadata.getTimeInterval().getStartMillis());
     committingSegmentZKMetadata.setEndTime(segmentMetadata.getTimeInterval().getEndMillis());
@@ -497,6 +511,10 @@ public class PinotLLCRealtimeSegmentManager {
 
     persistSegmentZKMetadata(realtimeTableName, committingSegmentZKMetadata, stat.getVersion());
     return committingSegmentZKMetadata;
+  }
+
+  private boolean isPeerURL(String segmentLocation) {
+    return segmentLocation != null && segmentLocation.toLowerCase().startsWith("peer://");
   }
 
   /**

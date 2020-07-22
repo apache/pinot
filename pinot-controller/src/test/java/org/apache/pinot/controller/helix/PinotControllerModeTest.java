@@ -23,8 +23,12 @@ import java.util.Set;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.manager.zk.ZkClient;
+import org.apache.helix.model.ClusterConstraints;
+import org.apache.helix.model.ConstraintItem;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.model.Message;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
@@ -51,21 +55,26 @@ public class PinotControllerModeTest extends ControllerTest {
   @Test
   public void testHelixOnlyController() {
     // Start a Helix-only controller
-    ControllerConf helixOnlyControllerConfig = getDefaultControllerConfiguration();
-    helixOnlyControllerConfig.setControllerMode(ControllerConf.ControllerMode.HELIX_ONLY);
-    startController(helixOnlyControllerConfig);
+    Map<String, Object> properties = getDefaultControllerConfiguration();
+    properties.put(ControllerConf.CONTROLLER_MODE, ControllerConf.ControllerMode.HELIX_ONLY);
+    
+    startController(properties);
     TestUtils.waitForCondition(aVoid -> _helixManager.isConnected(), TIMEOUT_IN_MS,
         "Failed to start the Helix-only controller");
-
+    checkHelixConstraints(_helixAdmin);
     stopController();
   }
 
   @Test
   public void testDualModeController() {
     // Start the first dual-mode controller
-    ControllerConf firstDualModeControllerConfig = getDefaultControllerConfiguration();
-    firstDualModeControllerConfig.setControllerMode(ControllerConf.ControllerMode.DUAL);
-    startController(firstDualModeControllerConfig);
+    Map<String, Object> properties = getDefaultControllerConfiguration();
+    properties.put(ControllerConf.CONTROLLER_MODE, ControllerConf.ControllerMode.DUAL);
+    
+    startController(properties);
+
+    // check the throttling constraint
+    checkHelixConstraints(_helixAdmin);
 
     // Disable delay rebalance feature
     IdealState idealState = _helixResourceManager.getTableIdealState(Helix.LEAD_CONTROLLER_RESOURCE_NAME);
@@ -103,10 +112,10 @@ public class PinotControllerModeTest extends ControllerTest {
     Assert.assertTrue(firstLeadControllerManager.isLeaderForTable(secondTableName));
 
     // Start the second dual-mode controller
-    ControllerConf secondDualModeControllerConfig = getDefaultControllerConfiguration();
-    secondDualModeControllerConfig.setControllerMode(ControllerConf.ControllerMode.DUAL);
-    secondDualModeControllerConfig.setControllerPort(Integer.toString(DEFAULT_CONTROLLER_PORT + 1));
-    ControllerStarter secondDualModeController = getControllerStarter(secondDualModeControllerConfig);
+    properties = getDefaultControllerConfiguration();
+    properties.put(ControllerConf.CONTROLLER_MODE, ControllerConf.ControllerMode.DUAL);
+    properties.put(ControllerConf.CONTROLLER_PORT, DEFAULT_CONTROLLER_PORT + 1);
+    ControllerStarter secondDualModeController = getControllerStarter(new ControllerConf(properties));
     secondDualModeController.start();
     TestUtils
         .waitForCondition(aVoid -> secondDualModeController.getHelixResourceManager().getHelixZkManager().isConnected(),
@@ -150,10 +159,11 @@ public class PinotControllerModeTest extends ControllerTest {
             "No cluster leader should be shown in Helix cluster");
     zkClient.close();
 
-    ControllerConf thirdDualModeControllerConfig = getDefaultControllerConfiguration();
-    thirdDualModeControllerConfig.setControllerMode(ControllerConf.ControllerMode.DUAL);
-    thirdDualModeControllerConfig.setControllerPort(Integer.toString(DEFAULT_CONTROLLER_PORT + 2));
-    ControllerStarter thirdDualModeController = getControllerStarter(thirdDualModeControllerConfig);
+    properties = getDefaultControllerConfiguration();
+    properties.put(ControllerConf.CONTROLLER_MODE, ControllerConf.ControllerMode.DUAL);
+    properties.put(ControllerConf.CONTROLLER_PORT, DEFAULT_CONTROLLER_PORT + 2);
+    
+    ControllerStarter thirdDualModeController = getControllerStarter(new ControllerConf(properties));
     thirdDualModeController.start();
     PinotHelixResourceManager pinotHelixResourceManager = thirdDualModeController.getHelixResourceManager();
     _helixManager = pinotHelixResourceManager.getHelixZkManager();
@@ -189,9 +199,10 @@ public class PinotControllerModeTest extends ControllerTest {
 
   @Test
   public void testPinotOnlyController() {
-    ControllerConf firstPinotOnlyControllerConfig = getDefaultControllerConfiguration();
-    firstPinotOnlyControllerConfig.setControllerMode(ControllerConf.ControllerMode.PINOT_ONLY);
-    ControllerStarter firstPinotOnlyController = getControllerStarter(firstPinotOnlyControllerConfig);
+    Map<String, Object> properties = getDefaultControllerConfiguration();
+    properties.put(ControllerConf.CONTROLLER_MODE, ControllerConf.ControllerMode.PINOT_ONLY);
+    
+    ControllerStarter firstPinotOnlyController = getControllerStarter(new ControllerConf(properties));
 
     // Starting Pinot-only controller without Helix controller should fail
     try {
@@ -202,10 +213,11 @@ public class PinotControllerModeTest extends ControllerTest {
     }
 
     // Start a Helix-only controller
-    ControllerConf helixOnlyControllerConfig = getDefaultControllerConfiguration();
-    helixOnlyControllerConfig.setControllerMode(ControllerConf.ControllerMode.HELIX_ONLY);
-    helixOnlyControllerConfig.setControllerPort(Integer.toString(DEFAULT_CONTROLLER_PORT + 1));
-    ControllerStarter helixOnlyController = new ControllerStarter(helixOnlyControllerConfig);
+    properties = getDefaultControllerConfiguration();
+    properties.put(ControllerConf.CONTROLLER_MODE, ControllerConf.ControllerMode.HELIX_ONLY);
+    properties.put(ControllerConf.CONTROLLER_PORT, DEFAULT_CONTROLLER_PORT + 1);
+    
+    ControllerStarter helixOnlyController = new ControllerStarter(new ControllerConf(properties));
     helixOnlyController.start();
     HelixManager helixControllerManager = helixOnlyController.getHelixControllerManager();
     HelixAdmin helixAdmin = helixControllerManager.getClusterManagmentTool();
@@ -221,17 +233,17 @@ public class PinotControllerModeTest extends ControllerTest {
     checkInstanceState(helixAdmin);
 
     // Start the second Pinot-only controller
-    ControllerConf secondPinotOnlyControllerConfig = getDefaultControllerConfiguration();
-    secondPinotOnlyControllerConfig.setControllerMode(ControllerConf.ControllerMode.PINOT_ONLY);
-    secondPinotOnlyControllerConfig.setControllerPort(Integer.toString(DEFAULT_CONTROLLER_PORT + 2));
-    ControllerStarter secondPinotOnlyController = getControllerStarter(secondPinotOnlyControllerConfig);
+    properties = getDefaultControllerConfiguration();
+    properties.put(ControllerConf.CONTROLLER_MODE, ControllerConf.ControllerMode.PINOT_ONLY);
+    properties.put(ControllerConf.CONTROLLER_PORT, DEFAULT_CONTROLLER_PORT + 2);
+    
+    ControllerStarter secondPinotOnlyController = getControllerStarter(new ControllerConf(properties));
     secondPinotOnlyController.start();
     TestUtils.waitForCondition(
         aVoid -> secondPinotOnlyController.getHelixResourceManager().getHelixZkManager().isConnected(), TIMEOUT_IN_MS,
         "Failed to start the second Pinot-only controller");
     // There should still be only one MASTER instance for each partition
     checkInstanceState(helixAdmin);
-
     // Stop the second Pinot-only controller, and there should still be only one MASTER instance for each partition
     secondPinotOnlyController.stop();
     checkInstanceState(helixAdmin);
@@ -246,6 +258,16 @@ public class PinotControllerModeTest extends ControllerTest {
 
     // Stop the Helix-only controller
     helixOnlyController.stop();
+  }
+
+  private void checkHelixConstraints(HelixAdmin helixAdmin) {
+    ClusterConstraints constraints =
+        helixAdmin.getConstraints(getHelixClusterName(), ClusterConstraints.ConstraintType.MESSAGE_CONSTRAINT);
+    ConstraintItem item = constraints.getConstraintItem("MaxStateTransitionsPerInstance");
+    Assert.assertEquals(item.getAttributeValue(ClusterConstraints.ConstraintAttribute.INSTANCE), ".*");
+    Assert.assertEquals(item.getAttributeValue(ClusterConstraints.ConstraintAttribute.MESSAGE_TYPE),
+        Message.MessageType.STATE_TRANSITION.name());
+    Assert.assertEquals(item.getConstraintValue(), CommonConstants.Helix.DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS);
   }
 
   private void checkInstanceState(HelixAdmin helixAdmin) {

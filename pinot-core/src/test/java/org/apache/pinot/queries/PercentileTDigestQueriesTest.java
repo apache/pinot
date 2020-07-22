@@ -164,7 +164,7 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
   @Test
   public void testInnerSegmentAggregation() {
     // For inner segment case, percentile does not affect the intermediate result
-    AggregationOperator aggregationOperator = getOperatorForQuery(getAggregationQuery(0));
+    AggregationOperator aggregationOperator = getOperatorForPqlQuery(getAggregationQuery(0));
     IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
     List<Object> aggregationResult = resultsBlock.getAggregationResult();
     Assert.assertNotNull(aggregationResult);
@@ -193,7 +193,7 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
   @Test
   public void testInnerSegmentGroupBy() {
     // For inner segment case, percentile does not affect the intermediate result
-    AggregationGroupByOperator groupByOperator = getOperatorForQuery(getGroupByQuery(0));
+    AggregationGroupByOperator groupByOperator = getOperatorForPqlQuery(getGroupByQuery(0));
     IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
     AggregationGroupByResult groupByResult = resultsBlock.getAggregationGroupByResult();
     Assert.assertNotNull(groupByResult);

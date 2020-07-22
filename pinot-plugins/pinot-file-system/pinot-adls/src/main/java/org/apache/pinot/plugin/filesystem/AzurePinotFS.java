@@ -18,13 +18,6 @@
  */
 package org.apache.pinot.plugin.filesystem;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.microsoft.azure.datalake.store.ADLStoreClient;
-import com.microsoft.azure.datalake.store.DirectoryEntry;
-import com.microsoft.azure.datalake.store.DirectoryEntryType;
-import com.microsoft.azure.datalake.store.IfExists;
-import com.microsoft.azure.datalake.store.oauth2.AccessTokenProvider;
-import com.microsoft.azure.datalake.store.oauth2.ClientCredsTokenProvider;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -38,12 +31,21 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import org.apache.commons.configuration.Configuration;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.microsoft.azure.datalake.store.ADLStoreClient;
+import com.microsoft.azure.datalake.store.DirectoryEntry;
+import com.microsoft.azure.datalake.store.DirectoryEntryType;
+import com.microsoft.azure.datalake.store.IfExists;
+import com.microsoft.azure.datalake.store.oauth2.AccessTokenProvider;
+import com.microsoft.azure.datalake.store.oauth2.ClientCredsTokenProvider;
 
 
 /**
@@ -70,16 +72,16 @@ public class AzurePinotFS extends PinotFS {
   }
 
   @Override
-  public void init(Configuration config) {
+  public void init(PinotConfiguration config) {
     // The ADL account id. Example: {@code mystore.azuredatalakestore.net}.
-    String account = config.getString(ACCOUNT_ID);
+    String account = config.getProperty(ACCOUNT_ID);
     // The endpoint that should be used for authentication.
     // Usually of the form {@code https://login.microsoftonline.com/<tenant-id>/oauth2/token}.
-    String authEndpoint = config.getString(AUTH_ENDPOINT);
+    String authEndpoint = config.getProperty(AUTH_ENDPOINT);
     // The clientId used to authenticate this application
-    String clientId = config.getString(CLIENT_ID);
+    String clientId = config.getProperty(CLIENT_ID);
     // The secret key used to authenticate this application
-    String clientSecret = config.getString(CLIENT_SECRET);
+    String clientSecret = config.getProperty(CLIENT_SECRET);
 
     AccessTokenProvider tokenProvider = new ClientCredsTokenProvider(authEndpoint, clientId, clientSecret);
     _adlStoreClient = ADLStoreClient.createClient(account, tokenProvider);

@@ -56,7 +56,6 @@ public class DoubleToIdMap extends BaseValueToIdMap {
 
   @Override
   public String getString(int id) {
-    assert id < _idToValueMap.size();
-    return (Double.valueOf(_idToValueMap.getDouble(id)).toString());
+    return Double.toString(getDouble(id));
   }
 }

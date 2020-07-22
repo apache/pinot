@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.query.scheduler.resources;
 
-import org.apache.commons.configuration.Configuration;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,7 +42,7 @@ public class ResourceLimitPolicy {
   private final int tableThreadsSoftLimit;
   private final int tableThreadsHardLimit;
 
-  ResourceLimitPolicy(Configuration config, int numWorkerThreads) {
+  ResourceLimitPolicy(PinotConfiguration config, int numWorkerThreads) {
     int softLimit = checkGetOrDefaultPct(config, TABLE_THREADS_SOFT_LIMIT, DEFAULT_TABLE_THREADS_SOFT_LIMIT);
     tableThreadsSoftLimit = Math.min(numWorkerThreads, Math.max(1, numWorkerThreads * softLimit / 100));
     int hardLimit = checkGetOrDefaultPct(config, TABLE_THREADS_HARD_LIMIT, DEFAULT_TABLE_THREADS_HARD_LIMIT);
@@ -59,8 +59,8 @@ public class ResourceLimitPolicy {
         tableThreadsSoftLimit, tableThreadsHardLimit);
   }
 
-  private int checkGetOrDefaultPct(Configuration schedulerConfig, String key, int defaultValue) {
-    int pct = schedulerConfig.getInt(key, defaultValue);
+  private int checkGetOrDefaultPct(PinotConfiguration schedulerConfig, String key, int defaultValue) {
+    int pct = schedulerConfig.getProperty(key, defaultValue);
     if (pct <= 0 || pct > 100) {
       LOGGER.error("Incorrect value for {}, value: {}; using default: {}", key, pct, defaultValue);
       pct = defaultValue;
