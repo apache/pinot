@@ -36,7 +36,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
@@ -68,6 +67,7 @@ import org.apache.pinot.common.lineage.LineageEntry;
 import org.apache.pinot.common.lineage.LineageEntryState;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
+import org.apache.pinot.common.lineage.SegmentLineageUtils;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
@@ -2169,9 +2169,9 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Computes the start batch upload phase
+   * Computes the start segment replace phase
    *
-   * 1. Generate a batch id
+   * 1. Generate a segment lineage entry id
    * 2. Compute validation on the user inputs
    * 3. Add the new lineage entry to the segment lineage metadata in the property store
    *
@@ -2181,18 +2181,13 @@ public class PinotHelixResourceManager {
    * @param tableNameWithType Table name with type
    * @param segmentsFrom a list of segments to be merged
    * @param segmentsTo a list of merged segments
-   * @return Bath Id
+   * @return Segment lineage entry id
    *
    * @throws InvalidConfigException
    */
-  public String startBatchUpload(String tableNameWithType, List<String> segmentsFrom, List<String> segmentsTo) {
-    // Create a batch id
-    String batchId = UUID.randomUUID().toString();
-
-    // Check that segmentsTo is not empty.
-    Preconditions.checkArgument(!segmentsTo.isEmpty(), String
-        .format("'segmentsTo' cannot be empty (tableName = '%s', segmentsFrom = '%s', segmentsTo = '%s'",
-            tableNameWithType, segmentsFrom, segmentsTo));
+  public String startReplaceSegments(String tableNameWithType, List<String> segmentsFrom, List<String> segmentsTo) {
+    // Create a segment lineage entry id
+    String segmentLineageEntryId = SegmentLineageUtils.generateLineageEntryId();
 
     // Check that all the segments from 'segmentsFrom' exist in the table
     Set<String> segmentsForTable = new HashSet<>(getSegmentsFor(tableNameWithType));
@@ -2208,7 +2203,6 @@ public class PinotHelixResourceManager {
         segmentsTo, segmentsForTable));
 
     try {
-      final List<String> finalSegmentsFrom = segmentsFrom;
       DEFAULT_RETRY_POLICY.attempt(() -> {
         // Fetch the segment lineage metadata
         ZNRecord segmentLineageZNRecord =
@@ -2222,19 +2216,18 @@ public class PinotHelixResourceManager {
           expectedVersion = segmentLineageZNRecord.getVersion();
         }
 
-        // Check that the batchId doesn't exists in the segment lineage
-        Preconditions.checkArgument(segmentLineage.getLineageEntry(batchId) == null,
-            String.format("BatchId (%s) already exists in the segment lineage.", batchId));
+        // Check that the segment lineage entry id doesn't exists in the segment lineage
+        Preconditions.checkArgument(segmentLineage.getLineageEntry(segmentLineageEntryId) == null,
+            String.format("SegmentLineageEntryId (%s) already exists in the segment lineage.", segmentLineageEntryId));
 
-        // Check
-        for (String lineageEntryId : segmentLineage.getLineageEntryIds()) {
-          LineageEntry lineageEntry = segmentLineage.getLineageEntry(lineageEntryId);
+        for (String entryId : segmentLineage.getLineageEntryIds()) {
+          LineageEntry lineageEntry = segmentLineage.getLineageEntry(entryId);
 
           // Check that any segment from 'segmentsFrom' does not appear twice.
-          Preconditions.checkArgument(Collections.disjoint(lineageEntry.getSegmentsFrom(), finalSegmentsFrom), String
+          Preconditions.checkArgument(Collections.disjoint(lineageEntry.getSegmentsFrom(), segmentsFrom), String
               .format("It is not allowed to merge segments that are already merged. (tableName = %s, segmentsFrom from "
                       + "existing lineage entry = %s, requested segmentsFrom = %s)", tableNameWithType,
-                  lineageEntry.getSegmentsFrom(), finalSegmentsFrom));
+                  lineageEntry.getSegmentsFrom(), segmentsFrom));
 
           // Check that merged segments name cannot be the same.
           Preconditions.checkArgument(Collections.disjoint(lineageEntry.getSegmentsTo(), segmentsTo), String.format(
@@ -2244,8 +2237,8 @@ public class PinotHelixResourceManager {
         }
 
         // Update lineage entry
-        segmentLineage.addLineageEntry(batchId,
-            new LineageEntry(finalSegmentsFrom, segmentsTo, LineageEntryState.IN_PROGRESS, System.currentTimeMillis()));
+        segmentLineage.addLineageEntry(segmentLineageEntryId,
+            new LineageEntry(segmentsFrom, segmentsTo, LineageEntryState.IN_PROGRESS, System.currentTimeMillis()));
 
         // Write back to the lineage entry
         return SegmentLineageAccessHelper.writeSegmentLineage(_propertyStore, segmentLineage, expectedVersion);
@@ -2259,13 +2252,14 @@ public class PinotHelixResourceManager {
     }
 
     // Only successful attempt can reach here
-    LOGGER.info("startBatchUpload is successfully processed. (tableNameWithType = {}, segmentsFrom = {}, "
-        + "segmentsTo = {}, batchId = {})", tableNameWithType, segmentsFrom, segmentsTo, batchId);
-    return batchId;
+    LOGGER.info("startReplaceSegments is successfully processed. (tableNameWithType = {}, segmentsFrom = {}, "
+            + "segmentsTo = {}, segmentLineageEntryId = {})", tableNameWithType, segmentsFrom, segmentsTo,
+        segmentLineageEntryId);
+    return segmentLineageEntryId;
   }
 
   /**
-   * Computes the end batch upload phase
+   * Computes the end segment replace phase
    *
    * 1. Compute validation
    * 2. Update the lineage entry state to "COMPLETED" and write metadata to the property store
@@ -2274,9 +2268,9 @@ public class PinotHelixResourceManager {
    * metadata.
    *
    * @param tableNameWithType
-   * @param batchId
+   * @param segmentLineageEntryId
    */
-  public void endBatchUpload(String tableNameWithType, String batchId) {
+  public void endReplaceSegments(String tableNameWithType, String segmentLineageEntryId) {
     try {
       DEFAULT_RETRY_POLICY.attempt(() -> {
         // Fetch the segment lineage metadata
@@ -2285,15 +2279,16 @@ public class PinotHelixResourceManager {
         SegmentLineage segmentLineage;
         int expectedVersion = -1;
         Preconditions.checkArgument(segmentLineageZNRecord != null, String
-            .format("Segment lineage does not exist. (tableNameWithType = '%s', batchId = '%s')", tableNameWithType,
-                batchId));
+            .format("Segment lineage does not exist. (tableNameWithType = '%s', segmentLineageEntryId = '%s')",
+                tableNameWithType, segmentLineageEntryId));
         segmentLineage = SegmentLineage.fromZNRecord(segmentLineageZNRecord);
         expectedVersion = segmentLineageZNRecord.getVersion();
 
-        // Look up the lineage entry based on the batch id
-        LineageEntry lineageEntry = segmentLineage.getLineageEntry(batchId);
-        Preconditions.checkArgument(lineageEntry != null,
-            String.format("Invalid batch id (tableName='%s', batchId='%s')", tableNameWithType, batchId));
+        // Look up the lineage entry based on the segment lineage entry id
+        LineageEntry lineageEntry = segmentLineage.getLineageEntry(segmentLineageEntryId);
+        Preconditions.checkArgument(lineageEntry != null, String
+            .format("Invalid segment lineage entry id (tableName='%s', segmentLineageEntryId='%s')", tableNameWithType,
+                segmentLineageEntryId));
 
         // Check that all the segments from 'segmentsTo' exist in the table
         Set<String> segmentsForTable = new HashSet<>(getSegmentsFor(tableNameWithType));
@@ -2303,8 +2298,9 @@ public class PinotHelixResourceManager {
 
         // NO-OPS if the entry is already completed
         if (lineageEntry.getState() == LineageEntryState.COMPLETED) {
-          LOGGER.warn("Lineage entry state is already COMPLETED. Nothing to update. (tableNameWithType={}, batchId={})",
-              tableNameWithType, batchId);
+          LOGGER.warn(
+              "Lineage entry state is already COMPLETED. Nothing to update. (tableNameWithType={}, segmentLineageEntryId={})",
+              tableNameWithType, segmentLineageEntryId);
           return true;
         }
 
@@ -2312,21 +2308,22 @@ public class PinotHelixResourceManager {
         LineageEntry newLineageEntry =
             new LineageEntry(lineageEntry.getSegmentsFrom(), lineageEntry.getSegmentsTo(), LineageEntryState.COMPLETED,
                 System.currentTimeMillis());
-        segmentLineage.updateLineageEntry(batchId, newLineageEntry);
+        segmentLineage.updateLineageEntry(segmentLineageEntryId, newLineageEntry);
 
         // Write back to the lineage entry
         return SegmentLineageAccessHelper.writeSegmentLineage(_propertyStore, segmentLineage, expectedVersion);
       });
     } catch (Exception e) {
       String errorMsg = String
-          .format("Failed to update the segment lineage. (tableName = %s, batchId = %s)", tableNameWithType, batchId);
+          .format("Failed to update the segment lineage. (tableName = %s, segmentLineageEntryId = %s)",
+              tableNameWithType, segmentLineageEntryId);
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg, e);
     }
 
     // Only successful attempt can reach here
-    LOGGER.info("endBatchUpload is successfully processed. (tableNameWithType = {}, batchId = {})", tableNameWithType,
-        batchId);
+    LOGGER.info("endReplaceSegments is successfully processed. (tableNameWithType = {}, segmentLineageEntryId = {})",
+        tableNameWithType, segmentLineageEntryId);
   }
 
   /*

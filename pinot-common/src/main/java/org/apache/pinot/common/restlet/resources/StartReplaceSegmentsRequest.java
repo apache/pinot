@@ -20,27 +20,27 @@ package org.apache.pinot.common.restlet.resources;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 
 
 /**
- * Request object for startBatchUpload API.
+ * Request object for startReplaceSegments API.
  *
  * 1. segmentsFrom : original segments. This field can be empty in case the user tries to upload the original segments
  *    and wants to achieve the atomic update of multiple segments.
  * 2. segmentsTo : merged segments.
  */
-public class StartBatchUploadRequest {
+public class StartReplaceSegmentsRequest {
   private List<String> _segmentsFrom;
   private List<String> _segmentsTo;
 
-  public StartBatchUploadRequest(@JsonProperty("segmentsFrom") @Nullable List<String> segmentsFrom,
+  public StartReplaceSegmentsRequest(@JsonProperty("segmentsFrom") @Nullable List<String> segmentsFrom,
       @JsonProperty("segmentsTo") List<String> segmentsTo) {
-    _segmentsFrom = (segmentsFrom == null) ? new ArrayList<>() : segmentsFrom;
+    _segmentsFrom = (segmentsFrom == null) ? Collections.emptyList() : segmentsFrom;
     _segmentsTo = segmentsTo;
-    Preconditions.checkNotNull(segmentsTo, "'segmentsTo' cannot be null");
+    Preconditions.checkArgument(segmentsTo != null && !segmentsTo.isEmpty(), "'segmentsTo' should not be null or empty");
   }
 
   public List<String> getSegmentsFrom() {

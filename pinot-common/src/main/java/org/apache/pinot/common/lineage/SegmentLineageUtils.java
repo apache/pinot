@@ -24,7 +24,11 @@ import java.util.UUID;
 /**
  * Util class for Segment Lineage
  */
-public class SegmentLineageUtil {
+public class SegmentLineageUtils {
+
+  private SegmentLineageUtils() {
+  }
+
   /**
    * Generate lineage entry id using UUID.
    *

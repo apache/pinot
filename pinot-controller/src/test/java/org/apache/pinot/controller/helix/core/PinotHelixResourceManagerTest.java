@@ -87,9 +87,9 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME);
 
-  private static final String BATCH_UPLOAD_TEST_TABLE_NAME = "batchUploadTestTable";
-  private static final String OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME =
-      TableNameBuilder.OFFLINE.tableNameWithType(BATCH_UPLOAD_TEST_TABLE_NAME);
+  private static final String SEGMENTS_REPLACE_TEST_TABLE_NAME = "segmentsReplaceTestTable";
+  private static final String OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME =
+      TableNameBuilder.OFFLINE.tableNameWithType(SEGMENTS_REPLACE_TEST_TABLE_NAME);
 
   private static final int CONNECTION_TIMEOUT_IN_MILLISECOND = 10_000;
   private static final int MAX_TIMEOUT_IN_MILLISECOND = 5_000;
@@ -521,42 +521,43 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
 
     // Create the table
     TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME).setNumReplicas(2)
-            .setBrokerTenant(BROKER_TENANT_NAME).setServerTenant(SERVER_TENANT_NAME).build();
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME)
+            .setNumReplicas(2).setBrokerTenant(BROKER_TENANT_NAME).setServerTenant(SERVER_TENANT_NAME).build();
 
     _helixResourceManager.addTable(tableConfig);
 
     for (int i = 0; i < 5; i++) {
-      _helixResourceManager.addNewSegment(OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME,
-          SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME, "s" + i), "downloadUrl");
+      _helixResourceManager.addNewSegment(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME,
+          SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, "s" + i),
+          "downloadUrl");
     }
-    List<String> segmentsForTable = _helixResourceManager.getSegmentsFor(OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME);
+    List<String> segmentsForTable = _helixResourceManager.getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
     Assert.assertEquals(segmentsForTable.size(), 5);
-
-    // Check null and empty segments from/to
-    try {
-      _helixResourceManager
-          .startBatchUpload(OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME, new ArrayList<>(), new ArrayList<>());
-    } catch (Exception e) {
-      // expected
-    }
 
     List<String> segmentsFrom = new ArrayList<>();
     List<String> segmentsTo = Arrays.asList("s5", "s6");
 
-    String batchId = _helixResourceManager.startBatchUpload(OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME, segmentsFrom, segmentsTo);
+    String lineageEntryId =
+        _helixResourceManager.startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo);
     SegmentLineage segmentLineage =
-        SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME);
+        SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
     Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 1);
-    Assert.assertEquals(segmentLineage.getLineageEntry(batchId).getSegmentsFrom(), new ArrayList<>());
-    Assert.assertEquals(segmentLineage.getLineageEntry(batchId).getSegmentsTo(), segmentsTo);
-    Assert.assertEquals(segmentLineage.getLineageEntry(batchId).getState(), LineageEntryState.IN_PROGRESS);
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId).getSegmentsFrom(), new ArrayList<>());
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId).getSegmentsTo(), segmentsTo);
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId).getState(), LineageEntryState.IN_PROGRESS);
 
     // Check invalid segmentsTo
     segmentsFrom = Arrays.asList("s1", "s2");
     segmentsTo = Arrays.asList("s3", "s4");
     try {
-      _helixResourceManager.startBatchUpload(OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME, segmentsFrom, segmentsTo);
+      _helixResourceManager.startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo);
+    } catch (Exception e) {
+      // expected
+    }
+    segmentsFrom = Arrays.asList("s1", "s2");
+    segmentsTo = Arrays.asList("s2");
+    try {
+      _helixResourceManager.startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo);
     } catch (Exception e) {
       // expected
     }
@@ -565,74 +566,77 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     segmentsFrom = Arrays.asList("s1", "s6");
     segmentsTo = Arrays.asList("merged1", "merged2");
     try {
-      _helixResourceManager.startBatchUpload(OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME, segmentsFrom, segmentsTo);
+      _helixResourceManager.startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo);
     } catch (Exception e) {
       // expected
     }
 
     segmentsFrom = Arrays.asList("s1", "s2");
-    String batchId2 =
-        _helixResourceManager.startBatchUpload(OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME, segmentsFrom, segmentsTo);
+    String lineageEntryId2 =
+        _helixResourceManager.startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo);
     segmentLineage =
-        SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME);
+        SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
     Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 2);
-    Assert.assertEquals(segmentLineage.getLineageEntry(batchId2).getSegmentsFrom(), segmentsFrom);
-    Assert.assertEquals(segmentLineage.getLineageEntry(batchId2).getSegmentsTo(), segmentsTo);
-    Assert.assertEquals(segmentLineage.getLineageEntry(batchId2).getState(), LineageEntryState.IN_PROGRESS);
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId2).getSegmentsFrom(), segmentsFrom);
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId2).getSegmentsTo(), segmentsTo);
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId2).getState(), LineageEntryState.IN_PROGRESS);
 
     try {
-      _helixResourceManager.startBatchUpload(OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME, segmentsFrom, segmentsTo);
+      _helixResourceManager.startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo);
     } catch (Exception e) {
       // expected
     }
 
     // Invalid table
     try {
-      _helixResourceManager.endBatchUpload(OFFLINE_TABLE_NAME, batchId);
+      _helixResourceManager.endReplaceSegments(OFFLINE_TABLE_NAME, lineageEntryId);
     } catch (Exception e) {
       // expected
     }
 
-    // Invalid batch id
+    // Invalid lineage entry id
     try {
-      _helixResourceManager.endBatchUpload(OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME, "aaa");
+      _helixResourceManager.endReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, "aaa");
     } catch (Exception e) {
       // expected
     }
 
     // Merged segment not available in the table
     try {
-      _helixResourceManager.endBatchUpload(OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME, batchId);
+      _helixResourceManager.endReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, lineageEntryId);
     } catch (Exception e) {
       // expected
     }
 
     // Try after adding merged segments to the table
-    _helixResourceManager.addNewSegment(OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME, "s5"), "downloadUrl");
-    _helixResourceManager.addNewSegment(OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME, "s6"), "downloadUrl");
+    _helixResourceManager.addNewSegment(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME,
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, "s5"), "downloadUrl");
+    _helixResourceManager.addNewSegment(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME,
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, "s6"), "downloadUrl");
 
-    _helixResourceManager.endBatchUpload(OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME, batchId);
+    _helixResourceManager.endReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, lineageEntryId);
     segmentLineage =
-        SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME);
+        SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
     Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 2);
-    Assert.assertEquals(segmentLineage.getLineageEntry(batchId).getSegmentsFrom(), new ArrayList<>());
-    Assert.assertEquals(segmentLineage.getLineageEntry(batchId).getSegmentsTo(), Arrays.asList("s5", "s6"));
-    Assert.assertEquals(segmentLineage.getLineageEntry(batchId).getState(), LineageEntryState.COMPLETED);
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId).getSegmentsFrom(), new ArrayList<>());
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId).getSegmentsTo(), Arrays.asList("s5", "s6"));
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId).getState(), LineageEntryState.COMPLETED);
 
-    _helixResourceManager.addNewSegment(OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME, "merged1"), "downloadUrl");
-    _helixResourceManager.addNewSegment(OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME, "merged2"), "downloadUrl");
+    _helixResourceManager.addNewSegment(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME,
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, "merged1"),
+        "downloadUrl");
+    _helixResourceManager.addNewSegment(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME,
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, "merged2"),
+        "downloadUrl");
 
-    _helixResourceManager.endBatchUpload(OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME, batchId2);
+    _helixResourceManager.endReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, lineageEntryId2);
     segmentLineage =
-        SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME);
+        SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
     Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 2);
-    Assert.assertEquals(segmentLineage.getLineageEntry(batchId2).getSegmentsFrom(), Arrays.asList("s1", "s2"));
-    Assert.assertEquals(segmentLineage.getLineageEntry(batchId2).getSegmentsTo(), Arrays.asList("merged1", "merged2"));
-    Assert.assertEquals(segmentLineage.getLineageEntry(batchId2).getState(), LineageEntryState.COMPLETED);
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId2).getSegmentsFrom(), Arrays.asList("s1", "s2"));
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId2).getSegmentsTo(),
+        Arrays.asList("merged1", "merged2"));
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId2).getState(), LineageEntryState.COMPLETED);
   }
 
   private void untagBrokers() {

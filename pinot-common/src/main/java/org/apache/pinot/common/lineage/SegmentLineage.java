@@ -24,7 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.ZNRecord;
 
 
@@ -119,8 +119,8 @@ public class SegmentLineage {
       String lineageId = listField.getKey();
       List<String> value = listField.getValue();
       Preconditions.checkState(value.size() == 4);
-      List<String> segmentsFrom = Arrays.asList(StringUtils.split(value.get(0), ','));
-      List<String> segmentsTo = Arrays.asList(StringUtils.split(value.get(1), ','));
+      List<String> segmentsFrom = Arrays.asList(StringUtils.split(value.get(0), COMMA_SEPARATOR));
+      List<String> segmentsTo = Arrays.asList(StringUtils.split(value.get(1), COMMA_SEPARATOR));
       LineageEntryState state = LineageEntryState.valueOf(value.get(2));
       long timestamp = Long.parseLong(value.get(3));
       lineageEntries.put(lineageId, new LineageEntry(segmentsFrom, segmentsTo, state, timestamp));
@@ -136,8 +136,8 @@ public class SegmentLineage {
     ZNRecord znRecord = new ZNRecord(_tableNameWithType);
     for (Map.Entry<String, LineageEntry> entry : _lineageEntries.entrySet()) {
       LineageEntry lineageEntry = entry.getValue();
-      String segmentsFrom = String.join(",", lineageEntry.getSegmentsFrom());
-      String segmentsTo = String.join(",", lineageEntry.getSegmentsTo());
+      String segmentsFrom = String.join(COMMA_SEPARATOR, lineageEntry.getSegmentsFrom());
+      String segmentsTo = String.join(COMMA_SEPARATOR, lineageEntry.getSegmentsTo());
       String state = lineageEntry.getState().toString();
       String timestamp = Long.toString(lineageEntry.getTimestamp());
       List<String> listEntry = Arrays.asList(segmentsFrom, segmentsTo, state, timestamp);
