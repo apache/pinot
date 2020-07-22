@@ -252,6 +252,7 @@ public class DetectionUtils {
       long start, long end, DetectionPipelineLoader loader, DataProvider provider) throws Exception {
     String baselineProviderComponentName = anomaly.getProperties().get(PROP_BASELINE_PROVIDER_COMPONENT_NAME);
     BaselineProvider baselineProvider = new RuleBaselineProvider();
+    TimeSeries returnTimeSeries;
 
     if (baselineProviderComponentName != null && config != null &&
         config.getComponentSpecs().containsKey(baselineProviderComponentName)) {
@@ -265,7 +266,20 @@ public class DetectionUtils {
       InputDataFetcher dataFetcher = new DefaultInputDataFetcher(provider, config.getId());
       baselineProvider.init(spec, dataFetcher);
     }
-    return baselineProvider.computePredictedTimeSeries(MetricSlice.from(metricId, start, end, filters));
+
+    try {
+      returnTimeSeries = baselineProvider.computePredictedTimeSeries(MetricSlice.from(metricId, start, end, filters));
+    } catch (Exception e) {
+      // send current if the predicted baseline can't be trained
+      BaselineProvider alternateProvider = new RuleBaselineProvider();
+      RuleBaselineProviderSpec spec = new RuleBaselineProviderSpec();
+      spec.setOffset("current");
+      InputDataFetcher dataFetcher = new DefaultInputDataFetcher(provider, config.getId());
+      alternateProvider.init(spec, dataFetcher);
+      returnTimeSeries = alternateProvider.computePredictedTimeSeries(MetricSlice.from(metricId, start, end, filters));
+    }
+
+    return returnTimeSeries;
   }
 
   /**
