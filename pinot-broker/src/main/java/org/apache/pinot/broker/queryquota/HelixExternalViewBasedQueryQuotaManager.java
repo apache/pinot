@@ -88,9 +88,9 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
       ExternalView brokerResourceEV = HelixHelper
           .getExternalViewForResource(_helixManager.getClusterManagmentTool(), _helixManager.getClusterName(),
               CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
-      processQueryQuotaChange(brokerResourceEV);
+      processQueryRateLimitingExternalViewChange(brokerResourceEV);
     } else {
-      processQueryQuotaInstanceConfigChange();
+      processQueryRateLimitingInstanceConfigChange();
     }
   }
 
@@ -291,7 +291,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   /**
    * Process query quota change when number of online brokers has changed.
    */
-  public void processQueryQuotaChange(ExternalView currentBrokerResource) {
+  public void processQueryRateLimitingExternalViewChange(ExternalView currentBrokerResource) {
     LOGGER.info("Start processing qps quota change.");
     long startTime = System.currentTimeMillis();
 
@@ -382,7 +382,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   /**
    * Process query quota state change when instance config gets changed
    */
-  public void processQueryQuotaInstanceConfigChange() {
+  public void processQueryRateLimitingInstanceConfigChange() {
     getQueryQuotaEnabledFlagFromInstanceConfig();
   }
 

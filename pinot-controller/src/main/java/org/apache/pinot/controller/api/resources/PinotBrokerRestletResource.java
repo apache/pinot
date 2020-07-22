@@ -144,14 +144,12 @@ public class PinotBrokerRestletResource {
       @ApiParam(value = "Broker instance name", required = true, example = "Broker_my.broker.com_30000") @PathParam("instanceName") String brokerInstanceName,
       @ApiParam(value = "ENABLE|DISABLE", allowableValues = "ENABLE, DISABLE", required = true)  @QueryParam("state") String state) {
     if (brokerInstanceName == null || !brokerInstanceName.startsWith("Broker_")) {
-      LOGGER.info("{} isn't a valid broker instance name", brokerInstanceName);
       throw new ControllerApplicationException(LOGGER,
           String.format("'%s' is not a valid broker instance name.", brokerInstanceName), Response.Status.BAD_REQUEST);
     }
     validateQueryQuotaStateChange(state);
     List<String> liveInstances = _pinotHelixResourceManager.getOnlineInstanceList();
     if (!liveInstances.contains(brokerInstanceName)) {
-      LOGGER.info("Broker instance: {} not found from live instances", brokerInstanceName);
       throw new ControllerApplicationException(LOGGER, String.format("Instance '%s' not found.", brokerInstanceName),
           Response.Status.NOT_FOUND);
     }
