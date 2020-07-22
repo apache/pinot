@@ -1059,22 +1059,25 @@ public class YamlResource {
    * Query all detection yaml configurations and optionally filter, then format as JSON and enhance with
    * detection config id, isActive, and createdBy information
    *
+   * NOTE: it is limited to list and filter the most recent 100 alerts only due to possible OOM issues.
+   *
    * @param dataset The dataset param passed by the client in the REST API call.
    * @param metric The metric param passed by the client in the REST API call.
    * @return the yaml configuration converted in to JSON, with enhanced information from detection config DTO.
    */
+  @Deprecated
   private List<Map<String, Object>> queryDetectionConfigurations(String dataset, String metric) {
     List<Map<String, Object>> yamls;
     if (dataset == null && metric == null) {
       yamls = this.detectionConfigDAO
-          .findAll()
+          .list(100, 0)
           .parallelStream()
           .map(config -> formatConfigOrNull(config))
           .filter(c -> c!= null)
           .collect(Collectors.toList());
     } else {
       yamls = this.detectionConfigDAO
-          .findAll()
+          .list(100, 0)
           .parallelStream()
           .map(config -> formatConfigOrNull(config))
           .filter(c -> c!= null)
@@ -1096,8 +1099,12 @@ public class YamlResource {
    */
   @GET
   @Path("/list")
-  @ApiOperation("Get the list of all detection YAML configurations as JSON enhanced with additional information, optionally filtered.")
+  @ApiOperation(
+      "Get the list of all detection YAML configurations as JSON enhanced with additional information, optionally filtered."
+          + "IMPORTANT NOTE: This endpoint is deprecated because it is not scalable. Please use the /alerts endpoint instead. "
+          + "For now, it is limited to list and filter the most recent 100 alerts only. ")
   @Produces(MediaType.APPLICATION_JSON)
+  @Deprecated
   public Response listYamls(
       @ApiParam("Dataset the detection configurations should be filtered by") @QueryParam("dataset") String dataset,
       @ApiParam("Metric the detection configurations should be filtered by") @QueryParam("metric") String metric){
