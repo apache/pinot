@@ -68,7 +68,7 @@ public class IngestionJobLauncherTest {
     SegmentGenerationJobSpec spec = IngestionJobLauncher.getSegmentGenerationJobSpec(
         GroovyTemplateUtils.class.getClassLoader().getResource("ingestionJobSpecTemplate.json").getFile(),
         GroovyTemplateUtils.class.getClassLoader().getResource("job_json.config").getFile(), null);
-    Assert.assertEquals(spec.getInputDirURI(), "file:///path/to/input/2019/06/07");
-    Assert.assertEquals(spec.getOutputDirURI(), "file:///path/to/output/2019/06/07");
+    Assert.assertEquals(spec.getInputDirURI(), "file:///path/to/input/2020/07/22");
+    Assert.assertEquals(spec.getOutputDirURI(), "file:///path/to/output/2020/07/22");
   }
 }
