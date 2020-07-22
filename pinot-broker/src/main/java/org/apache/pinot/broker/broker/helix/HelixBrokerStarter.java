@@ -123,7 +123,7 @@ public class HelixBrokerStarter implements ServiceStartable {
     _brokerId = _brokerConf.getProperty(Helix.Instance.INSTANCE_ID_KEY,
         Helix.PREFIX_OF_BROKER_INSTANCE + brokerHost + "_" + _brokerConf
             .getProperty(Helix.KEY_OF_BROKER_QUERY_PORT, Helix.DEFAULT_BROKER_QUERY_PORT));
-    
+
     _brokerConf.addProperty(Broker.CONFIG_OF_BROKER_ID, _brokerId);
   }
 
@@ -229,7 +229,7 @@ public class HelixBrokerStarter implements ServiceStartable {
     _routingManager.init(_spectatorHelixManager);
     _accessControlFactory = AccessControlFactory.loadFactory(_brokerConf.subset(Broker.ACCESS_CONTROL_CONFIG_PREFIX));
     HelixExternalViewBasedQueryQuotaManager queryQuotaManager =
-        new HelixExternalViewBasedQueryQuotaManager(_brokerMetrics);
+        new HelixExternalViewBasedQueryQuotaManager(_brokerMetrics, _brokerId);
     queryQuotaManager.init(_spectatorHelixManager);
     // Initialize FunctionRegistry before starting the broker request handler
     FunctionRegistry.init();
@@ -252,6 +252,7 @@ public class HelixBrokerStarter implements ServiceStartable {
       instanceConfigChangeHandler.init(_spectatorHelixManager);
     }
     _instanceConfigChangeHandlers.add(_routingManager);
+    _instanceConfigChangeHandlers.add(queryQuotaManager);
     for (ClusterChangeHandler liveInstanceChangeHandler : _liveInstanceChangeHandlers) {
       liveInstanceChangeHandler.init(_spectatorHelixManager);
     }
@@ -396,10 +397,10 @@ public class HelixBrokerStarter implements ServiceStartable {
 
   public static HelixBrokerStarter getDefault() throws Exception {
     Map<String, Object> properties = new HashMap<>();
-    
+
     properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, 5001);
     properties.put(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
-    
+
     return new HelixBrokerStarter(new PinotConfiguration(properties), "quickstart", "localhost:2122");
   }
 
