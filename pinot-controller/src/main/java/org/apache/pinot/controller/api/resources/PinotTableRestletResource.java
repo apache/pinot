@@ -377,6 +377,13 @@ public class PinotTableRestletResource {
     // Enable table by tableType
     toggleTableState(tableName, tableType, StateType.ENABLE);
 
+    // Setup table for real-time : (ensureRealtimeClusterIsSetUp)
+    if (tableType != TableType.OFFLINE && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
+      String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+      TableConfig realtimeTableConfig = _pinotHelixResourceManager.getTableConfig(realtimeTableName);
+      _pinotHelixResourceManager.ensureRealtimeClusterIsSetUp(realtimeTableConfig);
+    }
+
     if (!response.isSuccessful()) {
       throw new ControllerApplicationException(LOGGER,
           "Failed to delete segments from table: " + tableNameWithType + ", error message: " + response.getMessage(),
@@ -392,7 +399,7 @@ public class PinotTableRestletResource {
       // toggle offline table status
       _pinotHelixResourceManager.toggleTableState(tableNameWithType, status);
     }
-    if (tableType != TableType.OFFLINE && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
+    if (tableType != TableType.OFFLINE && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
       String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
       // toggle real-time table status
       _pinotHelixResourceManager.toggleTableState(tableNameWithType, status);
