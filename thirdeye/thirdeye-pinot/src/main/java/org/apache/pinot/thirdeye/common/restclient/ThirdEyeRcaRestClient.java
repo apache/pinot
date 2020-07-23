@@ -20,10 +20,13 @@
 package org.apache.pinot.thirdeye.common.restclient;
 
 import java.io.IOException;
-import java.util.HashMap;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
+import javax.ws.rs.client.Client;
+import javax.ws.rs.core.MultivaluedHashMap;
+import javax.ws.rs.core.MultivaluedMap;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.auth.ThirdEyePrincipal;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.AuthResource;
@@ -55,9 +58,9 @@ public class ThirdEyeRcaRestClient extends AbstractRestClient {
     }
   }
 
-  /** For testing only, create a client with an alternate URLFactory. This constructor allows unit tests to mock server communication. */
-  /* package private */  ThirdEyeRcaRestClient(HttpURLConnectionFactory connectionFactory, ThirdEyePrincipal principal) {
-    super(connectionFactory);
+  /** For testing only, create a client with an alternate Client. This constructor allows unit tests to mock server communication. */
+  /* package private */  ThirdEyeRcaRestClient(Client client, ThirdEyePrincipal principal) {
+    super(client);
     this.principal = principal;
     this.thirdEyeHost = DEFAULT_THIRDEYE_RCA_SERVICE_HOST;
   }
@@ -69,12 +72,11 @@ public class ThirdEyeRcaRestClient extends AbstractRestClient {
     TreeMap<String, String> queryParameters = new TreeMap<String, String>();
     queryParameters.put("anomalyId", String.valueOf(anomalyId));
 
-    Map<String, String> headers = new HashMap<>();
-    headers.put("Cookie", AuthResource.AUTH_TOKEN_NAME + "=" + principal.getSessionKey());
+    MultivaluedMap<String, Object> headers = new MultivaluedHashMap<>();
+    headers.put("Cookie", Arrays.asList(AuthResource.AUTH_TOKEN_NAME + "=" + principal.getSessionKey()));
 
     return doGet(
         composeUrl(this.thirdEyeHost, THIRDEYE_RCA_HIGHLIGHTS_URI, queryParameters),
-        this.thirdEyeHost,
         headers,
         new ResponseToMap());
   }
@@ -96,11 +98,11 @@ public class ThirdEyeRcaRestClient extends AbstractRestClient {
     queryParameters.put(CUBE_SUMMARY_SIZE, Long.toString(cubeSummarySize));
     queryParameters.put(CUBE_ORDER_TYPE, "auto");
 
-    Map<String, String> headers = new HashMap<>();
-    headers.put("Cookie", AuthResource.AUTH_TOKEN_NAME + "=" + principal.getSessionKey());
+    MultivaluedMap<String, Object> headers = new MultivaluedHashMap<>();
+    headers.put("Cookie", Arrays.asList(AuthResource.AUTH_TOKEN_NAME + "=" + principal.getSessionKey()));
+
     return doGet(
         composeUrl(this.thirdEyeHost, THIRDEYE_RCA_CUBE_URI, queryParameters),
-        this.thirdEyeHost,
         headers,
         new ResponseToMap());
   }

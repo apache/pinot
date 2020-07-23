@@ -58,13 +58,27 @@ public class MetricAnomaliesContent extends BaseNotificationContent {
   private static final Logger LOG = LoggerFactory.getLogger(MetricAnomaliesContent.class);
 
   private DetectionConfigManager configDAO = null;
+  private ThirdEyeRcaRestClient rcaClient;
 
-  public MetricAnomaliesContent() {}
+  public MetricAnomaliesContent() {
+  }
+
+  // For testing
+  public MetricAnomaliesContent(ThirdEyeRcaRestClient rcaClient) {
+    this.rcaClient = rcaClient;
+  }
 
   @Override
   public void init(Properties properties, ThirdEyeAnomalyConfiguration configuration) {
     super.init(properties, configuration);
     this.configDAO = DAORegistry.getInstance().getDetectionConfigManager();
+
+    if (this.rcaClient == null) {
+      ThirdEyePrincipal principal = new ThirdEyePrincipal();
+      principal.setName(this.thirdEyeAnomalyConfig.getThirdEyeRestClientConfiguration().getAdminUser());
+      principal.setSessionKey(this.thirdEyeAnomalyConfig.getThirdEyeRestClientConfiguration().getSessionKey());
+      this.rcaClient = new ThirdEyeRcaRestClient(principal, this.thirdEyeAnomalyConfig.getDashboardHost());
+    }
   }
 
   @Override
@@ -208,11 +222,7 @@ public class MetricAnomaliesContent extends BaseNotificationContent {
       String anomalyId = metricAnomalyReports.values().iterator().next().getAnomalyId();
       Map<String, Object> rcaHighlights = new HashMap<>();
       try {
-        ThirdEyePrincipal principal = new ThirdEyePrincipal();
-        principal.setName(this.thirdEyeAnomalyConfig.getThirdEyeRestClientConfiguration().getAdminUser());
-        principal.setSessionKey(this.thirdEyeAnomalyConfig.getThirdEyeRestClientConfiguration().getSessionKey());
-        rcaHighlights = new ThirdEyeRcaRestClient(principal, this.thirdEyeAnomalyConfig.getDashboardHost())
-            .getRootCauseHighlights(Long.parseLong(anomalyId));
+        rcaHighlights = this.rcaClient.getRootCauseHighlights(Long.parseLong(anomalyId));
       } catch (IOException e) {
         LOG.error("Failed to retrieve the RCA Highlights for anomaly " + anomalyId, e);
       }

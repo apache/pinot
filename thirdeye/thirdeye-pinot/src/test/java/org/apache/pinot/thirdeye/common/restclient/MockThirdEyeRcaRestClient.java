@@ -19,21 +19,22 @@
 
 package org.apache.pinot.thirdeye.common.restclient;
 
+import java.io.IOException;
 import java.util.Map;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.Invocation;
 import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.GenericType;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.thirdeye.auth.ThirdEyePrincipal;
 
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyString;
+import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.*;
 
 
-public class MockAbstractRestClient {
+public class MockThirdEyeRcaRestClient {
 
-  public static Client setupMockClient(final Map<String, Object> expectedResponse) {
+  public static ThirdEyeRcaRestClient setupMockClient(final Map<String, Object> expectedResponse) {
     Client client = mock(Client.class);
 
     WebTarget webTarget = mock(WebTarget.class);
@@ -47,6 +48,9 @@ public class MockAbstractRestClient {
     when(builder.get()).thenReturn(response);
     when(response.readEntity(any(GenericType.class))).thenReturn(expectedResponse);
 
-    return client;
+    ThirdEyePrincipal principal = new ThirdEyePrincipal();
+    principal.setSessionKey("dummy");
+
+    return new ThirdEyeRcaRestClient(client, principal);
   }
 }

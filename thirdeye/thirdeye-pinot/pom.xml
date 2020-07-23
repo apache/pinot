@@ -193,11 +193,6 @@
       <artifactId>presto-jdbc</artifactId>
       <version>0.215</version>
     </dependency>
-    <dependency>
-      <groupId>com.google.code.gson</groupId>
-      <artifactId>gson</artifactId>
-      <version>2.2.2</version>
-    </dependency>
 
     <!-- dataframe specific -->
     <dependency>

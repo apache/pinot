@@ -20,12 +20,10 @@
 package org.apache.pinot.thirdeye.dashboard.resources.v2;
 
 import com.google.common.base.Preconditions;
-import com.google.gson.Gson;
 import io.dropwizard.auth.Auth;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -34,17 +32,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
 import joptsimple.internal.Strings;
 import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.auth.ThirdEyePrincipal;
-import org.apache.pinot.thirdeye.common.restclient.ThirdEyeRcaRestClient;
 import org.apache.pinot.thirdeye.dashboard.resources.SummaryResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.RootCauseEntity;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -104,7 +99,7 @@ public class RootCauseResource {
         anomalyDTO.getEndTime() - TimeUnit.DAYS.toMillis(7), Strings.EMPTY, Strings.EMPTY,
         DEFAULT_HIGHLIGHT_CUBE_SUMMARY_SIZE, DEFAULT_HIGHLIGHT_CUBE_DEPTH, SummaryResource.DEFAULT_HIERARCHIES,
         false, DEFAULT_EXCLUDED_DIMENSIONS, SummaryResource.DEFAULT_TIMEZONE_ID);
-    responseMessage.put("cubeResults", new Gson().toJson(cubeHighlights));
+    responseMessage.put("cubeResults", cubeHighlights);
 
     return responseMessage;
   }

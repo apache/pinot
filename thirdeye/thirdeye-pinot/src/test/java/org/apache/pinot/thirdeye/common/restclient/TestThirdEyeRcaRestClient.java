@@ -19,7 +19,9 @@
 
 package org.apache.pinot.thirdeye.common.restclient;
 
+import java.util.HashMap;
 import java.util.Map;
+import javax.ws.rs.client.Client;
 import org.apache.pinot.thirdeye.auth.ThirdEyePrincipal;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -30,8 +32,6 @@ import org.testng.annotations.Test;
 
 
 public class TestThirdEyeRcaRestClient {
-
-  private static String SAMPLE_RESPONSE = "{\"cubeResults\": \"{}\"}";
 
   private DAOTestBase testDAOProvider;
   private long anomalyId;
@@ -46,17 +46,20 @@ public class TestThirdEyeRcaRestClient {
     anomaly.setMetric("metric");
     anomalyId = daoRegistry.getMergedAnomalyResultDAO().save(anomaly);
   }
+
   @Test
   public void testGetAllHighlights() throws Exception {
-    AbstractRestClient.HttpURLConnectionFactory factory = MockAbstractRestClient.setupMock(
-        "http://localhost:1426/rootcause/highlights?anomalyId=1",
-        SAMPLE_RESPONSE, null);
+    Map<String, Object> expectedResponse = new HashMap<>();
+    expectedResponse.put("cubeResults", "{}");
+
+    Client client = MockAbstractRestClient.setupMockClient(expectedResponse);
 
     ThirdEyePrincipal principal = new ThirdEyePrincipal();
     principal.setSessionKey("dummy");
-    ThirdEyeRcaRestClient client = new ThirdEyeRcaRestClient(factory, principal);
-    Map<String, Object> result = client.getRootCauseHighlights(anomalyId);
+    ThirdEyeRcaRestClient rcaClient = new ThirdEyeRcaRestClient(client, principal);
+    Map<String, Object> result = rcaClient.getRootCauseHighlights(anomalyId);
 
     Assert.assertTrue(result.containsKey("cubeResults"));
+    Assert.assertEquals(expectedResponse.get("cubeResults"), result.get("cubeResults"));
   }
 }
