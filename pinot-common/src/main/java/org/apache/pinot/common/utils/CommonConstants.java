@@ -187,7 +187,6 @@ public class CommonConstants {
         "pinot.server.instance.realtime.alloc.offheap.direct";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.server.storage.factory";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "pinot.server.crypter";
-    public static final String CONFIG_OF_SEGMENT_STORE_URI= "pinot.server.instance.segment.store.uri";
     // Configuration to consider the server ServiceStatus as being STARTED if the percent of resources (tables) that
     // are ONLINE for this this server has crossed the threshold percentage of the total number of tables
     // that it is expected to serve.
