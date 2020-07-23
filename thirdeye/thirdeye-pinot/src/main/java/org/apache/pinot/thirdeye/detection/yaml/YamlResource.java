@@ -225,9 +225,9 @@ public class YamlResource {
   /*
    * Create a yaml onboarding task. It runs 1 month replay and re-tune the pipeline.
    */
-  private void createYamlOnboardingTask(long configId, long tuningWindowStart, long tuningWindowEnd) throws Exception {
+  private void createYamlOnboardingTask(DetectionConfigDTO detectionConfig, long tuningWindowStart, long tuningWindowEnd) throws Exception {
     YamlOnboardingTaskInfo info = new YamlOnboardingTaskInfo();
-    info.setConfigId(configId);
+    info.setConfigId(detectionConfig.getId());
     if (tuningWindowStart == 0L && tuningWindowEnd == 0L) {
       // default tuning window 28 days
       tuningWindowEnd = System.currentTimeMillis();
@@ -236,10 +236,17 @@ public class YamlResource {
     info.setTuningWindowStart(tuningWindowStart);
     info.setTuningWindowEnd(tuningWindowEnd);
     info.setEnd(System.currentTimeMillis());
-    info.setStart(info.getEnd() - ONBOARDING_REPLAY_LOOKBACK);
+
+    long backFillStart = detectionConfig.getBackfillStart();
+    // If no value is present, set the default lookback
+    if (backFillStart == -1) {
+      backFillStart = info.getEnd() - ONBOARDING_REPLAY_LOOKBACK;
+    }
+    info.setStart(backFillStart);
+
     String taskInfoJson = OBJECT_MAPPER.writeValueAsString(info);
 
-    TaskDTO taskDTO = TaskUtils.buildTask(configId, taskInfoJson, TaskConstants.TaskType.YAML_DETECTION_ONBOARD);
+    TaskDTO taskDTO = TaskUtils.buildTask(detectionConfig.getId(), taskInfoJson, TaskConstants.TaskType.YAML_DETECTION_ONBOARD);
     long taskId = this.taskDAO.save(taskDTO);
     LOG.info("Created {} task {} with taskId {}", TaskConstants.TaskType.YAML_DETECTION_ONBOARD, taskDTO, taskId);
   }
@@ -299,8 +306,8 @@ public class YamlResource {
   public Response createYamlAlert(
       @Auth ThirdEyePrincipal user,
       @ApiParam(value =  "a json contains both subscription and detection yaml as string")  String payload,
-      @ApiParam("tuning window start time for tunable components") @QueryParam("startTime") long startTime,
-      @ApiParam("tuning window end time for tunable components") @QueryParam("endTime") long endTime) throws Exception {
+      @ApiParam("tuning window start time for tunable components") @QueryParam("startTime") long tuningStartTime,
+      @ApiParam("tuning window end time for tunable components") @QueryParam("endTime") long tuningEndTime) throws Exception {
     Map<String, String> responseMessage = new HashMap<>();
 
     // validate the payload
@@ -323,7 +330,7 @@ public class YamlResource {
       String detectionYaml = yamls.get(PROP_DETECTION);
       Preconditions.checkArgument(StringUtils.isNotBlank(detectionYaml), "detection yaml is missing");
 
-      detectionConfigId = createDetectionConfig(detectionYaml, startTime, endTime);
+      detectionConfigId = createDetectionConfig(detectionYaml, tuningStartTime, tuningEndTime);
     } catch (IllegalArgumentException e) {
       return processBadRequestResponse(PROP_DETECTION, YamlOperations.CREATING.name(), payload, e);
     } catch (Exception e) {
@@ -376,14 +383,14 @@ public class YamlResource {
     return createDetectionConfig(yamlDetectionConfig, 0, 0);
   }
 
-  long createDetectionConfig(@NotNull String payload, long startTime, long endTime) throws Exception {
+  long createDetectionConfig(@NotNull String payload, long tuningStartTime, long tuningEndTime) throws Exception {
     // if can't acquire alert onboarding QPS permit, throw an exception
     if (!this.onboardingRateLimiter.tryAcquire()) {
       throw new RuntimeException(
           String.format("Server is busy handling create detection requests. Please retry later. QPS quota: %f", this.onboardingRateLimiter.getRate()));
     }
 
-    DetectionConfigDTO detectionConfig = buildDetectionConfigFromYaml(startTime, endTime, payload, null);
+    DetectionConfigDTO detectionConfig = buildDetectionConfigFromYaml(tuningStartTime, tuningEndTime, payload, null);
 
     // Check for duplicates
     List<DetectionConfigDTO> detectionConfigDTOS = detectionConfigDAO
@@ -398,7 +405,7 @@ public class YamlResource {
     Preconditions.checkNotNull(id, "Error while saving the detection pipeline");
 
     // create an yaml onboarding task to run replay and tuning
-    createYamlOnboardingTask(detectionConfig.getId(), startTime, endTime);
+    createYamlOnboardingTask(detectionConfig, tuningStartTime, tuningEndTime);
 
     return detectionConfig.getId();
   }

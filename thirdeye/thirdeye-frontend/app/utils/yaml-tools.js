@@ -12,12 +12,11 @@ dataset: dataset_to_which_this_metric_belongs
 rules:
 - detection:
   - name: detection_rule_1
-    type: ALGORITHM             # Configure the detection type here. See doc for more details.
+    type: PERCENTAGE_RULE       # Configure the detection type here. See doc for more details.
     params:                     # The parameters for this rule. Different rules have different params.
-      configuration:
-        bucketPeriod: P1D       # Use P1D for daily; PT1H for hourly; PT5M for minutely data.
-        pValueThreshold: 0.05   # Higher value means more sensitive to small changes.
-        mlConfig: true          # Automatically maintain configuration with the best performance.
+      offset: wo1w              # Percentage rule wo1w implies that it will compare current values with last week
+      percentageChange: 0.3     # This means that a deviation of more than 30% from last week would correspond to an anomaly 
+  
   filter:                       # Filter out anomalies detected by rules to reduce noise.
   - name: filter_rule_1
     type: PERCENTAGE_CHANGE_FILTER
@@ -29,6 +28,20 @@ rules:
     type: DATA_SLA              # Alert if data is missing.
     params:
       sla: 3_DAYS               # Data is missing for 3 days since last availability
+
+# You can mention a cron to allow this detection to be run periodically
+# For example, the cron below would execute every 5 minutes.
+# cron: "0 0/5 * 1/1 * ? *"
+
+# Backfill detections
+# You can use the backfillStart parameter to denote how far back you want the anomalies
+# to be detected.
+# A valid entry is a timestamp value in millis.
+# 
+# - By default, (if not mentioned), the lookback is 30 days
+# - A value of 0 (zero) implies complete backfill till the start of data. As shown below.
+# backfillStart: 0 
+
 `;
 
 export const defaultSubscriptionYaml = `subscriptionGroupName: 'give_a_unique_name_to_this_group'
