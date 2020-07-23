@@ -35,6 +35,7 @@ public enum AggregationFunctionType {
   PERCENTILE("percentile"),
   PERCENTILEEST("percentileEst"),
   PERCENTILETDIGEST("percentileTDigest"),
+
   // geo aggregation functions
   ST_UNION("ST_Union"),
 
