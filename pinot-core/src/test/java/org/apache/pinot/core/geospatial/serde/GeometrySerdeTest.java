@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.geospatial.serde;
 
-import java.nio.ByteOrder;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.PrecisionModel;

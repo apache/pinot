@@ -22,27 +22,28 @@ package org.apache.pinot.core.geospatial;
  * The geometry type.
  */
 public enum GeometryType {
+  POINT(false, 0, "ST_Point"),
+  MULTI_POINT(true, 1, "ST_MultiPoint"),
+  LINE_STRING(false, 2, "ST_LineString"),
+  MULTI_LINE_STRING(true, 3, "ST_MultiLineString"),
+  POLYGON(false, 4, "ST_Polygon"),
+  MULTI_POLYGON(true, 5, "ST_MultiPolygon"),
+  GEOMETRY_COLLECTION(true, 6, "ST_GeomCollection");
 
-  POINT(false, 0,"ST_Point"),
-  MULTI_POINT(true, 1,"ST_MultiPoint"),
-  LINE_STRING(false, 2,"ST_LineString"),
-  MULTI_LINE_STRING(true, 3,"ST_MultiLineString"),
-  POLYGON(false, 4,"ST_Polygon"),
-  MULTI_POLYGON(true, 5,"ST_MultiPolygon"),
-  GEOMETRY_COLLECTION(true, 6,"ST_GeomCollection");
-
-  private final boolean _multitype;
+  private static final GeometryType[] ID_TO_TYPE_MAP =
+      new GeometryType[]{POINT, MULTI_POINT, LINE_STRING, MULTI_LINE_STRING, POLYGON, MULTI_POLYGON, GEOMETRY_COLLECTION};
+  private final boolean _multiType;
   private final int _id;
   private final String _name;
 
-  GeometryType(boolean multitype, int id, String name) {
-    _multitype = multitype;
+  GeometryType(boolean multiType, int id, String name) {
+    _multiType = multiType;
     _id = id;
     _name = name;
   }
 
-  public boolean isMultitype() {
-    return _multitype;
+  public boolean isMultiType() {
+    return _multiType;
   }
 
   public String getName() {
@@ -62,23 +63,8 @@ public enum GeometryType {
    * @return the serialization type
    */
   public static GeometryType fromID(int id) {
-    switch (id) {
-      case 0:
-        return POINT;
-      case 1:
-        return MULTI_POINT;
-      case 2:
-        return LINE_STRING;
-      case 3:
-        return MULTI_LINE_STRING;
-      case 4:
-        return POLYGON;
-      case 5:
-        return MULTI_POLYGON;
-      case 6:
-        return GEOMETRY_COLLECTION;
-      default:
-        throw new IllegalArgumentException("Invalid type id: " + id);
+    if (id > ID_TO_TYPE_MAP.length) {
+      throw new IllegalArgumentException("Invalid type id: " + id);
     }
-  }
-}
+    return ID_TO_TYPE_MAP[id];
+  }}

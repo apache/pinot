@@ -104,7 +104,7 @@ public class StDistanceFunction extends BaseTransformFunction {
         _results[i] = sphericalDistance(firstGeometry, secondGeometry);
       } else {
         _results[i] =
-            firstGeometry.isEmpty() || secondGeometry.isEmpty() ? null : firstGeometry.distance(secondGeometry);
+            firstGeometry.isEmpty() || secondGeometry.isEmpty() ? Double.NaN : firstGeometry.distance(secondGeometry);
       }
     }
     return _results;
@@ -121,8 +121,8 @@ public class StDistanceFunction extends BaseTransformFunction {
   }
 
   private static double sphericalDistance(Geometry leftGeometry, Geometry rightGeometry) {
-    validateGeographyType("ST_Distance", leftGeometry, EnumSet.of(GeometryType.POINT));
-    validateGeographyType("ST_Distance", rightGeometry, EnumSet.of(GeometryType.POINT));
+    Preconditions.checkArgument(leftGeometry instanceof Point, "The left argument must be a point");
+    Preconditions.checkArgument(rightGeometry instanceof Point, "The right argument must be a point");
     Point leftPoint = (Point) leftGeometry;
     Point rightPoint = (Point) rightGeometry;
 
@@ -156,14 +156,5 @@ public class StDistanceFunction extends BaseTransformFunction {
     double t2 = cos1 * sin2 - sin1 * cos2 * cosDeltaLongitude;
     double t3 = sin1 * sin2 + cos1 * cos2 * cosDeltaLongitude;
     return atan2(sqrt(t1 * t1 + t2 * t2), t3) * GeometryUtils.EARTH_RADIUS_M;
-  }
-
-  private static void validateGeographyType(String function, Geometry geometry, Set<GeometryType> validTypes) {
-    GeometryType type = GeometryType.valueOf(geometry.getGeometryType().toUpperCase());
-    if (!validTypes.contains(type)) {
-      throw new RuntimeException(String
-          .format("When applied to Geography inputs, %s only supports %s. Input " + "type is: %s", function,
-              GeometryUtils.OR_JOINER.join(validTypes), type));
-    }
   }
 }

@@ -33,14 +33,14 @@ public class ScalarFunctions {
   /**
    * Creates a point.
    *
-   * @param longitude longitude
-   * @param latitude latitude
+   * @param x x
+   * @param y y
    * @return the created point
    */
   @ScalarFunction
-  public static byte[] stPoint(double longitude, double latitude) {
+  public static byte[] stPoint(double x, double y) {
     return GeometrySerializer
-        .serialize(GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(longitude, latitude)));
+        .serialize(GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(x, y)));
   }
 
   /**

@@ -80,9 +80,9 @@ public class StAreaFunction extends BaseTransformFunction {
     }
 
     byte[][] values = _transformFunction.transformToBytesValuesSV(projectionBlock);
-    Geometry geometry;
-    for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      geometry = GeometrySerializer.deserialize(values[i]);
+    int numDocs = projectionBlock.getNumDocs();
+    for (int i = 0; i < numDocs; i++) {
+      Geometry geometry = GeometrySerializer.deserialize(values[i]);
       _results[i] = GeometryUtils.isGeography(geometry) ? calculateGeographyArea(geometry) : geometry.getArea();
     }
     return _results;
