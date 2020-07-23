@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -37,8 +38,6 @@ import javax.annotation.concurrent.ThreadSafe;
 
 import org.apache.calcite.sql.SqlKind;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
@@ -77,6 +76,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.QueryOptions;
+import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -94,6 +94,13 @@ import com.google.common.util.concurrent.RateLimiter;
 @ThreadSafe
 public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerRequestHandler.class);
+
+  private static final String INCLUSIVE_OPEN_RANGE = "(";
+  private static final String INCLUSIVE_CLOSE_RANGE = ")";
+  private static final String EXCLUSIVE_OPEN_RANGE = "[";
+  private static final String EXCLUSIVE_CLOSE_RANGE = "]";
+  private static final String ALL_VALUES_BEFORE = "*\t\t";
+  private static final String ALL_VALUES_AFTER = "\t\t*";
 
   protected final PinotConfiguration _config;
   protected final RoutingManager _routingManager;
@@ -122,19 +129,16 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   public BaseBrokerRequestHandler(PinotConfiguration config, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, BrokerMetrics brokerMetrics,
-      ZkHelixPropertyStore<ZNRecord> propertyStore) {
+      TableCache tableCache) {
     _config = config;
     _routingManager = routingManager;
     _accessControlFactory = accessControlFactory;
     _queryQuotaManager = queryQuotaManager;
     _brokerMetrics = brokerMetrics;
+    _tableCache = tableCache;
 
     _enableCaseInsensitive = _config.getProperty(CommonConstants.Helix.ENABLE_CASE_INSENSITIVE_KEY, false);
-    if (_enableCaseInsensitive) {
-      _tableCache = new TableCache(propertyStore);
-    } else {
-      _tableCache = null;
-    }
+
     _defaultHllLog2m = _config
         .getProperty(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M);
 
@@ -1044,8 +1048,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * Helper method to attach time boundary to a broker request.
    */
   private void attachTimeBoundary(String rawTableName, BrokerRequest brokerRequest, boolean isOfflineRequest) {
-    TimeBoundaryInfo timeBoundaryInfo =
-        _routingManager.getTimeBoundaryInfo(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName));
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+    TimeBoundaryInfo timeBoundaryInfo = _routingManager.getTimeBoundaryInfo(offlineTableName);
     if (timeBoundaryInfo == null) {
       LOGGER.warn("Failed to find time boundary info for hybrid table: {}", rawTableName);
       return;
@@ -1057,7 +1061,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     timeFilterQuery.setId(-1);
     timeFilterQuery.setColumn(timeBoundaryInfo.getTimeColumn());
     String timeValue = timeBoundaryInfo.getTimeValue();
-    String filterValue = isOfflineRequest ? "(*\t\t" + timeValue + "]" : "(" + timeValue + "\t\t*)";
+    String filterValue = getTimeBoundaryFilter(offlineTableName, timeValue, isOfflineRequest);
     timeFilterQuery.setValue(Collections.singletonList(filterValue));
     timeFilterQuery.setOperator(FilterOperator.RANGE);
     timeFilterQuery.setNestedFilterQueryIds(Collections.emptyList());
@@ -1085,6 +1089,24 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       brokerRequest.setFilterQuery(timeFilterQuery);
       brokerRequest.setFilterSubQueryMap(filterSubQueryMap);
     }
+  }
+
+  /**
+   * The time boundary filter string splits queries to offline and realtime pinot tables based on the current high
+   * watermark of available segments in the offline table. By default, Pinot serves all segments from offline up to
+   * the latest segment (exclusive), and everything else from realtime. However, one can configure Pinot to serve
+   * the latest offline segment inclusively via config.
+   */
+  private String getTimeBoundaryFilter(String offlineTableName, String timeValue, boolean isOfflineRequest) {
+    boolean shouldServeOfflineSegmentsImmediately = Optional.ofNullable(_tableCache.getTableConfig(offlineTableName).getQueryConfig())
+        .map(QueryConfig::getServeOfflineSegmentsImmediately)
+        .orElse(false);
+    boolean openRangeInclusive = isOfflineRequest || !shouldServeOfflineSegmentsImmediately;
+    String open = openRangeInclusive ? INCLUSIVE_OPEN_RANGE : EXCLUSIVE_OPEN_RANGE;
+    String range = isOfflineRequest ? ALL_VALUES_BEFORE + timeValue : timeValue + ALL_VALUES_AFTER;
+    boolean closeRangeExclusive = isOfflineRequest && !shouldServeOfflineSegmentsImmediately;
+    String close = closeRangeExclusive ? EXCLUSIVE_CLOSE_RANGE : INCLUSIVE_CLOSE_RANGE;
+    return open + range + close;
   }
 
   /**

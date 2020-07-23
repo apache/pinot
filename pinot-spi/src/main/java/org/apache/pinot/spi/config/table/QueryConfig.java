@@ -38,14 +38,28 @@ public class QueryConfig extends BaseJsonConfig {
   // because by the time the server times out, the broker should already timed out and returned the response.
   private final Long _timeoutMs;
 
+  // By default, Pinot serves queries to Hybrid tables by applying a time filter based on data availability.
+  // For example, when the most recent offline segment is for 1/2/2000, and a query has no time filter, then the broker
+  // queries the offline table for * - 1/2/2000 (exclusive), and the realtime table with 1/2/2000 (inclusive) - *.
+  // This config tells the broker to immediately start serving offline segments once available; or in other words, to
+  // query the offline table with the most recent time value inclusively.
+  private final Boolean _serveOfflineSegmentsImmediately;
+
   @JsonCreator
-  public QueryConfig(@JsonProperty("timeoutMs") @Nullable Long timeoutMs) {
+  public QueryConfig(@JsonProperty("timeoutMs") @Nullable Long timeoutMs,
+      @JsonProperty("serveOfflineSegmentsImmediately") @Nullable Boolean serveOfflineSegmentsImmediately) {
     Preconditions.checkArgument(timeoutMs == null || timeoutMs > 0, "Invalid 'timeoutMs': %s", timeoutMs);
     _timeoutMs = timeoutMs;
+    _serveOfflineSegmentsImmediately = serveOfflineSegmentsImmediately;
   }
 
   @Nullable
   public Long getTimeoutMs() {
     return _timeoutMs;
+  }
+
+  @Nullable
+  public Boolean getServeOfflineSegmentsImmediately() {
+    return _serveOfflineSegmentsImmediately;
   }
 }

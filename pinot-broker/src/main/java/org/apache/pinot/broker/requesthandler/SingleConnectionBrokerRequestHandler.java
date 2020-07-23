@@ -41,6 +41,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.common.utils.helix.TableCache;
 import org.apache.pinot.core.transport.AsyncQueryResponse;
 import org.apache.pinot.core.transport.QueryRouter;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -60,8 +61,8 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
 
   public SingleConnectionBrokerRequestHandler(PinotConfiguration config, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, BrokerMetrics brokerMetrics,
-      ZkHelixPropertyStore<ZNRecord> propertyStore) {
-    super(config, routingManager, accessControlFactory, queryQuotaManager, brokerMetrics, propertyStore);
+      TableCache tableCache) {
+    super(config, routingManager, accessControlFactory, queryQuotaManager, brokerMetrics, tableCache);
     _queryRouter = new QueryRouter(_brokerId, brokerMetrics);
   }
 

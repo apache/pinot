@@ -26,8 +26,6 @@ import java.util.Map;
 
 import javax.annotation.Nullable;
 
-import org.apache.commons.configuration.BaseConfiguration;
-import org.apache.commons.configuration.Configuration;
 import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixConstants.ChangeType;
@@ -61,6 +59,7 @@ import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.utils.helix.TableCache;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
@@ -235,7 +234,7 @@ public class HelixBrokerStarter implements ServiceStartable {
     FunctionRegistry.init();
     _brokerRequestHandler =
         new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory, queryQuotaManager,
-            _brokerMetrics, _propertyStore);
+            _brokerMetrics, new TableCache(_propertyStore));
 
     int brokerQueryPort = _brokerConf.getProperty(Helix.KEY_OF_BROKER_QUERY_PORT, Helix.DEFAULT_BROKER_QUERY_PORT);
     LOGGER.info("Starting broker admin application on port: {}", brokerQueryPort);
