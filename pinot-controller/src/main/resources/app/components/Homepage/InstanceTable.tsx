@@ -19,9 +19,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { TableData } from 'Models';
-import { getInstance } from '../../requests';
 import CustomizedTables from '../Table';
 import AppLoader from '../AppLoader';
+import PinotMethodUtils from '../../utils/PinotMethodUtils';
 
 type Props = {
   name: string,
@@ -36,28 +36,34 @@ const InstaceTable = ({ name, instances }: Props) => {
     records: []
   });
 
+  const fetchClusterName = async () => {
+    const clusterName = await PinotMethodUtils.getClusterName();
+    fetchLiveInstance(clusterName);
+  }
+
+  const fetchLiveInstance = async (clusterName) => {
+    const liveInstanceArr = await PinotMethodUtils.getLiveInstance(clusterName);
+    fetchData(liveInstanceArr.data);
+  }
+
+  const fetchData = async (liveInstanceArr) => {
+    const result = await PinotMethodUtils.getInstanceData(instances, liveInstanceArr);
+    setTableData(result);
+    setFetching(false);
+  };
+
   useEffect(() => {
-
-    const promiseArr = [
-      ...instances.map(inst => getInstance(inst))
-    ];
-
-    Promise.all(promiseArr).then(result => {
-      setTableData({
-        columns: ['Name', 'Enabled', 'Hostname', 'Port', 'URI'],
-        records: [
-          ...result.map(({ data }) => (
-            [data.instanceName, data.enabled, data.hostName, data.port, `${data.hostName}:${data.port}`]
-          ))
-        ]
-      });
-      setFetching(false);
-    });
-  }, [instances]);
+    fetchClusterName();
+  }, []);
 
   return (
     fetching ? <AppLoader /> :
-    <CustomizedTables title={name} data={tableData} />
+    <CustomizedTables
+      title={name}
+      data={tableData}
+      showSearchBox={true}
+      inAccordionFormat={true}
+    />
   );
 };
 

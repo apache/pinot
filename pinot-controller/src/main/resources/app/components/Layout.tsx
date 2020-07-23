@@ -23,11 +23,12 @@ import Sidebar from './SideBar';
 import Header from './Header';
 import QueryConsoleIcon from './SvgIcons/QueryConsoleIcon';
 import SwaggerIcon from './SvgIcons/SwaggerIcon';
+import ClusterManagerIcon from './SvgIcons/ClusterManagerIcon';
 
 const navigationItems = [
-  // { id: 1, name: 'Cluster Manager', link: '/' },
-  { id: 1, name: 'Query Console', link: '/', icon: <QueryConsoleIcon/> },
-  { id: 2, name: 'Swagger REST API', link: 'help', target: '_blank', icon: <SwaggerIcon/> }
+  { id: 1, name: 'Cluster Manager', link: '/', icon: <ClusterManagerIcon/> },
+  { id: 2, name: 'Query Console', link: '/query', icon: <QueryConsoleIcon/> },
+  { id: 3, name: 'Swagger REST API', link: 'help', target: '_blank', icon: <SwaggerIcon/> }
 ];
 
 const Layout = (props) => {

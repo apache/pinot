@@ -45,7 +45,8 @@ import { NavLink } from 'react-router-dom';
 import Chip from '@material-ui/core/Chip';
 import _ from 'lodash';
 import Utils from '../utils/Utils';
-import EnhancedTableToolbar from './EnhancedTableToolbar';
+import TableToolbar from './TableToolbar';
+import SimpleAccordion from './SimpleAccordion';
 
 type Props = {
   title?: string;
@@ -57,7 +58,10 @@ type Props = {
   isCellClickable?: boolean,
   highlightBackground?: boolean,
   isSticky?: boolean
-  baseURL?: string
+  baseURL?: string,
+  recordsCount?: number,
+  showSearchBox: boolean,
+  inAccordionFormat?: boolean
 };
 
 const StyledTableRow = withStyles((theme) =>
@@ -148,6 +152,10 @@ const useStyles = makeStyles((theme) => ({
   cellStatusBad: {
     color: '#f44336',
     border: '1px solid #f44336',
+  },
+  cellStatusConsuming: {
+    color: '#ff9800',
+    border: '1px solid #ff9800',
   }
 }));
 
@@ -238,7 +246,10 @@ export default function CustomizedTables({
   isCellClickable,
   highlightBackground,
   isSticky,
-  baseURL
+  baseURL,
+  recordsCount,
+  showSearchBox,
+  inAccordionFormat
 }: Props) {
   const [finalData, setFinalData] = React.useState(Utils.tableFormat(data));
 
@@ -284,7 +295,7 @@ export default function CustomizedTables({
   React.useEffect(() => {
     clearTimeout(timeoutId.current);
     timeoutId.current = setTimeout(() => {
-      filterSearchResults(search);
+      filterSearchResults(search.toLowerCase());
     }, 200);
 
     return () => {
@@ -292,8 +303,8 @@ export default function CustomizedTables({
     };
   }, [search, timeoutId, filterSearchResults]);
 
-  const styleCell = (str: string | number | boolean) => {
-    if (str === 'Good') {
+  const styleCell = (str: string) => {
+    if (str === 'Good' || str.toLowerCase() === 'online' || str.toLowerCase() === 'alive') {
       return (
         <StyledChip
           label={str}
@@ -302,7 +313,7 @@ export default function CustomizedTables({
         />
       );
     }
-    if (str === 'Bad') {
+    if (str === 'Bad' || str.toLowerCase() === 'offline' || str.toLowerCase() === 'dead') {
       return (
         <StyledChip
           label={str}
@@ -311,103 +322,147 @@ export default function CustomizedTables({
         />
       );
     }
+    if (str.toLowerCase() === 'consuming') {
+      return (
+        <StyledChip
+          label={str}
+          className={classes.cellStatusConsuming}
+          variant="outlined"
+        />
+      );
+    }
     return str.toString();
   };
 
-  return (
-    <div className={highlightBackground ? classes.highlightBackground : classes.root}>
-      {title ? (
-        <EnhancedTableToolbar
+  const renderTableComponent = () => {
+    return (
+      <>
+        <TableContainer style={{ maxHeight: isSticky ? 400 : 500 }}>
+          <Table className={classes.table} size="small" stickyHeader={isSticky}>
+            <TableHead>
+              <TableRow>
+                {data.columns.map((column, index) => (
+                  <StyledTableCell
+                    className={classes.head}
+                    key={index}
+                    onClick={() => {
+                      setFinalData(_.orderBy(finalData, column, order ? 'asc' : 'desc'));
+                      setOrder(!order);
+                      setColumnClicked(column);
+                    }}
+                  >
+                    {column}
+                    {column === columnClicked ? order ? (
+                      <ArrowDropDownIcon
+                        color="primary"
+                        style={{ verticalAlign: 'middle' }}
+                      />
+                    ) : (
+                      <ArrowDropUpIcon
+                        color="primary"
+                        style={{ verticalAlign: 'middle' }}
+                      />
+                    ) : null}
+                  </StyledTableCell>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody className={classes.body}>
+              {finalData.length === 0 ? (
+                <TableRow>
+                  <StyledTableCell
+                    className={classes.nodata}
+                    colSpan={2}
+                  >
+                    No Record(s) found
+                  </StyledTableCell>
+                </TableRow>
+              ) : (
+                finalData
+                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                  .map((row, index) => (
+                    <StyledTableRow key={index} hover>
+                      {Object.values(row).map((cell, idx) =>
+                        addLinks && !idx ? (
+                          <StyledTableCell key={idx}>
+                            <NavLink
+                              className={classes.link}
+                              to={`${baseURL}${cell}`}
+                            >
+                              {cell}
+                            </NavLink>
+                          </StyledTableCell>
+                        ) : (
+                          <StyledTableCell
+                            key={idx}
+                            className={isCellClickable ? classes.isCellClickable : (isSticky ? classes.isSticky : '')}
+                            onClick={() => {cellClickCallback && cellClickCallback(cell);}}
+                          >
+                            {styleCell(cell.toString())}
+                          </StyledTableCell>
+                        )
+                      )}
+                    </StyledTableRow>
+                  ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+        {isPagination && finalData.length > 10 ? (
+          <TablePagination
+            rowsPerPageOptions={[5, 10, 25]}
+            component="div"
+            count={finalData.length}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onChangePage={handleChangePage}
+            onChangeRowsPerPage={handleChangeRowsPerPage}
+            ActionsComponent={TablePaginationActions}
+            classes={{ spacer: classes.spacer }}
+          />
+        ) : null}
+      </>
+    );
+  };
+
+  const renderTable = () => {
+    return (
+      <>
+        <TableToolbar
           name={title}
-          showSearchBox={true}
+          showSearchBox={showSearchBox}
           searchValue={search}
           handleSearch={(val: string) => setSearch(val)}
+          recordCount={recordsCount}
         />
-      ) : null}
-      <TableContainer style={{ maxHeight: isSticky ? 400 : 600 }}>
-        <Table className={classes.table} size="small" stickyHeader={isSticky}>
-          <TableHead>
-            <TableRow>
-              {data.columns.map((column, index) => (
-                <StyledTableCell
-                  className={classes.head}
-                  key={index}
-                  onClick={() => {
-                    setFinalData(_.orderBy(finalData, column, order ? 'asc' : 'desc'));
-                    setOrder(!order);
-                    setColumnClicked(column);
-                  }}
-                >
-                  {column}
-                  {column === columnClicked ? order ? (
-                    <ArrowDropDownIcon
-                      color="primary"
-                      style={{ verticalAlign: 'middle' }}
-                    />
-                  ) : (
-                    <ArrowDropUpIcon
-                      color="primary"
-                      style={{ verticalAlign: 'middle' }}
-                    />
-                  ) : null}
-                </StyledTableCell>
-              ))}
-            </TableRow>
-          </TableHead>
-          <TableBody className={classes.body}>
-            {finalData.length === 0 ? (
-              <TableRow>
-                <StyledTableCell
-                  className={classes.nodata}
-                  colSpan={data.columns.length}
-                >
-                  No Record(s) found
-                </StyledTableCell>
-              </TableRow>
-            ) : (
-              finalData
-                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                .map((row, index) => (
-                  <StyledTableRow key={index} hover>
-                    {Object.values(row).map((cell, idx) =>
-                      addLinks && !idx ? (
-                        <StyledTableCell key={idx}>
-                          <NavLink
-                            className={classes.link}
-                            to={`${baseURL}${cell}`}
-                          >
-                            {cell}
-                          </NavLink>
-                        </StyledTableCell>
-                      ) : (
-                        <StyledTableCell
-                          key={idx}
-                          className={isCellClickable ? classes.isCellClickable : (isSticky ? classes.isSticky : '')}
-                          onClick={() => {cellClickCallback && cellClickCallback(cell);}}
-                        >
-                          {styleCell(cell.toString())}
-                        </StyledTableCell>
-                      )
-                    )}
-                  </StyledTableRow>
-                ))
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-      {isPagination && finalData.length > 10 ? (
-        <TablePagination
-          rowsPerPageOptions={[5, 10, 25]}
-          component="div"
-          count={finalData.length}
-          rowsPerPage={rowsPerPage}
-          page={page}
-          onChangePage={handleChangePage}
-          onChangeRowsPerPage={handleChangeRowsPerPage}
-          ActionsComponent={TablePaginationActions}
-          classes={{ spacer: classes.spacer }}
-        />
-      ) : null}
+        {renderTableComponent()}
+      </>
+    );
+  };
+
+  const renderTableInAccordion = () => {
+    return (
+      <>
+        <SimpleAccordion
+          headerTitle={title}
+          showSearchBox={showSearchBox}
+          searchValue={search}
+          handleSearch={(val: string) => setSearch(val)}
+          recordCount={recordsCount}
+        >
+          {renderTableComponent()}
+        </SimpleAccordion>
+      </>
+    );
+  }
+
+  return (
+    <div className={highlightBackground ? classes.highlightBackground : classes.root}>
+      {inAccordionFormat ?
+        renderTableInAccordion()
+      :
+        renderTable()
+      }
     </div>
   );
 }

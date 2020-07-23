@@ -29,6 +29,7 @@ type Props = {
   showSearchBox: boolean;
   searchValue?: string;
   handleSearch?: Function;
+  recordCount?: number
 };
 
 const useToolbarStyles = makeStyles((theme) => ({
@@ -36,20 +37,23 @@ const useToolbarStyles = makeStyles((theme) => ({
     paddingLeft: '15px',
     paddingRight: '15px',
     minHeight: 48,
+    backgroundColor: 'rgba(66, 133, 244, 0.1)'
   },
   title: {
     flex: '1 1 auto',
     fontWeight: 600,
     letterSpacing: '1px',
-    fontSize: '1rem'
+    fontSize: '1rem',
+    color: '#4285f4'
   },
 }));
 
-export default function EnhancedTableToolbar({
+export default function TableToolbar({
   name,
   showSearchBox,
   searchValue,
-  handleSearch
+  handleSearch,
+  recordCount
 }: Props) {
   const classes = useToolbarStyles();
 
@@ -66,7 +70,7 @@ export default function EnhancedTableToolbar({
       {showSearchBox ? <SearchBar
         value={searchValue}
         onChange={(e) => handleSearch(e.target.value)}
-      /> : null}
+      /> : <strong>{(recordCount)}</strong>}
     </Toolbar>
   );
 }

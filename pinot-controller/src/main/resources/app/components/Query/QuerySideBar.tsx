@@ -76,9 +76,10 @@ type Props = {
   tableList: TableData;
   fetchSQLData: Function;
   tableSchema: TableData;
+  selectedTable: string;
 };
 
-const Sidebar = ({ tableList, fetchSQLData, tableSchema }: Props) => {
+const Sidebar = ({ tableList, fetchSQLData, tableSchema, selectedTable }: Props) => {
   const classes = useStyles();
 
   return (
@@ -101,15 +102,17 @@ const Sidebar = ({ tableList, fetchSQLData, tableSchema }: Props) => {
               noOfRows={tableList.records.length}
               cellClickCallback={fetchSQLData}
               isCellClickable
+              showSearchBox={false}
             />
 
             {tableSchema.records.length ? (
               <CustomizedTables
-                title="Schema:"
+                title={`${selectedTable} schema`}
                 data={tableSchema}
                 isPagination={false}
                 noOfRows={tableSchema.records.length}
                 highlightBackground
+                showSearchBox={false}
               />
             ) : null}
           </Grid>

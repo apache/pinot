@@ -17,6 +17,8 @@
  * under the License.
  */
 
+import _ from 'lodash';
+
 const sortArray = function (sortingArr, keyName, ascendingFlag) {
   if (ascendingFlag) {
     return sortingArr.sort(function (a, b) {
@@ -55,7 +57,30 @@ const tableFormat = (data) => {
   return results;
 };
 
+const getSegmentStatus = (idealStateObj, externalViewObj) => {
+  const idealSegmentKeys = Object.keys(idealStateObj);
+  const idealSegmentCount = idealSegmentKeys.length;
+
+  const externalSegmentKeys = Object.keys(externalViewObj);
+  const externalSegmentCount = externalSegmentKeys.length;
+
+  if(idealSegmentCount !== externalSegmentCount){
+    return 'Bad';
+  }
+
+  let segmentStatus = 'Good';
+  idealSegmentKeys.map((segmentKey) => {
+    if(segmentStatus === 'Good'){
+      if( !_.isEqual( idealStateObj[segmentKey], externalViewObj[segmentKey] ) ){
+        segmentStatus = 'Bad';
+      }
+    }
+  });
+  return segmentStatus;
+};
+
 export default {
   sortArray,
   tableFormat,
+  getSegmentStatus
 };

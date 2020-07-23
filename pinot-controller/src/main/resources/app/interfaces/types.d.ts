@@ -82,6 +82,7 @@ declare module 'Models' {
   type schema = {
     name: string,
     dataType: string
+    fieldType?: string
   };
 
   export type SQLResult = {
@@ -91,6 +92,26 @@ declare module 'Models' {
         columnNames: Array<string>;
       }
       rows: Array<Array<number | string>>;
-    };
+    },
+    timeUsedMs: number
+    numDocsScanned: number
+    totalDocs: number
+    numServersQueried: number
+    numServersResponded: number
+    numSegmentsQueried: number
+    numSegmentsProcessed: number
+    numSegmentsMatched: number
+    numConsumingSegmentsQueried: number
+    numEntriesScannedInFilter: number
+    numEntriesScannedPostFilter: number
+    numGroupsLimitReached: boolean
+    partialResponse?: number
+    minConsumingFreshnessTimeMs: number
   };
+
+  export type ClusterName = {
+    clusterName: string
+  }
+
+  export type LiveInstances = Array<string>
 }
