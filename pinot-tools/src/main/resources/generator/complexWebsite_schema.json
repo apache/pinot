@@ -27,12 +27,13 @@
       "name": "platform"
     }
   ],
-  "timeFieldSpec": {
-    "incomingGranularitySpec": {
-      "timeType": "HOURS",
+  "dateTimeFieldSpecs": [
+    {
+      "name": "hoursSinceEpoch",
       "dataType": "LONG",
-      "name": "hoursSinceEpoch"
+      "format": "1:HOURS:EPOCH",
+      "granularity": "1:HOURS"
     }
-  },
+  ],
   "schemaName": "complexWebsite"
 }
