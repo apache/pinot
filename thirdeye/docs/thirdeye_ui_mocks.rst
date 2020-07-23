@@ -17,17 +17,15 @@
 .. under the License.
 ..
 
-########
-ThirdEye
-########
+.. _thirdeye-ui-mocks:
+
+ThirdEye UI Mocks
+##########################
 
 .. toctree::
-   :maxdepth: 2
+    :maxdepth: 1
 
-   introduction
-   configuration
-   datasources
-   caches
-   alert_setup
-   thirdeye_architecture
-   thirdeye_ui_mocks
+    :download: `Entity (multi-metrics) Monitoring <https://github.com/apache/incubator-pinot/files/4964811/ThirdEye_EntityMonitoring.pdf>`
+    :download: `Subscription group Management <https://github.com/apache/incubator-pinot/files/4964812/ThirdEye_SubscriptionGroups_Management.pdf>`
+    :download: `Suppress Alert <https://github.com/apache/incubator-pinot/files/4964813/ThirdEye_Suppress_Alerts.pdf>`
+    :download: `SLA monitoring <https://github.com/apache/incubator-pinot/files/4964810/ThirdEye_SLA_monitoring.pdf>`
