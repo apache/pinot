@@ -76,7 +76,7 @@ public class IngestionJobLauncher {
               jobSpecFilePath, Arrays.toString(propertiesMap.entrySet().toArray())), e);
     }
 
-    String jobSpecFormat = properties.getProperty(JOB_SPEC_FORMAT, YAML);
+    String jobSpecFormat = (String) propertiesMap.getOrDefault(JOB_SPEC_FORMAT, YAML);
     if (jobSpecFormat.equals(JSON)) {
       try {
         return JsonUtils.stringToObject(jobSpecStr, SegmentGenerationJobSpec.class);
