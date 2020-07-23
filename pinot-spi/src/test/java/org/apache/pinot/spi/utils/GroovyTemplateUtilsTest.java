@@ -75,7 +75,7 @@ public class GroovyTemplateUtilsTest {
   public void testIngestionJobTemplate()
       throws IOException, ClassNotFoundException {
     InputStream resourceAsStream =
-        GroovyTemplateUtils.class.getClassLoader().getResourceAsStream("ingestionJobSpecTemplate.yaml");
+        GroovyTemplateUtils.class.getClassLoader().getResourceAsStream("ingestion_job_spec_template.yaml");
     String yamlTemplate = IOUtils.toString(resourceAsStream);
     Map<String, Object> context =
         GroovyTemplateUtils.getTemplateContext(Arrays.asList("year=2020", "month=05", "day=06"));
