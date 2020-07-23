@@ -40,6 +40,7 @@ import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 import org.apache.spark.SparkContext;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.api.java.function.VoidFunction;
 
 
 public class SparkSegmentTarPushJobRunner implements IngestionJobRunner, Serializable {
@@ -106,14 +107,21 @@ public class SparkSegmentTarPushJobRunner implements IngestionJobRunner, Seriali
       JavaSparkContext sparkContext = JavaSparkContext.fromSparkContext(SparkContext.getOrCreate());
       JavaRDD<String> pathRDD = sparkContext.parallelize(segmentsToPush, pushParallelism);
       URI finalOutputDirURI = outputDirURI;
-      pathRDD.foreach(segmentTarPath -> {
-        for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
-          PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
-        }
-        try {
-          SegmentPushUtils.pushSegments(_spec, PinotFSFactory.create(finalOutputDirURI.getScheme()), Arrays.asList(segmentTarPath));
-        } catch (RetriableOperationException | AttemptsExceededException e) {
-          throw new RuntimeException(e);
+      // Prevent using lambda expression in Spark to avoid potential serialization exceptions, use inner function instead.
+      pathRDD.foreach(new VoidFunction<String>() {
+        @Override
+        public void call(String segmentTarPath)
+            throws Exception {
+          for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
+            PinotFSFactory
+                .register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
+          }
+          try {
+            SegmentPushUtils.pushSegments(_spec, PinotFSFactory.create(finalOutputDirURI.getScheme()),
+                Arrays.asList(segmentTarPath));
+          } catch (RetriableOperationException | AttemptsExceededException e) {
+            throw new RuntimeException(e);
+          }
         }
       });
     }
