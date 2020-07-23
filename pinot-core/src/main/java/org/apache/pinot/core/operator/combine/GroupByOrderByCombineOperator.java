@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.operator;
+package org.apache.pinot.core.operator.combine;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -38,6 +38,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
@@ -53,15 +54,15 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * The <code>CombineGroupByOrderByOperator</code> class is the operator to combine aggregation results with group-by and order by.
+ * Combine operator for aggregation group-by queries with SQL semantic.
+ * TODO:
+ *   - Use CombineOperatorUtils.getNumThreadsForQuery() to get the parallelism of the query instead of using all threads
+ *   - Try to extend BaseCombineOperator to reduce duplicate code
  */
-// TODO: this class has a lot of duplication with {@link CombineGroupByOperator}.
-// These 2 classes can be combined into one
-// For the first iteration of Order By support, these will be separate
 @SuppressWarnings("rawtypes")
-public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResultsBlock> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(CombineGroupByOrderByOperator.class);
-  private static final String OPERATOR_NAME = "CombineGroupByOrderByOperator";
+public class GroupByOrderByCombineOperator extends BaseOperator<IntermediateResultsBlock> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(GroupByOrderByCombineOperator.class);
+  private static final String OPERATOR_NAME = "GroupByOrderByCombineOperator";
 
   private final List<Operator> _operators;
   private final QueryContext _queryContext;
@@ -72,7 +73,7 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
   private DataSchema _dataSchema;
   private ConcurrentIndexedTable _indexedTable;
 
-  public CombineGroupByOrderByOperator(List<Operator> operators, QueryContext queryContext,
+  public GroupByOrderByCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService, long timeOutMs) {
     _operators = operators;
     _queryContext = queryContext;
@@ -220,16 +221,7 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
       }
 
       // Set the execution statistics.
-      ExecutionStatistics executionStatistics = new ExecutionStatistics();
-      for (Operator operator : _operators) {
-        executionStatistics.merge(operator.getExecutionStatistics());
-      }
-      mergedBlock.setNumDocsScanned(executionStatistics.getNumDocsScanned());
-      mergedBlock.setNumEntriesScannedInFilter(executionStatistics.getNumEntriesScannedInFilter());
-      mergedBlock.setNumEntriesScannedPostFilter(executionStatistics.getNumEntriesScannedPostFilter());
-      mergedBlock.setNumSegmentsProcessed(executionStatistics.getNumSegmentsProcessed());
-      mergedBlock.setNumSegmentsMatched(executionStatistics.getNumSegmentsMatched());
-      mergedBlock.setNumTotalDocs(executionStatistics.getNumTotalDocs());
+      CombineOperatorUtils.setExecutionStatistics(mergedBlock, _operators);
 
       if (_indexedTable.size() >= _indexedTableCapacity) {
         mergedBlock.setNumGroupsLimitReached(true);
