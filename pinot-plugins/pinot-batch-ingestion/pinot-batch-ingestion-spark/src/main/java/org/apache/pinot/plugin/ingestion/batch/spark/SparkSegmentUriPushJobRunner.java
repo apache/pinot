@@ -40,6 +40,8 @@ import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 import org.apache.spark.SparkContext;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.api.java.function.VoidFunction;
+
 
 public class SparkSegmentUriPushJobRunner implements IngestionJobRunner, Serializable {
   private SegmentGenerationJobSpec _spec;
@@ -109,11 +111,16 @@ public class SparkSegmentUriPushJobRunner implements IngestionJobRunner, Seriali
     } else {
       JavaSparkContext sparkContext = JavaSparkContext.fromSparkContext(SparkContext.getOrCreate());
       JavaRDD<String> pathRDD = sparkContext.parallelize(segmentUris, pushParallelism);
-      pathRDD.foreach(segmentUri -> {
-        try {
-          SegmentPushUtils.sendSegmentUris(_spec, Arrays.asList(segmentUri));
-        } catch (RetriableOperationException | AttemptsExceededException e) {
-          throw new RuntimeException(e);
+      // Prevent using lambda expression in Spark to avoid potential serialization exceptions, use inner function instead.
+      pathRDD.foreach(new VoidFunction<String>() {
+        @Override
+        public void call(String segmentUri)
+            throws Exception {
+          try {
+            SegmentPushUtils.sendSegmentUris(_spec, Arrays.asList(segmentUri));
+          } catch (RetriableOperationException | AttemptsExceededException e) {
+            throw new RuntimeException(e);
+          }
         }
       });
     }
