@@ -47,21 +47,23 @@ public class SegmentCommitterFactory {
   }
 
   public SegmentCommitter createSegmentCommitter(boolean isSplitCommit, SegmentCompletionProtocol.Request.Params params,
-      String controllerVipUrl) throws URISyntaxException {
+      String controllerVipUrl)
+      throws URISyntaxException {
     if (!isSplitCommit) {
       return new DefaultSegmentCommitter(LOGGER, _protocolHandler, params);
     }
     SegmentUploader segmentUploader;
+    // TODO Instead of using a peer segment download scheme to control how the servers do split commit, we should use
+    // other configs such as server or controller configs or controller responses to the servers.
     if (_tableConfig.getValidationConfig().getPeerSegmentDownloadScheme() != null) {
       segmentUploader = new PinotFSSegmentUploader(_indexLoadingConfig.getSegmentStoreURI(),
           PinotFSSegmentUploader.DEFAULT_SEGMENT_UPLOAD_TIMEOUT_MILLIS);
       return new PeerSchemeSplitSegmentCommitter(LOGGER, _protocolHandler, params, segmentUploader);
     }
 
-      segmentUploader =
-          new Server2ControllerSegmentUploader(LOGGER, _protocolHandler.getFileUploadDownloadClient(),
-              _protocolHandler.getSegmentCommitUploadURL(params, controllerVipUrl), params.getSegmentName(),
-              ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), _serverMetrics);
+    segmentUploader = new Server2ControllerSegmentUploader(LOGGER, _protocolHandler.getFileUploadDownloadClient(),
+        _protocolHandler.getSegmentCommitUploadURL(params, controllerVipUrl), params.getSegmentName(),
+        ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), _serverMetrics);
     return new SplitSegmentCommitter(LOGGER, _protocolHandler, params, segmentUploader);
   }
 }

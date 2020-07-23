@@ -34,18 +34,15 @@ public class PeerSchemeSplitSegmentCommitter extends SplitSegmentCommitter {
     super(segmentLogger, protocolHandler, params, segmentUploader);
   }
 
-  // Always return true even if the segment upload fails and return null uri.
+  // Always return a uri string even if the segment upload fails and returns a null uri.
   // If the segment upload fails, put peer:///segment_name in the segment location to notify the controller it is a
   // peer download scheme.
-  protected boolean uploadSegment(File segmentTarFile, SegmentUploader segmentUploader,
+  protected String uploadSegment(File segmentTarFile, SegmentUploader segmentUploader,
       SegmentCompletionProtocol.Request.Params params) {
     URI segmentLocation = segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(params.getSegmentName()));
-    if (segmentLocation != null) {
-      params.withSegmentLocation(segmentLocation.toString());
-    } else {
-      params.withSegmentLocation(
-          StringUtil.join("/", CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME, params.getSegmentName()));
+    if (segmentLocation == null) {
+      return StringUtil.join("/", CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME, params.getSegmentName());
     }
-    return true;
+    return segmentLocation.toString();
   }
 }
