@@ -30,30 +30,34 @@ public class NoOpPinotCryptTest {
   PinotCrypter pinotCrypter;
   File encryptedFile;
   File decryptedFile;
+  File srcFile;
   @BeforeTest
   public void init() throws IOException {
     pinotCrypter = new NoOpPinotCrypter();
+    srcFile = File.createTempFile("srcFile","txt");
     encryptedFile = File.createTempFile("encryptedFile","txt");
     encryptedFile.deleteOnExit();
     decryptedFile = File.createTempFile("decryptedFile","txt");
     decryptedFile.deleteOnExit();
-    FileUtils.write(encryptedFile,"testData");
+    FileUtils.write(srcFile,"testData");
   }
 
   @Test
-  public void testEncryption() throws IOException {
-    pinotCrypter.encrypt(decryptedFile, encryptedFile);
-    Assert.assertTrue(FileUtils.contentEquals(encryptedFile, decryptedFile));
-    decryptedFile = new File("fake");
-    pinotCrypter.encrypt(decryptedFile, encryptedFile);
-    Assert.assertFalse(encryptedFile.exists());
-
-  }
-
-  @Test
-  public void testDecryption() throws IOException {
+  public void testValidEncryptionDecryption() throws IOException {
+    pinotCrypter.encrypt(srcFile, encryptedFile);
     pinotCrypter.decrypt(encryptedFile, decryptedFile);
-    Assert.assertTrue(FileUtils.contentEquals(encryptedFile, decryptedFile));
+    Assert.assertTrue(FileUtils.contentEquals(srcFile, decryptedFile));
+  }
+
+  @Test
+  public void testInvalidEncryption() throws IOException {
+    srcFile = new File("fake");
+    pinotCrypter.encrypt(srcFile, decryptedFile);
+    Assert.assertFalse(decryptedFile.exists());
+  }
+
+  @Test
+  public void testInvalidDecryption() {
     encryptedFile = new File("fake");
     pinotCrypter.decrypt(encryptedFile, decryptedFile);
     Assert.assertFalse(decryptedFile.exists());
