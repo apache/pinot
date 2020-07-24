@@ -1,6 +1,8 @@
 logging:
   type: external
 server:
+  requestLog:
+    type: external
   type: default
   rootPath: '/api/*'
   applicationContextPath: /
