@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.core.data.recordtransformer;
 
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.BytesUtils;
 
@@ -470,6 +474,43 @@ public enum PinotDataType {
     }
   },
 
+  HASHMAP,
+
+  INTEGER_HASHMAP {
+    @Override
+    public Integer[] convert(Object value, PinotDataType sourceType) {
+      return sourceType.toIntegerArray(value);
+    }
+  },
+
+  LONG_HASHMAP {
+    @Override
+    public Long[] convert(Object value, PinotDataType sourceType) {
+      return sourceType.toLongArray(value);
+    }
+  },
+
+  FLOAT_HASHMAP {
+    @Override
+    public Float[] convert(Object value, PinotDataType sourceType) {
+      return sourceType.toFloatArray(value);
+    }
+  },
+
+  DOUBLE_HASHMAP {
+    @Override
+    public Double[] convert(Object value, PinotDataType sourceType) {
+      return sourceType.toDoubleArray(value);
+    }
+  },
+
+  STRING_HASHMAP {
+    @Override
+    public String[] convert(Object value, PinotDataType sourceType) {
+      return sourceType.toStringArray(value);
+    }
+  },
+
   OBJECT_ARRAY;
 
   /**
@@ -507,9 +548,17 @@ public enum PinotDataType {
       Object[] valueArray = (Object[]) value;
       int length = valueArray.length;
       Integer[] integerArray = new Integer[length];
-      PinotDataType singleValueType = getSingleValueType();
-      for (int i = 0; i < length; i++) {
-        integerArray[i] = singleValueType.toInteger(valueArray[i]);
+      if (valueArray[0] instanceof HashMap) {
+        for (int i = 0; i < length; i++) {
+          for (Object obj : ((HashMap<Object, Object>) valueArray[i]).values()) {
+            integerArray[i] = PinotDataType.INTEGER.toInteger(obj);
+          }
+        }
+      } else {
+        PinotDataType singleValueType = getSingleValueType();
+        for (int i = 0; i < length; i++) {
+          integerArray[i] = singleValueType.toInteger(valueArray[i]);
+        }
       }
       return integerArray;
     }
@@ -522,9 +571,17 @@ public enum PinotDataType {
       Object[] valueArray = (Object[]) value;
       int length = valueArray.length;
       Long[] longArray = new Long[length];
-      PinotDataType singleValueType = getSingleValueType();
-      for (int i = 0; i < length; i++) {
-        longArray[i] = singleValueType.toLong(valueArray[i]);
+      if (valueArray[0] instanceof HashMap) {
+        for (int i = 0; i < length; i++) {
+          for (Object obj : ((HashMap<Object, Object>) valueArray[i]).values()) {
+            longArray[i] = PinotDataType.LONG.toLong(obj);
+          }
+        }
+      } else {
+        PinotDataType singleValueType = getSingleValueType();
+        for (int i = 0; i < length; i++) {
+          longArray[i] = singleValueType.toLong(valueArray[i]);
+        }
       }
       return longArray;
     }
@@ -537,9 +594,17 @@ public enum PinotDataType {
       Object[] valueArray = (Object[]) value;
       int length = valueArray.length;
       Float[] floatArray = new Float[length];
-      PinotDataType singleValueType = getSingleValueType();
-      for (int i = 0; i < length; i++) {
-        floatArray[i] = singleValueType.toFloat(valueArray[i]);
+      if (valueArray[0] instanceof HashMap) {
+        for (int i = 0; i < length; i++) {
+          for (Object obj : ((HashMap<Object, Object>) valueArray[i]).values()) {
+            floatArray[i] = PinotDataType.FLOAT.toFloat(obj);
+          }
+        }
+      } else {
+        PinotDataType singleValueType = getSingleValueType();
+        for (int i = 0; i < length; i++) {
+          floatArray[i] = singleValueType.toFloat(valueArray[i]);
+        }
       }
       return floatArray;
     }
@@ -552,9 +617,17 @@ public enum PinotDataType {
       Object[] valueArray = (Object[]) value;
       int length = valueArray.length;
       Double[] doubleArray = new Double[length];
-      PinotDataType singleValueType = getSingleValueType();
-      for (int i = 0; i < length; i++) {
-        doubleArray[i] = singleValueType.toDouble(valueArray[i]);
+      if (valueArray[0] instanceof HashMap) {
+        for (int i = 0; i < length; i++) {
+          for (Object obj : ((HashMap<Object, Object>) valueArray[i]).values()) {
+            doubleArray[i] = PinotDataType.DOUBLE.toDouble(obj);
+          }
+        }
+      } else {
+        PinotDataType singleValueType = getSingleValueType();
+        for (int i = 0; i < length; i++) {
+          doubleArray[i] = singleValueType.toDouble(valueArray[i]);
+        }
       }
       return doubleArray;
     }
@@ -567,9 +640,17 @@ public enum PinotDataType {
       Object[] valueArray = (Object[]) value;
       int length = valueArray.length;
       String[] stringArray = new String[length];
-      PinotDataType singleValueType = getSingleValueType();
-      for (int i = 0; i < length; i++) {
-        stringArray[i] = singleValueType.toString(valueArray[i]);
+      if (valueArray[0] instanceof HashMap) {
+        for (int i = 0; i < length; i++) {
+          for (Object obj : ((HashMap<Object, Object>) valueArray[i]).values()) {
+            stringArray[i] = PinotDataType.STRING.toString(obj);
+          }
+        }
+      } else {
+        PinotDataType singleValueType = getSingleValueType();
+        for (int i = 0; i < length; i++) {
+          stringArray[i] = singleValueType.toString(valueArray[i]);
+        }
       }
       return stringArray;
     }
@@ -630,6 +711,24 @@ public enum PinotDataType {
       default:
         throw new UnsupportedOperationException(
             "Unsupported data type: " + dataType + " in field: " + fieldSpec.getName());
+    }
+  }
+
+  public static PinotDataType getPinotDataTypeFromHashMap(Map<Object, Object> map) {
+    Iterator<Object> iterator = map.values().iterator();
+    Object obj = iterator.next();
+    if (obj instanceof Integer) {
+      return PinotDataType.INTEGER_HASHMAP;
+    } else if (obj instanceof Long) {
+      return PinotDataType.LONG_HASHMAP;
+    } else if (obj instanceof Float) {
+      return PinotDataType.FLOAT_HASHMAP;
+    } else if (obj instanceof Double) {
+      return PinotDataType.DOUBLE_HASHMAP;
+    } else if (obj instanceof String) {
+      return PinotDataType.STRING_HASHMAP;
+    } else {
+      throw new IllegalStateException(String.format("'%s' isn't supported in the hash map.", obj.getClass()));
     }
   }
 }

@@ -353,6 +353,16 @@ public class AvroUtils {
    * Handles the conversion of every field of the GenericRecord
    */
   private static Object handleGenericRecord(GenericData.Record record) {
-    return record.get(0);
+    List<Field> fields = record.getSchema().getFields();
+    if (fields.isEmpty()) {
+      return null;
+    }
+
+    Map<Object, Object> convertedMap = new HashMap<>();
+    for (Field field : fields) {
+      String fieldName = field.name();
+      convertedMap.put(fieldName, convert(record.get(fieldName)));
+    }
+    return convertedMap;
   }
 }
