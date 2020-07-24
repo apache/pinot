@@ -42,7 +42,10 @@ import com.google.common.collect.ImmutableList;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProviderChain;
+import software.amazon.awssdk.auth.credentials.ContainerCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.EnvironmentVariableCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.InstanceProfileCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.SystemPropertyCredentialsProvider;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -90,8 +93,12 @@ public class S3PinotFS extends PinotFS {
         awsCredentialsProvider = StaticCredentialsProvider.create(awsBasicCredentials);
       } else {
         awsCredentialsProvider =
-            AwsCredentialsProviderChain.builder().addCredentialsProvider(SystemPropertyCredentialsProvider.create())
-                .addCredentialsProvider(EnvironmentVariableCredentialsProvider.create()).build();
+            AwsCredentialsProviderChain.builder()
+                    .addCredentialsProvider(SystemPropertyCredentialsProvider.create())
+                    .addCredentialsProvider(EnvironmentVariableCredentialsProvider.create())
+                    .addCredentialsProvider(ProfileCredentialsProvider.create())
+                    .addCredentialsProvider(InstanceProfileCredentialsProvider.create())
+                    .build();
       }
 
       _s3Client = S3Client.builder().region(Region.of(region)).credentialsProvider(awsCredentialsProvider).build();
