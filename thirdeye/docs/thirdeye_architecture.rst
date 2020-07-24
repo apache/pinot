@@ -17,17 +17,13 @@
 .. under the License.
 ..
 
-########
-ThirdEye
-########
+.. _thirdeye-architecture:
+
+ThirdEye Architecture
+##########################
 
 .. toctree::
-   :maxdepth: 2
+    :maxdepth: 1
 
-   introduction
-   configuration
-   datasources
-   caches
-   alert_setup
-   thirdeye_architecture
-   thirdeye_ui_mocks
+    detection_pipeline_architecture
+    detection_pipeline_execution_flow
