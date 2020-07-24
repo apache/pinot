@@ -108,7 +108,7 @@ public class ThirdEyeJiraClient {
     jiraQuery.append(" and ").append(buildQueryOnLabels(labels));
     jiraQuery.append(" and ").append(buildQueryOnCreatedBy(lookBackMillis));
 
-    Iterable<Issue> jiraIssuesIt = restClient.getSearchClient().searchJql(jiraQuery.toString()).claim().getIssues();Set up the client with a default URLFactory that creates real HTTP connections.
+    Iterable<Issue> jiraIssuesIt = restClient.getSearchClient().searchJql(jiraQuery.toString()).claim().getIssues();
     jiraIssuesIt.forEach(issues::add);
 
     LOG.info("Fetched {} Jira tickets using query - {}", issues.size(), jiraQuery.toString());
