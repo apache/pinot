@@ -59,9 +59,9 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   private final Binding _binding;
   private final Script _script;
 
-  public GroovyFunctionEvaluator(String transformExpression) {
-    Matcher matcher = GROOVY_FUNCTION_PATTERN.matcher(transformExpression);
-    Preconditions.checkState(matcher.matches(), "Invalid transform expression: %s", transformExpression);
+  public GroovyFunctionEvaluator(String closure) {
+    Matcher matcher = GROOVY_FUNCTION_PATTERN.matcher(closure);
+    Preconditions.checkState(matcher.matches(), "Invalid transform expression: %s", closure);
     String arguments = matcher.group(ARGUMENTS_GROUP_NAME);
     if (arguments != null) {
       _arguments = Splitter.on(ARGUMENTS_SEPARATOR).trimResults().splitToList(arguments);

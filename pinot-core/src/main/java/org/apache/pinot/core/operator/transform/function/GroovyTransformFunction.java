@@ -42,13 +42,13 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 /**
  * The GroovyTransformFunction executes groovy expressions
- * first argument - groovy script (string) using arg0, arg1, arg2... as arguments e.g. 'arg0 + " " + arg1', 'arg0 + arg1.toList().max() + arg2' etc
- * last argument - json string containing returnType and isSingleValue e.g. '{"returnType":"LONG", "isSingleValue":false}'
- * remaining arguments 2 to n-1 - identifiers/functions to the groovy script
+ * 1st argument - json string containing returnType and isSingleValue e.g. '{"returnType":"LONG", "isSingleValue":false}'
+ * 2nd argument - groovy script (string) using arg0, arg1, arg2... as arguments e.g. 'arg0 + " " + arg1', 'arg0 + arg1.toList().max() + arg2' etc
+ * rest of the arguments - identifiers/functions to the groovy script
  *
  * Sample queries:
- * SELECT GROOVY('arg0.findIndexValues{it==1}', products, '{"returnType":"LONG", "isSingleValue":false}') FROM myTable
- * SELECT GROOVY('arg0 * arg1 * 10', arraylength(units), columnB, '{"returnType":"INT", "isSingleValue":true}') FROM bob
+ * SELECT GROOVY('{"returnType":"LONG", "isSingleValue":false}', 'arg0.findIndexValues{it==1}', products) FROM myTable
+ * SELECT GROOVY('{"returnType":"INT", "isSingleValue":true}', 'arg0 * arg1 * 10', arraylength(units), columnB ) FROM bob
  */
 public class GroovyTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "groovy";
@@ -94,25 +94,20 @@ public class GroovyTransformFunction extends BaseTransformFunction {
       throw new IllegalArgumentException("GROOVY transform function requires at least 2 arguments");
     }
 
-    // first argument is groovy expression string
-    TransformFunction groovyTransformFunction = arguments.get(0);
-    Preconditions.checkState(groovyTransformFunction instanceof LiteralTransformFunction,
-        "First argument of GROOVY transform function must be a literal string, representing the groovy expression");
-
-    // last argument is a json string
-    TransformFunction returnValueMetadata = arguments.get(numArgs - 1);
+    // 1st argument is a json string
+    TransformFunction returnValueMetadata = arguments.get(0);
     Preconditions.checkState(returnValueMetadata instanceof LiteralTransformFunction,
-        "Last argument of GROOVY transform function must be a literal, representing a json string");
+        "First argument of GROOVY transform function must be a literal, representing a json string");
     String returnValueMetadataStr = ((LiteralTransformFunction) returnValueMetadata).getLiteral();
     try {
       JsonNode returnValueMetadataJson = JsonUtils.stringToJsonNode(returnValueMetadataStr);
       Preconditions.checkState(returnValueMetadataJson.hasNonNull(RETURN_TYPE_KEY),
-          "The json string in the last argument of GROOVY transform function must have non-null 'returnType'");
+          "The json string in the first argument of GROOVY transform function must have non-null 'returnType'");
       Preconditions.checkState(returnValueMetadataJson.hasNonNull(IS_SINGLE_VALUE_KEY),
-          "The json string in the last argument of GROOVY transform function must have non-null 'isSingleValue'");
+          "The json string in the first argument of GROOVY transform function must have non-null 'isSingleValue'");
       String returnTypeStr = returnValueMetadataJson.get(RETURN_TYPE_KEY).asText();
       Preconditions.checkState(EnumUtils.isValidEnum(FieldSpec.DataType.class, returnTypeStr),
-          "The 'returnType' in the json string which is the last argument of GROOVY transform function must be a valid FieldSpec.DataType enum value");
+          "The 'returnType' in the json string which is the first argument of GROOVY transform function must be a valid FieldSpec.DataType enum value");
       _resultMetadata = new TransformResultMetadata(FieldSpec.DataType.valueOf(returnTypeStr),
           returnValueMetadataJson.get(IS_SINGLE_VALUE_KEY).asBoolean(true), false);
     } catch (IOException e) {
@@ -120,17 +115,22 @@ public class GroovyTransformFunction extends BaseTransformFunction {
           "Caught exception when converting json string '" + returnValueMetadataStr + "' to JsonNode", e);
     }
 
-    // arguments 1 to n-1 are arguments to the groovy function
+    // 2nd argument is groovy expression string
+    TransformFunction groovyTransformFunction = arguments.get(1);
+    Preconditions.checkState(groovyTransformFunction instanceof LiteralTransformFunction,
+        "Second argument of GROOVY transform function must be a literal string, representing the groovy expression");
+
+    // 3rd argument onwards, all are arguments to the groovy function
     _numGroovyArgs = numArgs - 2;
     if (_numGroovyArgs > 0) {
       _groovyArguments = new TransformFunction[_numGroovyArgs];
       _isSourceSingleValue = new boolean[_numGroovyArgs];
       _sourceDataType = new FieldSpec.DataType[_numGroovyArgs];
       int idx = 0;
-      for (int i = 1; i < numArgs - 1; i++) {
+      for (int i = 2; i < numArgs; i++) {
         TransformFunction argument = arguments.get(i);
         Preconditions.checkState(!(argument instanceof LiteralTransformFunction),
-            "Argument in positions 2 to n-1 must be a column or other transform functions");
+            "Third argument onwards, all arguments must be a column or other transform function");
         _groovyArguments[idx] = argument;
         TransformResultMetadata resultMetadata = argument.getResultMetadata();
         _isSourceSingleValue[idx] = resultMetadata.isSingleValue();

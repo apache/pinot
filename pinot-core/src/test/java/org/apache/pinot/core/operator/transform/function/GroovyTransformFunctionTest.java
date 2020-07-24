@@ -46,7 +46,9 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
 
     // max in array (returns SV INT)
     groovyTransformFunction = String
-        .format("groovy('arg0.toList().max()', %s, '{\"returnType\":\"INT\", \"isSingleValue\":true}')", INT_MV_COLUMN);
+        .format("groovy('{\"returnType\":\"INT\", \"isSingleValue\":true}', "
+            + "'arg0.toList().max()', "
+            + "%s)", INT_MV_COLUMN);
     int[] expectedResult1 = new int[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedResult1[i] = Arrays.stream(_intMVValues[i]).max().getAsInt();
@@ -55,8 +57,9 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
 
     // simple addition (returns SV LONG)
     groovyTransformFunction = String
-        .format("groovy('arg0 + arg1', %s, %s, '{\"returnType\":\"LONG\", \"isSingleValue\":true}')", INT_SV_COLUMN,
-            LONG_SV_COLUMN);
+        .format("groovy('{\"returnType\":\"LONG\", \"isSingleValue\":true}', "
+                + "'arg0 + arg1', "
+                + "%s, %s)", INT_SV_COLUMN, LONG_SV_COLUMN);
     long[] expectedResult2 = new long[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedResult2[i] = _intSVValues[i] + _longSVValues[i];
@@ -65,8 +68,9 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
 
     // minimum of 2 numbers (returns SV DOUBLE)
     groovyTransformFunction = String
-        .format("groovy('Math.min(arg0, arg1)', %s, %s, '{\"returnType\":\"DOUBLE\", \"isSingleValue\":true}')",
-            DOUBLE_SV_COLUMN, INT_SV_COLUMN);
+        .format("groovy('{\"returnType\":\"DOUBLE\", \"isSingleValue\":true}', "
+                + "'Math.min(arg0, arg1)', "
+                + "%s, %s)", DOUBLE_SV_COLUMN, INT_SV_COLUMN);
     double[] expectedResult3 = new double[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedResult3[i] = Math.min(_intSVValues[i], _doubleSVValues[i]);
@@ -75,8 +79,9 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
 
     // (returns SV FLOAT)
     groovyTransformFunction = String.format(
-        "groovy('def result; switch(arg0.length()) { case 10: result = 1.1; break; case 20: result = 1.2; break; default: result = 1.3;}; return result.floatValue()', %s, '{\"returnType\":\"FLOAT\", \"isSingleValue\":true}')",
-        STRING_ALPHANUM_SV_COLUMN);
+        "groovy('{\"returnType\":\"FLOAT\", \"isSingleValue\":true}', "
+            + "'def result; switch(arg0.length()) { case 10: result = 1.1; break; case 20: result = 1.2; break; default: result = 1.3;}; return result.floatValue()', "
+            + "%s)", STRING_ALPHANUM_SV_COLUMN);
     float[] expectedResult4 = new float[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedResult4[i] =
@@ -86,8 +91,9 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
 
     // string operations (returns SV STRING)
     groovyTransformFunction = String.format(
-        "groovy('[arg0, arg1, arg2].join(\"_\")', %s, %s, %s, '{\"returnType\":\"STRING\", \"isSingleValue\":true}')",
-        FLOAT_SV_COLUMN, STRING_SV_COLUMN, DOUBLE_SV_COLUMN);
+        "groovy('{\"returnType\":\"STRING\", \"isSingleValue\":true}', "
+            + "'[arg0, arg1, arg2].join(\"_\")', "
+            + "%s, %s, %s)", FLOAT_SV_COLUMN, STRING_SV_COLUMN, DOUBLE_SV_COLUMN);
     String[] expectedResult5 = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedResult5[i] = Joiner.on("_").join(_floatSVValues[i], _stringSVValues[i], _doubleSVValues[i]);
@@ -96,8 +102,9 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
 
     // find all in array that match (returns MV INT)
     groovyTransformFunction = String
-        .format("groovy('arg0.findAll{it < 5}', %s, '{\"returnType\":\"INT\", \"isSingleValue\":false}')",
-            INT_MV_COLUMN);
+        .format("groovy('{\"returnType\":\"INT\", \"isSingleValue\":false}', "
+                + "'arg0.findAll{it < 5}', "
+                + "%s)", INT_MV_COLUMN);
     int[][] expectedResult6 = new int[NUM_ROWS][];
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedResult6[i] = Arrays.stream(_intMVValues[i]).filter(e -> e < 5).toArray();
@@ -106,8 +113,9 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
 
     // (returns MV LONG)
     groovyTransformFunction = String
-        .format("groovy('arg0.findIndexValues{it == 5}', %s, '{\"returnType\":\"LONG\", \"isSingleValue\":false}')",
-            INT_MV_COLUMN);
+        .format("groovy('{\"returnType\":\"LONG\", \"isSingleValue\":false}', "
+            + "'arg0.findIndexValues{it == 5}', "
+                + "%s)", INT_MV_COLUMN);
     long[][] expectedResult7 = new long[NUM_ROWS][];
     for (int i = 0; i < NUM_ROWS; i++) {
       int[] intMVValue = _intMVValues[i];
@@ -117,18 +125,18 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
     inputs.add(new Object[]{groovyTransformFunction, FieldSpec.DataType.LONG, false, expectedResult7});
 
     // no-args function (returns MV STRING)
-    groovyTransformFunction = "groovy('[\"foo\", \"bar\"]', '{\"returnType\":\"STRING\", \"isSingleValue\":false}')";
+    groovyTransformFunction = "groovy('{\"returnType\":\"STRING\", \"isSingleValue\":false}', '[\"foo\", \"bar\"]')";
     String[][] expectedResult8 = new String[NUM_ROWS][];
     Arrays.fill(expectedResult8, new String[]{"foo", "bar"});
     inputs.add(new Object[]{groovyTransformFunction, FieldSpec.DataType.STRING, false, expectedResult8});
 
     // nested groovy functions
     String groovy1 = String
-        .format("groovy('arg0.toList().max()', %s, '{\"returnType\":\"INT\", \"isSingleValue\":true}')", INT_MV_COLUMN);
+        .format("groovy('{\"returnType\":\"INT\", \"isSingleValue\":true}', 'arg0.toList().max()', %s)", INT_MV_COLUMN);
     String groovy2 = String
-        .format("groovy('arg0.toList().min()', %s, '{\"returnType\":\"INT\", \"isSingleValue\":true}')", INT_MV_COLUMN);
+        .format("groovy('{\"returnType\":\"INT\", \"isSingleValue\":true}', 'arg0.toList().min()', %s)", INT_MV_COLUMN);
     groovyTransformFunction = String
-        .format("groovy('[arg0, arg1, arg2.sum()]', %s, %s, %s, '{\"returnType\":\"INT\", \"isSingleValue\":false}')",
+        .format("groovy('{\"returnType\":\"INT\", \"isSingleValue\":false}', '[arg0, arg1, arg2.sum()]', %s, %s, %s)",
             groovy1, groovy2, INT_MV_COLUMN);
     int[][] expectedResult9 = new int[NUM_ROWS][];
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -139,7 +147,7 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
 
     // nested with other functions
     groovyTransformFunction = String
-        .format("groovy('arg0 + arg1', %s, arraylength(%s), '{\"returnType\":\"INT\", \"isSingleValue\":true}')",
+        .format("groovy('{\"returnType\":\"INT\", \"isSingleValue\":true}', 'arg0 + arg1', %s, arraylength(%s))",
             INT_SV_COLUMN, INT_MV_COLUMN);
     int[] expectedResult10 = new int[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -255,29 +263,29 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
     inputs.add(new Object[]{String.format("groovy(%s)", STRING_SV_COLUMN)});
     // first argument must be literal
     inputs.add(new Object[]{String.format("groovy(%s, %s)", DOUBLE_SV_COLUMN, STRING_SV_COLUMN)});
-    // last argument must be a literal
+    // second argument must be a literal
     inputs.add(new Object[]{String.format("groovy('arg0 + 10', %s)", STRING_SV_COLUMN)});
-    // last argument must be a valid json
-    inputs.add(new Object[]{String.format("groovy('arg0 + 10', %s, ']]')", STRING_SV_COLUMN)});
-    // last argument json must contain non-null key returnType
-    inputs.add(new Object[]{String.format("groovy('arg0 + 10', %s, '{\"isSingleValue\":true}')", INT_SV_COLUMN)});
-    inputs.add(new Object[]{String.format("groovy('arg0 + 10', %s, '{\"returnType\":null, \"isSingleValue\":true}')",
+    // first argument must be a valid json
+    inputs.add(new Object[]{String.format("groovy(']]', 'arg0 + 10', %s)", STRING_SV_COLUMN)});
+    // first argument json must contain non-null key returnType
+    inputs.add(new Object[]{String.format("groovy('{\"isSingleValue\":true}', 'arg0 + 10', %s)", INT_SV_COLUMN)});
+    inputs.add(new Object[]{String.format("groovy('{\"returnType\":null, \"isSingleValue\":true}', 'arg0 + 10', %s)",
         INT_SV_COLUMN)});
-    // last argument json must contain non-null key isSingleValue
-    inputs.add(new Object[]{String.format("groovy('arg0 + 10', %s, '{\"returnType\":\"INT\"}')", INT_SV_COLUMN)});
-    inputs.add(new Object[]{String.format("groovy('arg0 + 10', %s, '{\"returnType\":\"INT\", \"isSingleValue\":null}')",
+    // first argument json must contain non-null key isSingleValue
+    inputs.add(new Object[]{String.format("groovy('{\"returnType\":\"INT\"}', 'arg0 + 10', %s)", INT_SV_COLUMN)});
+    inputs.add(new Object[]{String.format("groovy('{\"returnType\":\"INT\", \"isSingleValue\":null}', 'arg0 + 10', %s)",
         INT_SV_COLUMN)});
     // return type must be valid DataType enum
-    inputs.add(new Object[]{String.format("groovy('arg0 + 10', %s, '{\"returnType\":\"foo\", \"isSingleValue\":true}')",
+    inputs.add(new Object[]{String.format("groovy('{\"returnType\":\"foo\", \"isSingleValue\":true}', 'arg0 + 10', %s)",
         INT_SV_COLUMN)});
     // arguments must be columns/transform functions
-    inputs.add(new Object[]{"groovy('arg0 + 10', 'foo', '{\"returnType\":\"INT\", \"isSingleValue\":true}')"});
+    inputs.add(new Object[]{"groovy('{\"returnType\":\"INT\", \"isSingleValue\":true}', 'arg0 + 10', 'foo')"});
     inputs.add(new Object[]{String.format(
-        "groovy('arg0 + arg1 + 10', 'arraylength(colB)', %s, '{\"returnType\":\"INT\", \"isSingleValue\":true}')",
+        "groovy('{\"returnType\":\"INT\", \"isSingleValue\":true}', 'arg0 + arg1 + 10', 'arraylength(colB)', %s)",
         INT_SV_COLUMN)});
     // invalid groovy expression
-    inputs.add(new Object[]{"groovy('+-+', '{\"returnType\":\"INT\"}')"});
-    inputs.add(new Object[]{String.format("groovy('+-+arg0 arg1', %s, %s, '{\"returnType\":\"INT\"}')", INT_SV_COLUMN,
+    inputs.add(new Object[]{"groovy('{\"returnType\":\"INT\"}', '+-+')"});
+    inputs.add(new Object[]{String.format("groovy('{\"returnType\":\"INT\"}', '+-+arg0 arg1', %s, %s)", INT_SV_COLUMN,
         DOUBLE_SV_COLUMN)});
     return inputs.toArray(new Object[0][]);
   }
