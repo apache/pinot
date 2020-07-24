@@ -398,8 +398,9 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   private boolean isPeerSegmentDownloadScheme(CommittingSegmentDescriptor committingSegmentDescriptor) {
-    return !(committingSegmentDescriptor == null) && !(committingSegmentDescriptor.getSegmentLocation() == null) &&
-        committingSegmentDescriptor.getSegmentLocation().toLowerCase().startsWith("peer://");
+    return !(committingSegmentDescriptor == null) && !(committingSegmentDescriptor.getSegmentLocation() == null)
+        && committingSegmentDescriptor.getSegmentLocation().toLowerCase()
+        .startsWith(CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME);
   }
 
   /**
@@ -514,7 +515,8 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   private boolean isPeerURL(String segmentLocation) {
-    return segmentLocation != null && segmentLocation.toLowerCase().startsWith("peer://");
+    return segmentLocation != null && segmentLocation.toLowerCase()
+        .startsWith(CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME);
   }
 
   /**

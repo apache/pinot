@@ -320,7 +320,8 @@ public class SegmentCompletionTest {
   @Test
   public void testHappyPathSplitCommitWithPeerDownloadScheme()
       throws Exception {
-    testHappyPathSplitCommit(5L, "peer:///segment1", "peer:///segment1");
+    testHappyPathSplitCommit(5L, CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME + "/segment1",
+        CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME + "/segment1");
   }
 
   @Test
