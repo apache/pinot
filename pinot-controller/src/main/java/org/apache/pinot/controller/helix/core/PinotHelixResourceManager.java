@@ -67,6 +67,11 @@ import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
+import org.apache.pinot.common.lineage.LineageEntry;
+import org.apache.pinot.common.lineage.LineageEntryState;
+import org.apache.pinot.common.lineage.SegmentLineage;
+import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
+import org.apache.pinot.common.lineage.SegmentLineageUtils;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
@@ -2201,6 +2206,164 @@ public class PinotHelixResourceManager {
     }
 
     return tableNamesWithType;
+  }
+
+  /**
+   * Computes the start segment replace phase
+   *
+   * 1. Generate a segment lineage entry id
+   * 2. Compute validation on the user inputs
+   * 3. Add the new lineage entry to the segment lineage metadata in the property store
+   *
+   * Update is done with retry logic along with read-modify-write block for achieving atomic update of the lineage
+   * metadata.
+   *
+   * @param tableNameWithType Table name with type
+   * @param segmentsFrom a list of segments to be merged
+   * @param segmentsTo a list of merged segments
+   * @return Segment lineage entry id
+   *
+   * @throws InvalidConfigException
+   */
+  public String startReplaceSegments(String tableNameWithType, List<String> segmentsFrom, List<String> segmentsTo) {
+    // Create a segment lineage entry id
+    String segmentLineageEntryId = SegmentLineageUtils.generateLineageEntryId();
+
+    // Check that all the segments from 'segmentsFrom' exist in the table
+    Set<String> segmentsForTable = new HashSet<>(getSegmentsFor(tableNameWithType));
+    Preconditions.checkArgument(segmentsForTable.containsAll(segmentsFrom), String.format(
+        "Not all segments from 'segmentsFrom' are available in the table. (tableName = '%s', segmentsFrom = '%s', "
+            + "segmentsTo = '%s', segmentsFromTable = '%s')", tableNameWithType, segmentsFrom, segmentsTo,
+        segmentsForTable));
+
+    // Check that all the segments from 'segmentTo' does not exist in the table.
+    Preconditions.checkArgument(Collections.disjoint(segmentsForTable, segmentsTo), String.format(
+        "Any segments from 'segmentsTo' should not be available in the table at this point. (tableName = '%s', "
+            + "segmentsFrom = '%s', segmentsTo = '%s', segmentsFromTable = '%s')", tableNameWithType, segmentsFrom,
+        segmentsTo, segmentsForTable));
+
+    try {
+      DEFAULT_RETRY_POLICY.attempt(() -> {
+        // Fetch the segment lineage metadata
+        ZNRecord segmentLineageZNRecord =
+            SegmentLineageAccessHelper.getSegmentLineageZNRecord(_propertyStore, tableNameWithType);
+        SegmentLineage segmentLineage;
+        int expectedVersion = -1;
+        if (segmentLineageZNRecord == null) {
+          segmentLineage = new SegmentLineage(tableNameWithType);
+        } else {
+          segmentLineage = SegmentLineage.fromZNRecord(segmentLineageZNRecord);
+          expectedVersion = segmentLineageZNRecord.getVersion();
+        }
+
+        // Check that the segment lineage entry id doesn't exists in the segment lineage
+        Preconditions.checkArgument(segmentLineage.getLineageEntry(segmentLineageEntryId) == null,
+            String.format("SegmentLineageEntryId (%s) already exists in the segment lineage.", segmentLineageEntryId));
+
+        for (String entryId : segmentLineage.getLineageEntryIds()) {
+          LineageEntry lineageEntry = segmentLineage.getLineageEntry(entryId);
+
+          // Check that any segment from 'segmentsFrom' does not appear twice.
+          Preconditions.checkArgument(Collections.disjoint(lineageEntry.getSegmentsFrom(), segmentsFrom), String
+              .format("It is not allowed to merge segments that are already merged. (tableName = %s, segmentsFrom from "
+                      + "existing lineage entry = %s, requested segmentsFrom = %s)", tableNameWithType,
+                  lineageEntry.getSegmentsFrom(), segmentsFrom));
+
+          // Check that merged segments name cannot be the same.
+          Preconditions.checkArgument(Collections.disjoint(lineageEntry.getSegmentsTo(), segmentsTo), String.format(
+              "It is not allowed to have the same segment name for merged segments. (tableName = %s, segmentsTo from "
+                  + "existing lineage entry = %s, requested segmentsTo = %s)", tableNameWithType,
+              lineageEntry.getSegmentsTo(), segmentsTo));
+        }
+
+        // Update lineage entry
+        segmentLineage.addLineageEntry(segmentLineageEntryId,
+            new LineageEntry(segmentsFrom, segmentsTo, LineageEntryState.IN_PROGRESS, System.currentTimeMillis()));
+
+        // Write back to the lineage entry
+        return SegmentLineageAccessHelper.writeSegmentLineage(_propertyStore, segmentLineage, expectedVersion);
+      });
+    } catch (Exception e) {
+      String errorMsg = String
+          .format("Failed while updating the segment lineage. (tableName = %s, segmentsFrom = %s, segmentsTo = %s)",
+              tableNameWithType, segmentsFrom, segmentsTo);
+      LOGGER.error(errorMsg, e);
+      throw new RuntimeException(errorMsg, e);
+    }
+
+    // Only successful attempt can reach here
+    LOGGER.info("startReplaceSegments is successfully processed. (tableNameWithType = {}, segmentsFrom = {}, "
+            + "segmentsTo = {}, segmentLineageEntryId = {})", tableNameWithType, segmentsFrom, segmentsTo,
+        segmentLineageEntryId);
+    return segmentLineageEntryId;
+  }
+
+  /**
+   * Computes the end segment replace phase
+   *
+   * 1. Compute validation
+   * 2. Update the lineage entry state to "COMPLETED" and write metadata to the property store
+   *
+   * Update is done with retry logic along with read-modify-write block for achieving atomic update of the lineage
+   * metadata.
+   *
+   * @param tableNameWithType
+   * @param segmentLineageEntryId
+   */
+  public void endReplaceSegments(String tableNameWithType, String segmentLineageEntryId) {
+    try {
+      DEFAULT_RETRY_POLICY.attempt(() -> {
+        // Fetch the segment lineage metadata
+        ZNRecord segmentLineageZNRecord =
+            SegmentLineageAccessHelper.getSegmentLineageZNRecord(_propertyStore, tableNameWithType);
+        SegmentLineage segmentLineage;
+        int expectedVersion = -1;
+        Preconditions.checkArgument(segmentLineageZNRecord != null, String
+            .format("Segment lineage does not exist. (tableNameWithType = '%s', segmentLineageEntryId = '%s')",
+                tableNameWithType, segmentLineageEntryId));
+        segmentLineage = SegmentLineage.fromZNRecord(segmentLineageZNRecord);
+        expectedVersion = segmentLineageZNRecord.getVersion();
+
+        // Look up the lineage entry based on the segment lineage entry id
+        LineageEntry lineageEntry = segmentLineage.getLineageEntry(segmentLineageEntryId);
+        Preconditions.checkArgument(lineageEntry != null, String
+            .format("Invalid segment lineage entry id (tableName='%s', segmentLineageEntryId='%s')", tableNameWithType,
+                segmentLineageEntryId));
+
+        // Check that all the segments from 'segmentsTo' exist in the table
+        Set<String> segmentsForTable = new HashSet<>(getSegmentsFor(tableNameWithType));
+        Preconditions.checkArgument(segmentsForTable.containsAll(lineageEntry.getSegmentsTo()), String.format(
+            "Not all segments from 'segmentsTo' are available in the table. (tableName = '%s', segmentsTo = '%s', "
+                + "segmentsFromTable = '%s')", tableNameWithType, lineageEntry.getSegmentsTo(), segmentsForTable));
+
+        // NO-OPS if the entry is already completed
+        if (lineageEntry.getState() == LineageEntryState.COMPLETED) {
+          LOGGER.warn(
+              "Lineage entry state is already COMPLETED. Nothing to update. (tableNameWithType={}, segmentLineageEntryId={})",
+              tableNameWithType, segmentLineageEntryId);
+          return true;
+        }
+
+        // Update lineage entry
+        LineageEntry newLineageEntry =
+            new LineageEntry(lineageEntry.getSegmentsFrom(), lineageEntry.getSegmentsTo(), LineageEntryState.COMPLETED,
+                System.currentTimeMillis());
+        segmentLineage.updateLineageEntry(segmentLineageEntryId, newLineageEntry);
+
+        // Write back to the lineage entry
+        return SegmentLineageAccessHelper.writeSegmentLineage(_propertyStore, segmentLineage, expectedVersion);
+      });
+    } catch (Exception e) {
+      String errorMsg = String
+          .format("Failed to update the segment lineage. (tableName = %s, segmentLineageEntryId = %s)",
+              tableNameWithType, segmentLineageEntryId);
+      LOGGER.error(errorMsg, e);
+      throw new RuntimeException(errorMsg, e);
+    }
+
+    // Only successful attempt can reach here
+    LOGGER.info("endReplaceSegments is successfully processed. (tableNameWithType = {}, segmentLineageEntryId = {})",
+        tableNameWithType, segmentLineageEntryId);
   }
 
   /*
