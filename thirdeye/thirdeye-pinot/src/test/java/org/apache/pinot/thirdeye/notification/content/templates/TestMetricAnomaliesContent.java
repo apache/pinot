@@ -17,7 +17,12 @@
 package org.apache.pinot.thirdeye.notification.content.templates;
 
 import java.util.Properties;
+import javax.ws.rs.client.Client;
 import org.apache.pinot.thirdeye.anomaly.AnomalyType;
+import org.apache.pinot.thirdeye.auth.ThirdEyePrincipal;
+import org.apache.pinot.thirdeye.common.restclient.MockAbstractRestClient;
+import org.apache.pinot.thirdeye.common.restclient.MockThirdEyeRcaRestClient;
+import org.apache.pinot.thirdeye.common.restclient.ThirdEyeRcaRestClient;
 import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
@@ -66,6 +71,7 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.thirdeye.datalayer.DaoTestUtils.*;
 import static org.apache.pinot.thirdeye.notification.commons.SmtpConfiguration.*;
+import static org.mockito.Mockito.*;
 
 
 public class TestMetricAnomaliesContent {
@@ -220,8 +226,12 @@ public class TestMetricAnomaliesContent {
     metric.setAlias(TEST + "::" + TEST);
     metricDAO.save(metric);
 
+    Map<String, Object> expectedResponse = new HashMap<>();
+    expectedResponse.put("cubeResults", "{}");
+    ThirdEyeRcaRestClient rcaClient = MockThirdEyeRcaRestClient.setupMockClient(expectedResponse);
+    MetricAnomaliesContent metricAnomaliesContent = new MetricAnomaliesContent(rcaClient);
     EmailContentFormatter
-        contentFormatter = new EmailContentFormatter(new Properties(), new MetricAnomaliesContent(),
+        contentFormatter = new EmailContentFormatter(new Properties(), metricAnomaliesContent,
         thirdeyeAnomalyConfig, DaoTestUtils.getTestNotificationConfig("Test Config"));
     EmailEntity emailEntity = contentFormatter.getEmailEntity(anomalies);
 

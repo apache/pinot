@@ -148,7 +148,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
     blacklistRecipients(recipients);
     validateAlert(recipients, anomalies);
 
-    BaseNotificationContent content = buildNotificationContent(emailClientConfigs);
+    BaseNotificationContent content = getNotificationContent(emailClientConfigs);
     EmailEntity emailEntity = new EmailContentFormatter(emailClientConfigs, content, this.teConfig, subsConfig)
         .getEmailEntity(anomalies);
     if (Strings.isNullOrEmpty(this.subsConfig.getFrom())) {

@@ -98,4 +98,8 @@ public abstract class DetectionAlertScheme {
           numOfAnomalies, this.subsConfig.getId(), e);
     }
   }
+
+  protected BaseNotificationContent getNotificationContent(Properties alertSchemeClientConfigs) {
+    return buildNotificationContent(alertSchemeClientConfigs);
+  }
 }

@@ -32,6 +32,8 @@ import org.apache.commons.io.IOUtils;
 import org.apache.pinot.thirdeye.anomaly.AnomalyType;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
+import org.apache.pinot.thirdeye.common.restclient.MockThirdEyeRcaRestClient;
+import org.apache.pinot.thirdeye.common.restclient.ThirdEyeRcaRestClient;
 import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
@@ -50,6 +52,7 @@ import org.apache.pinot.thirdeye.detection.alert.scheme.DetectionAlertScheme;
 import org.apache.pinot.thirdeye.notification.commons.JiraConfiguration;
 import org.apache.pinot.thirdeye.notification.commons.JiraEntity;
 import org.apache.pinot.thirdeye.notification.content.BaseNotificationContent;
+import org.apache.pinot.thirdeye.notification.content.templates.MetricAnomaliesContent;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.testng.Assert;
@@ -86,6 +89,7 @@ public class TestJiraContentFormatter {
   private Long subsId2;
   private DAOTestBase testDAOProvider;
   private List<AnomalyResult> anomalies;
+  private MetricAnomaliesContent metricAnomaliesContent;
 
   @BeforeMethod
   public void beforeMethod() throws Exception {
@@ -148,6 +152,11 @@ public class TestJiraContentFormatter {
     this.alertConfigDimAlerter = createDimRecipientsDetectionAlertConfig(this.detectionConfigId);
     subsId2 = this.alertConfigDAO.save(this.alertConfigDimAlerter);
     alertConfigDimAlerter.setId(subsId2);
+
+    Map<String, Object> expectedResponse = new HashMap<>();
+    expectedResponse.put("cubeResults", "{}");
+    ThirdEyeRcaRestClient rcaClient = MockThirdEyeRcaRestClient.setupMockClient(expectedResponse);
+    this.metricAnomaliesContent = new MetricAnomaliesContent(rcaClient);
   }
 
   @AfterClass(alwaysRun = true)
@@ -248,9 +257,9 @@ public class TestJiraContentFormatter {
     jiraClientConfig.put(PROP_LABELS, Arrays.asList("test-label-1", "test-label-2"));
     jiraClientConfig.put(PROP_SUBJECT_STYLE, AlertConfigBean.SubjectType.METRICS);
 
-    BaseNotificationContent content = DetectionAlertScheme.buildNotificationContent(jiraClientConfig);
     JiraContentFormatter jiraContent = new JiraContentFormatter(
-        JiraConfiguration.createFromProperties(jiraConfiguration), jiraClientConfig, content, teConfig, this.alertConfigDTO);
+        JiraConfiguration.createFromProperties(jiraConfiguration), jiraClientConfig, this.metricAnomaliesContent, teConfig,
+        this.alertConfigDTO);
 
     JiraEntity jiraEntity = jiraContent.getJiraEntity(ArrayListMultimap.create(), this.anomalies);
 
@@ -288,9 +297,9 @@ public class TestJiraContentFormatter {
     jiraClientConfig.put(PROP_LABELS, Arrays.asList("test-label-1", "test-label-2"));
     jiraClientConfig.put(PROP_SUBJECT_STYLE, AlertConfigBean.SubjectType.METRICS);
 
-    BaseNotificationContent content = DetectionAlertScheme.buildNotificationContent(jiraClientConfig);
     JiraContentFormatter jiraContent = new JiraContentFormatter(
-        JiraConfiguration.createFromProperties(jiraConfiguration), jiraClientConfig, content, teConfig, this.alertConfigDimAlerter);
+        JiraConfiguration.createFromProperties(jiraConfiguration), jiraClientConfig, this.metricAnomaliesContent,
+        teConfig, this.alertConfigDimAlerter);
 
     Multimap<String, String> dimensionKeys1 = ArrayListMultimap.create();
     dimensionKeys1.put("key", "value");
