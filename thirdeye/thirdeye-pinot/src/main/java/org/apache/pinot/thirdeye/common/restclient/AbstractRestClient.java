@@ -41,7 +41,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * A generic API Rest Client to perform short-lived http GET and POST
+ * A generic Jersey Client API to perform GET and POST
  */
 public abstract class AbstractRestClient {
   private final Logger LOG = LoggerFactory.getLogger(this.getClass());
@@ -50,7 +50,7 @@ public abstract class AbstractRestClient {
   private final Client client;
 
   /**
-   * Set up the client with a default URLFactory that creates real HTTP connections.
+   * Set up a default Jersey client.
    * For unit tests, we use the alternate constructor to pass a mock.
    */
   public AbstractRestClient() {
@@ -58,7 +58,7 @@ public abstract class AbstractRestClient {
   }
 
   /**
-   * For testing only, create a client with an alternate URLFactory. This constructor allows
+   * For testing only, create a client with an alternate client. This constructor allows
    * unit tests to mock server communication.
    */
   public AbstractRestClient(Client client) {
@@ -89,12 +89,11 @@ public abstract class AbstractRestClient {
 
   /**
    * Perform a POST request to the given URL, with a JSON or raw string as content.
-   * If the payload is an object that will be serialized to JSON the isContentTypeJSON must be set to true
-   * @param <T>  the type parameter defined as the return type of the response parser method
    * @param url the http url
    * @param postContent the post content
    */
-  public <T> T doPost(String url, MultivaluedMap<String, Object> headers, Object postContent, ParseResponseFunction<Response, T> responseParserFunc) throws IOException {
+  public <T> T doPost(String url, MultivaluedMap<String, Object> headers, Object postContent,
+      ParseResponseFunction<Response, T> responseParserFunc) throws IOException {
     long startedMillis = System.currentTimeMillis();
 
     WebTarget webTarget = this.client.target(url);
