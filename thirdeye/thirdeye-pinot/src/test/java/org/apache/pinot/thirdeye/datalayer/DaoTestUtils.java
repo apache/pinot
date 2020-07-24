@@ -211,7 +211,7 @@ public class DaoTestUtils {
     datasetConfigDTO.setTimeDuration(1);
     datasetConfigDTO.setTimeUnit(TimeUnit.HOURS);
     datasetConfigDTO.setActive(true);
-    datasetConfigDTO.setDataSource(PinotThirdEyeDataSource.DATA_SOURCE_NAME);
+    datasetConfigDTO.setDataSource(PinotThirdEyeDataSource.class.getSimpleName());
     datasetConfigDTO.setLastRefreshTime(System.currentTimeMillis());
     return datasetConfigDTO;
   }

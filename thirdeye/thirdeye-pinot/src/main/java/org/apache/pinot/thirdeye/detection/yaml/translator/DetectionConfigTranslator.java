@@ -194,7 +194,7 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     List<DatasetConfigDTO> datasetConfigs = this.metricAttributesMap.getAllDatasets();
     if (MapUtils.getString(yamlConfigMap, PROP_CRON) == null
         && datasetConfigs.stream().allMatch(c -> c.bucketTimeGranularity().getUnit().equals(TimeUnit.DAYS))
-        && datasetConfigs.stream().allMatch(c -> c.getDataSource().equals(PinotThirdEyeDataSource.DATA_SOURCE_NAME))) {
+        && datasetConfigs.stream().allMatch(c -> c.getDataSource().equals(PinotThirdEyeDataSource.class.getSimpleName()))) {
       config.setDataAvailabilitySchedule(true);
     }
     return config;

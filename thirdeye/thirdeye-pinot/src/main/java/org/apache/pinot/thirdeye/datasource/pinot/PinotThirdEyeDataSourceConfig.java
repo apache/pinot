@@ -250,12 +250,10 @@ public class PinotThirdEyeDataSourceConfig {
    *                                  controller host and port, cluster name, and the URL to zoo keeper.
    */
   static PinotThirdEyeDataSourceConfig createFromProperties(Map<String, Object> properties) {
+    String dataSourceName = MapUtils.getString(properties, PinotThirdeyeDataSourceProperties.NAME.getValue(), PinotThirdEyeDataSource.class.getSimpleName());
+
     ImmutableMap<String, Object> processedProperties = processPropertyMap(properties);
-    if (processedProperties == null) {
-      throw new IllegalArgumentException(
-          "Invalid properties for data source: " + PinotThirdEyeDataSource.DATA_SOURCE_NAME + ", properties="
-              + properties);
-    }
+    Preconditions.checkNotNull(processedProperties, "Invalid properties for data source: %s, properties=%s", dataSourceName, properties);
 
     String controllerHost = MapUtils.getString(processedProperties, PinotThirdeyeDataSourceProperties.CONTROLLER_HOST.getValue());
     int controllerPort = MapUtils.getInteger(processedProperties, PinotThirdeyeDataSourceProperties.CONTROLLER_PORT.getValue());
@@ -263,9 +261,10 @@ public class PinotThirdEyeDataSourceConfig {
     String zookeeperUrl = MapUtils.getString(processedProperties, PinotThirdeyeDataSourceProperties.ZOOKEEPER_URL.getValue());
     String clusterName = MapUtils.getString(processedProperties, PinotThirdeyeDataSourceProperties.CLUSTER_NAME.getValue());
 
-    // brokerUrl and tag are optional
+    // brokerUrl, tag, and name are optional
     String brokerUrl = MapUtils.getString(processedProperties, PinotThirdeyeDataSourceProperties.BROKER_URL.getValue());
     String tag = MapUtils.getString(processedProperties, PinotThirdeyeDataSourceProperties.TAG.getValue());
+    String name = MapUtils.getString(processedProperties, PinotThirdeyeDataSourceProperties.NAME.getValue());
 
     Builder builder =
         PinotThirdEyeDataSourceConfig.builder().setControllerHost(controllerHost).setControllerPort(controllerPort)
@@ -275,6 +274,9 @@ public class PinotThirdEyeDataSourceConfig {
     }
     if (StringUtils.isNotBlank(tag)) {
       builder.setTag(tag);
+    }
+    if (StringUtils.isNotBlank(name)) {
+      builder.setName(name);
     }
     if (StringUtils.isNotBlank(controllerConnectionScheme)) {
       builder.setControllerConnectionScheme(controllerConnectionScheme);

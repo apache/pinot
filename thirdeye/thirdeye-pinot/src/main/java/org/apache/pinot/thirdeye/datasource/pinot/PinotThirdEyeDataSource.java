@@ -58,7 +58,6 @@ import org.slf4j.LoggerFactory;
 public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
   private static final Logger LOG = LoggerFactory.getLogger(PinotThirdEyeDataSource.class);
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
-  public static final String DATA_SOURCE_NAME = PinotThirdEyeDataSource.class.getSimpleName();
   private static final String PINOT = "Pinot";
   private String name;
 
@@ -83,7 +82,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
 
     pinotDataSourceTimeQuery = new PinotDataSourceTimeQuery(this);
     pinotDataSourceDimensionFilters = new PinotDataSourceDimensionFilters(this);
-    name = pinotThirdEyeDataSourceConfig.getName() != null ? pinotThirdEyeDataSourceConfig.getName() : DATA_SOURCE_NAME;
+    name = pinotThirdEyeDataSourceConfig.getName() != null ? pinotThirdEyeDataSourceConfig.getName() : PinotThirdEyeDataSource.class.getSimpleName();
   }
 
 
@@ -101,7 +100,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
 
     pinotDataSourceTimeQuery = new PinotDataSourceTimeQuery(this);
     pinotDataSourceDimensionFilters = new PinotDataSourceDimensionFilters(this);
-    name = MapUtils.getString(properties, "name", DATA_SOURCE_NAME);
+    name = MapUtils.getString(properties, "name", PinotThirdEyeDataSource.class.getSimpleName());
   }
 
   /**

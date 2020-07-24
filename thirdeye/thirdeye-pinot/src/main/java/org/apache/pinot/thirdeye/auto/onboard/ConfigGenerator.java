@@ -75,7 +75,7 @@ public class ConfigGenerator {
   }
 
   public static DatasetConfigDTO generateDatasetConfig(String dataset, Schema schema, String timeColumnName,
-      Map<String, String> customConfigs) {
+      Map<String, String> customConfigs, String dataSourceName) {
     List<String> dimensions = schema.getDimensionNames();
     DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
     // Create DatasetConfig
@@ -83,7 +83,7 @@ public class ConfigGenerator {
     datasetConfigDTO.setDataset(dataset);
     datasetConfigDTO.setDimensions(dimensions);
     setDateTimeSpecs(datasetConfigDTO, dateTimeFieldSpec);
-    datasetConfigDTO.setDataSource(PinotThirdEyeDataSource.DATA_SOURCE_NAME);
+    datasetConfigDTO.setDataSource(dataSourceName);
     datasetConfigDTO.setProperties(customConfigs);
     checkNonAdditive(datasetConfigDTO);
     return datasetConfigDTO;

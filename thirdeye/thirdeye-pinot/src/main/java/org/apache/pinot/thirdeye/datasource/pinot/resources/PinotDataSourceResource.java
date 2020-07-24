@@ -95,7 +95,7 @@ public class PinotDataSourceResource {
       Preconditions.checkNotNull(ThirdEyeCacheRegistry.getInstance(),
           "Failed to get Pinot data source because ThirdEye cache registry is not initialized.");
       pinotDataSource = (PinotThirdEyeDataSource) ThirdEyeCacheRegistry.getInstance().getQueryCache()
-          .getDataSource(PinotThirdEyeDataSource.DATA_SOURCE_NAME);
+          .getDataSource(PinotThirdEyeDataSource.class.getSimpleName());
       Preconditions
           .checkNotNull(pinotDataSource, "Failed to get Pinot data source because it is not initialized in ThirdEye.");
     }
