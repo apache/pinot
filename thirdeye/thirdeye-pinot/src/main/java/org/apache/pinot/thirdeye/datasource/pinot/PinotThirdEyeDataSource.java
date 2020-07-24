@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -59,6 +60,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
   public static final String DATA_SOURCE_NAME = PinotThirdEyeDataSource.class.getSimpleName();
   private static final String PINOT = "Pinot";
+  private String name;
 
   private static final long CONNECTION_TIMEOUT = 60000;
 
@@ -81,6 +83,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
 
     pinotDataSourceTimeQuery = new PinotDataSourceTimeQuery(this);
     pinotDataSourceDimensionFilters = new PinotDataSourceDimensionFilters(this);
+    name = pinotThirdEyeDataSourceConfig.getName() != null ? pinotThirdEyeDataSourceConfig.getName() : DATA_SOURCE_NAME;
   }
 
 
@@ -98,6 +101,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
 
     pinotDataSourceTimeQuery = new PinotDataSourceTimeQuery(this);
     pinotDataSourceDimensionFilters = new PinotDataSourceDimensionFilters(this);
+    name = MapUtils.getString(properties, "name", DATA_SOURCE_NAME);
   }
 
   /**
@@ -133,7 +137,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
 
   @Override
   public String getName() {
-    return DATA_SOURCE_NAME;
+    return this.name;
   }
 
   @Override

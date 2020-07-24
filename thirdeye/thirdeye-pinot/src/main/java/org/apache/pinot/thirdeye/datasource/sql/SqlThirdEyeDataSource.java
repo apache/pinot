@@ -23,6 +23,8 @@ import com.google.common.cache.LoadingCache;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+
+import org.apache.commons.collections.MapUtils;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datasource.MetricFunction;
@@ -45,15 +47,17 @@ public class SqlThirdEyeDataSource implements ThirdEyeDataSource {
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
   protected LoadingCache<RelationalQuery, ThirdEyeResultSetGroup> sqlResponseCache;
   private SqlResponseCacheLoader sqlResponseCacheLoader;
+  private String name;
 
   public SqlThirdEyeDataSource(Map<String, Object> properties) throws Exception {
     sqlResponseCacheLoader = new SqlResponseCacheLoader(properties);
     sqlResponseCache = ThirdEyeUtils.buildResponseCache(sqlResponseCacheLoader);
+    name = MapUtils.getString(properties, "name", SqlThirdEyeDataSource.class.getSimpleName());
   }
 
   @Override
   public String getName() {
-    return SqlThirdEyeDataSource.class.getSimpleName();
+    return this.name;
   }
 
   @Override
