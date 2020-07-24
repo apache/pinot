@@ -74,8 +74,6 @@ public abstract class AbstractRestClient {
     long startedMillis = System.currentTimeMillis();
 
     WebTarget webTarget = this.client.target(url);
-    //TODO: Compose url vs build using client? .path("employees");
-    // No handling of status codes?
 
     Invocation.Builder invocationBuilder = webTarget.request(MediaType.APPLICATION_JSON).headers(headers);
     Response response = invocationBuilder.get();
@@ -100,8 +98,6 @@ public abstract class AbstractRestClient {
     long startedMillis = System.currentTimeMillis();
 
     WebTarget webTarget = this.client.target(url);
-    //TODO: Compose url vs build using client? .path("employees");
-    // No handling of status codes?
 
     Invocation.Builder invocationBuilder = webTarget.request(MediaType.APPLICATION_JSON).headers(headers);
     Response response = invocationBuilder.post(Entity.entity(postContent, MediaType.APPLICATION_JSON));
