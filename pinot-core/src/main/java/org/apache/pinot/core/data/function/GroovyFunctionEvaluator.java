@@ -55,6 +55,7 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   private static final String ARGUMENTS_SEPARATOR = ",";
 
   private final List<String> _arguments;
+  private final int _numArguments;
   private final Binding _binding;
   private final Script _script;
 
@@ -67,6 +68,7 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     } else {
       _arguments = Collections.emptyList();
     }
+    _numArguments = _arguments.size();
     _binding = new Binding();
     _script = new GroovyShell(_binding).parse(matcher.group(SCRIPT_GROUP_NAME));
   }
@@ -89,6 +91,17 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
         return null;
       }
       _binding.setVariable(argument, value);
+    }
+    return _script.run();
+  }
+
+  /**
+   * Evaluate the Groovy function with bindings provided as an array of Object
+   * The number of elements in the values must match the numArguments
+   */
+  public Object evaluate(Object[] values) {
+    for (int i = 0; i < _numArguments; i++) {
+      _binding.setVariable(_arguments.get(i), values[i]);
     }
     return _script.run();
   }

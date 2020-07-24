@@ -55,7 +55,7 @@ public enum TransformFunctionType {
   ARRAYLENGTH("arrayLength"),
   VALUEIN("valueIn"),
   MAPVALUE("mapValue"),
-
+  GROOVY("groovy"),
   // Special type for annotation based scalar functions
   SCALAR("scalar"),
 
