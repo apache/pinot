@@ -237,12 +237,12 @@ public class YamlResource {
     info.setTuningWindowEnd(tuningWindowEnd);
     info.setEnd(System.currentTimeMillis());
 
-    long backFillStart = detectionConfig.getBackfillStart();
+    long lastTimestamp = detectionConfig.getLastTimestamp();
     // If no value is present, set the default lookback
-    if (backFillStart == -1) {
-      backFillStart = info.getEnd() - ONBOARDING_REPLAY_LOOKBACK;
+    if (lastTimestamp < 0) {
+      lastTimestamp = info.getEnd() - ONBOARDING_REPLAY_LOOKBACK;
     }
-    info.setStart(backFillStart);
+    info.setStart(lastTimestamp);
 
     String taskInfoJson = OBJECT_MAPPER.writeValueAsString(info);
 

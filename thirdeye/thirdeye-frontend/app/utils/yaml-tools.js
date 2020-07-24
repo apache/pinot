@@ -33,14 +33,14 @@ rules:
 # For example, the cron below would execute every 5 minutes.
 # cron: "0 0/5 * 1/1 * ? *"
 
-# Backfill detections
-# You can use the backfillStart parameter to denote how far back you want the anomalies
-# to be detected.
-# A valid entry is a timestamp value in millis.
+# Detections in past data
+# You can use the lastTimestamp parameter to denote how far back you want the anomalies
+# to be detected. This value acts like a checkpoint or high watermark. 
+# A valid entry is a non negative timestamp value in millis.
 # 
 # - By default, (if not mentioned), the lookback is 30 days
 # - A value of 0 (zero) implies complete backfill till the start of data. As shown below.
-# backfillStart: 0 
+# lastTimestamp: 0 
 
 `;
 

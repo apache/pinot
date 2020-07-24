@@ -46,9 +46,6 @@ public class DetectionConfigBean extends AbstractBean {
   long lastTuningTimestamp;
   List<String> owners;
 
-  // Specifies how far to backfill the anomalies. Stored as DateTime in millis
-  long backfillStart;
-
   // Stores properties related to data SLA rules for every metric
   Map<String, Object> dataQualityProperties;
 
@@ -102,14 +99,6 @@ public class DetectionConfigBean extends AbstractBean {
 
   public void setCron(String cron) {
     this.cron = cron;
-  }
-
-  public long getBackfillStart() {
-    return backfillStart;
-  }
-
-  public void setBackfillStart(final long backfillStart) {
-    this.backfillStart = backfillStart;
   }
 
   public Map<String, Object> getProperties() {

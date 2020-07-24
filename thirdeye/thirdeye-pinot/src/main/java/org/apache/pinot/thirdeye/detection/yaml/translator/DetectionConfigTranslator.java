@@ -112,7 +112,7 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
   static final String PROP_CRON = "cron";
   static final String PROP_TYPE = "type";
   static final String PROP_NAME = "name";
-  static final String PROP_BACKFILL_START = "backfillStart";
+  static final String PROP_LAST_TIMESTAMP = "lastTimestamp";
 
   private static final String PROP_DETECTION_NAME = "detectionName";
   private static final String PROP_DESC_NAME = "description";
@@ -181,8 +181,14 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     config.setName(MapUtils.getString(yamlConfigMap, PROP_DETECTION_NAME));
     config.setDescription(MapUtils.getString(yamlConfigMap, PROP_DESC_NAME));
     config.setDescription(MapUtils.getString(yamlConfigMap, PROP_DESC_NAME));
-    config.setLastTimestamp(System.currentTimeMillis());
     config.setOwners(filterOwners(ConfigUtils.getList(yamlConfigMap.get(PROP_OWNERS))));
+
+    /*
+     * The lastTimestamp value is used as a checkpoint/high watermark for onboarding data.
+     * This implies that data entries post this timestamp will be processed for
+     * anomalies.
+     */
+    config.setLastTimestamp(longValue(yamlConfigMap.get(PROP_LAST_TIMESTAMP)));
 
     config.setProperties(detectionProperties);
     config.setDataQualityProperties(qualityProperties);
@@ -190,7 +196,6 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     config.setCron(cron);
     config.setActive(MapUtils.getBooleanValue(yamlConfigMap, PROP_ACTIVE, true));
     config.setYaml(yamlConfig);
-    config.setBackfillStart(parseTimeStampLong(yamlConfigMap.get(PROP_BACKFILL_START)));
 
     //TODO: data-availability trigger is only enabled for detections running on PINOT daily dataset only
     List<DatasetConfigDTO> datasetConfigs = this.metricAttributesMap.getAllDatasets();
@@ -202,7 +207,7 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     return config;
   }
 
-  private long parseTimeStampLong(final Object o) {
+  private static long longValue(final Object o) {
     if (o instanceof Number) {
       return ((Number) o).longValue();
     }
