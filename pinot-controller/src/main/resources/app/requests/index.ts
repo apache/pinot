@@ -18,7 +18,9 @@
  */
 
 import { AxiosResponse } from 'axios';
-import { TableData, Instances, Instance, Tenants, ClusterConfig, TableName, TableSize, IdealState, QueryTables, TableSchema, SQLResult, ClusterName, LiveInstances } from 'Models';
+import { TableData, Instances, Instance, Tenants, ClusterConfig, TableName, TableSize,
+  IdealState, QueryTables, TableSchema, SQLResult, ClusterName, LiveInstances, InstanceConfig
+} from 'Models';
 import { baseApi } from '../utils/axios-config';
 
 export const getTenants = (): Promise<AxiosResponse<Tenants>> =>
@@ -66,5 +68,8 @@ export const getQueryResult = (params: Object, url: string): Promise<AxiosRespon
 export const getClusterInfo = (): Promise<AxiosResponse<ClusterName>> =>
   baseApi.get('/cluster/info');
 
-  export const getLiveInstancesFromClusterName = (params: string): Promise<AxiosResponse<LiveInstances>> =>
+export const getLiveInstancesFromClusterName = (params: string): Promise<AxiosResponse<LiveInstances>> =>
   baseApi.get(`/zk/ls?path=${params}`);
+
+export const zookeeperGet = (params: string): Promise<AxiosResponse<InstanceConfig>> =>
+  baseApi.get(`/zk/get?path=${params}`);

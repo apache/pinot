@@ -30,10 +30,16 @@ type DataTable = {
 const Instances = () => {
   const [fetching, setFetching] = useState(true);
   const [instances, setInstances] = useState<DataTable>();
+  const [clusterName, setClusterName] = useState('');
 
   const fetchData = async () => {
     const result = await PinotMethodUtils.getAllInstances();
+    let clusterNameRes = localStorage.getItem('pinot_ui:clusterName');
+    if(!clusterNameRes){
+      clusterNameRes = await PinotMethodUtils.getClusterName();
+    }
     setInstances(result);
+    setClusterName(clusterNameRes);
     setFetching(false);
   };
   useEffect(() => {
@@ -46,7 +52,7 @@ const Instances = () => {
     <>
       {
         map(instances, (value, key) => {
-          return <InstanceTable key={key} name={key} instances={value} />;
+          return <InstanceTable key={key} name={key} instances={value} clusterName={clusterName} />;
         })
       }
     </>

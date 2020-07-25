@@ -25,10 +25,11 @@ import PinotMethodUtils from '../../utils/PinotMethodUtils';
 
 type Props = {
   name: string,
-  instances: string[]
+  instances: string[],
+  clusterName: string
 };
 
-const InstaceTable = ({ name, instances }: Props) => {
+const InstaceTable = ({ name, instances, clusterName }: Props) => {
 
   const [fetching, setFetching] = useState(true);
   const [tableData, setTableData] = useState<TableData>({
@@ -37,14 +38,13 @@ const InstaceTable = ({ name, instances }: Props) => {
   });
 
   const fetchClusterName = async () => {
-    const clusterName = await PinotMethodUtils.getClusterName();
     fetchLiveInstance(clusterName);
-  }
+  };
 
   const fetchLiveInstance = async (clusterName) => {
     const liveInstanceArr = await PinotMethodUtils.getLiveInstance(clusterName);
     fetchData(liveInstanceArr.data);
-  }
+  };
 
   const fetchData = async (liveInstanceArr) => {
     const result = await PinotMethodUtils.getInstanceData(instances, liveInstanceArr);
@@ -63,6 +63,8 @@ const InstaceTable = ({ name, instances }: Props) => {
       data={tableData}
       showSearchBox={true}
       inAccordionFormat={true}
+      addLinks
+      baseURL={'/instance/'}
     />
   );
 };

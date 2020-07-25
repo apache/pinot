@@ -50,7 +50,7 @@ const useStyles = makeStyles((theme) => ({
     padding: '20px',
   },
   codeMirror: {
-    '& .CodeMirror': { height: 100, border: '1px solid #BDCCD9' },
+    '& .CodeMirror': { height: 100, border: '1px solid #BDCCD9', fontSize: '13px' },
   },
   queryOutput: {
     '& .CodeMirror': { height: 430, border: '1px solid #BDCCD9' },
@@ -76,7 +76,7 @@ const useStyles = makeStyles((theme) => ({
     marginBottom: '20px',
   },
   sqlError: {
-    whiteSpace: 'pre'
+    whiteSpace: 'pre-wrap'
   }
 }));
 
@@ -86,7 +86,8 @@ const jsonoptions = {
   styleActiveLine: true,
   gutters: ['CodeMirror-lint-markers'],
   lint: true,
-  theme: 'default'
+  theme: 'default',
+  readOnly: 'nocursor'
 };
 
 const sqloptions = {

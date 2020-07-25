@@ -24,30 +24,40 @@ import { Switch, Route, HashRouter as Router } from 'react-router-dom';
 import theme from './theme';
 import Layout from './components/Layout';
 import RouterData from './router';
+import PinotMethodUtils from './utils/PinotMethodUtils';
 
-const App = () => (
-  <MuiThemeProvider theme={theme}>
-    <Router>
-      <Switch>
-        {RouterData.map(({ path, Component }, key) => (
-          <Route
-            exact
-            path={path}
-            key={key}
-            render={props => {
-              return (
-                <div className="p-8">
-                  <Layout {...props}>
-                    <Component {...props} />
-                  </Layout>
-                </div>
-              );
-            }}
-          />
-        ))}
-      </Switch>
-    </Router>
-  </MuiThemeProvider>
-);
+const App = () => {
+  const fetchClusterName = async () => {
+    const clusterNameResponse = await PinotMethodUtils.getClusterName();
+    localStorage.setItem('pinot_ui:clusterName', clusterNameResponse);
+  };
+  React.useEffect(()=>{
+    fetchClusterName();
+  }, []);
+  return (
+    <MuiThemeProvider theme={theme}>
+      <Router>
+        <Switch>
+          {RouterData.map(({ path, Component }, key) => (
+            <Route
+              exact
+              path={path}
+              key={key}
+              render={props => {
+                return (
+                  <div className="p-8">
+                    <Layout {...props}>
+                      <Component {...props} />
+                    </Layout>
+                  </div>
+                );
+              }}
+            />
+          ))}
+        </Switch>
+      </Router>
+    </MuiThemeProvider>
+  )
+};
 
 ReactDOM.render(<App />, document.getElementById('app'));
