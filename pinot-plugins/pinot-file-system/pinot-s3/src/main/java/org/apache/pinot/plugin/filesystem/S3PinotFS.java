@@ -41,10 +41,8 @@ import com.google.common.collect.ImmutableList;
 
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
-import software.amazon.awssdk.auth.credentials.AwsCredentialsProviderChain;
-import software.amazon.awssdk.auth.credentials.EnvironmentVariableCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
-import software.amazon.awssdk.auth.credentials.SystemPropertyCredentialsProvider;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.regions.Region;
@@ -89,9 +87,7 @@ public class S3PinotFS extends PinotFS {
         AwsBasicCredentials awsBasicCredentials = AwsBasicCredentials.create(accessKey, secretKey);
         awsCredentialsProvider = StaticCredentialsProvider.create(awsBasicCredentials);
       } else {
-        awsCredentialsProvider =
-            AwsCredentialsProviderChain.builder().addCredentialsProvider(SystemPropertyCredentialsProvider.create())
-                .addCredentialsProvider(EnvironmentVariableCredentialsProvider.create()).build();
+        awsCredentialsProvider = DefaultCredentialsProvider.create();
       }
 
       _s3Client = S3Client.builder().region(Region.of(region)).credentialsProvider(awsCredentialsProvider).build();
@@ -434,18 +430,10 @@ public class S3PinotFS extends PinotFS {
       if (prefix.equals(DELIMITER)) {
         return true;
       }
-      try {
-        HeadObjectRequest headObjectRequest =
-            HeadObjectRequest.builder().bucket(uri.getHost()).key(uri.getPath()).build();
-        HeadObjectResponse s3ObjectMetadata = _s3Client.headObject(headObjectRequest);
 
-        return s3ObjectMetadata.sdkHttpResponse().isSuccessful();
-      } catch (NoSuchKeyException e) {
-        LOGGER.error("Could not get directory entry for {}", uri);
-      }
-
-      ListObjectsV2Request listObjectsV2Request =
-          ListObjectsV2Request.builder().bucket(uri.getHost()).prefix(prefix).build();
+      ListObjectsV2Request listObjectsV2Request = ListObjectsV2Request
+              .builder().bucket(uri.getHost())
+              .prefix(prefix).maxKeys(2).build();
       ListObjectsV2Response listObjectsV2Response = _s3Client.listObjectsV2(listObjectsV2Request);
       return listObjectsV2Response.hasContents();
     } catch (NoSuchKeyException e) {
