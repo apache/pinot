@@ -450,11 +450,21 @@ const getSegmentDetails = (tableName, segmentName) => {
   });
 };
 
-// This method is used to fetch the instance config
+// This method is used to fetch the LIVEINSTANCE config
 // API: /zk/get?path=:clusterName/LIVEINSTANCES/:instanceName
 // Expected Output: configuration in JSON format
-const getInstanceConfig = (clusterName, instanceName) => {
+const getLiveInstanceConfig = (clusterName, instanceName) => {
   const params = encodeURIComponent(`/${clusterName}/LIVEINSTANCES/${instanceName}`);
+  return zookeeperGet(params).then((res) => {
+    return res.data;
+  })
+};
+
+// This method is used to fetch the instance config
+// API: /zk/get?path=:clusterName/CONFIGS/PARTICIPANT/:instanceName
+// Expected Output: configuration in JSON format
+const getInstanceConfig = (clusterName, instanceName) => {
+  const params = encodeURIComponent(`/${clusterName}/CONFIGS/PARTICIPANT/${instanceName}`);
   return zookeeperGet(params).then((res) => {
     return res.data;
   })
@@ -493,6 +503,7 @@ export default {
   getSegmentDetails,
   getClusterName,
   getLiveInstance,
+  getLiveInstanceConfig,
   getInstanceConfig,
   getTenantsFromInstance
 };

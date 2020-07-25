@@ -61,6 +61,7 @@ const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
   const clutserName = localStorage.getItem('pinot_ui:clusterName');
   const [fetching, setFetching] = useState(true);
   const [instanceConfig, setInstanceConfig] = useState(null);
+  const [liveConfig, setLiveConfig] = useState(null);
   const [tableData, setTableData] = useState<TableData>({
     columns: [],
     records: []
@@ -68,8 +69,10 @@ const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
   
   const fetchData = async () => {
     const configResponse = await PinotMethodUtils.getInstanceConfig(clutserName, instanceName);
+    const liveConfigResponse = await PinotMethodUtils.getLiveInstanceConfig(clutserName, instanceName);
     const tenantListResponse = await PinotMethodUtils.getTenantsFromInstance(instanceName);
     setInstanceConfig(JSON.stringify(configResponse, null , 2));
+    setLiveConfig(JSON.stringify(liveConfigResponse, null , 2));
     if(tenantListResponse){
       fetchTableDetails(tenantListResponse);
     } else {
@@ -112,19 +115,40 @@ const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
         overflowY: 'auto',
       }}
     >
-      <div className={classes.codeMirrorDiv}>
-        <SimpleAccordion
-          headerTitle="Instance Config"
-          showSearchBox={false}
-        >
-          <CodeMirror
-            options={jsonoptions}
-            value={instanceConfig}
-            className={classes.codeMirror}
-            autoCursor={false}
-          />
-        </SimpleAccordion>
-      </div>
+      <Grid container spacing={2}>
+        <Grid item xs={liveConfig ? 6 : 12}>
+          <div className={classes.codeMirrorDiv}>
+            <SimpleAccordion
+              headerTitle="Instance Config"
+              showSearchBox={false}
+            >
+              <CodeMirror
+                options={jsonoptions}
+                value={instanceConfig}
+                className={classes.codeMirror}
+                autoCursor={false}
+              />
+            </SimpleAccordion>
+          </div>
+        </Grid>
+        {liveConfig ?
+          <Grid item xs={6}>
+            <div className={classes.codeMirrorDiv}>
+              <SimpleAccordion
+                headerTitle="LiveInstance Config"
+                showSearchBox={false}
+              >
+                <CodeMirror
+                  options={jsonoptions}
+                  value={liveConfig}
+                  className={classes.codeMirror}
+                  autoCursor={false}
+                />
+              </SimpleAccordion>
+            </div>
+          </Grid>
+        : null}
+      </Grid>
       {tableData.columns.length ?
         <CustomizedTables
           title="Tables"
