@@ -56,14 +56,12 @@ public class DataTypeTransformer implements RecordTransformer {
     MULTI_VALUE_TYPE_MAP.put(Float.class, PinotDataType.FLOAT_ARRAY);
     MULTI_VALUE_TYPE_MAP.put(Double.class, PinotDataType.DOUBLE_ARRAY);
     MULTI_VALUE_TYPE_MAP.put(String.class, PinotDataType.STRING_ARRAY);
-    MULTI_VALUE_TYPE_MAP.put(HashMap.class, PinotDataType.HASHMAP);
+    MULTI_VALUE_TYPE_MAP.put(HashMap.class, PinotDataType.MAP);
   }
 
   private final Map<String, PinotDataType> _dataTypes = new HashMap<>();
-  private final Schema _schema;
 
   public DataTypeTransformer(Schema schema) {
-    _schema = schema;
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn()) {
         _dataTypes.put(fieldSpec.getName(), PinotDataType.getPinotDataType(fieldSpec));
@@ -90,8 +88,8 @@ public class DataTypeTransformer implements RecordTransformer {
         source = MULTI_VALUE_TYPE_MAP.get(values[0].getClass());
         if (source == null) {
           source = PinotDataType.OBJECT_ARRAY;
-        } else if (source == PinotDataType.HASHMAP) {
-          source = PinotDataType.getPinotDataTypeFromHashMap((Map<Object, Object>) values[0]);
+        } else if (source == PinotDataType.MAP) {
+          source = PinotDataType.getSpecificMapDataTypeFromMap((Map<Object, Object>) values[0]);
         }
       } else {
         // Single-value column
