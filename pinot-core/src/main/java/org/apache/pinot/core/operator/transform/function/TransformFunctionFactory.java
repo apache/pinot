@@ -90,6 +90,8 @@ public class TransformFunctionFactory {
           put(TransformFunctionType.ARRAYLENGTH.getName().toLowerCase(), ArrayLengthTransformFunction.class);
           put(TransformFunctionType.VALUEIN.getName().toLowerCase(), ValueInTransformFunction.class);
           put(TransformFunctionType.MAPVALUE.getName().toLowerCase(), MapValueTransformFunction.class);
+
+          put(TransformFunctionType.GROOVY.getName().toLowerCase(), GroovyTransformFunction.class);
           put(TransformFunctionType.CASE.getName().toLowerCase(), CaseTransformFunction.class);
 
           put(TransformFunctionType.EQUALS.getName().toLowerCase(), EqualsTransformFunction.class);

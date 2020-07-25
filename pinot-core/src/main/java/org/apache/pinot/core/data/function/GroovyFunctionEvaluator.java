@@ -55,18 +55,20 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   private static final String ARGUMENTS_SEPARATOR = ",";
 
   private final List<String> _arguments;
+  private final int _numArguments;
   private final Binding _binding;
   private final Script _script;
 
-  public GroovyFunctionEvaluator(String transformExpression) {
-    Matcher matcher = GROOVY_FUNCTION_PATTERN.matcher(transformExpression);
-    Preconditions.checkState(matcher.matches(), "Invalid transform expression: %s", transformExpression);
+  public GroovyFunctionEvaluator(String closure) {
+    Matcher matcher = GROOVY_FUNCTION_PATTERN.matcher(closure);
+    Preconditions.checkState(matcher.matches(), "Invalid transform expression: %s", closure);
     String arguments = matcher.group(ARGUMENTS_GROUP_NAME);
     if (arguments != null) {
       _arguments = Splitter.on(ARGUMENTS_SEPARATOR).trimResults().splitToList(arguments);
     } else {
       _arguments = Collections.emptyList();
     }
+    _numArguments = _arguments.size();
     _binding = new Binding();
     _script = new GroovyShell(_binding).parse(matcher.group(SCRIPT_GROUP_NAME));
   }
@@ -89,6 +91,17 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
         return null;
       }
       _binding.setVariable(argument, value);
+    }
+    return _script.run();
+  }
+
+  /**
+   * Evaluate the Groovy function with bindings provided as an array of Object
+   * The number of elements in the values must match the numArguments
+   */
+  public Object evaluate(Object[] values) {
+    for (int i = 0; i < _numArguments; i++) {
+      _binding.setVariable(_arguments.get(i), values[i]);
     }
     return _script.run();
   }
