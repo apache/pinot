@@ -1159,24 +1159,71 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "SELECT MAX(timeConvert(DaysSinceEpoch,'DAYS','SECONDS')) FROM mytable",
         "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')");
     List<String> queries = new ArrayList<>();
-    baseQueries.stream().forEach(q -> queries.add(q.replace("mytable", "MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch")));
-    baseQueries.stream().forEach(q -> queries.add(q.replace("mytable", "MYDB.MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch")));
+    baseQueries.forEach(q -> queries.add(q.replace("mytable", "MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch")));
+    baseQueries.forEach(q -> queries.add(q.replace("mytable", "MYDB.MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch")));
 
-    // Wait for at most 10 seconds for broker to get the ZK callback of the schema change
-    TestUtils.waitForCondition(aVoid -> {
+    for (String query : queries) {
       try {
-        for (String query : queries) {
-          JsonNode response = postQuery(query);
-          // NOTE: When table does not exist, we will get 'BrokerResourceMissingError'.
-          //       When column does not exist, all segments will be pruned and 'numSegmentsProcessed' will be 0.
-          return response.get("exceptions").size() == 0 && response.get("numSegmentsProcessed").asInt() > 0;
-        }
+        postQuery(query);
       } catch (Exception e) {
         // Fail the test when exception caught
-        throw new RuntimeException(e);
+        throw new RuntimeException("Got Exceptions from query - " + query);
       }
-      return true;
-    }, 10_000L, "Failed to get results for case-insensitive queries");
+    }
+  }
+
+  @Test
+  public void testColumnNameContainsTableName() {
+    int daysSinceEpoch = 16138;
+    long secondsSinceEpoch = 16138 * 24 * 60 * 60;
+    List<String> baseQueries = Arrays.asList("SELECT * FROM mytable",
+        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable",
+        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by DaysSinceEpoch limit 10000",
+        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by timeConvert(DaysSinceEpoch,'DAYS','SECONDS') DESC limit 10000",
+        "SELECT count(*) FROM mytable WHERE DaysSinceEpoch = " + daysSinceEpoch,
+        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch,
+        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + daysSinceEpoch,
+        "SELECT MAX(timeConvert(DaysSinceEpoch,'DAYS','SECONDS')) FROM mytable",
+        "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')");
+    List<String> queries = new ArrayList<>();
+    baseQueries.forEach(q -> queries.add(q.replace("DaysSinceEpoch", "mytable.DAYSSinceEpOch")));
+    baseQueries.forEach(q -> queries.add(q.replace("DaysSinceEpoch", "mytable.DAYSSinceEpOch")));
+
+    for (String query : queries) {
+      try {
+        postQuery(query);
+      } catch (Exception e) {
+        // Fail the test when exception caught
+        throw new RuntimeException("Got Exceptions from query - " + query);
+      }
+    }
+  }
+
+  @Test
+  public void testCaseInsensitivityWithColumnNameContainsTableName() {
+    int daysSinceEpoch = 16138;
+    long secondsSinceEpoch = 16138 * 24 * 60 * 60;
+    List<String> baseQueries = Arrays.asList("SELECT * FROM mytable",
+        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable",
+        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by DaysSinceEpoch limit 10000",
+        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by timeConvert(DaysSinceEpoch,'DAYS','SECONDS') DESC limit 10000",
+        "SELECT count(*) FROM mytable WHERE DaysSinceEpoch = " + daysSinceEpoch,
+        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch,
+        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + daysSinceEpoch,
+        "SELECT MAX(timeConvert(DaysSinceEpoch,'DAYS','SECONDS')) FROM mytable",
+        "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')");
+    List<String> queries = new ArrayList<>();
+    baseQueries.forEach(q -> queries.add(q.replace("mytable", "MYTABLE").replace("DaysSinceEpoch", "MYTABLE.DAYSSinceEpOch")));
+    baseQueries.forEach(q -> queries.add(q.replace("mytable", "MYDB.MYTABLE").replace("DaysSinceEpoch", "MYTABLE.DAYSSinceEpOch")));
+
+    for (String query : queries) {
+      try {
+        postQuery(query);
+      } catch (Exception e) {
+        // Fail the test when exception caught
+        throw new RuntimeException("Got Exceptions from query - " + query);
+      }
+    }
   }
 
   @Test
