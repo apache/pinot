@@ -430,18 +430,10 @@ public class S3PinotFS extends PinotFS {
       if (prefix.equals(DELIMITER)) {
         return true;
       }
-      try {
-        HeadObjectRequest headObjectRequest =
-            HeadObjectRequest.builder().bucket(uri.getHost()).key(prefix).build();
-        HeadObjectResponse s3ObjectMetadata = _s3Client.headObject(headObjectRequest);
 
-        return s3ObjectMetadata.sdkHttpResponse().isSuccessful();
-      } catch (NoSuchKeyException e) {
-        LOGGER.error("Could not get directory entry for {}", uri);
-      }
-
-      ListObjectsV2Request listObjectsV2Request =
-          ListObjectsV2Request.builder().bucket(uri.getHost()).prefix(prefix).build();
+      ListObjectsV2Request listObjectsV2Request = ListObjectsV2Request
+              .builder().bucket(uri.getHost())
+              .prefix(prefix).maxKeys(2).build();
       ListObjectsV2Response listObjectsV2Response = _s3Client.listObjectsV2(listObjectsV2Request);
       return listObjectsV2Response.hasContents();
     } catch (NoSuchKeyException e) {
