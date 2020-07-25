@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.data.recordtransformer;
 
+import java.util.HashMap;
+import java.util.Map;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.core.data.recordtransformer.PinotDataType.*;
@@ -101,6 +103,20 @@ public class PinotDataTypeTest {
     assertEquals(OBJECT.toInteger(new NumberObject("123")).intValue(), 123);
     assertEquals(OBJECT.toString(new NumberObject("123")), "123");
     assertEquals(OBJECT_ARRAY.getSingleValueType(), OBJECT);
+  }
+
+  @Test
+  public void testMap() {
+    Map<String, String> map1 = new HashMap<>();
+    map1.put("item", "10");
+    Map<String, String> map2 = new HashMap<>();
+    map2.put("item", "20");
+    Object[] objectArray = new Object[] {map1, map2};
+    assertEquals(STRING_ARRAY.convert(objectArray, OBJECT_ARRAY), new String[] {"10", "20"});
+    assertEquals(INTEGER_ARRAY.convert(objectArray, OBJECT_ARRAY), new Integer[]{10, 20});
+    assertEquals(LONG_ARRAY.convert(objectArray, OBJECT_ARRAY), new Long[]{10L, 20L});
+    assertEquals(FLOAT_ARRAY.convert(objectArray, OBJECT_ARRAY), new Float[]{10.0f, 20f});
+    assertEquals(DOUBLE_ARRAY.convert(objectArray, OBJECT_ARRAY), new Double[]{10.0d, 20d});
   }
 
   @Test
