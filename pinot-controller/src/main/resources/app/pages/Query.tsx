@@ -50,7 +50,7 @@ const useStyles = makeStyles((theme) => ({
     padding: '20px',
   },
   codeMirror: {
-    '& .CodeMirror': { height: 100, border: '1px solid #BDCCD9' },
+    '& .CodeMirror': { height: 100, border: '1px solid #BDCCD9', fontSize: '13px' },
   },
   queryOutput: {
     '& .CodeMirror': { height: 430, border: '1px solid #BDCCD9' },
