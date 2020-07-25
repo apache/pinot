@@ -75,6 +75,7 @@ const jsonoptions = {
 type Props = {
   tenantName: string;
   tableName: string;
+  instanceName: string;
 };
 
 type Summary = {
@@ -84,7 +85,7 @@ type Summary = {
 };
 
 const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
-  const { tenantName, tableName } = match.params;
+  const { tenantName, tableName, instanceName } = match.params;
   const classes = useStyles();
   const [fetching, setFetching] = useState(true);
   const [tableSummary, setTableSummary] = useState<Summary>({
@@ -179,7 +180,8 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
             data={segmentList}
             isPagination={false}
             noOfRows={segmentList.records.length}
-            baseURL={`/tenants/${tenantName}/table/${tableName}/`}
+            baseURL={
+              tenantName ? `/tenants/${tenantName}/table/${tableName}/` :  `/instance/${instanceName}/table/${tableName}/`}
             addLinks
             showSearchBox={true}
             inAccordionFormat={true}

@@ -35,7 +35,8 @@ import {
   getTenantTableDetails,
   getSegmentMetadata,
   getClusterInfo,
-  getLiveInstancesFromClusterName
+  getLiveInstancesFromClusterName,
+  zookeeperGet
 } from '../requests';
 import Utils from './Utils';
 
@@ -89,8 +90,8 @@ const getInstanceData = (instances, liveInstanceArr) => {
 
   return Promise.all(promiseArr).then((result) => {
     return {
-        columns: ['Insance Name', 'Enabled', 'Hostname', 'Port', 'Status'],
-        records: [
+      columns: ['Insance Name', 'Enabled', 'Hostname', 'Port', 'Status'],
+      records: [
         ...result.map(({ data }) => [
           data.instanceName,
           data.enabled,
@@ -109,18 +110,18 @@ const getInstanceData = (instances, liveInstanceArr) => {
 const getClusterName = () => {
   return getClusterInfo().then(({ data }) => {
     return data.clusterName;
-    })
-}
+  });
+};
 
 // This method is used to fetch array of live instances name
 // API: /zk/ls?path=:ClusterName/LIVEINSTANCES
 // Expected Output: []
 const getLiveInstance = (clusterName) => {
   const params = encodeURIComponent(`/${clusterName}/LIVEINSTANCES`)
-    return getLiveInstancesFromClusterName(params).then((data) => {
-      return data;
-    })
-}
+  return getLiveInstancesFromClusterName(params).then((data) => {
+    return data;
+  });
+};
 
 // This method is used to diaplay cluster congifuration on cluster manager home page
 // API: /cluster/configs
@@ -357,6 +358,10 @@ const getTenantTableData = (tenantName) => {
         };
       });
     }
+    return {
+      columns: columnHeaders,
+      records: []
+    };
   });
 };
 
@@ -444,6 +449,35 @@ const getSegmentDetails = (tableName, segmentName) => {
     };
   });
 };
+
+// This method is used to fetch the instance config
+// API: /zk/get?path=:clusterName/LIVEINSTANCES/:instanceName
+// Expected Output: configuration in JSON format
+const getInstanceConfig = (clusterName, instanceName) => {
+  const params = encodeURIComponent(`/${clusterName}/LIVEINSTANCES/${instanceName}`);
+  return zookeeperGet(params).then((res) => {
+    return res.data;
+  })
+};
+
+// This method is used to get tenants from tags using instance info
+// API: /instances/:instanceName
+// Expected Output: Unique array of tenants names
+const getTenantsFromInstance = (instanceName) => {
+  return getInstance(instanceName).then((res)=>{
+    const tenantsList = [];
+    res.data.tags.forEach((tag) => {
+      if(tag.search('_BROKER') !== -1 ||
+        tag.search('_REALTIME') !== -1 ||
+        tag.search('_OFFLINE') !== -1
+      ){
+        tenantsList.push(tag.split('_')[0]);
+      }
+    });
+    return _.uniq(tenantsList);
+  })
+}
+
 export default {
   getTenantsData,
   getAllInstances,
@@ -458,5 +492,7 @@ export default {
   getTableDetails,
   getSegmentDetails,
   getClusterName,
-  getLiveInstance
+  getLiveInstance,
+  getInstanceConfig,
+  getTenantsFromInstance
 };

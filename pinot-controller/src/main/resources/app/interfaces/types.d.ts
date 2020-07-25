@@ -114,4 +114,6 @@ declare module 'Models' {
   }
 
   export type LiveInstances = Array<string>
+
+  export type InstanceConfig = Object;
 }
