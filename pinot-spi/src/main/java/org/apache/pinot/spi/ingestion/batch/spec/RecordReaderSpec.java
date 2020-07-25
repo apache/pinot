@@ -38,8 +38,8 @@ public class RecordReaderSpec implements Serializable {
    *    org.apache.pinot.plugin.inputformat.avro.AvroRecordReader
    *    org.apache.pinot.plugin.inputformat.csv.CSVRecordReader
    *    org.apache.pinot.plugin.inputformat.parquet.ParquetRecordReader
-   *    org.apache.pinot.plugin.inputformat.json.JsonRecordReader
-   *    org.apache.pinot.plugin.inputformat.orc.OrcRecordReader
+   *    org.apache.pinot.plugin.inputformat.json.JSONRecordReader
+   *    org.apache.pinot.plugin.inputformat.orc.ORCRecordReader
    *    org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReader
    */
   private String _className;
@@ -79,8 +79,8 @@ public class RecordReaderSpec implements Serializable {
    *    org.apache.pinot.plugin.inputformat.avro.AvroRecordReader
    *    org.apache.pinot.plugin.inputformat.csv.CSVRecordReader
    *    org.apache.pinot.plugin.inputformat.parquet.ParquetRecordReader
-   *    org.apache.pinot.plugin.inputformat.json.JsonRecordReader
-   *    org.apache.pinot.plugin.inputformat.orc.OrcRecordReader
+   *    org.apache.pinot.plugin.inputformat.json.JSONRecordReader
+   *    org.apache.pinot.plugin.inputformat.orc.ORCRecordReader
    *    org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReader
    *
    * @param className

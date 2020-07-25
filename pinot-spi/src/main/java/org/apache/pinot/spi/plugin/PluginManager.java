@@ -57,7 +57,9 @@ public class PluginManager {
       put("org.apache.pinot.core.data.readers.AvroRecordReader", "org.apache.pinot.plugin.inputformat.avro.AvroRecordReader");
       put("org.apache.pinot.core.data.readers.CSVRecordReader", "org.apache.pinot.plugin.inputformat.csv.CSVRecordReader");
       put("org.apache.pinot.core.data.readers.JSONRecordReader", "org.apache.pinot.plugin.inputformat.json.JSONRecordReader");
+      put("org.apache.pinot.plugin.inputformat.json.JsonRecordReader", "org.apache.pinot.plugin.inputformat.json.JSONRecordReader");
       put("org.apache.pinot.orc.data.readers.ORCRecordReader", "org.apache.pinot.plugin.inputformat.orc.ORCRecordReader");
+      put("org.apache.pinot.plugin.inputformat.orc.OrcRecordReader", "org.apache.pinot.plugin.inputformat.orc.ORCRecordReader");
       put("org.apache.pinot.parquet.data.readers.ParquetRecordReader", "org.apache.pinot.plugin.inputformat.parquet.ParquetRecordReader");
       put("org.apache.pinot.core.data.readers.ThriftRecordReader", "org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReader");
 
