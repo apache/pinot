@@ -47,6 +47,8 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
   private static final String COMMA_SEPARATOR = ",";
   private static final int DEFAULT_RETENTION_FOR_HOURLY_PUSH = 24;
   private static final int DEFAULT_RETENTION_FOR_DAILY_PUSH = 72;
+  private static final int DEFAULT_RETENTION_FOR_WEEKLY_PUSH = 24*7 + 72;
+  private static final int DEFAULT_RETENTION_FOR_MONTHLY_PUSH = 24*31 + 72;
 
   @Option(name = "-tableConfigFile", required = true, metaVar = "<String>")
   private String _tableConfigFile;
@@ -96,6 +98,11 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     return this;
   }
 
+  public RealtimeProvisioningHelperCommand setRetentionHours(int retentionHours) {
+    _retentionHours = retentionHours;
+    return this;
+  }
+
   public RealtimeProvisioningHelperCommand setNumHosts(String numHosts) {
     _numHosts = numHosts;
     return this;
@@ -116,7 +123,7 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     return this;
   }
 
-  public RealtimeProvisioningHelperCommand setPeriodSampleSegmentConsumed(int ingestionRate) {
+  public RealtimeProvisioningHelperCommand setIngestionRate(int ingestionRate) {
     _ingestionRate = ingestionRate;
     return this;
   }
@@ -179,7 +186,7 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     int tableRetentionHours = (int) TimeUnit.valueOf(tableConfig.getValidationConfig().getRetentionTimeUnit())
             .toHours(Long.parseLong(tableConfig.getValidationConfig().getRetentionTimeValue()));
     if (_retentionHours > 0) {
-      note.append("\n* Table retention and push frequency ignored for determining retentionHours");
+      note.append("\n* Table retention and push frequency ignored for determining retentionHours since it is specified in command");
     } else {
       if (_pushFrequency == null) {
         // This is a realtime-only table. Pick up the retention time
@@ -191,9 +198,9 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
         } else if ("daily".equalsIgnoreCase(_pushFrequency)) {
           _retentionHours = DEFAULT_RETENTION_FOR_DAILY_PUSH;
         } else if ("weekly".equalsIgnoreCase(_pushFrequency)) {
-          _retentionHours = DEFAULT_RETENTION_FOR_DAILY_PUSH * 8;
+          _retentionHours = DEFAULT_RETENTION_FOR_WEEKLY_PUSH;
         } else if ("monthly".equalsIgnoreCase(_pushFrequency)) {
-          _retentionHours = DEFAULT_RETENTION_FOR_DAILY_PUSH * 32;
+          _retentionHours = DEFAULT_RETENTION_FOR_MONTHLY_PUSH;
         } else {
           throw new IllegalArgumentException("Illegal value for pushFrequency: '" + _pushFrequency + "'");
         }
@@ -221,8 +228,7 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
 
     note.append("\n* See https://docs.pinot.apache.org/operators/operating-pinot/tuning/realtime");
     // TODO: Make a recommendation of what config to choose by considering more inputs such as qps
-    System.out.println("\n============================================================\n" + toString());
-    System.out.println(note.toString());
+    displayOutputHeader(note);
     LOGGER.info("\nMemory used per host (Active/Mapped)");
     displayResults(memoryEstimator.getActiveMemoryPerHost(), numHosts, numHours);
     LOGGER.info("\nOptimal segment size");
@@ -232,6 +238,11 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     LOGGER.info("\nNumber of segments queried per host");
     displayResults(memoryEstimator.getNumSegmentsQueriedPerHost(), numHosts, numHours);
     return true;
+  }
+  
+  private void displayOutputHeader(StringBuilder note) {
+    System.out.println("\n============================================================\n" + toString());
+    System.out.println(note.toString());
   }
 
   /**
