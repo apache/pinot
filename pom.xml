@@ -51,6 +51,7 @@
     <module>pinot-perf</module>
     <module>pinot-integration-tests</module>
     <module>pinot-distribution</module>
+    <module>pinot-connectors</module>
   </modules>
 
   <licenses>
@@ -1653,6 +1654,9 @@
 
             <!-- JDBC Drivers -->
             <exclude>**/main/resources/java.sql.*</exclude>
+
+            <!-- Spark datasource register -->
+            <exclude>**/src/main/resources/META-INF/services/org.apache.spark.sql.sources.DataSourceRegister</exclude>
 
             <!-- Pinot Website (not part of the distribution) -->
             <exclude>website/**</exclude>
