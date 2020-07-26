@@ -250,8 +250,8 @@ public class PinotSegmentsMetadataTest {
       objectNode.put("segmentName", segment);
       segmentMetadata = JsonUtils.objectToString(objectNode);
       SegmentStatus status = new SegmentStatus();
-      status.segmentName = segment;
-      status.segmentReloadTime = "2020-07-18'T'20:20:20:200";
+      status._segmentName = segment;
+      status._segmentReloadTime = "2020-07-18'T'20:20:20:200";
       segmentsReloadStatus.add(status);
     }
 

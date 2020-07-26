@@ -63,6 +63,6 @@ public class SegmentMetadataFetcher {
     final DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss:SSS' UTC'");
     long refreshTime = segmentMetadata.getRefreshTime();
     String refreshTimeReadable = refreshTime != Long.MIN_VALUE ? dateFormat.format(new Date(refreshTime)) : "";
-    return new SegmentStatus(segmentDataManager.getSegmentName(), refreshTimeReadable);
+    return new SegmentStatus(segmentDataManager.getSegmentName(), refreshTimeReadable, "");
   }
 }

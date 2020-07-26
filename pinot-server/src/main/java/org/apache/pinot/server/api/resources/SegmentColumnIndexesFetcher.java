@@ -32,6 +32,16 @@ import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 public class SegmentColumnIndexesFetcher {
+  private static final String BLOOM_FILTER = "bloom-filter";
+  private static final String DICTIONARY = "dictionary";
+  private static final String FORWARD_INDEX = "forward-index";
+  private static final String INVERTED_INDEX = "inverted-index";
+  private static final String NULL_VALUE_VECTOR_READER = "null-value-vector-reader";
+  private static final String RANGE_INDEX = "range-index";
+
+  private static final String INDEX_NOT_AVAILABLE = "NO";
+  private static final String INDEX_AVAILABLE = "YES";
+
   public static JsonNode getIndexesForSegmentColumns(SegmentDataManager segmentDataManager, Set<String> columnSet) {
     ArrayNode columnsIndexMetadata = JsonUtils.newArrayNode();
     if (segmentDataManager instanceof ImmutableSegmentDataManager) {
@@ -39,7 +49,6 @@ public class SegmentColumnIndexesFetcher {
       ImmutableSegment immutableSegment = immutableSegmentDataManager.getSegment();
       if (immutableSegment instanceof ImmutableSegmentImpl) {
         ImmutableSegmentImpl immutableSegmentImpl = (ImmutableSegmentImpl) immutableSegment;
-//        Set<String> columns = immutableSegmentImpl.getSegmentMetadata().getAllColumns();
         Map<String, ColumnIndexContainer> columnIndexContainerMap = immutableSegmentImpl.getIndexContainerMap();
         columnsIndexMetadata.add(getImmutableSegmentColumnIndexes(columnIndexContainerMap, columnSet));
       }
@@ -50,31 +59,47 @@ public class SegmentColumnIndexesFetcher {
   private static ObjectNode getImmutableSegmentColumnIndexes(Map<String, ColumnIndexContainer> columnIndexContainerMap,
                                                              Set<String> columnSet) {
     ObjectNode columnIndexMap = JsonUtils.newObjectNode();
-
     for (Map.Entry<String, ColumnIndexContainer> e : columnIndexContainerMap.entrySet()) {
       if (columnSet != null && !columnSet.contains(e.getKey())) {
         continue;
       }
       ColumnIndexContainer columnIndexContainer = e.getValue();
       ObjectNode indexesNode = JsonUtils.newObjectNode();
-      if (Objects.isNull(columnIndexContainer.getBloomFilter())) indexesNode.put("bloom-filter", "NO");
-      else indexesNode.put("bloom-filter", "YES");
+      if (Objects.isNull(columnIndexContainer.getBloomFilter())) {
+        indexesNode.put(BLOOM_FILTER, INDEX_NOT_AVAILABLE);
+      } else {
+        indexesNode.put(BLOOM_FILTER, INDEX_AVAILABLE);
+      }
 
-      if (Objects.isNull(columnIndexContainer.getDictionary())) indexesNode.put("dictionary", "NO");
-      else indexesNode.put("dictionary", "YES");
+      if (Objects.isNull(columnIndexContainer.getDictionary())) {
+        indexesNode.put(DICTIONARY, INDEX_NOT_AVAILABLE);
+      } else {
+        indexesNode.put(DICTIONARY, INDEX_AVAILABLE);
+      }
 
-      if (Objects.isNull(columnIndexContainer.getForwardIndex())) indexesNode.put("forward-index", "NO");
-      else indexesNode.put("forward-index", "YES");
+      if (Objects.isNull(columnIndexContainer.getForwardIndex())) {
+        indexesNode.put(FORWARD_INDEX, INDEX_NOT_AVAILABLE);
+      } else {
+        indexesNode.put(FORWARD_INDEX, INDEX_AVAILABLE);
+      }
 
-      if (Objects.isNull(columnIndexContainer.getInvertedIndex())) indexesNode.put("inverted-index", "NO");
-      else indexesNode.put("inverted-index", "YES");
+      if (Objects.isNull(columnIndexContainer.getInvertedIndex())) {
+        indexesNode.put(INVERTED_INDEX, INDEX_NOT_AVAILABLE);
+      } else {
+        indexesNode.put(INVERTED_INDEX, INDEX_AVAILABLE);
+      }
 
-      if (Objects.isNull(columnIndexContainer.getNullValueVector()))
-        indexesNode.put("null-value-vector-reader", "NO");
-      else indexesNode.put("null-value-vector-reader", "YES");
+      if (Objects.isNull(columnIndexContainer.getNullValueVector())) {
+        indexesNode.put(NULL_VALUE_VECTOR_READER, INDEX_NOT_AVAILABLE);
+      } else {
+        indexesNode.put(NULL_VALUE_VECTOR_READER, INDEX_AVAILABLE);
+      }
 
-      if (Objects.isNull(columnIndexContainer.getNullValueVector())) indexesNode.put("range-index", "NO");
-      else indexesNode.put("range-index", "YES");
+      if (Objects.isNull(columnIndexContainer.getNullValueVector())) {
+        indexesNode.put(RANGE_INDEX, INDEX_NOT_AVAILABLE);
+      } else {
+        indexesNode.put(RANGE_INDEX, INDEX_AVAILABLE);
+      }
 
       columnIndexMap.set(e.getKey(), indexesNode);
     }

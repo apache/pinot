@@ -20,7 +20,6 @@ package org.apache.pinot.controller.util;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.BiMap;
 import java.io.IOException;
 import java.util.HashMap;
@@ -33,50 +32,47 @@ import org.apache.pinot.common.restlet.resources.SegmentStatus;
 import org.apache.pinot.controller.api.resources.ServerSegmentMetadataReader;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class TableMetadataReader {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TableMetadataReader.class);
-
-  private final Executor executor;
-  private final HttpConnectionManager connectionManager;
-  private final PinotHelixResourceManager pinotHelixResourceManager;
+  private final Executor _executor;
+  private final HttpConnectionManager _connectionManager;
+  private final PinotHelixResourceManager _pinotHelixResourceManager;
 
   public TableMetadataReader(Executor executor, HttpConnectionManager connectionManager,
                              PinotHelixResourceManager helixResourceManager) {
-    this.executor = executor;
-    this.connectionManager = connectionManager;
-    this.pinotHelixResourceManager = helixResourceManager;
+    _executor = executor;
+    _connectionManager = connectionManager;
+    _pinotHelixResourceManager = helixResourceManager;
   }
 
   public TableReloadStatus getReloadStatus(String tableNameWithType, Map<String, List<String>> serverToSegmentsMap,
                                            int timeoutMs)
           throws InvalidConfigException {
-    BiMap<String, String> endpoints = pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegmentsMap.keySet());
-    ServerSegmentMetadataReader serverSegmentMetadataReader = new ServerSegmentMetadataReader(executor, connectionManager);
+    BiMap<String, String> endpoints = _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegmentsMap.keySet());
+    ServerSegmentMetadataReader serverSegmentMetadataReader = new ServerSegmentMetadataReader(_executor, _connectionManager);
 
-    List<SegmentStatus> segmentStatus = serverSegmentMetadataReader.getSegmentReloadTime(tableNameWithType, serverToSegmentsMap, endpoints, timeoutMs);
+    List<SegmentStatus> segmentStatus = serverSegmentMetadataReader.getSegmentReloadTime(tableNameWithType,
+        serverToSegmentsMap, endpoints, timeoutMs);
     TableReloadStatus tableReloadStatus = new TableReloadStatus();
     tableReloadStatus._tableName = tableNameWithType;
     tableReloadStatus._segmentStatus = segmentStatus;
     return tableReloadStatus;
   }
 
-  public Map<String, String> getSegmentsMetadata(String tableNameWithType, int timeoutMs) throws InvalidConfigException, IOException {
-    final Map<String, List<String>> serversToSegmentsMap =
-            pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
-    BiMap<String, String> endpoints = pinotHelixResourceManager.getDataInstanceAdminEndpoints(serversToSegmentsMap.keySet());
-    ServerSegmentMetadataReader serverSegmentMetadataReader = new ServerSegmentMetadataReader(executor, connectionManager);
+  public Map<String, String> getSegmentsMetadata(String tableNameWithType, int timeoutMs)
+      throws InvalidConfigException, IOException {
+    final Map<String, List<String>> serverToSegments =
+        _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
+    BiMap<String, String> endpoints = _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
+    ServerSegmentMetadataReader serverSegmentMetadataReader = new ServerSegmentMetadataReader(_executor, _connectionManager);
 
     List<String> segmentsMetadata = serverSegmentMetadataReader.getSegmentMetadataFromServer(tableNameWithType,
-            serversToSegmentsMap, endpoints, timeoutMs);
+        serverToSegments, endpoints, timeoutMs);
 
     Map<String, String> response = new HashMap<>();
     for (String segmentMetadata : segmentsMetadata) {
       JsonNode responseJson = JsonUtils.stringToJsonNode(segmentMetadata);
-      ObjectNode objectNode = responseJson.deepCopy();
-      response.put(objectNode.get("segmentName").asText(), segmentMetadata);
+      response.put(responseJson.get("segmentName").asText(), segmentMetadata);
     }
     return response;
   }

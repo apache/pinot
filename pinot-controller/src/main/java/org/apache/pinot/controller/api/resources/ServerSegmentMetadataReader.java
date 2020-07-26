@@ -69,13 +69,13 @@ public class ServerSegmentMetadataReader {
         URI uri = getMethod.getURI();
         String instance = endpointsToServers.get(uri.getHost() + ":" + uri.getPort());
         if (getMethod.getStatusCode() >= 300) {
-          LOGGER.error("Server: {} returned error: {}", instance, getMethod.getStatusCode());
+          LOGGER.error("Server {} returned error: code: {}, message: {}", instance, getMethod.getStatusCode(),
+              getMethod.getResponseBodyAsString());
           continue;
         }
         JsonNode segmentMetadata =
                 JsonUtils.inputStreamToJsonNode(getMethod.getResponseBodyAsStream());
         segmentsMetadata.add(JsonUtils.objectToString(segmentMetadata));
-        LOGGER.info("Updated segment metadata: {}", segmentMetadata.size());
       } catch (Exception e) {
         // Ignore individual exceptions because the exception has been logged in MultiGetRequest
         // Log the number of failed servers after gathering all responses
@@ -85,31 +85,32 @@ public class ServerSegmentMetadataReader {
         }
       }
     }
+    LOGGER.info("Retrieved segment metadata from servers.");
     return segmentsMetadata;
   }
 
   private String generateSegmentMetadataServerURL(String tableNameWithType, String segmentName, String endpoint) {
-    return "http://" + endpoint + "/tables/" + tableNameWithType + "/segments/" + segmentName + "/metadata";
+    return String.format("http://%s/tables/%s/segments/%s/metadata", endpoint, tableNameWithType, segmentName);
   }
 
   private String generateReloadStatusServerURL(String tableNameWithType, String segmentName, String endpoint) {
-    return "http://" + endpoint + "/tables/" + tableNameWithType + "/segments/" + segmentName + "/reload-status";
+    return String.format("http://%s/tables/%s/segments/%s/reload-status", endpoint, tableNameWithType, segmentName);
   }
 
   public List<SegmentStatus> getSegmentReloadTime(String tableNameWithType,
-                                                  Map<String, List<String>> serversToSegmentsMap,
-                                                  BiMap<String, String> endpoints, int timeoutMs) {
+                                                  Map<String, List<String>> serverToSegments,
+                                                  BiMap<String, String> serverToEndpoint, int timeoutMs) {
     LOGGER.info("Reading segment reload status from servers for table {}.", tableNameWithType);
     List<String> serverURLs = new ArrayList<>();
-    for (Map.Entry<String, List<String>> serverToSegments : serversToSegmentsMap.entrySet()) {
-      List<String> segments = serverToSegments.getValue();
+    for (Map.Entry<String, List<String>> serverToSegmentsEntry : serverToSegments.entrySet()) {
+      List<String> segments = serverToSegmentsEntry.getValue();
       for (String segment : segments) {
-        serverURLs.add(generateReloadStatusServerURL(tableNameWithType, segment, endpoints.get(serverToSegments.getKey())));
+        serverURLs.add(generateReloadStatusServerURL(tableNameWithType, segment, serverToEndpoint.get(serverToSegmentsEntry.getKey())));
       }
     }
     CompletionService<GetMethod> completionService =
-            new MultiGetRequest(_executor, _connectionManager).execute(serverURLs, timeoutMs);
-    BiMap<String, String> endpointsToServers = endpoints.inverse();
+        new MultiGetRequest(_executor, _connectionManager).execute(serverURLs, timeoutMs);
+    BiMap<String, String> endpointsToServers = serverToEndpoint.inverse();
     List<SegmentStatus> segmentsStatus = new ArrayList<>();
 
     for (int i = 0; i < serverURLs.size(); i++) {
@@ -119,7 +120,8 @@ public class ServerSegmentMetadataReader {
         URI uri = getMethod.getURI();
         String instance = endpointsToServers.get(uri.getHost() + ":" + uri.getPort());
         if (getMethod.getStatusCode() >= 300) {
-          LOGGER.error("Server: {} returned error: {}", instance, getMethod.getStatusCode());
+          LOGGER.error("Server {} returned error: code: {}, message: {}", instance, getMethod.getStatusCode(),
+              getMethod.getResponseBodyAsString());
           continue;
         }
         SegmentStatus segmentStatus = JsonUtils.inputStreamToObject(getMethod.getResponseBodyAsStream(), SegmentStatus.class);

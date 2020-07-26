@@ -21,21 +21,23 @@ package org.apache.pinot.common.restlet.resources;
 import java.util.Objects;
 
 public class SegmentStatus {
-  public String segmentName;
-  public String segmentReloadTime;
+  public String _segmentName;
+  public String _segmentReloadTime;
+  public String _segmentReloadStatusMessage;
 
   public SegmentStatus() {
   }
 
-  public SegmentStatus(String segmentName, String segmentReloadTime) {
-    this.segmentName = segmentName;
-    this.segmentReloadTime = segmentReloadTime;
+  public SegmentStatus(String segmentName, String segmentReloadTime, String segmentReloadStatusMessage) {
+    _segmentName = segmentName;
+    _segmentReloadTime = segmentReloadTime;
+    _segmentReloadStatusMessage = segmentReloadStatusMessage;
   }
 
   @Override
   public int hashCode() {
-    int result = segmentName != null ? segmentName.hashCode() : 0;
-    result = 31 * result + (segmentReloadTime != null ? segmentReloadTime.hashCode() : 0);
+    int result = _segmentName != null ? _segmentName.hashCode() : 0;
+    result = 31 * result + (_segmentReloadTime != null ? _segmentReloadTime.hashCode() : 0);
     return result;
 
   }
@@ -51,14 +53,14 @@ public class SegmentStatus {
 
     SegmentStatus that = (SegmentStatus) obj;
 
-    if (!segmentReloadTime.equals(that.segmentReloadTime)) {
+    if (!_segmentReloadTime.equals(that._segmentReloadTime)) {
       return false;
     }
-    return Objects.equals(segmentName, that.segmentName);
+    return Objects.equals(_segmentName, that._segmentName);
   }
 
   @Override
   public String toString() {
-    return "{ segmentName: " + segmentName + ", segmentReloadTime: " + segmentReloadTime + " }";
+    return "{ segmentName: " + _segmentName + ", segmentReloadTime: " + _segmentReloadTime + " }";
   }
 }
