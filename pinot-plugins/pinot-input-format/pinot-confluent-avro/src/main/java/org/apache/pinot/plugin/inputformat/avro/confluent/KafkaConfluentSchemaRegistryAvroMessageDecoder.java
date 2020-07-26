@@ -21,11 +21,19 @@ package org.apache.pinot.plugin.inputformat.avro.confluent;
 import com.google.common.base.Preconditions;
 import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
+import io.confluent.kafka.schemaregistry.client.rest.RestService;
 import io.confluent.kafka.serializers.KafkaAvroDeserializer;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
+
 import org.apache.avro.generic.GenericData.Record;
+import org.apache.kafka.common.config.types.Password;
+import org.apache.kafka.common.network.Mode;
+import org.apache.kafka.common.protocol.types.Field;
+import org.apache.kafka.common.security.ssl.SslFactory;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
@@ -46,12 +54,50 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMes
   private RecordExtractor<Record> _avroRecordExtractor;
   private String _topicName;
 
+  public RestService createRestService(String schemaRegistryUrl, Map<String, String> configs) {
+    RestService restService = new RestService(schemaRegistryUrl);
+    Map<String, Object> asslConfigs = configs.entrySet().stream()
+            .filter(e -> !e.equals(SCHEMA_REGISTRY_REST_URL))
+            .filter(e -> e.getKey().startsWith("schema.registry."))
+            .collect(Collectors.toMap(
+                    e -> e.getKey().substring("schema.registry.".length()),
+                    Map.Entry::getValue));
+
+    Map<String, Object> sslConfigs = new HashMap<>();
+    for (String key : configs.keySet()) {
+      if (!key.equals(SCHEMA_REGISTRY_REST_URL) && key.startsWith("schema.registry.")) {
+        String value = configs.get(key);
+        key = key.substring("schema.registry.".length());
+        if (key.contains("password")) {
+          sslConfigs.put(key, new Password(value));
+        } else {
+          sslConfigs.put(key, value);
+        }
+      }
+    }
+
+    System.out.println(configs.toString());
+    System.out.println(sslConfigs.toString());
+    System.out.println("CONFIGS CONFIGS");
+
+    if (!sslConfigs.isEmpty()) {
+      SslFactory sslFactory = new SslFactory(Mode.CLIENT);
+      sslFactory.configure(sslConfigs);
+      restService.setSslSocketFactory(sslFactory.sslContext().getSocketFactory());
+    }
+    return restService;
+  }
+
   @Override
   public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
       throws Exception {
     checkState(props.containsKey(SCHEMA_REGISTRY_REST_URL), "Missing required property '%s'", SCHEMA_REGISTRY_REST_URL);
     String schemaRegistryUrl = props.get(SCHEMA_REGISTRY_REST_URL);
-    SchemaRegistryClient schemaRegistryClient = new CachedSchemaRegistryClient(schemaRegistryUrl, 1000);
+    SchemaRegistryClient schemaRegistryClient =
+            new CachedSchemaRegistryClient(
+                    createRestService(schemaRegistryUrl, props),
+                    1000);
+
     _deserializer = new KafkaAvroDeserializer(schemaRegistryClient);
     Preconditions.checkNotNull(topicName, "Topic must be provided");
     _topicName = topicName;
