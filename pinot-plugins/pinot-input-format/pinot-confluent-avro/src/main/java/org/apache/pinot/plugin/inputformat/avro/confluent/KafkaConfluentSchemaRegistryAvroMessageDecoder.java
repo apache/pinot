@@ -30,6 +30,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.apache.avro.generic.GenericData.Record;
+import org.apache.kafka.common.config.ConfigDef;
+import org.apache.kafka.common.config.SslConfigs;
 import org.apache.kafka.common.config.types.Password;
 import org.apache.kafka.common.network.Mode;
 import org.apache.kafka.common.protocol.types.Field;
@@ -50,35 +52,34 @@ import static com.google.common.base.Preconditions.checkState;
  */
 public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final String SCHEMA_REGISTRY_REST_URL = "schema.registry.rest.url";
+  private static final String SCHEMA_REGISTRY_OPTS_PREFIX = "schema.registry.";
   private KafkaAvroDeserializer _deserializer;
   private RecordExtractor<Record> _avroRecordExtractor;
   private String _topicName;
 
   public RestService createRestService(String schemaRegistryUrl, Map<String, String> configs) {
     RestService restService = new RestService(schemaRegistryUrl);
-    Map<String, Object> asslConfigs = configs.entrySet().stream()
-            .filter(e -> !e.equals(SCHEMA_REGISTRY_REST_URL))
-            .filter(e -> e.getKey().startsWith("schema.registry."))
-            .collect(Collectors.toMap(
-                    e -> e.getKey().substring("schema.registry.".length()),
-                    Map.Entry::getValue));
 
+
+    ConfigDef configDef = new ConfigDef();
+    SslConfigs.addClientSslSupport(configDef);
+    Map<String, ConfigDef.ConfigKey> configKeyMap = configDef.configKeys();
     Map<String, Object> sslConfigs = new HashMap<>();
     for (String key : configs.keySet()) {
-      if (!key.equals(SCHEMA_REGISTRY_REST_URL) && key.startsWith("schema.registry.")) {
+      if (!key.equals(SCHEMA_REGISTRY_REST_URL) && key.startsWith(SCHEMA_REGISTRY_OPTS_PREFIX)) {
         String value = configs.get(key);
-        key = key.substring("schema.registry.".length());
-        if (key.contains("password")) {
-          sslConfigs.put(key, new Password(value));
-        } else {
-          sslConfigs.put(key, value);
+        key = key.substring(SCHEMA_REGISTRY_OPTS_PREFIX.length());
+
+        if (configKeyMap.containsKey(key)) {
+          if (configKeyMap.get(key).type == ConfigDef.Type.PASSWORD) {
+            sslConfigs.put(key, new Password(value));
+          } else {
+            sslConfigs.put(key, value);
+          }
         }
       }
     }
 
-    System.out.println(configs.toString());
-    System.out.println(sslConfigs.toString());
-    System.out.println("CONFIGS CONFIGS");
 
     if (!sslConfigs.isEmpty()) {
       SslFactory sslFactory = new SslFactory(Mode.CLIENT);
