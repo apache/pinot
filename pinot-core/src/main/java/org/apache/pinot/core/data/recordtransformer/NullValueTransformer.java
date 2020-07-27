@@ -19,7 +19,6 @@
 package org.apache.pinot.core.data.recordtransformer;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
@@ -49,8 +48,7 @@ public class NullValueTransformer implements RecordTransformer {
     for (Map.Entry<String, Object> entry : _defaultNullValues.entrySet()) {
       String fieldName = entry.getKey();
       Object value = record.getValue(fieldName);
-      if (value == null || (value instanceof Object[] && ((Object[]) value).length == 0) || (value instanceof List
-          && ((List) value).isEmpty())) {
+      if (value == null) {
         record.putDefaultNullValue(fieldName, entry.getValue());
       }
     }

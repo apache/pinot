@@ -110,7 +110,7 @@ public class ExpressionTransformerTest {
 
     Assert.assertEquals(genericRow.getValue("userId"), 1L);
     Assert.assertEquals(genericRow.getValue("fullName"), "John Denver");
-    Assert.assertEquals(((Integer[]) genericRow.getValue("bids")), new Integer[]{10, 20});
+    Assert.assertEquals(((Object[]) genericRow.getValue("bids")), new Integer[]{10, 20});
     Assert.assertEquals(genericRow.getValue("maxBid"), 20);
     // handle Map through transform functions
     Object[] map2Keys = (Object[]) genericRow.getValue("map2_keys");
