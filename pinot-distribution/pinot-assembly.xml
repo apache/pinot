@@ -83,6 +83,10 @@
       <source>${pinot.root}/pinot-plugins/pinot-file-system/pinot-hdfs/target/pinot-hdfs-${project.version}-shaded.jar</source>
       <destName>plugins/pinot-file-system/pinot-hdfs/pinot-hdfs-${project.version}-shaded.jar</destName>
     </file>
+    <file>
+      <source>${pinot.root}/pinot-plugins/pinot-file-system/pinot-s3/target/pinot-s3-${project.version}-shaded.jar</source>
+      <destName>plugins/pinot-file-system/pinot-s3/pinot-s3-${project.version}-shaded.jar</destName>
+    </file>
     <!-- End Include Pinot File System Plugins-->
     <!-- Start Include Pinot Input Format Plugins-->
     <file>
@@ -114,8 +118,8 @@
       <destName>plugins/pinot-input-format/pinot-thrift/pinot-thrift-${project.version}-shaded.jar</destName>
     </file>
     <file>
-      <source>${pinot.root}/pinot-plugins/pinot-file-system/pinot-s3/target/pinot-s3-${project.version}-shaded.jar</source>
-      <destName>plugins/pinot-file-system/pinot-s3/pinot-s3-${project.version}-shaded.jar</destName>
+      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-protobuf/target/pinot-protobuf-${project.version}-shaded.jar</source>
+      <destName>plugins/pinot-input-format/pinot-protobuf/pinot-protobuf-${project.version}-shaded.jar</destName>
     </file>
     <!-- End Include Pinot Input Format Plugins-->
     <!-- End Include Pinot Plugins-->
