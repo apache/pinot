@@ -48,15 +48,13 @@ For getting started guides, deployment recipes, tutorials, and more, please visi
 
 <img src="https://gblobscdn.gitbook.com/assets%2F-LtH6nl58DdnZnelPdTc%2F-M69C48fK2BhCoou1REr%2F-M69DbDfcATcZOAgyX7k%2Fpinot-overview-graphic.png?alt=media&token=3552722e-8d1d-4397-972e-a81917ced182" align="center" alt="Apache Pinot"/>
 
-
-
 ## Features
 
 Pinot was originally built at LinkedIn to power rich interactive real-time analytic applications such as [Who Viewed Profile](https://www.linkedin.com/me/profile-views/urn:li:wvmp:summary/),  [Company Analytics](https://www.linkedin.com/company/linkedin/insights/),  [Talent Insights](https://business.linkedin.com/talent-solutions/talent-insights), and many more. [UberEats Restaurant Manager](https://eng.uber.com/restaurant-manager/) is another example of a customer facing Analytics App. At LinkedIn, Pinot powers 50+ user-facing products, ingesting millions of events per second and serving 100k+ queries per second at millisecond latency.
 
 * **Column-oriented**: a column-oriented database with various compression schemes such as Run Length, Fixed Bit Length.
 
-* **Pluggable indexing**: pluggable indexing technologies Sorted Index, Bitmap Index, Inverted Index.
+* [**Pluggable indexing**](https://docs.pinot.apache.org/basics/features/indexing): pluggable indexing technologies Sorted Index, Bitmap Index, Inverted Index.
 
 * **Query optimization**: ability to optimize query/execution plan based on query and segment metadata.
 
@@ -70,7 +68,7 @@ Pinot was originally built at LinkedIn to power rich interactive real-time analy
 
 ## When should I use Pinot?
 
-Pinot is designed to execute OLAP queries with low latency. It is suited in contexts where fast analytics, such as aggregations, are needed on immutable data, possibly, with real-time data ingestion. Pinot works very well for querying time series data with lots of Dimensions and Metrics.
+Pinot is designed to execute real-time OLAP queries with low latency on massive amounts of data and events. In addition to real-time stream ingestion, Pinot also supports batch use cases with the same low latency guarantees. It is suited in contexts where fast analytics, such as aggregations, are needed on immutable data, possibly, with real-time data ingestion. Pinot works very well for querying time series data with lots of dimensions and metrics.
 
 Example query:
 ```SQL
@@ -82,7 +80,7 @@ SELECT sum(clicks), sum(impressions) FROM AdAnalyticsTable
        daysSinceEpoch TOP 100
 ```
 
-Pinot is not a replacement for database i.e it cannot be used as source of truth store, cannot mutate data. While Pinot supports text search, it's not a replacement for a search engine. Also, Pinot queries cannot span across multiple tables by default. You can use the Presto-Pinot connector to achieve table joins and other features.
+Pinot is not a replacement for database i.e it cannot be used as source of truth store, cannot mutate data. While Pinot [supports text search](https://docs.pinot.apache.org/basics/features/text-search-support), it's not a replacement for a search engine. Also, Pinot queries cannot span across multiple tables by default. You can use the [Presto-Pinot connector](https://prestosql.io/blog/2020/05/25/pinot-connector.html) to achieve table joins and other features.
 
 ## Building Pinot
 More detailed instructions can be found at [Quick Demo](https://docs.pinot.apache.org/getting-started) section in the documentation.
