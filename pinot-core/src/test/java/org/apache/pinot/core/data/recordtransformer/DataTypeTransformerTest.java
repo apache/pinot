@@ -135,6 +135,16 @@ public class DataTypeTransformerTest {
     }
     assertEquals((Object[]) DataTypeTransformer.standardize(COLUMN, list, false), expectedValues);
 
+    values = new Object[]{Collections.singletonMap("testKey", "testValue1"), Collections.singletonMap("testKey",
+        "testValue2")};
+    try {
+      DataTypeTransformer.standardize(COLUMN, values, true);
+      fail();
+    } catch (Exception e) {
+      // Expected
+    }
+    assertEqualsNoOrder((Object[]) DataTypeTransformer.standardize(COLUMN, values, false), expectedValues);
+
     values = new Object[]{new Object[0], Collections.singletonList(
         Collections.singletonMap("testKey", "testValue1")), Collections.singletonMap("testKey",
         Arrays.asList(new Object[]{"testValue2"}, Collections.emptyMap()))};
