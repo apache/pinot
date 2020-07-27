@@ -56,7 +56,6 @@ public class DataTypeTransformer implements RecordTransformer {
     MULTI_VALUE_TYPE_MAP.put(Float.class, PinotDataType.FLOAT_ARRAY);
     MULTI_VALUE_TYPE_MAP.put(Double.class, PinotDataType.DOUBLE_ARRAY);
     MULTI_VALUE_TYPE_MAP.put(String.class, PinotDataType.STRING_ARRAY);
-    MULTI_VALUE_TYPE_MAP.put(HashMap.class, PinotDataType.MAP);
   }
 
   private final Map<String, PinotDataType> _dataTypes = new HashMap<>();
@@ -87,9 +86,11 @@ public class DataTypeTransformer implements RecordTransformer {
         Object[] values = (Object[]) value;
         source = MULTI_VALUE_TYPE_MAP.get(values[0].getClass());
         if (source == null) {
-          source = PinotDataType.OBJECT_ARRAY;
-        } else if (source == PinotDataType.MAP) {
-          source = PinotDataType.getSpecificMapDataTypeFromMap((Map<Object, Object>) values[0]);
+          if (values[0] instanceof Map) {
+            source = PinotDataType.getSpecificMapDataTypeFromMap((Map<Object, Object>) values[0]);
+          } else {
+            source = PinotDataType.OBJECT_ARRAY;
+          }
         }
       } else {
         // Single-value column
@@ -100,7 +101,6 @@ public class DataTypeTransformer implements RecordTransformer {
       }
       PinotDataType dest = entry.getValue();
       if (source != dest) {
-
         value = dest.convert(value, source);
       }
 

@@ -472,37 +472,35 @@ public enum PinotDataType {
     }
   },
 
-  MAP,
-
-  INTEGER_MAP {
+  INTEGER_VALUE_MAP {
     @Override
     public Integer[] convert(Object value, PinotDataType sourceType) {
       return sourceType.toIntegerArray(value);
     }
   },
 
-  LONG_MAP {
+  LONG_VALUE_MAP {
     @Override
     public Long[] convert(Object value, PinotDataType sourceType) {
       return sourceType.toLongArray(value);
     }
   },
 
-  FLOAT_MAP {
+  FLOAT_VALUE_MAP {
     @Override
     public Float[] convert(Object value, PinotDataType sourceType) {
       return sourceType.toFloatArray(value);
     }
   },
 
-  DOUBLE_MAP {
+  DOUBLE_VALUE_MAP {
     @Override
     public Double[] convert(Object value, PinotDataType sourceType) {
       return sourceType.toDoubleArray(value);
     }
   },
 
-  STRING_MAP {
+  STRING_VALUE_MAP {
     @Override
     public String[] convert(Object value, PinotDataType sourceType) {
       return sourceType.toStringArray(value);
@@ -676,19 +674,19 @@ public enum PinotDataType {
       case SHORT_ARRAY:
         return SHORT;
       case INTEGER_ARRAY:
-      case INTEGER_MAP:
+      case INTEGER_VALUE_MAP:
         return INTEGER;
       case LONG_ARRAY:
-      case LONG_MAP:
+      case LONG_VALUE_MAP:
         return LONG;
       case FLOAT_ARRAY:
-      case FLOAT_MAP:
+      case FLOAT_VALUE_MAP:
         return FLOAT;
       case DOUBLE_ARRAY:
-      case DOUBLE_MAP:
+      case DOUBLE_VALUE_MAP:
         return DOUBLE;
       case STRING_ARRAY:
-      case STRING_MAP:
+      case STRING_VALUE_MAP:
         return STRING;
       case OBJECT_ARRAY:
         return OBJECT;
@@ -726,16 +724,17 @@ public enum PinotDataType {
     Iterator<Object> iterator = map.values().iterator();
     Object obj = iterator.next();
     if (obj instanceof Integer) {
-      return PinotDataType.INTEGER_MAP;
+      return PinotDataType.INTEGER_VALUE_MAP;
     } else if (obj instanceof Long) {
-      return PinotDataType.LONG_MAP;
+      return PinotDataType.LONG_VALUE_MAP;
     } else if (obj instanceof Float) {
-      return PinotDataType.FLOAT_MAP;
+      return PinotDataType.FLOAT_VALUE_MAP;
     } else if (obj instanceof Double) {
-      return PinotDataType.DOUBLE_MAP;
+      return PinotDataType.DOUBLE_VALUE_MAP;
     } else if (obj instanceof String) {
-      return PinotDataType.STRING_MAP;
+      return PinotDataType.STRING_VALUE_MAP;
     } else {
+      // TODO: Support more complex map types like nested map, single-entry map with multiple values (Object[]).
       throw new IllegalStateException(String.format("'%s' isn't supported in the hash map.", obj.getClass()));
     }
   }
