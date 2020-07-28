@@ -66,8 +66,7 @@ const useStyles = makeStyles((theme: Theme) =>
     },
     leftPanel: {
       width: 300,
-      height: 'calc(100vh)',
-      padding: 20
+      padding: '0 20px'
     },
   }),
 );

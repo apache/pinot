@@ -49,6 +49,7 @@ const breadcrumbNameMap: { [key: string]: string } = {
   '/': 'Home',
   '/query': 'Query Console',
   '/cluster': 'Cluster Manager',
+  '/zookeeper': 'Zookeeper Browser'
 };
 
 const BreadcrumbsComponent = ({ ...props }) => {
@@ -113,7 +114,7 @@ const BreadcrumbsComponent = ({ ...props }) => {
   return (
     <Box marginY="auto" padding="0.25rem 1.5rem" display="flex">
       <Breadcrumbs
-        separator={<NavigateNextIcon fontSize="small" style={{ fill: '#fff' }} />}
+        separator={<NavigateNextIcon style={{ fill: '#fff' }} />}
         aria-label="breadcrumb"
       >
         {generateBreadcrumb()}

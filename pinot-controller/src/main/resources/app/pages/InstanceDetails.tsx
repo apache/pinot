@@ -48,7 +48,7 @@ const jsonoptions = {
   gutters: ['CodeMirror-lint-markers'],
   lint: true,
   theme: 'default',
-  readOnly: 'nocursor'
+  readOnly: true
 };
 
 type Props = {

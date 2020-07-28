@@ -17,11 +17,33 @@
  * under the License.
  */
 
-import { ThemeOptions } from '@material-ui/core';
+import React, {  } from 'react';
+import { Box } from "@material-ui/core";
 
-const typography: ThemeOptions['typography'] = {
-  fontFamily: "'Source Sans Pro', sans-serif",
-  fontSize: 16
-};
+interface TabPanelProps {
+  children?: React.ReactNode;
+  dir?: string;
+  index: any;
+  value: any;
+}
 
-export default typography;
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`full-width-tabpanel-${index}`}
+      aria-labelledby={`full-width-tab-${index}`}
+      {...other}
+    >
+      {value === index && (
+        <Box style={{padding: '24px 0'}}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
+export default TabPanel;
