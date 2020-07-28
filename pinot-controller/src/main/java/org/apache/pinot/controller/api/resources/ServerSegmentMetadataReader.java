@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.BiMap;
 import java.util.ArrayList;
@@ -35,6 +36,11 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * This is a helper class that calls the server API endpoints to fetch server metadata and the segment reload status
+ * Only the servers returning success are returned by the method. For servers returning errors (http error or otherwise),
+ * no entry is created in the return list
+ */
 public class ServerSegmentMetadataReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerSegmentMetadataReader.class);
 
@@ -46,6 +52,15 @@ public class ServerSegmentMetadataReader {
     _connectionManager = connectionManager;
   }
 
+  /**
+   * This method is called when the API request is to fetch segment metadata for all segments of the table.
+   * This method makes a MultiGet call to all servers that host their respective segments and gets the results.
+   * @param tableNameWithType
+   * @param serversToSegmentsMap
+   * @param endpoints
+   * @param timeoutMs
+   * @return list of segments and their metadata as a JSON string
+   */
   public List<String> getSegmentMetadataFromServer(String tableNameWithType,
                                                    Map<String, List<String>> serversToSegmentsMap,
                                                    BiMap<String, String> endpoints, int timeoutMs) {
@@ -58,7 +73,7 @@ public class ServerSegmentMetadataReader {
       }
     }
     CompletionService<GetMethod> completionService =
-            new MultiGetRequest(_executor, _connectionManager).execute(serverURLs, timeoutMs);
+        new MultiGetRequest(_executor, _connectionManager).execute(serverURLs, timeoutMs);
     List<String> segmentsMetadata = new ArrayList<>();
 
     BiMap<String, String> endpointsToServers = endpoints.inverse();
@@ -74,7 +89,7 @@ public class ServerSegmentMetadataReader {
           continue;
         }
         JsonNode segmentMetadata =
-                JsonUtils.inputStreamToJsonNode(getMethod.getResponseBodyAsStream());
+            JsonUtils.inputStreamToJsonNode(getMethod.getResponseBodyAsStream());
         segmentsMetadata.add(JsonUtils.objectToString(segmentMetadata));
       } catch (Exception e) {
         // Ignore individual exceptions because the exception has been logged in MultiGetRequest
@@ -97,9 +112,18 @@ public class ServerSegmentMetadataReader {
     return String.format("http://%s/tables/%s/segments/%s/reload-status", endpoint, tableNameWithType, segmentName);
   }
 
-  public List<SegmentStatus> getSegmentReloadTime(String tableNameWithType,
-                                                  Map<String, List<String>> serverToSegments,
-                                                  BiMap<String, String> serverToEndpoint, int timeoutMs) {
+  /**
+   * This method is called when the API request is to fetch segment metadata for all segments of the table.
+   * It makes a MultiGet call to all servers that host their respective segments and gets the results.
+   * @param tableNameWithType
+   * @param serverToSegments
+   * @param serverToEndpoint
+   * @param timeoutMs
+   * @return list of segments along with their last reload times
+   */
+  public TableReloadStatus getSegmentReloadTime(String tableNameWithType,
+                                                Map<String, List<String>> serverToSegments,
+                                                BiMap<String, String> serverToEndpoint, int timeoutMs) {
     LOGGER.info("Reading segment reload status from servers for table {}.", tableNameWithType);
     List<String> serverURLs = new ArrayList<>();
     for (Map.Entry<String, List<String>> serverToSegmentsEntry : serverToSegments.entrySet()) {
@@ -112,7 +136,7 @@ public class ServerSegmentMetadataReader {
         new MultiGetRequest(_executor, _connectionManager).execute(serverURLs, timeoutMs);
     BiMap<String, String> endpointsToServers = serverToEndpoint.inverse();
     List<SegmentStatus> segmentsStatus = new ArrayList<>();
-
+    int failedCounter = 0;
     for (int i = 0; i < serverURLs.size(); i++) {
       GetMethod getMethod = null;
       try {
@@ -122,6 +146,7 @@ public class ServerSegmentMetadataReader {
         if (getMethod.getStatusCode() >= 300) {
           LOGGER.error("Server {} returned error: code: {}, message: {}", instance, getMethod.getStatusCode(),
               getMethod.getResponseBodyAsString());
+          failedCounter++;
           continue;
         }
         SegmentStatus segmentStatus = JsonUtils.inputStreamToObject(getMethod.getResponseBodyAsStream(), SegmentStatus.class);
@@ -135,7 +160,25 @@ public class ServerSegmentMetadataReader {
         }
       }
     }
-    return segmentsStatus;
+
+    TableReloadStatus tableReloadStatus = new TableReloadStatus();
+    tableReloadStatus._tableName = tableNameWithType;
+    tableReloadStatus._segmentStatus = segmentsStatus;
+    tableReloadStatus._numSegmentsFailed = failedCounter;
+    return tableReloadStatus;
   }
 
+  /**
+   * Structure to hold the reload statsus for all segments of a given table.
+   */
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public static class TableReloadStatus {
+    String _tableName;
+    List<SegmentStatus> _segmentStatus;
+    int _numSegmentsFailed;
+
+    public List<SegmentStatus> getSegmentStatus() {
+      return _segmentStatus;
+    }
+  }
 }

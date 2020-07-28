@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.common.restlet.resources;
 
-import java.util.Objects;
-
+/**
+ * Holds segment last reload time status along with any errors for a segment with unsuccessful call to get reload times.
+ */
 public class SegmentStatus {
   public String _segmentName;
   public String _segmentReloadTime;
@@ -35,32 +36,8 @@ public class SegmentStatus {
   }
 
   @Override
-  public int hashCode() {
-    int result = _segmentName != null ? _segmentName.hashCode() : 0;
-    result = 31 * result + (_segmentReloadTime != null ? _segmentReloadTime.hashCode() : 0);
-    return result;
-
-  }
-
-  @Override
-  public boolean equals(Object obj) {
-    if (this == obj) {
-      return true;
-    }
-    if (!(obj instanceof SegmentStatus)) {
-      return false;
-    }
-
-    SegmentStatus that = (SegmentStatus) obj;
-
-    if (!_segmentReloadTime.equals(that._segmentReloadTime)) {
-      return false;
-    }
-    return Objects.equals(_segmentName, that._segmentName);
-  }
-
-  @Override
   public String toString() {
-    return "{ segmentName: " + _segmentName + ", segmentReloadTime: " + _segmentReloadTime + " }";
+    return "{ segmentName: " + _segmentName + ", segmentReloadTime: " + _segmentReloadTime +
+        ", segmentReloadStatusMessage: " + _segmentReloadStatusMessage + " }";
   }
 }

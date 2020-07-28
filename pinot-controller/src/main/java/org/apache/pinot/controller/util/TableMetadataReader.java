@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.util;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.BiMap;
 import java.io.IOException;
@@ -28,11 +27,17 @@ import java.util.Map;
 import java.util.concurrent.Executor;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
-import org.apache.pinot.common.restlet.resources.SegmentStatus;
 import org.apache.pinot.controller.api.resources.ServerSegmentMetadataReader;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.utils.JsonUtils;
 
+/**
+ * This class acts as a bridge between the API call to controller and the internal API call made to the
+ * server to get segment metadata.
+ *
+ * Currently has two helper methods: one to retrieve the reload time and one to retrieve the segment metadata including
+ * the column indexes available.
+ */
 public class TableMetadataReader {
   private final Executor _executor;
   private final HttpConnectionManager _connectionManager;
@@ -45,20 +50,33 @@ public class TableMetadataReader {
     _pinotHelixResourceManager = helixResourceManager;
   }
 
-  public TableReloadStatus getReloadStatus(String tableNameWithType, Map<String, List<String>> serverToSegmentsMap,
-                                           int timeoutMs)
-          throws InvalidConfigException {
-    BiMap<String, String> endpoints = _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegmentsMap.keySet());
+  /**
+   * This helper method is used to retrieve the reload status for all segments of a table.
+   * Currently supports only OFFLINE tables.
+   * @param tableNameWithType
+   * @param serverToSegmentsMap
+   * @param timeoutMs
+   * @return reload status object containing the refreshTime for each of the segments.
+   * @throws InvalidConfigException
+   */
+  public ServerSegmentMetadataReader.TableReloadStatus getReloadStatus(String tableNameWithType, int timeoutMs) throws InvalidConfigException {
+    final Map<String, List<String>> serverToSegments = _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
+    BiMap<String, String> endpoints = _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
     ServerSegmentMetadataReader serverSegmentMetadataReader = new ServerSegmentMetadataReader(_executor, _connectionManager);
 
-    List<SegmentStatus> segmentStatus = serverSegmentMetadataReader.getSegmentReloadTime(tableNameWithType,
-        serverToSegmentsMap, endpoints, timeoutMs);
-    TableReloadStatus tableReloadStatus = new TableReloadStatus();
-    tableReloadStatus._tableName = tableNameWithType;
-    tableReloadStatus._segmentStatus = segmentStatus;
-    return tableReloadStatus;
+    return serverSegmentMetadataReader.getSegmentReloadTime(tableNameWithType,
+        serverToSegments, endpoints, timeoutMs);
   }
 
+  /**
+   * This method retrieves the full segment metadata for a given table.
+   * Currently supports only OFFLINE tables.
+   * @param tableNameWithType
+   * @param timeoutMs
+   * @return a map of segmentName to its metadata
+   * @throws InvalidConfigException
+   * @throws IOException
+   */
   public Map<String, String> getSegmentsMetadata(String tableNameWithType, int timeoutMs)
       throws InvalidConfigException, IOException {
     final Map<String, List<String>> serverToSegments =
@@ -77,9 +95,4 @@ public class TableMetadataReader {
     return response;
   }
 
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  public static class TableReloadStatus {
-    String _tableName;
-    List<SegmentStatus> _segmentStatus;
-  }
 }

@@ -245,7 +245,7 @@ public class TablesResource {
   @GET
   @Path("tables/{tableName}/{segmentName}/reload-status")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Metadata from server segment directory", notes = "Metadata from server that hosts the segment provided.")
+  @ApiOperation(value = "Metadata from server segment metadata.properties", notes = "Metadata from server that hosts the segment provided.")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"), @ApiResponse(code = 404, message = "Table not found")})
   public String getSegmentReloadStatus(
           @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE") @PathParam("tableName") String tableName,
@@ -258,6 +258,7 @@ public class TablesResource {
     }
 
     try {
+      LOGGER.info("Get segment reload status for: {}", segmentName);
       SegmentStatus segmentStatus = SegmentMetadataFetcher.getSegmentReloadStatus(segmentDataManager);
       return ResourceUtils.convertToJsonString(segmentStatus);
     } catch (Exception e) {

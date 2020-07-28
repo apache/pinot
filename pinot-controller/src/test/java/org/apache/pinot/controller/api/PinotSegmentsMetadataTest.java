@@ -169,9 +169,9 @@ public class PinotSegmentsMetadataTest {
     return metadataReader.getSegmentMetadataFromServer(table, serverToSegmentsMap, endpoints, timeoutMsec);
   }
 
-  private List<SegmentStatus> testReloadStatusResponse(String table,
-                                                       Map<String, List<String>> serverToSegmentsMap,
-                                                       BiMap<String, String> endpoints) {
+  private ServerSegmentMetadataReader.TableReloadStatus testReloadStatusResponse(String table,
+                                                                                 Map<String, List<String>> serverToSegmentsMap,
+                                                                                 BiMap<String, String> endpoints) {
     ServerSegmentMetadataReader metadataReader = new ServerSegmentMetadataReader(executor, connectionManager);
     return metadataReader.getSegmentReloadTime(table, serverToSegmentsMap, endpoints, timeoutMsec);
   }
@@ -218,8 +218,8 @@ public class PinotSegmentsMetadataTest {
     Map<String, List<String>> serverToSegmentsMap = getServerToSegments(servers);
     BiMap<String, String> endpoints = serverEndpoints(servers);
     String table = "offline";
-    List<SegmentStatus> metadata = testReloadStatusResponse(table, serverToSegmentsMap, endpoints);
-    Assert.assertEquals(1, metadata.size());
+    ServerSegmentMetadataReader.TableReloadStatus metadata = testReloadStatusResponse(table, serverToSegmentsMap, endpoints);
+    Assert.assertEquals(1, metadata.getSegmentStatus().size());
   }
 
   @Test
@@ -228,8 +228,8 @@ public class PinotSegmentsMetadataTest {
     Map<String, List<String>> serverToSegmentsMap = getServerToSegments(servers);
     BiMap<String, String> endpoints = serverEndpoints(servers);
     String table = "offline";
-    List<SegmentStatus> metadata = testReloadStatusResponse(table, serverToSegmentsMap, endpoints);
-    Assert.assertEquals(1, metadata.size());
+    ServerSegmentMetadataReader.TableReloadStatus metadata = testReloadStatusResponse(table, serverToSegmentsMap, endpoints);
+    Assert.assertEquals(1, metadata.getSegmentStatus().size());
   }
 
   public static class SegmentsServerMock {

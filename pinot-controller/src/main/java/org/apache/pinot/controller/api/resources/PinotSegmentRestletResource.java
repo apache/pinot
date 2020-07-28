@@ -76,6 +76,7 @@ import org.slf4j.LoggerFactory;
  *       <li>"/segments/{tableName}/servers": get a map from server to segments hosted by the server</li>
  *       <li>"/segments/{tableName}/crc": get a map from segment to CRC of the segment (OFFLINE table only)</li>
  *       <li>"/segments/{tableName}/{segmentName}/metadata: get the metadata for a segment</li>
+ *       <li>"/segments/{tableName}/metadata: get the metadata for all segments from the server</li>
  *     </ul>
  *   </li>
  *   <li>
@@ -83,6 +84,7 @@ import org.slf4j.LoggerFactory;
  *     <ul>
  *       <li>"/segments/{tableName}/{segmentName}/reload": reload a segment</li>
  *       <li>"/segments/{tableName}/reload": reload all segments</li>
+ *       <li>"segments/{tableName}/reload-status": retrieve reload status of all segments</li>
  *     </ul>
  *   </li>
  *   <li>
@@ -506,7 +508,7 @@ public class PinotSegmentRestletResource {
   @Path("segments/{tableName}/reload-status")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Status of segment reload", notes = "Status of segment reload")
-  public Map<String, TableMetadataReader.TableReloadStatus> getReloadStatus(
+  public Map<String, ServerSegmentMetadataReader.TableReloadStatus> getReloadStatus(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr) {
     TableType tableType = Constants.validateTableType(tableTypeStr);
@@ -516,9 +518,9 @@ public class PinotSegmentRestletResource {
     }
 
     List<String> tableNamesWithType = getExistingTableNamesWithType(tableName, Constants.validateTableType(tableTypeStr));
-    Map<String, TableMetadataReader.TableReloadStatus> reloadStatusMap = new HashMap<>();
+    Map<String, ServerSegmentMetadataReader.TableReloadStatus> reloadStatusMap = new HashMap<>();
     for (String tableNameWithType : tableNamesWithType) {
-      TableMetadataReader.TableReloadStatus tableReloadStatus;
+      ServerSegmentMetadataReader.TableReloadStatus tableReloadStatus;
       try {
         tableReloadStatus = getSegmentsReloadStatus(tableNameWithType);
       } catch (InvalidConfigException e) {
@@ -529,13 +531,11 @@ public class PinotSegmentRestletResource {
     return reloadStatusMap;
   }
 
-  private TableMetadataReader.TableReloadStatus getSegmentsReloadStatus(String tableNameWithType)
+  private ServerSegmentMetadataReader.TableReloadStatus getSegmentsReloadStatus(String tableNameWithType)
       throws InvalidConfigException {
-    final Map<String, List<String>> serversToSegmentsMap =
-        _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
     TableMetadataReader tableMetadataReader =
         new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
-    return tableMetadataReader.getReloadStatus(tableNameWithType, serversToSegmentsMap,
+    return tableMetadataReader.getReloadStatus(tableNameWithType,
         _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
   }
 
@@ -565,6 +565,13 @@ public class PinotSegmentRestletResource {
     return segmentsMetadata;
   }
 
+  /**
+   * This is a helper method to get the metadata for all segments for a given table name.
+   * @param tableNameWithType
+   * @return Map<SegmentName, SegmentMetadata>
+   * @throws InvalidConfigException
+   * @throws IOException
+   */
   private Map<String, String> getSegmentsMetadataFromServer(String tableNameWithType)
       throws InvalidConfigException, IOException {
     TableMetadataReader tableMetadataReader =
