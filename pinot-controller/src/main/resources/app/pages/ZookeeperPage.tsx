@@ -93,9 +93,9 @@ const ZookeeperPage = () => {
 
   // on select, show node data and node metadata
   const showInfoEvent = async (fullPath) => {
-    const { currentNodeData, currentNodeMetadata, currentNodeListStat } = await PinotMethodUtils.getNodeData(fullPath);
+    const { currentNodeData, currentNodeMetadata } = await PinotMethodUtils.getNodeData(fullPath);
     setCurrentNodeData(currentNodeData);
-    setCurrentNodeMetadata(!_.isEmpty(currentNodeListStat) ? currentNodeListStat : currentNodeMetadata);
+    setCurrentNodeMetadata(currentNodeMetadata);
   }
 
   // handlers for Tabs
@@ -127,11 +127,11 @@ const ZookeeperPage = () => {
   const fetchData = async () => {
     setFetching(true);
     const path = '/';
-    const {newTreeData, currentNodeData, currentNodeMetadata, currentNodeListStat, counter } = await PinotMethodUtils.getZookeeperData(path, 1);
+    const {newTreeData, currentNodeData, currentNodeMetadata, counter } = await PinotMethodUtils.getZookeeperData(path, 1);
     setTreeData(newTreeData);
     setSelectedNode(path);
     setCurrentNodeData(currentNodeData || {});
-    setCurrentNodeMetadata(!_.isEmpty(currentNodeListStat) ? currentNodeListStat : currentNodeMetadata);
+    setCurrentNodeMetadata(currentNodeMetadata);
     setCount(counter);
     setExpanded(["1"]);
     setSelected(["1"]);
