@@ -77,6 +77,7 @@ public class AutoOnboardPinotMetadataSource extends AutoOnboard {
   private final AlertConfigManager alertDAO;
   private final DatasetConfigManager datasetDAO;
   private final MetricConfigManager metricDAO;
+  private final String dataSourceName;
 
   private AutoOnboardPinotMetricsUtils autoLoadPinotMetricsUtils;
 
@@ -92,6 +93,7 @@ public class AutoOnboardPinotMetadataSource extends AutoOnboard {
     this.datasetDAO = DAO_REGISTRY.getDatasetConfigDAO();
     this.metricDAO = DAO_REGISTRY.getMetricConfigDAO();
     this.alertDAO = DAO_REGISTRY.getAlertConfigDAO();
+    this.dataSourceName = MapUtils.getString(metadataSourceConfig.getProperties(), "name", PinotThirdEyeDataSource.class.getSimpleName());
   }
 
   public AutoOnboardPinotMetadataSource(MetadataSourceConfig metadataSourceConfig, AutoOnboardPinotMetricsUtils utils) {
@@ -100,6 +102,7 @@ public class AutoOnboardPinotMetadataSource extends AutoOnboard {
     this.datasetDAO = DAO_REGISTRY.getDatasetConfigDAO();
     this.metricDAO = DAO_REGISTRY.getMetricConfigDAO();
     this.alertDAO = DAO_REGISTRY.getAlertConfigDAO();
+    this.dataSourceName = MapUtils.getString(metadataSourceConfig.getProperties(), "name", PinotThirdEyeDataSource.class.getSimpleName());
   }
 
   public void run() {
@@ -132,7 +135,7 @@ public class AutoOnboardPinotMetadataSource extends AutoOnboard {
     Collection<DatasetConfigDTO> filtered = Collections2.filter(allExistingDataset, new com.google.common.base.Predicate<DatasetConfigDTO>() {
       @Override
       public boolean apply(@Nullable DatasetConfigDTO datasetConfigDTO) {
-        return datasetConfigDTO.getDataSource().equals(PinotThirdEyeDataSource.DATA_SOURCE_NAME);
+        return datasetConfigDTO.getDataSource().equals(AutoOnboardPinotMetadataSource.this.dataSourceName);
       }
     });
 
@@ -185,8 +188,7 @@ public class AutoOnboardPinotMetadataSource extends AutoOnboard {
     List<MetricFieldSpec> metricSpecs = schema.getMetricFieldSpecs();
 
     // Create DatasetConfig
-    DatasetConfigDTO datasetConfigDTO =
-        ConfigGenerator.generateDatasetConfig(dataset, schema, timeColumnName, customConfigs);
+    DatasetConfigDTO datasetConfigDTO = ConfigGenerator.generateDatasetConfig(dataset, schema, timeColumnName, customConfigs, this.dataSourceName);
     LOG.info("Creating dataset for {}", dataset);
     this.datasetDAO.save(datasetConfigDTO);
 
