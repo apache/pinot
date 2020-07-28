@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.core.operator.docvalsets;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.DataBlockCache;
+import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.ProjectionOperator;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -32,32 +35,33 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 public class ProjectionBlockValSet implements BlockValSet {
   private final DataBlockCache _dataBlockCache;
   private final String _column;
-  private final DataType _dataType;
-  private final boolean _singleValue;
+  private final DataSource _dataSource;
 
   /**
    * Constructor for the class.
-   * The dataBlockCache argument is initialized in {@link ProjectionOperator},
-   * so that it can be reused across multiple calls to {@link ProjectionOperator#nextBlock()}.
-   *
-   * @param dataBlockCache data block cache
-   * @param column Projection column.
+   * The dataBlockCache is initialized in {@link ProjectionOperator} so that it can be reused across multiple calls to
+   * {@link ProjectionOperator#nextBlock()}.
    */
-  public ProjectionBlockValSet(DataBlockCache dataBlockCache, String column, DataType dataType, boolean singleValue) {
+  public ProjectionBlockValSet(DataBlockCache dataBlockCache, String column, DataSource dataSource) {
     _dataBlockCache = dataBlockCache;
     _column = column;
-    _dataType = dataType;
-    _singleValue = singleValue;
+    _dataSource = dataSource;
   }
 
   @Override
   public DataType getValueType() {
-    return _dataType;
+    return _dataSource.getDataSourceMetadata().getDataType();
   }
 
   @Override
   public boolean isSingleValue() {
-    return _singleValue;
+    return _dataSource.getDataSourceMetadata().isSingleValue();
+  }
+
+  @Nullable
+  @Override
+  public Dictionary getDictionary() {
+    return _dataSource.getDictionary();
   }
 
   @Override
