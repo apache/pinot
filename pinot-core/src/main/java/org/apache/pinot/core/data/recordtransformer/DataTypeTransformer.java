@@ -118,6 +118,11 @@ public class DataTypeTransformer implements RecordTransformer {
 
   /**
    * Standardize the value into supported types.
+   * <ul>
+   *   <li>Empty Collection/Map/Object[] will be standardized to null</li>
+   *   <li>Single-entry Collection/Map/Object[] will be standardized to single value (map key is ignored)</li>
+   *   <li>Multi-entries Collection/Map/Object[] will be standardized to Object[] (map key is ignored)</li>
+   * </ul>
    */
   @VisibleForTesting
   @Nullable
@@ -184,7 +189,7 @@ public class DataTypeTransformer implements RecordTransformer {
       return standardizedValues.get(0);
     }
     Preconditions
-        .checkState(!isSingleValue, "Cannot read single-value from collection: %s for column: %s", collection, column);
+        .checkState(!isSingleValue, "Cannot read single-value from Collection: %s for column: %s", collection, column);
     return standardizedValues.toArray();
   }
 }
