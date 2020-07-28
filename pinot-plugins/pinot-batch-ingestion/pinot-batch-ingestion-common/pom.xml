@@ -35,5 +35,6 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
+    <phase.prop>none</phase.prop>
   </properties>
 </project>

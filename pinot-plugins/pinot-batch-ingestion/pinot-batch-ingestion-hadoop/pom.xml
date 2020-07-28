@@ -36,6 +36,7 @@
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
     <hadoop.version>2.7.0</hadoop.version>
+    <phase.prop>package</phase.prop>
   </properties>
   <dependencies>
     <dependency>
