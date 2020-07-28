@@ -18,47 +18,71 @@
     under the License.
 
 -->
-# Apache Pinot (incubating)
+<img src="https://imgur.com/GNevDZ0.png" align="center" alt="Apache Pinot"/>
 
-[![Build Status](https://api.travis-ci.org/apache/incubator-pinot.svg?branch=master)](https://travis-ci.org/apache/incubator-pinot) 
+---------------------------------------
+
+[![Build Status](https://api.travis-ci.org/apache/incubator-pinot.svg?branch=master)](https://travis-ci.org/apache/incubator-pinot)
 [![Release](https://img.shields.io/github/release/apache/incubator-pinot/all.svg)](https://pinot.apache.org/download/)
-[![codecov.io](https://codecov.io/github/apache/incubator-pinot/branch/master/graph/badge.svg)](https://codecov.io/github/apache/incubator-pinot) 
-[![Join the chat at https://communityinviter.com/apps/apache-pinot/apache-pinot](https://img.shields.io/badge/slack-apache--pinot-brightgreen?logo=slack)](https://communityinviter.com/apps/apache-pinot/apache-pinot) 
-[![Twitter Follow](https://img.shields.io/twitter/follow/apachepinot.svg?label=Follow&style=social)](https://twitter.com/intent/follow?screen_name=apachepinot) 
+[![codecov.io](https://codecov.io/github/apache/incubator-pinot/branch/master/graph/badge.svg)](https://codecov.io/github/apache/incubator-pinot)
+[![Join the chat at https://communityinviter.com/apps/apache-pinot/apache-pinot](https://img.shields.io/badge/slack-apache--pinot-brightgreen?logo=slack)](https://communityinviter.com/apps/apache-pinot/apache-pinot)
+[![Twitter Follow](https://img.shields.io/twitter/follow/apachepinot.svg?label=Follow&style=social)](https://twitter.com/intent/follow?screen_name=apachepinot)
 [![license](https://img.shields.io/github/license/apache/pinot.svg)](LICENSE)
 
-Apache Pinot is a realtime distributed OLAP datastore, which is used to deliver scalable real time analytics with low latency. It can ingest data from offline data sources (such as Hadoop and flat files) as well as online sources (such as Kafka). Pinot is designed to scale horizontally.
+- [What is Apache Pinot?](#what-is-apache-pinot)
+- [Features](#features)
+- [When should I use Pinot?](#when-should-i-use-pinot)
+- [Building Pinot](#building-pinot)
+- [Deploying Pinot to Kubernetes](#deploying-pinot-to-kubernetes)
+- [Join the Community](#join-the-community)
+- [Documentation](#documentation)
+- [License](#license)
 
-These presentations on Pinot give an overview of Pinot:
+# What is Apache Pinot?
 
-* [Building realtime applications using Pinot @ DataCouncil](https://www.youtube.com/watch?v=mOzjVRf0yt4)
-* [Pinot: Enabling Real-time Analytics Applications @ LinkedIn's Scale  - ApacheCon 2019 (Sep 2019)](https://www.slideshare.net/seunghyunlee1460/pinot-enabling-realtime-analytics-applications-linkedins-scale)
-* [Pinot: Realtime OLAP for 530 Million Users - Sigmod 2018 (Jun 2018)](http://www.slideshare.net/seunghyunlee1460/pinot-realtime-olap-for-530-million-users-sigmod-2018-107394584)
-* [Open Source Analytics Pipeline at LinkedIn (Sep 2016, covers Gobblin and Pinot)](http://www.slideshare.net/IssacBuenrostro/open-source-linkedin-analytics-pipeline-vldb-2016)
-* [Introduction to Pinot (Jan 2016)](http://www.slideshare.net/jeanfrancoisim/intro-to-pinot-20160104)
-* [Pinot: Realtime Distributed OLAP Datastore (Aug 2015)](http://www.slideshare.net/KishoreGopalakrishna/pinot-realtime-distributed-olap-datastore)
+[Apache Pinot](https://pinot.apache.org) (incubating) is a real-time distributed OLAP datastore, built to deliver scalable real-time analytics with low latency. It can ingest from batch data sources (such as Hadoop HDFS, Amazon S3, Azure ADLS, Google Cloud Storage) as well as stream data sources (such as Apache Kafka).
 
-Looking for the ThirdEye anomaly detection and root-cause analysis platform? Check out the [Pinot/ThirdEye project](https://github.com/apache/incubator-pinot/tree/master/thirdeye)
+Pinot was built by engineers at LinkedIn and Uber and is designed to scale up and out with no upper bound. Performance always remains constant based on the size of your cluster and an expected query per second (QPS) threshold.
 
-## Key Features
+For getting started guides, deployment recipes, tutorials, and more, please visit our project documentation at [https://docs.pinot.apache.org](https://docs.pinot.apache.org).
 
-- A column-oriented database with various compression schemes such as Run Length, Fixed Bit Length
-- Pluggable indexing technologies - Sorted Index, Bitmap Index, Inverted Index, Star-Tree Index
-- Ability to optimize query/execution plan based on query and segment metadata
-- Near real time ingestion from Kafka and batch ingestion from Hadoop
-- SQL like language that supports _selection, aggregation, filtering, group by, order by, distinct_ queries on fact data
-- Support for multivalued fields
-- Horizontally scalable and fault tolerant 
+<img src="https://gblobscdn.gitbook.com/assets%2F-LtH6nl58DdnZnelPdTc%2F-M69C48fK2BhCoou1REr%2F-M69DbDfcATcZOAgyX7k%2Fpinot-overview-graphic.png?alt=media&token=3552722e-8d1d-4397-972e-a81917ced182" align="center" alt="Apache Pinot"/>
 
-Because of the design choices we made to achieve these goals, there are certain limitations present in Pinot:
+## Features
 
-- Pinot is not a replacement for database i.e it cannot be used as source of truth store, cannot mutate data 
-- While Pinot supports text search, its not a replacement for search engine i.e relevance is not supported
-- Query cannot span across multiple tables - Use Presto-Pinot connector to achieve joins and other features
+Pinot was originally built at LinkedIn to power rich interactive real-time analytic applications such as [Who Viewed Profile](https://www.linkedin.com/me/profile-views/urn:li:wvmp:summary/),  [Company Analytics](https://www.linkedin.com/company/linkedin/insights/),  [Talent Insights](https://business.linkedin.com/talent-solutions/talent-insights), and many more. [UberEats Restaurant Manager](https://eng.uber.com/restaurant-manager/) is another example of a customer facing Analytics App. At LinkedIn, Pinot powers 50+ user-facing products, ingesting millions of events per second and serving 100k+ queries per second at millisecond latency.
 
-Pinot works very well for querying time series data with lots of Dimensions and Metrics. Example - Query (profile views, ad campaign performance, etc.) in an analytical fashion (who viewed this profile in the last weeks, how many ads were clicked per campaign). 
+* **Column-oriented**: a column-oriented database with various compression schemes such as Run Length, Fixed Bit Length.
 
-## Instructions to build Pinot
+* [**Pluggable indexing**](https://docs.pinot.apache.org/basics/features/indexing): pluggable indexing technologies Sorted Index, Bitmap Index, Inverted Index.
+
+* **Query optimization**: ability to optimize query/execution plan based on query and segment metadata.
+
+* **Stream and batch ingest**: near real time ingestion from streams and batch ingestion from Hadoop.
+
+* **Query with SQL:** SQL-like language that supports selection, aggregation, filtering, group by, order by, distinct queries on data.
+
+* **Multi-valued fields:** support for multi-valued fields, allowing you to query fields as comma separated values.
+
+* **Cloud-native on Kubernetes**: Helm chart provides a horizontally scalable and fault-tolerant clustered deployment that is easy to manage using Kubernetes.
+
+## When should I use Pinot?
+
+Pinot is designed to execute real-time OLAP queries with low latency on massive amounts of data and events. In addition to real-time stream ingestion, Pinot also supports batch use cases with the same low latency guarantees. It is suited in contexts where fast analytics, such as aggregations, are needed on immutable data, possibly, with real-time data ingestion. Pinot works very well for querying time series data with lots of dimensions and metrics.
+
+Example query:
+```SQL
+SELECT sum(clicks), sum(impressions) FROM AdAnalyticsTable
+  WHERE
+       ((daysSinceEpoch >= 17849 AND daysSinceEpoch <= 17856)) AND
+       accountId IN (123456789)
+  GROUP BY
+       daysSinceEpoch TOP 100
+```
+
+Pinot is not a replacement for database i.e it cannot be used as source of truth store, cannot mutate data. While Pinot [supports text search](https://docs.pinot.apache.org/basics/features/text-search-support), it's not a replacement for a search engine. Also, Pinot queries cannot span across multiple tables by default. You can use the [Presto-Pinot connector](https://prestodb.io/docs/current/connector/pinot.html) to achieve table joins and other features.
+
+## Building Pinot
 More detailed instructions can be found at [Quick Demo](https://docs.pinot.apache.org/getting-started) section in the documentation.
 ```
 # Clone a repo
@@ -73,12 +97,10 @@ $ cd pinot-distribution/target/apache-pinot-incubating-<version>-SNAPSHOT-bin
 $ bin/quick-start-batch.sh
 ```
 
-## Deploy Pinot on Kubernetes
-Please refer to [Kubernetes Readme](kubernetes/helm/README.md) to deploy Pinot using [Helm](https://helm.sh/docs/using_helm/#installing-helm) and load demo data set.
+## Deploying Pinot to Kubernetes
+Please refer to [Running Pinot on Kubernetes](https://docs.pinot.apache.org/basics/getting-started/kubernetes-quickstart) in our project documentation. Pinot also provides Kubernetes integrations with the interactive query engine, [Presto](kubernetes/helm/presto-coordinator.yaml), and the data visualization tool, [Apache Superset](kubernetes/helm/superset.yaml).
 
-Pinot also provides k8s integration with interactive query engine [Presto](kubernetes/helm/presto-coordinator.yaml) and data visualization tool [Apache Superset](kubernetes/helm/superset.yaml).
-
-## Getting Involved
+## Join the Community
  - Ask questions on [Apache Pinot Slack](https://communityinviter.com/apps/apache-pinot/apache-pinot)
  - Please join Apache Pinot mailing lists  
    dev-subscribe@pinot.apache.org (subscribe to pinot-dev mailing list)  
@@ -92,16 +114,6 @@ Check out [Pinot documentation](https://docs.pinot.apache.org/) for a complete d
 - [Quick Demo](https://docs.pinot.apache.org/getting-started/running-pinot-locally)
 - [Pinot Architecture](https://docs.pinot.apache.org/basics/architecture)
 - [Pinot Query Language](https://docs.pinot.apache.org/users/user-guide-query/pinot-query-language)
-
-## Pinot Query Clients
-
-Pinot community has contributed libraries to interact with Apache Pinot with other languages.
-
-### Python
-  - [python-pinot-dbapi/pinot-dbapi](https://github.com/python-pinot-dbapi/pinot-dbapi) - Python DB-API and SQLAlchemy dialect for Pinot
-
-### Golang
-  - [fx19880617/pinot-client-go](https://github.com/fx19880617/pinot-client-go) - A Golang Query Client for Pinot
 
 ## License
 Apache Pinot is under [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0)
