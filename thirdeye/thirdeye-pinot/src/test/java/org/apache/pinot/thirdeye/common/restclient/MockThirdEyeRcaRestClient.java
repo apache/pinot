@@ -19,7 +19,6 @@
 
 package org.apache.pinot.thirdeye.common.restclient;
 
-import java.io.IOException;
 import java.util.Map;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.Invocation;
