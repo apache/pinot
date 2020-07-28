@@ -167,11 +167,12 @@ export default Route.extend(AuthenticatedRouteMixin, {
     let { contextUrnsInit, selectedUrnsInit, anomalyUrnsInit, anomalyRangeInit, analysisRangeInit, compareModeInit, granularityInit } = params;
     const isDevEnv = config.environment === 'development';
 
-    let metricUrn, metricEntity, session, anomalyUrn, anomalyEntity, anomalySessions;
+    let metricUrn, metricEntity, session, anomalyUrn, anomalyEntity, anomalySessions, metricTemplate;
 
     if (metricId) {
       metricUrn = `thirdeye:metric:${metricId}`;
       metricEntity = fetch(`/rootcause/raw?framework=identity&urns=${metricUrn}`).then(checkStatus).then(res => res[0]).catch(() => {});
+      metricTemplate = fetch(`/rootcause/template/search?metricId=${metricId}`).then(checkStatus).then(res => (res.length != 0) ? res[0] : null).catch(() => {});
     }
 
     if (anomalyId) {
@@ -225,6 +226,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
       anomalyUrnsPredefined,
       anomalyRange,
       analysisRange,
+      metricTemplate,
       granularity: granularityInit,
       compareMode: compareModeInit
     });
@@ -297,7 +299,8 @@ export default Route.extend(AuthenticatedRouteMixin, {
       anomalyEntity,
       contextUrnsPredefined,
       selectedUrnsPredefined,
-      anomalyUrnsPredefined
+      anomalyUrnsPredefined,
+      metricTemplate
     } = model;
 
     // default blank context
@@ -354,6 +357,20 @@ export default Route.extend(AuthenticatedRouteMixin, {
       }
     }
 
+    // rca template context  
+    if(metricTemplate) {
+      const dimAnalysisModule = metricTemplate.modules[0];
+      sessionTableSettings = {
+        oneSideError: dimAnalysisModule.configuration.oneSideError,
+        orderType: (dimAnalysisModule.configuration.manualOrder == true) ? 'manual' : 'auto',
+        summarySize: dimAnalysisModule.configuration.summarySize,
+        depth: dimAnalysisModule.configuration.dimensionDepth,
+        dimensions: dimAnalysisModule.configuration.includedDimension,
+        excludedDimensions: (dimAnalysisModule.configuration.excludedDimension) ? dimAnalysisModule.configuration.excludedDimension : []
+      };
+      sessionUserCustomized = true;
+    }
+
     // anomaly-initialized context
     if (anomalyId && anomalyUrn) {
       if (!_.isEmpty(anomalyEntity)) {
@@ -401,7 +418,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
     if (sessionId) {
       if (!_.isEmpty(session)) {
         const { name, text, updatedBy, updated, owner, permissions,
-        isUserCustomizingRequest, customTableSettings } = model.session;
+          isUserCustomizingRequest, customTableSettings } = model.session;
         context = {
           urns: new Set(session.contextUrns),
           anomalyRange: [session.anomalyRangeStart, session.anomalyRangeEnd],
