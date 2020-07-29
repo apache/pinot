@@ -1,0 +1,53 @@
+<fieldset class="te-form__section te-form__section--micro row">
+  <div class="te-form__group col-xs-12 baseline-type">
+    <label for="dimension-select-include" class="control-label te-label te-label--small">
+      Baseline Type
+    </label>
+    <div class="btn-group">
+      {{#each baselineTypes as |type|}}
+        {{#radio-button value=type groupValue=selectedBaselineType changed=(action "onSelectBaselineType")}}
+          {{type}}
+        {{/radio-button}}
+      {{/each}}
+    </div>
+  </div>
+</fieldset>
+
+<fieldset class="te-form__section te-form__section--micro row" id="time-unit">
+  <div class="te-form__group col-xs-12 baseline-type">
+    <label for="dimension-select-include" class="control-label te-label te-label--small">
+      Unit of Time
+    </label>
+    <div class="btn-group">
+      {{#each timeUnits as |unit|}}
+        {{#radio-button value=unit groupValue=selectedTimeUnit changed=(action "onSelectTimeUnit")}}
+          {{unit}}
+        {{/radio-button}}
+      {{/each}}
+    </div>
+  </div>
+</fieldset>
+
+<fieldset class="te-form__section te-form__section--micro row" id="dimensions-settings">
+  <div class="te-form__group te-form__group--hz-micro col-xs-6">
+    <label for="num-top-contibutors" class="control-label te-label te-label--small">
+      Number (x) of {{selectedTimeUnit}}s
+    </label>
+    {{input
+      type="number"
+      min="1"
+      step="1"
+      id="num-units"
+      class="form-control te-input"
+      focus-out=(action "onInputNumber")
+      value=selectedNumber
+    }}
+    <div class="te-form__sub-label te-form__sub-label--micro">Only accepts integers greater than zero</div>
+  </div>
+</fieldset>
+
+<fieldset class="te-form__section te-form__section--micro row" id="dimensions-error">
+  <div class="te-form__group col-xs-12">
+    <h2>Baseline configured as {{configuredBaseline}}</h2>
+  </div>
+</fieldset>
