@@ -42,6 +42,7 @@ import org.apache.pinot.thirdeye.dashboard.resources.CacheResource;
 import org.apache.pinot.thirdeye.dashboard.resources.CustomizedEventResource;
 import org.apache.pinot.thirdeye.dashboard.resources.DashboardResource;
 import org.apache.pinot.thirdeye.dashboard.resources.DatasetConfigResource;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.RootCauseTemplateResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.alerts.AlertResource;
 import org.apache.pinot.thirdeye.dashboard.resources.EntityManagerResource;
 import org.apache.pinot.thirdeye.dashboard.resources.EntityMappingResource;
@@ -188,6 +189,7 @@ public class ThirdEyeDashboardApplication
         config.getAlertOnboardingPermitPerSecond()));
     env.jersey().register(new SqlDataSourceResource());
     env.jersey().register(new AlertResource());
+    env.jersey().register(new RootCauseTemplateResource());
 
     TimeSeriesLoader timeSeriesLoader = new DefaultTimeSeriesLoader(
         DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(),
