@@ -49,6 +49,7 @@ public class ThirdEyeResultSetUtils {
   private static final String MYSQL = "MySQL";
   private static final String H2 = "H2";
   private static final String PINOT = "Pinot";
+  private static final String ONLINE = "Online";
 
   public static List<String[]> parseResultSets(ThirdEyeRequest request,
       Map<MetricFunction, List<ThirdEyeResultSet>> metricFunctionToResultSetList,

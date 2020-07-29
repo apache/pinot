@@ -65,23 +65,26 @@ public class TaskDriver {
   private long workerId;
   private final Set<TaskStatus> allowedOldTaskStatus = new HashSet<>();
   private TaskDriverConfiguration driverConfiguration;
+  private boolean isOnline;
 
   private volatile boolean shutdown = false;
 
-  public TaskDriver(ThirdEyeAnomalyConfiguration thirdEyeAnomalyConfiguration) {
+  public TaskDriver(ThirdEyeAnomalyConfiguration thirdEyeAnomalyConfiguration, boolean isOnline) {
     driverConfiguration = thirdEyeAnomalyConfiguration.getTaskDriverConfiguration();
     workerId = thirdEyeAnomalyConfiguration.getId();
     taskDAO = DAO_REGISTRY.getTaskDAO();
+    String threadNamePrefix = isOnline ? "online-" : "";
     taskExecutorService = Executors.newFixedThreadPool(
             driverConfiguration.getMaxParallelTasks(),
-            new ThreadFactoryBuilder().setNameFormat("task-executor-%d").build());
+            new ThreadFactoryBuilder().setNameFormat(threadNamePrefix + "task-executor-%d").build());
     taskWatcherExecutorService = Executors.newFixedThreadPool(
             driverConfiguration.getMaxParallelTasks(),
-            new ThreadFactoryBuilder().setNameFormat("task-watcher-%d").setDaemon(true).build());
+            new ThreadFactoryBuilder().setNameFormat(threadNamePrefix + "task-watcher-%d").setDaemon(true).build());
     taskContext = new TaskContext();
     taskContext.setThirdEyeAnomalyConfiguration(thirdEyeAnomalyConfiguration);
     allowedOldTaskStatus.add(TaskStatus.FAILED);
     allowedOldTaskStatus.add(TaskStatus.WAITING);
+    this.isOnline = isOnline;
   }
 
   public void start() throws Exception {
@@ -106,6 +109,9 @@ public class TaskDriver {
 
             if (anomalyTaskSpec != null) { // a task has acquired and we must finish executing it before termination
               long tStart = System.nanoTime();
+              if (TaskDriver.this.isOnline) {
+                ThirdeyeMetricsUtil.onlineTaskCounter.inc();
+              }
               ThirdeyeMetricsUtil.taskCounter.inc();
 
               try {
@@ -152,6 +158,9 @@ public class TaskDriver {
                 long elapsedTime = System.nanoTime() - tStart;
                 LOG.info("Task {} took {} nano seconds", anomalyTaskSpec.getId(), elapsedTime);
                 MDC.clear();
+                if (TaskDriver.this.isOnline) {
+                  ThirdeyeMetricsUtil.onlineTaskDurationCounter.inc(elapsedTime);
+                }
                 ThirdeyeMetricsUtil.taskDurationCounter.inc(elapsedTime);
               }
             }
@@ -183,8 +192,11 @@ public class TaskDriver {
       try {
         // randomize fetching head and tail to reduce synchronized patterns across threads (and hosts)
         boolean orderAscending = System.currentTimeMillis() % 2 == 0;
+
+        // find by task type to separate online task from a normal task
+        TaskType type = this.isOnline ? TaskType.DETECTION_ONLINE : TaskType.DETECTION;
         anomalyTasks = taskDAO
-            .findByStatusOrderByCreateTime(TaskStatus.WAITING, driverConfiguration.getTaskFetchSizeCap(),
+            .findByStatusAndTypeOrderByCreateTime(TaskStatus.WAITING, type, driverConfiguration.getTaskFetchSizeCap(),
                 orderAscending);
       } catch (Exception e) {
         hasFetchError = true;

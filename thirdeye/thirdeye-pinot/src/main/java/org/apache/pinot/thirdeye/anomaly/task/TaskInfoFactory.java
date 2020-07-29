@@ -57,6 +57,9 @@ public class TaskInfoFactory {
         case MONITOR:
           taskInfo = OBJECT_MAPPER.readValue(taskInfoString, MonitorTaskInfo.class);
           break;
+        case DETECTION_ONLINE:
+          taskInfo = OBJECT_MAPPER.readValue(taskInfoString, DetectionPipelineTaskInfo.class);
+          break;
         default:
           LOG.error("TaskType must be one of DATA_QUALITY, DETECTION, DETECTION_ALERT, YAML_DETECTION_ONBOARD, MONITOR");
           break;

@@ -90,7 +90,7 @@ public class UserDashboardResource {
     this.detectionAlertDAO = detectionAlertDAO;
   }
 
-  List<AnomalySummary> queryAnomalies(Long start, Long end, String application, String group, String metric,
+  public List<AnomalySummary> queryAnomalies(Long start, Long end, String application, String group, String metric,
       String dataset, List<MetricDatasetPair> metricDatasetPairs, boolean fetchTrueAnomaly, Integer limit) {
     if (limit == null) {
       LOG.warn("No upper limit specified while fetching anomalies. Defaulting to " + ANOMALIES_LIMIT_DEFAULT);

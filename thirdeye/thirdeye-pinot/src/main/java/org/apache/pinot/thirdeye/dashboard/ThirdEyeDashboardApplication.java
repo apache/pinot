@@ -39,6 +39,7 @@ import javax.servlet.DispatcherType;
 import javax.servlet.FilterRegistration;
 import org.apache.pinot.thirdeye.api.application.ApplicationResource;
 import org.apache.pinot.thirdeye.api.user.dashboard.UserDashboardResource;
+import org.apache.pinot.thirdeye.api.detection.AnomalyDetectionResource;
 import org.apache.pinot.thirdeye.auth.ThirdEyeAuthFilter;
 import org.apache.pinot.thirdeye.auth.ThirdEyePrincipal;
 import org.apache.pinot.thirdeye.common.BaseThirdEyeApplication;
@@ -168,7 +169,8 @@ public class ThirdEyeDashboardApplication
         RootCauseTemplateResource.class,
         RootCauseSessionResource.class,
         RootCauseMetricResource.class,
-        AnomalySearchResource.class
+        AnomalySearchResource.class,
+        AnomalyDetectionResource.class
     )
         .map(c -> injector.getInstance(c))
         .forEach(jersey::register);

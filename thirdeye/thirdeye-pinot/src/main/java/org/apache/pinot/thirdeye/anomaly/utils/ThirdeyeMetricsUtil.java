@@ -197,6 +197,12 @@ public class ThirdeyeMetricsUtil {
   public static final Counter jiraAlertsNumCommentsCounter =
       metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "jiraAlertsNumCommentsCounter");
 
+  public static final Counter onlineTaskCounter =
+          metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "onlineTaskCounter");
+
+  public static final Counter onlineTaskDurationCounter =
+          metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "onlineTaskDurationCounter");
+
   public static MetricsRegistry getMetricsRegistry() {
     return metricsRegistry;
   }
