@@ -82,8 +82,8 @@ public class StUnionAggregationFunction extends BaseSingleInputAggregationFuncti
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeyArray[i];
       Geometry value = GeometrySerializer.deserialize(bytesArray[i]);
-      groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getResult(groupKey) == null ? value
-          : ((Geometry) groupByResultHolder.getResult(groupKey)).union(value));
+      Geometry geometry = groupByResultHolder.getResult(groupKey);
+      groupByResultHolder.setValueForKey(groupKey, geometry == null ? value : geometry.union(value));
     }
   }
 
@@ -94,8 +94,8 @@ public class StUnionAggregationFunction extends BaseSingleInputAggregationFuncti
     for (int i = 0; i < length; i++) {
       Geometry value = GeometrySerializer.deserialize(bytesArray[i]);
       for (int groupKey : groupKeysArray[i]) {
-        groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getResult(groupKey) == null ? value
-            : ((Geometry) groupByResultHolder.getResult(groupKey)).union(value));
+        Geometry geometry = groupByResultHolder.getResult(groupKey);
+        groupByResultHolder.setValueForKey(groupKey, geometry == null ? value : geometry.union(value));
       }
     }
   }
