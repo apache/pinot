@@ -35,8 +35,10 @@ import {
   getTenantTableDetails,
   getSegmentMetadata,
   getClusterInfo,
-  getLiveInstancesFromClusterName,
-  zookeeperGet
+  zookeeperGetList,
+  zookeeperGetData,
+  zookeeperGetListWithStat,
+  zookeeperGetStat
 } from '../requests';
 import Utils from './Utils';
 
@@ -118,7 +120,7 @@ const getClusterName = () => {
 // Expected Output: []
 const getLiveInstance = (clusterName) => {
   const params = encodeURIComponent(`/${clusterName}/LIVEINSTANCES`)
-  return getLiveInstancesFromClusterName(params).then((data) => {
+  return zookeeperGetList(params).then((data) => {
     return data;
   });
 };
@@ -455,7 +457,7 @@ const getSegmentDetails = (tableName, segmentName) => {
 // Expected Output: configuration in JSON format
 const getLiveInstanceConfig = (clusterName, instanceName) => {
   const params = encodeURIComponent(`/${clusterName}/LIVEINSTANCES/${instanceName}`);
-  return zookeeperGet(params).then((res) => {
+  return zookeeperGetData(params).then((res) => {
     return res.data;
   })
 };
@@ -465,7 +467,7 @@ const getLiveInstanceConfig = (clusterName, instanceName) => {
 // Expected Output: configuration in JSON format
 const getInstanceConfig = (clusterName, instanceName) => {
   const params = encodeURIComponent(`/${clusterName}/CONFIGS/PARTICIPANT/${instanceName}`);
-  return zookeeperGet(params).then((res) => {
+  return zookeeperGetData(params).then((res) => {
     return res.data;
   })
 };
@@ -486,7 +488,54 @@ const getTenantsFromInstance = (instanceName) => {
     });
     return _.uniq(tenantsList);
   })
-}
+};
+
+// This method is responsible to prepare the data for tree structure
+// It internally calls getNodeData() which makes the required API calls.
+const getZookeeperData = (path, count) => {
+  let counter = count;
+  const newTreeData = [{
+    nodeId: ''+counter++,
+    label: path,
+    child: [],
+    isLeafNode: false,
+    hasChildRendered: true
+  }]
+  return getNodeData(path).then((obj)=>{
+    const { currentNodeData, currentNodeMetadata, currentNodeListStat } = obj;
+    let pathNames = Object.keys(currentNodeListStat);
+    pathNames.map((pathName)=>{
+      newTreeData[0].child.push({
+        nodeId: ''+counter++,
+        label: pathName,
+        fullPath: path === '/' ? path+pathName : path+'/'+pathName,
+        child: [],
+        isLeafNode: currentNodeListStat[pathName].numChildren === 0,
+        hasChildRendered: false
+      });
+    });
+    return { newTreeData, currentNodeData, currentNodeMetadata, currentNodeListStat, counter };
+  });
+};
+
+// This method is responsible to get data, get list with stats and get stats.
+// API: /zk/get => Get node data
+// API: /zk/lsl => Get node list with stats
+// API: /zk/get => Get node stats
+const getNodeData = (path) => {
+  const params = encodeURIComponent(path);
+  let promiseArr = [
+    zookeeperGetData(params),
+    zookeeperGetListWithStat(params),
+    zookeeperGetStat(params)
+  ];
+  return Promise.all(promiseArr).then((results)=>{
+    const currentNodeData = results[0].data || {};
+    const currentNodeListStat = results[1].data;
+    const currentNodeMetadata = results[2].data;
+    return { currentNodeData, currentNodeMetadata, currentNodeListStat };
+  });
+};
 
 export default {
   getTenantsData,
@@ -505,5 +554,7 @@ export default {
   getLiveInstance,
   getLiveInstanceConfig,
   getInstanceConfig,
-  getTenantsFromInstance
+  getTenantsFromInstance,
+  getZookeeperData,
+  getNodeData
 };

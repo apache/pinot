@@ -113,7 +113,7 @@ declare module 'Models' {
     clusterName: string
   }
 
-  export type LiveInstances = Array<string>
+  export type ZKGetList = Array<string>
 
-  export type InstanceConfig = Object;
+  export type ZKConfig = Object;
 }

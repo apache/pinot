@@ -28,7 +28,7 @@ import Box from '@material-ui/core/Box';
 import Typography from '@material-ui/core/Typography';
 import { NavLink } from 'react-router-dom';
 
-const drawerWidth = 250;
+const drawerWidth = 260;
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({

@@ -46,9 +46,7 @@ const useStyles = makeStyles((theme) => ({
     flexGrow: 1,
     paddingLeft: '20px',
   },
-  rightPanel: {
-    padding: '20px',
-  },
+  rightPanel: {},
   codeMirror: {
     '& .CodeMirror': { height: 100, border: '1px solid #BDCCD9', fontSize: '13px' },
   },
@@ -87,7 +85,7 @@ const jsonoptions = {
   gutters: ['CodeMirror-lint-markers'],
   lint: true,
   theme: 'default',
-  readOnly: 'nocursor'
+  readOnly: true
 };
 
 const sqloptions = {

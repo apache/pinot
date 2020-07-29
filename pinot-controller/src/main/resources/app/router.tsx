@@ -23,6 +23,7 @@ import TenantPageDetails from './pages/TenantDetails';
 import QueryPage from './pages/Query';
 import SegmentDetails from './pages/SegmentDetails';
 import InstanceDetails from './pages/InstanceDetails';
+import ZookeeperPage from './pages/ZookeeperPage';
 
 export default [
   { path: "/", Component: HomePage },
@@ -32,5 +33,6 @@ export default [
   { path: "/tenants/:tenantName/table/:tableName/:segmentName", Component: SegmentDetails },
   { path: "/instance/:instanceName", Component: InstanceDetails },
   { path: "/instance/:instanceName/table/:tableName", Component: TenantPageDetails },
-  { path: "/instance/:instanceName/table/:tableName/:segmentName", Component: SegmentDetails }
+  { path: "/instance/:instanceName/table/:tableName/:segmentName", Component: SegmentDetails },
+  { path: "/zookeeper", Component: ZookeeperPage },
 ];
