@@ -177,6 +177,30 @@ public class StUnionQueriesTest extends BaseQueriesTest {
   }
 
   @Test
+  public void testAggregationOnlyOnEmptyResultSet() {
+    String query = "SELECT ST_UNION(pointColumn) FROM testTable where intColumn=-1";
+
+    // Inner segment
+    Operator operator = getOperatorForPqlQuery(query);
+    assertTrue(operator instanceof AggregationOperator);
+    IntermediateResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), 0, 0, 0, NUM_RECORDS);
+    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+
+    assertNotNull(aggregationResult);
+
+    assertEquals(aggregationResult.get(0), GeometryUtils.EMPTY_POINT);
+
+    // Inter segments
+    String[] expectedResults = new String[1];
+    expectedResults[0] = new ByteArray(GeometrySerializer.serialize(GeometryUtils.EMPTY_POINT)).toHexString();
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 0, 0, 0, 4 * NUM_RECORDS, expectedResults);
+    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 0, 0, 0, 4 * NUM_RECORDS, expectedResults);
+  }
+
+  @Test
   public void testAggregationGroupBy() {
     String query = "SELECT ST_UNION(pointColumn) FROM testTable GROUP BY intColumn";
 
@@ -195,7 +219,6 @@ public class StUnionQueriesTest extends BaseQueriesTest {
       numGroups++;
       GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
       assertTrue(_values.containsKey(Integer.parseInt(groupKey._stringKey)));
-//      assertEquals(((Set<Integer>) aggregationGroupByResult.getResultForKey(groupKey, 0)).size(), 1);
     }
     assertEquals(numGroups, _values.size());
 

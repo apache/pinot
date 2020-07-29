@@ -22,6 +22,7 @@ import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.geospatial.GeometryUtils;
 import org.apache.pinot.core.geospatial.serde.GeometrySerializer;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
@@ -102,12 +103,14 @@ public class StUnionAggregationFunction extends BaseSingleInputAggregationFuncti
 
   @Override
   public Geometry extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    return aggregationResultHolder.getResult();
+    Geometry geometry = aggregationResultHolder.getResult();
+    return geometry == null ? GeometryUtils.EMPTY_POINT : geometry;
   }
 
   @Override
   public Geometry extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    return groupByResultHolder.getResult(groupKey);
+    Geometry geometry = groupByResultHolder.getResult(groupKey);
+    return geometry == null ? GeometryUtils.EMPTY_POINT : geometry;
   }
 
   @Override
@@ -117,7 +120,7 @@ public class StUnionAggregationFunction extends BaseSingleInputAggregationFuncti
 
   @Override
   public boolean isIntermediateResultComparable() {
-    return true;
+    return false;
   }
 
   @Override
