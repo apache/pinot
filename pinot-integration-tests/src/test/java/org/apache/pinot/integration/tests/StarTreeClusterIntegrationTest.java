@@ -65,7 +65,8 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final int NUM_STAR_TREE_METRICS = 5;
   private static final List<AggregationFunctionType> AGGREGATION_FUNCTION_TYPES = Arrays
       .asList(AggregationFunctionType.COUNT, AggregationFunctionType.MIN, AggregationFunctionType.MAX,
-          AggregationFunctionType.SUM, AggregationFunctionType.AVG, AggregationFunctionType.MINMAXRANGE);
+          AggregationFunctionType.SUM, AggregationFunctionType.AVG, AggregationFunctionType.MINMAXRANGE,
+          AggregationFunctionType.DISTINCTCOUNTBITMAP);
   private static final int NUM_QUERIES_TO_GENERATE = 100;
 
   private String _currentTable;
