@@ -25,6 +25,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +43,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.RootcauseTemplateDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
+import scala.Array;
 
 
 @Path(value = "/rootcause/template")
@@ -114,9 +116,13 @@ public class RootCauseTemplateResource {
     DimensionAnalysisModuleConfig dimAnalysisModuleConfig = new DimensionAnalysisModuleConfig();
     if (!Strings.isNullOrEmpty(dimensionStr)) {
       dimAnalysisModuleConfig.setIncludedDimension(Arrays.asList(dimensionStr.split(",")));
+    } else {
+      dimAnalysisModuleConfig.setIncludedDimension(Collections.emptyList());
     }
     if (!Strings.isNullOrEmpty(excludeDimStr)) {
       dimAnalysisModuleConfig.setIncludedDimension(Arrays.asList(excludeDimStr.split(",")));
+    } else {
+      dimAnalysisModuleConfig.setExcludedDimension(Collections.emptyList());
     }
     dimAnalysisModuleConfig.setManualOrder(manualOrder);
     dimAnalysisModuleConfig.setOneSideError(oneSideError);
