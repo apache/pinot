@@ -25,9 +25,8 @@ import org.apache.pinot.core.common.BlockDocIdValueSet;
 import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.DataBlockCache;
-import org.apache.pinot.core.common.DataSourceMetadata;
+import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.docvalsets.ProjectionBlockValSet;
-import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
@@ -35,14 +34,25 @@ import org.apache.pinot.spi.data.FieldSpec;
  * It provides DocIdSetBlock for a given column.
  */
 public class ProjectionBlock implements Block {
-  private final Map<String, DataSourceMetadata> _dataSourceMetadataMap;
-  private final DocIdSetBlock _docIdSetBlock;
+  private final Map<String, DataSource> _dataSourceMap;
   private final DataBlockCache _dataBlockCache;
 
-  public ProjectionBlock(Map<String, DataSourceMetadata> dataSourceMetadataMap, DataBlockCache dataBlockCache, DocIdSetBlock docIdSetBlock) {
-    _dataSourceMetadataMap = dataSourceMetadataMap;
-    _docIdSetBlock = docIdSetBlock;
+  public ProjectionBlock(Map<String, DataSource> dataSourceMap, DataBlockCache dataBlockCache) {
+    _dataSourceMap = dataSourceMap;
     _dataBlockCache = dataBlockCache;
+  }
+
+  public int getNumDocs() {
+    return _dataBlockCache.getNumDocs();
+  }
+
+  public BlockValSet getBlockValueSet(String column) {
+    return new ProjectionBlockValSet(_dataBlockCache, column, _dataSourceMap.get(column));
+  }
+
+  @Override
+  public BlockDocIdSet getBlockDocIdSet() {
+    throw new UnsupportedOperationException();
   }
 
   @Override
@@ -56,26 +66,7 @@ public class ProjectionBlock implements Block {
   }
 
   @Override
-  public BlockDocIdSet getBlockDocIdSet() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public BlockMetadata getMetadata() {
     throw new UnsupportedOperationException();
-  }
-
-  public BlockValSet getBlockValueSet(String column) {
-    FieldSpec fieldSpec = _dataSourceMetadataMap.get(column).getFieldSpec();
-    return new ProjectionBlockValSet(_dataBlockCache, column, fieldSpec.getDataType(),
-        fieldSpec.isSingleValueField());
-  }
-
-  public DocIdSetBlock getDocIdSetBlock() {
-    return _docIdSetBlock;
-  }
-
-  public int getNumDocs() {
-    return _docIdSetBlock.getSearchableLength();
   }
 }

@@ -25,6 +25,7 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
@@ -47,9 +48,23 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
     IntOpenHashSet valueSet = getValueSet(aggregationResultHolder);
 
-    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    // For dictionary-encoded expression, store dictionary ids into the value set
+    Dictionary dictionary = blockValSet.getDictionary();
+    if (dictionary != null) {
+      _dictionary = dictionary;
+      int[][] dictIds = blockValSet.getDictionaryIdsMV();
+      for (int i = 0; i < length; i++) {
+        for (int dictId : dictIds[i]) {
+          valueSet.add(dictId);
+        }
+      }
+      return;
+    }
+
+    // For non-dictionary-encoded expression, store hash code of the values into the value set
     FieldSpec.DataType valueType = blockValSet.getValueType();
     switch (valueType) {
       case INT:
@@ -100,8 +115,23 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    FieldSpec.DataType valueType = blockValSet.getValueType();
 
+    // For dictionary-encoded expression, store dictionary ids into the value set
+    Dictionary dictionary = blockValSet.getDictionary();
+    if (dictionary != null) {
+      _dictionary = dictionary;
+      int[][] dictIds = blockValSet.getDictionaryIdsMV();
+      for (int i = 0; i < length; i++) {
+        IntOpenHashSet valueSet = getValueSet(groupByResultHolder, groupKeyArray[i]);
+        for (int dictId : dictIds[i]) {
+          valueSet.add(dictId);
+        }
+      }
+      return;
+    }
+
+    // For non-dictionary-encoded expression, store hash code of the values into the value set
+    FieldSpec.DataType valueType = blockValSet.getValueType();
     switch (valueType) {
       case INT:
         int[][] intValues = blockValSet.getIntValuesMV();
@@ -157,8 +187,25 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    FieldSpec.DataType valueType = blockValSet.getValueType();
 
+    // For dictionary-encoded expression, store dictionary ids into the value set
+    Dictionary dictionary = blockValSet.getDictionary();
+    if (dictionary != null) {
+      _dictionary = dictionary;
+      int[][] dictIds = blockValSet.getDictionaryIdsMV();
+      for (int i = 0; i < length; i++) {
+        for (int groupKey : groupKeysArray[i]) {
+          IntOpenHashSet valueSet = getValueSet(groupByResultHolder, groupKey);
+          for (int dictId : dictIds[i]) {
+            valueSet.add(dictId);
+          }
+        }
+      }
+      return;
+    }
+
+    // For non-dictionary-encoded expression, store hash code of the values into the value set
+    FieldSpec.DataType valueType = blockValSet.getValueType();
     switch (valueType) {
       case INT:
         int[][] intValues = blockValSet.getIntValuesMV();
