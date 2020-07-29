@@ -19,13 +19,14 @@
 
 package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Singleton;
 import java.util.List;
 import org.apache.pinot.thirdeye.datalayer.bao.RootcauseTemplateManager;
 import org.apache.pinot.thirdeye.datalayer.dto.RootcauseTemplateDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.RootcauseTemplateBean;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 
-
+@Singleton
 public class RootcauseTemplateManagerImpl extends AbstractManagerImpl<RootcauseTemplateDTO> implements
                                                                                             RootcauseTemplateManager {
 

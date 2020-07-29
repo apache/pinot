@@ -22,6 +22,10 @@ package org.apache.pinot.thirdeye.dashboard.resources.v2.rootcause;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.io.Serializable;
 
+
+/**
+ * Abstract config class for RCA modules, which is persisted as JSON.
+ */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public abstract class AbstractRCAModuleConfig implements Serializable {
 
