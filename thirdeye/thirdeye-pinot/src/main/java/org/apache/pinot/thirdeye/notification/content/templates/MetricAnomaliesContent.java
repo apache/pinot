@@ -218,7 +218,7 @@ public class MetricAnomaliesContent extends BaseNotificationContent {
     // Display RCA highlights in email only if report contains anomalies belonging to a single metric.
     // Note: Once we have a sophisticated rca highlight support and users start seeing value, we'll
     // enable it for all the metrics.
-    if (metricAnomalyReports.keySet().size() == 1) {
+    if (this.rcaClient != null && metricAnomalyReports.keySet().size() == 1) {
       String anomalyId = metricAnomalyReports.values().iterator().next().getAnomalyId();
       Map<String, Object> rcaHighlights = new HashMap<>();
       try {

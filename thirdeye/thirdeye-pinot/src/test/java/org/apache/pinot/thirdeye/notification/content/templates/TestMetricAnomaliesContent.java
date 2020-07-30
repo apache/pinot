@@ -16,11 +16,19 @@
 
 package org.apache.pinot.thirdeye.notification.content.templates;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import freemarker.cache.FileTemplateLoader;
+import freemarker.template.Configuration;
+import freemarker.template.Template;
+import freemarker.template.TemplateException;
+import java.io.File;
+import java.io.IOException;
+import java.io.StringWriter;
+import java.io.Writer;
 import java.util.Properties;
-import javax.ws.rs.client.Client;
+import org.apache.commons.codec.CharEncoding;
 import org.apache.pinot.thirdeye.anomaly.AnomalyType;
-import org.apache.pinot.thirdeye.auth.ThirdEyePrincipal;
-import org.apache.pinot.thirdeye.common.restclient.MockAbstractRestClient;
 import org.apache.pinot.thirdeye.common.restclient.MockThirdEyeRcaRestClient;
 import org.apache.pinot.thirdeye.common.restclient.ThirdEyeRcaRestClient;
 import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
@@ -71,7 +79,6 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.thirdeye.datalayer.DaoTestUtils.*;
 import static org.apache.pinot.thirdeye.notification.commons.SmtpConfiguration.*;
-import static org.mockito.Mockito.*;
 
 
 public class TestMetricAnomaliesContent {
@@ -90,6 +97,7 @@ public class TestMetricAnomaliesContent {
   private EvaluationManager evaluationDAO;
   private DetectionPipelineLoader detectionPipelineLoader;
   private DataProvider provider;
+  private ObjectMapper mapper = new ObjectMapper();
 
   @BeforeMethod
   public void beforeMethod(){
@@ -227,7 +235,6 @@ public class TestMetricAnomaliesContent {
     metricDAO.save(metric);
 
     Map<String, Object> expectedResponse = new HashMap<>();
-    expectedResponse.put("cubeResults", "{}");
     ThirdEyeRcaRestClient rcaClient = MockThirdEyeRcaRestClient.setupMockClient(expectedResponse);
     MetricAnomaliesContent metricAnomaliesContent = new MetricAnomaliesContent(rcaClient);
     EmailContentFormatter
@@ -239,5 +246,36 @@ public class TestMetricAnomaliesContent {
     Assert.assertEquals(
         ContentFormatterUtils.getEmailHtml(emailEntity).replaceAll("\\s", ""),
         ContentFormatterUtils.getHtmlContent(htmlPath).replaceAll("\\s", ""));
+  }
+
+  @Test
+  public void testRCAHighlights() throws TemplateException, IOException {
+    Configuration cfg = new Configuration(Configuration.DEFAULT_INCOMPATIBLE_IMPROVEMENTS);
+    cfg.setClassForTemplateLoading(TestMetricAnomaliesContent.class, "/org/apache/pinot/thirdeye/detector/");
+    Template template = cfg.getTemplate("metric-anomalies-template.ftl");
+    HashMap<String, Object> model = new HashMap<String, Object>();
+    model.put("anomalyCount", 1);
+    model.put("metricsMap", new HashMap<>());
+    model.put("startTime", 0);
+    model.put("endTime", 10);
+    model.put("timeZone", "UTC");
+    model.put("dashboardHost", dashboardHost);
+    model.put("anomalyIds", "");
+    model.put("metricToAnomalyDetailsMap", new HashMap<>());
+    model.put("alertConfigName", "test_alert");
+
+    Map<String, Object> rootCauseHighlights = new HashMap<>();
+    String cubeResponsePath = ClassLoader.getSystemResource("test-email-rca-highlights-cube-algo-response.json").getPath();
+    Map<String, Object> cubeResults = mapper.readValue(new File(
+        cubeResponsePath), new TypeReference<Map<String, Object>>() {
+    });
+    rootCauseHighlights.putAll(cubeResults);
+    model.put("rootCauseHighlights", rootCauseHighlights);
+
+    Writer out = new StringWriter();
+    template.process(model, out);
+
+    String rcaResultRendered = ClassLoader.getSystemResource("test-email-rca-highlights-cube-algo-response-rendered.html").getPath();
+    Assert.assertEquals(out.toString(), ContentFormatterUtils.getHtmlContent(rcaResultRendered));
   }
 }

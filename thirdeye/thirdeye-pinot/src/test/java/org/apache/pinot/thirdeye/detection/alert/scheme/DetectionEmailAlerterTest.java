@@ -154,7 +154,6 @@ public class DetectionEmailAlerterTest {
     when(htmlEmail.send()).thenReturn("sent");
 
     Map<String, Object> expectedResponse = new HashMap<>();
-    expectedResponse.put("cubeResults", "{}");
     ThirdEyeRcaRestClient rcaClient = MockThirdEyeRcaRestClient.setupMockClient(expectedResponse);
     MetricAnomaliesContent metricAnomaliesContent = new MetricAnomaliesContent(rcaClient);
 
