@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.broker.routing.segmentselector;
 
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.helix.ZNRecord;
@@ -29,41 +28,38 @@ import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 
 
-public class SegmentLineageBasedSegmentSelector {
+/**
+ * Segment lineage based segment pre-selector
+ *
+ * This pre-selector reads the segment lineage metadata and filters out either merged segments or original segments
+ * to make sure that the final segments contain no duplicate data.
+ */
+public class SegmentLineageBasedSegmentPreSelector implements SegmentPreSelector {
   private final String _tableNameWithType;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
-  private volatile Set<String> _segmentsToRemove;
-
-  public SegmentLineageBasedSegmentSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore) {
+  public SegmentLineageBasedSegmentPreSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     _tableNameWithType = tableNameWithType;
     _propertyStore = propertyStore;
   }
 
-  public void init() {
-    onExternalViewChange();
-  }
-
-  public void onExternalViewChange() {
-    // Fetch segment lineage
+  @Override
+  public Set<String> preSelect(Set<String> onlineSegments) {
+    Set<String> segmentsToProcess = new HashSet<>(onlineSegments);
     SegmentLineage segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, _tableNameWithType);
     Set<String> segmentsToRemove = new HashSet<>();
     if (segmentLineage != null) {
       for (String lineageEntryId : segmentLineage.getLineageEntryIds()) {
         LineageEntry lineageEntry = segmentLineage.getLineageEntry(lineageEntryId);
-        if (lineageEntry.getState() == LineageEntryState.COMPLETED) {
+        if (lineageEntry.getState() == LineageEntryState.COMPLETED && onlineSegments
+            .containsAll(lineageEntry.getSegmentsTo())) {
           segmentsToRemove.addAll(lineageEntry.getSegmentsFrom());
         } else {
           segmentsToRemove.addAll(lineageEntry.getSegmentsTo());
         }
       }
     }
-    _segmentsToRemove = Collections.unmodifiableSet(segmentsToRemove);
-  }
-
-  public Set<String> computeSegmentsToProcess(Set<String> onlineSegments) {
-    Set<String> segmentsToProcess = new HashSet<>(onlineSegments);
-    segmentsToProcess.removeAll(_segmentsToRemove);
+    segmentsToProcess.removeAll(segmentsToRemove);
     return segmentsToProcess;
   }
 }

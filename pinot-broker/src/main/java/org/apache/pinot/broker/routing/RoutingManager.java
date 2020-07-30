@@ -42,6 +42,8 @@ import org.apache.pinot.broker.routing.instanceselector.InstanceSelector;
 import org.apache.pinot.broker.routing.instanceselector.InstanceSelectorFactory;
 import org.apache.pinot.broker.routing.segmentpruner.SegmentPruner;
 import org.apache.pinot.broker.routing.segmentpruner.SegmentPrunerFactory;
+import org.apache.pinot.broker.routing.segmentselector.SegmentPreSelector;
+import org.apache.pinot.broker.routing.segmentselector.SegmentPreSelectorFactory;
 import org.apache.pinot.broker.routing.segmentselector.SegmentSelector;
 import org.apache.pinot.broker.routing.segmentselector.SegmentSelectorFactory;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
@@ -312,7 +314,9 @@ public class RoutingManager implements ClusterChangeHandler {
 
     Set<String> enabledInstances = _enabledServerInstanceMap.keySet();
 
-    SegmentSelector segmentSelector = SegmentSelectorFactory.getSegmentSelector(tableConfig, _propertyStore);
+    SegmentPreSelector segmentPreSelector =
+        SegmentPreSelectorFactory.getSegmentPreSelector(tableConfig, _propertyStore);
+    SegmentSelector segmentSelector = SegmentSelectorFactory.getSegmentSelector(tableConfig);
     segmentSelector.init(externalView, onlineSegments);
     List<SegmentPruner> segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
     for (SegmentPruner segmentPruner : segmentPruners) {
@@ -363,8 +367,8 @@ public class RoutingManager implements ClusterChangeHandler {
     Long queryTimeoutMs = queryConfig != null ? queryConfig.getTimeoutMs() : null;
 
     RoutingEntry routingEntry =
-        new RoutingEntry(tableNameWithType, segmentSelector, segmentPruners, instanceSelector, externalViewVersion,
-            timeBoundaryManager, queryTimeoutMs);
+        new RoutingEntry(tableNameWithType, segmentPreSelector, segmentSelector, segmentPruners, instanceSelector,
+            externalViewVersion, timeBoundaryManager, queryTimeoutMs);
     if (_routingEntryMap.put(tableNameWithType, routingEntry) == null) {
       LOGGER.info("Built routing for table: {}", tableNameWithType);
     } else {
@@ -471,6 +475,7 @@ public class RoutingManager implements ClusterChangeHandler {
 
   private static class RoutingEntry {
     final String _tableNameWithType;
+    final SegmentPreSelector _segmentPreSelector;
     final SegmentSelector _segmentSelector;
     final List<SegmentPruner> _segmentPruners;
     final InstanceSelector _instanceSelector;
@@ -481,10 +486,11 @@ public class RoutingManager implements ClusterChangeHandler {
     // Time boundary manager is only available for the offline part of the hybrid table
     transient TimeBoundaryManager _timeBoundaryManager;
 
-    RoutingEntry(String tableNameWithType, SegmentSelector segmentSelector, List<SegmentPruner> segmentPruners,
-        InstanceSelector instanceSelector, int lastUpdateExternalViewVersion,
+    RoutingEntry(String tableNameWithType, SegmentPreSelector segmentPreSelector, SegmentSelector segmentSelector,
+        List<SegmentPruner> segmentPruners, InstanceSelector instanceSelector, int lastUpdateExternalViewVersion,
         @Nullable TimeBoundaryManager timeBoundaryManager, @Nullable Long queryTimeoutMs) {
       _tableNameWithType = tableNameWithType;
+      _segmentPreSelector = segmentPreSelector;
       _segmentSelector = segmentSelector;
       _segmentPruners = segmentPruners;
       _instanceSelector = instanceSelector;
@@ -518,13 +524,14 @@ public class RoutingManager implements ClusterChangeHandler {
     // inconsistency between components, which is fine because the inconsistency only exists for the newly changed
     // segments and only lasts for a very short time.
     void onExternalViewChange(ExternalView externalView, Set<String> onlineSegments) {
-      _segmentSelector.onExternalViewChange(externalView, onlineSegments);
+      Set<String> preSelectedSegments = _segmentPreSelector.preSelect(onlineSegments);
+      _segmentSelector.onExternalViewChange(externalView, preSelectedSegments);
       for (SegmentPruner segmentPruner : _segmentPruners) {
-        segmentPruner.onExternalViewChange(externalView, onlineSegments);
+        segmentPruner.onExternalViewChange(externalView, preSelectedSegments);
       }
-      _instanceSelector.onExternalViewChange(externalView, onlineSegments);
+      _instanceSelector.onExternalViewChange(externalView, preSelectedSegments);
       if (_timeBoundaryManager != null) {
-        _timeBoundaryManager.onExternalViewChange(externalView, onlineSegments);
+        _timeBoundaryManager.onExternalViewChange(externalView, preSelectedSegments);
       }
       _lastUpdateExternalViewVersion = externalView.getStat().getVersion();
     }

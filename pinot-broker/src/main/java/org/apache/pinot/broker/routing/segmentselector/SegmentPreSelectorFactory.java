@@ -17,19 +17,19 @@
  * under the License.
  */
 package org.apache.pinot.broker.routing.segmentselector;
+
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 
 
-public class SegmentSelectorFactory {
-  private SegmentSelectorFactory() {
+public class SegmentPreSelectorFactory {
+  private SegmentPreSelectorFactory() {
   }
 
-  public static SegmentSelector getSegmentSelector(TableConfig tableConfig) {
-    if (tableConfig.getTableType() == TableType.OFFLINE) {
-      return new OfflineSegmentSelector();
-    } else {
-      return new RealtimeSegmentSelector();
-    }
+  public static SegmentPreSelector getSegmentPreSelector(TableConfig tableConfig,
+      ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    String tableNameWithType = tableConfig.getTableName();
+    return new SegmentLineageBasedSegmentPreSelector(tableNameWithType, propertyStore);
   }
 }

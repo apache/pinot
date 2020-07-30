@@ -17,19 +17,23 @@
  * under the License.
  */
 package org.apache.pinot.broker.routing.segmentselector;
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 
+import java.util.Set;
 
-public class SegmentSelectorFactory {
-  private SegmentSelectorFactory() {
-  }
+/**
+ * The segment pre-selector filters the unnecessary online segments for the query.
+ * <p>Segment pre-selector examples:
+ * <ul>
+ *   <li>
+ *     For table with segment merge/rollup enabled, select the merged segments over the original segments with the same
+ *     data
+ *   </li>
+ * </ul>
+ */
+public interface SegmentPreSelector {
 
-  public static SegmentSelector getSegmentSelector(TableConfig tableConfig) {
-    if (tableConfig.getTableType() == TableType.OFFLINE) {
-      return new OfflineSegmentSelector();
-    } else {
-      return new RealtimeSegmentSelector();
-    }
-  }
+  /**
+   * Process pre-selection for online segments to filter out unnecessary online segments.
+   */
+  Set<String> preSelect(Set<String> onlineSegments);
 }
