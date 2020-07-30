@@ -18,7 +18,7 @@
 # under the License.
 #
 
-if [ -n "${DEPLOY_BUILD_OPTS}" ]; then
+# if [ -n "${DEPLOY_BUILD_OPTS}" ]; then
   echo "Deploying ThirdEye to bintray"
   # Generate new version number
   cd thirdeye/
@@ -27,10 +27,10 @@ if [ -n "${DEPLOY_BUILD_OPTS}" ]; then
   mvn versions:set -DnewVersion="$BUILD_VERSION${DEV_VERSION}" -q -B
   mvn versions:commit -q -B
   # Deploy ThirdEye backend to bintray
-  mvn -pl '!thirdeye-frontend' deploy -s ../.travis/.ci.settings.xml -DskipTests -q
+  mvn -pl '!thirdeye-frontend' deploy -s ../.travis/.ci.settings.xml -DskipTests -q -DaltDeploymentRepository=bintray-linkedin-maven::default::'https://api.bintray.com/maven/linkedin/maven/thirdeye/;publish=1;override=1'
   # Deploy ThirdEye frontend to NPM
   cd thirdeye-frontend/
   npm version ${BUILD_VERSION}${DEV_VERSION}
   npm-login-noninteractive
   npm publish
-fi
+# fi
