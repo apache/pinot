@@ -327,8 +327,9 @@ public class FileUploadDownloadClient implements Closeable {
   private static HttpUriRequest getDownloadFileRequest(URI uri, int socketTimeoutMs) {
     RequestBuilder requestBuilder = RequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
     setTimeout(requestBuilder, socketTimeoutMs);
-    if (uri.getUserInfo() != null) {
-      String encoded = Base64.encodeBase64String(StringUtil.encodeUtf8(uri.getUserInfo()));
+    String userInfo = uri.getUserInfo();
+    if (userInfo != null) {
+      String encoded = Base64.encodeBase64String(StringUtil.encodeUtf8(userInfo));
       String authHeader = "Basic " + encoded;
       requestBuilder.addHeader(HttpHeaders.AUTHORIZATION, authHeader);
     }
