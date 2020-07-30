@@ -121,7 +121,7 @@ public abstract class BaseCubePinotClient<R extends Row> implements CubePinotCli
     for (CubeSpec cubeSpec : cubeSpecs) {
       // Set dataset and metric
       List<MetricExpression> metricExpressions =
-          Utils.convertToMetricExpressions(cubeSpec.getMetric(), MetricAggFunction.SUM, dataset);
+          Utils.convertToMetricExpressions(cubeSpec.getMetric(), MetricAggFunction.AVG, dataset);
       List<MetricFunction> metricFunctions = metricExpressions.get(0).computeMetricFunctions();
 
       ThirdEyeRequest.ThirdEyeRequestBuilder builder = ThirdEyeRequest.newBuilder();

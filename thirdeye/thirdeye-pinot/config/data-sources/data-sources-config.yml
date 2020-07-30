@@ -228,8 +228,8 @@ dataSourceConfigs:
             dataFile: "hourly.csv"
       PostgreSQL:
         - db:
-            utk_test: jdbc:postgresql://localhost:25432/thirdeye
-          user: root
+            utk_test: jdbc:postgresql://127.0.0.1:5432/thirdeye
+          user: postgres
           password: root
       Druid:
         - db:
