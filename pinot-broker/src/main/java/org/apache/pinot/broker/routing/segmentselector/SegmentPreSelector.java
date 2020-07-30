@@ -20,6 +20,7 @@ package org.apache.pinot.broker.routing.segmentselector;
 
 import java.util.Set;
 
+
 /**
  * The segment pre-selector filters the unnecessary online segments for the query.
  * <p>Segment pre-selector examples:
@@ -33,7 +34,8 @@ import java.util.Set;
 public interface SegmentPreSelector {
 
   /**
-   * Process pre-selection for online segments to filter out unnecessary online segments.
+   * Process pre-selection for online segments to filter out unnecessary online segments. It is safe to modify the input
+   * online segments.
    */
   Set<String> preSelect(Set<String> onlineSegments);
 }

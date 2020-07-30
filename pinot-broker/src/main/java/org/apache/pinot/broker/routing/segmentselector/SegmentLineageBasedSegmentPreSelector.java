@@ -45,21 +45,17 @@ public class SegmentLineageBasedSegmentPreSelector implements SegmentPreSelector
 
   @Override
   public Set<String> preSelect(Set<String> onlineSegments) {
-    Set<String> segmentsToProcess = new HashSet<>(onlineSegments);
     SegmentLineage segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, _tableNameWithType);
-    Set<String> segmentsToRemove = new HashSet<>();
     if (segmentLineage != null) {
       for (String lineageEntryId : segmentLineage.getLineageEntryIds()) {
         LineageEntry lineageEntry = segmentLineage.getLineageEntry(lineageEntryId);
-        if (lineageEntry.getState() == LineageEntryState.COMPLETED && onlineSegments
-            .containsAll(lineageEntry.getSegmentsTo())) {
-          segmentsToRemove.addAll(lineageEntry.getSegmentsFrom());
+        if (lineageEntry.getState() == LineageEntryState.COMPLETED) {
+          onlineSegments.removeAll(lineageEntry.getSegmentsFrom());
         } else {
-          segmentsToRemove.addAll(lineageEntry.getSegmentsTo());
+          onlineSegments.removeAll(lineageEntry.getSegmentsTo());
         }
       }
     }
-    segmentsToProcess.removeAll(segmentsToRemove);
-    return segmentsToProcess;
+    return onlineSegments;
   }
 }

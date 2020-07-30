@@ -316,14 +316,15 @@ public class RoutingManager implements ClusterChangeHandler {
 
     SegmentPreSelector segmentPreSelector =
         SegmentPreSelectorFactory.getSegmentPreSelector(tableConfig, _propertyStore);
+    Set<String> preSelectedOnlineSegments = segmentPreSelector.preSelect(onlineSegments);
     SegmentSelector segmentSelector = SegmentSelectorFactory.getSegmentSelector(tableConfig);
-    segmentSelector.init(externalView, onlineSegments);
+    segmentSelector.init(externalView, preSelectedOnlineSegments);
     List<SegmentPruner> segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
     for (SegmentPruner segmentPruner : segmentPruners) {
-      segmentPruner.init(externalView, onlineSegments);
+      segmentPruner.init(externalView, preSelectedOnlineSegments);
     }
     InstanceSelector instanceSelector = InstanceSelectorFactory.getInstanceSelector(tableConfig, _brokerMetrics);
-    instanceSelector.init(enabledInstances, externalView, onlineSegments);
+    instanceSelector.init(enabledInstances, externalView, preSelectedOnlineSegments);
 
     // Add time boundary manager if both offline and real-time part exist for a hybrid table
     TimeBoundaryManager timeBoundaryManager = null;
@@ -524,14 +525,14 @@ public class RoutingManager implements ClusterChangeHandler {
     // inconsistency between components, which is fine because the inconsistency only exists for the newly changed
     // segments and only lasts for a very short time.
     void onExternalViewChange(ExternalView externalView, Set<String> onlineSegments) {
-      Set<String> preSelectedSegments = _segmentPreSelector.preSelect(onlineSegments);
-      _segmentSelector.onExternalViewChange(externalView, preSelectedSegments);
+      Set<String> preSelectedOnlineSegments = _segmentPreSelector.preSelect(onlineSegments);
+      _segmentSelector.onExternalViewChange(externalView, preSelectedOnlineSegments);
       for (SegmentPruner segmentPruner : _segmentPruners) {
-        segmentPruner.onExternalViewChange(externalView, preSelectedSegments);
+        segmentPruner.onExternalViewChange(externalView, preSelectedOnlineSegments);
       }
-      _instanceSelector.onExternalViewChange(externalView, preSelectedSegments);
+      _instanceSelector.onExternalViewChange(externalView, preSelectedOnlineSegments);
       if (_timeBoundaryManager != null) {
-        _timeBoundaryManager.onExternalViewChange(externalView, preSelectedSegments);
+        _timeBoundaryManager.onExternalViewChange(externalView, preSelectedOnlineSegments);
       }
       _lastUpdateExternalViewVersion = externalView.getStat().getVersion();
     }
