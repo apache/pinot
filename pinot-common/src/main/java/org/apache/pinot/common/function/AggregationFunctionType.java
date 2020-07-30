@@ -36,6 +36,9 @@ public enum AggregationFunctionType {
   PERCENTILEEST("percentileEst"),
   PERCENTILETDIGEST("percentileTDigest"),
 
+  // geo aggregation functions
+  ST_UNION("ST_Union"),
+
   // Aggregation functions for multi-valued columns
   COUNTMV("countMV"),
   MINMV("minMV"),

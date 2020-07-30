@@ -152,6 +152,8 @@ public class AggregationFunctionFactory {
           case DISTINCT:
             return new DistinctAggregationFunction(arguments, queryContext.getOrderByExpressions(),
                 queryContext.getLimit());
+          case ST_UNION:
+            return new StUnionAggregationFunction(firstArgument);
           default:
             throw new IllegalArgumentException();
         }
