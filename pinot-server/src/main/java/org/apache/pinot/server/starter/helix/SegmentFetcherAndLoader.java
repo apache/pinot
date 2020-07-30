@@ -25,6 +25,7 @@ import java.util.concurrent.locks.Lock;
 import javax.annotation.Nullable;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
@@ -220,7 +221,8 @@ public class SegmentFetcherAndLoader {
         return indexDir.getAbsolutePath();
       } catch (Exception e) {
         _serverMetrics.addMeteredTableValue(tableName, ServerMeter.UNTAR_FAILURES, 1L);
-        throw e;
+        Utils.rethrowException(e);
+        return null;
       }
     } finally {
       FileUtils.deleteQuietly(tempDir);
