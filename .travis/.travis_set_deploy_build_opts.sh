@@ -22,6 +22,6 @@
   export DEV_VERSION="-dev-${TRAVIS_BUILD_NUMBER}"
   export DEPLOY_BUILD_OPTS="-Dsha1=-dev-${TRAVIS_BUILD_NUMBER}"
   npm install -g npm-login-noninteractive
-else
-  export DEPLOY_BUILD_OPTS=""
+# else
+  # export DEPLOY_BUILD_OPTS=""
 # fi
