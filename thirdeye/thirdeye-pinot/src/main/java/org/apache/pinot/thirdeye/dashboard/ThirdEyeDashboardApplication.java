@@ -69,6 +69,7 @@ import org.apache.pinot.thirdeye.dashboard.resources.v2.RootCauseResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.RootCauseSessionResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.RootCauseTemplateResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.alerts.AlertResource;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.anomalies.AnomalySearchResource;
 import org.apache.pinot.thirdeye.dataset.DatasetAutoOnboardResource;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.sql.resources.SqlDataSourceResource;
@@ -166,7 +167,8 @@ public class ThirdEyeDashboardApplication
         AlertResource.class,
         RootCauseTemplateResource.class,
         RootCauseSessionResource.class,
-        RootCauseMetricResource.class
+        RootCauseMetricResource.class,
+        AnomalySearchResource.class
     )
         .map(c -> injector.getInstance(c))
         .forEach(jersey::register);
