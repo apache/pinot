@@ -18,7 +18,7 @@
 # under the License.
 #
 
-# if [ -n "${DEPLOY_BUILD_OPTS}" ]; then
+if [ -n "${DEPLOY_BUILD_OPTS}" ]; then
   echo "Deploying ThirdEye to bintray"
   # Generate new version number
   cd thirdeye/
@@ -33,4 +33,4 @@
   npm version ${BUILD_VERSION}${DEV_VERSION}
   npm-login-noninteractive
   npm publish
-# fi
+fi
