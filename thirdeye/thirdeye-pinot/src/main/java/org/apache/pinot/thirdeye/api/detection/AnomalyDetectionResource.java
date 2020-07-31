@@ -552,11 +552,6 @@ public class AnomalyDetectionResource {
       detectionConfigDAO.delete(detectionConfigDTO);
       LOG.info("Deleted detection: {}", detectionConfigDTO);
     }
-
-    if (taskDTO != null) {
-      taskDAO.delete(taskDTO);
-      LOG.info("Deleted task: {}", taskDTO);
-    }
   }
 
   /**
