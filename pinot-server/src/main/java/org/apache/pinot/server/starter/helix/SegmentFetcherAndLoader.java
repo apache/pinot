@@ -25,7 +25,6 @@ import java.util.concurrent.locks.Lock;
 import javax.annotation.Nullable;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
@@ -209,7 +208,7 @@ public class SegmentFetcherAndLoader {
       } catch (AttemptsExceededException e) {
         LOGGER.error("Attempts exceeded when downloading segment: {} for table: {} from: {} to: {}", segmentName,
             tableName, uri, tempTarFile);
-        _serverMetrics.addMeteredTableValue(tableName, ServerMeter.RETRY_EXCEEDED_FAILURES, 1L);
+        _serverMetrics.addMeteredTableValue(tableName, ServerMeter.SEGMENT_DOWNLOAD_FAILURES, 1L);
         Utils.rethrowException(e);
         return null;
       }
