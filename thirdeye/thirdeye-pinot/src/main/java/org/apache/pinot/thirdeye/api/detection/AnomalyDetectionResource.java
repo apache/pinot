@@ -57,7 +57,6 @@ import org.apache.pinot.thirdeye.detection.validators.MetricConfigValidator;
 import org.apache.pinot.thirdeye.detection.yaml.DetectionConfigTuner;
 import org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTranslator;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
-import org.jfree.util.Log;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
@@ -116,6 +115,7 @@ public class AnomalyDetectionResource {
   private static final String TASK_MYSQL_NAME_COLUMN = "name";
   private static final String ANOMALY_ENDPOINT_URL = "/userdashboard/anomalies";
   private static final long POLLING_SLEEP_TIME = 5L;
+  private static final long POLLING_TIMEOUT = 60 * 10L;
   private static final int DEFAULT_TIME_DURATION = 1;
   private static final long MAX_ONLINE_PAYLOAD_SIZE = 10 * 1024 * 1024L;
 
@@ -494,24 +494,30 @@ public class AnomalyDetectionResource {
     long startTime = System.currentTimeMillis();
     TaskDTO taskDTO;
 
-    // Timeout mechanism will be handled by worker thread in the controller
+    // Add timeout mechanism in case anything external goes wrong
     while (true) {
       taskDTO = taskDAO.findById(taskId);
 
       LOG.info("Polling task : " + taskDTO);
 
       TaskConstants.TaskStatus taskStatus = taskDTO.getStatus();
-      if (!taskStatus.equals(TaskConstants.TaskStatus.WAITING) && !taskStatus
-          .equals(TaskConstants.TaskStatus.RUNNING)) {
-        LOG.info("Polling finished ({}ms). Task status: {}", System.currentTimeMillis() - startTime,
-            taskStatus);
+      if (!taskStatus.equals(TaskConstants.TaskStatus.WAITING) &&
+              !taskStatus.equals(TaskConstants.TaskStatus.RUNNING)) {
+        LOG.info("Polling finished ({}ms). Task status: {}",
+            System.currentTimeMillis() - startTime, taskStatus);
         break;
       }
 
       try {
         TimeUnit.SECONDS.sleep(POLLING_SLEEP_TIME);
       } catch (InterruptedException e) {
-        Log.warn("Interrupted during polling sleep");
+        LOG.warn("Interrupted during polling sleep");
+        break;
+      }
+
+      if ( (System.currentTimeMillis() - startTime) > TimeUnit.SECONDS.toMillis(POLLING_TIMEOUT)) {
+        LOG.warn("Polling timeout. Mark task as FAILED");
+        taskDTO.setStatus(TaskConstants.TaskStatus.FAILED);
         break;
       }
     }
