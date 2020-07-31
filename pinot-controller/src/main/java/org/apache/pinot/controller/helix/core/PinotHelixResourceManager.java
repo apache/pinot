@@ -72,6 +72,7 @@ import org.apache.pinot.common.lineage.LineageEntryState;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.lineage.SegmentLineageUtils;
+import org.apache.pinot.common.messages.RoutingTableRebuildMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
@@ -83,6 +84,7 @@ import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.BrokerResourceStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Server;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
@@ -1753,6 +1755,27 @@ public class PinotHelixResourceManager {
     }
   }
 
+  private void sendRoutingTableRebuildMessage(String tableNameWithType) {
+    RoutingTableRebuildMessage routingTableRebuildMessage = new RoutingTableRebuildMessage(tableNameWithType);
+
+    // Send table config refresh message to brokers
+    Criteria recipientCriteria = new Criteria();
+    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+    recipientCriteria.setInstanceName("%");
+    recipientCriteria.setResource(Helix.BROKER_RESOURCE_INSTANCE);
+    recipientCriteria.setSessionSpecific(true);
+    recipientCriteria.setPartition(tableNameWithType);
+    // Send message with no callback and infinite timeout on the recipient
+    int numMessagesSent =
+        _helixZkManager.getMessagingService().send(recipientCriteria, routingTableRebuildMessage, null, -1);
+    if (numMessagesSent > 0) {
+      // TODO: Would be nice if we can get the name of the instances to which messages were sent
+      LOGGER.info("Sent {} table config refresh messages to brokers for table: {}", numMessagesSent, tableNameWithType);
+    } else {
+      LOGGER.warn("No table config refresh message sent to brokers for table: {}", tableNameWithType);
+    }
+  }
+
   /**
    * Update the instance config given the broker instance id
    */
@@ -2330,12 +2353,6 @@ public class PinotHelixResourceManager {
             .format("Invalid segment lineage entry id (tableName='%s', segmentLineageEntryId='%s')", tableNameWithType,
                 segmentLineageEntryId));
 
-        // Check that all the segments from 'segmentsTo' exist in the table
-        Set<String> segmentsForTable = new HashSet<>(getSegmentsFor(tableNameWithType));
-        Preconditions.checkArgument(segmentsForTable.containsAll(lineageEntry.getSegmentsTo()), String.format(
-            "Not all segments from 'segmentsTo' are available in the table. (tableName = '%s', segmentsTo = '%s', "
-                + "segmentsFromTable = '%s')", tableNameWithType, lineageEntry.getSegmentsTo(), segmentsForTable));
-
         // NO-OPS if the entry is already completed
         if (lineageEntry.getState() == LineageEntryState.COMPLETED) {
           LOGGER.warn(
@@ -2344,6 +2361,19 @@ public class PinotHelixResourceManager {
           return true;
         }
 
+        // Check that all the segments from 'segmentsTo' exist in the table
+        Set<String> segmentsForTable = new HashSet<>(getSegmentsFor(tableNameWithType));
+        Preconditions.checkArgument(segmentsForTable.containsAll(lineageEntry.getSegmentsTo()), String.format(
+            "Not all segments from 'segmentsTo' are available in the table. (tableName = '%s', segmentsTo = '%s', "
+                + "segmentsFromTable = '%s')", tableNameWithType, lineageEntry.getSegmentsTo(), segmentsForTable));
+
+        // Check that all the segments from 'segmentsTo' became ONLINE in the external view
+        Set<String> onlineSegmentsFromEV = getOnlineSegmentsFromExternalView(tableNameWithType);
+        Preconditions.checkArgument(onlineSegmentsFromEV.containsAll(lineageEntry.getSegmentsTo()), String.format(
+            "Not all segments from 'segmentsTo' are ONLINE from the external view. (tableName = '%s', "
+                + "segmentsTo = '%s', segmentsFromEV = '%s')", tableNameWithType, lineageEntry.getSegmentsTo(),
+            onlineSegmentsFromEV));
+
         // Update lineage entry
         LineageEntry newLineageEntry =
             new LineageEntry(lineageEntry.getSegmentsFrom(), lineageEntry.getSegmentsTo(), LineageEntryState.COMPLETED,
@@ -2351,7 +2381,15 @@ public class PinotHelixResourceManager {
         segmentLineage.updateLineageEntry(segmentLineageEntryId, newLineageEntry);
 
         // Write back to the lineage entry
-        return SegmentLineageAccessHelper.writeSegmentLineage(_propertyStore, segmentLineage, expectedVersion);
+        if (SegmentLineageAccessHelper.writeSegmentLineage(_propertyStore, segmentLineage, expectedVersion)) {
+          // If the segment lineage metadata is successfully updated, we need to trigger brokers to rebuild the
+          // routing table because it is possible that there has been no EV change but the routing result may be
+          // different after updating the lineage entry.
+          sendRoutingTableRebuildMessage(tableNameWithType);
+          return true;
+        } else {
+          return false;
+        }
       });
     } catch (Exception e) {
       String errorMsg = String
@@ -2366,6 +2404,23 @@ public class PinotHelixResourceManager {
         tableNameWithType, segmentLineageEntryId);
   }
 
+  private Set<String> getOnlineSegmentsFromExternalView(String tableNameWithType) {
+    ExternalView externalView = getTableExternalView(tableNameWithType);
+    if (externalView != null) {
+      Set<String> partitionSet = externalView.getPartitionSet();
+      Set<String> onlineSegments = new HashSet<>(HashUtil.getHashMapCapacity(partitionSet.size()));
+      for (String partition : partitionSet) {
+        Map<String, String> instanceStateMap = externalView.getStateMap(partition);
+        if (instanceStateMap.containsValue(SegmentStateModel.ONLINE) || instanceStateMap
+            .containsValue(SegmentStateModel.CONSUMING)) {
+          onlineSegments.add(partition);
+        }
+      }
+      return onlineSegments;
+    } else {
+      return null;
+    }
+  }
   /*
    * Uncomment and use for testing on a real cluster
   public static void main(String[] args) throws Exception {
