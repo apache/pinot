@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -384,7 +385,11 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
 
   @Override
   public Map<String, Sketch> extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    Map<Predicate, Union> unionMap = getUnionMap(aggregationResultHolder);
+    Map<Predicate, Union> unionMap = aggregationResultHolder.getResult();
+    if (unionMap == null || unionMap.isEmpty()) {
+      return Collections.emptyMap();
+    }
+
     Map<String, Sketch> result = new HashMap<>();
     for (PredicateInfo predicateInfo : _predicateInfoMap.values()) {
       result.put(predicateInfo.getStringPredicate(), unionMap.get(predicateInfo.getPredicate()).getResult());
@@ -394,7 +399,11 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
 
   @Override
   public Map<String, Sketch> extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    Map<Predicate, Union> unionMap = getUnionMap(groupByResultHolder, groupKey);
+    Map<Predicate, Union> unionMap = groupByResultHolder.getResult(groupKey);
+    if (unionMap == null || unionMap.isEmpty()) {
+      return Collections.emptyMap();
+    }
+
     Map<String, Sketch> result = new HashMap<>();
     for (PredicateInfo predicateInfo : _predicateInfoMap.values()) {
       result.put(predicateInfo.getStringPredicate(), unionMap.get(predicateInfo.getPredicate()).getResult());
@@ -404,9 +413,9 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
 
   @Override
   public Map<String, Sketch> merge(Map<String, Sketch> intermediateResult1, Map<String, Sketch> intermediateResult2) {
-    if (intermediateResult1 == null) {
+    if (intermediateResult1 == null || intermediateResult1.isEmpty()) {
       return intermediateResult2;
-    } else if (intermediateResult2 == null) {
+    } else if (intermediateResult2 == null || intermediateResult2.isEmpty()) {
       return intermediateResult1;
     }
 
