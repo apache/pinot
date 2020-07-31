@@ -57,6 +57,7 @@ import java.io.File;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.sql.Connection;
+import java.sql.SQLException;
 import javax.validation.Validation;
 import org.apache.tomcat.jdbc.pool.DataSource;
 import org.h2.store.fs.FileUtils;
@@ -139,6 +140,15 @@ public abstract class DaoProviderUtil {
   public static <T extends AbstractManagerImpl<? extends AbstractDTO>> T getInstance(Class<T> c) {
     T instance = provider.getInstance(c);
     return instance;
+  }
+
+  public static boolean isDataSourceHealthy() {
+    try {
+      return dataSource.getConnection().createStatement().execute("SELECT 1");
+    } catch (SQLException throwables) {
+      LOG.error(throwables.toString());
+      return false;
+    }
   }
 
   static class DataSourceModule extends AbstractModule {

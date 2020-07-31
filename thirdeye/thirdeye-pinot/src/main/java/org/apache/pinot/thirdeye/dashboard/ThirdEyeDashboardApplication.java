@@ -74,6 +74,7 @@ import org.apache.pinot.thirdeye.detection.DetectionConfigurationResource;
 import org.apache.pinot.thirdeye.detection.yaml.YamlResource;
 import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
 import org.apache.pinot.thirdeye.detector.function.AnomalyFunctionFactory;
+import org.apache.pinot.thirdeye.misc.HealthCheckResource;
 import org.apache.pinot.thirdeye.model.download.ModelDownloaderManager;
 import org.apache.pinot.thirdeye.rootcause.RCAFramework;
 import org.apache.pinot.thirdeye.rootcause.impl.RCAFrameworkLoader;
@@ -188,6 +189,7 @@ public class ThirdEyeDashboardApplication
         config.getAlertOnboardingPermitPerSecond()));
     env.jersey().register(new SqlDataSourceResource());
     env.jersey().register(new AlertResource());
+    env.jersey().register(new HealthCheckResource());
 
     TimeSeriesLoader timeSeriesLoader = new DefaultTimeSeriesLoader(
         DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(),
