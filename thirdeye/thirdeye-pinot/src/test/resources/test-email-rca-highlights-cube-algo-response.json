@@ -10,36 +10,36 @@
     "globalRatio":1.0595,
     "dimensions":["country_code","industry","device"],
     "responseRows":[{
-      "baselineValue":189072.0,
-      "currentValue":188105.0,
-      "sizeFactor":0.9490281429667744,
-      "percentageChange":"-0.5114%",
-      "contributionChange":"-5.9718%",
-      "contributionToOverallChange":"-8.4270%",
-      "names":["(ALL)-","",""],
-      "otherDimensionValues":"united states, united kingdom, canada, germany, united arab emirates, france, israel, bangladesh, netherlands, brazil, and more...",
-      "cost":0.0
-    },{
-      "baselineValue":3907.0,
-      "currentValue":15598.0,
-      "sizeFactor":0.04907720759369456,
-      "percentageChange":"299.2321%",
-      "contributionChange":"5.6045%",
-      "contributionToOverallChange":"101.8824%",
-      "names":["india","information technology and services","Android"],
-      "otherDimensionValues":"",
-      "cost":1614.9572993483027
-    },{
-      "baselineValue":1.0,
-      "currentValue":752.0,
-      "sizeFactor":0.0018946494395309925,
-      "percentageChange":"75100.0000%",
-      "contributionChange":"0.3673%",
-      "contributionToOverallChange":"6.5447%",
-      "names":["australia","computer and network security","Android"],
-      "otherDimensionValues":"",
-      "cost":666.8745820987359
-    }],
+        "baselineValue":189072.0,
+        "currentValue":188105.0,
+        "sizeFactor":0.9490281429667744,
+        "percentageChange":"-0.5114%",
+        "contributionChange":"-5.9718%",
+        "contributionToOverallChange":"-8.4270%",
+        "names":["(ALL)-","",""],
+        "otherDimensionValues":"united states, united kingdom, canada, germany, united arab emirates, france, israel, bangladesh, netherlands, brazil, and more...",
+        "cost":0.0
+      },{
+        "baselineValue":3907.0,
+        "currentValue":15598.0,
+        "sizeFactor":0.04907720759369456,
+        "percentageChange":"299.2321%",
+        "contributionChange":"5.6045%",
+        "contributionToOverallChange":"101.8824%",
+        "names":["india","information technology and services","Android"],
+        "otherDimensionValues":"",
+        "cost":1614.9572993483027
+      },{
+        "baselineValue":1.0,
+        "currentValue":752.0,
+        "sizeFactor":0.0018946494395309925,
+        "percentageChange":"75100.0000%",
+        "contributionChange":"0.3673%",
+        "contributionToOverallChange":"6.5447%",
+        "names":["australia","computer and network security","Android"],
+        "otherDimensionValues":"",
+        "cost":666.8745820987359
+      }],
     "gainer":[{
       "baselineValue":138253.0,
       "currentValue":155978.0,
@@ -88,7 +88,8 @@
       "contributionChange":"3.4521%",
       "contributionToOverallChange":"72.6623%",
       "dimensionName":"country_code",
-      "dimensionValue":"india","cost":"276.9238"
+      "dimensionValue":"india",
+      "cost":"276.9238"
     }],
     "loser":[{
       "baselineValue":38146.0,

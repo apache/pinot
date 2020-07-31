@@ -50,7 +50,7 @@ public class TestThirdEyeRcaRestClient {
   @Test
   public void testGetAllHighlights() throws Exception {
     Map<String, Object> expectedResponse = new HashMap<>();
-    expectedResponse.put("cubeResults", "{}");
+    expectedResponse.put("cubeResults", new HashMap<>());
 
     Client client = MockAbstractRestClient.setupMockClient(expectedResponse);
 

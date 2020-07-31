@@ -23,7 +23,6 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -45,6 +44,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.util.ThirdEyeStringUtils;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.notification.content.BaseNotificationContent;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
@@ -220,14 +220,14 @@ public class MetricAnomaliesContent extends BaseNotificationContent {
     // enable it for all the metrics.
     if (this.rcaClient != null && metricAnomalyReports.keySet().size() == 1) {
       String anomalyId = metricAnomalyReports.values().iterator().next().getAnomalyId();
-      Map<String, Object> rcaHighlights = new HashMap<>();
       try {
-        rcaHighlights = this.rcaClient.getRootCauseHighlights(Long.parseLong(anomalyId));
-      } catch (IOException e) {
-        LOG.error("Failed to retrieve the RCA Highlights for anomaly " + anomalyId, e);
+        Map<String, Object> rcaHighlights = this.rcaClient.getRootCauseHighlights(Long.parseLong(anomalyId));
+        LOG.info("Setting rootCauseHighlights in email template " + rcaHighlights);
+        templateData.put("rootCauseHighlights", rcaHighlights);
+      } catch (Exception e) {
+        // alert notification shouldn't fail if rca insights are not available
+        LOG.error("Skip Embedding RCA in email. Failed to retrieve the RCA Highlights for anomaly " + anomalyId, e);
       }
-      LOG.info("Setting rootCauseHighlights in email template " + rcaHighlights);
-      templateData.put("rootCauseHighlights", rcaHighlights);
     }
 
     return templateData;

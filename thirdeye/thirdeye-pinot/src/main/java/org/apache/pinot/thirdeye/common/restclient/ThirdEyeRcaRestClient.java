@@ -41,7 +41,7 @@ import static org.apache.pinot.thirdeye.common.constants.rca.RootCauseResourceCo
 public class ThirdEyeRcaRestClient extends AbstractRestClient {
 
   private final String DEFAULT_THIRDEYE_RCA_SERVICE_HOST = "localhost:1426";
-  private final String THIRDEYE_RCA_CUBE_URI = "/dashboard/summary/autoDimensionOrder";
+  private final String THIRDEYE_RCA_CUBE_URI = "/dashboard/summary/autoDimensionOrder/v2";
   private final String THIRDEYE_RCA_HIGHLIGHTS_URI = "/rootcause/highlights";
 
   private ThirdEyePrincipal principal;
