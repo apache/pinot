@@ -19,6 +19,10 @@
 
 package org.apache.pinot.thirdeye.dashboard.resources;
 
+import static org.apache.pinot.thirdeye.dashboard.resources.ResourceUtils.badRequest;
+import static org.apache.pinot.thirdeye.dashboard.resources.ResourceUtils.ensure;
+import static org.apache.pinot.thirdeye.dashboard.resources.ResourceUtils.ensureExists;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
 import org.apache.pinot.thirdeye.api.Constants;
@@ -48,6 +52,8 @@ import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.OverrideConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.SessionDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.DatasetConfigBean;
+import org.apache.pinot.thirdeye.datalayer.pojo.MetricConfigBean;
 import org.apache.pinot.thirdeye.datalayer.pojo.SessionBean;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
@@ -55,7 +61,6 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import javax.ws.rs.GET;
@@ -133,7 +138,9 @@ public class EntityManagerResource {
   @Path("{entityType}")
   @ApiOperation(value = "GET request to get all entities for a type.")
   public List<? extends AbstractDTO> getAllEntitiesForType(@PathParam("entityType") String entityTypeStr) {
-    EntityType entityType = EntityType.valueOf(entityTypeStr);
+    ensureExists(entityTypeStr, "entityType is null");
+
+    final EntityType entityType = entityType(entityTypeStr);
 
     switch (entityType) {
       case ANOMALY_FUNCTION:
@@ -141,24 +148,12 @@ public class EntityManagerResource {
 
       case DATASET_CONFIG:
         List<DatasetConfigDTO> allDatasets = datasetConfigManager.findAll();
-        Collections.sort(allDatasets, new Comparator<DatasetConfigDTO>() {
-
-          @Override
-          public int compare(DatasetConfigDTO o1, DatasetConfigDTO o2) {
-            return o1.getDataset().compareTo(o2.getDataset());
-          }
-        });
+        allDatasets.sort(Comparator.comparing(DatasetConfigBean::getDataset));
         return allDatasets;
 
       case METRIC_CONFIG:
         List<MetricConfigDTO> allMetrics = metricConfigManager.findAll();
-        Collections.sort(allMetrics, new Comparator<MetricConfigDTO>() {
-
-          @Override
-          public int compare(MetricConfigDTO o1, MetricConfigDTO o2) {
-            return o1.getDataset().compareTo(o2.getDataset());
-          }
-        });
+        allMetrics.sort(Comparator.comparing(MetricConfigBean::getDataset));
         return allMetrics;
 
       case OVERRIDE_CONFIG:
@@ -195,11 +190,9 @@ public class EntityManagerResource {
 
   @POST
   public Long updateEntity(@QueryParam("entityType") String entityTypeStr, String jsonPayload) {
-    if (Strings.isNullOrEmpty(entityTypeStr)) {
-      throw new WebApplicationException("EntryType can not be null");
-    }
+    ensure(!Strings.isNullOrEmpty(entityTypeStr), "entityType must be non-empty");
 
-    EntityType entityType = EntityType.valueOf(entityTypeStr);
+    final EntityType entityType = entityType(entityTypeStr);
 
     try {
       switch (entityType) {
@@ -245,12 +238,20 @@ public class EntityManagerResource {
           return assertNotNull(detectionAlertConfigManager.save(OBJECT_MAPPER.readValue(jsonPayload, DetectionAlertConfigDTO.class)));
 
         default:
-          throw new WebApplicationException("Unknown entity type : " + entityType);
+          throw badRequest("Entity type not supported: " + entityType);
       }
 
     } catch (IOException e) {
       LOG.error("Error saving the entity with payload : " + jsonPayload, e);
       throw new WebApplicationException(e);
+    }
+  }
+
+  private static EntityType entityType(final String entityTypeStr) {
+    try {
+      return EntityType.valueOf(entityTypeStr);
+    } catch (IllegalArgumentException e) {
+      throw badRequest("Invalid type: " + entityTypeStr);
     }
   }
 
