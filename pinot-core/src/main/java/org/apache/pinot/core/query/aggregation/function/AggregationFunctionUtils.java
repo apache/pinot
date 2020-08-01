@@ -209,12 +209,12 @@ public class AggregationFunctionUtils {
   }
 
   public static boolean isFitForDictionaryBasedComputation(String functionName) {
-    if (functionName.equalsIgnoreCase(AggregationFunctionType.MIN.name()) ||  //
-        functionName.equalsIgnoreCase(AggregationFunctionType.MAX.name()) || //
-        functionName.equalsIgnoreCase(AggregationFunctionType.MINMAXRANGE.name()) || //
-        functionName.equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNT.name())) {
-      return true;
-    }
-    return false;
+    //@formatter:off
+    return functionName.equalsIgnoreCase(AggregationFunctionType.MIN.name())
+        || functionName.equalsIgnoreCase(AggregationFunctionType.MAX.name())
+        || functionName.equalsIgnoreCase(AggregationFunctionType.MINMAXRANGE.name())
+        || functionName.equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNT.name())
+        || functionName.equalsIgnoreCase(AggregationFunctionType.SEGMENTPARTITIONEDDISTINCTCOUNT.name());
+    //@formatter:on
   }
 }

@@ -123,6 +123,8 @@ public class AggregationFunctionFactory {
             return new DistinctCountAggregationFunction(firstArgument);
           case DISTINCTCOUNTBITMAP:
             return new DistinctCountBitmapAggregationFunction(firstArgument);
+          case SEGMENTPARTITIONEDDISTINCTCOUNT:
+            return new SegmentPartitionedDistinctCountAggregationFunction(firstArgument);
           case DISTINCTCOUNTHLL:
             return new DistinctCountHLLAggregationFunction(arguments);
           case DISTINCTCOUNTRAWHLL:

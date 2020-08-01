@@ -114,6 +114,9 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
           }
           aggregationResults.add(set);
           break;
+        case SEGMENTPARTITIONEDDISTINCTCOUNT:
+          aggregationResults.add((long) dictionarySize);
+          break;
         default:
           throw new IllegalStateException(
               "Dictionary based aggregation operator does not support function type: " + aggregationFunction.getType());
