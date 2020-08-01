@@ -25,15 +25,15 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.segment.creator.InvertedIndexCreator;
+import org.apache.pinot.core.segment.creator.DictionaryBasedInvertedIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /**
- * Implementation of {@link InvertedIndexCreator} that uses on-heap memory.
+ * Implementation of {@link DictionaryBasedInvertedIndexCreator} that uses on-heap memory.
  */
-public final class OnHeapBitmapInvertedIndexCreator implements InvertedIndexCreator {
+public final class OnHeapBitmapInvertedIndexCreator implements DictionaryBasedInvertedIndexCreator {
   private final File _invertedIndexFile;
   private final MutableRoaringBitmap[] _bitmaps;
   private int _nextDocId;

@@ -33,7 +33,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.query.utils.Pair;
-import org.apache.pinot.core.segment.creator.InvertedIndexCreator;
+import org.apache.pinot.core.segment.creator.DictionaryBasedInvertedIndexCreator;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -45,7 +45,7 @@ import static org.apache.pinot.core.segment.creator.impl.V1Constants.Indexes.BIT
 
 
 /**
- * Implementation of {@link InvertedIndexCreator} that uses off-heap memory.
+ * Implementation of {@link DictionaryBasedInvertedIndexCreator} that uses off-heap memory.
  * <p>We use 2 passes to create the range index.
  * <ul>
  *
@@ -65,7 +65,7 @@ import static org.apache.pinot.core.segment.creator.impl.V1Constants.Indexes.BIT
  *   </li>
  * </ul>
  */
-public final class RangeIndexCreator implements InvertedIndexCreator {
+public final class RangeIndexCreator implements DictionaryBasedInvertedIndexCreator {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RangeIndexCreator.class);
 
