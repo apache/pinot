@@ -121,6 +121,8 @@ public class AggregationFunctionFactory {
             return new MinMaxRangeAggregationFunction(firstArgument);
           case DISTINCTCOUNT:
             return new DistinctCountAggregationFunction(firstArgument);
+          case DISTINCTCOUNTBITMAP:
+            return new DistinctCountBitmapAggregationFunction(firstArgument);
           case DISTINCTCOUNTHLL:
             return new DistinctCountHLLAggregationFunction(arguments);
           case DISTINCTCOUNTRAWHLL:
@@ -145,6 +147,8 @@ public class AggregationFunctionFactory {
             return new MinMaxRangeMVAggregationFunction(firstArgument);
           case DISTINCTCOUNTMV:
             return new DistinctCountMVAggregationFunction(firstArgument);
+          case DISTINCTCOUNTBITMAPMV:
+            return new DistinctCountBitmapMVAggregationFunction(firstArgument);
           case DISTINCTCOUNTHLLMV:
             return new DistinctCountHLLMVAggregationFunction(arguments);
           case DISTINCTCOUNTRAWHLLMV:
