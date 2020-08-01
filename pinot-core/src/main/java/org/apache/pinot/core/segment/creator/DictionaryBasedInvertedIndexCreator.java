@@ -56,7 +56,7 @@ import java.io.IOException;
  *
  * Support for Lucene based inverted index for text
  */
-public interface DictionaryBasedInvertedIndexCreator extends Closeable {
+public interface DictionaryBasedInvertedIndexCreator extends InvertedIndexCreator {
 
   /**
    * For single-valued column, adds the dictionary Id for the next document.
