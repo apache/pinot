@@ -42,6 +42,7 @@ public class ResourceUtils {
    *
    * @param o ensure this object is not null
    * @param message message sent in the 400 response to the user in plain text
+   * @return o (same object) if exists
    */
   public static <T> T ensureExists(T o, String message) {
     ensure(o != null, message);
