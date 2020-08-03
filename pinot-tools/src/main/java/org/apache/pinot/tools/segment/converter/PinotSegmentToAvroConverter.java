@@ -19,6 +19,7 @@
 package org.apache.pinot.tools.segment.converter;
 
 import java.io.File;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileWriter;
@@ -60,6 +61,10 @@ public class PinotSegmentToAvroConverter implements PinotSegmentConverter {
             if (value instanceof Object[]) {
               record.put(field, Arrays.asList((Object[]) value));
             } else {
+              // PinotSegmentRecordReader returns byte[] instead of ByteBuffer.
+              if (value instanceof byte[]) {
+                value = ByteBuffer.wrap((byte[]) value);
+              }
               record.put(field, value);
             }
           }
