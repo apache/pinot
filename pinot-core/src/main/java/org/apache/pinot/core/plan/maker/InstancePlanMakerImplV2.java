@@ -158,7 +158,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   /**
    * Returns {@code true} if the given aggregation-only without filter QueryContext can be solved with dictionary,
    * {@code false} otherwise.
-   * <p>Aggregations supported: MIN, MAX, MINMAXRANGE, DISTINCTCOUNT
+   * <p>Aggregations supported: MIN, MAX, MIN_MAX_RANGE, DISTINCT_COUNT, SEGMENT_PARTITIONED_DISTINCT_COUNT
    */
   @VisibleForTesting
   static boolean isFitForDictionaryBasedPlan(QueryContext queryContext, IndexSegment indexSegment) {
@@ -179,8 +179,10 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       if (dictionary == null) {
         return false;
       }
-      // NOTE: DISTINCTCOUNT does not require sorted dictionary
-      if (!dictionary.isSorted() && !functionName.equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNT.name())) {
+      // TODO: Remove this check because MutableDictionary maintains min/max value
+      // NOTE: DISTINCT_COUNT and SEGMENT_PARTITIONED_DISTINCT_COUNT does not require sorted dictionary
+      if (!dictionary.isSorted() && !functionName.equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNT.name())
+          && !functionName.equalsIgnoreCase(AggregationFunctionType.SEGMENTPARTITIONEDDISTINCTCOUNT.name())) {
         return false;
       }
     }

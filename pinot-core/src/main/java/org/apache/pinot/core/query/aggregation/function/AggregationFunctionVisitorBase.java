@@ -51,6 +51,9 @@ public class AggregationFunctionVisitorBase {
   public void visit(DistinctCountBitmapMVAggregationFunction function) {
   }
 
+  public void visit(SegmentPartitionedDistinctCountAggregationFunction function) {
+  }
+
   public void visit(DistinctCountHLLAggregationFunction function) {
   }
 
@@ -106,7 +109,6 @@ public class AggregationFunctionVisitorBase {
   }
 
   public void visit(StUnionAggregationFunction function) {
-
   }
 }
 
