@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.dashboard.resources.v2;
 
+import com.google.inject.Inject;
 import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.auth.ThirdEyeAuthFilter;
 import org.apache.pinot.thirdeye.datalayer.bao.RootcauseSessionManager;
@@ -53,6 +54,7 @@ public class RootCauseSessionResource {
   private final RootcauseSessionManager sessionDAO;
   private final ObjectMapper mapper;
 
+  @Inject
   public RootCauseSessionResource(RootcauseSessionManager sessionDAO, ObjectMapper mapper) {
     this.sessionDAO = sessionDAO;
     this.mapper = mapper;

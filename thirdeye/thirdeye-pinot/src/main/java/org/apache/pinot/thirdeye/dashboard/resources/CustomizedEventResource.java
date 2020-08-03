@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.dashboard.resources;
 
+import com.google.inject.Inject;
 import org.apache.pinot.thirdeye.anomaly.events.EventType;
 import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.ResourceUtils;
@@ -50,6 +51,7 @@ public class CustomizedEventResource {
    *
    * @param eventDAO the event dao
    */
+  @Inject
   public CustomizedEventResource(EventManager eventDAO) {
     this.eventDAO = eventDAO;
   }

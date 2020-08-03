@@ -20,6 +20,7 @@
 package org.apache.pinot.thirdeye.dashboard.resources;
 
 import com.google.common.base.Preconditions;
+import com.google.inject.Inject;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -73,7 +74,9 @@ public class AnomalyFlattenResource {
   private static final int DEFAULT_THREAD_POOLS_SIZE = 5;
   private static final long DEFAULT_TIME_OUT_IN_MINUTES = 1;
 
-  public AnomalyFlattenResource(MergedAnomalyResultManager mergedAnomalyResultDAO, DatasetConfigManager datasetConfgDAO,
+  @Inject
+  public AnomalyFlattenResource(MergedAnomalyResultManager mergedAnomalyResultDAO,
+      DatasetConfigManager datasetConfgDAO,
       MetricConfigManager metricConfigDAO) {
     this.mergedAnomalyResultDAO = mergedAnomalyResultDAO;
     this.datasetConfgDAO = datasetConfgDAO;
