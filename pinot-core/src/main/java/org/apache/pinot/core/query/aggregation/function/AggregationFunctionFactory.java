@@ -45,10 +45,12 @@ public class AggregationFunctionFactory {
   public static AggregationFunction getAggregationFunction(FunctionContext function, QueryContext queryContext) {
     try {
       String upperCaseFunctionName = function.getFunctionName().toUpperCase();
+      AggregationFunctionType aggregationFunctionType =
+          AggregationFunctionType.getAggregationFunctionType(upperCaseFunctionName);
       List<ExpressionContext> arguments = function.getArguments();
       ExpressionContext firstArgument = arguments.get(0);
-      if (upperCaseFunctionName.startsWith("PERCENTILE")) {
-        String remainingFunctionName = upperCaseFunctionName.substring(10);
+      if (aggregationFunctionType.getName().toUpperCase().startsWith("PERCENTILE")) {
+        String remainingFunctionName = upperCaseFunctionName.replace("_", "").substring(10);
         int numArguments = arguments.size();
         if (numArguments == 1) {
           // Single argument percentile (e.g. Percentile99(foo), PercentileTDigest95(bar), etc.)
@@ -106,7 +108,7 @@ public class AggregationFunctionFactory {
         }
         throw new IllegalArgumentException("Invalid percentile function: " + function);
       } else {
-        switch (AggregationFunctionType.valueOf(upperCaseFunctionName)) {
+        switch (aggregationFunctionType) {
           case COUNT:
             return new CountAggregationFunction();
           case MIN:

@@ -95,15 +95,19 @@ public enum AggregationFunctionType {
         return PERCENTILEESTMV;
       } else if (remainingFunctionName.equals("TDIGESTMV") || remainingFunctionName.matches("TDIGEST\\d+MV")) {
         return PERCENTILETDIGESTMV;
-      } else {
-        throw new IllegalArgumentException("Invalid aggregation function name: " + functionName);
-      }
-    } else {
-      try {
-        return AggregationFunctionType.valueOf(upperCaseFunctionName);
-      } catch (Exception e) {
-        throw new IllegalArgumentException("Invalid aggregation function name: " + functionName);
       }
     }
+    try {
+      return AggregationFunctionType.valueOf(upperCaseFunctionName);
+    } catch (Exception e) {
+      if (upperCaseFunctionName.contains("_")) {
+        try {
+          return getAggregationFunctionType(upperCaseFunctionName.replace("_", ""));
+        } catch (Exception e2) {
+          // throw IllegalArgumentException
+        }
+      }
+    }
+    throw new IllegalArgumentException("Invalid aggregation function name: " + functionName);
   }
 }
