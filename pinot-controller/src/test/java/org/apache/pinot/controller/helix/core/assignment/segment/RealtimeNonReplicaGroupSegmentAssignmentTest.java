@@ -153,13 +153,13 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
     noRelocationInstancePartitionsMap
         .put(InstancePartitionsType.CONSUMING, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
     assertEquals(_segmentAssignment
-            .rebalanceTable(currentAssignment, noRelocationInstancePartitionsMap, new BaseConfiguration()),
+            .rebalanceTable(currentAssignment, noRelocationInstancePartitionsMap, null, new BaseConfiguration()),
         currentAssignment);
 
     // Rebalance with COMPLETED instance partitions should relocate all COMPLETED (ONLINE) segments to the COMPLETED
     // instances
     Map<String, Map<String, String>> newAssignment =
-        _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, new BaseConfiguration());
+        _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, null, new BaseConfiguration());
     assertEquals(newAssignment.size(), NUM_SEGMENTS + 1);
     for (int segmentId = 0; segmentId < NUM_SEGMENTS; segmentId++) {
       if (segmentId < NUM_SEGMENTS - NUM_PARTITIONS) {
@@ -190,27 +190,28 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
     // Rebalance with COMPLETED instance partitions including CONSUMING segments should give the same assignment
     BaseConfiguration rebalanceConfig = new BaseConfiguration();
     rebalanceConfig.setProperty(RebalanceConfigConstants.INCLUDE_CONSUMING, true);
-    assertEquals(_segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, rebalanceConfig),
+    assertEquals(_segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, null, rebalanceConfig),
         newAssignment);
 
     // Rebalance without COMPLETED instance partitions again should change the segment assignment back
     currentAssignment.put(offlineSegmentName, offlineSegmentInstanceStateMap);
-    assertEquals(
-        _segmentAssignment.rebalanceTable(newAssignment, noRelocationInstancePartitionsMap, new BaseConfiguration()),
+    assertEquals(_segmentAssignment
+            .rebalanceTable(newAssignment, noRelocationInstancePartitionsMap, null, new BaseConfiguration()),
         currentAssignment);
 
     // Bootstrap table without COMPLETED instance partitions should be the same as regular rebalance
     rebalanceConfig = new BaseConfiguration();
     rebalanceConfig.setProperty(RebalanceConfigConstants.BOOTSTRAP, true);
     assertEquals(
-        _segmentAssignment.rebalanceTable(currentAssignment, noRelocationInstancePartitionsMap, rebalanceConfig),
+        _segmentAssignment.rebalanceTable(currentAssignment, noRelocationInstancePartitionsMap, null, rebalanceConfig),
         currentAssignment);
-    assertEquals(_segmentAssignment.rebalanceTable(newAssignment, noRelocationInstancePartitionsMap, rebalanceConfig),
+    assertEquals(
+        _segmentAssignment.rebalanceTable(newAssignment, noRelocationInstancePartitionsMap, null, rebalanceConfig),
         currentAssignment);
 
     // Bootstrap table with COMPLETED instance partitions should reassign all COMPLETED segments based on their
     // alphabetical order
-    newAssignment = _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, rebalanceConfig);
+    newAssignment = _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, null, rebalanceConfig);
     int index = 0;
     for (Map.Entry<String, Map<String, String>> entry : newAssignment.entrySet()) {
       String segmentName = entry.getKey();

@@ -73,6 +73,7 @@ import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
 import org.apache.pinot.controller.helix.core.relocation.RealtimeSegmentRelocator;
 import org.apache.pinot.controller.helix.core.retention.RetentionManager;
 import org.apache.pinot.controller.helix.core.statemodel.LeadControllerResourceMasterSlaveStateModelFactory;
+import org.apache.pinot.controller.helix.core.tier.TieredStorageRelocator;
 import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.controller.util.ListenerConfigUtil;
@@ -133,6 +134,7 @@ public class ControllerStarter implements ServiceStartable {
   private RetentionManager _retentionManager;
   private SegmentStatusChecker _segmentStatusChecker;
   private PinotTaskManager _taskManager;
+  private TieredStorageRelocator _tieredStorageRelocator;
   private PeriodicTaskScheduler _periodicTaskScheduler;
   private PinotHelixTaskResourceManager _helixTaskResourceManager;
   private PinotRealtimeSegmentManager _realtimeSegmentsManager;
@@ -582,6 +584,8 @@ public class ControllerStarter implements ServiceStartable {
         new RealtimeSegmentRelocator(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
             _executorService);
     periodicTasks.add(_realtimeSegmentRelocator);
+    _tieredStorageRelocator = new TieredStorageRelocator(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics, _executorService);
+    periodicTasks.add(_tieredStorageRelocator);
 
     return periodicTasks;
   }

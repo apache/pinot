@@ -44,12 +44,14 @@ public class InstancePartitionsUtils {
   private InstancePartitionsUtils() {
   }
 
+  public static final char TYPE_SUFFIX_SEPARATOR = '_';
+
   /**
    * Returns the name of the instance partitions for the given table name (with or without type suffix) and instance
    * partitions type.
    */
-  public static String getInstancePartitionsName(String tableName, InstancePartitionsType instancePartitionsType) {
-    return instancePartitionsType.getInstancePartitionsName(TableNameBuilder.extractRawTableName(tableName));
+  public static String getInstancePartitionsName(String tableName, String instancePartitionsType) {
+    return TableNameBuilder.extractRawTableName(tableName) + TYPE_SUFFIX_SEPARATOR + instancePartitionsType;
   }
 
   /**
@@ -61,8 +63,8 @@ public class InstancePartitionsUtils {
 
     // Fetch the instance partitions from property store if it exists
     ZkHelixPropertyStore<ZNRecord> propertyStore = helixManager.getHelixPropertyStore();
-    InstancePartitions instancePartitions =
-        fetchInstancePartitions(propertyStore, getInstancePartitionsName(tableNameWithType, instancePartitionsType));
+    InstancePartitions instancePartitions = fetchInstancePartitions(propertyStore,
+        getInstancePartitionsName(tableNameWithType, instancePartitionsType.toString()));
     if (instancePartitions != null) {
       return instancePartitions;
     }
@@ -105,13 +107,24 @@ public class InstancePartitionsUtils {
       default:
         throw new IllegalStateException();
     }
+    return computeDefaultInstancePartitionsForTag(helixManager, tableConfig.getTableName(),
+        instancePartitionsType.toString(), serverTag);
+  }
+
+  /**
+   * Computes the default instance partitions using the given serverTag.
+   * Sort all qualified instances and rotate the list based on the table name to prevent creating hotspot servers.
+   * <p>Choose both enabled and disabled instances with the server tag as the qualified instances to avoid unexpected
+   * data shuffling when instances get disabled.
+   */
+  public static InstancePartitions computeDefaultInstancePartitionsForTag(HelixManager helixManager,
+      String tableNameWithType, String instancePartitionsType, String serverTag) {
     List<String> instances = HelixHelper.getInstancesWithTag(helixManager, serverTag);
     int numInstances = instances.size();
     Preconditions.checkState(numInstances > 0, "No instance found with tag: %s", serverTag);
 
     // Sort the instances and rotate the list based on the table name
     instances.sort(null);
-    String tableNameWithType = tableConfig.getTableName();
     Collections.rotate(instances, -(Math.abs(tableNameWithType.hashCode()) % numInstances));
     InstancePartitions instancePartitions =
         new InstancePartitions(getInstancePartitionsName(tableNameWithType, instancePartitionsType));

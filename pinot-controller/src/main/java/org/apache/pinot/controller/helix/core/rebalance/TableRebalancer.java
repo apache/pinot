@@ -20,9 +20,12 @@ package org.apache.pinot.controller.helix.core.rebalance;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 import org.I0Itec.zkclient.exception.ZkBadVersionException;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.AccessOption;
@@ -35,6 +38,9 @@ import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.tier.PinotServerTierStorage;
+import org.apache.pinot.common.tier.Tier;
+import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
@@ -167,6 +173,23 @@ public class TableRebalancer {
 
     LOGGER.info("Fetching/computing instance partitions, reassigning instances if configured for table: {}",
         tableNameWithType);
+
+    // get instancePartitions for tiers
+    Map<String, InstancePartitions> tierToInstancePartitionMap = null;
+    if (InstanceAssignmentConfigUtils.shouldRelocateToTiers(tableConfig)) {
+      // get tiers with storageType = "pinotServer". This is the only type available right now.
+      // Other types should be treated differently
+      List<Tier> tiers = tableConfig.getTierConfigsList().stream()
+          .filter(t -> TierFactory.PINOT_SERVER_STORAGE_TYPE.equals(t.getStorageType()))
+          .map(t -> TierFactory.getTier(t, _helixManager)).collect(Collectors.toList());
+      tierToInstancePartitionMap = new HashMap<>();
+      for (Tier tier : tiers) {
+        LOGGER.info("Fetching/computing instance partitions for tier: {} of table: {}", tier.getName(),
+            tableNameWithType);
+        tierToInstancePartitionMap.put(tier.getName(), getInstancePartitionsForTier(tier, tableNameWithType));
+      }
+    }
+
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
     try {
       if (tableConfig.getTableType() == TableType.OFFLINE) {
@@ -186,8 +209,8 @@ public class TableRebalancer {
               "COMPLETED segments should not be relocated, skipping fetching/computing COMPLETED instance partitions for table: {}",
               tableNameWithType);
           if (!dryRun) {
-            String instancePartitionsName =
-                InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, InstancePartitionsType.COMPLETED);
+            String instancePartitionsName = InstancePartitionsUtils
+                .getInstancePartitionsName(tableNameWithType, InstancePartitionsType.COMPLETED.toString());
             LOGGER.info("Removing instance partitions: {} from ZK if it exists", instancePartitionsName);
             InstancePartitionsUtils
                 .removeInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitionsName);
@@ -207,7 +230,8 @@ public class TableRebalancer {
     Map<String, Map<String, String>> currentAssignment = currentIdealState.getRecord().getMapFields();
     Map<String, Map<String, String>> targetAssignment;
     try {
-      targetAssignment = segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, rebalanceConfig);
+      targetAssignment = segmentAssignment
+          .rebalanceTable(currentAssignment, instancePartitionsMap, tierToInstancePartitionMap, rebalanceConfig);
     } catch (Exception e) {
       LOGGER.warn("Caught exception while calculating target assignment for table: {}, aborting the rebalance",
           tableNameWithType, e);
@@ -266,8 +290,8 @@ public class TableRebalancer {
             Preconditions.checkState(idealState != null, "Failed to find the IdealState");
             currentIdealState = idealState;
             currentAssignment = currentIdealState.getRecord().getMapFields();
-            targetAssignment =
-                segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, rebalanceConfig);
+            targetAssignment = segmentAssignment
+                .rebalanceTable(currentAssignment, instancePartitionsMap, tierToInstancePartitionMap, rebalanceConfig);
           } catch (Exception e1) {
             LOGGER.warn(
                 "Caught exception while re-calculating the target assignment for table: {}, aborting the rebalance",
@@ -330,8 +354,8 @@ public class TableRebalancer {
         try {
           currentIdealState = idealState;
           currentAssignment = currentIdealState.getRecord().getMapFields();
-          targetAssignment =
-              segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, rebalanceConfig);
+          targetAssignment = segmentAssignment
+              .rebalanceTable(currentAssignment, instancePartitionsMap, tierToInstancePartitionMap, rebalanceConfig);
           expectedVersion = currentIdealState.getRecord().getVersion();
         } catch (Exception e) {
           LOGGER
@@ -420,6 +444,18 @@ public class TableRebalancer {
       }
       return instancePartitions;
     }
+  }
+
+  /**
+   * Creates a default instance assignment for the tier.
+   * TODO: We only support default server-tag based assignment currently.
+   *  In next iteration, we will add InstanceAssignmentConfig to the TierConfig and also support persisting of the InstancePartitions to zk.
+   *  Then we'll be able to support replica group assignment while creating InstancePartitions for tiers
+   */
+  private InstancePartitions getInstancePartitionsForTier(Tier tier, String tableNameWithType) {
+    PinotServerTierStorage storage = (PinotServerTierStorage) tier.getStorage();
+    return InstancePartitionsUtils
+        .computeDefaultInstancePartitionsForTag(_helixManager, tableNameWithType, tier.getName(), storage.getTag());
   }
 
   private IdealState waitForExternalViewToConverge(String tableNameWithType, boolean bestEfforts)

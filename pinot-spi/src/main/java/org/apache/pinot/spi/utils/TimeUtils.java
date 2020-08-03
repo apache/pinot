@@ -179,4 +179,16 @@ public class TimeUtils {
     }
     return periodStr;
   }
+
+  /**
+   * Checks if the given period string is valid i.e. has format like 30h, 15d, 10m
+   */
+  public static boolean isPeriodValid(String timeStr) {
+    try {
+      PERIOD_FORMATTER.parsePeriod(timeStr);
+      return true;
+    } catch (Exception e) {
+      return false;
+    }
+  }
 }

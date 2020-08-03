@@ -86,6 +86,8 @@ public class ControllerConf extends PinotConfiguration {
     // separate interval
     public static final String SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS =
         "controller.segment.level.validation.intervalInSeconds";
+    public static final String TIERED_STORAGE_RELOCATOR_FREQUENCY_IN_SECONDS =
+        "controller.tiered.storage.relocator.frequencyInSeconds";
 
     // Initial delays
     public static final String STATUS_CHECKER_INITIAL_DELAY_IN_SECONDS =
@@ -96,6 +98,8 @@ public class ControllerConf extends PinotConfiguration {
         "controller.offlineSegmentIntervalChecker.initialDelayInSeconds";
     public static final String REALTIME_SEGMENT_RELOCATION_INITIAL_DELAY_IN_SECONDS =
         "controller.realtimeSegmentRelocation.initialDelayInSeconds";
+    public static final String TIERED_STORAGE_RELOCATOR_INITIAL_DELAY_IN_SECONDS =
+        "controller.tieredStorageRelocator.initialDelayInSeconds";
 
     public static final int MIN_INITIAL_DELAY_IN_SECONDS = 120;
     public static final int MAX_INITIAL_DELAY_IN_SECONDS = 300;
@@ -116,6 +120,7 @@ public class ControllerConf extends PinotConfiguration {
     private static final int DEFAULT_TASK_MANAGER_FREQUENCY_IN_SECONDS = -1; // Disabled
     private static final String DEFAULT_REALTIME_SEGMENT_RELOCATOR_FREQUENCY = "1h"; // 1 hour
     private static final int DEFAULT_SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS = 24 * 60 * 60;
+    private static final int DEFAULT_TIERED_STORAGE_RELOCATOR_FREQUENCY_IN_SECONDS = 60 * 60;
   }
 
   private static final String SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = "server.request.timeoutSeconds";
@@ -460,6 +465,11 @@ public class ControllerConf extends PinotConfiguration {
         Integer.toString(statusCheckerWaitForPushTimeInSeconds));
   }
 
+  public int getTieredStorageRelocatorFrequencyInSeconds() {
+    return getProperty(ControllerPeriodicTasksConf.TIERED_STORAGE_RELOCATOR_FREQUENCY_IN_SECONDS,
+        ControllerPeriodicTasksConf.DEFAULT_TIERED_STORAGE_RELOCATOR_FREQUENCY_IN_SECONDS);
+  }
+
   public long getExternalViewOnlineToOfflineTimeout() {
     return getProperty(EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT, DEFAULT_EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT_MILLIS);
   }
@@ -576,6 +586,11 @@ public class ControllerConf extends PinotConfiguration {
 
   public long getPinotTaskManagerInitialDelaySeconds() {
     return getPeriodicTaskInitialDelayInSeconds();
+  }
+
+  public long getTieredStorageRelocatorInitialDelayInSeconds() {
+    return getProperty(ControllerPeriodicTasksConf.TIERED_STORAGE_RELOCATOR_INITIAL_DELAY_IN_SECONDS,
+        ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
   }
 
   public long getPeriodicTaskInitialDelayInSeconds() {

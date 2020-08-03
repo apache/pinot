@@ -37,6 +37,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableCustomConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
+import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
@@ -130,9 +131,16 @@ public class TableConfigUtils {
       ingestionConfig = JsonUtils.stringToObject(ingestionConfigString, IngestionConfig.class);
     }
 
+    List<TierConfig> tierConfigList = null;
+    String tierConfigListString = simpleFields.get(TableConfig.TIER_CONFIGS_LIST_KEY);
+    if (tierConfigListString != null) {
+      tierConfigList = JsonUtils.stringToObject(tierConfigListString, new TypeReference<List<TierConfig>>() {
+      });
+    }
+
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
         quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList, upsertConfig,
-        ingestionConfig);
+        ingestionConfig, tierConfigList);
   }
 
   public static ZNRecord toZNRecord(TableConfig tableConfig)
@@ -181,6 +189,10 @@ public class TableConfigUtils {
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     if (ingestionConfig != null) {
       simpleFields.put(TableConfig.INGESTION_CONFIG_KEY, JsonUtils.objectToString(ingestionConfig));
+    }
+    List<TierConfig> tierConfigList = tableConfig.getTierConfigsList();
+    if (tierConfigList != null) {
+      simpleFields.put(TableConfig.TIER_CONFIGS_LIST_KEY, JsonUtils.objectToString(tierConfigList));
     }
 
     ZNRecord znRecord = new ZNRecord(tableConfig.getTableName());
