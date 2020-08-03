@@ -35,7 +35,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.broker.requesthandler.PinotQueryRequest;
+import org.apache.pinot.core.requesthandler.PinotQueryRequest;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -335,13 +335,13 @@ public class HybridClusterIntegrationTestCommandLineRunner {
 
       // Start the Pinot cluster
       Map<String, Object> properties = getDefaultControllerConfiguration();
-      
+
       properties.put(ControllerConf.CONTROLLER_PORT, CONTROLLER_PORT);
       properties.put(ControllerConf.ZK_STR, ZK_STR);
       properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
-      
+
       startController(properties);
-      
+
       startBroker(BROKER_PORT, ZK_STR);
       startServers(2, SERVER_BASE_ADMIN_API_PORT, SERVER_BASE_NETTY_PORT, ZK_STR);
 

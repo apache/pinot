@@ -16,30 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.broker.requesthandler;
+package org.apache.pinot.core.requesthandler;
 
-public class PinotQueryRequest {
-  private String queryFormat;
-  private String query;
+import org.apache.pinot.common.utils.request.FilterQueryTree;
 
-  public PinotQueryRequest(String queryFormat, String query) {
-    this.queryFormat = queryFormat;
-    this.query = query;
-  }
 
-  public String getQueryFormat() {
-    return queryFormat;
-  }
+/**
+ * Interface for optimizations that can be done on the FilterQueryTree of a query.
+ */
+public abstract class FilterQueryTreeOptimizer {
+  private final String _optimizationName = OptimizationFlags.optimizationName(this.getClass());
 
-  public void setQueryFormat(String queryFormat) {
-    this.queryFormat = queryFormat;
-  }
+  public abstract FilterQueryTree optimize(FilterQueryOptimizerRequest request);
 
-  public String getQuery() {
-    return query;
-  }
-
-  public void setQuery(String query) {
-    this.query = query;
+  public String getOptimizationName() {
+    return _optimizationName;
   }
 }
