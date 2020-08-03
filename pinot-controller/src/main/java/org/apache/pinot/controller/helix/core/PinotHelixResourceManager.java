@@ -27,6 +27,7 @@ import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -204,7 +205,15 @@ public class PinotHelixResourceManager {
     addInstanceGroupTagIfNeeded();
     _segmentDeletionManager = new SegmentDeletionManager(_dataDir, _helixAdmin, _helixClusterName, _propertyStore);
     ZKMetadataProvider.setClusterTenantIsolationEnabled(_propertyStore, _isSingleTenantCluster);
-    _tableCache = new TableCache(_propertyStore);
+
+    // Initialize TableCache
+    HelixConfigScope helixConfigScope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(_helixClusterName).build();
+    Map<String, String> configs = _helixAdmin.getConfig(helixConfigScope,
+        Arrays.asList(Helix.ENABLE_CASE_INSENSITIVE_KEY, Helix.DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY));
+    boolean caseInsensitive = Boolean.parseBoolean(configs.get(Helix.ENABLE_CASE_INSENSITIVE_KEY)) || Boolean
+        .parseBoolean(configs.get(Helix.DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY));
+    _tableCache = new TableCache(_propertyStore, caseInsensitive);
   }
 
   /**
@@ -467,28 +476,23 @@ public class PinotHelixResourceManager {
    * @return tableName actually defined in Pinot (matches case) and exists ,else, return the input value
    */
   public String getActualTableName(String tableName) {
-    return _tableCache.getActualTableName(tableName);
+    if (_tableCache.isCaseInsensitive()) {
+      String actualTableName = _tableCache.getActualTableName(tableName);
+      return actualTableName != null ? actualTableName : tableName;
+    } else {
+      return tableName;
+    }
   }
 
   /**
-   *  Given a column name in any case, returns the column name as defined in Schema
-   *  If table has no schema, it just returns the input value
-   * @param tableName
-   * @param columnName
-   * @return
-   */
-  public String getActualColumnName(String tableName, String columnName) {
-    return _tableCache.getActualColumnName(tableName, columnName);
-  }
-
-  /**
-   * Given a table name in any case, returns crypter class name defined in table config
-   * @param tableName table name in any case
+   * Returns the crypter class name defined in the table config for the given table.
+   *
+   * @param tableNameWithType Table name with type suffix
    * @return crypter class name
    */
-  public String getCrypterClassNameFromTableConfig(String tableName) {
-    TableConfig tableConfig = _tableCache.getTableConfig(tableName);
-    Preconditions.checkNotNull(tableConfig, "Table config is not available for table '%s'", tableName);
+  public String getCrypterClassNameFromTableConfig(String tableNameWithType) {
+    TableConfig tableConfig = _tableCache.getTableConfig(tableNameWithType);
+    Preconditions.checkNotNull(tableConfig, "Table config is not available for table '%s'", tableNameWithType);
     return tableConfig.getValidationConfig().getCrypterClassName();
   }
 
@@ -1761,8 +1765,7 @@ public class PinotHelixResourceManager {
     propToUpdate.put(Helix.QUERY_RATE_LIMIT_DISABLED, Boolean.toString("DISABLE".equals(state)));
     HelixConfigScope scope =
         new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.PARTICIPANT, _helixClusterName)
-            .forParticipant(brokerInstanceName)
-            .build();
+            .forParticipant(brokerInstanceName).build();
     _helixAdmin.setConfig(scope, propToUpdate);
   }
 
@@ -2264,10 +2267,10 @@ public class PinotHelixResourceManager {
           LineageEntry lineageEntry = segmentLineage.getLineageEntry(entryId);
 
           // Check that any segment from 'segmentsFrom' does not appear twice.
-          Preconditions.checkArgument(Collections.disjoint(lineageEntry.getSegmentsFrom(), segmentsFrom), String
-              .format("It is not allowed to merge segments that are already merged. (tableName = %s, segmentsFrom from "
-                      + "existing lineage entry = %s, requested segmentsFrom = %s)", tableNameWithType,
-                  lineageEntry.getSegmentsFrom(), segmentsFrom));
+          Preconditions.checkArgument(Collections.disjoint(lineageEntry.getSegmentsFrom(), segmentsFrom), String.format(
+              "It is not allowed to merge segments that are already merged. (tableName = %s, segmentsFrom from "
+                  + "existing lineage entry = %s, requested segmentsFrom = %s)", tableNameWithType,
+              lineageEntry.getSegmentsFrom(), segmentsFrom));
 
           // Check that merged segments name cannot be the same.
           Preconditions.checkArgument(Collections.disjoint(lineageEntry.getSegmentsTo(), segmentsTo), String.format(
