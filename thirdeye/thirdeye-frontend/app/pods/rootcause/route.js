@@ -318,7 +318,10 @@ export default Route.extend(AuthenticatedRouteMixin, {
       anomalyUrnsPredefined
     } = model;
 
-    // The metric 
+    /* 
+      To ensure that the call to search for metric template happens after getting metric id of an anomaly, 
+      we put anomalyEntity and metricTemplate under anomalyTemplateEntity
+    */
     const metricTemplate = (model.metricTemplate) ? model.metricTemplate : (anomalyTemplateEntity || {}).template;
     const anomalyEntity = (anomalyTemplateEntity || {}).entity;
 
