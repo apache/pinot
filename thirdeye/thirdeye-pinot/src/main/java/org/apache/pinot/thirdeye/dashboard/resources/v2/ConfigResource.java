@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.dashboard.resources.v2;
 
+import com.google.inject.Inject;
 import org.apache.pinot.thirdeye.config.ConfigNamespace;
 import org.apache.pinot.thirdeye.datalayer.bao.ConfigManager;
 import java.io.IOException;
@@ -44,6 +45,7 @@ public class ConfigResource {
 
   private final ConfigManager configDAO;
 
+  @Inject
   public ConfigResource(ConfigManager configDAO) {
     this.configDAO = configDAO;
   }

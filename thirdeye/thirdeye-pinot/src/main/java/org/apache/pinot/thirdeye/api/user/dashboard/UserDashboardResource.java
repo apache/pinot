@@ -21,6 +21,7 @@ package org.apache.pinot.thirdeye.api.user.dashboard;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Collections2;
+import com.google.inject.Inject;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -76,9 +77,11 @@ public class UserDashboardResource {
   private final DetectionConfigManager detectionDAO;
   private final DetectionAlertConfigManager detectionAlertDAO;
 
-
-  public UserDashboardResource(MergedAnomalyResultManager anomalyDAO, MetricConfigManager metricDAO,
-      DatasetConfigManager datasetDAO, DetectionConfigManager detectionDAO,
+  @Inject
+  public UserDashboardResource(MergedAnomalyResultManager anomalyDAO,
+      MetricConfigManager metricDAO,
+      DatasetConfigManager datasetDAO,
+      DetectionConfigManager detectionDAO,
       DetectionAlertConfigManager detectionAlertDAO) {
     this.anomalyDAO = anomalyDAO;
     this.metricDAO = metricDAO;

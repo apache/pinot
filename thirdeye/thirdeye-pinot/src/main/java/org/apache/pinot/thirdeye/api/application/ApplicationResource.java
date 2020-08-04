@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.api.application;
 
+import com.google.inject.Inject;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import java.util.ArrayList;
@@ -58,9 +59,11 @@ public class ApplicationResource {
   private final DetectionConfigManager detectionDAO;
   private final DetectionAlertConfigManager detectionAlertDAO;
 
-
-  public ApplicationResource(ApplicationManager appDAO, MergedAnomalyResultManager anomalyDAO,
-      DetectionConfigManager detectionDAO, DetectionAlertConfigManager detectionAlertDAO) {
+  @Inject
+  public ApplicationResource(ApplicationManager appDAO,
+      MergedAnomalyResultManager anomalyDAO,
+      DetectionConfigManager detectionDAO,
+      DetectionAlertConfigManager detectionAlertDAO) {
     this.appDAO = appDAO;
     this.anomalyDAO = anomalyDAO;
     this.detectionDAO = detectionDAO;

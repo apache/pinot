@@ -25,6 +25,7 @@ import static org.apache.pinot.thirdeye.dashboard.resources.ResourceUtils.ensure
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
+import com.google.inject.Inject;
 import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.common.ThirdEyeConfiguration;
 import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
@@ -98,6 +99,7 @@ public class EntityManagerResource {
   public static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final Logger LOG = LoggerFactory.getLogger(EntityManagerResource.class);
 
+  @Inject
   public EntityManagerResource(ThirdEyeConfiguration configuration) {
     this.anomalyFunctionManager = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.metricConfigManager = DAO_REGISTRY.getMetricConfigDAO();

@@ -20,6 +20,7 @@
 package org.apache.pinot.thirdeye.dashboard.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.inject.Inject;
 import org.apache.pinot.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
 import org.apache.pinot.thirdeye.api.Constants;
@@ -66,6 +67,7 @@ public class AnomalyResource {
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
+  @Inject
   public AnomalyResource(AlertFilterFactory alertFilterFactory) {
     this.anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.alertFilterFactory = alertFilterFactory;

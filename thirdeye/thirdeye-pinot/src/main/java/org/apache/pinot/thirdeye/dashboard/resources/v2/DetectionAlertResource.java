@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.dashboard.resources.v2;
 
+import com.google.inject.Inject;
 import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
@@ -44,6 +45,7 @@ import javax.ws.rs.core.MediaType;
 public class DetectionAlertResource {
   private final DetectionAlertConfigManager detectionAlertDAO;
 
+  @Inject
   public DetectionAlertResource(DetectionAlertConfigManager detectionAlertDAO) {
     this.detectionAlertDAO = detectionAlertDAO;
   }
