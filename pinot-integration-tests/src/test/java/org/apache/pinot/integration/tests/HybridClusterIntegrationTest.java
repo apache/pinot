@@ -20,7 +20,7 @@ package org.apache.pinot.integration.tests;
 
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.util.ArrayList;
+import java.net.URLEncoder;
 import java.util.List;
 import java.util.Map;
 
@@ -182,6 +182,19 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     Assert.assertNotNull(getDebugInfo("debug/routingTable/" + tableName));
     Assert.assertNotNull(getDebugInfo("debug/routingTable/" + TableNameBuilder.OFFLINE.tableNameWithType(tableName)));
     Assert.assertNotNull(getDebugInfo("debug/routingTable/" + TableNameBuilder.REALTIME.tableNameWithType(tableName)));
+  }
+
+  @Test
+  public void testBrokerDebugRoutingTableSQL()
+          throws Exception {
+    String tableName = getTableName();
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    String encodedSQL;
+    encodedSQL = URLEncoder.encode("select * from " + realtimeTableName, "UTF-8");
+    Assert.assertNotNull(getDebugInfo("debug/routingTable/sql?query=" + encodedSQL));
+    encodedSQL = URLEncoder.encode("select * from " + offlineTableName, "UTF-8");
+    Assert.assertNotNull(getDebugInfo("debug/routingTable/sql?query=" + encodedSQL));
   }
 
   @Test
