@@ -74,7 +74,7 @@ public class EntriesScannedQuantileReport extends AbstractBaseCommand implements
 
   @Override
   public String description() {
-    return "Scan  through broker log (containing time of execution, numEntriesScannedInFilter, numEntriesScannedPostFilter) and give percentile of numEntriesScannedInFilter";
+    return "Scan through broker log (containing time of execution, numEntriesScannedInFilter, numEntriesScannedPostFilter) and give percentile of numEntriesScannedInFilter";
   }
 
   @Override
