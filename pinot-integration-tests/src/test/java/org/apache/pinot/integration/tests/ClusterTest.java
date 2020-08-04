@@ -44,7 +44,7 @@ import org.apache.avro.io.DecoderFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.HttpStatus;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
-import org.apache.pinot.broker.requesthandler.PinotQueryRequest;
+import org.apache.pinot.core.requesthandler.PinotQueryRequest;
 import org.apache.pinot.common.utils.CommonConstants.Broker;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Minion;
@@ -110,7 +110,7 @@ public abstract class ClusterTest extends ControllerTest {
       properties.put(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
       PinotConfiguration configuration = new PinotConfiguration(properties);
       overrideBrokerConf(configuration);
-      
+
       HelixBrokerStarter brokerStarter =
           new HelixBrokerStarter(configuration, getHelixClusterName(), zkStr, LOCAL_HOST);
       brokerStarter.start();
@@ -120,11 +120,11 @@ public abstract class ClusterTest extends ControllerTest {
 
   public static PinotConfiguration getDefaultServerConfiguration() {
     PinotConfiguration configuration = DefaultHelixStarterServerConfig.loadDefaultServerConf();
-    
+
     configuration.setProperty(Helix.KEY_OF_SERVER_NETTY_HOST, LOCAL_HOST);
     configuration.setProperty(Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, "v3");
     configuration.setProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_QUERY_CHECK, false);
-    
+
     return configuration;
   }
 

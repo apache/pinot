@@ -21,7 +21,7 @@ package org.apache.pinot.broker.request;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.List;
-import org.apache.pinot.broker.requesthandler.BrokerRequestOptimizer;
+import org.apache.pinot.core.requesthandler.BrokerRequestOptimizer;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.SelectionSort;

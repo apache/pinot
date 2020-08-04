@@ -20,6 +20,8 @@ package org.apache.pinot.broker.requesthandler;
 
 import java.util.Collections;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.core.requesthandler.FlattenNestedPredicatesFilterQueryTreeOptimizer;
+import org.apache.pinot.core.requesthandler.OptimizationFlags;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

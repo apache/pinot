@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.broker.requesthandler;
+package org.apache.pinot.core.requesthandler;
 
 import java.util.ArrayList;
 import java.util.Iterator;
