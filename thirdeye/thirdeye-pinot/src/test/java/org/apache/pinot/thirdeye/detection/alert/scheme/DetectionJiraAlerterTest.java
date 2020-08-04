@@ -146,7 +146,7 @@ public class DetectionJiraAlerterTest {
     doNothing().when(jiraClient).addComment(any(Issue.class), anyString());
 
     Map<String, Object> expectedResponse = new HashMap<>();
-    expectedResponse.put("cubeResults", "{}");
+    expectedResponse.put("cubeResults", new HashMap<>());
     ThirdEyeRcaRestClient rcaClient = MockThirdEyeRcaRestClient.setupMockClient(expectedResponse);
     MetricAnomaliesContent metricAnomaliesContent = new MetricAnomaliesContent(rcaClient);
 

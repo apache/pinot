@@ -29,6 +29,7 @@ import java.net.URLDecoder;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.ws.rs.DefaultValue;
@@ -95,25 +96,10 @@ public class SummaryResource {
     return metricConfigDTO;
   }
 
-  @GET
-  @Path(value = "/summary/autoDimensionOrder")
-  @Produces(MediaType.APPLICATION_JSON)
-  public String buildSummary(
-      @QueryParam(METRIC_URN) String metricUrn,
-      @QueryParam("dataset") String dataset,
-      @QueryParam("metric") String metric,
-      @QueryParam(CURRENT_START) long currentStartInclusive,
-      @QueryParam(CURRENT_END) long currentEndExclusive,
-      @QueryParam(BASELINE_START) long baselineStartInclusive,
-      @QueryParam(BASELINE_END) long baselineEndExclusive,
-      @QueryParam("dimensions") String groupByDimensions,
-      @QueryParam("filters") String filterJsonPayload,
-      @QueryParam(CUBE_SUMMARY_SIZE) int summarySize,
-      @QueryParam(CUBE_DEPTH) @DefaultValue(DEFAULT_DEPTH) int depth,
-      @QueryParam(CUBE_DIM_HIERARCHIES) @DefaultValue(DEFAULT_HIERARCHIES) String hierarchiesPayload,
-      @QueryParam(CUBE_ONE_SIDE_ERROR) @DefaultValue(DEFAULT_ONE_SIDE_ERROR) boolean doOneSideError,
-      @QueryParam(CUBE_EXCLUDED_DIMENSIONS) @DefaultValue(DEFAULT_EXCLUDED_DIMENSIONS) String excludedDimensions,
-      @QueryParam(TIME_ZONE) @DefaultValue(DEFAULT_TIMEZONE_ID) String timeZone) throws Exception {
+  private SummaryResponse buildDataCubeSummary(String metricUrn, String dataset, String metric, long currentStartInclusive,
+      long currentEndExclusive, long baselineStartInclusive, long baselineEndExclusive, String groupByDimensions,
+      String filterJsonPayload, int summarySize, int depth, String hierarchiesPayload, boolean doOneSideError,
+      String excludedDimensions, String timeZone) throws Exception {
     if (summarySize < 1) summarySize = 1;
 
     String metricName = metric;
@@ -172,6 +158,57 @@ public class SummaryResource {
         response = SummaryResponse.buildNotAvailableResponse(datasetName, metricName);
       }
     }
+
+    return response;
+  }
+
+  @GET
+  @Path(value = "/summary/autoDimensionOrder/v2")
+  @Produces(MediaType.APPLICATION_JSON)
+  public Map<String, Object> getDataCubeSummary(
+      @QueryParam(METRIC_URN) String metricUrn,
+      @QueryParam("dataset") String dataset,
+      @QueryParam("metric") String metric,
+      @QueryParam(CURRENT_START) long currentStartInclusive,
+      @QueryParam(CURRENT_END) long currentEndExclusive,
+      @QueryParam(BASELINE_START) long baselineStartInclusive,
+      @QueryParam(BASELINE_END) long baselineEndExclusive,
+      @QueryParam("dimensions") String groupByDimensions,
+      @QueryParam("filters") String filterJsonPayload,
+      @QueryParam(CUBE_SUMMARY_SIZE) int summarySize,
+      @QueryParam(CUBE_DEPTH) @DefaultValue(DEFAULT_DEPTH) int depth,
+      @QueryParam(CUBE_DIM_HIERARCHIES) @DefaultValue(DEFAULT_HIERARCHIES) String hierarchiesPayload,
+      @QueryParam(CUBE_ONE_SIDE_ERROR) @DefaultValue(DEFAULT_ONE_SIDE_ERROR) boolean doOneSideError,
+      @QueryParam(CUBE_EXCLUDED_DIMENSIONS) @DefaultValue(DEFAULT_EXCLUDED_DIMENSIONS) String excludedDimensions,
+      @QueryParam(TIME_ZONE) @DefaultValue(DEFAULT_TIMEZONE_ID) String timeZone) throws Exception {
+    SummaryResponse response = buildDataCubeSummary(metricUrn, metric, dataset, currentStartInclusive, currentEndExclusive, baselineStartInclusive,
+        baselineEndExclusive, groupByDimensions, filterJsonPayload, summarySize, depth, hierarchiesPayload,
+        doOneSideError, excludedDimensions, timeZone);
+    return OBJECT_MAPPER.convertValue(response, Map.class);
+  }
+
+  @GET
+  @Path(value = "/summary/autoDimensionOrder")
+  @Produces(MediaType.APPLICATION_JSON)
+  public String buildSummary(
+      @QueryParam(METRIC_URN) String metricUrn,
+      @QueryParam("dataset") String dataset,
+      @QueryParam("metric") String metric,
+      @QueryParam(CURRENT_START) long currentStartInclusive,
+      @QueryParam(CURRENT_END) long currentEndExclusive,
+      @QueryParam(BASELINE_START) long baselineStartInclusive,
+      @QueryParam(BASELINE_END) long baselineEndExclusive,
+      @QueryParam("dimensions") String groupByDimensions,
+      @QueryParam("filters") String filterJsonPayload,
+      @QueryParam(CUBE_SUMMARY_SIZE) int summarySize,
+      @QueryParam(CUBE_DEPTH) @DefaultValue(DEFAULT_DEPTH) int depth,
+      @QueryParam(CUBE_DIM_HIERARCHIES) @DefaultValue(DEFAULT_HIERARCHIES) String hierarchiesPayload,
+      @QueryParam(CUBE_ONE_SIDE_ERROR) @DefaultValue(DEFAULT_ONE_SIDE_ERROR) boolean doOneSideError,
+      @QueryParam(CUBE_EXCLUDED_DIMENSIONS) @DefaultValue(DEFAULT_EXCLUDED_DIMENSIONS) String excludedDimensions,
+      @QueryParam(TIME_ZONE) @DefaultValue(DEFAULT_TIMEZONE_ID) String timeZone) throws Exception {
+    SummaryResponse response = buildDataCubeSummary(metricUrn, metric, dataset, currentStartInclusive, currentEndExclusive, baselineStartInclusive,
+        baselineEndExclusive, groupByDimensions, filterJsonPayload, summarySize, depth, hierarchiesPayload,
+        doOneSideError, excludedDimensions, timeZone);
     return OBJECT_MAPPER.writeValueAsString(response);
   }
 
