@@ -110,6 +110,7 @@ create table if not exists merged_anomaly_result_index (
     base_id bigint(20) not null,
     create_time timestamp,
     update_time timestamp default current_timestamp,
+    child boolean,
     version int(10)
 ) ENGINE=InnoDB;
 create index merged_anomaly_result_function_idx on merged_anomaly_result_index(function_id);
