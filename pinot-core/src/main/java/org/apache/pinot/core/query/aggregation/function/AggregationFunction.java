@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
 import java.util.Map;
+import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -30,10 +31,13 @@ import org.apache.pinot.core.query.request.context.ExpressionContext;
 
 /**
  * Interface for aggregation functions.
+ * <p>The implementation should be stateless, and can be shared among multiple segments in multiple threads. The result
+ * for each segment should be stored and passed in via the result holder.
  *
  * @param <IntermediateResult> Intermediate result generated from segment
  * @param <FinalResult> Final result used in broker response
  */
+@ThreadSafe
 @SuppressWarnings("rawtypes")
 public interface AggregationFunction<IntermediateResult, FinalResult extends Comparable> {
 
@@ -56,11 +60,6 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
    * Returns a list of input expressions needed for performing aggregation.
    */
   List<ExpressionContext> getInputExpressions();
-
-  /**
-   * Accepts an aggregation function visitor to visit.
-   */
-  void accept(AggregationFunctionVisitorBase visitor);
 
   /**
    * Returns an aggregation result holder for this function (aggregation only).

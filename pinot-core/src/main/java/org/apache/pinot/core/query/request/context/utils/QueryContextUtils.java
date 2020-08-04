@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Set;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.FilterContext;
-import org.apache.pinot.core.query.request.context.FunctionContext;
 import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
@@ -67,24 +66,8 @@ public class QueryContextUtils {
 
   /**
    * Returns {@code true} if the given query is an aggregation query, {@code false} otherwise.
-   * <p>A query is an aggregation query if there are aggregation functions in the SELECT clause or ORDER-BY clause.
    */
   public static boolean isAggregationQuery(QueryContext query) {
-    for (ExpressionContext selectExpression : query.getSelectExpressions()) {
-      FunctionContext function = selectExpression.getFunction();
-      if (function != null && function.getType() == FunctionContext.Type.AGGREGATION) {
-        return true;
-      }
-    }
-    List<OrderByExpressionContext> orderByExpressions = query.getOrderByExpressions();
-    if (orderByExpressions != null) {
-      for (OrderByExpressionContext orderByExpression : orderByExpressions) {
-        FunctionContext function = orderByExpression.getExpression().getFunction();
-        if (function != null && function.getType() == FunctionContext.Type.AGGREGATION) {
-          return true;
-        }
-      }
-    }
-    return false;
+    return query.getAggregationFunctions() != null;
   }
 }

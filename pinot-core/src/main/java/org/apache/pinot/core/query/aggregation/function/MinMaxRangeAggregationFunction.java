@@ -44,11 +44,6 @@ public class MinMaxRangeAggregationFunction extends BaseSingleInputAggregationFu
   }
 
   @Override
-  public void accept(AggregationFunctionVisitorBase visitor) {
-    visitor.visit(this);
-  }
-
-  @Override
   public AggregationResultHolder createAggregationResultHolder() {
     return new ObjectAggregationResultHolder();
   }

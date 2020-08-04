@@ -61,11 +61,6 @@ public class CountMVAggregationFunction extends CountAggregationFunction {
   }
 
   @Override
-  public void accept(AggregationFunctionVisitorBase visitor) {
-    visitor.visit(this);
-  }
-
-  @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     int[] valueArray = blockValSetMap.get(_expression).getNumMVEntries();
