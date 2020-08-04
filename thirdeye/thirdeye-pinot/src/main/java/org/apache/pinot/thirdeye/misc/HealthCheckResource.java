@@ -17,7 +17,6 @@ public class HealthCheckResource {
 
     @GET
     @Path(value = "/")
-    @Produces(MediaType.TEXT_HTML)
     public String healthCheck() {
         if (DaoProviderUtil.isDataSourceHealthy()) {
             return "I'm healthy";
