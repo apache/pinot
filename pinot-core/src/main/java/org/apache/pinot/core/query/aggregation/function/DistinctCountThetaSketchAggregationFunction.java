@@ -392,7 +392,12 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
 
     Map<String, Sketch> result = new HashMap<>();
     for (PredicateInfo predicateInfo : _predicateInfoMap.values()) {
-      result.put(predicateInfo.getStringPredicate(), unionMap.get(predicateInfo.getPredicate()).getResult());
+      Sketch sketch = unionMap.get(predicateInfo.getPredicate()).getResult();
+
+      // Skip empty sketches, as they lead to unnecessary unions (and cost performance)
+      if (!sketch.isEmpty()) {
+        result.put(predicateInfo.getStringPredicate(), sketch);
+      }
     }
     return result;
   }
@@ -406,7 +411,12 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
 
     Map<String, Sketch> result = new HashMap<>();
     for (PredicateInfo predicateInfo : _predicateInfoMap.values()) {
-      result.put(predicateInfo.getStringPredicate(), unionMap.get(predicateInfo.getPredicate()).getResult());
+      Sketch sketch = unionMap.get(predicateInfo.getPredicate()).getResult();
+
+      // Skip empty sketches, as they lead to unnecessary unions (and cost performance)
+      if (!sketch.isEmpty()) {
+        result.put(predicateInfo.getStringPredicate(), sketch);
+      }
     }
     return result;
   }
@@ -419,24 +429,32 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
       return intermediateResult1;
     }
 
-    // NOTE: Here we parse the map keys to Predicate to handle the non-standard predicate string returned from server
-    //       side for backward-compatibility.
-    // TODO: Remove the extra parsing after releasing 0.5.0
-    Map<Predicate, Union> unionMap = getDefaultUnionMap();
-    for (Map.Entry<String, Sketch> entry : intermediateResult1.entrySet()) {
-      Predicate predicate = getPredicate(entry.getKey());
-      unionMap.get(predicate).update(entry.getValue());
-    }
-    for (Map.Entry<String, Sketch> entry : intermediateResult2.entrySet()) {
-      Predicate predicate = getPredicate(entry.getKey());
-      unionMap.get(predicate).update(entry.getValue());
-    }
+    // Add sketches from intermediateResult1, merged with overlapping ones from intermediateResult2
     Map<String, Sketch> mergedResult = new HashMap<>();
-    for (Map.Entry<Predicate, Union> entry : unionMap.entrySet()) {
-      mergedResult.put(entry.getKey().toString(), entry.getValue().getResult());
+    for (Map.Entry<String, Sketch> entry : intermediateResult1.entrySet()) {
+      String predicate = entry.getKey();
+      Sketch sketch = intermediateResult2.get(predicate);
+
+      // Merge the overlapping ones
+      if (sketch != null) {
+        Union union = getSetOperationBuilder().buildUnion();
+        union.update(entry.getValue());
+        union.update(sketch);
+        mergedResult.put(predicate, union.getResult());
+      } else { // Collect the non-overlapping ones
+        mergedResult.put(predicate, entry.getValue());
+      }
     }
+
+    // Add sketches that are only in intermediateResult2
+    for (Map.Entry<String, Sketch> entry : intermediateResult2.entrySet()) {
+      // If key already present, it was already merged in the previous iteration.
+      mergedResult.putIfAbsent(entry.getKey(), entry.getValue());
+    }
+
     return mergedResult;
   }
+
 
   @Override
   public boolean isIntermediateResultComparable() {
