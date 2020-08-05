@@ -35,16 +35,24 @@ import org.apache.pinot.thirdeye.dashboard.views.ThirdEyeAdminView;
 public class AdminResource {
 
   private final DatasetConfigResource datasetConfigResource;
+  private final MetricConfigResource metricConfigResource;
 
   @Inject
   public AdminResource(
-      final DatasetConfigResource datasetConfigResource) {
+      final DatasetConfigResource datasetConfigResource,
+      final MetricConfigResource metricConfigResource) {
     this.datasetConfigResource = datasetConfigResource;
+    this.metricConfigResource = metricConfigResource;
   }
 
   @Path("dataset-config")
   public DatasetConfigResource getDatasetConfigResource() {
     return datasetConfigResource;
+  }
+
+  @Path("metric-config")
+  public MetricConfigResource getMetricConfigResource() {
+    return metricConfigResource;
   }
 
   @GET

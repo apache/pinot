@@ -44,7 +44,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Path(value = "/entityMapping")
 @Produces(MediaType.APPLICATION_JSON)
 public class EntityMappingResource {
 

@@ -33,16 +33,24 @@ import io.dropwizard.views.View;
 public class ThirdEyeResource {
 
   private final AnomalyFlattenResource anomalyFlattenResource;
+  private final EntityManagerResource entityManagerResource;
 
   @Inject
   public ThirdEyeResource(
-      final AnomalyFlattenResource anomalyFlattenResource) {
+      final AnomalyFlattenResource anomalyFlattenResource,
+      final EntityManagerResource entityManagerResource) {
     this.anomalyFlattenResource = anomalyFlattenResource;
+    this.entityManagerResource = entityManagerResource;
   }
 
   @Path("table")
   public AnomalyFlattenResource getAnomalyFlattenResource() {
     return anomalyFlattenResource;
+  }
+
+  @Path("entity")
+  public EntityManagerResource getEntityManagerResource() {
+    return entityManagerResource;
   }
 
   @GET

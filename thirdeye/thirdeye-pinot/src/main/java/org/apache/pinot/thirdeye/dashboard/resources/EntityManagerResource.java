@@ -76,7 +76,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-@Path("thirdeye/entity")
 @Produces(MediaType.APPLICATION_JSON)
 @Api(tags = {Constants.DASHBOARD_TAG})
 public class EntityManagerResource {

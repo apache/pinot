@@ -49,6 +49,7 @@ public class RootResource {
   private final DatasetAutoOnboardResource datasetAutoOnboardResource;
   private final DetectionResource detectionResource;
   private final DetectionAlertResource detectionAlertResource;
+  private final EntityMappingResource entityMappingResource;
   private final ThirdEyeResource thirdEyeResource;
   private final UserDashboardResource userDashboardResource;
   private final YamlResource yamlResource;
@@ -68,6 +69,7 @@ public class RootResource {
       final DatasetAutoOnboardResource datasetAutoOnboardResource,
       final DetectionResource detectionResource,
       final DetectionAlertResource detectionAlertResource,
+      final EntityMappingResource entityMappingResource,
       final ThirdEyeResource thirdEyeResource,
       final UserDashboardResource userDashboardResource,
       final YamlResource yamlResource) {
@@ -84,6 +86,7 @@ public class RootResource {
     this.datasetAutoOnboardResource = datasetAutoOnboardResource;
     this.detectionResource = detectionResource;
     this.detectionAlertResource = detectionAlertResource;
+    this.entityMappingResource = entityMappingResource;
     this.thirdEyeResource = thirdEyeResource;
     this.userDashboardResource = userDashboardResource;
     this.yamlResource = yamlResource;
@@ -142,6 +145,11 @@ public class RootResource {
   @Path("detection")
   public DetectionResource getDetectionResource() {
     return detectionResource;
+  }
+
+  @Path(value = "entityMapping")
+  public EntityMappingResource getEntityMappingResource() {
+    return entityMappingResource;
   }
 
   @Path("groups")

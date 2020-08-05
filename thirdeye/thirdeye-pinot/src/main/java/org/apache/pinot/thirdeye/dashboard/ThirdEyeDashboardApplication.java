@@ -124,9 +124,6 @@ public class ThirdEyeDashboardApplication
     injector = Guice.createInjector(new ThirdEyeDashboardModule(config, env, DAO_REGISTRY));
     Stream.of(
         AnomalyResource.class,
-        EntityManagerResource.class,
-        EntityMappingResource.class,
-        MetricConfigResource.class,
         OnboardDatasetMetricResource.class,
         RootCauseMetricResource.class,
         RootCauseSessionResource.class,

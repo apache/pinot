@@ -57,7 +57,6 @@ import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.util.JsonResponseUtil;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 
-@Path(value = "/thirdeye-admin/metric-config")
 @Produces(MediaType.APPLICATION_JSON)
 public class MetricConfigResource {
   private static final Logger LOG = LoggerFactory.getLogger(MetricConfigResource.class);
