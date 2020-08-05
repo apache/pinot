@@ -3,7 +3,7 @@ FROM centos:7
 ARG PINOT_BRANCH=rzp
 ARG MAVEN_VERSION=3.6.3
 ARG BASE_URL=https://apache.osuosl.org/maven/maven-3/${MAVEN_VERSION}/binaries
-ARG PINOT_GIT_URL="https://github.com/utk-spartan/incubator-pinot.git"
+ARG PINOT_GIT_URL="https://github.com/razorpay/incubator-pinot.git"
 ENV TE_HOME=/opt/thirdeye
 ENV TE_BUILD_DIR=/opt/thirdeye-build
 
