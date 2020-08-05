@@ -78,11 +78,13 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
 
     File tempDataDir = new File(new File(MINION_CONTEXT.getDataDir(), taskType), "tmp-" + UUID.randomUUID());
     Preconditions.checkState(tempDataDir.mkdirs(), "Failed to create temporary directory: %s", tempDataDir);
+    String crypterName = getTableConfig(tableNameWithType).getValidationConfig().getCrypterClassName();
+
     try {
       // Download the tarred segment file
       File tarredSegmentFile = new File(tempDataDir, "tarredSegment");
       LOGGER.info("Downloading segment from {} to {}", downloadURL, tarredSegmentFile.getAbsolutePath());
-      SegmentFetcherFactory.fetchSegmentToLocal(downloadURL, tarredSegmentFile);
+      SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(downloadURL, tarredSegmentFile, crypterName);
 
       // Un-tar the segment file
       File segmentDir = new File(tempDataDir, "segmentDir");
