@@ -24,7 +24,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -514,7 +513,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
 
   @Test
   public void testSegmentReplacement()
-      throws IOException, InterruptedException {
+      throws IOException {
     // Create broker tenant on 1 Brokers
     Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 1, 0, 0);
     PinotResourceManagerResponse response = _helixResourceManager.createBrokerTenant(brokerTenant);
@@ -614,7 +613,6 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
         SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, "s5"), "downloadUrl");
     _helixResourceManager.addNewSegment(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME,
         SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, "s6"), "downloadUrl");
-    waitForEVUpdateForSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, new HashSet<>(Arrays.asList("s5", "s6")));
 
     _helixResourceManager.endReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, lineageEntryId);
     segmentLineage =
@@ -630,8 +628,6 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     _helixResourceManager.addNewSegment(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME,
         SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, "merged2"),
         "downloadUrl");
-    waitForEVUpdateForSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME,
-        new HashSet<>(Arrays.asList("merged1", "merged2")));
 
     _helixResourceManager.endReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, lineageEntryId2);
     segmentLineage =
@@ -641,29 +637,6 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId2).getSegmentsTo(),
         Arrays.asList("merged1", "merged2"));
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId2).getState(), LineageEntryState.COMPLETED);
-  }
-
-  private void waitForEVUpdateForSegments(String tableNameWithType, Set<String> segments)
-      throws InterruptedException {
-    long endTimeMs = System.currentTimeMillis() + MAX_TIMEOUT_IN_MILLISECOND;
-    ExternalView externalView = _helixResourceManager.getTableExternalView(tableNameWithType);
-    do {
-      Set<String> onlineSegments = new HashSet<>();
-      for (String segment : segments) {
-        Map<String, String> instanceStateMap = externalView.getStateMap(segment);
-        if (instanceStateMap == null) {
-          continue;
-        } else if (instanceStateMap.containsValue(CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE)
-            || instanceStateMap.containsValue(CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING)) {
-          onlineSegments.add(segment);
-        }
-      }
-      if (onlineSegments.size() == segments.size()) {
-        break;
-      } else {
-        Thread.sleep(500L);
-      }
-    } while (System.currentTimeMillis() < endTimeMs);
   }
 
   private void untagBrokers() {

@@ -39,6 +39,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
@@ -130,6 +131,10 @@ public class PinotHelixResourceManager {
   private static final long CACHE_ENTRY_EXPIRE_TIME_HOURS = 6L;
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
   public static final String APPEND = "APPEND";
+
+  // TODO: make this configurable
+  public static final long EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS = 10 * 60_000L; // 10 minutes
+  public static final long EXTERNAL_VIEW_CHECK_INTERVAL_MS = 1_000L; // 1 second
 
   private final Map<String, Map<String, Long>> _segmentCrcMap = new HashMap<>();
   private final Map<String, Map<String, Integer>> _lastKnownSegmentMetadataVersionMap = new HashMap<>();
@@ -1770,9 +1775,9 @@ public class PinotHelixResourceManager {
         _helixZkManager.getMessagingService().send(recipientCriteria, routingTableRebuildMessage, null, -1);
     if (numMessagesSent > 0) {
       // TODO: Would be nice if we can get the name of the instances to which messages were sent
-      LOGGER.info("Sent {} table config refresh messages to brokers for table: {}", numMessagesSent, tableNameWithType);
+      LOGGER.info("Sent {} routing table rebuild messages to brokers for table: {}", numMessagesSent, tableNameWithType);
     } else {
-      LOGGER.warn("No table config refresh message sent to brokers for table: {}", tableNameWithType);
+      LOGGER.warn("No routing table rebuild message sent to brokers for table: {}", tableNameWithType);
     }
   }
 
@@ -2367,12 +2372,8 @@ public class PinotHelixResourceManager {
             "Not all segments from 'segmentsTo' are available in the table. (tableName = '%s', segmentsTo = '%s', "
                 + "segmentsFromTable = '%s')", tableNameWithType, lineageEntry.getSegmentsTo(), segmentsForTable));
 
-        // Check that all the segments from 'segmentsTo' became ONLINE in the external view
-        Set<String> onlineSegmentsFromEV = getOnlineSegmentsFromExternalView(tableNameWithType);
-        Preconditions.checkArgument(onlineSegmentsFromEV.containsAll(lineageEntry.getSegmentsTo()), String.format(
-            "Not all segments from 'segmentsTo' are ONLINE from the external view. (tableName = '%s', "
-                + "segmentsTo = '%s', segmentsFromEV = '%s')", tableNameWithType, lineageEntry.getSegmentsTo(),
-            onlineSegmentsFromEV));
+        // Check that all the segments from 'segmentsTo' become ONLINE in the external view
+        waitForSegmentsBecomeOnline(tableNameWithType, new HashSet<>(lineageEntry.getSegmentsTo()));
 
         // Update lineage entry
         LineageEntry newLineageEntry =
@@ -2404,23 +2405,37 @@ public class PinotHelixResourceManager {
         tableNameWithType, segmentLineageEntryId);
   }
 
+  private void waitForSegmentsBecomeOnline(String tableNameWithType, Set<String> segmentsToCheck)
+      throws InterruptedException, TimeoutException {
+    long endTimeMs = System.currentTimeMillis() + EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS;
+    do {
+      Set<String> onlineSegments = getOnlineSegmentsFromExternalView(tableNameWithType);
+      if (onlineSegments.containsAll(segmentsToCheck)) {
+        return;
+      }
+      Thread.sleep(EXTERNAL_VIEW_CHECK_INTERVAL_MS);
+    } while (System.currentTimeMillis() < endTimeMs);
+    throw new TimeoutException(String.format(
+        "Time out while waiting segments become ONLINE. (tableNameWithType = %s, segmentsToCheck = %s)",
+        tableNameWithType, segmentsToCheck));
+  }
+
   private Set<String> getOnlineSegmentsFromExternalView(String tableNameWithType) {
     ExternalView externalView = getTableExternalView(tableNameWithType);
-    if (externalView != null) {
-      Set<String> partitionSet = externalView.getPartitionSet();
-      Set<String> onlineSegments = new HashSet<>(HashUtil.getHashMapCapacity(partitionSet.size()));
-      for (String partition : partitionSet) {
-        Map<String, String> instanceStateMap = externalView.getStateMap(partition);
-        if (instanceStateMap.containsValue(SegmentStateModel.ONLINE) || instanceStateMap
-            .containsValue(SegmentStateModel.CONSUMING)) {
-          onlineSegments.add(partition);
-        }
+    Preconditions
+        .checkState(externalView != null, String.format("External view is null for table (%s)", tableNameWithType));
+    Map<String, Map<String, String>> segmentAssignment = externalView.getRecord().getMapFields();
+    Set<String> onlineSegments = new HashSet<>(HashUtil.getHashMapCapacity(segmentAssignment.size()));
+    for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
+      Map<String, String> instanceStateMap = entry.getValue();
+      if (instanceStateMap.containsValue(SegmentStateModel.ONLINE) || instanceStateMap
+          .containsValue(SegmentStateModel.CONSUMING)) {
+        onlineSegments.add(entry.getKey());
       }
-      return onlineSegments;
-    } else {
-      return null;
     }
+    return onlineSegments;
   }
+
   /*
    * Uncomment and use for testing on a real cluster
   public static void main(String[] args) throws Exception {
