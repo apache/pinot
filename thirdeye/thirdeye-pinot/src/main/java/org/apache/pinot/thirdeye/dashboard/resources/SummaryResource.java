@@ -64,7 +64,6 @@ import static org.apache.pinot.thirdeye.common.constants.rca.MultiDimensionalSum
 import static org.apache.pinot.thirdeye.common.constants.rca.RootCauseResourceConstants.*;
 
 
-@Path(value = "/dashboard")
 public class SummaryResource {
   private static final Logger LOG = LoggerFactory.getLogger(SummaryResource.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -163,7 +162,7 @@ public class SummaryResource {
   }
 
   @GET
-  @Path(value = "/summary/autoDimensionOrder/v2")
+  @Path("autoDimensionOrder/v2")
   @Produces(MediaType.APPLICATION_JSON)
   public Map<String, Object> getDataCubeSummary(
       @QueryParam(METRIC_URN) String metricUrn,
@@ -188,7 +187,7 @@ public class SummaryResource {
   }
 
   @GET
-  @Path(value = "/summary/autoDimensionOrder")
+  @Path("autoDimensionOrder")
   @Produces(MediaType.APPLICATION_JSON)
   public String buildSummary(
       @QueryParam(METRIC_URN) String metricUrn,
@@ -213,7 +212,7 @@ public class SummaryResource {
   }
 
   @GET
-  @Path(value = "/summary/manualDimensionOrder")
+  @Path("manualDimensionOrder")
   @Produces(MediaType.APPLICATION_JSON)
   public String buildSummaryManualDimensionOrder(
       @QueryParam(METRIC_URN) String metricUrn,
