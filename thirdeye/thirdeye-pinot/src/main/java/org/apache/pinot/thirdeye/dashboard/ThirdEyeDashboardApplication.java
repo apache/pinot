@@ -137,10 +137,7 @@ public class ThirdEyeDashboardApplication
         RootCauseSessionResource.class,
         RootCauseTemplateResource.class,
         RootResource.class,
-        SqlDataSourceResource.class,
-        ThirdEyeResource.class,
-        UserDashboardResource.class,
-        YamlResource.class
+        SqlDataSourceResource.class
     )
         .map(c -> injector.getInstance(c))
         .forEach(jersey::register);

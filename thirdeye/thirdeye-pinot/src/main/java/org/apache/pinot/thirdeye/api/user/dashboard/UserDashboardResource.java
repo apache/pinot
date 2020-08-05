@@ -64,7 +64,6 @@ import org.slf4j.LoggerFactory;
  * Endpoints for user-customized dashboards (currently alerts only)
  */
 @Api(tags = {Constants.DASHBOARD_TAG})
-@Path(value = "/userdashboard")
 @Produces(MediaType.APPLICATION_JSON)
 public class UserDashboardResource {
   protected static final Logger LOG = LoggerFactory.getLogger(UserDashboardResource.class);

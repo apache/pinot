@@ -23,10 +23,12 @@ package org.apache.pinot.thirdeye.dashboard.resources;
 import com.google.inject.Inject;
 import javax.ws.rs.Path;
 import org.apache.pinot.thirdeye.api.application.ApplicationResource;
+import org.apache.pinot.thirdeye.api.user.dashboard.UserDashboardResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.AnomaliesResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.ConfigResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.DataResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.alerts.AlertResource;
+import org.apache.pinot.thirdeye.detection.yaml.YamlResource;
 
 @Path("/")
 public class RootResource {
@@ -40,6 +42,9 @@ public class RootResource {
   private final ConfigResource configResource;
   private final DashboardResource dashboardResource;
   private final DataResource dataResource;
+  private final ThirdEyeResource thirdEyeResource;
+  private final UserDashboardResource userDashboardResource;
+  private final YamlResource yamlResource;
 
   @Inject
   public RootResource(
@@ -51,7 +56,10 @@ public class RootResource {
       final CacheResource cacheResource,
       final ConfigResource configResource,
       final DashboardResource dashboardResource,
-      final DataResource dataResource) {
+      final DataResource dataResource,
+      final ThirdEyeResource thirdEyeResource,
+      final UserDashboardResource userDashboardResource,
+      final YamlResource yamlResource) {
     this.alertResource = alertResource;
     this.adminResource = adminResource;
     this.anomaliesResource = anomaliesResource;
@@ -61,6 +69,9 @@ public class RootResource {
     this.configResource = configResource;
     this.dashboardResource = dashboardResource;
     this.dataResource = dataResource;
+    this.thirdEyeResource = thirdEyeResource;
+    this.userDashboardResource = userDashboardResource;
+    this.yamlResource = yamlResource;
   }
 
   @Path("alerts")
@@ -106,5 +117,20 @@ public class RootResource {
   @Path("thirdeye-admin")
   public AdminResource getAdminResource() {
     return adminResource;
+  }
+
+  @Path("thirdeye")
+  public ThirdEyeResource getThirdEyeResource() {
+    return thirdEyeResource;
+  }
+
+  @Path("userdashboard")
+  public UserDashboardResource getUserDashboardResource() {
+    return userDashboardResource;
+  }
+
+  @Path("yaml")
+  public YamlResource getYamlResource() {
+    return yamlResource;
   }
 }

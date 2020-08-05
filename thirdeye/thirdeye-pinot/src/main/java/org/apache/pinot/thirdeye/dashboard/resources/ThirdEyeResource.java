@@ -28,7 +28,6 @@ import org.apache.pinot.thirdeye.dashboard.views.ThirdEyeView;
 
 import io.dropwizard.views.View;
 
-@Path(value = "/thirdeye")
 @Produces(MediaType.APPLICATION_JSON)
 public class ThirdEyeResource {
 
