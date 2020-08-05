@@ -40,7 +40,6 @@ import javax.ws.rs.QueryParam;
 /**
  * Customized events resource.
  */
-@Path(value = "/events")
 @Api(tags = {Constants.RCA_TAG})
 public class CustomizedEventResource {
 

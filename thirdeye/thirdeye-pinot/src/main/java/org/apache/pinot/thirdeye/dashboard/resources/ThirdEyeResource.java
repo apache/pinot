@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.dashboard.resources;
 
+import com.google.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -30,6 +31,19 @@ import io.dropwizard.views.View;
 
 @Produces(MediaType.APPLICATION_JSON)
 public class ThirdEyeResource {
+
+  private final AnomalyFlattenResource anomalyFlattenResource;
+
+  @Inject
+  public ThirdEyeResource(
+      final AnomalyFlattenResource anomalyFlattenResource) {
+    this.anomalyFlattenResource = anomalyFlattenResource;
+  }
+
+  @Path("table")
+  public AnomalyFlattenResource getAnomalyFlattenResource() {
+    return anomalyFlattenResource;
+  }
 
   @GET
   @Path(value = "/")

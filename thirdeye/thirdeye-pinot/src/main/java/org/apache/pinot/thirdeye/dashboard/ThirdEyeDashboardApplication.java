@@ -121,10 +121,7 @@ public class ThirdEyeDashboardApplication
     final JerseyEnvironment jersey = env.jersey();
     injector = Guice.createInjector(new ThirdEyeDashboardModule(config, env, DAO_REGISTRY));
     Stream.of(
-        AnomalyFlattenResource.class,
         AnomalyResource.class,
-        CustomizedEventResource.class,
-        DatasetAutoOnboardResource.class,
         DatasetConfigResource.class,
         DetectionAlertResource.class,
         DetectionConfigurationResource.class,

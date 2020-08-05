@@ -59,7 +59,6 @@ import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
 /**
  * Provide a table combining metrics data and anomaly feedback for UI representation
  */
-@Path("thirdeye/table")
 @Api(tags = {Constants.ANOMALY_TAG})
 public class AnomalyFlattenResource {
   private final MergedAnomalyResultManager mergedAnomalyResultDAO;

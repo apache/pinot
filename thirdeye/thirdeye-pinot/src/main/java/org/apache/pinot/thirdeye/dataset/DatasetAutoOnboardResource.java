@@ -34,7 +34,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 
 
-@Path("/dataset-auto-onboard")
 @Produces(MediaType.APPLICATION_JSON)
 public class DatasetAutoOnboardResource {
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();

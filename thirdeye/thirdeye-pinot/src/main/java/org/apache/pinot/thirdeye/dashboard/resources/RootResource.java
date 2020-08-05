@@ -28,6 +28,7 @@ import org.apache.pinot.thirdeye.dashboard.resources.v2.AnomaliesResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.ConfigResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.DataResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.alerts.AlertResource;
+import org.apache.pinot.thirdeye.dataset.DatasetAutoOnboardResource;
 import org.apache.pinot.thirdeye.detection.yaml.YamlResource;
 
 @Path("/")
@@ -40,8 +41,10 @@ public class RootResource {
   private final AutoOnboardResource autoOnboardResource;
   private final CacheResource cacheResource;
   private final ConfigResource configResource;
+  private final CustomizedEventResource customizedEventResource;
   private final DashboardResource dashboardResource;
   private final DataResource dataResource;
+  private final DatasetAutoOnboardResource datasetAutoOnboardResource;
   private final ThirdEyeResource thirdEyeResource;
   private final UserDashboardResource userDashboardResource;
   private final YamlResource yamlResource;
@@ -55,8 +58,10 @@ public class RootResource {
       final AutoOnboardResource autoOnboardResource,
       final CacheResource cacheResource,
       final ConfigResource configResource,
+      final CustomizedEventResource customizedEventResource,
       final DashboardResource dashboardResource,
       final DataResource dataResource,
+      final DatasetAutoOnboardResource datasetAutoOnboardResource,
       final ThirdEyeResource thirdEyeResource,
       final UserDashboardResource userDashboardResource,
       final YamlResource yamlResource) {
@@ -67,8 +72,10 @@ public class RootResource {
     this.autoOnboardResource = autoOnboardResource;
     this.cacheResource = cacheResource;
     this.configResource = configResource;
+    this.customizedEventResource = customizedEventResource;
     this.dashboardResource = dashboardResource;
     this.dataResource = dataResource;
+    this.datasetAutoOnboardResource = datasetAutoOnboardResource;
     this.thirdEyeResource = thirdEyeResource;
     this.userDashboardResource = userDashboardResource;
     this.yamlResource = yamlResource;
@@ -87,6 +94,11 @@ public class RootResource {
   @Path("application")
   public ApplicationResource getApplicationResource() {
     return applicationResource;
+  }
+
+  @Path("events")
+  public CustomizedEventResource getCustomizedEventResource() {
+    return customizedEventResource;
   }
 
   @Path(value = "autoOnboard")
@@ -112,6 +124,11 @@ public class RootResource {
   @Path("data")
   public DataResource getDataResource() {
     return dataResource;
+  }
+
+  @Path("dataset-auto-onboard")
+  public DatasetAutoOnboardResource getDatasetAutoOnboardResource() {
+    return datasetAutoOnboardResource;
   }
 
   @Path("thirdeye-admin")
