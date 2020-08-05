@@ -300,6 +300,7 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
               getUnionMap(groupByResultHolder, groupKeyArray[i]).get(predicate).update(sketches[i]);
             }
           }
+          break;
         default:
           throw new IllegalStateException();
       }
