@@ -29,6 +29,10 @@ import 'codemirror/lib/codemirror.css';
 import 'codemirror/theme/material.css';
 import 'codemirror/mode/javascript/javascript';
 import 'codemirror/mode/sql/sql';
+import 'codemirror/addon/hint/show-hint';
+import 'codemirror/addon/hint/sql-hint';
+import 'codemirror/addon/hint/show-hint.css';
+import NativeCodeMirror from 'codemirror';
 import _ from 'lodash';
 import FormControlLabel from '@material-ui/core/FormControlLabel';
 import Switch from '@material-ui/core/Switch';
@@ -40,6 +44,7 @@ import QuerySideBar from '../components/Query/QuerySideBar';
 import TableToolbar from '../components/TableToolbar';
 import SimpleAccordion from '../components/SimpleAccordion';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
+import '../styles/styles.css';
 
 const useStyles = makeStyles((theme) => ({
   title: {
@@ -48,7 +53,11 @@ const useStyles = makeStyles((theme) => ({
   },
   rightPanel: {},
   codeMirror: {
-    '& .CodeMirror': { height: 100, border: '1px solid #BDCCD9', fontSize: '13px' },
+    '& .CodeMirror': {
+      height: 100,
+      border: '1px solid #BDCCD9',
+      fontSize: '13px',
+    },
   },
   queryOutput: {
     '& .CodeMirror': { height: 430, border: '1px solid #BDCCD9' },
@@ -74,8 +83,8 @@ const useStyles = makeStyles((theme) => ({
     marginBottom: '20px',
   },
   sqlError: {
-    whiteSpace: 'pre-wrap'
-  }
+    whiteSpace: 'pre-wrap',
+  },
 }));
 
 const jsonoptions = {
@@ -85,16 +94,19 @@ const jsonoptions = {
   gutters: ['CodeMirror-lint-markers'],
   lint: true,
   theme: 'default',
-  readOnly: true
+  readOnly: true,
 };
 
 const sqloptions = {
   lineNumbers: true,
-  mode: 'sql',
+  mode: 'text/x-sql',
   styleActiveLine: true,
-  gutters: ['CodeMirror-lint-markers'],
   lint: true,
-  theme: 'default'
+  theme: 'default',
+  indentWithTabs: true,
+  smartIndent: true,
+  lineWrapping: true,
+  extraKeys: { "'@'": 'autocomplete' },
 };
 
 const QueryPage = () => {
@@ -125,13 +137,13 @@ const QueryPage = () => {
 
   const [queryStats, setQueryStats] = useState<TableData>({
     columns: [],
-    records: []
+    records: [],
   });
 
   const [checked, setChecked] = React.useState({
     tracing: false,
     querySyntaxPQL: false,
-    showResultJSON: false
+    showResultJSON: false,
   });
 
   const [copyMsg, showCopyMsg] = React.useState(false);
@@ -162,10 +174,14 @@ const QueryPage = () => {
       });
     }
 
-    const results = await PinotMethodUtils.getQueryResults(params, url, checked);
+    const results = await PinotMethodUtils.getQueryResults(
+      params,
+      url,
+      checked
+    );
     setResultError(results.error || '');
-    setResultData(results.result || {columns: [], records: []});
-    setQueryStats(results.queryStats || {columns: [], records: []});
+    setResultData(results.result || { columns: [], records: [] });
+    setQueryStats(results.queryStats || { columns: [], records: [] });
     setOutputResult(JSON.stringify(results.data, null, 2) || '');
     setQueryLoader(false);
   };
@@ -223,6 +239,40 @@ const QueryPage = () => {
     fetchData();
   }, []);
 
+  const handleSqlHints = (cm: NativeCodeMirror.Editor) => {
+    const tableNames = [];
+    tableList.records.forEach((obj, i) => {
+      tableNames.push(obj[i]);
+    });
+    const columnNames = tableSchema.records.map((obj) => {
+      return obj[0];
+    });
+    const hintOptions = [];
+    const defaultHint = (NativeCodeMirror as any).hint.sql(cm);
+
+    Array.prototype.push.apply(hintOptions, Utils.generateCodeMirrorOptions(tableNames, 'TABLE'));
+    Array.prototype.push.apply(hintOptions, Utils.generateCodeMirrorOptions(columnNames, 'COLUMNS'));
+
+    const cur = cm.getCursor();
+    const curLine = cm.getLine(cur.line);
+    let start = cur.ch;
+    let end = start;
+    // eslint-disable-next-line no-plusplus
+    while (end < curLine.length && /[\w$]/.test(curLine.charAt(end))) ++end;
+    // eslint-disable-next-line no-plusplus
+    while (start && /[\w$]/.test(curLine.charAt(start - 1))) --start;
+    const curWord = start !== end && curLine.slice(start, end);
+    const regex = new RegExp(`^${  curWord}`, 'i');
+
+    const finalList =  (!curWord ? hintOptions : hintOptions.filter(function (item) {
+      return item.displayText.match(regex);
+    })).sort();
+
+    Array.prototype.push.apply(defaultHint.list, finalList);
+
+    return defaultHint;
+  };
+
   return fetching ? (
     <AppLoader />
   ) : (
@@ -235,13 +285,27 @@ const QueryPage = () => {
           selectedTable={selectedTable}
         />
       </Grid>
-      <Grid item xs style={{ padding: 20, backgroundColor: 'white', maxHeight: 'calc(100vh - 70px)', overflowY: 'auto' }}>
+      <Grid
+        item
+        xs
+        style={{
+          padding: 20,
+          backgroundColor: 'white',
+          maxHeight: 'calc(100vh - 70px)',
+          overflowY: 'auto',
+        }}
+      >
         <Grid container>
           <Grid item xs={12} className={classes.rightPanel}>
             <div className={classes.sqlDiv}>
               <TableToolbar name="SQL Editor" showSearchBox={false} />
               <CodeMirror
-                options={sqloptions}
+                options={{
+                  ...sqloptions,
+                  hintOptions: {
+                    hint: handleSqlHints,
+                  },
+                }}
                 value={inputQuery}
                 onChange={handleOutputDataChange}
                 className={classes.codeMirror}
@@ -281,16 +345,17 @@ const QueryPage = () => {
               </Grid>
             </Grid>
 
-            {queryLoader ?
+            {queryLoader ? (
               <AppLoader />
-            :
+            ) : (
               <>
-                {
-                  resultError ?
-                  <Alert severity="error" className={classes.sqlError}>{resultError}</Alert>
-                :
+                {resultError ? (
+                  <Alert severity="error" className={classes.sqlError}>
+                    {resultError}
+                  </Alert>
+                ) : (
                   <>
-                    {queryStats.records.length ?
+                    {queryStats.records.length ? (
                       <Grid item xs style={{ backgroundColor: 'white' }}>
                         <CustomizedTables
                           title="Query Response Stats"
@@ -299,8 +364,7 @@ const QueryPage = () => {
                           inAccordionFormat={true}
                         />
                       </Grid>
-                      : null 
-                    }
+                    ) : null}
 
                     <Grid item xs style={{ backgroundColor: 'white' }}>
                       {resultData.records.length ? (
@@ -338,7 +402,8 @@ const QueryPage = () => {
                                 icon={<FileCopyIcon fontSize="inherit" />}
                                 severity="info"
                               >
-                                Copied {resultData.records.length} rows to Clipboard
+                                Copied {resultData.records.length} rows to
+                                Clipboard
                               </Alert>
                             ) : null}
 
@@ -355,37 +420,35 @@ const QueryPage = () => {
                               className={classes.runNowBtn}
                             />
                           </Grid>
-                          {!checked.showResultJSON
-                            ?
-                              <CustomizedTables
-                                title="Query Result"
-                                data={resultData}
-                                isPagination
-                                isSticky={true}
-                                showSearchBox={true}
-                                inAccordionFormat={true}
+                          {!checked.showResultJSON ? (
+                            <CustomizedTables
+                              title="Query Result"
+                              data={resultData}
+                              isPagination
+                              isSticky={true}
+                              showSearchBox={true}
+                              inAccordionFormat={true}
+                            />
+                          ) : resultData.records.length ? (
+                            <SimpleAccordion
+                              headerTitle="Query Result (JSON Format)"
+                              showSearchBox={false}
+                            >
+                              <CodeMirror
+                                options={jsonoptions}
+                                value={outputResult}
+                                className={classes.queryOutput}
+                                autoCursor={false}
                               />
-                            :
-                            resultData.records.length ? (
-                              <SimpleAccordion
-                                headerTitle="Query Result (JSON Format)"
-                                showSearchBox={false}
-                              >
-                                <CodeMirror
-                                  options={jsonoptions}
-                                  value={outputResult}
-                                  className={classes.queryOutput}
-                                  autoCursor={false}
-                                />
-                              </SimpleAccordion>
-                            ) : null}
+                            </SimpleAccordion>
+                          ) : null}
                         </>
                       ) : null}
                     </Grid>
                   </>
-                }
+                )}
               </>
-            }
+            )}
           </Grid>
         </Grid>
       </Grid>

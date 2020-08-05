@@ -20,3 +20,64 @@
 body {
     font-family: 'Source Sans Pro', sans-serif;
 }
+
+li.CodeMirror-hint {
+  margin: 0;
+  padding: 4px 0 4px 25px;
+  border-radius: 2px;
+  white-space: pre;
+  color: black;
+  cursor: pointer;
+  position: relative;
+  line-height: 1.5;
+}
+
+li.CodeMirror-hint:before {
+  position: absolute;
+  left: 5px;
+  top: 5px;
+  border-radius: 50%;
+  font-size: 12px;
+  height: 15px;
+  width: 15px;
+  line-height: 15px;
+  text-align: center;
+  color: white;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+}
+
+li.codemirror-table.CodeMirror-hint,
+li.codemirror-column.CodeMirror-hint{
+  color: black;
+}
+
+li.codemirror-table.CodeMirror-hint > div >  span.funcText > span,
+li.codemirror-column.CodeMirror-hint > div >  span.funcText > span{
+  font-weight: bold;
+  font-size: 10px;
+}
+
+li.codemirror-table.CodeMirror-hint::before {
+  content: "T";
+  background: #2F7E89;
+}
+
+li.codemirror-column.CodeMirror-hint::before {
+  content: "C";
+  background: #05a;
+}
+
+.CodeMirror-hints {
+  padding: 4px;
+  box-shadow: 0px 0px 5px rgba(0,0,0,.2);
+  border-radius: 0px;
+  font-family: 'Source Sans Pro', sans-serif;
+  font-size: 12px;
+  border: 1px solid #eaeaea;
+  min-width: 140px;
+}
+
+li.CodeMirror-hint-active {
+  background-color: #dae2f2;
+}
