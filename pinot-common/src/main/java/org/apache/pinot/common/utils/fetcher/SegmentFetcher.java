@@ -21,7 +21,8 @@ package org.apache.pinot.common.utils.fetcher;
 import java.io.File;
 import java.net.URI;
 import java.util.List;
-import org.apache.commons.configuration.Configuration;
+
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 public interface SegmentFetcher {
@@ -29,7 +30,7 @@ public interface SegmentFetcher {
   /**
    * Initializes the segment fetcher.
    */
-  void init(Configuration config);
+  void init(PinotConfiguration config);
 
   /**
    * Fetches a segment from URI location to local.

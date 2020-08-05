@@ -18,18 +18,19 @@
  */
 package org.apache.pinot.common.utils.fetcher;
 
-import java.io.File;
-import java.net.URI;
-import java.util.Arrays;
-import java.util.List;
-import javax.ws.rs.NotSupportedException;
-import org.apache.commons.configuration.BaseConfiguration;
-import org.apache.commons.configuration.Configuration;
-import org.testng.annotations.Test;
-
 import static org.apache.pinot.common.utils.CommonConstants.HTTPS_PROTOCOL;
 import static org.apache.pinot.common.utils.CommonConstants.HTTP_PROTOCOL;
 import static org.testng.Assert.assertEquals;
+
+import java.io.File;
+import java.net.URI;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.testng.annotations.Test;
 
 
 public class SegmentFetcherFactoryTest {
@@ -48,13 +49,13 @@ public class SegmentFetcherFactoryTest {
   @Test(dependsOnMethods = "testDefaultSegmentFetcherFactory")
   public void testCustomizedSegmentFetcherFactory()
       throws Exception {
-    Configuration config = new BaseConfiguration();
-    config.addProperty("foo", "bar");
-    config.addProperty("protocols", Arrays.asList(HTTP_PROTOCOL, HTTPS_PROTOCOL, TEST_PROTOCOL, "foo"));
-    config.addProperty("http.foo", "bar");
-    config.addProperty(TEST_PROTOCOL + SegmentFetcherFactory.SEGMENT_FETCHER_CLASS_KEY_SUFFIX,
+    Map<String, Object> properties = new HashMap<>();
+    properties.put("foo", "bar");
+    properties.put("protocols", Arrays.asList(HTTP_PROTOCOL, HTTPS_PROTOCOL, TEST_PROTOCOL, "foo"));
+    properties.put("http.foo", "bar");
+    properties.put(TEST_PROTOCOL + SegmentFetcherFactory.SEGMENT_FETCHER_CLASS_KEY_SUFFIX,
         TestSegmentFetcher.class.getName());
-    SegmentFetcherFactory.init(config);
+    SegmentFetcherFactory.init(new PinotConfiguration(properties));
 
     assertEquals(SegmentFetcherFactory.getSegmentFetcher(HTTP_PROTOCOL).getClass(), HttpSegmentFetcher.class);
     assertEquals(SegmentFetcherFactory.getSegmentFetcher(HTTPS_PROTOCOL).getClass(), HttpsSegmentFetcher.class);
@@ -80,7 +81,7 @@ public class SegmentFetcherFactoryTest {
     private int _fetchFileToLocalCalled = 0;
 
     @Override
-    public void init(Configuration config) {
+    public void init(PinotConfiguration config) {
       _initCalled++;
     }
 

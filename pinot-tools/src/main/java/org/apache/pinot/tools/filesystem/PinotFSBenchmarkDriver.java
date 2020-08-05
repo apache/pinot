@@ -18,24 +18,23 @@
  */
 package org.apache.pinot.tools.filesystem;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.security.MessageDigest;
+
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
-import org.apache.pinot.spi.plugin.PluginManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Preconditions;
 
 
 public class PinotFSBenchmarkDriver {
@@ -56,7 +55,7 @@ public class PinotFSBenchmarkDriver {
   public PinotFSBenchmarkDriver(String mode, String configFilePath, String baseDirectoryUri, String localTempDir,
       Integer numSegmentsForListFilesTest, Integer dataSizeInMBsForCopyTest, Integer numOps) throws ConfigurationException {
     Configuration configuration = new PropertiesConfiguration(new File(configFilePath));
-    PinotFSFactory.init(configuration);
+    PinotFSFactory.init(new PinotConfiguration(configuration));
     _mode = mode;
     _baseDirectoryUri = URI.create(baseDirectoryUri);
     _pinotFS = PinotFSFactory.create(_baseDirectoryUri.getScheme());

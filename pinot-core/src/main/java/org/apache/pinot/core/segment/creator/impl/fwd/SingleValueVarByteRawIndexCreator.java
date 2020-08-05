@@ -22,17 +22,23 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
-import org.apache.pinot.core.io.writer.impl.v1.BaseChunkSingleValueWriter;
-import org.apache.pinot.core.io.writer.impl.v1.VarByteChunkSingleValueWriter;
-import org.apache.pinot.core.segment.creator.BaseSingleValueRawIndexCreator;
+import org.apache.pinot.core.io.writer.impl.BaseChunkSVForwardIndexWriter;
+import org.apache.pinot.core.io.writer.impl.VarByteChunkSVForwardIndexWriter;
+import org.apache.pinot.core.segment.creator.ForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-public class SingleValueVarByteRawIndexCreator extends BaseSingleValueRawIndexCreator {
+/**
+ * Forward index creator for raw (non-dictionary-encoded) single-value column of variable length data type (STRING,
+ * BYTES).
+ */
+public class SingleValueVarByteRawIndexCreator implements ForwardIndexCreator {
   private static final int DEFAULT_NUM_DOCS_PER_CHUNK = 1000;
   private static final int TARGET_MAX_CHUNK_SIZE = 1024 * 1024;
 
-  private final VarByteChunkSingleValueWriter _indexWriter;
+  private final VarByteChunkSVForwardIndexWriter _indexWriter;
+  private final DataType _valueType;
 
   /**
    * Create a var-byte raw index creator for the given column
@@ -40,14 +46,15 @@ public class SingleValueVarByteRawIndexCreator extends BaseSingleValueRawIndexCr
    * @param compressionType Type of compression to use
    * @param column Name of column to index
    * @param totalDocs Total number of documents to index
+   * @param valueType Type of the values
    * @param maxLength length of longest entry (in bytes)
    * @throws IOException
    */
   public SingleValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressorFactory.CompressionType compressionType,
-      String column, int totalDocs, int maxLength)
+      String column, int totalDocs, DataType valueType, int maxLength)
       throws IOException {
-    this(baseIndexDir, compressionType, column, totalDocs, maxLength, false,
-        BaseChunkSingleValueWriter.DEFAULT_VERSION);
+    this(baseIndexDir, compressionType, column, totalDocs, valueType, maxLength, false,
+        BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
   }
 
   /**
@@ -56,46 +63,51 @@ public class SingleValueVarByteRawIndexCreator extends BaseSingleValueRawIndexCr
    * @param compressionType Type of compression to use
    * @param column Name of column to index
    * @param totalDocs Total number of documents to index
+   * @param valueType Type of the values
    * @param maxLength length of longest entry (in bytes)
    * @param deriveNumDocsPerChunk true if writer should auto-derive the number of rows per chunk
    * @param writerVersion writer format version
    * @throws IOException
    */
   public SingleValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressorFactory.CompressionType compressionType,
-      String column, int totalDocs, int maxLength, boolean deriveNumDocsPerChunk, int writerVersion)
+      String column, int totalDocs, DataType valueType, int maxLength, boolean deriveNumDocsPerChunk, int writerVersion)
       throws IOException {
     File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
     int numDocsPerChunk = deriveNumDocsPerChunk ? getNumDocsPerChunk(maxLength) : DEFAULT_NUM_DOCS_PER_CHUNK;
-    _indexWriter =
-        new VarByteChunkSingleValueWriter(file, compressionType, totalDocs, numDocsPerChunk, maxLength, writerVersion);
+    _indexWriter = new VarByteChunkSVForwardIndexWriter(file, compressionType, totalDocs, numDocsPerChunk, maxLength,
+        writerVersion);
+    _valueType = valueType;
   }
 
   @VisibleForTesting
   public static int getNumDocsPerChunk(int lengthOfLongestEntry) {
-    int overheadPerEntry = lengthOfLongestEntry + VarByteChunkSingleValueWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
+    int overheadPerEntry = lengthOfLongestEntry + VarByteChunkSVForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
     return Math.max(TARGET_MAX_CHUNK_SIZE / overheadPerEntry, 1);
   }
 
   @Override
-  public void index(int docId, String valueToIndex) {
-    _indexWriter.setString(docId, valueToIndex);
+  public boolean isDictionaryEncoded() {
+    return false;
   }
 
   @Override
-  public void index(int docId, byte[] valueToIndex) {
-    _indexWriter.setBytes(docId, valueToIndex);
+  public boolean isSingleValue() {
+    return true;
   }
 
   @Override
-  public void index(int docId, Object valueToIndex) {
-    if (valueToIndex instanceof String) {
-      _indexWriter.setString(docId, (String) valueToIndex);
-    } else if (valueToIndex instanceof byte[]) {
-      _indexWriter.setBytes(docId, (byte[]) valueToIndex);
-    } else {
-      throw new IllegalArgumentException(
-          "Illegal data type for variable length indexing: " + valueToIndex.getClass().getName());
-    }
+  public DataType getValueType() {
+    return _valueType;
+  }
+
+  @Override
+  public void putString(String value) {
+    _indexWriter.putString(value);
+  }
+
+  @Override
+  public void putBytes(byte[] value) {
+    _indexWriter.putBytes(value);
   }
 
   @Override

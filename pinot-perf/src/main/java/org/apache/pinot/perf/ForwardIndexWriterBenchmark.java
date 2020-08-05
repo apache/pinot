@@ -25,7 +25,7 @@ import java.io.FileReader;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.io.IOUtils;
-import org.apache.pinot.core.io.writer.impl.v1.FixedBitMultiValueWriter;
+import org.apache.pinot.core.io.writer.impl.FixedBitMVForwardIndexWriter;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -61,11 +61,11 @@ public class ForwardIndexWriterBenchmark {
     int bitMapSize = 0;
     File outputFile = new File("output.mv.fwd");
 
-    FixedBitMultiValueWriter fixedBitSkipListSCMVWriter =
-        new FixedBitMultiValueWriter(outputFile, totalDocs, totalNumValues, maxBitsNeeded);
+    FixedBitMVForwardIndexWriter fixedBitSkipListSCMVWriter =
+        new FixedBitMVForwardIndexWriter(outputFile, totalDocs, totalNumValues, maxBitsNeeded);
 
     for (int i = 0; i < totalDocs; i++) {
-      fixedBitSkipListSCMVWriter.setIntArray(i, data[i]);
+      fixedBitSkipListSCMVWriter.putDictIds(data[i]);
       if (i % size == size - 1) {
         MutableRoaringBitmap rr1 = MutableRoaringBitmap.bitmapOf(offsets);
         ByteArrayOutputStream bos = new ByteArrayOutputStream();

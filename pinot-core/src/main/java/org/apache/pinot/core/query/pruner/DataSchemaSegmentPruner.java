@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.query.pruner;
 
-import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
@@ -30,7 +30,7 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 public class DataSchemaSegmentPruner implements SegmentPruner {
 
   @Override
-  public void init(Configuration config) {
+  public void init(PinotConfiguration config) {
   }
 
   @Override

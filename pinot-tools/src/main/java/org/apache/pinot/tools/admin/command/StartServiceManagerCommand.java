@@ -18,13 +18,16 @@
  */
 package org.apache.pinot.tools.admin.command;
 
+import static org.apache.pinot.common.utils.CommonConstants.Helix.PINOT_SERVICE_ROLE;
+
 import java.io.File;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import org.apache.commons.configuration.Configuration;
+import java.util.Map;
+
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.services.ServiceRole;
@@ -36,8 +39,6 @@ import org.kohsuke.args4j.spi.StringArrayOptionHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.common.utils.CommonConstants.Helix.PINOT_SERVICE_ROLE;
-
 
 /**
  * Class to implement StartPinotService command.
@@ -45,7 +46,7 @@ import static org.apache.pinot.common.utils.CommonConstants.Helix.PINOT_SERVICE_
  */
 public class StartServiceManagerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartServiceManagerCommand.class);
-  private final List<Configuration> _bootstrapConfigurations = new ArrayList<>();
+  private final List<Map<String, Object>> _bootstrapConfigurations = new ArrayList<>();
   private final String[] BOOTSTRAP_SERVICES = new String[]{"CONTROLLER", "BROKER", "SERVER"};
 
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
@@ -161,8 +162,8 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
           addBootstrapService(serviceRole, getDefaultConfig(serviceRole));
         }
       }
-      for (Configuration conf : _bootstrapConfigurations) {
-        startPinotService(conf);
+      for (Map<String, Object> properties : _bootstrapConfigurations) {
+        startPinotService(properties);
       }
       String pidFile = ".pinotAdminService-" + System.currentTimeMillis() + ".pid";
       savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
@@ -174,7 +175,7 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
     }
   }
 
-  private Configuration getDefaultConfig(ServiceRole serviceRole)
+  private Map<String, Object> getDefaultConfig(ServiceRole serviceRole)
       throws SocketException, UnknownHostException {
     switch (serviceRole) {
       case CONTROLLER:
@@ -190,13 +191,13 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
     }
   }
 
-  private void startPinotService(Configuration conf) {
-    startPinotService(ServiceRole.valueOf(conf.getString(PINOT_SERVICE_ROLE)), conf);
+  private void startPinotService(Map<String, Object> properties) {
+    startPinotService(ServiceRole.valueOf(properties.get(PINOT_SERVICE_ROLE).toString()), properties);
   }
 
-  public boolean startPinotService(ServiceRole role, Configuration conf) {
+  public boolean startPinotService(ServiceRole role, Map<String, Object> properties) {
     try {
-      String instanceId = _pinotServiceManager.startRole(role, conf);
+      String instanceId = _pinotServiceManager.startRole(role, properties);
       LOGGER.info("Started Pinot [{}] Instance [{}].", role, instanceId);
     } catch (Exception e) {
       LOGGER.error(String.format("Failed to start a [ %s ] Service", role), e);
@@ -205,9 +206,11 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
     return true;
   }
 
-  public StartServiceManagerCommand addBootstrapService(ServiceRole role, Configuration configuration) {
-    configuration.addProperty(PINOT_SERVICE_ROLE, role.toString());
-    _bootstrapConfigurations.add(configuration);
+  public StartServiceManagerCommand addBootstrapService(ServiceRole role, Map<String, Object> properties) {
+    properties.put(PINOT_SERVICE_ROLE, role.toString());
+    
+    _bootstrapConfigurations.add(properties);
+    
     return this;
   }
 }

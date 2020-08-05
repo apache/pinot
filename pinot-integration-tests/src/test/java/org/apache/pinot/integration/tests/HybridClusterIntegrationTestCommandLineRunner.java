@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.integration.tests;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.base.Preconditions;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -27,12 +25,15 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+
 import javax.annotation.Nullable;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.broker.requesthandler.PinotQueryRequest;
 import org.apache.pinot.common.segment.ReadMode;
@@ -49,6 +50,9 @@ import org.testng.TestNG;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.base.Preconditions;
 
 
 /**
@@ -330,11 +334,14 @@ public class HybridClusterIntegrationTestCommandLineRunner {
       startKafka();
 
       // Start the Pinot cluster
-      ControllerConf config = getDefaultControllerConfiguration();
-      config.setControllerPort(Integer.toString(CONTROLLER_PORT));
-      config.setZkStr(ZK_STR);
-      config.setTenantIsolationEnabled(false);
-      startController(config);
+      Map<String, Object> properties = getDefaultControllerConfiguration();
+      
+      properties.put(ControllerConf.CONTROLLER_PORT, CONTROLLER_PORT);
+      properties.put(ControllerConf.ZK_STR, ZK_STR);
+      properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
+      
+      startController(properties);
+      
       startBroker(BROKER_PORT, ZK_STR);
       startServers(2, SERVER_BASE_ADMIN_API_PORT, SERVER_BASE_NETTY_PORT, ZK_STR);
 

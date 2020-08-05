@@ -19,17 +19,6 @@
 
 package org.apache.pinot.plugin.filesystem;
 
-import com.google.common.base.Strings;
-import org.apache.commons.configuration.Configuration;
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.RemoteIterator;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.pinot.spi.filesystem.PinotFS;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -37,6 +26,20 @@ import java.io.InputStream;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.filesystem.PinotFS;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Strings;
 
 /**
  * Implementation of PinotFS for the Hadoop Filesystem
@@ -57,12 +60,12 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   @Override
-  public void init(Configuration config) {
+  public void init(PinotConfiguration config) {
     try {
-      _hadoopConf = getConf(config.getString(HADOOP_CONF_PATH));
+      _hadoopConf = getConf(config.getProperty(HADOOP_CONF_PATH));
       authenticate(_hadoopConf, config);
       _hadoopFS = org.apache.hadoop.fs.FileSystem.get(_hadoopConf);
-      _hadoopFS.setWriteChecksum((config.getBoolean(WRITE_CHECKSUM, false)));
+      _hadoopFS.setWriteChecksum((config.getProperty(WRITE_CHECKSUM, false)));
       LOGGER.info("successfully initialized HadoopPinotFS");
     } catch (IOException e) {
       throw new RuntimeException("Could not initialize HadoopPinotFS", e);
@@ -234,10 +237,10 @@ public class HadoopPinotFS extends PinotFS {
     return _hadoopFS.open(path);
   }
 
-  private void authenticate(org.apache.hadoop.conf.Configuration hadoopConf,
-      org.apache.commons.configuration.Configuration configs) {
-    String principal = configs.getString(PRINCIPAL);
-    String keytab = configs.getString(KEYTAB);
+  private void authenticate(Configuration hadoopConf,
+      PinotConfiguration configs) {
+    String principal = configs.getProperty(PRINCIPAL);
+    String keytab = configs.getProperty(KEYTAB);
     if (!Strings.isNullOrEmpty(principal) && !Strings.isNullOrEmpty(keytab)) {
       UserGroupInformation.setConfiguration(hadoopConf);
       if (UserGroupInformation.isSecurityEnabled()) {

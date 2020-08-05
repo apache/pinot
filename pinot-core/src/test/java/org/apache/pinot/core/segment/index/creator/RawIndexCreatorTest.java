@@ -26,24 +26,25 @@ import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.core.data.readers.GenericRowRecordReader;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.core.segment.index.readers.forward.BaseChunkSVForwardIndexReader.ChunkReaderContext;
+import org.apache.pinot.core.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.core.segment.store.ColumnIndexType;
+import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.spi.data.readers.RecordReader;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import org.apache.pinot.core.io.reader.impl.ChunkReaderContext;
-import org.apache.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
-import org.apache.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
-import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
-import org.apache.pinot.core.segment.store.ColumnIndexType;
-import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -81,11 +82,11 @@ public class RawIndexCreatorTest {
   public void setup()
       throws Exception {
     Schema schema = new Schema();
-    schema.addField(new DimensionFieldSpec(INT_COLUMN, FieldSpec.DataType.INT, true));
-    schema.addField(new DimensionFieldSpec(LONG_COLUMN, FieldSpec.DataType.LONG, true));
-    schema.addField(new DimensionFieldSpec(FLOAT_COLUMN, FieldSpec.DataType.FLOAT, true));
-    schema.addField(new DimensionFieldSpec(DOUBLE_COLUMN, FieldSpec.DataType.DOUBLE, true));
-    schema.addField(new DimensionFieldSpec(STRING_COLUMN, FieldSpec.DataType.STRING, true));
+    schema.addField(new DimensionFieldSpec(INT_COLUMN, DataType.INT, true));
+    schema.addField(new DimensionFieldSpec(LONG_COLUMN, DataType.LONG, true));
+    schema.addField(new DimensionFieldSpec(FLOAT_COLUMN, DataType.FLOAT, true));
+    schema.addField(new DimensionFieldSpec(DOUBLE_COLUMN, DataType.DOUBLE, true));
+    schema.addField(new DimensionFieldSpec(STRING_COLUMN, DataType.STRING, true));
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
 
@@ -109,7 +110,7 @@ public class RawIndexCreatorTest {
   @Test
   public void testIntRawIndexCreator()
       throws Exception {
-    testFixedLengthRawIndexCreator(INT_COLUMN, FieldSpec.DataType.INT);
+    testFixedLengthRawIndexCreator(INT_COLUMN, DataType.INT);
   }
 
   /**
@@ -120,7 +121,7 @@ public class RawIndexCreatorTest {
   @Test
   public void testLongRawIndexCreator()
       throws Exception {
-    testFixedLengthRawIndexCreator(LONG_COLUMN, FieldSpec.DataType.LONG);
+    testFixedLengthRawIndexCreator(LONG_COLUMN, DataType.LONG);
   }
 
   /**
@@ -131,7 +132,7 @@ public class RawIndexCreatorTest {
   @Test
   public void testFloatRawIndexCreator()
       throws Exception {
-    testFixedLengthRawIndexCreator(FLOAT_COLUMN, FieldSpec.DataType.FLOAT);
+    testFixedLengthRawIndexCreator(FLOAT_COLUMN, DataType.FLOAT);
   }
 
   /**
@@ -142,7 +143,7 @@ public class RawIndexCreatorTest {
   @Test
   public void testDoubleRawIndexCreator()
       throws Exception {
-    testFixedLengthRawIndexCreator(DOUBLE_COLUMN, FieldSpec.DataType.DOUBLE);
+    testFixedLengthRawIndexCreator(DOUBLE_COLUMN, DataType.DOUBLE);
   }
 
   /**
@@ -154,15 +155,13 @@ public class RawIndexCreatorTest {
   public void testStringRawIndexCreator()
       throws Exception {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(STRING_COLUMN);
-    VarByteChunkSingleValueReader rawIndexReader = new VarByteChunkSingleValueReader(indexBuffer);
-
-    _recordReader.rewind();
-    ChunkReaderContext context = rawIndexReader.createContext();
-    for (int row = 0; row < NUM_ROWS; row++) {
-      GenericRow expectedRow = _recordReader.next();
-      Object expected = expectedRow.getValue(STRING_COLUMN);
-      Object actual = rawIndexReader.getString(row, context);
-      Assert.assertEquals(actual, expected);
+    try (VarByteChunkSVForwardIndexReader rawIndexReader = new VarByteChunkSVForwardIndexReader(indexBuffer,
+        DataType.STRING); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
+      _recordReader.rewind();
+      for (int row = 0; row < NUM_ROWS; row++) {
+        GenericRow expectedRow = _recordReader.next();
+        Assert.assertEquals(rawIndexReader.getString(row, readerContext), expectedRow.getValue(STRING_COLUMN));
+      }
     }
   }
 
@@ -173,20 +172,16 @@ public class RawIndexCreatorTest {
    * @param dataType Data type of the column
    * @throws Exception
    */
-  private void testFixedLengthRawIndexCreator(String column, FieldSpec.DataType dataType)
+  private void testFixedLengthRawIndexCreator(String column, DataType dataType)
       throws Exception {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(column);
-
-    FixedByteChunkSingleValueReader rawIndexReader = new FixedByteChunkSingleValueReader(indexBuffer);
-
-    _recordReader.rewind();
-    for (int row = 0; row < NUM_ROWS; row++) {
-      GenericRow expectedRow = _recordReader.next();
-      Object expected = expectedRow.getValue(column);
-
-      Object actual;
-      actual = readValueFromIndex(rawIndexReader, dataType, row);
-      Assert.assertEquals(actual, expected);
+    try (FixedByteChunkSVForwardIndexReader rawIndexReader = new FixedByteChunkSVForwardIndexReader(indexBuffer,
+        dataType); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
+      _recordReader.rewind();
+      for (int row = 0; row < NUM_ROWS; row++) {
+        GenericRow expectedRow = _recordReader.next();
+        Assert.assertEquals(readValueFromIndex(rawIndexReader, readerContext, row), expectedRow.getValue(column));
+      }
     }
   }
 
@@ -247,7 +242,7 @@ public class RawIndexCreatorTest {
    * @param dataType Data type for which to generate the random value
    * @return Random value for the data type
    */
-  public static Object getRandomValue(Random random, FieldSpec.DataType dataType) {
+  public static Object getRandomValue(Random random, DataType dataType) {
     switch (dataType) {
       case INT:
         return random.nextInt();
@@ -269,34 +264,24 @@ public class RawIndexCreatorTest {
    * Helper method to reader value for the given row.
    *
    * @param rawIndexReader Index reader
-   * @param dataType Data type of value to be read
-   * @param row Row to read
+   * @param readerContext Reader context
+   * @param docId Document id
    * @return Value read from index
    */
-  private Object readValueFromIndex(FixedByteChunkSingleValueReader rawIndexReader, FieldSpec.DataType dataType,
-      int row) {
-    Object actual;
-    ChunkReaderContext context = rawIndexReader.createContext();
-    switch (dataType) {
+  private Object readValueFromIndex(FixedByteChunkSVForwardIndexReader rawIndexReader, ChunkReaderContext readerContext,
+      int docId) {
+    switch (rawIndexReader.getValueType()) {
       case INT:
-        actual = rawIndexReader.getInt(row, context);
-        break;
-
+        return rawIndexReader.getInt(docId, readerContext);
       case LONG:
-        actual = rawIndexReader.getLong(row, context);
-        break;
-
+        return rawIndexReader.getLong(docId, readerContext);
       case FLOAT:
-        actual = rawIndexReader.getFloat(row, context);
-        break;
-
+        return rawIndexReader.getFloat(docId, readerContext);
       case DOUBLE:
-        actual = rawIndexReader.getDouble(row, context);
-        break;
-
+        return rawIndexReader.getDouble(docId, readerContext);
       default:
-        throw new IllegalArgumentException("Illegal data type for fixed width raw index reader: " + dataType);
+        throw new IllegalArgumentException(
+            "Illegal data type for fixed width raw index reader: " + rawIndexReader.getValueType());
     }
-    return actual;
   }
 }

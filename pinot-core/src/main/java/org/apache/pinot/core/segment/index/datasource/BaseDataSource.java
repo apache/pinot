@@ -19,35 +19,28 @@
 package org.apache.pinot.core.segment.index.datasource;
 
 import javax.annotation.Nullable;
-import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.common.DataSourceMetadata;
-import org.apache.pinot.core.io.reader.DataFileReader;
-import org.apache.pinot.core.io.reader.SingleColumnMultiValueReader;
-import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
-import org.apache.pinot.core.operator.blocks.MultiValueBlock;
-import org.apache.pinot.core.operator.blocks.SingleValueBlock;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
-import org.apache.pinot.spi.data.FieldSpec;
 
 
-public abstract class BaseDataSource extends DataSource {
+public abstract class BaseDataSource implements DataSource {
   private final DataSourceMetadata _dataSourceMetadata;
-  private final DataFileReader _forwardIndex;
+  private final ForwardIndexReader<?> _forwardIndex;
   private final Dictionary _dictionary;
-  private final InvertedIndexReader _invertedIndex;
-  private final InvertedIndexReader _rangeIndex;
+  private final InvertedIndexReader<?> _invertedIndex;
+  private final InvertedIndexReader<?> _rangeIndex;
   private final BloomFilterReader _bloomFilter;
   private final NullValueVectorReader _nullValueVector;
-  private final String _operatorName;
 
-  public BaseDataSource(DataSourceMetadata dataSourceMetadata, DataFileReader forwardIndex,
-      @Nullable Dictionary dictionary, @Nullable InvertedIndexReader invertedIndex,
-      @Nullable InvertedIndexReader rangeIndex, @Nullable BloomFilterReader bloomFilter,
-      @Nullable NullValueVectorReader nullValueVector, String operatorName) {
+  public BaseDataSource(DataSourceMetadata dataSourceMetadata, ForwardIndexReader<?> forwardIndex,
+      @Nullable Dictionary dictionary, @Nullable InvertedIndexReader<?> invertedIndex,
+      @Nullable InvertedIndexReader<?> rangeIndex, @Nullable BloomFilterReader bloomFilter,
+      @Nullable NullValueVectorReader nullValueVector) {
     _dataSourceMetadata = dataSourceMetadata;
     _forwardIndex = forwardIndex;
     _dictionary = dictionary;
@@ -55,7 +48,6 @@ public abstract class BaseDataSource extends DataSource {
     _rangeIndex = rangeIndex;
     _bloomFilter = bloomFilter;
     _nullValueVector = nullValueVector;
-    _operatorName = operatorName;
   }
 
   @Override
@@ -64,7 +56,7 @@ public abstract class BaseDataSource extends DataSource {
   }
 
   @Override
-  public DataFileReader getForwardIndex() {
+  public ForwardIndexReader<?> getForwardIndex() {
     return _forwardIndex;
   }
 
@@ -76,13 +68,13 @@ public abstract class BaseDataSource extends DataSource {
 
   @Nullable
   @Override
-  public InvertedIndexReader getInvertedIndex() {
+  public InvertedIndexReader<?> getInvertedIndex() {
     return _invertedIndex;
   }
 
   @Nullable
   @Override
-  public InvertedIndexReader getRangeIndex() {
+  public InvertedIndexReader<?> getRangeIndex() {
     return _rangeIndex;
   }
 
@@ -96,22 +88,5 @@ public abstract class BaseDataSource extends DataSource {
   @Override
   public NullValueVectorReader getNullValueVector() {
     return _nullValueVector;
-  }
-
-  @Override
-  protected Block getNextBlock() {
-    FieldSpec.DataType dataType = _dataSourceMetadata.getDataType();
-    if (_dataSourceMetadata.isSingleValue()) {
-      return new SingleValueBlock((SingleColumnSingleValueReader) _forwardIndex, _dataSourceMetadata.getNumDocs(),
-          dataType, _dictionary);
-    } else {
-      return new MultiValueBlock((SingleColumnMultiValueReader) _forwardIndex, _dataSourceMetadata.getNumDocs(),
-          _dataSourceMetadata.getMaxNumValuesPerMVEntry(), dataType, _dictionary);
-    }
-  }
-
-  @Override
-  public String getOperatorName() {
-    return _operatorName;
   }
 }

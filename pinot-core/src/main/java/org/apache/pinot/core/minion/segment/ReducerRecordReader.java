@@ -20,6 +20,7 @@ package org.apache.pinot.core.minion.segment;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -118,7 +119,8 @@ public class ReducerRecordReader implements RecordReader {
   }
 
   @Override
-  public void close() {
+  public void close()
+      throws IOException {
     _pinotSegmentRecordReader.close();
   }
 

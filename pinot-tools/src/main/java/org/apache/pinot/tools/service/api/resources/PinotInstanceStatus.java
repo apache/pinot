@@ -19,24 +19,24 @@
 package org.apache.pinot.tools.service.api.resources;
 
 import java.util.Map;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.ConfigurationConverter;
+
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.services.ServiceRole;
 
 
 public class PinotInstanceStatus {
   private final ServiceRole _serviceRole;
   private final String _instanceId;
-  private final Map _config;
+  private final Map<String, Object> _config;
   private final ServiceStatus.Status _serviceStatus;
   private final String _statusDescription;
 
-  public PinotInstanceStatus(ServiceRole serviceRole, String instanceId, Configuration config,
+  public PinotInstanceStatus(ServiceRole serviceRole, String instanceId, PinotConfiguration config,
       ServiceStatus.Status serviceStatus, String statusDescription) {
     _serviceRole = serviceRole;
     _instanceId = instanceId;
-    _config = ConfigurationConverter.getMap(config);
+    _config = config.toMap();
     _serviceStatus = serviceStatus;
     _statusDescription = statusDescription;
   }
@@ -53,7 +53,11 @@ public class PinotInstanceStatus {
     return _instanceId;
   }
 
-  public Map getConfig() {
+  public Map<String, Object> getConfig() {
     return _config;
+  }
+
+  public ServiceStatus.Status getServiceStatus() {
+    return _serviceStatus;
   }
 }

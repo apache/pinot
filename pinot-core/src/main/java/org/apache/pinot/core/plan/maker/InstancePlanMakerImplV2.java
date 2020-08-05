@@ -85,8 +85,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
    */
   public InstancePlanMakerImplV2(QueryExecutorConfig queryExecutorConfig) {
     _maxInitialResultHolderCapacity = queryExecutorConfig.getConfig()
-        .getInt(MAX_INITIAL_RESULT_HOLDER_CAPACITY_KEY, DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
-    _numGroupsLimit = queryExecutorConfig.getConfig().getInt(NUM_GROUPS_LIMIT, DEFAULT_NUM_GROUPS_LIMIT);
+        .getProperty(MAX_INITIAL_RESULT_HOLDER_CAPACITY_KEY, DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
+    _numGroupsLimit = queryExecutorConfig.getConfig().getProperty(NUM_GROUPS_LIMIT, DEFAULT_NUM_GROUPS_LIMIT);
     Preconditions.checkState(_maxInitialResultHolderCapacity <= _numGroupsLimit,
         "Invalid configuration: maxInitialResultHolderCapacity: %d must be smaller or equal to numGroupsLimit: %d",
         _maxInitialResultHolderCapacity, _numGroupsLimit);

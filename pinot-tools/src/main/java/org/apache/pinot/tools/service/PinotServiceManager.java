@@ -18,25 +18,26 @@
  */
 package org.apache.pinot.tools.service;
 
-import com.google.common.collect.ImmutableList;
+import static org.apache.pinot.tools.utils.PinotConfigUtils.getAvailablePort;
+
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
+
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.server.starter.helix.HelixServerStarter;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
 import org.apache.pinot.tools.service.api.resources.PinotInstanceStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.tools.utils.PinotConfigUtils.getAvailablePort;
+import com.google.common.collect.ImmutableList;
 
 
 /**
@@ -82,15 +83,15 @@ public class PinotServiceManager {
     pinotServiceManager.start();
   }
 
-  public String startRole(ServiceRole role, Configuration conf)
+  public String startRole(ServiceRole role, Map<String, Object> properties)
       throws Exception {
     switch (role) {
       case CONTROLLER:
-        return startController(new ControllerConf(conf));
+        return startController(new ControllerConf(properties));
       case BROKER:
-        return startBroker(conf);
+        return startBroker(new PinotConfiguration(properties));
       case SERVER:
-        return startServer(conf);
+        return startServer(new PinotConfiguration(properties));
     }
     return null;
   }
@@ -116,10 +117,10 @@ public class PinotServiceManager {
     return instanceId;
   }
 
-  public String startBroker(Configuration brokerConf)
+  public String startBroker(PinotConfiguration brokerConf)
       throws Exception {
     LOGGER.info("Trying to start Pinot Broker...");
-    String brokerHost = brokerConf.getString("broker.host");
+    String brokerHost = brokerConf.getProperty("broker.host");
     HelixBrokerStarter brokerStarter;
     try {
       brokerStarter = new HelixBrokerStarter(brokerConf, _clusterName, _zkAddress, brokerHost);
@@ -139,7 +140,7 @@ public class PinotServiceManager {
     return instanceId;
   }
 
-  public String startServer(Configuration serverConf)
+  public String startServer(PinotConfiguration serverConf)
       throws Exception {
     LOGGER.info("Trying to start Pinot Server...");
     HelixServerStarter serverStarter = new HelixServerStarter(_clusterName, _zkAddress, serverConf);

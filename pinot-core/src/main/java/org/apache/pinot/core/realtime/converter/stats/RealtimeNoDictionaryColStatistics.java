@@ -22,7 +22,7 @@ import java.util.Set;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.data.partition.PartitionFunction;
-import org.apache.pinot.core.io.readerwriter.BaseSingleColumnSingleValueReaderWriter;
+import org.apache.pinot.core.segment.index.readers.MutableForwardIndex;
 import org.apache.pinot.core.segment.creator.ColumnStatistics;
 
 import static org.apache.pinot.core.common.Constants.UNKNOWN_CARDINALITY;
@@ -30,11 +30,11 @@ import static org.apache.pinot.core.common.Constants.UNKNOWN_CARDINALITY;
 
 public class RealtimeNoDictionaryColStatistics implements ColumnStatistics {
   private final DataSourceMetadata _dataSourceMetadata;
-  private final BaseSingleColumnSingleValueReaderWriter _forwardIndex;
+  private final MutableForwardIndex _forwardIndex;
 
   public RealtimeNoDictionaryColStatistics(DataSource dataSource) {
     _dataSourceMetadata = dataSource.getDataSourceMetadata();
-    _forwardIndex = (BaseSingleColumnSingleValueReaderWriter) dataSource.getForwardIndex();
+    _forwardIndex = (MutableForwardIndex) dataSource.getForwardIndex();
   }
 
   @Override

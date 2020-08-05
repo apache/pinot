@@ -23,14 +23,20 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import org.apache.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
-import org.apache.pinot.core.segment.creator.SingleValueForwardIndexCreator;
+import org.apache.pinot.core.segment.creator.ForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
-public class SingleValueSortedForwardIndexCreator implements SingleValueForwardIndexCreator {
+/**
+ * Forward index creator for dictionary-encoded sorted single-value column.
+ */
+public class SingleValueSortedForwardIndexCreator implements ForwardIndexCreator {
   private final FixedByteSingleValueMultiColWriter _writer;
   private final int[] _minDocIds;
   private final int[] _maxDocIds;
+
+  private int _nextDocId = 0;
 
   public SingleValueSortedForwardIndexCreator(File outputDir, String column, int cardinality)
       throws Exception {
@@ -44,7 +50,23 @@ public class SingleValueSortedForwardIndexCreator implements SingleValueForwardI
   }
 
   @Override
-  public void index(int docId, int dictId) {
+  public boolean isDictionaryEncoded() {
+    return true;
+  }
+
+  @Override
+  public boolean isSingleValue() {
+    return true;
+  }
+
+  @Override
+  public FieldSpec.DataType getValueType() {
+    return FieldSpec.DataType.INT;
+  }
+
+  @Override
+  public void putDictId(int dictId) {
+    int docId = _nextDocId++;
     if (_minDocIds[dictId] > docId) {
       _minDocIds[dictId] = docId;
     }

@@ -18,19 +18,23 @@
  */
 package org.apache.pinot.core.query.scheduler;
 
-import com.google.common.base.Preconditions;
 import java.lang.reflect.Constructor;
 import java.util.concurrent.atomic.LongAccumulator;
+
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.scheduler.fcfs.BoundedFCFSScheduler;
 import org.apache.pinot.core.query.scheduler.fcfs.FCFSQueryScheduler;
 import org.apache.pinot.core.query.scheduler.tokenbucket.TokenPriorityScheduler;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Preconditions;
 
 
 /**
@@ -53,13 +57,13 @@ public class QuerySchedulerFactory {
    * @return returns an instance of query scheduler
    */
   public static @Nonnull
-  QueryScheduler create(@Nonnull Configuration schedulerConfig, @Nonnull QueryExecutor queryExecutor,
+  QueryScheduler create(@Nonnull PinotConfiguration schedulerConfig, @Nonnull QueryExecutor queryExecutor,
       ServerMetrics serverMetrics, @Nonnull LongAccumulator latestQueryTime) {
     Preconditions.checkNotNull(schedulerConfig);
     Preconditions.checkNotNull(queryExecutor);
 
     String schedulerName =
-        schedulerConfig.getString(ALGORITHM_NAME_CONFIG_KEY, DEFAULT_QUERY_SCHEDULER_ALGORITHM).toLowerCase();
+        schedulerConfig.getProperty(ALGORITHM_NAME_CONFIG_KEY, DEFAULT_QUERY_SCHEDULER_ALGORITHM).toLowerCase();
     if (schedulerName.equals(FCFS_ALGORITHM)) {
       LOGGER.info("Using FCFS query scheduler");
       return new FCFSQueryScheduler(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime);
@@ -86,7 +90,7 @@ public class QuerySchedulerFactory {
   }
 
   private static @Nullable
-  QueryScheduler getQuerySchedulerByClassName(String className, Configuration schedulerConfig,
+  QueryScheduler getQuerySchedulerByClassName(String className, PinotConfiguration schedulerConfig,
       QueryExecutor queryExecutor) {
     try {
       Constructor<?> constructor =

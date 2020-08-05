@@ -23,17 +23,19 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
-import org.apache.commons.configuration.BaseConfiguration;
-import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf;
+import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,7 +47,7 @@ public class PinotConfigUtils {
   private static final String CONTROLLER_CONFIG_VALIDATION_ERROR_MESSAGE_FORMAT =
       "Pinot Controller Config Validation Error: %s";
 
-  public static ControllerConf generateControllerConf(String zkAddress, String clusterName, String controllerHost,
+  public static Map<String, Object> generateControllerConf(String zkAddress, String clusterName, String controllerHost,
       String controllerPort, String dataDir, ControllerConf.ControllerMode controllerMode, boolean tenantIsolation)
       throws SocketException, UnknownHostException {
     if (StringUtils.isEmpty(zkAddress)) {
@@ -54,45 +56,33 @@ public class PinotConfigUtils {
     if (StringUtils.isEmpty(clusterName)) {
       throw new RuntimeException("clusterName cannot be empty.");
     }
-    ControllerConf conf = new ControllerConf();
-    conf.setZkStr(zkAddress);
-    conf.setHelixClusterName(clusterName);
-    if (StringUtils.isEmpty(controllerHost)) {
-      controllerHost = NetUtil.getHostAddress();
-    }
-    conf.setControllerHost(controllerHost);
-    if (StringUtils.isEmpty(controllerPort)) {
-      controllerPort = Integer.toString(getAvailablePort());
-    }
-    conf.setControllerPort(controllerPort);
+    
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(ControllerConf.ZK_STR, zkAddress);
+    properties.put(ControllerConf.HELIX_CLUSTER_NAME, clusterName);
+    properties.put(ControllerConf.CONTROLLER_HOST, !StringUtils.isEmpty(controllerHost) ? controllerHost : NetUtil.getHostAddress());
+    properties.put(ControllerConf.CONTROLLER_PORT, !StringUtils.isEmpty(controllerPort) ? controllerPort:getAvailablePort());
+    properties.put(ControllerConf.DATA_DIR, !StringUtils.isEmpty(dataDir) ? dataDir : TMP_DIR + String.format("Controller_%s_%s/controller/data", controllerHost, controllerPort));
+    properties.put(ControllerConf.CONTROLLER_VIP_HOST, controllerHost);
+    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, tenantIsolation);
+    properties.put(ControllerPeriodicTasksConf.RETENTION_MANAGER_FREQUENCY_IN_SECONDS, 3600 * 6);
+    properties.put(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS, 3600);
+    properties.put(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS, 3600);
+    properties.put(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS, 3600);
+    properties.put(ControllerConf.CONTROLLER_MODE, controllerMode.toString());
 
-    if (StringUtils.isEmpty(dataDir)) {
-      dataDir = TMP_DIR + String.format("Controller_%s_%s/controller/data", controllerHost, controllerPort);
-    }
-    conf.setDataDir(dataDir);
-    conf.setControllerVipHost(controllerHost);
-    conf.setTenantIsolationEnabled(tenantIsolation);
-
-    conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
-    conf.setOfflineSegmentIntervalCheckerFrequencyInSeconds(3600);
-    conf.setRealtimeSegmentValidationFrequencyInSeconds(3600);
-    conf.setBrokerResourceValidationFrequencyInSeconds(3600);
-
-    conf.setControllerMode(controllerMode);
-    return conf;
+    return properties;
   }
 
-  public static ControllerConf generateControllerConf(String configFileName)
-      throws ConfigurationException {
-    ControllerConf conf = readControllerConfigFromFile(configFileName);
-    if (conf == null) {
+  public static Map<String, Object> generateControllerConf(String configFileName) throws ConfigurationException {
+    Map<String, Object> properties = readControllerConfigFromFile(configFileName);
+    if (properties == null) {
       throw new RuntimeException("Error: Unable to find controller config file " + configFileName);
     }
-    return conf;
+    return properties;
   }
 
-  public static ControllerConf readControllerConfigFromFile(String configFileName)
-      throws ConfigurationException {
+  public static Map<String, Object> readControllerConfigFromFile(String configFileName) throws ConfigurationException {
     if (configFileName == null) {
       return null;
     }
@@ -102,17 +92,20 @@ public class PinotConfigUtils {
       return null;
     }
 
-    ControllerConf conf = new ControllerConf(configFile);
+    Map<String, Object> properties = CommonsConfigurationUtils.toMap(new PropertiesConfiguration(configFile));
+    ControllerConf conf = new ControllerConf(properties);
+    
     conf.setPinotFSFactoryClasses(null);
+    
     if (!validateControllerConfig(conf)) {
       LOGGER.error("Failed to validate controller conf.");
       throw new ConfigurationException("Pinot Controller Conf validation failure");
     }
-    return (validateControllerConfig(conf)) ? conf : null;
+    
+    return properties;
   }
 
-  public static boolean validateControllerConfig(ControllerConf conf)
-      throws ConfigurationException {
+  public static boolean validateControllerConfig(ControllerConf conf) throws ConfigurationException {
     if (conf == null) {
       throw new ConfigurationException(
           String.format(CONTROLLER_CONFIG_VALIDATION_ERROR_MESSAGE_FORMAT, "null conf object."));
@@ -133,6 +126,62 @@ public class PinotConfigUtils {
           "missing helix cluster name, please specify 'controller.helix.cluster.name' property in config file."));
     }
     return true;
+  }
+
+  public static Map<String, Object> readConfigFromFile(String configFileName) throws ConfigurationException {
+    if (configFileName == null) {
+      return null;
+    }
+    File configFile = new File(configFileName);
+    if (configFile.exists()) {
+      return CommonsConfigurationUtils.toMap(new PropertiesConfiguration(configFile));
+    }
+    
+    return null;
+  }
+
+  public static Map<String, Object> generateBrokerConf(int brokerPort) {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, brokerPort != 0 ? brokerPort : getAvailablePort());
+    
+    return properties;
+  }
+
+  public static Map<String, Object> generateServerConf(String serverHost, int serverPort, int serverAdminPort,
+      String serverDataDir, String serverSegmentDir) throws SocketException, UnknownHostException {
+    if (serverHost == null) {
+      serverHost = NetUtil.getHostAddress();
+    }
+    if (serverPort == 0) {
+      serverPort = getAvailablePort();
+    }
+    if (serverAdminPort == 0) {
+      serverAdminPort = getAvailablePort();
+    }
+    if (serverDataDir == null) {
+      serverDataDir = TMP_DIR + String.format("Server_%s_%d/server/data", serverHost, serverPort);
+    }
+    if (serverSegmentDir == null) {
+      serverSegmentDir = TMP_DIR + String.format("Server_%s_%d/server/segment", serverHost, serverPort);
+    }
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST, serverHost);
+    properties.put(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT, serverPort);
+    properties.put(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT, serverAdminPort);
+    properties.put(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR, serverDataDir);
+    properties.put(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, serverSegmentDir);
+    
+    return properties;
+  }
+
+  public static int getAvailablePort() {
+    try {
+      try (ServerSocket socket = new ServerSocket(0)) {
+        return socket.getLocalPort();
+      }
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to find an available port to use", e);
+    }
   }
 
   private static List<String> validateControllerAccessProtocols(ControllerConf conf) throws ConfigurationException {
@@ -182,60 +231,4 @@ public class PinotConfigUtils {
     return Optional.empty();
   }
 
-  public static PropertiesConfiguration readConfigFromFile(String configFileName) throws ConfigurationException {
-    if (configFileName == null) {
-      return null;
-    }
-    File configFile = new File(configFileName);
-    if (configFile.exists()) {
-      return new PropertiesConfiguration(configFile);
-    }
-    return null;
-  }
-
-  public static Configuration generateBrokerConf(int brokerPort) {
-    if (brokerPort == 0) {
-      brokerPort = getAvailablePort();
-    }
-    Configuration brokerConf = new BaseConfiguration();
-    brokerConf.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, brokerPort);
-    return brokerConf;
-  }
-
-  public static Configuration generateServerConf(String serverHost, int serverPort, int serverAdminPort,
-      String serverDataDir, String serverSegmentDir)
-      throws SocketException, UnknownHostException {
-    if (serverHost == null) {
-      serverHost = NetUtil.getHostAddress();
-    }
-    if (serverPort == 0) {
-      serverPort = getAvailablePort();
-    }
-    if (serverAdminPort == 0) {
-      serverAdminPort = getAvailablePort();
-    }
-    if (serverDataDir == null) {
-      serverDataDir = TMP_DIR + String.format("Server_%s_%d/server/data", serverHost, serverPort);
-    }
-    if (serverSegmentDir == null) {
-      serverSegmentDir = TMP_DIR + String.format("Server_%s_%d/server/segment", serverHost, serverPort);
-    }
-    Configuration serverConf = new PropertiesConfiguration();
-    serverConf.addProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST, serverHost);
-    serverConf.addProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT, serverPort);
-    serverConf.addProperty(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT, serverAdminPort);
-    serverConf.addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR, serverDataDir);
-    serverConf.addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, serverSegmentDir);
-    return serverConf;
-  }
-
-  public static int getAvailablePort() {
-    try {
-      try (ServerSocket socket = new ServerSocket(0)) {
-        return socket.getLocalPort();
-      }
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to find an available port to use", e);
-    }
-  }
 }

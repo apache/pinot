@@ -18,10 +18,20 @@
  */
 package org.apache.pinot.core.segment.index.metadata;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.base.Preconditions;
+import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.DATETIME_COLUMNS;
+import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.DIMENSIONS;
+import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.METRICS;
+import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_CREATOR_VERSION;
+import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME;
+import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_NAME;
+import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_PADDING_CHARACTER;
+import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME;
+import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS;
+import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_VERSION;
+import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.TABLE_NAME;
+import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.TIME_COLUMN_NAME;
+import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.TIME_UNIT;
+
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -39,8 +49,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
+
 import javax.annotation.Nullable;
-import org.apache.commons.configuration.ConfigurationException;
+
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
@@ -50,6 +61,7 @@ import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
 import org.apache.pinot.core.startree.v2.StarTreeV2Constants;
 import org.apache.pinot.core.startree.v2.StarTreeV2Metadata;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.joda.time.DateTimeZone;
@@ -58,7 +70,10 @@ import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.*;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.base.Preconditions;
 
 
 public class SegmentMetadataImpl implements SegmentMetadata {
@@ -150,11 +165,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   public static PropertiesConfiguration getPropertiesConfiguration(File indexDir) {
     File metadataFile = SegmentDirectoryPaths.findMetadataFile(indexDir);
     Preconditions.checkNotNull(metadataFile, "Cannot find segment metadata file under directory: %s", indexDir);
-    try {
-      return new PropertiesConfiguration(metadataFile);
-    } catch (ConfigurationException e) {
-      throw new RuntimeException(e);
-    }
+    
+    return CommonsConfigurationUtils.fromFile(metadataFile);
   }
 
   /**

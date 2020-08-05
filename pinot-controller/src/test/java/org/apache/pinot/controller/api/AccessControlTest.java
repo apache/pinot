@@ -19,6 +19,8 @@
 package org.apache.pinot.controller.api;
 
 import java.io.IOException;
+import java.util.Map;
+
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
@@ -34,9 +36,11 @@ public class AccessControlTest extends ControllerTest {
   @BeforeClass
   public void setUp() {
     startZk();
-    ControllerConf config = getDefaultControllerConfiguration();
-    config.setAccessControlFactoryClass(DenyAllAccessFactory.class.getName());
-    startController(config);
+    
+    Map<String, Object> properties = getDefaultControllerConfiguration();
+    properties.put(ControllerConf.ACCESS_CONTROL_FACTORY_CLASS, DenyAllAccessFactory.class.getName());
+
+    startController(properties);
   }
 
   @Test

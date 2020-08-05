@@ -19,7 +19,8 @@
 package org.apache.pinot.spi.crypt;
 
 import java.io.File;
-import org.apache.commons.configuration.Configuration;
+
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
@@ -32,7 +33,7 @@ public interface PinotCrypter {
    * Initializes a crypter with any configurations it might need.
    * @param config
    */
-  void init(Configuration config);
+  void init(PinotConfiguration config);
 
   /**
    * Encrypts the file into the file location provided. The implementation should clean up file after any failures.

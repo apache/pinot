@@ -33,7 +33,7 @@ import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.STAR_IN_FORW
  * The {@code OnHeapSingleTreeBuilder} class is the single star-tree builder that uses on-heap memory.
  */
 public class OnHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
-  private List<Record> _records = new ArrayList<>();
+  private final List<Record> _records = new ArrayList<>();
 
   /**
    * Constructor for the on-heap single star-tree builder.
@@ -156,9 +156,5 @@ public class OnHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
         return next;
       }
     };
-  }
-
-  @Override
-  public void close() {
   }
 }

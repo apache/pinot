@@ -18,18 +18,19 @@
  */
 package org.apache.pinot.integration.tests;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.commons.configuration.Configuration;
+import java.util.Map;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -37,6 +38,8 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import com.fasterxml.jackson.databind.JsonNode;
 
 
 /**
@@ -67,7 +70,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   }
 
   @Override
-  protected void overrideServerConf(Configuration configuration) {
+  protected void overrideServerConf(PinotConfiguration configuration) {
     configuration.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_RELOAD_CONSUMING_SEGMENT, true);
   }
 
@@ -115,9 +118,11 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     startKafka();
 
     // Start the Pinot cluster
-    ControllerConf config = getDefaultControllerConfiguration();
-    config.setTenantIsolationEnabled(false);
-    startController(config);
+    Map<String, Object> properties = getDefaultControllerConfiguration();
+    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
+
+    startController(properties);
+    
     startBroker();
     startServers(2);
 

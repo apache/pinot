@@ -18,18 +18,19 @@
  */
 package org.apache.pinot.controller.api;
 
-import java.io.File;
-import java.net.URI;
-import org.apache.commons.configuration.BaseConfiguration;
-import org.apache.commons.io.FileUtils;
-import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.api.resources.ControllerFilePathProvider;
-import org.apache.pinot.spi.filesystem.PinotFSFactory;
-import org.testng.annotations.Test;
-
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
+
+import java.io.File;
+import java.net.URI;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.api.resources.ControllerFilePathProvider;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.testng.annotations.Test;
 
 
 public class ControllerFilePathProviderTest {
@@ -39,10 +40,9 @@ public class ControllerFilePathProviderTest {
   private static final File LOCAL_TEMP_DIR = new File(DATA_DIR, "localTemp");
 
   @Test
-  public void testLocalTempDirConfigured()
-      throws Exception {
+  public void testLocalTempDirConfigured() throws Exception {
     FileUtils.deleteQuietly(DATA_DIR);
-    PinotFSFactory.init(new BaseConfiguration());
+    PinotFSFactory.init(new PinotConfiguration());
 
     ControllerConf controllerConf = new ControllerConf();
     controllerConf.setControllerHost(HOST);
@@ -74,10 +74,9 @@ public class ControllerFilePathProviderTest {
   }
 
   @Test
-  public void testLocalTempDirNotConfigured()
-      throws Exception {
+  public void testLocalTempDirNotConfigured() throws Exception {
     FileUtils.deleteQuietly(DATA_DIR);
-    PinotFSFactory.init(new BaseConfiguration());
+    PinotFSFactory.init(new PinotConfiguration());
 
     ControllerConf controllerConf = new ControllerConf();
     controllerConf.setControllerHost(HOST);

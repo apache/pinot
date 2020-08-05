@@ -26,9 +26,9 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.MapConfiguration;
+
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentPushUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner;
@@ -40,14 +40,9 @@ import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 import org.apache.spark.SparkContext;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class SparkSegmentTarPushJobRunner implements IngestionJobRunner, Serializable {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(SparkSegmentTarPushJobRunner.class);
-
   private SegmentGenerationJobSpec _spec;
 
   public SparkSegmentTarPushJobRunner() {
@@ -67,8 +62,7 @@ public class SparkSegmentTarPushJobRunner implements IngestionJobRunner, Seriali
     //init all file systems
     List<PinotFSSpec> pinotFSSpecs = _spec.getPinotFSSpecs();
     for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
-      Configuration config = new MapConfiguration(pinotFSSpec.getConfigs());
-      PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), config);
+      PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
     }
 
     //Get outputFS for writing output pinot segments
@@ -114,8 +108,7 @@ public class SparkSegmentTarPushJobRunner implements IngestionJobRunner, Seriali
       URI finalOutputDirURI = outputDirURI;
       pathRDD.foreach(segmentTarPath -> {
         for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
-          Configuration config = new MapConfiguration(pinotFSSpec.getConfigs());
-          PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), config);
+          PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
         }
         try {
           SegmentPushUtils.pushSegments(_spec, PinotFSFactory.create(finalOutputDirURI.getScheme()), Arrays.asList(segmentTarPath));

@@ -19,8 +19,9 @@
 package org.apache.pinot.core.query.scheduler.tokenbucket;
 
 import java.util.concurrent.atomic.LongAccumulator;
+
 import javax.annotation.Nonnull;
-import org.apache.commons.configuration.Configuration;
+
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.scheduler.MultiLevelPriorityQueue;
@@ -30,6 +31,7 @@ import org.apache.pinot.core.query.scheduler.SchedulerGroupFactory;
 import org.apache.pinot.core.query.scheduler.TableBasedGroupMapper;
 import org.apache.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
@@ -42,17 +44,17 @@ public class TokenPriorityScheduler extends PriorityScheduler {
   public static final String TOKEN_LIFETIME_MS_KEY = "token_lifetime_ms";
   private static final int DEFAULT_TOKEN_LIFETIME_MS = 100;
 
-  public static TokenPriorityScheduler create(@Nonnull Configuration config, @Nonnull QueryExecutor queryExecutor,
+  public static TokenPriorityScheduler create(@Nonnull PinotConfiguration config, @Nonnull QueryExecutor queryExecutor,
       @Nonnull ServerMetrics metrics, @Nonnull LongAccumulator latestQueryTime) {
     final ResourceManager rm = new PolicyBasedResourceManager(config);
     final SchedulerGroupFactory groupFactory = new SchedulerGroupFactory() {
       @Override
-      public SchedulerGroup create(Configuration config, String groupName) {
+      public SchedulerGroup create(PinotConfiguration config, String groupName) {
         // max available tokens per millisecond equals number of threads (total execution capacity)
         // we are over provisioning tokens here because its better to keep pipe full rather than empty
         int maxTokensPerMs = rm.getNumQueryRunnerThreads() + rm.getNumQueryWorkerThreads();
-        int tokensPerMs = config.getInt(TOKENS_PER_MS_KEY, maxTokensPerMs);
-        int tokenLifetimeMs = config.getInt(TOKEN_LIFETIME_MS_KEY, DEFAULT_TOKEN_LIFETIME_MS);
+        int tokensPerMs = config.getProperty(TOKENS_PER_MS_KEY, maxTokensPerMs);
+        int tokenLifetimeMs = config.getProperty(TOKEN_LIFETIME_MS_KEY, DEFAULT_TOKEN_LIFETIME_MS);
 
         return new TokenSchedulerGroup(groupName, tokensPerMs, tokenLifetimeMs);
       }
@@ -62,7 +64,7 @@ public class TokenPriorityScheduler extends PriorityScheduler {
     return new TokenPriorityScheduler(config, rm, queryExecutor, queue, metrics, latestQueryTime);
   }
 
-  private TokenPriorityScheduler(@Nonnull Configuration config, @Nonnull ResourceManager resourceManager,
+  private TokenPriorityScheduler(@Nonnull PinotConfiguration config, @Nonnull ResourceManager resourceManager,
       @Nonnull QueryExecutor queryExecutor, @Nonnull MultiLevelPriorityQueue queue, @Nonnull ServerMetrics metrics,
       @Nonnull LongAccumulator latestQueryTime) {
     super(config, resourceManager, queryExecutor, queue, metrics, latestQueryTime);

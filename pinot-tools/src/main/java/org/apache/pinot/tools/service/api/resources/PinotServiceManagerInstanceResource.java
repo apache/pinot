@@ -19,15 +19,17 @@
 
 package org.apache.pinot.tools.service.api.resources;
 
-import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiOperation;
-import io.swagger.annotations.ApiParam;
-import io.swagger.annotations.ApiResponse;
-import io.swagger.annotations.ApiResponses;
+import static org.apache.pinot.common.utils.CommonConstants.Controller.CONFIG_OF_CONTROLLER_METRICS_PREFIX;
+import static org.apache.pinot.common.utils.CommonConstants.Controller.DEFAULT_METRICS_PREFIX;
+import static org.apache.pinot.tools.utils.PinotConfigUtils.TMP_DIR;
+import static org.apache.pinot.tools.utils.PinotConfigUtils.getAvailablePort;
+
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -39,21 +41,23 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.service.PinotServiceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.common.utils.CommonConstants.Controller.CONFIG_OF_CONTROLLER_METRICS_PREFIX;
-import static org.apache.pinot.common.utils.CommonConstants.Controller.DEFAULT_METRICS_PREFIX;
-import static org.apache.pinot.tools.utils.PinotConfigUtils.TMP_DIR;
-import static org.apache.pinot.tools.utils.PinotConfigUtils.getAvailablePort;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
 
 
 @Api(tags = "Startable")
@@ -127,28 +131,21 @@ public class PinotServiceManagerInstanceResource {
     } catch (Exception e) {
       throw new WebApplicationException("Unrecognized Role: " + role, Response.Status.NOT_FOUND);
     }
-    Configuration configuration;
+    Map<String, Object> properties = new HashMap<>();
     try {
-      configuration = JsonUtils.stringToObject(confStr, Configuration.class);
+      properties = CommonsConfigurationUtils.toMap(JsonUtils.stringToObject(confStr, Configuration.class));
     } catch (IOException e) {
-      if (autoMode) {
-        switch (serviceRole) {
-          case CONTROLLER:
-            configuration = new ControllerConf();
-            break;
-          default:
-            configuration = new PropertiesConfiguration();
-        }
-      } else {
+      if (!autoMode) {
         throw new WebApplicationException("Unable to deserialize Conf String to Configuration Object",
             Response.Status.BAD_REQUEST);
       }
     }
+
     if (autoMode) {
-      updateConfiguration(serviceRole, configuration);
+      updateConfiguration(serviceRole, properties);
     }
     try {
-      String instanceName = _pinotServiceManager.startRole(serviceRole, configuration);
+      String instanceName = _pinotServiceManager.startRole(serviceRole, properties);
       if (instanceName != null) {
         LOGGER.info("Successfully started Pinot [{}] instance [{}]", serviceRole, instanceName);
         return _pinotServiceManager.getInstanceStatus(instanceName);
@@ -161,79 +158,88 @@ public class PinotServiceManagerInstanceResource {
     }
   }
 
-  private void updateConfiguration(ServiceRole role, Configuration configuration) {
+  private void updateConfiguration(ServiceRole role, Map<String, Object> properties) {
     switch (role) {
       case CONTROLLER:
-        ControllerConf controllerConf = (ControllerConf) configuration;
-        if (controllerConf.getControllerHost() == null) {
-          String hostname;
+        String controllerHost =
+            Optional.ofNullable(properties.get(ControllerConf.CONTROLLER_HOST)).map(Object::toString).orElse(null);
+        if (controllerHost == null) {
           try {
-            hostname = NetUtil.getHostAddress();
+            controllerHost = NetUtil.getHostAddress();
           } catch (Exception e) {
-            hostname = "localhost";
+            controllerHost = "localhost";
           }
-          controllerConf.setControllerHost(hostname);
+          properties.put(ControllerConf.CONTROLLER_HOST, controllerHost);
         }
-        if (controllerConf.getControllerPort() == null) {
-          controllerConf.setControllerPort(Integer.toString(getAvailablePort()));
+
+        String controllerPort =
+            Optional.ofNullable(properties.get(ControllerConf.CONTROLLER_PORT)).map(Object::toString).orElse(null);
+        if (controllerPort == null) {
+          controllerPort = Integer.toString(getAvailablePort());
+          properties.put(ControllerConf.CONTROLLER_PORT, controllerPort);
         }
-        if (controllerConf.getDataDir() == null) {
-          controllerConf.setDataDir(TMP_DIR + String
-              .format("Controller_%s_%s/data", controllerConf.getControllerHost(), controllerConf.getControllerPort()));
+
+        if (!properties.containsKey(ControllerConf.DATA_DIR)) {
+          properties.put(ControllerConf.DATA_DIR,
+              TMP_DIR + String.format("Controller_%s_%s/data", controllerHost, controllerPort));
         }
-        if (!controllerConf.containsKey(CONFIG_OF_CONTROLLER_METRICS_PREFIX)) {
-          controllerConf.addProperty(CONFIG_OF_CONTROLLER_METRICS_PREFIX, String
-              .format("%s.%s_%s", DEFAULT_METRICS_PREFIX, controllerConf.getControllerHost(),
-                  controllerConf.getControllerPort()));
+
+        if (!properties.containsKey(CONFIG_OF_CONTROLLER_METRICS_PREFIX)) {
+          properties.put(CONFIG_OF_CONTROLLER_METRICS_PREFIX,
+              String.format("%s.%s_%s", DEFAULT_METRICS_PREFIX, controllerHost, controllerPort));
         }
+
         break;
       case BROKER:
-        if (!configuration.containsKey(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT)) {
-          configuration.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, getAvailablePort());
+
+        if (!properties.containsKey(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT)) {
+          properties.put(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, getAvailablePort());
         }
-        if (!configuration.containsKey(CommonConstants.Broker.METRICS_CONFIG_PREFIX)) {
+        if (!properties.containsKey(CommonConstants.Broker.METRICS_CONFIG_PREFIX)) {
           String hostname;
           try {
             hostname = NetUtil.getHostAddress();
           } catch (Exception e) {
             hostname = "localhost";
           }
-          configuration.addProperty(CommonConstants.Broker.CONFIG_OF_METRICS_NAME_PREFIX, String
-              .format("%s%s_%d", CommonConstants.Broker.DEFAULT_METRICS_NAME_PREFIX, hostname,
-                  configuration.getInt(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT)));
+          properties.put(CommonConstants.Broker.CONFIG_OF_METRICS_NAME_PREFIX,
+              String.format("%s%s_%s", CommonConstants.Broker.DEFAULT_METRICS_NAME_PREFIX, hostname,
+                  properties.get(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT)));
         }
         return;
       case SERVER:
-        if (!configuration.containsKey(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST)) {
+        if (!properties.containsKey(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST)) {
           String hostname;
           try {
             hostname = NetUtil.getHostAddress();
           } catch (Exception e) {
             hostname = "localhost";
           }
-          configuration.addProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST, hostname);
+          properties.put(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST, hostname);
         }
-        if (!configuration.containsKey(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT)) {
-          configuration.addProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT, getAvailablePort());
+        if (!properties.containsKey(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT)) {
+          properties.put(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT, getAvailablePort());
         }
-        if (!configuration.containsKey(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT)) {
-          configuration.addProperty(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT, getAvailablePort());
+        if (!properties.containsKey(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT)) {
+          properties.put(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT, getAvailablePort());
         }
-        if (!configuration.containsKey(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR)) {
-          configuration.addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR, TMP_DIR + String
-              .format("Server_%s_%d/data", configuration.getString(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST),
-                  configuration.getInt(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT)));
+        if (!properties.containsKey(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR)) {
+          properties.put(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR,
+              TMP_DIR
+                  + String.format("Server_%s_%s/data", properties.get(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST),
+                      properties.get(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT)));
         }
-        if (!configuration.containsKey(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR)) {
-          configuration.addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, TMP_DIR + String
-              .format("Server_%s_%d/segment", configuration.getString(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST),
-                  configuration.getInt(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT)));
+        if (!properties.containsKey(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR)) {
+          properties.put(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR,
+              TMP_DIR + String.format("Server_%s_%s/segment",
+                  properties.get(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST),
+                  properties.get(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT)));
         }
-        if (!configuration.containsKey(CommonConstants.Server.PINOT_SERVER_METRICS_PREFIX)) {
-          configuration.addProperty(CommonConstants.Server.PINOT_SERVER_METRICS_PREFIX, String
-              .format("%s%s_%d", CommonConstants.Server.DEFAULT_METRICS_PREFIX,
-                  configuration.getString(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST),
-                  configuration.getInt(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT)));
+        if (!properties.containsKey(CommonConstants.Server.PINOT_SERVER_METRICS_PREFIX)) {
+          properties.put(CommonConstants.Server.PINOT_SERVER_METRICS_PREFIX,
+              String.format("%s%s_%s", CommonConstants.Server.DEFAULT_METRICS_PREFIX,
+                  properties.get(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST),
+                  properties.get(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT)));
         }
         return;
     }

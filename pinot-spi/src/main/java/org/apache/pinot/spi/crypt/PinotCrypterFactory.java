@@ -19,9 +19,10 @@
 package org.apache.pinot.spi.crypt;
 
 import java.util.HashMap;
-import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
-import org.apache.commons.configuration.Configuration;
+
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,22 +50,23 @@ public class PinotCrypterFactory {
    * class.nooppinotcrypter = org.apache.pinot.core.crypt.NoOpPinotCrypter
    * nooppinotcrypter.keyMap = sample_key
    */
-  public static void init(Configuration config) {
+  public static void init(PinotConfiguration config) {
     // Get schemes and their respective classes
-    Iterator<String> keys = config.subset(CLASS).getKeys();
-    if (!keys.hasNext()) {
+    PinotConfiguration schemesConfig = config.subset(CLASS);
+    List<String> schemes = schemesConfig.getKeys();
+    if (!schemes.isEmpty()) {
       LOGGER.info("Did not find any crypter classes in the configuration");
     }
-    while (keys.hasNext()) {
-      String key = keys.next();
-      String className = (String) config.getProperty(CLASS + "." + key);
-      LOGGER.info("Got crypter class name {}, full crypter path {}, starting to initialize", key, className);
+    for (String scheme : schemes) {
+      String className = schemesConfig.getProperty(scheme);
+      
+      LOGGER.info("Got crypter class name {}, full crypter path {}, starting to initialize", scheme, className);
 
       try {
         PinotCrypter pinotCrypter = PluginManager.get().createInstance(className);
-        pinotCrypter.init(config.subset(key));
-        LOGGER.info("Initializing PinotCrypter for scheme {}, classname {}", key, className);
-        _crypterMap.put(key.toLowerCase(), pinotCrypter);
+        pinotCrypter.init(config.subset(scheme));
+        LOGGER.info("Initializing PinotCrypter for scheme {}, classname {}", scheme, className);
+        _crypterMap.put(scheme.toLowerCase(), pinotCrypter);
       } catch (Exception e) {
         LOGGER.error("Could not instantiate crypter for class {}", className, e);
         throw new RuntimeException(e);

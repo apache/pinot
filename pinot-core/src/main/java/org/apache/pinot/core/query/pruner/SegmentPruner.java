@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.query.pruner;
 
-import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 public interface SegmentPruner {
@@ -28,7 +28,7 @@ public interface SegmentPruner {
   /**
    * Initializes the segment pruner.
    */
-  void init(Configuration config);
+  void init(PinotConfiguration config);
 
   /**
    * Returns <code>true</code> if the segment can be pruned based on the query request.

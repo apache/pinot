@@ -21,14 +21,6 @@ package org.apache.pinot.core.segment.index.column;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
-import org.apache.pinot.core.io.reader.DataFileReader;
-import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
-import org.apache.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader;
-import org.apache.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
-import org.apache.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
-import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReader;
-import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReaderImpl;
-import org.apache.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.readers.BaseImmutableDictionary;
@@ -37,6 +29,7 @@ import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.BytesDictionary;
 import org.apache.pinot.core.segment.index.readers.DoubleDictionary;
 import org.apache.pinot.core.segment.index.readers.FloatDictionary;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.IntDictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.LongDictionary;
@@ -47,7 +40,13 @@ import org.apache.pinot.core.segment.index.readers.OnHeapIntDictionary;
 import org.apache.pinot.core.segment.index.readers.OnHeapLongDictionary;
 import org.apache.pinot.core.segment.index.readers.OnHeapStringDictionary;
 import org.apache.pinot.core.segment.index.readers.RangeIndexReader;
+import org.apache.pinot.core.segment.index.readers.SortedIndexReader;
 import org.apache.pinot.core.segment.index.readers.StringDictionary;
+import org.apache.pinot.core.segment.index.readers.forward.FixedBitMVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.sorted.SortedIndexReaderImpl;
 import org.apache.pinot.core.segment.index.readers.text.LuceneTextIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
@@ -60,9 +59,9 @@ import org.slf4j.LoggerFactory;
 public final class PhysicalColumnIndexContainer implements ColumnIndexContainer {
   private static final Logger LOGGER = LoggerFactory.getLogger(PhysicalColumnIndexContainer.class);
 
-  private final DataFileReader _forwardIndex;
-  private final InvertedIndexReader _invertedIndex;
-  private final InvertedIndexReader _rangeIndex;
+  private final ForwardIndexReader<?> _forwardIndex;
+  private final InvertedIndexReader<?> _invertedIndex;
+  private final InvertedIndexReader<?> _rangeIndex;
   private final BaseImmutableDictionary _dictionary;
   private final BloomFilterReader _bloomFilterReader;
   private final NullValueVectorReaderImpl _nullValueVectorReader;
@@ -108,7 +107,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
         // Single-value
         if (metadata.isSorted()) {
           // Sorted
-          SortedIndexReader sortedIndexReader = new SortedIndexReaderImpl(fwdIndexBuffer, metadata.getCardinality());
+          SortedIndexReader<?> sortedIndexReader = new SortedIndexReaderImpl(fwdIndexBuffer, metadata.getCardinality());
           _forwardIndex = sortedIndexReader;
           _invertedIndex = sortedIndexReader;
           _rangeIndex = null;
@@ -116,13 +115,12 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
         } else {
           // Unsorted
           _forwardIndex =
-              new FixedBitSingleValueReader(fwdIndexBuffer, metadata.getTotalDocs(), metadata.getBitsPerElement());
+              new FixedBitSVForwardIndexReader(fwdIndexBuffer, metadata.getTotalDocs(), metadata.getBitsPerElement());
         }
       } else {
         // Multi-value
-        _forwardIndex =
-            new FixedBitMultiValueReader(fwdIndexBuffer, metadata.getTotalDocs(), metadata.getTotalNumberOfEntries(),
-                metadata.getBitsPerElement());
+        _forwardIndex = new FixedBitMVForwardIndexReader(fwdIndexBuffer, metadata.getTotalDocs(),
+            metadata.getTotalNumberOfEntries(), metadata.getBitsPerElement());
       }
       if (loadInvertedIndex) {
         _invertedIndex =
@@ -153,17 +151,17 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   }
 
   @Override
-  public DataFileReader getForwardIndex() {
+  public ForwardIndexReader<?> getForwardIndex() {
     return _forwardIndex;
   }
 
   @Override
-  public InvertedIndexReader getInvertedIndex() {
+  public InvertedIndexReader<?> getInvertedIndex() {
     return _invertedIndex;
   }
 
   @Override
-  public InvertedIndexReader getRangeIndex() {
+  public InvertedIndexReader<?> getRangeIndex() {
     return _rangeIndex;
   }
 
@@ -224,18 +222,17 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     }
   }
 
-  private static SingleColumnSingleValueReader loadRawForwardIndex(PinotDataBuffer forwardIndexBuffer,
+  private static ForwardIndexReader<?> loadRawForwardIndex(PinotDataBuffer forwardIndexBuffer,
       FieldSpec.DataType dataType) {
-
     switch (dataType) {
       case INT:
       case LONG:
       case FLOAT:
       case DOUBLE:
-        return new FixedByteChunkSingleValueReader(forwardIndexBuffer);
+        return new FixedByteChunkSVForwardIndexReader(forwardIndexBuffer, dataType);
       case STRING:
       case BYTES:
-        return new VarByteChunkSingleValueReader(forwardIndexBuffer);
+        return new VarByteChunkSVForwardIndexReader(forwardIndexBuffer, dataType);
       default:
         throw new IllegalStateException("Illegal data type for raw forward index: " + dataType);
     }

@@ -19,9 +19,10 @@
 package org.apache.pinot.core.segment.index.loader;
 
 import java.io.File;
+import java.util.List;
 import java.util.Set;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
@@ -35,6 +36,8 @@ import org.apache.pinot.core.segment.index.loader.invertedindex.RangeIndexHandle
 import org.apache.pinot.core.segment.index.loader.invertedindex.TextIndexHandler;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
+import org.apache.pinot.core.startree.v2.builder.MultipleTreesBuilder;
+import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -54,8 +57,7 @@ public class SegmentPreProcessor implements AutoCloseable {
   private final SegmentDirectory _segmentDirectory;
   private SegmentMetadataImpl _segmentMetadata;
 
-  public SegmentPreProcessor(@Nonnull File indexDir, @Nonnull IndexLoadingConfig indexLoadingConfig,
-      @Nullable Schema schema)
+  public SegmentPreProcessor(File indexDir, IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema)
       throws Exception {
     _indexDir = indexDir;
     _indexLoadingConfig = indexLoadingConfig;
@@ -100,7 +102,7 @@ public class SegmentPreProcessor implements AutoCloseable {
           new InvertedIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
       invertedIndexHandler.createInvertedIndices();
 
-      // Create column inverted indices according to the index config.
+      // Create column range indices according to the index config.
       RangeIndexHandler rangeIndexHandler =
           new RangeIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
       rangeIndexHandler.createRangeIndices();
@@ -112,11 +114,25 @@ public class SegmentPreProcessor implements AutoCloseable {
         textIndexHandler.createTextIndexesOnSegmentLoad();
       }
 
-
       // Create bloom filter if required
       BloomFilterHandler bloomFilterHandler =
           new BloomFilterHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
       bloomFilterHandler.createBloomFilters();
+
+      // Create star-tree if required
+      // TODO: Support removing/modifying star-tree when the config changes
+      if (_segmentMetadata.getStarTreeV2MetadataList() == null) {
+        List<StarTreeIndexConfig> starTreeIndexConfigs = _indexLoadingConfig.getStarTreeIndexConfigs();
+        boolean enableDefaultStarTree = _indexLoadingConfig.isEnableDefaultStarTree();
+        if (CollectionUtils.isNotEmpty(starTreeIndexConfigs) || enableDefaultStarTree) {
+          // NOTE: Always use OFF_HEAP mode on server side.
+          try (MultipleTreesBuilder builder = new MultipleTreesBuilder(starTreeIndexConfigs, enableDefaultStarTree,
+              _indexDir, MultipleTreesBuilder.BuildMode.OFF_HEAP)) {
+            builder.build();
+          }
+          _segmentMetadata = new SegmentMetadataImpl(_indexDir);
+        }
+      }
 
       // Add min/max value to column metadata according to the prune mode.
       // For star-tree index, because it can only increase the range, so min/max value can still be used in pruner.

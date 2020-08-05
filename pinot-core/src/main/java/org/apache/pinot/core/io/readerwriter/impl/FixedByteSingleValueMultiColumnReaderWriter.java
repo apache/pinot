@@ -18,23 +18,24 @@
  */
 package org.apache.pinot.core.io.readerwriter.impl;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
-import org.apache.pinot.core.io.readerwriter.BaseSingleValueMultiColumnReaderWriter;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
 /**
- * Extension of {@link BaseSingleValueMultiColumnReaderWriter} that fully implements a
  * SingleValue MultiColumn reader and writer for fixed size columns.
  *
  * This implementation currently does not support reading with context, but can be enhanced to do so.
+ *
+ * TODO: Clean this up
  */
-public class FixedByteSingleValueMultiColumnReaderWriter extends BaseSingleValueMultiColumnReaderWriter {
+public class FixedByteSingleValueMultiColumnReaderWriter implements Closeable {
 
   private final List<FixedByteSingleValueMultiColWriter> _writers;
   private volatile List<FixedByteSingleValueMultiColReader> _readers;
@@ -76,7 +77,6 @@ public class FixedByteSingleValueMultiColumnReaderWriter extends BaseSingleValue
     _chunkSizeInBytes = rowSizeInBytes * numRowsPerChunk;
   }
 
-  @Override
   public int getInt(int row, int column) {
     int rowInChunk = row % _numRowsPerChunk;
     int chunkId = row / _numRowsPerChunk;
@@ -84,7 +84,6 @@ public class FixedByteSingleValueMultiColumnReaderWriter extends BaseSingleValue
     return _readers.get(chunkId).getInt(rowInChunk, column);
   }
 
-  @Override
   public long getLong(int row, int column) {
     int rowInChunk = row % _numRowsPerChunk;
     int chunkId = row / _numRowsPerChunk;
@@ -92,7 +91,6 @@ public class FixedByteSingleValueMultiColumnReaderWriter extends BaseSingleValue
     return _readers.get(chunkId).getLong(rowInChunk, column);
   }
 
-  @Override
   public float getFloat(int row, int column) {
     int rowInChunk = row % _numRowsPerChunk;
     int chunkId = row / _numRowsPerChunk;
@@ -100,7 +98,6 @@ public class FixedByteSingleValueMultiColumnReaderWriter extends BaseSingleValue
     return _readers.get(chunkId).getFloat(rowInChunk, column);
   }
 
-  @Override
   public double getDouble(int row, int column) {
     int rowInChunk = row % _numRowsPerChunk;
     int chunkId = row / _numRowsPerChunk;
@@ -108,7 +105,6 @@ public class FixedByteSingleValueMultiColumnReaderWriter extends BaseSingleValue
     return _readers.get(chunkId).getDouble(rowInChunk, column);
   }
 
-  @Override
   public String getString(int row, int column) {
     int rowInChunk = row % _numRowsPerChunk;
     int chunkId = row / _numRowsPerChunk;
@@ -116,7 +112,6 @@ public class FixedByteSingleValueMultiColumnReaderWriter extends BaseSingleValue
     return _readers.get(chunkId).getString(rowInChunk, column);
   }
 
-  @Override
   public void setInt(int row, int column, int value) {
     ensureCapacity(row);
     int rowInChunk = row % _numRowsPerChunk;
@@ -124,7 +119,6 @@ public class FixedByteSingleValueMultiColumnReaderWriter extends BaseSingleValue
     _writers.get(chunkId).setInt(rowInChunk, column, value);
   }
 
-  @Override
   public void setLong(int row, int column, long value) {
     ensureCapacity(row);
     int rowInChunk = row % _numRowsPerChunk;
@@ -132,7 +126,6 @@ public class FixedByteSingleValueMultiColumnReaderWriter extends BaseSingleValue
     _writers.get(chunkId).setLong(rowInChunk, column, value);
   }
 
-  @Override
   public void setFloat(int row, int column, float value) {
     ensureCapacity(row);
     int rowInChunk = row % _numRowsPerChunk;
@@ -140,7 +133,6 @@ public class FixedByteSingleValueMultiColumnReaderWriter extends BaseSingleValue
     _writers.get(chunkId).setFloat(rowInChunk, column, value);
   }
 
-  @Override
   public void setDouble(int row, int column, double value) {
     ensureCapacity(row);
     int rowInChunk = row % _numRowsPerChunk;
@@ -148,7 +140,6 @@ public class FixedByteSingleValueMultiColumnReaderWriter extends BaseSingleValue
     _writers.get(chunkId).setDouble(rowInChunk, column, value);
   }
 
-  @Override
   public void setString(int row, int column, String value) {
     ensureCapacity(row);
     int rowInChunk = row % _numRowsPerChunk;

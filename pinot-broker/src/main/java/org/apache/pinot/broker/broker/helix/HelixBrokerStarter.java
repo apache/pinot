@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.broker.broker.helix;
 
-import com.google.common.collect.ImmutableList;
-import com.yammer.metrics.core.MetricsRegistry;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
 import javax.annotation.Nullable;
+
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.ConfigAccessor;
@@ -61,17 +61,21 @@ import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.collect.ImmutableList;
+import com.yammer.metrics.core.MetricsRegistry;
 
 
 @SuppressWarnings("unused")
 public class HelixBrokerStarter implements ServiceStartable {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixBrokerStarter.class);
 
-  private final Configuration _brokerConf;
+  private final PinotConfiguration _brokerConf;
   private final String _clusterName;
   private final String _zkServers;
   private final String _brokerId;
@@ -97,12 +101,12 @@ public class HelixBrokerStarter implements ServiceStartable {
   // Participant Helix manager handles Helix functionality such as state transitions and messages
   private HelixManager _participantHelixManager;
 
-  public HelixBrokerStarter(Configuration brokerConf, String clusterName, String zkServer)
+  public HelixBrokerStarter(PinotConfiguration brokerConf, String clusterName, String zkServer)
       throws Exception {
     this(brokerConf, clusterName, zkServer, null);
   }
 
-  public HelixBrokerStarter(Configuration brokerConf, String clusterName, String zkServer, @Nullable String brokerHost)
+  public HelixBrokerStarter(PinotConfiguration brokerConf, String clusterName, String zkServer, @Nullable String brokerHost)
       throws Exception {
     _brokerConf = brokerConf;
     setupHelixSystemProperties();
@@ -113,12 +117,13 @@ public class HelixBrokerStarter implements ServiceStartable {
     _zkServers = zkServer.replaceAll("\\s+", "");
 
     if (brokerHost == null) {
-      brokerHost = _brokerConf.getBoolean(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtil
+      brokerHost = _brokerConf.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtil
           .getHostnameOrAddress() : NetUtil.getHostAddress();
     }
-    _brokerId = _brokerConf.getString(Helix.Instance.INSTANCE_ID_KEY,
+    _brokerId = _brokerConf.getProperty(Helix.Instance.INSTANCE_ID_KEY,
         Helix.PREFIX_OF_BROKER_INSTANCE + brokerHost + "_" + _brokerConf
-            .getInt(Helix.KEY_OF_BROKER_QUERY_PORT, Helix.DEFAULT_BROKER_QUERY_PORT));
+            .getProperty(Helix.KEY_OF_BROKER_QUERY_PORT, Helix.DEFAULT_BROKER_QUERY_PORT));
+    
     _brokerConf.addProperty(Broker.CONFIG_OF_BROKER_ID, _brokerId);
   }
 
@@ -127,7 +132,7 @@ public class HelixBrokerStarter implements ServiceStartable {
     // from ZooKeeper). Setting flapping time window to a small value can avoid this from happening. Helix ignores the
     // non-positive value, so set the default value as 1.
     System.setProperty(SystemPropertyKeys.FLAPPING_TIME_WINDOW,
-        _brokerConf.getString(Helix.CONFIG_OF_BROKER_FLAPPING_TIME_WINDOW_MS, Helix.DEFAULT_FLAPPING_TIME_WINDOW_MS));
+        _brokerConf.getProperty(Helix.CONFIG_OF_BROKER_FLAPPING_TIME_WINDOW_MS, Helix.DEFAULT_FLAPPING_TIME_WINDOW_MS));
   }
 
   /**
@@ -168,7 +173,7 @@ public class HelixBrokerStarter implements ServiceStartable {
   }
 
   @Override
-  public Configuration getConfig() {
+  public PinotConfiguration getConfig() {
     return _brokerConf;
   }
 
@@ -215,9 +220,9 @@ public class HelixBrokerStarter implements ServiceStartable {
     MetricsHelper.initializeMetrics(_brokerConf.subset(Broker.METRICS_CONFIG_PREFIX));
     MetricsHelper.registerMetricsRegistry(_metricsRegistry);
     _brokerMetrics = new BrokerMetrics(
-        _brokerConf.getString(Broker.CONFIG_OF_METRICS_NAME_PREFIX, Broker.DEFAULT_METRICS_NAME_PREFIX),
+        _brokerConf.getProperty(Broker.CONFIG_OF_METRICS_NAME_PREFIX, Broker.DEFAULT_METRICS_NAME_PREFIX),
         _metricsRegistry,
-        !_brokerConf.getBoolean(Broker.CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS, !Broker.DEFAULT_METRICS_GLOBAL_ENABLED));
+        !_brokerConf.getProperty(Broker.CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS, !Broker.DEFAULT_METRICS_GLOBAL_ENABLED));
     _brokerMetrics.initializeGlobalMeters();
     // Set up request handling classes
     _routingManager = new RoutingManager(_brokerMetrics);
@@ -232,7 +237,7 @@ public class HelixBrokerStarter implements ServiceStartable {
         new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory, queryQuotaManager,
             _brokerMetrics, _propertyStore);
 
-    int brokerQueryPort = _brokerConf.getInt(Helix.KEY_OF_BROKER_QUERY_PORT, Helix.DEFAULT_BROKER_QUERY_PORT);
+    int brokerQueryPort = _brokerConf.getProperty(Helix.KEY_OF_BROKER_QUERY_PORT, Helix.DEFAULT_BROKER_QUERY_PORT);
     LOGGER.info("Starting broker admin application on port: {}", brokerQueryPort);
     _brokerAdminApplication = new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics);
     _brokerAdminApplication.start(brokerQueryPort);
@@ -305,8 +310,8 @@ public class HelixBrokerStarter implements ServiceStartable {
       }
     }
 
-    double minResourcePercentForStartup = _brokerConf.getDouble(Broker.CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START,
-        Broker.DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START);
+    double minResourcePercentForStartup = _brokerConf.getProperty(
+        Broker.CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START, Broker.DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START);
 
     LOGGER.info("Registering service status handler");
     ServiceStatus.setServiceStatusCallback(_brokerId, new ServiceStatus.MultipleCallbackServiceStatusCallback(
@@ -342,7 +347,7 @@ public class HelixBrokerStarter implements ServiceStartable {
     // Delay shutdown of request handler so that the pending queries can be finished. The participant Helix manager has
     // been disconnected, so instance should disappear from ExternalView soon and stop getting new queries.
     long delayShutdownTimeMs =
-        _brokerConf.getLong(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, Broker.DEFAULT_DELAY_SHUTDOWN_TIME_MS);
+        _brokerConf.getProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, Broker.DEFAULT_DELAY_SHUTDOWN_TIME_MS);
     LOGGER
         .info("Wait for {}ms before shutting down request handler to finish the pending queries", delayShutdownTimeMs);
     try {
@@ -389,13 +394,13 @@ public class HelixBrokerStarter implements ServiceStartable {
     return _brokerRequestHandler;
   }
 
-  public static HelixBrokerStarter getDefault()
-      throws Exception {
-    Configuration brokerConf = new BaseConfiguration();
-    int port = 5001;
-    brokerConf.addProperty(Helix.KEY_OF_BROKER_QUERY_PORT, port);
-    brokerConf.addProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
-    return new HelixBrokerStarter(brokerConf, "quickstart", "localhost:2122");
+  public static HelixBrokerStarter getDefault() throws Exception {
+    Map<String, Object> properties = new HashMap<>();
+    
+    properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, 5001);
+    properties.put(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
+    
+    return new HelixBrokerStarter(new PinotConfiguration(properties), "quickstart", "localhost:2122");
   }
 
   public static void main(String[] args)

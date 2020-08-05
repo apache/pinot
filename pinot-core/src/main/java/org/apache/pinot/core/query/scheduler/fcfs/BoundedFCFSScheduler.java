@@ -19,8 +19,9 @@
 package org.apache.pinot.core.query.scheduler.fcfs;
 
 import java.util.concurrent.atomic.LongAccumulator;
+
 import javax.annotation.Nonnull;
-import org.apache.commons.configuration.Configuration;
+
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.scheduler.MultiLevelPriorityQueue;
@@ -31,8 +32,7 @@ import org.apache.pinot.core.query.scheduler.SchedulerPriorityQueue;
 import org.apache.pinot.core.query.scheduler.TableBasedGroupMapper;
 import org.apache.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
@@ -41,14 +41,12 @@ import org.slf4j.LoggerFactory;
  * concrete classes. All the scheduling logic resides in {@link PriorityScheduler}
  */
 public class BoundedFCFSScheduler extends PriorityScheduler {
-  private static Logger LOGGER = LoggerFactory.getLogger(BoundedFCFSScheduler.class);
-
-  public static BoundedFCFSScheduler create(@Nonnull Configuration config, @Nonnull QueryExecutor queryExecutor,
+  public static BoundedFCFSScheduler create(@Nonnull PinotConfiguration config, @Nonnull QueryExecutor queryExecutor,
       @Nonnull ServerMetrics serverMetrics, @Nonnull LongAccumulator latestQueryTime) {
     final ResourceManager rm = new PolicyBasedResourceManager(config);
     final SchedulerGroupFactory groupFactory = new SchedulerGroupFactory() {
       @Override
-      public SchedulerGroup create(Configuration config, String groupName) {
+      public SchedulerGroup create(PinotConfiguration config, String groupName) {
         return new FCFSSchedulerGroup(groupName);
       }
     };
@@ -56,7 +54,7 @@ public class BoundedFCFSScheduler extends PriorityScheduler {
     return new BoundedFCFSScheduler(config, rm, queryExecutor, queue, serverMetrics, latestQueryTime);
   }
 
-  private BoundedFCFSScheduler(@Nonnull Configuration config, @Nonnull ResourceManager resourceManager,
+  private BoundedFCFSScheduler(@Nonnull PinotConfiguration config, @Nonnull ResourceManager resourceManager,
       @Nonnull QueryExecutor queryExecutor, @Nonnull SchedulerPriorityQueue queue, @Nonnull ServerMetrics metrics,
       @Nonnull LongAccumulator latestQueryTime) {
     super(config, resourceManager, queryExecutor, queue, metrics, latestQueryTime);

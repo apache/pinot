@@ -20,6 +20,7 @@ package org.apache.pinot.core.data.readers;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.io.IOException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -145,11 +146,7 @@ public class PinotSegmentRecordReader implements RecordReader {
   private GenericRow getRecord(GenericRow reuse, int docId) {
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       String fieldName = fieldSpec.getName();
-      if (fieldSpec.isSingleValueField()) {
-        reuse.putField(fieldName, _columnReaderMap.get(fieldName).readSV(docId, fieldSpec.getDataType()));
-      } else {
-        reuse.putField(fieldName, _columnReaderMap.get(fieldName).readMV(docId));
-      }
+      reuse.putValue(fieldName, _columnReaderMap.get(fieldName).getValue(docId));
     }
     return reuse;
   }
@@ -160,7 +157,11 @@ public class PinotSegmentRecordReader implements RecordReader {
   }
 
   @Override
-  public void close() {
+  public void close()
+      throws IOException {
+    for (PinotSegmentColumnReader columnReader : _columnReaderMap.values()) {
+      columnReader.close();
+    }
     _immutableSegment.destroy();
   }
 }

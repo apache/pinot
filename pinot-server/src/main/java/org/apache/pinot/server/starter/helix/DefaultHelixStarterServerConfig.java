@@ -18,11 +18,9 @@
  */
 package org.apache.pinot.server.starter.helix;
 
-import java.util.Iterator;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.server.conf.ServerConf;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,20 +28,20 @@ import org.slf4j.LoggerFactory;
 public class DefaultHelixStarterServerConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultHelixStarterServerConfig.class);
 
-  public static ServerConf getDefaultHelixServerConfig(Configuration externalConfigs) {
-    Configuration defaultConfigs = loadDefaultServerConf();
-    @SuppressWarnings("unchecked")
-    Iterator<String> iterable = externalConfigs.getKeys();
-    while (iterable.hasNext()) {
-      String key = iterable.next();
-      defaultConfigs.setProperty(key, externalConfigs.getProperty(key));
+  public static ServerConf getDefaultHelixServerConfig(PinotConfiguration externalConfigs) {
+    PinotConfiguration defaultConfigs = loadDefaultServerConf();
+    
+    for (String key: externalConfigs.getKeys()) {
+      defaultConfigs.setProperty(key, externalConfigs.getRawProperty(key));
+      
       LOGGER.info("External config key: {}, value: {}", key, externalConfigs.getProperty(key));
     }
     return new ServerConf(defaultConfigs);
   }
 
-  public static Configuration loadDefaultServerConf() {
-    Configuration serverConf = new PropertiesConfiguration();
+  public static PinotConfiguration loadDefaultServerConf() {
+    PinotConfiguration serverConf = new PinotConfiguration();
+    
     serverConf.addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR,
         CommonConstants.Server.DEFAULT_INSTANCE_DATA_DIR);
     serverConf.addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR,

@@ -19,8 +19,9 @@
 package org.apache.pinot.core.operator.dociditerators;
 
 import org.apache.pinot.core.common.Constants;
-import org.apache.pinot.core.operator.docvalsets.MultiValueSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -30,19 +31,23 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  * The {@code MVScanDocIdIterator} is the scan-based iterator for MVScanDocIdSet to scan a multi-value column for the
  * matching document ids.
  */
+@SuppressWarnings({"rawtypes", "unchecked"})
 public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   private final PredicateEvaluator _predicateEvaluator;
-  private final MultiValueSet _valueSet;
+  private final ForwardIndexReader _reader;
+  // TODO: Figure out a way to close the reader context
+  private final ForwardIndexReaderContext _readerContext;
   private final int _numDocs;
   private final int[] _dictIdBuffer;
 
   private int _nextDocId = 0;
   private long _numEntriesScanned = 0L;
 
-  public MVScanDocIdIterator(PredicateEvaluator predicateEvaluator, MultiValueSet valueSet, int numDocs,
+  public MVScanDocIdIterator(PredicateEvaluator predicateEvaluator, ForwardIndexReader reader, int numDocs,
       int maxNumEntriesPerValue) {
     _predicateEvaluator = predicateEvaluator;
-    _valueSet = valueSet;
+    _reader = reader;
+    _readerContext = reader.createContext();
     _numDocs = numDocs;
     _dictIdBuffer = new int[maxNumEntriesPerValue];
   }
@@ -51,7 +56,7 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   public int next() {
     while (_nextDocId < _numDocs) {
       int nextDocId = _nextDocId++;
-      int length = _valueSet.getIntValues(nextDocId, _dictIdBuffer);
+      int length = _reader.getDictIdMV(nextDocId, _dictIdBuffer, _readerContext);
       _numEntriesScanned += length;
       if (_predicateEvaluator.applyMV(_dictIdBuffer, length)) {
         return nextDocId;
@@ -72,7 +77,7 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     IntIterator docIdIterator = docIds.getIntIterator();
     int nextDocId;
     while (docIdIterator.hasNext() && (nextDocId = docIdIterator.next()) < _numDocs) {
-      int length = _valueSet.getIntValues(nextDocId, _dictIdBuffer);
+      int length = _reader.getDictIdMV(nextDocId, _dictIdBuffer, _readerContext);
       _numEntriesScanned += length;
       if (_predicateEvaluator.applyMV(_dictIdBuffer, length)) {
         result.add(nextDocId);

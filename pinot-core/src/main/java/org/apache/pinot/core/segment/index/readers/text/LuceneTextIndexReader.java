@@ -77,7 +77,8 @@ public class LuceneTextIndexReader implements InvertedIndexReader<MutableRoaring
       _indexDirectory = FSDirectory.open(indexFile.toPath());
       _indexReader = DirectoryReader.open(_indexDirectory);
       _indexSearcher = new IndexSearcher(_indexReader);
-      if (textIndexProperties == null || !Boolean.parseBoolean(textIndexProperties.get(FieldConfig.TEXT_INDEX_ENABLE_QUERY_CACHE))) {
+      if (textIndexProperties == null || !Boolean
+          .parseBoolean(textIndexProperties.get(FieldConfig.TEXT_INDEX_ENABLE_QUERY_CACHE))) {
         // Disable Lucene query result cache. While it helps a lot with performance for
         // repeated queries, on the downside it cause heap issues.
         _indexSearcher.setQueryCache(null);
@@ -122,14 +123,8 @@ public class LuceneTextIndexReader implements InvertedIndexReader<MutableRoaring
     throw new IllegalStateException("Using dictionary ID is not supported on Lucene inverted index");
   }
 
-  /**
-   * Get docIds from the text inverted index for a given raw value
-   * @param value value to look for in the inverted index
-   * @return docIDs in bitmap
-   */
   @Override
-  public MutableRoaringBitmap getDocIds(Object value) {
-    String searchQuery = (String) value;
+  public MutableRoaringBitmap getDocIds(String searchQuery) {
     MutableRoaringBitmap docIds = new MutableRoaringBitmap();
     Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
     try {
@@ -141,7 +136,8 @@ public class LuceneTextIndexReader implements InvertedIndexReader<MutableRoaring
       _indexSearcher.search(query, docIDCollector);
       return docIds;
     } catch (Exception e) {
-      String msg = "Caught excepttion while searching the text index for column:" + _column + " search query:" + searchQuery;
+      String msg =
+          "Caught excepttion while searching the text index for column:" + _column + " search query:" + searchQuery;
       throw new RuntimeException(msg, e);
     }
   }
@@ -195,7 +191,8 @@ public class LuceneTextIndexReader implements InvertedIndexReader<MutableRoaring
             int pinotDocId = Integer.parseInt(document.get(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME));
             _buffer.putInt(i * Integer.BYTES, pinotDocId);
           } catch (Exception e) {
-            throw new RuntimeException("Caught exception while building doc id mapping for text index column: " + column, e);
+            throw new RuntimeException(
+                "Caught exception while building doc id mapping for text index column: " + column, e);
           }
         }
       }

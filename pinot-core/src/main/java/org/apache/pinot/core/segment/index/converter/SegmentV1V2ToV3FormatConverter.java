@@ -41,6 +41,7 @@ import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
 import org.apache.pinot.core.startree.v2.StarTreeV2Constants;
+import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -209,7 +210,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     File v2MetadataFile = new File(currentDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
     File v3MetadataFile = new File(v3Dir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
 
-    final PropertiesConfiguration properties = new PropertiesConfiguration(v2MetadataFile);
+    final PropertiesConfiguration properties = CommonsConfigurationUtils.fromFile(v2MetadataFile);
     // update the segment version
     properties.setProperty(V1Constants.MetadataKeys.Segment.SEGMENT_VERSION, SegmentVersion.v3.toString());
     properties.save(v3MetadataFile);

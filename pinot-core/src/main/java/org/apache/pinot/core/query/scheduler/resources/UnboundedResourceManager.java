@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.query.scheduler.resources;
 
-import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
@@ -30,7 +30,7 @@ import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
  */
 public class UnboundedResourceManager extends ResourceManager {
 
-  public UnboundedResourceManager(Configuration config) {
+  public UnboundedResourceManager(PinotConfiguration config) {
     super(config);
   }
 

@@ -21,9 +21,10 @@ package org.apache.pinot.broker.requesthandler;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.commons.configuration.Configuration;
+
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.broker.api.RequestStatistics;
@@ -43,6 +44,7 @@ import org.apache.pinot.core.transport.QueryRouter;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerResponse;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
@@ -54,7 +56,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final QueryRouter _queryRouter;
 
-  public SingleConnectionBrokerRequestHandler(Configuration config, RoutingManager routingManager,
+  public SingleConnectionBrokerRequestHandler(PinotConfiguration config, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, BrokerMetrics brokerMetrics,
       ZkHelixPropertyStore<ZNRecord> propertyStore) {
     super(config, routingManager, accessControlFactory, queryQuotaManager, brokerMetrics, propertyStore);

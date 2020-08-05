@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.tools.perf;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.base.Preconditions;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -31,13 +28,14 @@ import java.io.OutputStreamWriter;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+
 import javax.annotation.Nullable;
-import org.apache.commons.configuration.BaseConfiguration;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
+
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
@@ -55,6 +53,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -63,8 +62,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.base.Preconditions;
 
-@SuppressWarnings("FieldCanBeLocal")
+
 public class PerfBenchmarkDriver {
   private static final Logger LOGGER = LoggerFactory.getLogger(PerfBenchmarkDriver.class);
   private static final long BROKER_TIMEOUT_MS = 60_000L;
@@ -219,12 +221,15 @@ public class PerfBenchmarkDriver {
       LOGGER.info("Skipping start broker step. Assumes broker is already started.");
       return;
     }
-    Configuration brokerConf = new BaseConfiguration();
     String brokerInstanceName = "Broker_localhost_" + CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT;
-    brokerConf.setProperty(CommonConstants.Helix.Instance.INSTANCE_ID_KEY, brokerInstanceName);
-    brokerConf.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS, BROKER_TIMEOUT_MS);
+
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Helix.Instance.INSTANCE_ID_KEY, brokerInstanceName);
+    properties.put(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS, BROKER_TIMEOUT_MS);
+
     LOGGER.info("Starting broker instance: {}", brokerInstanceName);
-    new HelixBrokerStarter(brokerConf, _clusterName, _zkAddress).start();
+
+    new HelixBrokerStarter(new PinotConfiguration(properties), _clusterName, _zkAddress).start();
   }
 
   private void startServer()
@@ -233,17 +238,20 @@ public class PerfBenchmarkDriver {
       LOGGER.info("Skipping start server step. Assumes server is already started.");
       return;
     }
-    Configuration serverConfiguration = new PropertiesConfiguration();
-    serverConfiguration.addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR, _serverInstanceDataDir);
-    serverConfiguration
-        .addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, _serverInstanceSegmentTarDir);
-    serverConfiguration.addProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST, "localhost");
+
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR, _serverInstanceDataDir);
+    properties.put(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, _serverInstanceSegmentTarDir);
+    properties.put(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST, "localhost");
+    properties.put(CommonConstants.Server.CONFIG_OF_INSTANCE_ID, _serverInstanceName);
     if (_segmentFormatVersion != null) {
-      serverConfiguration.setProperty(CommonConstants.Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, _segmentFormatVersion);
+      properties.put(CommonConstants.Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, _segmentFormatVersion);
     }
-    serverConfiguration.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID, _serverInstanceName);
+
     LOGGER.info("Starting server instance: {}", _serverInstanceName);
-    HelixServerStarter helixServerStarter = new HelixServerStarter(_clusterName, _zkAddress, serverConfiguration);
+
+    HelixServerStarter helixServerStarter =
+        new HelixServerStarter(_clusterName, _zkAddress, new PinotConfiguration(properties));
     helixServerStarter.start();
   }
 

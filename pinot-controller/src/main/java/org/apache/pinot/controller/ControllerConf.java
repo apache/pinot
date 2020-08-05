@@ -18,48 +18,44 @@
  */
 package org.apache.pinot.controller;
 
-import java.io.File;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Optional;
-import java.util.Random;
-import java.util.stream.Collectors;
-
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
-import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.spi.filesystem.LocalPinotFS;
-
 import static org.apache.pinot.common.utils.CommonConstants.Controller.CONFIG_OF_CONTROLLER_METRICS_PREFIX;
 import static org.apache.pinot.common.utils.CommonConstants.Controller.DEFAULT_METRICS_PREFIX;
 
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Random;
 
-public class ControllerConf extends PropertiesConfiguration {
-  private static final String CONTROLLER_VIP_HOST = "controller.vip.host";
-  private static final String CONTROLLER_VIP_PORT = "controller.vip.port";
-  private static final String CONTROLLER_VIP_PROTOCOL = "controller.vip.protocol";
-  private static final String CONTROLLER_HOST = "controller.host";
-  private static final String CONTROLLER_PORT = "controller.port";
-  private static final String CONTROLLER_ACCESS_PROTOCOLS = "controller.access.protocols";
-  private static final String DATA_DIR = "controller.data.dir";
+import org.apache.commons.configuration.Configuration;
+import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
+import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.filesystem.LocalPinotFS;
+
+
+public class ControllerConf extends PinotConfiguration {
+  public static final String CONTROLLER_VIP_HOST = "controller.vip.host";
+  public static final String CONTROLLER_VIP_PORT = "controller.vip.port";
+  public static final String CONTROLLER_VIP_PROTOCOL = "controller.vip.protocol";
+  public static final String CONTROLLER_HOST = "controller.host";
+  public static final String CONTROLLER_PORT = "controller.port";
+  public static final String CONTROLLER_ACCESS_PROTOCOLS = "controller.access.protocols";
+  public static final String DATA_DIR = "controller.data.dir";
   // Potentially same as data dir if local
-  private static final String LOCAL_TEMP_DIR = "controller.local.temp.dir";
-  private static final String ZK_STR = "controller.zk.str";
+  public static final String LOCAL_TEMP_DIR = "controller.local.temp.dir";
+  public static final String ZK_STR = "controller.zk.str";
   // boolean: Update the statemodel on boot?
-  private static final String UPDATE_SEGMENT_STATE_MODEL = "controller.update_segment_state_model";
-  private static final String HELIX_CLUSTER_NAME = "controller.helix.cluster.name";
-  private static final String CLUSTER_TENANT_ISOLATION_ENABLE = "cluster.tenant.isolation.enable";
-  private static final String CONSOLE_WEBAPP_ROOT_PATH = "controller.query.console";
-  private static final String CONSOLE_WEBAPP_USE_HTTPS = "controller.query.console.useHttps";
-  private static final String EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT = "controller.upload.onlineToOfflineTimeout";
-  private static final String CONTROLLER_MODE = "controller.mode";
-  private static final String LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY = "controller.resource.rebalance.strategy";
+  public static final String UPDATE_SEGMENT_STATE_MODEL = "controller.update_segment_state_model";
+  public static final String HELIX_CLUSTER_NAME = "controller.helix.cluster.name";
+  public static final String CLUSTER_TENANT_ISOLATION_ENABLE = "cluster.tenant.isolation.enable";
+  public static final String CONSOLE_WEBAPP_ROOT_PATH = "controller.query.console";
+  public static final String CONSOLE_WEBAPP_USE_HTTPS = "controller.query.console.useHttps";
+  public static final String EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT = "controller.upload.onlineToOfflineTimeout";
+  public static final String CONTROLLER_MODE = "controller.mode";
+  public static final String LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY = "controller.resource.rebalance.strategy";
 
   public enum ControllerMode {
     DUAL, PINOT_ONLY, HELIX_ONLY
@@ -67,38 +63,38 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public static class ControllerPeriodicTasksConf {
     // frequency configs
-    private static final String RETENTION_MANAGER_FREQUENCY_IN_SECONDS = "controller.retention.frequencyInSeconds";
+    public static final String RETENTION_MANAGER_FREQUENCY_IN_SECONDS = "controller.retention.frequencyInSeconds";
     @Deprecated
     // The ValidationManager has been split up into 3 separate tasks, each having their own frequency config settings
-    private static final String DEPRECATED_VALIDATION_MANAGER_FREQUENCY_IN_SECONDS =
+    public static final String DEPRECATED_VALIDATION_MANAGER_FREQUENCY_IN_SECONDS =
         "controller.validation.frequencyInSeconds";
-    private static final String OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS =
+    public static final String OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS =
         "controller.offline.segment.interval.checker.frequencyInSeconds";
-    private static final String REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS =
+    public static final String REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS =
         "controller.realtime.segment.validation.frequencyInSeconds";
-    private static final String BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS =
+    public static final String BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS =
         "controller.broker.resource.validation.frequencyInSeconds";
-    private static final String BROKER_RESOURCE_VALIDATION_INITIAL_DELAY_IN_SECONDS =
+    public static final String BROKER_RESOURCE_VALIDATION_INITIAL_DELAY_IN_SECONDS =
         "controller.broker.resource.validation.initialDelayInSeconds";
-    private static final String STATUS_CHECKER_FREQUENCY_IN_SECONDS = "controller.statuschecker.frequencyInSeconds";
-    private static final String STATUS_CHECKER_WAIT_FOR_PUSH_TIME_IN_SECONDS =
+    public static final String STATUS_CHECKER_FREQUENCY_IN_SECONDS = "controller.statuschecker.frequencyInSeconds";
+    public static final String STATUS_CHECKER_WAIT_FOR_PUSH_TIME_IN_SECONDS =
         "controller.statuschecker.waitForPushTimeInSeconds";
-    private static final String TASK_MANAGER_FREQUENCY_IN_SECONDS = "controller.task.frequencyInSeconds";
-    private static final String REALTIME_SEGMENT_RELOCATOR_FREQUENCY =
+    public static final String TASK_MANAGER_FREQUENCY_IN_SECONDS = "controller.task.frequencyInSeconds";
+    public static final String REALTIME_SEGMENT_RELOCATOR_FREQUENCY =
         "controller.realtime.segment.relocator.frequency";
     // Because segment level validation is expensive and requires heavy ZK access, we run segment level validation with a
     // separate interval
-    private static final String SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS =
+    public static final String SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS =
         "controller.segment.level.validation.intervalInSeconds";
 
     // Initial delays
-    private static final String STATUS_CHECKER_INITIAL_DELAY_IN_SECONDS =
+    public static final String STATUS_CHECKER_INITIAL_DELAY_IN_SECONDS =
         "controller.statusChecker.initialDelayInSeconds";
-    private static final String RETENTION_MANAGER_INITIAL_DELAY_IN_SECONDS =
+    public static final String RETENTION_MANAGER_INITIAL_DELAY_IN_SECONDS =
         "controller.retentionManager.initialDelayInSeconds";
-    private static final String OFFLINE_SEGMENT_INTERVAL_CHECKER_INITIAL_DELAY_IN_SECONDS =
+    public static final String OFFLINE_SEGMENT_INTERVAL_CHECKER_INITIAL_DELAY_IN_SECONDS =
         "controller.offlineSegmentIntervalChecker.initialDelayInSeconds";
-    private static final String REALTIME_SEGMENT_RELOCATION_INITIAL_DELAY_IN_SECONDS =
+    public static final String REALTIME_SEGMENT_RELOCATION_INITIAL_DELAY_IN_SECONDS =
         "controller.realtimeSegmentRelocation.initialDelayInSeconds";
 
     public static final int MIN_INITIAL_DELAY_IN_SECONDS = 120;
@@ -125,11 +121,11 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = "server.request.timeoutSeconds";
   private static final String SEGMENT_COMMIT_TIMEOUT_SECONDS = "controller.realtime.segment.commit.timeoutSeconds";
   private static final String DELETED_SEGMENTS_RETENTION_IN_DAYS = "controller.deleted.segments.retentionInDays";
-  private static final String TABLE_MIN_REPLICAS = "table.minReplicas";
-  private static final String ENABLE_SPLIT_COMMIT = "controller.enable.split.commit";
+  public static final String TABLE_MIN_REPLICAS = "table.minReplicas";
+  public static final String ENABLE_SPLIT_COMMIT = "controller.enable.split.commit";
   private static final String JERSEY_ADMIN_API_PORT = "jersey.admin.api.port";
   private static final String JERSEY_ADMIN_IS_PRIMARY = "jersey.admin.isprimary";
-  private static final String ACCESS_CONTROL_FACTORY_CLASS = "controller.admin.access.control.factory.class";
+  public static final String ACCESS_CONTROL_FACTORY_CLASS = "controller.admin.access.control.factory.class";
   // Amount of the time the segment can take from the beginning of upload to the end of upload. Used when parallel push
   // protection is enabled. If the upload does not finish within the timeout, next upload can override the previous one.
   private static final String SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = "controller.segment.upload.timeoutInMillis";
@@ -140,10 +136,9 @@ public class ControllerConf extends PropertiesConfiguration {
   // It is used to disable the HLC realtime segment completion and disallow HLC table in the cluster. True by default.
   // If it's set to false, existing HLC realtime tables will stop consumption, and creation of new HLC tables will be disallowed.
   // Please make sure there is no HLC table running in the cluster before disallowing it.
-  private static final String ALLOW_HLC_TABLES = "controller.allow.hlc.tables";
+  public static final String ALLOW_HLC_TABLES = "controller.allow.hlc.tables";
 
   // Defines the kind of storage and the underlying PinotFS implementation
-  private static final String PINOT_FS_FACTORY_CLASS_PREFIX = "controller.storage.factory.class";
   private static final String PINOT_FS_FACTORY_CLASS_LOCAL = "controller.storage.factory.class.file";
 
   private static final long DEFAULT_EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT_MILLIS = 120_000L; // 2 minutes
@@ -165,22 +160,16 @@ public class ControllerConf extends PropertiesConfiguration {
 
   private static final String DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL = LocalPinotFS.class.getName();
 
-  public ControllerConf(File file)
-      throws ConfigurationException {
-    super(file);
-  }
-
   public ControllerConf() {
-    super();
+    super(new HashMap<>());
+  }
+  
+  public ControllerConf(Map<String, Object> baseProperties) {
+    super(baseProperties);
   }
 
-  public ControllerConf(Configuration conf) {
-    super();
-    Iterator<String> keysIterator = conf.getKeys();
-    while(keysIterator.hasNext()) {
-      String key = keysIterator.next();
-      this.setProperty(key, conf.getProperty(key));
-    }
+  public ControllerConf(Configuration baseConfiguration) {
+    super(baseConfiguration);
   }
 
   public void setLocalTempDir(String localTempDir) {
@@ -188,7 +177,7 @@ public class ControllerConf extends PropertiesConfiguration {
   }
 
   public String getLocalTempDir() {
-    return getString(LOCAL_TEMP_DIR);
+    return getProperty(LOCAL_TEMP_DIR);
   }
 
   public void setPinotFSFactoryClasses(Configuration pinotFSFactoryClasses) {
@@ -209,10 +198,9 @@ public class ControllerConf extends PropertiesConfiguration {
   }
 
   public String getQueryConsoleWebappPath() {
-    if (containsKey(CONSOLE_WEBAPP_ROOT_PATH)) {
-      return (String) getProperty(CONSOLE_WEBAPP_ROOT_PATH);
-    }
-    return ControllerConf.class.getClassLoader().getResource("webapp").toExternalForm();
+    return Optional.ofNullable(getProperty(CONSOLE_WEBAPP_ROOT_PATH))
+
+        .orElseGet(() -> ControllerConf.class.getClassLoader().getResource("webapp").toExternalForm());
   }
 
   public void setQueryConsoleUseHttps(boolean useHttps) {
@@ -220,7 +208,7 @@ public class ControllerConf extends PropertiesConfiguration {
   }
 
   public boolean getQueryConsoleUseHttps() {
-    return containsKey(CONSOLE_WEBAPP_USE_HTTPS) && getBoolean(CONSOLE_WEBAPP_USE_HTTPS);
+    return getProperty(CONSOLE_WEBAPP_USE_HTTPS, false);
   }
 
   public void setJerseyAdminPrimary(String jerseyAdminPrimary) {
@@ -270,54 +258,49 @@ public class ControllerConf extends PropertiesConfiguration {
   // A boolean to decide whether Jersey API should be the primary one. For now, we set this to be false,
   // but we turn it on to true when we are sure that jersey api has no backward compatibility problems.
   public boolean isJerseyAdminPrimary() {
-    return getBoolean(JERSEY_ADMIN_IS_PRIMARY, true);
+    return getProperty(JERSEY_ADMIN_IS_PRIMARY, true);
   }
 
   public String getHelixClusterName() {
-    return (String) getProperty(HELIX_CLUSTER_NAME);
+    return getProperty(HELIX_CLUSTER_NAME);
   }
 
   public String getControllerHost() {
-    return (String) getProperty(CONTROLLER_HOST);
+    return getProperty(CONTROLLER_HOST);
   }
 
   public String getControllerPort() {
-    return (String) getProperty(CONTROLLER_PORT);
+    return getProperty(CONTROLLER_PORT);
   }
-
+  
   public List<String> getControllerAccessProtocols() {
-    return Optional.ofNullable(getStringArray(CONTROLLER_ACCESS_PROTOCOLS))
-
-        .map(protocols -> Arrays.stream(protocols).collect(Collectors.toList()))
-
-        // http will be defaulted only if the legacy controller.port property is not defined.
-        .orElseGet(() -> getControllerPort() == null ? Arrays.asList("http") : Arrays.asList());
+    return getProperty(CONTROLLER_ACCESS_PROTOCOLS,
+        getControllerPort() == null ? Arrays.asList("http") : Arrays.asList());
   }
 
   public String getControllerAccessProtocolProperty(String protocol, String property) {
-    return getString(CONTROLLER_ACCESS_PROTOCOLS + "." + protocol + "." + property);
+    return getProperty(CONTROLLER_ACCESS_PROTOCOLS + "." + protocol + "." + property);
   }
 
   public String getControllerAccessProtocolProperty(String protocol, String property, String defaultValue) {
-    return getString(CONTROLLER_ACCESS_PROTOCOLS + "." + protocol + "." + property, defaultValue);
+    return getProperty(CONTROLLER_ACCESS_PROTOCOLS + "." + protocol + "." + property, defaultValue);
+  }
+
+  public boolean getControllerAccessProtocolProperty(String protocol, String property, boolean defaultValue) {
+    return getProperty(CONTROLLER_ACCESS_PROTOCOLS + "." + protocol + "." + property, defaultValue);
   }
 
   public String getDataDir() {
-    return (String) getProperty(DATA_DIR);
+    return getProperty(DATA_DIR);
   }
 
   public int getSegmentCommitTimeoutSeconds() {
-    if (containsKey(SEGMENT_COMMIT_TIMEOUT_SECONDS)) {
-      return Integer.parseInt((String) getProperty(SEGMENT_COMMIT_TIMEOUT_SECONDS));
-    }
-    return SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSeconds();
+    return getProperty(SEGMENT_COMMIT_TIMEOUT_SECONDS,
+        SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSeconds());
   }
 
   public boolean isUpdateSegmentStateModel() {
-    if (containsKey(UPDATE_SEGMENT_STATE_MODEL)) {
-      return Boolean.parseBoolean(getProperty(UPDATE_SEGMENT_STATE_MODEL).toString());
-    }
-    return false;   // Default is to leave the statemodel untouched.
+    return getProperty(UPDATE_SEGMENT_STATE_MODEL, false);
   }
 
   public String generateVipUrl() {
@@ -325,20 +308,7 @@ public class ControllerConf extends PropertiesConfiguration {
   }
 
   public String getZkStr() {
-    Object zkAddressObj = getProperty(ZK_STR);
-
-    // The set method converted comma separated string into ArrayList, so need to convert back to String here.
-    if (zkAddressObj instanceof ArrayList) {
-      List<String> zkAddressList = (ArrayList<String>) zkAddressObj;
-      String[] zkAddress = zkAddressList.toArray(new String[0]);
-      return StringUtil.join(",", zkAddress);
-    } else if (zkAddressObj instanceof String) {
-      return (String) zkAddressObj;
-    } else {
-      throw new RuntimeException(
-          "Unexpected data type for zkAddress PropertiesConfiguration, expecting String but got " + zkAddressObj
-              .getClass().getName());
-    }
+    return getProperty(ZK_STR);
   }
 
   @Override
@@ -346,55 +316,50 @@ public class ControllerConf extends PropertiesConfiguration {
     return super.toString();
   }
 
-  public Configuration getPinotFSFactoryClasses() {
-    return this.subset(PINOT_FS_FACTORY_CLASS_PREFIX);
-  }
-
   public boolean getAcceptSplitCommit() {
-    return getBoolean(ENABLE_SPLIT_COMMIT, DEFAULT_ENABLE_SPLIT_COMMIT);
+    return getProperty(ENABLE_SPLIT_COMMIT, DEFAULT_ENABLE_SPLIT_COMMIT);
   }
 
   public String getControllerVipHost() {
-    if (containsKey(CONTROLLER_VIP_HOST) && ((String) getProperty(CONTROLLER_VIP_HOST)).length() > 0) {
-      return (String) getProperty(CONTROLLER_VIP_HOST);
-    }
-    return (String) getProperty(CONTROLLER_HOST);
+    return Optional.ofNullable(getProperty(CONTROLLER_VIP_HOST))
+
+        .filter(controllerVipHost -> !controllerVipHost.isEmpty())
+
+        .orElseGet(() -> getProperty(CONTROLLER_HOST));
   }
 
   public String getControllerVipPort() {
-    if (containsKey(CONTROLLER_VIP_PORT) && ((String) getProperty(CONTROLLER_VIP_PORT)).length() > 0) {
-      return (String) getProperty(CONTROLLER_VIP_PORT);
-    }
+    return Optional.ofNullable(getProperty(CONTROLLER_VIP_PORT))
 
-    // Vip port is not explicitly defined. Initiate discovery from the configured protocols.
-    return getControllerAccessProtocols().stream()
+        .filter(controllerVipPort -> !controllerVipPort.isEmpty())
 
-        .filter(protocol -> Boolean.parseBoolean(getControllerAccessProtocolProperty(protocol, "vip", "false")))
+        .orElseGet(() -> getControllerAccessProtocols().stream()
 
-        .map(protocol -> Optional.ofNullable(getControllerAccessProtocolProperty(protocol, "port")))
+            .filter(protocol -> getControllerAccessProtocolProperty(protocol, "vip", false))
 
-        .filter(Optional::isPresent)
+            .map(protocol -> Optional.ofNullable(getControllerAccessProtocolProperty(protocol, "port")))
 
-        .map(Optional::get)
+            .filter(Optional::isPresent)
 
-        .findFirst()
+            .map(Optional::get)
 
-        // No protocol defines a port as VIP. Fallback on legacy controller.port property.
-        .orElseGet(this::getControllerPort);
-  }
+            .findFirst()
+
+            // No protocol defines a port as VIP. Fallback on legacy controller.port property.
+            .orElseGet(this::getControllerPort));
+  }  
 
   public String getControllerVipProtocol() {
-    if (containsKey(CONTROLLER_VIP_PROTOCOL) && getProperty(CONTROLLER_VIP_PROTOCOL).equals(CommonConstants.HTTPS_PROTOCOL)) {
-      return CommonConstants.HTTPS_PROTOCOL;
-    }
-    return CommonConstants.HTTP_PROTOCOL;
+    return Optional.ofNullable(getProperty(CONTROLLER_VIP_PROTOCOL))
+
+        .filter(protocol -> CommonConstants.HTTPS_PROTOCOL.equals(protocol))
+
+        .orElse(CommonConstants.HTTP_PROTOCOL);
   }
 
   public int getRetentionControllerFrequencyInSeconds() {
-    if (containsKey(ControllerPeriodicTasksConf.RETENTION_MANAGER_FREQUENCY_IN_SECONDS)) {
-      return Integer.parseInt((String) getProperty(ControllerPeriodicTasksConf.RETENTION_MANAGER_FREQUENCY_IN_SECONDS));
-    }
-    return ControllerPeriodicTasksConf.DEFAULT_RETENTION_CONTROLLER_FREQUENCY_IN_SECONDS;
+    return getProperty(ControllerPeriodicTasksConf.RETENTION_MANAGER_FREQUENCY_IN_SECONDS,
+        ControllerPeriodicTasksConf.DEFAULT_RETENTION_CONTROLLER_FREQUENCY_IN_SECONDS);
   }
 
   public void setRetentionControllerFrequencyInSeconds(int retentionFrequencyInSeconds) {
@@ -410,11 +375,7 @@ public class ControllerConf extends PropertiesConfiguration {
    * @return
    */
   public int getOfflineSegmentIntervalCheckerFrequencyInSeconds() {
-    if (containsKey(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS)) {
-      return Integer.parseInt(
-          (String) getProperty(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS));
-    }
-    return getInt(ControllerPeriodicTasksConf.SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS,
+    return getProperty(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS,
         ControllerPeriodicTasksConf.DEFAULT_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS);
   }
 
@@ -431,12 +392,12 @@ public class ControllerConf extends PropertiesConfiguration {
    * @return
    */
   public int getRealtimeSegmentValidationFrequencyInSeconds() {
-    if (containsKey(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS)) {
-      return Integer
-          .parseInt((String) getProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS));
-    }
-    return getInt(ControllerPeriodicTasksConf.DEPRECATED_VALIDATION_MANAGER_FREQUENCY_IN_SECONDS,
-        ControllerPeriodicTasksConf.DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS);
+    return Optional
+        .ofNullable(
+            getProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS, Integer.class))
+
+        .orElseGet(() -> getProperty(ControllerPeriodicTasksConf.DEPRECATED_VALIDATION_MANAGER_FREQUENCY_IN_SECONDS,
+            ControllerPeriodicTasksConf.DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS));
   }
 
   public void setRealtimeSegmentValidationFrequencyInSeconds(int validationFrequencyInSeconds) {
@@ -452,12 +413,12 @@ public class ControllerConf extends PropertiesConfiguration {
    * @return
    */
   public int getBrokerResourceValidationFrequencyInSeconds() {
-    if (containsKey(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS)) {
-      return Integer
-          .parseInt((String) getProperty(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS));
-    }
-    return getInt(ControllerPeriodicTasksConf.DEPRECATED_VALIDATION_MANAGER_FREQUENCY_IN_SECONDS,
-        ControllerPeriodicTasksConf.DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS);
+    return Optional
+        .ofNullable(
+            getProperty(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS, Integer.class))
+
+        .orElseGet(() -> getProperty(ControllerPeriodicTasksConf.DEPRECATED_VALIDATION_MANAGER_FREQUENCY_IN_SECONDS,
+            ControllerPeriodicTasksConf.DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS));
   }
 
   public void setBrokerResourceValidationFrequencyInSeconds(int validationFrequencyInSeconds) {
@@ -466,15 +427,13 @@ public class ControllerConf extends PropertiesConfiguration {
   }
 
   public long getBrokerResourceValidationInitialDelayInSeconds() {
-    return getLong(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_INITIAL_DELAY_IN_SECONDS,
+    return getProperty(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_INITIAL_DELAY_IN_SECONDS,
         getPeriodicTaskInitialDelayInSeconds());
   }
 
   public int getStatusCheckerFrequencyInSeconds() {
-    if (containsKey(ControllerPeriodicTasksConf.STATUS_CHECKER_FREQUENCY_IN_SECONDS)) {
-      return Integer.parseInt((String) getProperty(ControllerPeriodicTasksConf.STATUS_CHECKER_FREQUENCY_IN_SECONDS));
-    }
-    return ControllerPeriodicTasksConf.DEFAULT_STATUS_CONTROLLER_FREQUENCY_IN_SECONDS;
+    return getProperty(ControllerPeriodicTasksConf.STATUS_CHECKER_FREQUENCY_IN_SECONDS,
+        ControllerPeriodicTasksConf.DEFAULT_STATUS_CONTROLLER_FREQUENCY_IN_SECONDS);
   }
 
   public void setStatusCheckerFrequencyInSeconds(int statusCheckerFrequencyInSeconds) {
@@ -483,10 +442,8 @@ public class ControllerConf extends PropertiesConfiguration {
   }
 
   public String getRealtimeSegmentRelocatorFrequency() {
-    if (containsKey(ControllerPeriodicTasksConf.REALTIME_SEGMENT_RELOCATOR_FREQUENCY)) {
-      return (String) getProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_RELOCATOR_FREQUENCY);
-    }
-    return ControllerPeriodicTasksConf.DEFAULT_REALTIME_SEGMENT_RELOCATOR_FREQUENCY;
+    return getProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_RELOCATOR_FREQUENCY,
+        ControllerPeriodicTasksConf.DEFAULT_REALTIME_SEGMENT_RELOCATOR_FREQUENCY);
   }
 
   public void setRealtimeSegmentRelocatorFrequency(String relocatorFrequency) {
@@ -494,11 +451,8 @@ public class ControllerConf extends PropertiesConfiguration {
   }
 
   public int getStatusCheckerWaitForPushTimeInSeconds() {
-    if (containsKey(ControllerPeriodicTasksConf.STATUS_CHECKER_WAIT_FOR_PUSH_TIME_IN_SECONDS)) {
-      return Integer
-          .parseInt((String) getProperty(ControllerPeriodicTasksConf.STATUS_CHECKER_WAIT_FOR_PUSH_TIME_IN_SECONDS));
-    }
-    return ControllerPeriodicTasksConf.DEFAULT_STATUS_CONTROLLER_WAIT_FOR_PUSH_TIME_IN_SECONDS;
+    return getProperty(ControllerPeriodicTasksConf.STATUS_CHECKER_WAIT_FOR_PUSH_TIME_IN_SECONDS,
+        ControllerPeriodicTasksConf.DEFAULT_STATUS_CONTROLLER_WAIT_FOR_PUSH_TIME_IN_SECONDS);
   }
 
   public void setStatusCheckerWaitForPushTimeInSeconds(int statusCheckerWaitForPushTimeInSeconds) {
@@ -507,10 +461,7 @@ public class ControllerConf extends PropertiesConfiguration {
   }
 
   public long getExternalViewOnlineToOfflineTimeout() {
-    if (containsKey(EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT)) {
-      return Integer.parseInt((String) getProperty(EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT));
-    }
-    return DEFAULT_EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT_MILLIS;
+    return getProperty(EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT, DEFAULT_EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT_MILLIS);
   }
 
   public void setExternalViewOnlineToOfflineTimeout(long timeout) {
@@ -518,10 +469,7 @@ public class ControllerConf extends PropertiesConfiguration {
   }
 
   public boolean tenantIsolationEnabled() {
-    if (containsKey(CLUSTER_TENANT_ISOLATION_ENABLE)) {
-      return Boolean.parseBoolean(getProperty(CLUSTER_TENANT_ISOLATION_ENABLE).toString());
-    }
-    return true;
+    return getProperty(CLUSTER_TENANT_ISOLATION_ENABLE, true);
   }
 
   public void setTenantIsolationEnabled(boolean isSingleTenant) {
@@ -533,11 +481,11 @@ public class ControllerConf extends PropertiesConfiguration {
   }
 
   public int getServerAdminRequestTimeoutSeconds() {
-    return getInt(SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS, DEFAULT_SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS);
+    return getProperty(SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS, DEFAULT_SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS);
   }
 
   public int getDeletedSegmentsRetentionInDays() {
-    return getInt(DELETED_SEGMENTS_RETENTION_IN_DAYS, DEFAULT_DELETED_SEGMENTS_RETENTION_IN_DAYS);
+    return getProperty(DELETED_SEGMENTS_RETENTION_IN_DAYS, DEFAULT_DELETED_SEGMENTS_RETENTION_IN_DAYS);
   }
 
   public void setDeletedSegmentsRetentionInDays(int retentionInDays) {
@@ -545,7 +493,7 @@ public class ControllerConf extends PropertiesConfiguration {
   }
 
   public int getTaskManagerFrequencyInSeconds() {
-    return getInt(ControllerPeriodicTasksConf.TASK_MANAGER_FREQUENCY_IN_SECONDS,
+    return getProperty(ControllerPeriodicTasksConf.TASK_MANAGER_FREQUENCY_IN_SECONDS,
         ControllerPeriodicTasksConf.DEFAULT_TASK_MANAGER_FREQUENCY_IN_SECONDS);
   }
 
@@ -554,7 +502,7 @@ public class ControllerConf extends PropertiesConfiguration {
   }
 
   public int getDefaultTableMinReplicas() {
-    return getInt(TABLE_MIN_REPLICAS, DEFAULT_TABLE_MIN_REPLICAS);
+    return getProperty(TABLE_MIN_REPLICAS, DEFAULT_TABLE_MIN_REPLICAS);
   }
 
   public void setTableMinReplicas(int minReplicas) {
@@ -562,11 +510,11 @@ public class ControllerConf extends PropertiesConfiguration {
   }
 
   public String getJerseyAdminApiPort() {
-    return getString(JERSEY_ADMIN_API_PORT, String.valueOf(DEFAULT_JERSEY_ADMIN_PORT));
+    return getProperty(JERSEY_ADMIN_API_PORT, String.valueOf(DEFAULT_JERSEY_ADMIN_PORT));
   }
 
   public String getAccessControlFactoryClass() {
-    return getString(ACCESS_CONTROL_FACTORY_CLASS, DEFAULT_ACCESS_CONTROL_FACTORY_CLASS);
+    return getProperty(ACCESS_CONTROL_FACTORY_CLASS, DEFAULT_ACCESS_CONTROL_FACTORY_CLASS);
   }
 
   public void setAccessControlFactoryClass(String accessControlFactoryClass) {
@@ -574,7 +522,7 @@ public class ControllerConf extends PropertiesConfiguration {
   }
 
   public long getSegmentUploadTimeoutInMillis() {
-    return getLong(SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS, DEFAULT_SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS);
+    return getProperty(SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS, DEFAULT_SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS);
   }
 
   public void setSegmentUploadTimeoutInMillis(long segmentUploadTimeoutInMillis) {
@@ -582,7 +530,7 @@ public class ControllerConf extends PropertiesConfiguration {
   }
 
   public int getRealtimeSegmentMetadataCommitNumLocks() {
-    return getInt(REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS, DEFAULT_REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS);
+    return getProperty(REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS, DEFAULT_REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS);
   }
 
   public void setRealtimeSegmentMetadataCommitNumLocks(int realtimeSegmentMetadataCommitNumLocks) {
@@ -590,35 +538,35 @@ public class ControllerConf extends PropertiesConfiguration {
   }
 
   public boolean getEnableStorageQuotaCheck() {
-    return getBoolean(ENABLE_STORAGE_QUOTA_CHECK, DEFAULT_ENABLE_STORAGE_QUOTA_CHECK);
+    return getProperty(ENABLE_STORAGE_QUOTA_CHECK, DEFAULT_ENABLE_STORAGE_QUOTA_CHECK);
   }
 
   public boolean getEnableBatchMessageMode() {
-    return getBoolean(ENABLE_BATCH_MESSAGE_MODE, DEFAULT_ENABLE_BATCH_MESSAGE_MODE);
+    return getProperty(ENABLE_BATCH_MESSAGE_MODE, DEFAULT_ENABLE_BATCH_MESSAGE_MODE);
   }
 
   public int getSegmentLevelValidationIntervalInSeconds() {
-    return getInt(ControllerPeriodicTasksConf.SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS,
+    return getProperty(ControllerPeriodicTasksConf.SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS,
         ControllerPeriodicTasksConf.DEFAULT_SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS);
   }
 
   public long getStatusCheckerInitialDelayInSeconds() {
-    return getLong(ControllerPeriodicTasksConf.STATUS_CHECKER_INITIAL_DELAY_IN_SECONDS,
+    return getProperty(ControllerPeriodicTasksConf.STATUS_CHECKER_INITIAL_DELAY_IN_SECONDS,
         ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
   }
 
   public long getRetentionManagerInitialDelayInSeconds() {
-    return getLong(ControllerPeriodicTasksConf.RETENTION_MANAGER_INITIAL_DELAY_IN_SECONDS,
+    return getProperty(ControllerPeriodicTasksConf.RETENTION_MANAGER_INITIAL_DELAY_IN_SECONDS,
         ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
   }
 
   public long getRealtimeSegmentRelocationInitialDelayInSeconds() {
-    return getLong(ControllerPeriodicTasksConf.REALTIME_SEGMENT_RELOCATION_INITIAL_DELAY_IN_SECONDS,
+    return getProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_RELOCATION_INITIAL_DELAY_IN_SECONDS,
         ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
   }
 
   public long getOfflineSegmentIntervalCheckerInitialDelayInSeconds() {
-    return getLong(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_INITIAL_DELAY_IN_SECONDS,
+    return getProperty(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_INITIAL_DELAY_IN_SECONDS,
         ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
   }
 
@@ -639,7 +587,7 @@ public class ControllerConf extends PropertiesConfiguration {
   }
 
   public ControllerMode getControllerMode() {
-    return ControllerMode.valueOf(getString(CONTROLLER_MODE, DEFAULT_CONTROLLER_MODE).toUpperCase());
+    return ControllerMode.valueOf(getProperty(CONTROLLER_MODE, DEFAULT_CONTROLLER_MODE.toString()).toUpperCase());
   }
 
   public void setLeadControllerResourceRebalanceStrategy(String rebalanceStrategy) {
@@ -647,11 +595,11 @@ public class ControllerConf extends PropertiesConfiguration {
   }
 
   public String getLeadControllerResourceRebalanceStrategy() {
-    return getString(LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY, DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY);
+    return getProperty(LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY, DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY);
   }
 
   public boolean getHLCTablesAllowed() {
-    return getBoolean(ALLOW_HLC_TABLES, DEFAULT_ALLOW_HLC_TABLES);
+    return getProperty(ALLOW_HLC_TABLES, DEFAULT_ALLOW_HLC_TABLES);
   }
 
   public void setHLCTablesAllowed(boolean allowHLCTables) {
@@ -659,6 +607,6 @@ public class ControllerConf extends PropertiesConfiguration {
   }
 
   public String getMetricsPrefix() {
-    return getString(CONFIG_OF_CONTROLLER_METRICS_PREFIX, DEFAULT_METRICS_PREFIX);
+    return getProperty(CONFIG_OF_CONTROLLER_METRICS_PREFIX, DEFAULT_METRICS_PREFIX);
   }
 }

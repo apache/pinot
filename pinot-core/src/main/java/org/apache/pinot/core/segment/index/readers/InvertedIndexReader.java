@@ -24,13 +24,14 @@ import java.io.Closeable;
 public interface InvertedIndexReader<T> extends Closeable {
 
   /**
-   * Get the document ids for the given dictionary id.
-   * @param dictId dictionary ID
+   * Returns the document ids for the given dictionary id.
    */
   T getDocIds(int dictId);
 
   /**
-   * Get the document ids for a given value
+   * Returns the document ids for the given string representation of the value.
    */
-  T getDocIds(Object value);
+  default T getDocIds(String value) {
+    throw new UnsupportedOperationException();
+  }
 }

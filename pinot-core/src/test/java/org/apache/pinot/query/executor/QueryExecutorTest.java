@@ -18,13 +18,16 @@
  */
 package org.apache.pinot.query.executor;
 
-import com.yammer.metrics.core.MetricsRegistry;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
@@ -48,13 +51,13 @@ import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.segments.v1.creator.SegmentTestUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import com.yammer.metrics.core.MetricsRegistry;
 
 
 public class QueryExecutorTest {
@@ -116,7 +119,7 @@ public class QueryExecutorTest {
     queryExecutorConfig.setDelimiterParsingDisabled(false);
     queryExecutorConfig.load(new File(resourceUrl.getFile()));
     _queryExecutor = new ServerQueryExecutorV1Impl();
-    _queryExecutor.init(queryExecutorConfig, instanceDataManager, _serverMetrics);
+    _queryExecutor.init(new PinotConfiguration(queryExecutorConfig), instanceDataManager, _serverMetrics);
   }
 
   @Test

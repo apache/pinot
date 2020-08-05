@@ -19,13 +19,15 @@
 package org.apache.pinot.core.query.executor;
 
 import java.util.concurrent.ExecutorService;
+
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.commons.configuration.Configuration;
+
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 @ThreadSafe
@@ -35,7 +37,7 @@ public interface QueryExecutor {
    * Initializes the query executor.
    * <p>Should be called only once and before calling any other method.
    */
-  void init(Configuration config, InstanceDataManager instanceDataManager, ServerMetrics serverMetrics)
+  void init(PinotConfiguration config, InstanceDataManager instanceDataManager, ServerMetrics serverMetrics)
       throws ConfigurationException;
 
   /**

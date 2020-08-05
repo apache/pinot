@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.core.operator.docvalsets;
 
-import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.core.common.BaseBlockValSet;
+import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.DataBlockCache;
 import org.apache.pinot.core.operator.ProjectionOperator;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
@@ -29,7 +29,7 @@ import org.apache.pinot.core.operator.ProjectionOperator;
  * It provides api's to access data for a specified projection column.
  * It uses {@link DataBlockCache} to cache the projection data.
  */
-public class ProjectionBlockValSet extends BaseBlockValSet {
+public class ProjectionBlockValSet implements BlockValSet {
   private final DataBlockCache _dataBlockCache;
   private final String _column;
   private final DataType _dataType;

@@ -18,27 +18,29 @@
  */
 package org.apache.pinot.integration.tests;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
+
 import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+
 import javax.annotation.Nullable;
+
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DecoderFactory;
-import org.apache.commons.configuration.BaseConfiguration;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.HttpStatus;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
@@ -59,14 +61,14 @@ import org.apache.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
 import org.apache.pinot.server.starter.helix.HelixServerStarter;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 
 /**
@@ -102,22 +104,27 @@ public abstract class ClusterTest extends ControllerTest {
     _brokerBaseApiUrl = "http://localhost:" + basePort;
     _brokerStarters = new ArrayList<>(numBrokers);
     for (int i = 0; i < numBrokers; i++) {
-      Configuration brokerConf = new BaseConfiguration();
-      brokerConf.setProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
-      brokerConf.setProperty(Helix.KEY_OF_BROKER_QUERY_PORT, Integer.toString(basePort + i));
-      brokerConf.setProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
-      overrideBrokerConf(brokerConf);
-      HelixBrokerStarter brokerStarter = new HelixBrokerStarter(brokerConf, getHelixClusterName(), zkStr, LOCAL_HOST);
+      Map<String, Object> properties = new HashMap<>();
+      properties.put(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
+      properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, basePort + i);
+      properties.put(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
+      PinotConfiguration configuration = new PinotConfiguration(properties);
+      overrideBrokerConf(configuration);
+      
+      HelixBrokerStarter brokerStarter =
+          new HelixBrokerStarter(configuration, getHelixClusterName(), zkStr, LOCAL_HOST);
       brokerStarter.start();
       _brokerStarters.add(brokerStarter);
     }
   }
 
-  public static Configuration getDefaultServerConfiguration() {
-    Configuration configuration = DefaultHelixStarterServerConfig.loadDefaultServerConf();
+  public static PinotConfiguration getDefaultServerConfiguration() {
+    PinotConfiguration configuration = DefaultHelixStarterServerConfig.loadDefaultServerConf();
+    
     configuration.setProperty(Helix.KEY_OF_SERVER_NETTY_HOST, LOCAL_HOST);
     configuration.setProperty(Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, "v3");
     configuration.setProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_QUERY_CHECK, false);
+    
     return configuration;
   }
 
@@ -125,7 +132,7 @@ public abstract class ClusterTest extends ControllerTest {
     startServers(1);
   }
 
-  protected void startServer(Configuration configuration) {
+  protected void startServer(PinotConfiguration configuration) {
     startServers(1, configuration, Server.DEFAULT_ADMIN_API_PORT, Helix.DEFAULT_SERVER_NETTY_PORT,
         ZkStarter.DEFAULT_ZK_STR);
   }
@@ -139,7 +146,7 @@ public abstract class ClusterTest extends ControllerTest {
     startServers(numServers, getDefaultServerConfiguration(), baseAdminApiPort, baseNettyPort, zkStr);
   }
 
-  protected void startServers(int numServers, Configuration configuration, int baseAdminApiPort, int baseNettyPort,
+  protected void startServers(int numServers, PinotConfiguration configuration, int baseAdminApiPort, int baseNettyPort,
       String zkStr) {
     FileUtils.deleteQuietly(new File(Server.DEFAULT_INSTANCE_BASE_DIR));
     _serverStarters = new ArrayList<>(numServers);
@@ -147,8 +154,8 @@ public abstract class ClusterTest extends ControllerTest {
     try {
       for (int i = 0; i < numServers; i++) {
         configuration.setProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR, Server.DEFAULT_INSTANCE_DATA_DIR + "-" + i);
-        configuration
-            .setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
+        configuration.setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR,
+            Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
         configuration.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, baseAdminApiPort - i);
         configuration.setProperty(Server.CONFIG_OF_NETTY_PORT, baseNettyPort + i);
         HelixServerStarter helixServerStarter = new HelixServerStarter(getHelixClusterName(), zkStr, configuration);
@@ -167,7 +174,7 @@ public abstract class ClusterTest extends ControllerTest {
     FileUtils.deleteQuietly(new File(Minion.DEFAULT_INSTANCE_BASE_DIR));
     try {
       _minionStarter =
-          new MinionStarter(ZkStarter.DEFAULT_ZK_STR, getHelixClusterName(), new PropertiesConfiguration());
+          new MinionStarter(ZkStarter.DEFAULT_ZK_STR, getHelixClusterName(), new PinotConfiguration());
       // Register task executor factories
       if (taskExecutorFactoryRegistry != null) {
         for (Map.Entry<String, PinotTaskExecutorFactory> entry : taskExecutorFactoryRegistry.entrySet()) {
@@ -186,11 +193,11 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
-  protected void overrideServerConf(Configuration configuration) {
+  protected void overrideServerConf(PinotConfiguration configuration) {
     // Do nothing, to be overridden by tests if they need something specific
   }
 
-  protected void overrideBrokerConf(Configuration brokerConf) {
+  protected void overrideBrokerConf(PinotConfiguration configuration) {
     // Do nothing, to be overridden by tests if they need something specific
   }
 

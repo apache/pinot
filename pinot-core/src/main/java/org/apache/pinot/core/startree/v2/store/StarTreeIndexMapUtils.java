@@ -18,18 +18,24 @@
  */
 package org.apache.pinot.core.startree.v2.store;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
-import java.util.ArrayList;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.pinot.spi.env.CommonsConfigurationUtils;
+
+import com.google.common.base.Preconditions;
 
 
 /**
@@ -150,7 +156,14 @@ public class StarTreeIndexMapUtils {
         configuration.addProperty(key.getPropertyName(i, SIZE_SUFFIX), value._size);
       }
     }
-    configuration.save();
+    
+    // Commons Configuration 1.10 does not support file path containing '%'. 
+    // Explicitly providing the output stream for the file bypasses the problem.       
+    try (FileOutputStream fileOutputStream = new FileOutputStream(configuration.getFile())) {
+      configuration.save(fileOutputStream);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   /**
@@ -160,14 +173,12 @@ public class StarTreeIndexMapUtils {
       throws ConfigurationException {
     Preconditions.checkState(indexMapFile.exists(), "Star-tree index map file does not exist");
 
-    PropertiesConfiguration configuration = new PropertiesConfiguration(indexMapFile);
-    List<Map<IndexKey, IndexValue>> indexMaps = new ArrayList<>(numStarTrees);
-    for (int i = 0; i < numStarTrees; i++) {
-      indexMaps.add(new HashMap<>());
-    }
-    Iterator keys = configuration.getKeys();
-    while (keys.hasNext()) {
-      String key = (String) keys.next();
+    PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(indexMapFile);
+    
+    List<Map<IndexKey, IndexValue>> indexMaps = IntStream.range(0, numStarTrees).boxed()
+        .map(index -> new HashMap<IndexKey, IndexValue>()).collect(Collectors.toList());
+    
+    for (String key : CommonsConfigurationUtils.getKeys(configuration)) {
       String[] split = key.split("\\.");
       Preconditions.checkState(split.length == 4,
           "Invalid key: " + key + " in star-tree index map file: " + indexMapFile.getAbsolutePath());

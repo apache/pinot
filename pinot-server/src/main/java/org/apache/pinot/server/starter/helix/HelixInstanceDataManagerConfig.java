@@ -18,12 +18,13 @@
  */
 package org.apache.pinot.server.starter.helix;
 
-import java.util.Iterator;
-import org.apache.commons.configuration.Configuration;
+import java.util.Optional;
+
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.utils.CommonConstants.Server;
 import org.apache.pinot.core.data.manager.config.InstanceDataManagerConfig;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -93,104 +94,104 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   private static final String MAX_PARALLEL_REFRESH_THREADS = "max.parallel.refresh.threads";
 
   private final static String[] REQUIRED_KEYS = {INSTANCE_ID, INSTANCE_DATA_DIR, READ_MODE};
-  private Configuration _instanceDataManagerConfiguration = null;
+  private PinotConfiguration _instanceDataManagerConfiguration = null;
 
-  public HelixInstanceDataManagerConfig(Configuration serverConfig)
+  public HelixInstanceDataManagerConfig(PinotConfiguration serverConfig)
       throws ConfigurationException {
     _instanceDataManagerConfiguration = serverConfig;
-    Iterator keysIterator = serverConfig.getKeys();
-    while (keysIterator.hasNext()) {
-      String key = (String) keysIterator.next();
+
+    for (String key: serverConfig.getKeys()) {
       LOGGER.info("InstanceDataManagerConfig, key: {} , value: {}", key, serverConfig.getProperty(key));
     }
+    
     checkRequiredKeys();
   }
 
   private void checkRequiredKeys()
       throws ConfigurationException {
     for (String keyString : REQUIRED_KEYS) {
-      if (!_instanceDataManagerConfiguration.containsKey(keyString)) {
-        throw new ConfigurationException("Cannot find required key : " + keyString);
-      }
+      Optional.ofNullable(_instanceDataManagerConfiguration.getProperty(keyString))
+
+          .orElseThrow(() -> new ConfigurationException("Cannot find required key : " + keyString));
     }
   }
 
   @Override
-  public Configuration getConfig() {
+  public PinotConfiguration getConfig() {
     return _instanceDataManagerConfiguration;
   }
 
   @Override
   public String getInstanceId() {
-    return _instanceDataManagerConfiguration.getString(INSTANCE_ID);
+    return _instanceDataManagerConfiguration.getProperty(INSTANCE_ID);
   }
 
   @Override
   public String getInstanceDataDir() {
-    return _instanceDataManagerConfiguration.getString(INSTANCE_DATA_DIR);
+    return _instanceDataManagerConfiguration.getProperty(INSTANCE_DATA_DIR);
   }
 
   @Override
   public String getConsumerDir() {
-    return _instanceDataManagerConfiguration.getString(CONSUMER_DIR);
+    return _instanceDataManagerConfiguration.getProperty(CONSUMER_DIR);
   }
 
   @Override
   public String getInstanceSegmentTarDir() {
-    return _instanceDataManagerConfiguration.getString(INSTANCE_SEGMENT_TAR_DIR);
+    return _instanceDataManagerConfiguration.getProperty(INSTANCE_SEGMENT_TAR_DIR);
   }
 
   @Override
   public String getInstanceBootstrapSegmentDir() {
-    return _instanceDataManagerConfiguration.getString(INSTANCE_BOOTSTRAP_SEGMENT_DIR);
+    return _instanceDataManagerConfiguration.getProperty(INSTANCE_BOOTSTRAP_SEGMENT_DIR);
   }
 
   @Override
   public ReadMode getReadMode() {
-    return ReadMode.valueOf(_instanceDataManagerConfiguration.getString(READ_MODE));
+    return ReadMode.valueOf(_instanceDataManagerConfiguration.getProperty(READ_MODE));
   }
 
   @Override
   public String getSegmentFormatVersion() {
-    return _instanceDataManagerConfiguration.getString(SEGMENT_FORMAT_VERSION);
+    return _instanceDataManagerConfiguration.getProperty(SEGMENT_FORMAT_VERSION);
   }
 
   @Override
   public boolean isEnableSplitCommit() {
-    return _instanceDataManagerConfiguration.getBoolean(ENABLE_SPLIT_COMMIT, false);
+    return _instanceDataManagerConfiguration.getProperty(ENABLE_SPLIT_COMMIT, false);
   }
 
   @Override
   public boolean isEnableSplitCommitEndWithMetadata() {
-    return _instanceDataManagerConfiguration.getBoolean(ENABLE_SPLIT_COMMIT_END_WITH_METADATA, true);
+    return _instanceDataManagerConfiguration.getProperty(ENABLE_SPLIT_COMMIT_END_WITH_METADATA, true);
   }
 
   @Override
   public boolean isRealtimeOffHeapAllocation() {
-    return _instanceDataManagerConfiguration.getBoolean(REALTIME_OFFHEAP_ALLOCATION, false);
+    return _instanceDataManagerConfiguration.getProperty(REALTIME_OFFHEAP_ALLOCATION, false);
   }
 
   @Override
   public boolean isDirectRealtimeOffheapAllocation() {
-    return _instanceDataManagerConfiguration.getBoolean(DIRECT_REALTIME_OFFHEAP_ALLOCATION, false);
+    return _instanceDataManagerConfiguration.getProperty(DIRECT_REALTIME_OFFHEAP_ALLOCATION, false);
   }
 
   public boolean shouldReloadConsumingSegment() {
     return _instanceDataManagerConfiguration
-        .getBoolean(INSTANCE_RELOAD_CONSUMING_SEGMENT, Server.DEFAULT_RELOAD_CONSUMING_SEGMENT);
+        .getProperty(INSTANCE_RELOAD_CONSUMING_SEGMENT, Server.DEFAULT_RELOAD_CONSUMING_SEGMENT);
   }
 
   @Override
   public String getAvgMultiValueCount() {
-    return _instanceDataManagerConfiguration.getString(AVERAGE_MV_COUNT, null);
+    return _instanceDataManagerConfiguration.getProperty(AVERAGE_MV_COUNT);
   }
 
   public int getMaxParallelRefreshThreads() {
-    return _instanceDataManagerConfiguration.getInt(MAX_PARALLEL_REFRESH_THREADS, 1);
+    return _instanceDataManagerConfiguration.getProperty(MAX_PARALLEL_REFRESH_THREADS, 1);
   }
 
   public int getMaxParallelSegmentBuilds() {
-    return _instanceDataManagerConfiguration.getInt(MAX_PARALLEL_SEGMENT_BUILDS, 0);
+    return _instanceDataManagerConfiguration.getProperty(MAX_PARALLEL_SEGMENT_BUILDS, 0);
   }
 
   @Override

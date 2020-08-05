@@ -31,13 +31,12 @@ import org.apache.pinot.spi.data.FieldSpec;
  * The {@code ImmutableDataSource} class is the data source for a column in the immutable segment.
  */
 public class ImmutableDataSource extends BaseDataSource {
-  private static final String OPERATOR_NAME_PREFIX = "ImmutableDataSource:";
 
   public ImmutableDataSource(ColumnMetadata columnMetadata, ColumnIndexContainer columnIndexContainer) {
     super(new ImmutableDataSourceMetadata(columnMetadata), columnIndexContainer.getForwardIndex(),
-        columnIndexContainer.getDictionary(), columnIndexContainer.getInvertedIndex(), columnIndexContainer.getRangeIndex(),
-        columnIndexContainer.getBloomFilter(), columnIndexContainer.getNullValueVector(),
-        OPERATOR_NAME_PREFIX + columnMetadata.getColumnName());
+        columnIndexContainer.getDictionary(), columnIndexContainer.getInvertedIndex(),
+        columnIndexContainer.getRangeIndex(), columnIndexContainer.getBloomFilter(),
+        columnIndexContainer.getNullValueVector());
   }
 
   private static class ImmutableDataSourceMetadata implements DataSourceMetadata {

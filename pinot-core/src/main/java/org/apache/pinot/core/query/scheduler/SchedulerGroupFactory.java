@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.query.scheduler;
 
-import org.apache.commons.configuration.Configuration;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
@@ -32,5 +32,5 @@ public interface SchedulerGroupFactory {
    * @param groupName Scheduler group name
    * @return instance of SchedulerGroup
    */
-  SchedulerGroup create(Configuration config, String groupName);
+  SchedulerGroup create(PinotConfiguration config, String groupName);
 }

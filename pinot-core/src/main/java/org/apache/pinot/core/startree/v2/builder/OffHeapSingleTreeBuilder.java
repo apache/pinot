@@ -343,6 +343,7 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
   @Override
   public void close()
       throws IOException {
+    super.close();
     _starTreeRecordBuffer.close();
     _starTreeRecordOutputStream.close();
     FileUtils.forceDelete(_starTreeRecordFile);

@@ -229,7 +229,7 @@ dataSourceConfigs:
       PostgreSQL:
         - db:
             utk_test: jdbc:postgresql://127.0.0.1:5432/thirdeye
-          user: postgres
+          user: root
           password: root
       Druid:
         - db:

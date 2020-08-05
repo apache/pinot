@@ -89,9 +89,10 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
   public void setUp()
       throws Exception {
     startZk();
-    ControllerConf config = getDefaultControllerConfiguration();
-    config.setTenantIsolationEnabled(false);
-    startController(config);
+    Map<String, Object> properties = getDefaultControllerConfiguration();
+    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
+    
+    startController(properties);
     addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_INSTANCES, false);
     addFakeServerInstancesToAutoJoinHelixCluster(NUM_INSTANCES, false, BASE_SERVER_ADMIN_PORT);
 

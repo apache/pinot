@@ -18,16 +18,12 @@
  */
 package org.apache.pinot.core.query.scheduler;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListenableFutureTask;
-import com.google.common.util.concurrent.MoreExecutors;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.LongAccumulator;
+
 import javax.annotation.Nonnull;
-import org.apache.commons.configuration.Configuration;
+
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -36,8 +32,15 @@ import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.resources.QueryExecutorService;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListenableFutureTask;
+import com.google.common.util.concurrent.MoreExecutors;
 
 
 /**
@@ -54,7 +57,7 @@ public abstract class PriorityScheduler extends QueryScheduler {
   @VisibleForTesting
   Thread scheduler;
 
-  public PriorityScheduler(@Nonnull Configuration config, @Nonnull ResourceManager resourceManager,
+  public PriorityScheduler(@Nonnull PinotConfiguration config, @Nonnull ResourceManager resourceManager,
       @Nonnull QueryExecutor queryExecutor, @Nonnull SchedulerPriorityQueue queue, @Nonnull ServerMetrics metrics,
       @Nonnull LongAccumulator latestQueryTime) {
     super(config, queryExecutor, resourceManager, metrics, latestQueryTime);

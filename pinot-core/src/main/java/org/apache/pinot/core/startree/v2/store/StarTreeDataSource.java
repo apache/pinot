@@ -22,19 +22,17 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.data.partition.PartitionFunction;
-import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.datasource.BaseDataSource;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
 public class StarTreeDataSource extends BaseDataSource {
-  private static final String OPERATOR_NAME_PREFIX = "StarTreeDataSource:";
 
-  public StarTreeDataSource(FieldSpec fieldSpec, int numDocs, SingleColumnSingleValueReader forwardIndex,
+  public StarTreeDataSource(FieldSpec fieldSpec, int numDocs, ForwardIndexReader<?> forwardIndex,
       @Nullable Dictionary dictionary) {
-    super(new StarTreeDataSourceMetadata(fieldSpec, numDocs), forwardIndex, dictionary, null, null, null, null,
-        OPERATOR_NAME_PREFIX + fieldSpec.getName());
+    super(new StarTreeDataSourceMetadata(fieldSpec, numDocs), forwardIndex, dictionary, null, null, null, null);
   }
 
   private static final class StarTreeDataSourceMetadata implements DataSourceMetadata {

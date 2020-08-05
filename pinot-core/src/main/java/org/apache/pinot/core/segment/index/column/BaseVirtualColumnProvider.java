@@ -40,6 +40,7 @@ public abstract class BaseVirtualColumnProvider implements VirtualColumnProvider
 
   @Override
   public ColumnIndexContainer buildColumnIndexContainer(VirtualColumnContext context) {
-    return new VirtualColumnIndexContainer(buildReader(context), buildInvertedIndex(context), buildDictionary(context));
+    return new VirtualColumnIndexContainer(buildForwardIndex(context), buildInvertedIndex(context),
+        buildDictionary(context));
   }
 }

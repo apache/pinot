@@ -40,21 +40,19 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
-import javax.annotation.Nonnull;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
-import org.apache.pinot.core.io.reader.DataFileReader;
-import org.apache.pinot.core.io.reader.impl.ChunkReaderContext;
-import org.apache.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
 import org.apache.pinot.core.segment.creator.TextIndexType;
 import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreator;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.readers.forward.BaseChunkSVForwardIndexReader.ChunkReaderContext;
+import org.apache.pinot.core.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -89,8 +87,8 @@ public class TextIndexHandler {
   private final SegmentVersion _segmentVersion;
   private final Set<ColumnMetadata> _textIndexColumns = new HashSet<>();
 
-  public TextIndexHandler(@Nonnull File indexDir, @Nonnull SegmentMetadataImpl segmentMetadata,
-      @Nonnull Set<String> textIndexColumns, @Nonnull SegmentDirectory.Writer segmentWriter) {
+  public TextIndexHandler(File indexDir, SegmentMetadataImpl segmentMetadata, Set<String> textIndexColumns,
+      SegmentDirectory.Writer segmentWriter) {
     _indexDir = indexDir;
     _segmentWriter = segmentWriter;
     _segmentName = segmentMetadata.getName();
@@ -139,7 +137,7 @@ public class TextIndexHandler {
           "Text index is currently not supported on multi-value columns: " + column);
     }
 
-    if (columnMetadata.getDataType() != FieldSpec.DataType.STRING) {
+    if (columnMetadata.getDataType() != DataType.STRING) {
       throw new UnsupportedOperationException("Text index is currently only supported on STRING columns: " + column);
     }
   }
@@ -160,16 +158,13 @@ public class TextIndexHandler {
     // segmentDirectory is indicated to us by SegmentDirectoryPaths, we create lucene index there. There is no
     // further need to move around the lucene index directory since it is created with correct directory structure
     // based on segmentVersion.
-    try (LuceneTextIndexCreator textIndexCreator = new LuceneTextIndexCreator(column, segmentDirectory, true)) {
-      try (DataFileReader forwardIndexReader = getForwardIndexReader(columnMetadata)) {
-        VarByteChunkSingleValueReader forwardIndex = (VarByteChunkSingleValueReader) forwardIndexReader;
-        ChunkReaderContext readerContext = forwardIndex.createContext();
-        for (int docID = 0; docID < numDocs; docID++) {
-          Object docToAdd = forwardIndex.getString(docID, readerContext);
-          textIndexCreator.addDoc(docToAdd, docID);
-        }
-        textIndexCreator.seal();
+    try (LuceneTextIndexCreator textIndexCreator = new LuceneTextIndexCreator(column, segmentDirectory, true);
+        VarByteChunkSVForwardIndexReader forwardIndexReader = getForwardIndexReader(columnMetadata);
+        ChunkReaderContext readerContext = forwardIndexReader.createContext()) {
+      for (int docId = 0; docId < numDocs; docId++) {
+        textIndexCreator.addDoc(forwardIndexReader.getString(docId, readerContext), docId);
       }
+      textIndexCreator.seal();
     }
     LOGGER.info("Created text index for column: {} in segment: {}", column, _segmentName);
     PropertiesConfiguration properties = SegmentMetadataImpl.getPropertiesConfiguration(_indexDir);
@@ -177,9 +172,9 @@ public class TextIndexHandler {
     properties.save();
   }
 
-  private DataFileReader getForwardIndexReader(ColumnMetadata columnMetadata)
+  private VarByteChunkSVForwardIndexReader getForwardIndexReader(ColumnMetadata columnMetadata)
       throws IOException {
     PinotDataBuffer buffer = _segmentWriter.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.FORWARD_INDEX);
-    return new VarByteChunkSingleValueReader(buffer);
+    return new VarByteChunkSVForwardIndexReader(buffer, DataType.STRING);
   }
 }

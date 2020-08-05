@@ -40,6 +40,8 @@ public class IndexingConfig extends BaseJsonConfig {
   private List<String> _onHeapDictionaryColumns;
   private boolean _enableDefaultStarTree;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
+  // Whether to allow creating star-tree when server loads the segment
+  private boolean _enableDynamicStarTreeCreation;
   private SegmentPartitionConfig _segmentPartitionConfig;
   private boolean _aggregateMetrics;
   private boolean _nullHandlingEnabled;
@@ -189,6 +191,14 @@ public class IndexingConfig extends BaseJsonConfig {
 
   public void setStarTreeIndexConfigs(List<StarTreeIndexConfig> starTreeIndexConfigs) {
     _starTreeIndexConfigs = starTreeIndexConfigs;
+  }
+
+  public boolean isEnableDynamicStarTreeCreation() {
+    return _enableDynamicStarTreeCreation;
+  }
+
+  public void setEnableDynamicStarTreeCreation(boolean enableDynamicStarTreeCreation) {
+    _enableDynamicStarTreeCreation = enableDynamicStarTreeCreation;
   }
 
   @Nullable

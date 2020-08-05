@@ -20,11 +20,13 @@ package org.apache.pinot.common.utils.fetcher;
 
 import java.util.Iterator;
 import java.util.Set;
+
 import javax.net.ssl.SSLContext;
-import org.apache.commons.configuration.Configuration;
+
 import org.apache.pinot.common.utils.ClientSSLContextGenerator;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /*
@@ -56,20 +58,19 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient;
 public class HttpsSegmentFetcher extends HttpSegmentFetcher {
 
   @Override
-  protected void doInit(Configuration config) {
-    Configuration sslConfig = config.subset(CommonConstants.PREFIX_OF_SSL_SUBSET);
+  protected void doInit(PinotConfiguration config) {
+    PinotConfiguration sslConfig = config.subset(CommonConstants.PREFIX_OF_SSL_SUBSET);
     _logger.info("Initializing with the following ssl config:");
     Set<String> protectedConfigKeys = ClientSSLContextGenerator.getProtectedConfigKeys();
-    @SuppressWarnings("unchecked")
-    Iterator<String> iterator = sslConfig.getKeys();
-    while (iterator.hasNext()) {
-      String configKey = iterator.next();
+    
+    for (String configKey : sslConfig.getKeys()) {
       if (protectedConfigKeys.contains(configKey)) {
         _logger.info("{}: {}", configKey, "********");
       } else {
-        _logger.info("{}: {}", configKey, config.getString(configKey));
+        _logger.info("{}: {}", configKey, config.getProperty(configKey));
       }
     }
+
     SSLContext sslContext = new ClientSSLContextGenerator(sslConfig).generate();
     _httpClient = new FileUploadDownloadClient(sslContext);
   }

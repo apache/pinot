@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.server.starter.helix;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -26,9 +25,10 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
+
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.commons.configuration.Configuration;
+
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
@@ -50,8 +50,11 @@ import org.apache.pinot.core.segment.index.loader.LoaderUtils;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Preconditions;
 
 
 /**
@@ -72,7 +75,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
   @Override
-  public synchronized void init(Configuration config, HelixManager helixManager, ServerMetrics serverMetrics)
+  public synchronized void init(PinotConfiguration config, HelixManager helixManager, ServerMetrics serverMetrics)
       throws ConfigurationException {
     LOGGER.info("Initializing Helix instance data manager");
 

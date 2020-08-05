@@ -18,20 +18,10 @@
  */
 package org.apache.pinot.plugin.filesystem;
 
-import com.google.api.gax.paging.Page;
-import com.google.auth.oauth2.GoogleCredentials;
-import com.google.cloud.WriteChannel;
-import com.google.cloud.storage.Blob;
-import com.google.cloud.storage.Bucket;
-import com.google.cloud.storage.CopyWriter;
-import com.google.cloud.storage.Storage;
-import com.google.cloud.storage.StorageException;
-import com.google.cloud.storage.StorageOptions;
-import com.google.common.collect.ImmutableList;
-import org.apache.commons.configuration.Configuration;
-import org.apache.pinot.spi.filesystem.PinotFS;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static com.google.common.base.Preconditions.checkState;
+import static java.util.Objects.requireNonNull;
+import static joptsimple.internal.Strings.isNullOrEmpty;
+import static org.glassfish.jersey.internal.guava.Preconditions.checkArgument;
 
 import java.io.File;
 import java.io.IOException;
@@ -46,10 +36,21 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-import static com.google.common.base.Preconditions.checkState;
-import static java.util.Objects.requireNonNull;
-import static joptsimple.internal.Strings.isNullOrEmpty;
-import static org.glassfish.jersey.internal.guava.Preconditions.checkArgument;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.filesystem.PinotFS;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.api.gax.paging.Page;
+import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.WriteChannel;
+import com.google.cloud.storage.Blob;
+import com.google.cloud.storage.Bucket;
+import com.google.cloud.storage.CopyWriter;
+import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.StorageException;
+import com.google.cloud.storage.StorageOptions;
+import com.google.common.collect.ImmutableList;
 
 public class GcsPinotFS  extends PinotFS {
   public static final String PROJECT_ID = "projectId";
@@ -61,15 +62,15 @@ public class GcsPinotFS  extends PinotFS {
   private Storage storage;
 
   @Override
-  public void init(Configuration config) {
+  public void init(PinotConfiguration config) {
     LOGGER.info("Configs are: {}, {}",
             PROJECT_ID,
-            config.getString(PROJECT_ID));
+            config.getProperty(PROJECT_ID));
 
-    checkArgument(!isNullOrEmpty(config.getString(PROJECT_ID)));
-    checkArgument(!isNullOrEmpty(config.getString(GCP_KEY)));
-    String projectId = config.getString(PROJECT_ID);
-    String gcpKey = config.getString(GCP_KEY);
+    checkArgument(!isNullOrEmpty(config.getProperty(PROJECT_ID)));
+    checkArgument(!isNullOrEmpty(config.getProperty(GCP_KEY)));
+    String projectId = config.getProperty(PROJECT_ID);
+    String gcpKey = config.getProperty(GCP_KEY);
     try {
       storage = StorageOptions.newBuilder()
           .setProjectId(projectId)

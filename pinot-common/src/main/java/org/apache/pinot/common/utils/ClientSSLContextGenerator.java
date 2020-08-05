@@ -29,14 +29,16 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.Collections;
 import java.util.Set;
+
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
-import org.apache.commons.configuration.Configuration;
+
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,15 +62,15 @@ public class ClientSSLContextGenerator {
     return Collections.singleton(CONFIG_OF_CLIENT_PKCS12_PASSWORD);
   }
 
-  public ClientSSLContextGenerator(Configuration sslConfig) {
-    if (sslConfig.getBoolean(CONFIG_OF_ENABLE_SERVER_VERIFICATION, true)) {
-      _serverCACertFile = sslConfig.getString(CONFIG_OF_SERVER_CA_CERT);
+  public ClientSSLContextGenerator(PinotConfiguration sslConfig) {
+    if (sslConfig.getProperty(CONFIG_OF_ENABLE_SERVER_VERIFICATION, true)) {
+      _serverCACertFile = sslConfig.getProperty(CONFIG_OF_SERVER_CA_CERT);
     } else {
       _serverCACertFile = null;
       LOGGER.warn("Https Server CA file not configured.. All servers will be trusted!");
     }
-    _keyStoreFile = sslConfig.getString(CONFIG_OF_CLIENT_PKCS12_FILE);
-    _keyStorePassword = sslConfig.getString(CONFIG_OF_CLIENT_PKCS12_PASSWORD);
+    _keyStoreFile = sslConfig.getProperty(CONFIG_OF_CLIENT_PKCS12_FILE);
+    _keyStorePassword = sslConfig.getProperty(CONFIG_OF_CLIENT_PKCS12_PASSWORD);
     if ((_keyStorePassword == null && _keyStoreFile != null) || (_keyStorePassword != null && _keyStoreFile == null)) {
       throw new IllegalArgumentException("Invalid configuration of keystore file and passowrd");
     }

@@ -18,24 +18,6 @@
  */
 package org.apache.pinot.plugin.filesystem;
 
-import com.azure.core.http.rest.PagedIterable;
-import com.azure.core.util.Context;
-import com.azure.storage.blob.BlobClient;
-import com.azure.storage.blob.BlobServiceClient;
-import com.azure.storage.blob.BlobServiceClientBuilder;
-import com.azure.storage.common.StorageSharedKeyCredential;
-import com.azure.storage.common.Utility;
-import com.azure.storage.file.datalake.DataLakeDirectoryClient;
-import com.azure.storage.file.datalake.DataLakeFileClient;
-import com.azure.storage.file.datalake.DataLakeFileSystemClient;
-import com.azure.storage.file.datalake.DataLakeServiceClient;
-import com.azure.storage.file.datalake.DataLakeServiceClientBuilder;
-import com.azure.storage.file.datalake.models.DataLakeRequestConditions;
-import com.azure.storage.file.datalake.models.DataLakeStorageException;
-import com.azure.storage.file.datalake.models.ListPathsOptions;
-import com.azure.storage.file.datalake.models.PathHttpHeaders;
-import com.azure.storage.file.datalake.models.PathItem;
-import com.azure.storage.file.datalake.models.PathProperties;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -54,11 +36,31 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.Map;
-import org.apache.commons.configuration.Configuration;
+
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.azure.core.http.rest.PagedIterable;
+import com.azure.core.util.Context;
+import com.azure.storage.blob.BlobClient;
+import com.azure.storage.blob.BlobServiceClient;
+import com.azure.storage.blob.BlobServiceClientBuilder;
+import com.azure.storage.common.StorageSharedKeyCredential;
+import com.azure.storage.common.Utility;
+import com.azure.storage.file.datalake.DataLakeDirectoryClient;
+import com.azure.storage.file.datalake.DataLakeFileClient;
+import com.azure.storage.file.datalake.DataLakeFileSystemClient;
+import com.azure.storage.file.datalake.DataLakeServiceClient;
+import com.azure.storage.file.datalake.DataLakeServiceClientBuilder;
+import com.azure.storage.file.datalake.models.DataLakeRequestConditions;
+import com.azure.storage.file.datalake.models.DataLakeStorageException;
+import com.azure.storage.file.datalake.models.ListPathsOptions;
+import com.azure.storage.file.datalake.models.PathHttpHeaders;
+import com.azure.storage.file.datalake.models.PathItem;
+import com.azure.storage.file.datalake.models.PathProperties;
 
 
 /**
@@ -95,15 +97,15 @@ public class ADLSGen2PinotFS extends PinotFS {
   private boolean _enableChecksum;
 
   @Override
-  public void init(Configuration config) {
-    _enableChecksum = config.getBoolean(ENABLE_CHECKSUM, false);
+  public void init(PinotConfiguration config) {
+    _enableChecksum = config.getProperty(ENABLE_CHECKSUM, false);
 
     // Azure storage account name
-    String accountName = config.getString(ACCOUNT_NAME);
+    String accountName = config.getProperty(ACCOUNT_NAME);
 
     // TODO: consider to add the encryption of the following config
-    String accessKey = config.getString(ACCESS_KEY);
-    String fileSystemName = config.getString(FILE_SYSTEM_NAME);
+    String accessKey = config.getProperty(ACCESS_KEY);
+    String fileSystemName = config.getProperty(FILE_SYSTEM_NAME);
 
     String dfsServiceEndpointUrl = HTTPS_URL_PREFIX + accountName + AZURE_STORAGE_DNS_SUFFIX;
     String blobServiceEndpointUrl = HTTPS_URL_PREFIX + accountName + AZURE_BLOB_DNS_SUFFIX;

@@ -61,13 +61,6 @@ public class RealtimeInvertedIndexReader implements InvertedIndexReader<MutableR
   }
 
   @Override
-  public MutableRoaringBitmap getDocIds(Object value) {
-    // This should not be called from anywhere. If it happens, there is a bug
-    // and that's why we throw illegal state exception
-    throw new IllegalStateException("realtime bitmap inverted index reader supports lookup only on dictionary id");
-  }
-
-  @Override
   public MutableRoaringBitmap getDocIds(int dictId) {
     ThreadSafeMutableRoaringBitmap bitmap;
     try {

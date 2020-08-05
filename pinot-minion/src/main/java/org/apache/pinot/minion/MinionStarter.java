@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.minion;
 
-import com.yammer.metrics.core.MetricsRegistry;
+import static org.apache.pinot.common.utils.CommonConstants.HTTPS_PROTOCOL;
+
 import java.io.File;
 import java.io.IOException;
+
 import javax.net.ssl.SSLContext;
-import org.apache.commons.configuration.Configuration;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
@@ -46,13 +48,14 @@ import org.apache.pinot.minion.metrics.MinionMeter;
 import org.apache.pinot.minion.metrics.MinionMetrics;
 import org.apache.pinot.minion.taskfactory.TaskFactoryRegistry;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.common.utils.CommonConstants.HTTPS_PROTOCOL;
+import com.yammer.metrics.core.MetricsRegistry;
 
 
 /**
@@ -64,16 +67,16 @@ public class MinionStarter implements ServiceStartable {
 
   private static final String HTTPS_ENABLED = "enabled";
 
-  private final Configuration _config;
+  private final PinotConfiguration _config;
   private final String _instanceId;
   private final HelixManager _helixManager;
   private final TaskExecutorFactoryRegistry _taskExecutorFactoryRegistry;
   private final EventObserverFactoryRegistry _eventObserverFactoryRegistry;
 
-  public MinionStarter(String zkAddress, String helixClusterName, Configuration config)
+  public MinionStarter(String zkAddress, String helixClusterName, PinotConfiguration config)
       throws Exception {
     _config = config;
-    _instanceId = config.getString(CommonConstants.Helix.Instance.INSTANCE_ID_KEY,
+    _instanceId = config.getProperty(CommonConstants.Helix.Instance.INSTANCE_ID_KEY,
         CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE + NetUtil.getHostAddress() + "_"
             + CommonConstants.Minion.DEFAULT_HELIX_PORT);
     setupHelixSystemProperties();
@@ -87,7 +90,7 @@ public class MinionStarter implements ServiceStartable {
     // from ZooKeeper). Setting flapping time window to a small value can avoid this from happening. Helix ignores the
     // non-positive value, so set the default value as 1.
     System.setProperty(SystemPropertyKeys.FLAPPING_TIME_WINDOW, _config
-        .getString(CommonConstants.Helix.CONFIG_OF_MINION_FLAPPING_TIME_WINDOW_MS,
+        .getProperty(CommonConstants.Helix.CONFIG_OF_MINION_FLAPPING_TIME_WINDOW_MS,
             CommonConstants.Helix.DEFAULT_FLAPPING_TIME_WINDOW_MS));
   }
 
@@ -118,7 +121,7 @@ public class MinionStarter implements ServiceStartable {
   }
 
   @Override
-  public Configuration getConfig() {
+  public PinotConfiguration getConfig() {
     return _config;
   }
 
@@ -136,7 +139,7 @@ public class MinionStarter implements ServiceStartable {
     // Initialize data directory
     LOGGER.info("Initializing data directory");
     File dataDir = new File(_config
-        .getString(CommonConstants.Helix.Instance.DATA_DIR_KEY, CommonConstants.Minion.DEFAULT_INSTANCE_DATA_DIR));
+        .getProperty(CommonConstants.Helix.Instance.DATA_DIR_KEY, CommonConstants.Minion.DEFAULT_INSTANCE_DATA_DIR));
     if (dataDir.exists()) {
       FileUtils.forceDelete(dataDir);
     }
@@ -149,30 +152,30 @@ public class MinionStarter implements ServiceStartable {
     MetricsRegistry metricsRegistry = new MetricsRegistry();
     MetricsHelper.registerMetricsRegistry(metricsRegistry);
     MinionMetrics minionMetrics = new MinionMetrics(_config
-        .getString(CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX_KEY,
+        .getProperty(CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX_KEY,
             CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX), metricsRegistry);
     minionMetrics.initializeGlobalMeters();
     minionContext.setMinionMetrics(minionMetrics);
 
     // Start all components
     LOGGER.info("Initializing PinotFSFactory");
-    Configuration pinotFSConfig = _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
+    PinotConfiguration pinotFSConfig = _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
     PinotFSFactory.init(pinotFSConfig);
 
     LOGGER.info("Initializing segment fetchers for all protocols");
-    Configuration segmentFetcherFactoryConfig =
+    PinotConfiguration segmentFetcherFactoryConfig =
         _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
     SegmentFetcherFactory.init(segmentFetcherFactoryConfig);
 
     LOGGER.info("Initializing pinot crypter");
-    Configuration pinotCrypterConfig = _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
+    PinotConfiguration pinotCrypterConfig = _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
     PinotCrypterFactory.init(pinotCrypterConfig);
 
     // Need to do this before we start receiving state transitions.
     LOGGER.info("Initializing ssl context for segment uploader");
-    Configuration httpsConfig =
+    PinotConfiguration httpsConfig =
         _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER).subset(HTTPS_PROTOCOL);
-    if (httpsConfig.getBoolean(HTTPS_ENABLED, false)) {
+    if (httpsConfig.getProperty(HTTPS_ENABLED, false)) {
       SSLContext sslContext =
           new ClientSSLContextGenerator(httpsConfig.subset(CommonConstants.PREFIX_OF_SSL_SUBSET)).generate();
       minionContext.setSSLContext(sslContext);

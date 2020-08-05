@@ -18,16 +18,19 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
+
 import java.io.File;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import java.util.HashMap;
+import java.util.Map;
+
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.crypt.NoOpPinotCrypter;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
-import static org.testng.Assert.*;
 
 
 public class PinotSegmentUploadDownloadRestletResourceTest {
@@ -50,9 +53,9 @@ public class PinotSegmentUploadDownloadRestletResourceTest {
     _decryptedFile.deleteOnExit();
 
     // configure pinot crypter
-    Configuration conf = new PropertiesConfiguration();
-    conf.addProperty("class.nooppinotcrypter", NoOpPinotCrypter.class.getName());
-    PinotCrypterFactory.init(conf);
+    Map<String, Object> properties = new HashMap<>();
+    properties.put("class.nooppinotcrypter", NoOpPinotCrypter.class.getName());
+    PinotCrypterFactory.init(new PinotConfiguration(properties));
   }
 
   @Test

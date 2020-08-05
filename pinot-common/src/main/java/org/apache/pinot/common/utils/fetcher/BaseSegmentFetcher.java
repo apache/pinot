@@ -22,7 +22,8 @@ import java.io.File;
 import java.net.URI;
 import java.util.List;
 import java.util.Random;
-import org.apache.commons.configuration.Configuration;
+
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,10 +47,10 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
   protected int _retryDelayScaleFactor;
 
   @Override
-  public void init(Configuration config) {
-    _retryCount = config.getInt(RETRY_COUNT_CONFIG_KEY, DEFAULT_RETRY_COUNT);
-    _retryWaitMs = config.getInt(RETRY_WAIT_MS_CONFIG_KEY, DEFAULT_RETRY_WAIT_MS);
-    _retryDelayScaleFactor = config.getInt(RETRY_DELAY_SCALE_FACTOR_CONFIG_KEY, DEFAULT_RETRY_DELAY_SCALE_FACTOR);
+  public void init(PinotConfiguration config) {
+    _retryCount = config.getProperty(RETRY_COUNT_CONFIG_KEY, DEFAULT_RETRY_COUNT);
+    _retryWaitMs = config.getProperty(RETRY_WAIT_MS_CONFIG_KEY, DEFAULT_RETRY_WAIT_MS);
+    _retryDelayScaleFactor = config.getProperty(RETRY_DELAY_SCALE_FACTOR_CONFIG_KEY, DEFAULT_RETRY_DELAY_SCALE_FACTOR);
     doInit(config);
     _logger
         .info("Initialized with retryCount: {}, retryWaitMs: {}, retryDelayScaleFactor: {}", _retryCount, _retryWaitMs,
@@ -59,7 +60,7 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
   /**
    * Override this for custom initialization.
    */
-  protected void doInit(Configuration config) {
+  protected void doInit(PinotConfiguration config) {
   }
 
   @Override

@@ -64,9 +64,11 @@ public class PinotInstanceAssignmentRestletResourceTest extends ControllerTest {
   public void setUp()
       throws Exception {
     startZk();
-    ControllerConf config = getDefaultControllerConfiguration();
-    config.setTenantIsolationEnabled(false);
-    startController(config);
+    
+    Map<String, Object> properties = getDefaultControllerConfiguration();
+    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
+    
+    startController(properties);
     addFakeBrokerInstancesToAutoJoinHelixCluster(1, false);
     addFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVER_INSTANCES, false);
 

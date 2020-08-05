@@ -21,7 +21,8 @@ package org.apache.pinot.tools.admin.command;
 import java.io.File;
 import java.net.SocketException;
 import java.net.UnknownHostException;
-import org.apache.commons.configuration.Configuration;
+import java.util.Map;
+
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.controller.ControllerConf;
@@ -137,19 +138,19 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
     }
   }
 
-  private Configuration getControllerConf()
+  private Map<String, Object> getControllerConf()
       throws ConfigurationException, SocketException, UnknownHostException {
-    ControllerConf conf;
+    Map<String, Object> properties;
     if (_configFileName != null) {
-      conf = PinotConfigUtils.generateControllerConf(_configFileName);
+      properties = PinotConfigUtils.generateControllerConf(_configFileName);
     } else {
       if (_controllerHost == null) {
         _controllerHost = NetUtil.getHostAddress();
       }
-      conf = PinotConfigUtils
+      properties = PinotConfigUtils
           .generateControllerConf(_zkAddress, _clusterName, _controllerHost, _controllerPort, _dataDir, _controllerMode,
               _tenantIsolation);
     }
-    return conf;
+    return properties;
   }
 }
