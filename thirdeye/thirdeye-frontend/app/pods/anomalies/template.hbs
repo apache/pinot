@@ -63,7 +63,7 @@
           {{#each paginatedSelectedAnomalies as |anomaly|}}
             <section class="te-search-results">
               {{anomaly-summary
-                anomalyId=anomaly
+                anomalyData = anomaly
               }}
             </section>
           {{/each}}

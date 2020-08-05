@@ -121,7 +121,7 @@ export default Component.extend({
       case 'metric': {
         return fetch(autocompleteAPI.metric(text))
           .then(checkStatus)
-          .then(metrics => metrics.map(m => m.name));
+          .then(metrics => [...new Set(metrics.map(m => m.name))]);
       }
       case 'application': {
         return fetch(autocompleteAPI.application(text))
@@ -140,7 +140,12 @@ export default Component.extend({
       case 'dataset': {
         return fetch(autocompleteAPI.dataset(text))
           .then(checkStatus)
-          .then(datasets => datasets.map(d => d.name));
+          .then(datasets =>  [...new Set(datasets.map(d => d.name))]);
+      }
+      case 'alertName': {
+        return fetch(autocompleteAPI.alertByName(text))
+          .then(checkStatus)
+          .then(detections => detections.map(d => d.name));
       }
     }
   }),
