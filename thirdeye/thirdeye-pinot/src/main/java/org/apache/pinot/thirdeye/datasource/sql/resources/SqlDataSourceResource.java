@@ -12,7 +12,6 @@ import org.apache.pinot.thirdeye.datasource.sql.SqlDataset;
 import org.apache.pinot.thirdeye.datasource.sql.SqlResponseCacheLoader;
 import org.apache.pinot.thirdeye.datasource.sql.SqlUtils;
 
-@Path("/sql-data-source")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 public class SqlDataSourceResource {

@@ -30,9 +30,15 @@ import org.apache.pinot.thirdeye.dashboard.resources.v2.DataResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.DetectionAlertResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.alerts.AlertResource;
 import org.apache.pinot.thirdeye.dataset.DatasetAutoOnboardResource;
+import org.apache.pinot.thirdeye.datasource.sql.resources.SqlDataSourceResource;
 import org.apache.pinot.thirdeye.detection.DetectionResource;
 import org.apache.pinot.thirdeye.detection.yaml.YamlResource;
 
+/**
+ * This is the Jersey root endpoint "/"
+ * All child endpoints should be registered here with method level @Path annotations.
+ *
+ */
 @Path("/")
 public class RootResource {
 
@@ -50,6 +56,8 @@ public class RootResource {
   private final DetectionResource detectionResource;
   private final DetectionAlertResource detectionAlertResource;
   private final EntityMappingResource entityMappingResource;
+  private final OnboardDatasetMetricResource onboardDatasetMetricResource;
+  private final SqlDataSourceResource sqlDataSourceResource;
   private final ThirdEyeResource thirdEyeResource;
   private final UserDashboardResource userDashboardResource;
   private final YamlResource yamlResource;
@@ -70,6 +78,8 @@ public class RootResource {
       final DetectionResource detectionResource,
       final DetectionAlertResource detectionAlertResource,
       final EntityMappingResource entityMappingResource,
+      final OnboardDatasetMetricResource onboardDatasetMetricResource,
+      final SqlDataSourceResource sqlDataSourceResource,
       final ThirdEyeResource thirdEyeResource,
       final UserDashboardResource userDashboardResource,
       final YamlResource yamlResource) {
@@ -87,6 +97,8 @@ public class RootResource {
     this.detectionResource = detectionResource;
     this.detectionAlertResource = detectionAlertResource;
     this.entityMappingResource = entityMappingResource;
+    this.onboardDatasetMetricResource = onboardDatasetMetricResource;
+    this.sqlDataSourceResource = sqlDataSourceResource;
     this.thirdEyeResource = thirdEyeResource;
     this.userDashboardResource = userDashboardResource;
     this.yamlResource = yamlResource;
@@ -157,9 +169,19 @@ public class RootResource {
     return detectionAlertResource;
   }
 
+  @Path("onboard")
+  public OnboardDatasetMetricResource getOnboardDatasetMetricResource() {
+    return onboardDatasetMetricResource;
+  }
+
   @Path("thirdeye-admin")
   public AdminResource getAdminResource() {
     return adminResource;
+  }
+
+  @Path("sql-data-source")
+  public SqlDataSourceResource getSqlDataSourceResource() {
+    return sqlDataSourceResource;
   }
 
   @Path("thirdeye")

@@ -45,7 +45,6 @@ import org.apache.commons.lang3.StringUtils;
 /**
  * Endpoints for adding datasets and metrics to be read by data sources
  */
-@Path(value = "/onboard")
 @Produces(MediaType.APPLICATION_JSON)
 public class OnboardDatasetMetricResource {
 
