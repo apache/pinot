@@ -40,7 +40,6 @@ import javax.ws.rs.core.Response.Status;
 /**
  * Endpoints for triggering adhoc onboard on auto onboard services
  */
-@Path(value = "/autoOnboard")
 @Produces(MediaType.APPLICATION_JSON)
 @Api(tags = {Constants.DASHBOARD_TAG})
 public class AutoOnboardResource {

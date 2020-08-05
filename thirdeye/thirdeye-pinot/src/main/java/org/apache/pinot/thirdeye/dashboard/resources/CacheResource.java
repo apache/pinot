@@ -43,7 +43,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-@Path("/cache")
 @Api(tags = { Constants.CACHE_TAG })
 @Produces(MediaType.APPLICATION_JSON)
 public class CacheResource {

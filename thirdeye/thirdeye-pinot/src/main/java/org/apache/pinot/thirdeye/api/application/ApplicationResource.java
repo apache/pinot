@@ -49,7 +49,6 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.thirdeye.detection.yaml.translator.SubscriptionConfigTranslator.*;
 
 
-@Path(value = "/application")
 @Produces(MediaType.APPLICATION_JSON)
 public class ApplicationResource {
   protected static final Logger LOG = LoggerFactory.getLogger(ApplicationResource.class);

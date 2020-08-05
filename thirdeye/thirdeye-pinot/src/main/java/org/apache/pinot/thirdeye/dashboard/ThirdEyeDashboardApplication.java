@@ -37,7 +37,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import javax.servlet.DispatcherType;
 import javax.servlet.FilterRegistration;
-import org.apache.pinot.thirdeye.api.application.ApplicationResource;
 import org.apache.pinot.thirdeye.api.user.dashboard.UserDashboardResource;
 import org.apache.pinot.thirdeye.api.detection.AnomalyDetectionResource;
 import org.apache.pinot.thirdeye.auth.ThirdEyeAuthFilter;
@@ -46,31 +45,13 @@ import org.apache.pinot.thirdeye.common.BaseThirdEyeApplication;
 import org.apache.pinot.thirdeye.common.ThirdEyeSwaggerBundle;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.dashboard.configs.ResourceConfiguration;
-import org.apache.pinot.thirdeye.dashboard.resources.AdminResource;
-import org.apache.pinot.thirdeye.dashboard.resources.AnomalyFlattenResource;
-import org.apache.pinot.thirdeye.dashboard.resources.AnomalyResource;
-import org.apache.pinot.thirdeye.dashboard.resources.AutoOnboardResource;
-import org.apache.pinot.thirdeye.dashboard.resources.CacheResource;
-import org.apache.pinot.thirdeye.dashboard.resources.CustomizedEventResource;
-import org.apache.pinot.thirdeye.dashboard.resources.DashboardResource;
-import org.apache.pinot.thirdeye.dashboard.resources.DatasetConfigResource;
-import org.apache.pinot.thirdeye.dashboard.resources.EntityManagerResource;
-import org.apache.pinot.thirdeye.dashboard.resources.EntityMappingResource;
-import org.apache.pinot.thirdeye.dashboard.resources.MetricConfigResource;
-import org.apache.pinot.thirdeye.dashboard.resources.OnboardDatasetMetricResource;
-import org.apache.pinot.thirdeye.dashboard.resources.SummaryResource;
-import org.apache.pinot.thirdeye.dashboard.resources.ThirdEyeResource;
-import org.apache.pinot.thirdeye.dashboard.resources.v2.AnomaliesResource;
+import org.apache.pinot.thirdeye.dashboard.resources.*;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.AuthResource;
-import org.apache.pinot.thirdeye.dashboard.resources.v2.ConfigResource;
-import org.apache.pinot.thirdeye.dashboard.resources.v2.DataResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.DetectionAlertResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.RootCauseMetricResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.RootCauseResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.RootCauseSessionResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.RootCauseTemplateResource;
-import org.apache.pinot.thirdeye.dashboard.resources.v2.alerts.AlertResource;
-import org.apache.pinot.thirdeye.dashboard.resources.v2.anomalies.AnomalySearchResource;
 import org.apache.pinot.thirdeye.dataset.DatasetAutoOnboardResource;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.sql.resources.SqlDataSourceResource;
@@ -140,37 +121,26 @@ public class ThirdEyeDashboardApplication
     final JerseyEnvironment jersey = env.jersey();
     injector = Guice.createInjector(new ThirdEyeDashboardModule(config, env, DAO_REGISTRY));
     Stream.of(
-        DetectionConfigurationResource.class,
-        DatasetAutoOnboardResource.class,
-        DashboardResource.class,
-        CacheResource.class,
-        AnomalyResource.class,
-        EntityManagerResource.class,
-        MetricConfigResource.class,
-        DatasetConfigResource.class,
-        AdminResource.class,
-        SummaryResource.class,
-        ThirdEyeResource.class,
-        DataResource.class,
-        AnomaliesResource.class,
-        EntityMappingResource.class,
-        OnboardDatasetMetricResource.class,
-        AutoOnboardResource.class,
-        ConfigResource.class,
-        CustomizedEventResource.class,
         AnomalyFlattenResource.class,
-        UserDashboardResource.class,
-        ApplicationResource.class,
-        DetectionResource.class,
+        AnomalyResource.class,
+        CustomizedEventResource.class,
+        DatasetAutoOnboardResource.class,
+        DatasetConfigResource.class,
         DetectionAlertResource.class,
-        YamlResource.class,
-        SqlDataSourceResource.class,
-        AlertResource.class,
-        RootCauseTemplateResource.class,
-        RootCauseSessionResource.class,
+        DetectionConfigurationResource.class,
+        DetectionResource.class,
+        EntityManagerResource.class,
+        EntityMappingResource.class,
+        MetricConfigResource.class,
+        OnboardDatasetMetricResource.class,
         RootCauseMetricResource.class,
-        AnomalySearchResource.class,
-        AnomalyDetectionResource.class
+        RootCauseSessionResource.class,
+        RootCauseTemplateResource.class,
+        RootResource.class,
+        SqlDataSourceResource.class,
+        ThirdEyeResource.class,
+        UserDashboardResource.class,
+        YamlResource.class
     )
         .map(c -> injector.getInstance(c))
         .forEach(jersey::register);

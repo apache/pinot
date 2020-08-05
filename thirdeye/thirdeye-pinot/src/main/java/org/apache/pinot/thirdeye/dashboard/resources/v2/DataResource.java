@@ -98,7 +98,6 @@ import org.slf4j.LoggerFactory;
  *    b. Add a ExceptionMapper and register it in the dw environment
  *    c. Add a web filter / intercepter to catch and convert RTEs to web exception
  */
-@Path(value = "/data")
 @Produces(MediaType.APPLICATION_JSON)
 @Api(tags = {Constants.DASHBOARD_TAG})
 public class DataResource {

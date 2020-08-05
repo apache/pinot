@@ -112,7 +112,6 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
-@Path(value = "/anomalies")
 @Produces(MediaType.APPLICATION_JSON)
 public class AnomaliesResource {
   private static final String COL_CURRENT = "current";

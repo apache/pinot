@@ -19,20 +19,17 @@
 
 package org.apache.pinot.thirdeye.dashboard.resources;
 
-import org.apache.pinot.thirdeye.api.Constants;
+import io.dropwizard.views.View;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
-
+import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.dashboard.views.ThirdEyeAdminView;
 
-import io.dropwizard.views.View;
-
-@Path(value = "/thirdeye-admin")
-@Api(tags = {Constants.ADMIN_TAG } )
+@Api(tags = {Constants.ADMIN_TAG})
 @Produces(MediaType.APPLICATION_JSON)
 public class AdminResource {
 

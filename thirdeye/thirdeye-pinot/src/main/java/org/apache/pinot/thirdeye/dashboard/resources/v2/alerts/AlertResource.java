@@ -36,7 +36,6 @@ import org.apache.pinot.thirdeye.api.Constants;
 /**
  * The Alert resource.
  */
-@Path(value = "/alerts")
 @Produces(MediaType.APPLICATION_JSON)
 @Api(tags = {Constants.DETECTION_TAG})
 public class AlertResource {
