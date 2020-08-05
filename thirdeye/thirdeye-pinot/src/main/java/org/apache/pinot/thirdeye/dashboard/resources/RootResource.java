@@ -27,8 +27,10 @@ import org.apache.pinot.thirdeye.api.user.dashboard.UserDashboardResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.AnomaliesResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.ConfigResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.DataResource;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.DetectionAlertResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.alerts.AlertResource;
 import org.apache.pinot.thirdeye.dataset.DatasetAutoOnboardResource;
+import org.apache.pinot.thirdeye.detection.DetectionResource;
 import org.apache.pinot.thirdeye.detection.yaml.YamlResource;
 
 @Path("/")
@@ -45,6 +47,8 @@ public class RootResource {
   private final DashboardResource dashboardResource;
   private final DataResource dataResource;
   private final DatasetAutoOnboardResource datasetAutoOnboardResource;
+  private final DetectionResource detectionResource;
+  private final DetectionAlertResource detectionAlertResource;
   private final ThirdEyeResource thirdEyeResource;
   private final UserDashboardResource userDashboardResource;
   private final YamlResource yamlResource;
@@ -62,6 +66,8 @@ public class RootResource {
       final DashboardResource dashboardResource,
       final DataResource dataResource,
       final DatasetAutoOnboardResource datasetAutoOnboardResource,
+      final DetectionResource detectionResource,
+      final DetectionAlertResource detectionAlertResource,
       final ThirdEyeResource thirdEyeResource,
       final UserDashboardResource userDashboardResource,
       final YamlResource yamlResource) {
@@ -76,6 +82,8 @@ public class RootResource {
     this.dashboardResource = dashboardResource;
     this.dataResource = dataResource;
     this.datasetAutoOnboardResource = datasetAutoOnboardResource;
+    this.detectionResource = detectionResource;
+    this.detectionAlertResource = detectionAlertResource;
     this.thirdEyeResource = thirdEyeResource;
     this.userDashboardResource = userDashboardResource;
     this.yamlResource = yamlResource;
@@ -129,6 +137,16 @@ public class RootResource {
   @Path("dataset-auto-onboard")
   public DatasetAutoOnboardResource getDatasetAutoOnboardResource() {
     return datasetAutoOnboardResource;
+  }
+
+  @Path("detection")
+  public DetectionResource getDetectionResource() {
+    return detectionResource;
+  }
+
+  @Path("groups")
+  public DetectionAlertResource getDetectionAlertResource() {
+    return detectionAlertResource;
   }
 
   @Path("thirdeye-admin")

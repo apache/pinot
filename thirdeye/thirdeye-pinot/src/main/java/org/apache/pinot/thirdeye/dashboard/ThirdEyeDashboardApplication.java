@@ -37,27 +37,29 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import javax.servlet.DispatcherType;
 import javax.servlet.FilterRegistration;
-import org.apache.pinot.thirdeye.api.user.dashboard.UserDashboardResource;
-import org.apache.pinot.thirdeye.api.detection.AnomalyDetectionResource;
 import org.apache.pinot.thirdeye.auth.ThirdEyeAuthFilter;
 import org.apache.pinot.thirdeye.auth.ThirdEyePrincipal;
 import org.apache.pinot.thirdeye.common.BaseThirdEyeApplication;
 import org.apache.pinot.thirdeye.common.ThirdEyeSwaggerBundle;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.dashboard.configs.ResourceConfiguration;
-import org.apache.pinot.thirdeye.dashboard.resources.*;
+import org.apache.pinot.thirdeye.dashboard.resources.AnomalyResource;
+import org.apache.pinot.thirdeye.dashboard.resources.DatasetConfigResource;
+import org.apache.pinot.thirdeye.dashboard.resources.EntityManagerResource;
+import org.apache.pinot.thirdeye.dashboard.resources.EntityMappingResource;
+import org.apache.pinot.thirdeye.dashboard.resources.MetricConfigResource;
+import org.apache.pinot.thirdeye.dashboard.resources.OnboardDatasetMetricResource;
+import org.apache.pinot.thirdeye.dashboard.resources.RootResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.AuthResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.DetectionAlertResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.RootCauseMetricResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.RootCauseResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.RootCauseSessionResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.RootCauseTemplateResource;
-import org.apache.pinot.thirdeye.dataset.DatasetAutoOnboardResource;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.sql.resources.SqlDataSourceResource;
 import org.apache.pinot.thirdeye.detection.DetectionConfigurationResource;
 import org.apache.pinot.thirdeye.detection.DetectionResource;
-import org.apache.pinot.thirdeye.detection.yaml.YamlResource;
 import org.apache.pinot.thirdeye.model.download.ModelDownloaderManager;
 import org.apache.pinot.thirdeye.tracking.RequestStatisticsLogger;
 import org.eclipse.jetty.servlets.CrossOriginFilter;
@@ -122,10 +124,6 @@ public class ThirdEyeDashboardApplication
     injector = Guice.createInjector(new ThirdEyeDashboardModule(config, env, DAO_REGISTRY));
     Stream.of(
         AnomalyResource.class,
-        DatasetConfigResource.class,
-        DetectionAlertResource.class,
-        DetectionConfigurationResource.class,
-        DetectionResource.class,
         EntityManagerResource.class,
         EntityMappingResource.class,
         MetricConfigResource.class,

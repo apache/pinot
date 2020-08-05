@@ -40,7 +40,6 @@ import javax.ws.rs.core.MediaType;
  * Endpoints for detection alert (aka "groups") management
  */
 @Api(tags = {Constants.DASHBOARD_TAG})
-@Path(value = "/groups")
 @Produces(MediaType.APPLICATION_JSON)
 public class DetectionAlertResource {
   private final DetectionAlertConfigManager detectionAlertDAO;

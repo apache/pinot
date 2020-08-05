@@ -34,7 +34,6 @@ import org.apache.pinot.thirdeye.detection.annotation.Components;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
 
 
-@Path("/detection/rule")
 @Api(tags = {Constants.DETECTION_TAG})
 public class DetectionConfigurationResource {
   private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
