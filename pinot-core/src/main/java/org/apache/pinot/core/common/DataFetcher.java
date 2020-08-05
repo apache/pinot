@@ -254,7 +254,9 @@ public class DataFetcher {
   private class ColumnValueReader implements Closeable {
     final ForwardIndexReader _reader;
     final Dictionary _dictionary;
-    ForwardIndexReaderContext _readerContext = null;
+
+    boolean _readerContextCreated;
+    ForwardIndexReaderContext _readerContext;
 
     ColumnValueReader(ForwardIndexReader reader, @Nullable Dictionary dictionary) {
       _reader = reader;
@@ -262,8 +264,10 @@ public class DataFetcher {
     }
 
     private ForwardIndexReaderContext getReaderContext() {
-      if (_readerContext == null) {
+      // Create reader context lazily to reduce the duration of existence
+      if (!_readerContextCreated) {
         _readerContext = _reader.createContext();
+        _readerContextCreated = true;
       }
       return _readerContext;
     }
@@ -504,6 +508,7 @@ public class DataFetcher {
     }
 
     void readIntValuesMV(int[] docIds, int length, int[][] valuesBuffer) {
+      assert _dictionary != null;
       for (int i = 0; i < length; i++) {
         int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, getReaderContext());
         int[] values = new int[numValues];
@@ -513,6 +518,7 @@ public class DataFetcher {
     }
 
     void readLongValuesMV(int[] docIds, int length, long[][] valuesBuffer) {
+      assert _dictionary != null;
       for (int i = 0; i < length; i++) {
         int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, getReaderContext());
         long[] values = new long[numValues];
@@ -522,6 +528,7 @@ public class DataFetcher {
     }
 
     void readFloatValuesMV(int[] docIds, int length, float[][] valuesBuffer) {
+      assert _dictionary != null;
       for (int i = 0; i < length; i++) {
         int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, getReaderContext());
         float[] values = new float[numValues];
@@ -531,6 +538,7 @@ public class DataFetcher {
     }
 
     void readDoubleValuesMV(int[] docIds, int length, double[][] valuesBuffer) {
+      assert _dictionary != null;
       for (int i = 0; i < length; i++) {
         int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, getReaderContext());
         double[] values = new double[numValues];
@@ -540,6 +548,7 @@ public class DataFetcher {
     }
 
     void readStringValuesMV(int[] docIds, int length, String[][] valuesBuffer) {
+      assert _dictionary != null;
       for (int i = 0; i < length; i++) {
         int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, getReaderContext());
         String[] values = new String[numValues];
