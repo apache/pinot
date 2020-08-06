@@ -122,9 +122,12 @@ public class ColumnMetadata {
       builder.setDateTimeGranularity(dateTimeGranularity);
     }
 
-    // Set min/max value if available.
-    String minString = config.getString(getKeyFor(column, MIN_VALUE), null);
-    String maxString = config.getString(getKeyFor(column, MAX_VALUE), null);
+    // Set min/max value if available
+    // NOTE: Use getProperty() instead of getString() to avoid variable substitution ('${anotherKey}'), which can cause
+    //       problem for special values such as '$${' where the first '$' is identified as escape character.
+    // TODO: Use getProperty() for other properties as well to avoid the overhead of variable substitution
+    String minString = (String) config.getProperty(getKeyFor(column, MIN_VALUE));
+    String maxString = (String) config.getProperty(getKeyFor(column, MAX_VALUE));
     if (minString != null && maxString != null) {
       switch (dataType) {
         case INT:
