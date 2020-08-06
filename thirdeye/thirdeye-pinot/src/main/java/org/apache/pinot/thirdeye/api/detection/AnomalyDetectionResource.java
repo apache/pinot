@@ -25,6 +25,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
+import com.google.inject.Inject;
 import io.dropwizard.auth.Auth;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -135,6 +136,7 @@ public class AnomalyDetectionResource {
   private final ObjectMapper objectMapper = new ObjectMapper();
   private final Yaml yaml;
 
+  @Inject
   public AnomalyDetectionResource(UserDashboardResource userDashboardResource) {
     this.detectionConfigDAO = DAORegistry.getInstance().getDetectionConfigManager();
     this.metricConfigDAO = DAORegistry.getInstance().getMetricConfigDAO();
