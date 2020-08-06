@@ -97,9 +97,11 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
       InstancePartitionsUtils.getInstancePartitionsName(RAW_TABLE_NAME, TIER_C_NAME);
 
   private List<String> _segments;
-  private SegmentAssignment _segmentAssignment;
   private Map<InstancePartitionsType, InstancePartitions> _instancePartitionsMap;
   private Map<String, InstancePartitions> _tierInstancePartitionsMap;
+  private List<Tier> _sortedTiers;
+  private SegmentAssignment _segmentAssignment;
+  private SegmentAssignment _segmentAssignmentWithTiers;
 
   @BeforeClass
   public void setUp() {
@@ -109,18 +111,21 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
           System.currentTimeMillis()).getSegmentName());
     }
 
-    List<TierConfig> tierConfigs = Lists.newArrayList(
+    List<TierConfig> tierConfigList = Lists.newArrayList(
         new TierConfig(TIER_A_NAME, TierFactory.TIME_BASED_SEGMENT_SELECTOR_TYPE, "10d",
             TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_A_NAME),
         new TierConfig(TIER_B_NAME, TierFactory.TIME_BASED_SEGMENT_SELECTOR_TYPE, "20d",
             TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_B_NAME),
         new TierConfig(TIER_C_NAME, TierFactory.TIME_BASED_SEGMENT_SELECTOR_TYPE, "30d",
             TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_C_NAME));
+    TableConfig tableConfigWithTierConfigs =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
+            .setTierConfigList(tierConfigList).setLLC(true).build();
     TableConfig tableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).setTierConfigList(tierConfigs)
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
             .setLLC(true).build();
-    _segmentAssignment = new TestRealtimeSegmentAssignment();
-    _segmentAssignment.init(null, tableConfig);
+    _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(null, tableConfig);
+    _segmentAssignmentWithTiers = SegmentAssignmentFactory.getSegmentAssignment(null, tableConfigWithTierConfigs);
 
     _instancePartitionsMap = new TreeMap<>();
     // CONSUMING instances:
@@ -151,6 +156,11 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
     _tierInstancePartitionsMap.put(TIER_A_NAME, instancePartitionsTierA);
     _tierInstancePartitionsMap.put(TIER_B_NAME, instancePartitionsTierB);
     _tierInstancePartitionsMap.put(TIER_C_NAME, instancePartitionsTierC);
+
+    _sortedTiers = Lists
+        .newArrayList(new Tier(TIER_C_NAME, new TestSegmentSelectorC(), new PinotServerTierStorage(TAG_C_NAME)),
+            new Tier(TIER_B_NAME, new TestSegmentSelectorB(), new PinotServerTierStorage(TAG_B_NAME)),
+            new Tier(TIER_A_NAME, new TestSegmentSelectorA(), new PinotServerTierStorage(TAG_A_NAME)));
   }
 
   @Test
@@ -159,7 +169,7 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
     for (int segmentId = 0; segmentId < NUM_SEGMENTS; segmentId++) {
       String segmentName = _segments.get(segmentId);
       List<String> instancesAssigned =
-          _segmentAssignment.assignSegment(segmentName, currentAssignment, _instancePartitionsMap);
+          _segmentAssignmentWithTiers.assignSegment(segmentName, currentAssignment, _instancePartitionsMap);
       addToAssignment(currentAssignment, segmentId, instancesAssigned);
     }
 
@@ -171,8 +181,8 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
     }
 
     // Rebalance without tier instancePartitions moves all instances to COMPLETED
-    Map<String, Map<String, String>> newAssignment =
-        _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, null, new BaseConfiguration());
+    Map<String, Map<String, String>> newAssignment = _segmentAssignment
+        .rebalanceTable(currentAssignment, _instancePartitionsMap, null, null, new BaseConfiguration());
     assertEquals(newAssignment.size(), NUM_SEGMENTS);
     for (int segmentId = 0; segmentId < NUM_SEGMENTS; segmentId++) {
       if (segmentId < NUM_SEGMENTS - NUM_PARTITIONS) { // ONLINE segments
@@ -194,8 +204,9 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
     int expectedOnTierA = 40;
     int expectedOnTierB = 20;
     int expectedOnCompleted = NUM_SEGMENTS - NUM_PARTITIONS - expectedOnTierA - expectedOnTierB;
-    newAssignment =
-        _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, _tierInstancePartitionsMap, new BaseConfiguration());
+    newAssignment = _segmentAssignmentWithTiers
+        .rebalanceTable(currentAssignment, _instancePartitionsMap, _tierInstancePartitionsMap, _sortedTiers,
+            new BaseConfiguration());
     assertEquals(newAssignment.size(), NUM_SEGMENTS);
     for (int segmentId = 0; segmentId < NUM_SEGMENTS; segmentId++) {
       if (segmentId < NUM_SEGMENTS - NUM_PARTITIONS) {
@@ -248,22 +259,24 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
     // Rebalance with including CONSUMING should give the same assignment
     BaseConfiguration rebalanceConfig = new BaseConfiguration();
     rebalanceConfig.setProperty(RebalanceConfigConstants.INCLUDE_CONSUMING, true);
-    assertEquals(_segmentAssignment
-            .rebalanceTable(currentAssignment, _instancePartitionsMap, _tierInstancePartitionsMap, rebalanceConfig),
-        newAssignment);
+    assertEquals(_segmentAssignmentWithTiers
+        .rebalanceTable(currentAssignment, _instancePartitionsMap, _tierInstancePartitionsMap, _sortedTiers,
+            rebalanceConfig), newAssignment);
 
     // Rebalance without COMPLETED instance partitions and without tierInstancePartitions again should change the segment assignment back
     Map<InstancePartitionsType, InstancePartitions> noRelocationInstancePartitionsMap = new TreeMap<>();
     noRelocationInstancePartitionsMap
         .put(InstancePartitionsType.CONSUMING, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
     assertEquals(_segmentAssignment
-            .rebalanceTable(newAssignment, noRelocationInstancePartitionsMap, null, new BaseConfiguration()),
+            .rebalanceTable(newAssignment, noRelocationInstancePartitionsMap, null, null, new BaseConfiguration()),
         currentAssignment);
 
     // Bootstrap
     rebalanceConfig = new BaseConfiguration();
     rebalanceConfig.setProperty(RebalanceConfigConstants.BOOTSTRAP, true);
-    newAssignment = _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, _tierInstancePartitionsMap, rebalanceConfig);
+    newAssignment = _segmentAssignmentWithTiers
+        .rebalanceTable(currentAssignment, _instancePartitionsMap, _tierInstancePartitionsMap, _sortedTiers,
+            rebalanceConfig);
     int index = 0;
     int indexA = 0;
     int indexB = 0;
@@ -308,19 +321,6 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
     // Add the new segment into the assignment as CONSUMING
     currentAssignment.put(_segments.get(segmentId),
         SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.CONSUMING));
-  }
-
-  /**
-   * Test realtime assignment which mocks segment selector logic
-   */
-  private static class TestRealtimeSegmentAssignment extends RealtimeSegmentAssignment {
-    @Override
-    protected List<Tier> getSortedTiersForPinotServerStorage(List<TierConfig> tierConfigs) {
-      return Lists
-          .newArrayList(new Tier(TIER_C_NAME, new TestSegmentSelectorC(), new PinotServerTierStorage(TAG_C_NAME)),
-              new Tier(TIER_B_NAME, new TestSegmentSelectorB(), new PinotServerTierStorage(TAG_B_NAME)),
-              new Tier(TIER_A_NAME, new TestSegmentSelectorA(), new PinotServerTierStorage(TAG_A_NAME)));
-    }
   }
 
   /**

@@ -20,6 +20,7 @@ package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
@@ -50,6 +51,10 @@ public class TierConfig extends BaseJsonConfig {
       @JsonProperty("segmentAge") @Nullable String segmentAge,
       @JsonProperty(value = "storageType", required = true) String storageType,
       @JsonProperty("serverTag") @Nullable String serverTag) {
+    Preconditions.checkArgument(name != null, "Must provide non-null 'name' in tierConfig");
+    Preconditions
+        .checkArgument(segmentSelectorType != null, "Must provide non-null 'segmentSelectorType' in tierConfig");
+    Preconditions.checkArgument(storageType != null, "Must provide non-null 'storageType' in tierConfig");
     _name = name;
     _segmentSelectorType = segmentSelectorType;
     _segmentAge = segmentAge;

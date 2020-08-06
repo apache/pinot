@@ -51,13 +51,6 @@ public class InstanceAssignmentConfigUtils {
   }
 
   /**
-   * Returns whether relocation of segments to tiers has been enabled for this table
-   */
-  public static boolean shouldRelocateToTiers(TableConfig tableConfig) {
-    return tableConfig.getTierConfigsList() != null && !tableConfig.getTierConfigsList().isEmpty();
-  }
-
-  /**
    * Returns whether the instance assignment is allowed for the given table config and instance partitions type.
    */
   public static boolean allowInstanceAssignment(TableConfig tableConfig,

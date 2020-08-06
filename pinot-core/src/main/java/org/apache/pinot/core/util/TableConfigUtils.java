@@ -163,9 +163,8 @@ public final class TableConfigUtils {
     Set<String> tierNames = new HashSet<>();
     for (TierConfig tierConfig : tierConfigList) {
       String tierName = tierConfig.getName();
-      Preconditions.checkState(!tierName.isEmpty());
-      Preconditions.checkState(!tierNames.contains(tierName), "Tier name: %s already exists in tier configs", tierName);
-      tierNames.add(tierName);
+      Preconditions.checkState(!tierName.isEmpty(), "Tier name cannot be blank");
+      Preconditions.checkState(tierNames.add(tierName), "Tier name: %s already exists in tier configs", tierName);
 
       String segmentSelectorType = tierConfig.getSegmentSelectorType();
       String segmentAge = tierConfig.getSegmentAge();

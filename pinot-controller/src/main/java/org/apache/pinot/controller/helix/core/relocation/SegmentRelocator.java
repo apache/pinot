@@ -24,6 +24,7 @@ import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -40,41 +41,51 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Periodic task to run rebalancer in background to relocate COMPLETED segments for LLC real-time table. Allow at most
- * one replica unavailable during rebalance.
+ * Periodic task to run rebalancer in background to
+ * 1. relocate COMPLETED segments to tag overrides
+ * 2. relocate ONLINE segments to tiers if tier configs are set
+ * Allow at most one replica unavailable during rebalance. Not applicable for HLC tables.
  */
-public class RealtimeSegmentRelocator extends ControllerPeriodicTask<Void> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentRelocator.class);
+public class SegmentRelocator extends ControllerPeriodicTask<Void> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentRelocator.class);
 
   private final ExecutorService _executorService;
 
-  public RealtimeSegmentRelocator(PinotHelixResourceManager pinotHelixResourceManager,
+  public SegmentRelocator(PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics,
       ExecutorService executorService) {
-    super("RealtimeSegmentRelocator", getRunFrequencySeconds(config.getRealtimeSegmentRelocatorFrequency()),
-        config.getRealtimeSegmentRelocationInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
+    super(SegmentRelocator.class.getSimpleName(), 60,
+        30, pinotHelixResourceManager, leadControllerManager,
         controllerMetrics);
     _executorService = executorService;
   }
 
   @Override
   protected void processTable(String tableNameWithType) {
-    // Only relocate segments for LLC real-time table
-    if (!TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
-      return;
-    }
     TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: {}", tableNameWithType);
-    if (new StreamConfig(tableNameWithType, tableConfig.getIndexingConfig().getStreamConfigs())
+
+    // Segment relocation doesn't apply to HLC
+    boolean isRealtimeTable = TableNameBuilder.isRealtimeTableResource(tableNameWithType);
+    if (isRealtimeTable && new StreamConfig(tableNameWithType, tableConfig.getIndexingConfig().getStreamConfigs())
         .hasHighLevelConsumerType()) {
       return;
     }
-    if (!InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig)) {
-      LOGGER.debug("No need to relocate COMPLETED segments for table: {}", tableNameWithType);
+
+    boolean relocate = false;
+    if (TierConfigUtils.shouldRelocateToTiers(tableConfig)) {
+      relocate = true;
+      LOGGER.info("Relocating segments to tiers for table: {}", tableNameWithType);
+    }
+    if (isRealtimeTable && InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig)) {
+      relocate = true;
+      LOGGER.info("Relocating COMPLETED segments for table: {}", tableNameWithType);
+    }
+    if (!relocate) {
+      LOGGER.debug("No need to relocate segments of table: {}", tableNameWithType);
       return;
     }
 
-    LOGGER.info("Relocating COMPLETED segments for table: {}", tableNameWithType);
     // Allow at most one replica unavailable during relocation
     Configuration rebalanceConfig = new BaseConfiguration();
     rebalanceConfig.addProperty(RebalanceConfigConstants.MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME, -1);
@@ -85,10 +96,10 @@ public class RealtimeSegmentRelocator extends ControllerPeriodicTask<Void> {
             new TableRebalancer(_pinotHelixResourceManager.getHelixZkManager()).rebalance(tableConfig, rebalanceConfig);
         switch (rebalance.getStatus()) {
           case NO_OP:
-            LOGGER.info("All COMPLETED segments are already relocated for table: {}", tableNameWithType);
+            LOGGER.info("All segments are already relocated for table: {}", tableNameWithType);
             break;
           case DONE:
-            LOGGER.info("Finished relocating COMPLETED segments for table: {}", tableNameWithType);
+            LOGGER.info("Finished relocating segments for table: {}", tableNameWithType);
             break;
           default:
             LOGGER.error("Relocation failed for table: {}", tableNameWithType);
@@ -97,16 +108,5 @@ public class RealtimeSegmentRelocator extends ControllerPeriodicTask<Void> {
         LOGGER.error("Caught exception/error while rebalancing table: {}", tableNameWithType, t);
       }
     });
-  }
-
-  private static long getRunFrequencySeconds(String timeStr) {
-    long seconds;
-    try {
-      Long millis = TimeUtils.convertPeriodToMillis(timeStr);
-      seconds = millis / 1000;
-    } catch (Exception e) {
-      throw new RuntimeException("Invalid time spec '" + timeStr + "' (Valid examples: '3h', '4h30m', '30m')", e);
-    }
-    return seconds;
   }
 }

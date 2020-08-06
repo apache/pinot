@@ -264,7 +264,7 @@ public class OfflineReplicaGroupSegmentAssignmentTest {
     assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
     // Current assignment should already be balanced
     assertEquals(_segmentAssignmentWithoutPartition
-            .rebalanceTable(currentAssignment, _instancePartitionsMapWithoutPartition, null, new BaseConfiguration()),
+            .rebalanceTable(currentAssignment, _instancePartitionsMapWithoutPartition, null, null, new BaseConfiguration()),
         currentAssignment);
   }
 
@@ -293,7 +293,7 @@ public class OfflineReplicaGroupSegmentAssignmentTest {
     assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
     // Current assignment should already be balanced
     assertEquals(_segmentAssignmentWithPartition
-            .rebalanceTable(currentAssignment, _instancePartitionsMapWithPartition, null, new BaseConfiguration()),
+            .rebalanceTable(currentAssignment, _instancePartitionsMapWithPartition, null, null, new BaseConfiguration()),
         currentAssignment);
   }
 
@@ -311,7 +311,7 @@ public class OfflineReplicaGroupSegmentAssignmentTest {
     Configuration rebalanceConfig = new BaseConfiguration();
     rebalanceConfig.setProperty(RebalanceConfigConstants.BOOTSTRAP, true);
     Map<String, Map<String, String>> newAssignment = _segmentAssignmentWithoutPartition
-        .rebalanceTable(currentAssignment, _instancePartitionsMapWithoutPartition, null, rebalanceConfig);
+        .rebalanceTable(currentAssignment, _instancePartitionsMapWithoutPartition, null, null, rebalanceConfig);
     assertEquals(newAssignment.size(), NUM_SEGMENTS);
     List<String> sortedSegments = new ArrayList<>(SEGMENTS);
     sortedSegments.sort(null);
@@ -334,7 +334,7 @@ public class OfflineReplicaGroupSegmentAssignmentTest {
     Configuration rebalanceConfig = new BaseConfiguration();
     rebalanceConfig.setProperty(RebalanceConfigConstants.BOOTSTRAP, true);
     Map<String, Map<String, String>> newAssignment = _segmentAssignmentWithPartition
-        .rebalanceTable(currentAssignment, _instancePartitionsMapWithPartition, null, rebalanceConfig);
+        .rebalanceTable(currentAssignment, _instancePartitionsMapWithPartition, null, null, rebalanceConfig);
     assertEquals(newAssignment.size(), NUM_SEGMENTS);
     int numSegmentsPerPartition = NUM_SEGMENTS / NUM_PARTITIONS;
     String[][] partitionIdToSegmentsMap = new String[NUM_PARTITIONS][numSegmentsPerPartition];

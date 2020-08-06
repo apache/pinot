@@ -18,22 +18,22 @@
  */
 package org.apache.pinot.controller;
 
-import static org.apache.pinot.common.utils.CommonConstants.Controller.CONFIG_OF_CONTROLLER_METRICS_PREFIX;
-import static org.apache.pinot.common.utils.CommonConstants.Controller.DEFAULT_METRICS_PREFIX;
-
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
-
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
+import org.apache.pinot.spi.utils.TimeUtils;
+
+import static org.apache.pinot.common.utils.CommonConstants.Controller.CONFIG_OF_CONTROLLER_METRICS_PREFIX;
+import static org.apache.pinot.common.utils.CommonConstants.Controller.DEFAULT_METRICS_PREFIX;
 
 
 public class ControllerConf extends PinotConfiguration {
@@ -80,14 +80,16 @@ public class ControllerConf extends PinotConfiguration {
     public static final String STATUS_CHECKER_WAIT_FOR_PUSH_TIME_IN_SECONDS =
         "controller.statuschecker.waitForPushTimeInSeconds";
     public static final String TASK_MANAGER_FREQUENCY_IN_SECONDS = "controller.task.frequencyInSeconds";
-    public static final String REALTIME_SEGMENT_RELOCATOR_FREQUENCY =
+    @Deprecated
+    // RealtimeSegmentRelocator has been rebranded as SegmentRelocator
+    public static final String DEPRECATED_REALTIME_SEGMENT_RELOCATOR_FREQUENCY =
         "controller.realtime.segment.relocator.frequency";
+    public static final String SEGMENT_RELOCATOR_FREQUENCY_IN_SECONDS =
+        "controller.segment.relocator.frequencyInSeconds";
     // Because segment level validation is expensive and requires heavy ZK access, we run segment level validation with a
     // separate interval
     public static final String SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS =
         "controller.segment.level.validation.intervalInSeconds";
-    public static final String TIERED_STORAGE_RELOCATOR_FREQUENCY_IN_SECONDS =
-        "controller.tiered.storage.relocator.frequencyInSeconds";
 
     // Initial delays
     public static final String STATUS_CHECKER_INITIAL_DELAY_IN_SECONDS =
@@ -96,10 +98,12 @@ public class ControllerConf extends PinotConfiguration {
         "controller.retentionManager.initialDelayInSeconds";
     public static final String OFFLINE_SEGMENT_INTERVAL_CHECKER_INITIAL_DELAY_IN_SECONDS =
         "controller.offlineSegmentIntervalChecker.initialDelayInSeconds";
-    public static final String REALTIME_SEGMENT_RELOCATION_INITIAL_DELAY_IN_SECONDS =
+    @Deprecated
+    // RealtimeSegmentRelocator has been rebranded as SegmentRelocator
+    public static final String DEPRECATED_REALTIME_SEGMENT_RELOCATION_INITIAL_DELAY_IN_SECONDS =
         "controller.realtimeSegmentRelocation.initialDelayInSeconds";
-    public static final String TIERED_STORAGE_RELOCATOR_INITIAL_DELAY_IN_SECONDS =
-        "controller.tieredStorageRelocator.initialDelayInSeconds";
+    public static final String SEGMENT_RELOCATOR_INITIAL_DELAY_IN_SECONDS =
+        "controller.segmentRelocator.initialDelayInSeconds";
 
     public static final int MIN_INITIAL_DELAY_IN_SECONDS = 120;
     public static final int MAX_INITIAL_DELAY_IN_SECONDS = 300;
@@ -118,9 +122,8 @@ public class ControllerConf extends PinotConfiguration {
     private static final int DEFAULT_STATUS_CONTROLLER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
     private static final int DEFAULT_STATUS_CONTROLLER_WAIT_FOR_PUSH_TIME_IN_SECONDS = 10 * 60; // 10 minutes
     private static final int DEFAULT_TASK_MANAGER_FREQUENCY_IN_SECONDS = -1; // Disabled
-    private static final String DEFAULT_REALTIME_SEGMENT_RELOCATOR_FREQUENCY = "1h"; // 1 hour
     private static final int DEFAULT_SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS = 24 * 60 * 60;
-    private static final int DEFAULT_TIERED_STORAGE_RELOCATOR_FREQUENCY_IN_SECONDS = 60 * 60;
+    private static final int DEFAULT_SEGMENT_RELOCATOR_FREQUENCY_IN_SECONDS = 60 * 60;
   }
 
   private static final String SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = "server.request.timeoutSeconds";
@@ -446,15 +449,6 @@ public class ControllerConf extends PinotConfiguration {
         Integer.toString(statusCheckerFrequencyInSeconds));
   }
 
-  public String getRealtimeSegmentRelocatorFrequency() {
-    return getProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_RELOCATOR_FREQUENCY,
-        ControllerPeriodicTasksConf.DEFAULT_REALTIME_SEGMENT_RELOCATOR_FREQUENCY);
-  }
-
-  public void setRealtimeSegmentRelocatorFrequency(String relocatorFrequency) {
-    setProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_RELOCATOR_FREQUENCY, relocatorFrequency);
-  }
-
   public int getStatusCheckerWaitForPushTimeInSeconds() {
     return getProperty(ControllerPeriodicTasksConf.STATUS_CHECKER_WAIT_FOR_PUSH_TIME_IN_SECONDS,
         ControllerPeriodicTasksConf.DEFAULT_STATUS_CONTROLLER_WAIT_FOR_PUSH_TIME_IN_SECONDS);
@@ -465,9 +459,28 @@ public class ControllerConf extends PinotConfiguration {
         Integer.toString(statusCheckerWaitForPushTimeInSeconds));
   }
 
-  public int getTieredStorageRelocatorFrequencyInSeconds() {
-    return getProperty(ControllerPeriodicTasksConf.TIERED_STORAGE_RELOCATOR_FREQUENCY_IN_SECONDS,
-        ControllerPeriodicTasksConf.DEFAULT_TIERED_STORAGE_RELOCATOR_FREQUENCY_IN_SECONDS);
+  /**
+   * RealtimeSegmentRelocator has been rebranded to SegmentRelocator.
+   * Check for SEGMENT_RELOCATOR_FREQUENCY_IN_SECONDS property, if not found, return REALTIME_SEGMENT_RELOCATOR_FREQUENCY
+   */
+  public int getSegmentRelocatorFrequencyInSeconds() {
+    Integer segmentRelocatorFreqSeconds =
+        getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_FREQUENCY_IN_SECONDS, Integer.class);
+    if (segmentRelocatorFreqSeconds == null) {
+      String realtimeSegmentRelocatorPeriod =
+          getProperty(ControllerPeriodicTasksConf.DEPRECATED_REALTIME_SEGMENT_RELOCATOR_FREQUENCY);
+      if (realtimeSegmentRelocatorPeriod != null) {
+        segmentRelocatorFreqSeconds = (int) convertPeriodToSeconds(realtimeSegmentRelocatorPeriod);
+      } else {
+        segmentRelocatorFreqSeconds = ControllerPeriodicTasksConf.DEFAULT_SEGMENT_RELOCATOR_FREQUENCY_IN_SECONDS;
+      }
+    }
+    return segmentRelocatorFreqSeconds;
+  }
+
+  public void setSegmentRelocatorFrequencyInSeconds(int segmentRelocatorFrequencyInSeconds) {
+    setProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_FREQUENCY_IN_SECONDS,
+        Integer.toString(segmentRelocatorFrequencyInSeconds));
   }
 
   public long getExternalViewOnlineToOfflineTimeout() {
@@ -570,11 +583,6 @@ public class ControllerConf extends PinotConfiguration {
         ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
   }
 
-  public long getRealtimeSegmentRelocationInitialDelayInSeconds() {
-    return getProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_RELOCATION_INITIAL_DELAY_IN_SECONDS,
-        ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
-  }
-
   public long getOfflineSegmentIntervalCheckerInitialDelayInSeconds() {
     return getProperty(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_INITIAL_DELAY_IN_SECONDS,
         ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
@@ -588,9 +596,19 @@ public class ControllerConf extends PinotConfiguration {
     return getPeriodicTaskInitialDelayInSeconds();
   }
 
-  public long getTieredStorageRelocatorInitialDelayInSeconds() {
-    return getProperty(ControllerPeriodicTasksConf.TIERED_STORAGE_RELOCATOR_INITIAL_DELAY_IN_SECONDS,
-        ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
+  /**
+   * RealtimeSegmentRelocator has been rebranded to SegmentRelocator.
+   * Check for SEGMENT_RELOCATOR_INITIAL_DELAY_IN_SECONDS property, if not found, return REALTIME_SEGMENT_RELOCATION_INITIAL_DELAY_IN_SECONDS
+   */
+  public long getSegmentRelocatorInitialDelayInSeconds() {
+    Long segmentRelocatorInitialDelaySeconds =
+        getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_INITIAL_DELAY_IN_SECONDS, Long.class);
+    if (segmentRelocatorInitialDelaySeconds == null) {
+      segmentRelocatorInitialDelaySeconds =
+          getProperty(ControllerPeriodicTasksConf.DEPRECATED_REALTIME_SEGMENT_RELOCATION_INITIAL_DELAY_IN_SECONDS,
+              ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
+    }
+    return segmentRelocatorInitialDelaySeconds;
   }
 
   public long getPeriodicTaskInitialDelayInSeconds() {
@@ -623,5 +641,16 @@ public class ControllerConf extends PinotConfiguration {
 
   public String getMetricsPrefix() {
     return getProperty(CONFIG_OF_CONTROLLER_METRICS_PREFIX, DEFAULT_METRICS_PREFIX);
+  }
+
+  private long convertPeriodToSeconds(String timeStr) {
+    long seconds;
+    try {
+      Long millis = TimeUtils.convertPeriodToMillis(timeStr);
+      seconds = millis / 1000;
+    } catch (Exception e) {
+      throw new RuntimeException("Invalid time spec '" + timeStr + "' (Valid examples: '3h', '4h30m', '30m')", e);
+    }
+    return seconds;
   }
 }

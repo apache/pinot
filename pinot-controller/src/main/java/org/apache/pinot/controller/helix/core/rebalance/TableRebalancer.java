@@ -42,6 +42,7 @@ import org.apache.pinot.common.tier.PinotServerTierStorage;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
+import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentFactory;
@@ -176,14 +177,17 @@ public class TableRebalancer {
 
     // get instancePartitions for tiers
     Map<String, InstancePartitions> tierToInstancePartitionMap = null;
-    if (InstanceAssignmentConfigUtils.shouldRelocateToTiers(tableConfig)) {
+    List<Tier> sortedTiers = null;
+    if (TierConfigUtils.shouldRelocateToTiers(tableConfig)) {
       // get tiers with storageType = "pinotServer". This is the only type available right now.
       // Other types should be treated differently
-      List<Tier> tiers = tableConfig.getTierConfigsList().stream()
-          .filter(t -> TierFactory.PINOT_SERVER_STORAGE_TYPE.equals(t.getStorageType()))
-          .map(t -> TierFactory.getTier(t, _helixManager)).collect(Collectors.toList());
+      sortedTiers = TierConfigUtils
+          .getTiersForStorageType(tableConfig.getTierConfigsList(), TierFactory.PINOT_SERVER_STORAGE_TYPE,
+              _helixManager);
+      sortedTiers.sort(TierFactory.getTierComparator());
+
       tierToInstancePartitionMap = new HashMap<>();
-      for (Tier tier : tiers) {
+      for (Tier tier : sortedTiers) {
         LOGGER.info("Fetching/computing instance partitions for tier: {} of table: {}", tier.getName(),
             tableNameWithType);
         tierToInstancePartitionMap.put(tier.getName(), getInstancePartitionsForTier(tier, tableNameWithType));
@@ -231,7 +235,8 @@ public class TableRebalancer {
     Map<String, Map<String, String>> targetAssignment;
     try {
       targetAssignment = segmentAssignment
-          .rebalanceTable(currentAssignment, instancePartitionsMap, tierToInstancePartitionMap, rebalanceConfig);
+          .rebalanceTable(currentAssignment, instancePartitionsMap, tierToInstancePartitionMap, sortedTiers,
+              rebalanceConfig);
     } catch (Exception e) {
       LOGGER.warn("Caught exception while calculating target assignment for table: {}, aborting the rebalance",
           tableNameWithType, e);
@@ -291,7 +296,8 @@ public class TableRebalancer {
             currentIdealState = idealState;
             currentAssignment = currentIdealState.getRecord().getMapFields();
             targetAssignment = segmentAssignment
-                .rebalanceTable(currentAssignment, instancePartitionsMap, tierToInstancePartitionMap, rebalanceConfig);
+                .rebalanceTable(currentAssignment, instancePartitionsMap, tierToInstancePartitionMap, sortedTiers,
+                    rebalanceConfig);
           } catch (Exception e1) {
             LOGGER.warn(
                 "Caught exception while re-calculating the target assignment for table: {}, aborting the rebalance",
@@ -355,7 +361,8 @@ public class TableRebalancer {
           currentIdealState = idealState;
           currentAssignment = currentIdealState.getRecord().getMapFields();
           targetAssignment = segmentAssignment
-              .rebalanceTable(currentAssignment, instancePartitionsMap, tierToInstancePartitionMap, rebalanceConfig);
+              .rebalanceTable(currentAssignment, instancePartitionsMap, tierToInstancePartitionMap, sortedTiers,
+                  rebalanceConfig);
           expectedVersion = currentIdealState.getRecord().getVersion();
         } catch (Exception e) {
           LOGGER
