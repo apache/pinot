@@ -295,7 +295,7 @@ public class AnomalyDetectionResource {
       return Response.status(responseStatus).entity(responseMessage).build();
     } finally {
       // Online service is stateless
-      cleanStates(anomalies, metricConfigDTO, datasetConfigDTO);
+      cleanStates(metricConfigDTO, datasetConfigDTO);
     }
   }
 
@@ -548,32 +548,25 @@ public class AnomalyDetectionResource {
     return anomalies;
   }
 
-  private void cleanStates(Map<String, Object> anomalies, MetricConfigDTO metricConfigDTO,
-      DatasetConfigDTO datasetConfigDTO) {
-    try {
-      if (anomalies != null) {
-        List<?> anomalyList = (List<?>) anomalies.get("elements");
-        MergedAnomalyResultDTO anomaly;
-        for (Object obj : anomalyList) {
-          Preconditions.checkArgument(obj instanceof MergedAnomalyResultDTO, "invalid anomaly: " + obj);
-          anomaly = (MergedAnomalyResultDTO) obj;
-          anomalyDAO.deleteById(anomaly.getId());
-          LOG.info("Deleted anomaly with id: {}", anomaly.getId());
-        }
-      }
-    } catch (Exception e) {
-      LOG.error("Failed to remove anomalies", e);
-    }
-
-
+  private void cleanStates(MetricConfigDTO metricConfigDTO, DatasetConfigDTO datasetConfigDTO) {
     if (datasetConfigDTO != null) {
       datasetConfigDAO.delete(datasetConfigDTO);
       LOG.info("Deleted dataset: {}", datasetConfigDTO);
+
+      int anomalyCnt = anomalyDAO.deleteByPredicate(
+          Predicate.EQ("collection", datasetConfigDTO.getName()));
+      LOG.info("Deleted {} anomalies with dataset {}",
+          anomalyCnt, datasetConfigDTO.getName());
     }
 
     if (metricConfigDTO != null) {
       metricConfigDAO.delete(metricConfigDTO);
       LOG.info("Deleted metric: {}", metricConfigDTO);
+
+      int anomalyCnt = anomalyDAO.deleteByPredicate(
+          Predicate.EQ("metric", metricConfigDTO.getName()));
+      LOG.info("Deleted {} anomalies with metric {}",
+          anomalyCnt, metricConfigDTO.getName());
     }
   }
 
