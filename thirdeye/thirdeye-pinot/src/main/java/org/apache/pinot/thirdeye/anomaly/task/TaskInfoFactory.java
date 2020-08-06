@@ -61,7 +61,7 @@ public class TaskInfoFactory {
           taskInfo = OBJECT_MAPPER.readValue(taskInfoString, DetectionPipelineTaskInfo.class);
           break;
         default:
-          LOG.error("TaskType must be one of DATA_QUALITY, DETECTION, DETECTION_ALERT, YAML_DETECTION_ONBOARD, MONITOR");
+          LOG.error("TaskType must be one of DATA_QUALITY, DETECTION, DETECTION_ALERT, YAML_DETECTION_ONBOARD, MONITOR, DETECTION_ONLINE");
           break;
       }
     } catch (Exception e) {
