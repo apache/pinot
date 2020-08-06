@@ -69,6 +69,14 @@ public class SegmentColumnarIndexCreatorTest {
     assertTrue(SegmentColumnarIndexCreator.isValidPropertyValue(""));
     testPropertyValueWithSpecialCharacters("");
 
+    // Variable substitution (should be disabled)
+    assertTrue(SegmentColumnarIndexCreator.isValidPropertyValue("$${testKey}"));
+    testPropertyValueWithSpecialCharacters("$${testKey}");
+
+    // Escape character for variable substitution
+    assertTrue(SegmentColumnarIndexCreator.isValidPropertyValue("$${"));
+    testPropertyValueWithSpecialCharacters("$${");
+
     for (int i = 0; i < NUM_ROUNDS; i++) {
       testPropertyValueWithSpecialCharacters(RandomStringUtils.randomAscii(5));
       testPropertyValueWithSpecialCharacters(RandomStringUtils.random(5));
@@ -80,11 +88,11 @@ public class SegmentColumnarIndexCreatorTest {
     if (SegmentColumnarIndexCreator.isValidPropertyValue(value)) {
       PropertiesConfiguration configuration = new PropertiesConfiguration(CONFIG_FILE);
       configuration.setProperty(PROPERTY_KEY, value);
-      assertEquals(configuration.getString(PROPERTY_KEY), value);
+      assertEquals(configuration.getProperty(PROPERTY_KEY), value);
       configuration.save();
 
       configuration = new PropertiesConfiguration(CONFIG_FILE);
-      assertEquals(configuration.getString(PROPERTY_KEY), value);
+      assertEquals(configuration.getProperty(PROPERTY_KEY), value);
     }
   }
 
