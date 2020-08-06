@@ -54,6 +54,7 @@ public class AnomalyDetectionResourceTest {
   private DetectionConfigManager detectionDAO;
   private DatasetConfigManager datasetDAO;
   private MetricConfigManager metricDAO;
+  private TaskManager taskDAO;
   private ThirdEyePrincipal user;
   private String suffix;
   private ObjectMapper objectMapper;
@@ -66,6 +67,7 @@ public class AnomalyDetectionResourceTest {
     this.detectionDAO = this.daoRegistry.getDetectionConfigManager();
     this.datasetDAO = this.daoRegistry.getDatasetConfigDAO();
     this.metricDAO = this.daoRegistry.getMetricConfigDAO();
+    this.taskDAO = this.daoRegistry.getTaskDAO();
     this.suffix = "_" + this.user.getName();
     this.objectMapper = new ObjectMapper();
     UserDashboardResource userDashboardResource = new UserDashboardResource(
@@ -102,13 +104,16 @@ public class AnomalyDetectionResourceTest {
 
     DetectionConfigDTO detectionConfigDTO = new DetectionConfigDTO();
     detectionConfigDTO.setName(DEFAULT_DETECTION_NAME + this.suffix);
-    this.detectionDAO.save(detectionConfigDTO);
+
+    TaskDTO taskDTO = new TaskDTO();
+    taskDTO.setJobName(TaskConstants.TaskType.DETECTION + this.suffix);
+    this.taskDAO.save(taskDTO);
 
     this.anomalyDetectionResource.cleanExistingOnlineTask(this.suffix);
 
     Assert.assertNull(this.datasetDAO.findById(datasetConfigDTO.getId()));
     Assert.assertNull(this.metricDAO.findById(metricConfigDTO.getId()));
-    Assert.assertNull(this.detectionDAO.findById(detectionConfigDTO.getId()));
+    Assert.assertNull(this.taskDAO.findById(taskDTO.getId()));
   }
 
   @Test
@@ -168,7 +173,10 @@ public class AnomalyDetectionResourceTest {
   @Test
   public void testGenerateTaskConfig() throws JsonProcessingException {
     long dummyId = 123456L;
-    TaskDTO taskDTO = this.anomalyDetectionResource.generateTaskConfig(dummyId, 0, 0);
+    DetectionConfigDTO detectionConfigDTO = new DetectionConfigDTO();
+    detectionConfigDTO.setId(dummyId);
+    TaskDTO taskDTO = this.anomalyDetectionResource
+        .generateTaskConfig(detectionConfigDTO, 0, 0, this.suffix);
 
     Assert.assertEquals(taskDTO.getTaskType(), TaskConstants.TaskType.DETECTION_ONLINE);
     Assert.assertEquals(taskDTO.getStatus(), TaskConstants.TaskStatus.WAITING);

@@ -32,6 +32,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.DetectionConfigBean;
+import org.apache.pinot.thirdeye.detection.DetectionPipelineTaskInfo;
 import org.joda.time.DateTime;
 
 import com.google.inject.persist.Transactional;
@@ -247,5 +250,17 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
       LOG.warn("Could not retrieve task backlog size. Defaulting to -1.", e);
       return -1;
     }
+  }
+
+  @Override
+  public void populateDetectionConfig(DetectionConfigDTO detectionConfigDTO, DetectionPipelineTaskInfo taskInfo) {
+    DetectionConfigBean bean = convertDTO2Bean(detectionConfigDTO, DetectionConfigBean.class);
+    taskInfo.setDetectionConfigBean(bean);
+  }
+
+  @Override
+  public DetectionConfigDTO extractDetectionConfig(DetectionPipelineTaskInfo taskInfo) {
+    DetectionConfigBean detectionConfigBean = taskInfo.getDetectionConfigBean();
+    return MODEL_MAPPER.map(detectionConfigBean, DetectionConfigDTO.class);
   }
 }

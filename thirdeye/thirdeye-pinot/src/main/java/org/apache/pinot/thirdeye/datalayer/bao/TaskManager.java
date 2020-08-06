@@ -23,7 +23,9 @@ import java.util.List;
 
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants.TaskStatus;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
+import org.apache.pinot.thirdeye.detection.DetectionPipelineTaskInfo;
 import java.util.Set;
 
 public interface TaskManager extends AbstractManager<TaskDTO>{
@@ -56,4 +58,8 @@ public interface TaskManager extends AbstractManager<TaskDTO>{
   int deleteRecordsOlderThanDaysWithStatus(int days, TaskStatus status);
 
   int countWaiting();
+
+  void populateDetectionConfig(DetectionConfigDTO detectionConfigDTO, DetectionPipelineTaskInfo taskInfo);
+
+  DetectionConfigDTO extractDetectionConfig(DetectionPipelineTaskInfo taskInfo);
 }

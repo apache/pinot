@@ -25,6 +25,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
+import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
 import io.dropwizard.auth.Auth;
 import io.swagger.annotations.Api;
@@ -36,11 +37,13 @@ import org.apache.pinot.thirdeye.api.user.dashboard.UserDashboardResource;
 import org.apache.pinot.thirdeye.auth.ThirdEyePrincipal;
 import org.apache.pinot.thirdeye.common.metric.MetricType;
 import org.apache.pinot.thirdeye.constant.MetricAggFunction;
-import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.AnomalySummary;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.anomalies.AnomalySearchFilter;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.anomalies.AnomalySearcher;
 import org.apache.pinot.thirdeye.datalayer.bao.*;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
@@ -119,6 +122,7 @@ public class AnomalyDetectionResource {
   private static final long POLLING_TIMEOUT = 60 * 10L;
   private static final int DEFAULT_TIME_DURATION = 1;
   private static final long MAX_ONLINE_PAYLOAD_SIZE = 10 * 1024 * 1024L;
+  private static final int ANOMALIES_LIMIT = 500;
 
   private final UserDashboardResource userDashboardResource;
   private final DetectionConfigManager detectionConfigDAO;
@@ -133,6 +137,7 @@ public class AnomalyDetectionResource {
   private final DetectionConfigValidator detectionValidator;
   private final DatasetConfigValidator datasetConfigValidator;
   private final MetricConfigValidator metricConfigValidator;
+  private final AnomalySearcher anomalySearcher;
   private final ObjectMapper objectMapper = new ObjectMapper();
   private final Yaml yaml;
 
@@ -165,6 +170,7 @@ public class AnomalyDetectionResource {
     this.detectionValidator = new DetectionConfigValidator(this.provider);
     this.metricConfigValidator = new MetricConfigValidator();
     this.datasetConfigValidator = new DatasetConfigValidator();
+    this.anomalySearcher = new AnomalySearcher();
 
     // Read template from disk
     this.yaml = new Yaml();
@@ -192,9 +198,9 @@ public class AnomalyDetectionResource {
           @Auth ThirdEyePrincipal principal) {
     DatasetConfigDTO datasetConfigDTO = null;
     MetricConfigDTO metricConfigDTO = null;
-    DetectionConfigDTO detectionConfigDTO = null;
-    TaskDTO taskDTO = null;
-    List<AnomalySummary> anomalies = null;
+    DetectionConfigDTO detectionConfigDTO;
+    TaskDTO taskDTO;
+    Map<String, Object> anomalies = null;
     Response.Status responseStatus;
     Map<String, String> responseMessage = new HashMap<>();
     ObjectMapper objectMapper = new ObjectMapper();
@@ -231,7 +237,7 @@ public class AnomalyDetectionResource {
               end);
 
       // Create & save task
-      taskDTO = generateTaskConfig(detectionConfigDTO.getId(), start, end);
+      taskDTO = generateTaskConfig(detectionConfigDTO, start, end, nameSuffix);
 
       // Polling task status
       TaskDTO polledTaskDTO = pollingTask(taskDTO.getId());
@@ -291,7 +297,7 @@ public class AnomalyDetectionResource {
       return Response.status(responseStatus).entity(responseMessage).build();
     } finally {
       // Online service is stateless
-      cleanStates(anomalies, taskDTO, metricConfigDTO, datasetConfigDTO, detectionConfigDTO);
+      cleanStates(anomalies, metricConfigDTO, datasetConfigDTO);
     }
   }
 
@@ -310,15 +316,9 @@ public class AnomalyDetectionResource {
       LOG.info("Deleted existing dataset: {}", datasetConfigDTO);
     }
 
-    String detectionName = DEFAULT_DETECTION_NAME + nameSuffix;
-    List<DetectionConfigDTO> detectionConfigDTOS = detectionConfigDAO
-        .findByPredicate(Predicate.EQ(DETECTION_MYSQL_NAME_COLUMN, detectionName));
-    for (DetectionConfigDTO detectionConfigDTO : detectionConfigDTOS) {
-      detectionConfigDAO.delete(detectionConfigDTO);
-      taskDAO.deleteByPredicate(Predicate.EQ(TASK_MYSQL_NAME_COLUMN,
-          TaskConstants.TaskType.DETECTION.name() + "_" + detectionConfigDTO.getId()));
-      LOG.info("Deleted existing task with detection: {}", detectionConfigDTO);
-    }
+    String taskName = TaskConstants.TaskType.DETECTION.name() + nameSuffix;
+    taskDAO.deleteByPredicate(Predicate.EQ(TASK_MYSQL_NAME_COLUMN, taskName));
+    LOG.info("Deleted existing task with name: {}", taskName);
   }
 
   boolean validateOnlineRequestPayload(JsonNode payloadNode) {
@@ -469,20 +469,28 @@ public class AnomalyDetectionResource {
     // Validate the detection config
     detectionValidator.validateConfig(detectionConfigDTO);
 
-    detectionConfigDAO.save(detectionConfigDTO);
+    // Online detection will not save detect config into DB
+
     LOG.info("Created detection with config {}", detectionConfigDTO);
 
     return detectionConfigDTO;
   }
 
-  TaskDTO generateTaskConfig(long detectionConfigId, long start, long end)
+  TaskDTO generateTaskConfig(DetectionConfigDTO detectionConfigDTO,
+        long start, long end, String nameSuffix)
       throws JsonProcessingException {
     TaskDTO taskDTO = new TaskDTO();
-    taskDTO.setJobName(TaskConstants.TaskType.DETECTION.toString() + "_" + detectionConfigId);
+    taskDTO.setJobName(
+        TaskConstants.TaskType.DETECTION.toString() + nameSuffix);
     taskDTO.setStatus(TaskConstants.TaskStatus.WAITING);
     taskDTO.setTaskType(TaskConstants.TaskType.DETECTION_ONLINE);
     DetectionPipelineTaskInfo taskInfo =
-        new DetectionPipelineTaskInfo(detectionConfigId, start, end);
+        new DetectionPipelineTaskInfo(-1L, start, end);
+    taskInfo.setOnline(true);
+
+    // Store the detection config into online task info
+    taskDAO.populateDetectionConfig(detectionConfigDTO, taskInfo);
+
     String taskInfoJson = objectMapper.writeValueAsString(taskInfo);
     taskDTO.setTaskInfo(taskInfoJson);
 
@@ -527,24 +535,34 @@ public class AnomalyDetectionResource {
     return taskDTO;
   }
 
-  private List<AnomalySummary> getAnomalies(long start, long end, String metric, String dataset) {
-    List<AnomalySummary> anomalies =
-        this.userDashboardResource.queryAnomalies(start, end, null, null, metric,
-            dataset, null, false, null);
+  private Map<String, Object> getAnomalies(long start, long end, String metric, String dataset) {
+    AnomalySearchFilter searchFilter =
+        new AnomalySearchFilter(start, end, Collections.emptyList(), Collections.emptyList(), Collections.emptyList(),
+            Collections.singletonList(metric), Collections.singletonList(dataset), Collections.emptyList());
 
-    LOG.info("Successfully returned " + anomalies.size() + " anomalies.");
+    Map<String, Object> anomalies = this.anomalySearcher.search(searchFilter, ANOMALIES_LIMIT, 0);
+
+    LOG.info("Successfully returned " + anomalies.get("count") + " anomalies.");
     return anomalies;
   }
 
-  private void cleanStates(List<AnomalySummary> anomalies, TaskDTO taskDTO,
-      MetricConfigDTO metricConfigDTO, DatasetConfigDTO datasetConfigDTO,
-      DetectionConfigDTO detectionConfigDTO) {
-    if (anomalies != null) {
-      for (AnomalySummary anomaly : anomalies) {
-        anomalyDAO.deleteById(anomaly.getId());
-        LOG.info("Deleted anomaly with id: {}", anomaly.getId());
+  private void cleanStates(Map<String, Object> anomalies, MetricConfigDTO metricConfigDTO,
+      DatasetConfigDTO datasetConfigDTO) {
+    try {
+      if (anomalies != null) {
+        List<?> anomalyList = (List<?>) anomalies.get("elements");
+        MergedAnomalyResultDTO anomaly;
+        for (Object obj : anomalyList) {
+          Preconditions.checkArgument(obj instanceof MergedAnomalyResultDTO, "invalid anomaly: " + obj);
+          anomaly = (MergedAnomalyResultDTO) obj;
+          anomalyDAO.deleteById(anomaly.getId());
+          LOG.info("Deleted anomaly with id: {}", anomaly.getId());
+        }
       }
+    } catch (Exception e) {
+      LOG.error("Failed to remove anomalies", e);
     }
+
 
     if (datasetConfigDTO != null) {
       datasetConfigDAO.delete(datasetConfigDTO);
@@ -554,11 +572,6 @@ public class AnomalyDetectionResource {
     if (metricConfigDTO != null) {
       metricConfigDAO.delete(metricConfigDTO);
       LOG.info("Deleted metric: {}", metricConfigDTO);
-    }
-
-    if (detectionConfigDTO != null) {
-      detectionConfigDAO.delete(detectionConfigDTO);
-      LOG.info("Deleted detection: {}", detectionConfigDTO);
     }
   }
 
