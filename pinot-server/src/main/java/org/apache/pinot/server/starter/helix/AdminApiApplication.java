@@ -98,7 +98,7 @@ public class AdminApiApplication extends ResourceConfig {
     beanConfig.setDescription("APIs for accessing Pinot server information");
     beanConfig.setContact("https://github.com/apache/incubator-pinot");
     beanConfig.setVersion("1.0");
-    beanConfig.setSchemes(new String[]{CommonConstants.HTTP_PROTOCOL});
+    beanConfig.setSchemes(new String[]{CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL});
     beanConfig.setBasePath(baseUri.getPath());
     beanConfig.setResourcePackage(RESOURCE_PACKAGE);
     beanConfig.setScan(true);
@@ -110,7 +110,7 @@ public class AdminApiApplication extends ResourceConfig {
     httpServer.getServerConfiguration().addHttpHandler(staticHttpHandler, "/help/");
 
     URL swaggerDistLocation =
-        AdminApiApplication.class.getClassLoader().getResource("META-INF/resources/webjars/swagger-ui/2.2.2/");
+        AdminApiApplication.class.getClassLoader().getResource("META-INF/resources/webjars/swagger-ui/2.2.10-1/");
     CLStaticHttpHandler swaggerDist = new CLStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
     httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
   }

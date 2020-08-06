@@ -59,23 +59,6 @@ public abstract class ListenerConfigUtil {
     return listenerConfigs;
   }
 
-  /**
-   * Will determine if the query console should be advertised as http or https.
-   * 
-   * The query console can be advertised as secured with 
-   * {@link ControllerConf#getQueryConsoleUseHttps()} for cases for only http 
-   * listeners are defined by the query console is served by a secured reverse 
-   * proxy.
-   * 
-   * @param listenerConfigs generated listener configs from {@link ListenerConfigUtil#buildListenerConfigs(ControllerConf)}
-   * @param controllerConf property holders for controller configuration
-   * @return whether the query console should be advertised as http or https.
-   */
-  public static boolean shouldAdvertiseAsHttps(List<ListenerConfig> listenerConfigs, ControllerConf controllerConf) {
-    return controllerConf.getQueryConsoleUseHttps() || !listenerConfigs.stream().map(ListenerConfig::getProtocol)
-        .filter(protocol -> protocol.equals("http")).findAny().isPresent();
-  }
-
   private static Optional<TlsConfiguration> buildTlsConfiguration(String protocol, ControllerConf controllerConf) {
     return Optional.ofNullable(controllerConf.getControllerAccessProtocolProperty(protocol, "tls.keystore.path"))
 

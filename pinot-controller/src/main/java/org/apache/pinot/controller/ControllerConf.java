@@ -52,7 +52,6 @@ public class ControllerConf extends PinotConfiguration {
   public static final String HELIX_CLUSTER_NAME = "controller.helix.cluster.name";
   public static final String CLUSTER_TENANT_ISOLATION_ENABLE = "cluster.tenant.isolation.enable";
   public static final String CONSOLE_WEBAPP_ROOT_PATH = "controller.query.console";
-  public static final String CONSOLE_WEBAPP_USE_HTTPS = "controller.query.console.useHttps";
   public static final String EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT = "controller.upload.onlineToOfflineTimeout";
   public static final String CONTROLLER_MODE = "controller.mode";
   public static final String LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY = "controller.resource.rebalance.strategy";
@@ -201,14 +200,6 @@ public class ControllerConf extends PinotConfiguration {
     return Optional.ofNullable(getProperty(CONSOLE_WEBAPP_ROOT_PATH))
 
         .orElseGet(() -> ControllerConf.class.getClassLoader().getResource("webapp").toExternalForm());
-  }
-
-  public void setQueryConsoleUseHttps(boolean useHttps) {
-    setProperty(CONSOLE_WEBAPP_USE_HTTPS, useHttps);
-  }
-
-  public boolean getQueryConsoleUseHttps() {
-    return getProperty(CONSOLE_WEBAPP_USE_HTTPS, false);
   }
 
   public void setJerseyAdminPrimary(String jerseyAdminPrimary) {
