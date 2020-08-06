@@ -29,6 +29,7 @@ import org.apache.pinot.thirdeye.auth.ThirdEyePrincipal;
 import org.apache.pinot.thirdeye.datalayer.bao.*;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
@@ -55,6 +56,7 @@ public class AnomalyDetectionResourceTest {
   private DatasetConfigManager datasetDAO;
   private MetricConfigManager metricDAO;
   private TaskManager taskDAO;
+  private MergedAnomalyResultManager anomalyDAO;
   private ThirdEyePrincipal user;
   private String suffix;
   private ObjectMapper objectMapper;
@@ -68,6 +70,7 @@ public class AnomalyDetectionResourceTest {
     this.datasetDAO = this.daoRegistry.getDatasetConfigDAO();
     this.metricDAO = this.daoRegistry.getMetricConfigDAO();
     this.taskDAO = this.daoRegistry.getTaskDAO();
+    anomalyDAO = this.daoRegistry.getMergedAnomalyResultDAO();
     this.suffix = "_" + this.user.getName();
     this.objectMapper = new ObjectMapper();
     UserDashboardResource userDashboardResource = new UserDashboardResource(
@@ -107,13 +110,26 @@ public class AnomalyDetectionResourceTest {
 
     TaskDTO taskDTO = new TaskDTO();
     taskDTO.setJobName(TaskConstants.TaskType.DETECTION + this.suffix);
+    taskDTO.setStatus(TaskConstants.TaskStatus.FAILED);
+    taskDTO.setTaskType(TaskConstants.TaskType.DETECTION_ONLINE);
     this.taskDAO.save(taskDTO);
+
+    MergedAnomalyResultDTO anomalyResultDTO = new MergedAnomalyResultDTO();
+    anomalyResultDTO.setMetric(metricConfigDTO.getName());
+    long anomalyId1 = anomalyDAO.save(anomalyResultDTO);
+
+    anomalyResultDTO.setCollection(datasetConfigDTO.getName());
+    anomalyResultDTO.setMetric(null);
+    anomalyResultDTO.setId(null);
+    long anomalyId2 = anomalyDAO.save(anomalyResultDTO);
 
     this.anomalyDetectionResource.cleanExistingOnlineTask(this.suffix);
 
     Assert.assertNull(this.datasetDAO.findById(datasetConfigDTO.getId()));
     Assert.assertNull(this.metricDAO.findById(metricConfigDTO.getId()));
     Assert.assertNull(this.taskDAO.findById(taskDTO.getId()));
+    Assert.assertNull(this.anomalyDAO.findById(anomalyId1));
+    Assert.assertNull(this.anomalyDAO.findById(anomalyId2));
   }
 
   @Test

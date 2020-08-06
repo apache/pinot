@@ -313,6 +313,14 @@ public class AnomalyDetectionResource {
     String taskName = TaskConstants.TaskType.DETECTION.name() + nameSuffix;
     int taskCnt = taskDAO.deleteByPredicate(Predicate.EQ("name", taskName));
     LOG.info("Deleted existing {} task", taskCnt);
+
+    int anomalyCnt = anomalyDAO.deleteByPredicate(
+        Predicate.EQ("metric", metricName));
+    LOG.info("Deleted existing {} anomalies with metric: {}", anomalyCnt, metricName);
+
+    anomalyCnt = anomalyDAO.deleteByPredicate(
+        Predicate.EQ("collection", datasetName));
+    LOG.info("Deleted existing {} anomalies with dataset: {}", anomalyCnt, datasetName);
   }
 
   boolean validateOnlineRequestPayload(JsonNode payloadNode) {
