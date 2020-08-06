@@ -49,7 +49,7 @@ public class AggregationFunctionFactory {
           AggregationFunctionType.getAggregationFunctionType(upperCaseFunctionName);
       List<ExpressionContext> arguments = function.getArguments();
       ExpressionContext firstArgument = arguments.get(0);
-      if (aggregationFunctionType.getName().toUpperCase().startsWith("PERCENTILE")) {
+      if (aggregationFunctionType.name().startsWith("PERCENTILE")) {
         String remainingFunctionName = upperCaseFunctionName.replace("_", "").substring(10);
         int numArguments = arguments.size();
         if (numArguments == 1) {
@@ -160,7 +160,7 @@ public class AggregationFunctionFactory {
           case DISTINCT:
             return new DistinctAggregationFunction(arguments, queryContext.getOrderByExpressions(),
                 queryContext.getLimit());
-          case ST_UNION:
+          case STUNION:
             return new StUnionAggregationFunction(firstArgument);
           default:
             throw new IllegalArgumentException();

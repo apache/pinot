@@ -46,7 +46,7 @@ public class StUnionAggregationFunction extends BaseSingleInputAggregationFuncti
 
   @Override
   public AggregationFunctionType getType() {
-    return AggregationFunctionType.ST_UNION;
+    return AggregationFunctionType.STUNION;
   }
 
   @Override

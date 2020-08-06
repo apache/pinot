@@ -20,6 +20,7 @@ package org.apache.pinot.common.function;
 
 public enum AggregationFunctionType {
   // Aggregation functions for single-valued columns
+  // Please note that no underscore is allowed to be used in the enum.
   COUNT("count"),
   MIN("min"),
   MAX("max"),
@@ -39,7 +40,7 @@ public enum AggregationFunctionType {
   PERCENTILETDIGEST("percentileTDigest"),
 
   // geo aggregation functions
-  ST_UNION("ST_Union"),
+  STUNION("STUnion"),
 
   // Aggregation functions for multi-valued columns
   COUNTMV("countMV"),
