@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -29,7 +29,7 @@ jdk_version() {
     result=no_java
   else
     for line in $lines; do
-      if [[ (-z $result) && ($line = *"version \""*) ]]
+      if test -z $result && echo "$line" | grep -q 'version "'
       then
         local ver=$(echo $line | sed -e 's/.*version "\(.*\)"\(.*\)/\1/; 1q')
         # on macOS, sed doesn't support '?'
@@ -149,7 +149,7 @@ if [[ "$JAVA_VER" -gt 8 ]] ; then
     fi
     if [[ -d "$PLUGINS_DIR" ]] ; then
       if [ -n "$PLUGINS_INCLUDE" ] ; then
-        IFS=';' read -ra PLUGINS_ARR <<< "$PLUGINS_INCLUDE"
+        IFS=';' echo "$PLUGINS_INCLUDE" | read -ra PLUGINS_ARR
         for PLUGIN_JAR in "${PLUGINS_ARR[@]}"; do
             PLUGIN_JAR_PATH=$(find "$PLUGINS_DIR" -path \*/"$PLUGIN_JAR"/"$PLUGIN_JAR"-\*.jar)
             if [ -n "$PLUGINS_CLASSPATH" ] ; then
