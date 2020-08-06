@@ -57,11 +57,6 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
   }
 
   @Override
-  public void accept(AggregationFunctionVisitorBase visitor) {
-    visitor.visit(this);
-  }
-
-  @Override
   public AggregationResultHolder createAggregationResultHolder() {
     return new ObjectAggregationResultHolder();
   }

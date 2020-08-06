@@ -46,41 +46,36 @@ public class DistinctCountBitmapMVAggregationFunction extends DistinctCountBitma
   }
 
   @Override
-  public void accept(AggregationFunctionVisitorBase visitor) {
-    visitor.visit(this);
-  }
-
-  @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    RoaringBitmap bitmap = getBitmap(aggregationResultHolder);
 
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
-      _dictionary = dictionary;
+      RoaringBitmap dictIdBitmap = getDictIdBitmap(aggregationResultHolder, dictionary);
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
       for (int i = 0; i < length; i++) {
-        bitmap.add(dictIds[i]);
+        dictIdBitmap.add(dictIds[i]);
       }
       return;
     }
 
     // For non-dictionary-encoded expression, store hash code of the values into the bitmap
+    RoaringBitmap valueBitmap = getValueBitmap(aggregationResultHolder);
     DataType valueType = blockValSet.getValueType();
     switch (valueType) {
       case INT:
         int[][] intValues = blockValSet.getIntValuesMV();
         for (int i = 0; i < length; i++) {
-          bitmap.add(intValues[i]);
+          valueBitmap.add(intValues[i]);
         }
         break;
       case LONG:
         long[][] longValues = blockValSet.getLongValuesMV();
         for (int i = 0; i < length; i++) {
           for (long value : longValues[i]) {
-            bitmap.add(Long.hashCode(value));
+            valueBitmap.add(Long.hashCode(value));
           }
         }
         break;
@@ -88,14 +83,14 @@ public class DistinctCountBitmapMVAggregationFunction extends DistinctCountBitma
         float[][] floatValues = blockValSet.getFloatValuesMV();
         for (int i = 0; i < length; i++) {
           for (float value : floatValues[i]) {
-            bitmap.add(Float.hashCode(value));
+            valueBitmap.add(Float.hashCode(value));
           }
         }
       case DOUBLE:
         double[][] doubleValues = blockValSet.getDoubleValuesMV();
         for (int i = 0; i < length; i++) {
           for (double value : doubleValues[i]) {
-            bitmap.add(Double.hashCode(value));
+            valueBitmap.add(Double.hashCode(value));
           }
         }
         break;
@@ -103,7 +98,7 @@ public class DistinctCountBitmapMVAggregationFunction extends DistinctCountBitma
         String[][] stringValues = blockValSet.getStringValuesMV();
         for (int i = 0; i < length; i++) {
           for (String value : stringValues[i]) {
-            bitmap.add(value.hashCode());
+            valueBitmap.add(value.hashCode());
           }
         }
         break;
@@ -121,10 +116,9 @@ public class DistinctCountBitmapMVAggregationFunction extends DistinctCountBitma
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
-      _dictionary = dictionary;
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
       for (int i = 0; i < length; i++) {
-        getBitmap(groupByResultHolder, groupKeyArray[i]).add(dictIds[i]);
+        getDictIdBitmap(groupByResultHolder, groupKeyArray[i], dictionary).add(dictIds[i]);
       }
       return;
     }
@@ -135,13 +129,13 @@ public class DistinctCountBitmapMVAggregationFunction extends DistinctCountBitma
       case INT:
         int[][] intValues = blockValSet.getIntValuesMV();
         for (int i = 0; i < length; i++) {
-          getBitmap(groupByResultHolder, groupKeyArray[i]).add(intValues[i]);
+          getValueBitmap(groupByResultHolder, groupKeyArray[i]).add(intValues[i]);
         }
         break;
       case LONG:
         long[][] longValues = blockValSet.getLongValuesMV();
         for (int i = 0; i < length; i++) {
-          RoaringBitmap bitmap = getBitmap(groupByResultHolder, groupKeyArray[i]);
+          RoaringBitmap bitmap = getValueBitmap(groupByResultHolder, groupKeyArray[i]);
           for (long value : longValues[i]) {
             bitmap.add(Long.hashCode(value));
           }
@@ -150,7 +144,7 @@ public class DistinctCountBitmapMVAggregationFunction extends DistinctCountBitma
       case FLOAT:
         float[][] floatValues = blockValSet.getFloatValuesMV();
         for (int i = 0; i < length; i++) {
-          RoaringBitmap bitmap = getBitmap(groupByResultHolder, groupKeyArray[i]);
+          RoaringBitmap bitmap = getValueBitmap(groupByResultHolder, groupKeyArray[i]);
           for (float value : floatValues[i]) {
             bitmap.add(Float.hashCode(value));
           }
@@ -159,7 +153,7 @@ public class DistinctCountBitmapMVAggregationFunction extends DistinctCountBitma
       case DOUBLE:
         double[][] doubleValues = blockValSet.getDoubleValuesMV();
         for (int i = 0; i < length; i++) {
-          RoaringBitmap bitmap = getBitmap(groupByResultHolder, groupKeyArray[i]);
+          RoaringBitmap bitmap = getValueBitmap(groupByResultHolder, groupKeyArray[i]);
           for (double value : doubleValues[i]) {
             bitmap.add(Double.hashCode(value));
           }
@@ -168,7 +162,7 @@ public class DistinctCountBitmapMVAggregationFunction extends DistinctCountBitma
       case STRING:
         String[][] stringValues = blockValSet.getStringValuesMV();
         for (int i = 0; i < length; i++) {
-          RoaringBitmap bitmap = getBitmap(groupByResultHolder, groupKeyArray[i]);
+          RoaringBitmap bitmap = getValueBitmap(groupByResultHolder, groupKeyArray[i]);
           for (String value : stringValues[i]) {
             bitmap.add(value.hashCode());
           }
@@ -188,11 +182,10 @@ public class DistinctCountBitmapMVAggregationFunction extends DistinctCountBitma
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
-      _dictionary = dictionary;
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
       for (int i = 0; i < length; i++) {
         for (int groupKey : groupKeysArray[i]) {
-          getBitmap(groupByResultHolder, groupKey).add(dictIds[i]);
+          getDictIdBitmap(groupByResultHolder, groupKey, dictionary).add(dictIds[i]);
         }
       }
       return;
@@ -205,7 +198,7 @@ public class DistinctCountBitmapMVAggregationFunction extends DistinctCountBitma
         int[][] intValues = blockValSet.getIntValuesMV();
         for (int i = 0; i < length; i++) {
           for (int groupKey : groupKeysArray[i]) {
-            getBitmap(groupByResultHolder, groupKey).add(intValues[i]);
+            getValueBitmap(groupByResultHolder, groupKey).add(intValues[i]);
           }
         }
         break;
@@ -213,7 +206,7 @@ public class DistinctCountBitmapMVAggregationFunction extends DistinctCountBitma
         long[][] longValues = blockValSet.getLongValuesMV();
         for (int i = 0; i < length; i++) {
           for (int groupKey : groupKeysArray[i]) {
-            RoaringBitmap bitmap = getBitmap(groupByResultHolder, groupKey);
+            RoaringBitmap bitmap = getValueBitmap(groupByResultHolder, groupKey);
             for (long value : longValues[i]) {
               bitmap.add(Long.hashCode(value));
             }
@@ -224,7 +217,7 @@ public class DistinctCountBitmapMVAggregationFunction extends DistinctCountBitma
         float[][] floatValues = blockValSet.getFloatValuesMV();
         for (int i = 0; i < length; i++) {
           for (int groupKey : groupKeysArray[i]) {
-            RoaringBitmap bitmap = getBitmap(groupByResultHolder, groupKey);
+            RoaringBitmap bitmap = getValueBitmap(groupByResultHolder, groupKey);
             for (float value : floatValues[i]) {
               bitmap.add(Float.hashCode(value));
             }
@@ -235,7 +228,7 @@ public class DistinctCountBitmapMVAggregationFunction extends DistinctCountBitma
         double[][] doubleValues = blockValSet.getDoubleValuesMV();
         for (int i = 0; i < length; i++) {
           for (int groupKey : groupKeysArray[i]) {
-            RoaringBitmap bitmap = getBitmap(groupByResultHolder, groupKey);
+            RoaringBitmap bitmap = getValueBitmap(groupByResultHolder, groupKey);
             for (double value : doubleValues[i]) {
               bitmap.add(Double.hashCode(value));
             }
@@ -246,7 +239,7 @@ public class DistinctCountBitmapMVAggregationFunction extends DistinctCountBitma
         String[][] stringValues = blockValSet.getStringValuesMV();
         for (int i = 0; i < length; i++) {
           for (int groupKey : groupKeysArray[i]) {
-            RoaringBitmap bitmap = getBitmap(groupByResultHolder, groupKey);
+            RoaringBitmap bitmap = getValueBitmap(groupByResultHolder, groupKey);
             for (String value : stringValues[i]) {
               bitmap.add(value.hashCode());
             }

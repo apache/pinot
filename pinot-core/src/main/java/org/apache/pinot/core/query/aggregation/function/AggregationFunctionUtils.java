@@ -69,9 +69,9 @@ public class AggregationFunctionUtils {
   }
 
   /**
-   * Creates an array of {@link AggregationFunction}s based on the given {@link QueryContext}.
+   * Creates a list of {@link AggregationFunction}s based on the given {@link QueryContext}.
    */
-  public static AggregationFunction[] getAggregationFunctions(QueryContext queryContext) {
+  public static List<AggregationFunction> getAggregationFunctions(QueryContext queryContext) {
     List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
     Set<FunctionContext> functions = new HashSet<>();
     List<AggregationFunction> aggregationFunctions = new ArrayList<>();
@@ -94,7 +94,7 @@ public class AggregationFunctionUtils {
         }
       }
     }
-    return aggregationFunctions.toArray(new AggregationFunction[0]);
+    return aggregationFunctions;
   }
 
   /**

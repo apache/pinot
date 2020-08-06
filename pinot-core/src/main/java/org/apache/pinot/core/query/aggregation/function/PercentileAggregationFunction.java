@@ -57,11 +57,6 @@ public class PercentileAggregationFunction extends BaseSingleInputAggregationFun
   }
 
   @Override
-  public void accept(AggregationFunctionVisitorBase visitor) {
-    visitor.visit(this);
-  }
-
-  @Override
   public AggregationResultHolder createAggregationResultHolder() {
     return new ObjectAggregationResultHolder();
   }

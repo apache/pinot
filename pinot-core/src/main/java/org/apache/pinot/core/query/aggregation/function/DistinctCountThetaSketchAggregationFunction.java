@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 import org.apache.calcite.sql.parser.SqlParseException;
+import org.apache.commons.collections.MapUtils;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.Intersection;
 import org.apache.datasketches.theta.SetOperation;
@@ -55,7 +56,6 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
  * Theta Sketches.
  * <p>TODO: For performance concern, use {@code List<Sketch>} as the intermediate result.
  */
-@SuppressWarnings("Duplicates")
 public class DistinctCountThetaSketchAggregationFunction implements AggregationFunction<Map<String, Sketch>, Long> {
   private final ExpressionContext _thetaSketchColumn;
   private final ThetaSketchParams _thetaSketchParams;
@@ -157,11 +157,6 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
   @Override
   public List<ExpressionContext> getInputExpressions() {
     return _inputExpressions;
-  }
-
-  @Override
-  public void accept(AggregationFunctionVisitorBase visitor) {
-    visitor.visit(this);
   }
 
   @Override
@@ -387,7 +382,7 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
   @Override
   public Map<String, Sketch> extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     Map<Predicate, Union> unionMap = aggregationResultHolder.getResult();
-    if (unionMap == null || unionMap.isEmpty()) {
+    if (unionMap == null) {
       return Collections.emptyMap();
     }
 
@@ -406,7 +401,7 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
   @Override
   public Map<String, Sketch> extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     Map<Predicate, Union> unionMap = groupByResultHolder.getResult(groupKey);
-    if (unionMap == null || unionMap.isEmpty()) {
+    if (unionMap == null) {
       return Collections.emptyMap();
     }
 
@@ -424,9 +419,10 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
 
   @Override
   public Map<String, Sketch> merge(Map<String, Sketch> intermediateResult1, Map<String, Sketch> intermediateResult2) {
-    if (intermediateResult1 == null || intermediateResult1.isEmpty()) {
+    if (MapUtils.isEmpty(intermediateResult1)) {
       return intermediateResult2;
-    } else if (intermediateResult2 == null || intermediateResult2.isEmpty()) {
+    }
+    if (MapUtils.isEmpty(intermediateResult2)) {
       return intermediateResult1;
     }
 
@@ -435,14 +431,14 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
     for (Map.Entry<String, Sketch> entry : intermediateResult1.entrySet()) {
       String predicate = entry.getKey();
       Sketch sketch = intermediateResult2.get(predicate);
-
-      // Merge the overlapping ones
       if (sketch != null) {
+        // Merge the overlapping ones
         Union union = getSetOperationBuilder().buildUnion();
         union.update(entry.getValue());
         union.update(sketch);
         mergedResult.put(predicate, union.getResult());
-      } else { // Collect the non-overlapping ones
+      } else {
+        // Collect the non-overlapping ones
         mergedResult.put(predicate, entry.getValue());
       }
     }
@@ -455,7 +451,6 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
 
     return mergedResult;
   }
-
 
   @Override
   public boolean isIntermediateResultComparable() {
@@ -563,9 +558,6 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
    * @return Final Sketch obtained by computing the post-aggregation expression on intermediate result
    */
   protected Sketch extractFinalSketch(Map<String, Sketch> intermediateResult) {
-    // NOTE: Here we parse the map keys to Predicate to handle the non-standard predicate string returned from server
-    //       side for backward-compatibility.
-    // TODO: Remove the extra parsing after releasing 0.5.0
     Map<Predicate, Sketch> sketchMap = new HashMap<>();
     for (Map.Entry<String, Sketch> entry : intermediateResult.entrySet()) {
       Predicate predicate = getPredicate(entry.getKey());

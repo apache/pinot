@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 
 
 /**
@@ -51,6 +53,7 @@ import org.apache.pinot.common.request.BrokerRequest;
  *   </li>
  * </ul>
  */
+@SuppressWarnings("rawtypes")
 public class QueryContext {
   private final List<ExpressionContext> _selectExpressions;
   private final Map<ExpressionContext, String> _aliasMap;
@@ -66,6 +69,9 @@ public class QueryContext {
   // Keep the BrokerRequest to make incremental changes
   // TODO: Remove it once the whole query engine is using the QueryContext
   private final BrokerRequest _brokerRequest;
+
+  // Pre-generate the aggregation functions for the query so that it can be shared among all the segments
+  private AggregationFunction[] _aggregationFunctions;
 
   private QueryContext(List<ExpressionContext> selectExpressions, Map<ExpressionContext, String> aliasMap,
       @Nullable FilterContext filter, @Nullable List<ExpressionContext> groupByExpressions,
@@ -169,6 +175,14 @@ public class QueryContext {
   }
 
   /**
+   * Returns the aggregation functions for the query, or {@code null} if the query does not have any aggregation.
+   */
+  @Nullable
+  public AggregationFunction[] getAggregationFunctions() {
+    return _aggregationFunctions;
+  }
+
+  /**
    * NOTE: For debugging only.
    */
   @Override
@@ -250,8 +264,17 @@ public class QueryContext {
     public QueryContext build() {
       // TODO: Add validation logic here
 
-      return new QueryContext(_selectExpressions, _aliasMap, _filter, _groupByExpressions, _orderByExpressions,
-          _havingFilter, _limit, _offset, _queryOptions, _debugOptions, _brokerRequest);
+      QueryContext queryContext =
+          new QueryContext(_selectExpressions, _aliasMap, _filter, _groupByExpressions, _orderByExpressions,
+              _havingFilter, _limit, _offset, _queryOptions, _debugOptions, _brokerRequest);
+
+      // Pre-generate the aggregation functions for the query
+      List<AggregationFunction> aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(queryContext);
+      if (!aggregationFunctions.isEmpty()) {
+        queryContext._aggregationFunctions = aggregationFunctions.toArray(new AggregationFunction[0]);
+      }
+
+      return queryContext;
     }
   }
 }
