@@ -25,7 +25,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
-import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
 import io.dropwizard.auth.Auth;
 import io.swagger.annotations.Api;
@@ -43,7 +42,6 @@ import org.apache.pinot.thirdeye.datalayer.bao.*;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
@@ -76,38 +74,12 @@ import java.util.concurrent.TimeUnit;
 public class AnomalyDetectionResource {
   protected static final Logger LOG = LoggerFactory.getLogger(AnomalyDetectionResource.class);
 
-  private static final String TEMPLATE_DETECTION_PATH = "detection-config-template.yml";
-
-  /* -------- Detection config fields -------- */
-  private static final String DETECTION_YAML_FIELD = "detectionName";
-  private static final String DEFAULT_DETECTION_NAME = "online_detection";
-
-  /* -------- Metric config fields -------- */
-  private static final String DATASET_YAML_FIELD = "dataset";
-  private static final String DEFAULT_DATASET_NAME = "online_dataset";
-  private static final String DATATYPE_YAML_FIELD = "datatype";
-  private static final MetricType DEFAULT_DATA_TYPE = MetricType.DOUBLE;
-
-  /* -------- Dataset config fields -------- */
-  private static final String METRIC_YAML_FIELD = "metric";
-  private static final String DEFAULT_METRIC_NAME = "online_metric";
-  private static final String DEFAULT_METRIC_COLUMN = "metric";
-  private static final String TIME_COLUMN_YAML_FIELD = "timeColumn";
-  private static final String DEFAULT_TIME_COLUMN = "date";
-  private static final String TIME_UNIT_YAML_FIELD = "timeUnit";
-  private static final TimeUnit DEFAULT_TIME_UNIT = TimeUnit.DAYS;
-  private static final String TIME_DURATION_YAML_FIELD = "timeDuration";
-  private static final String TIME_FORMAT_YAML_FIELD = "timeFormat";
-  private static final String DEFAULT_TIME_FORMAT = "SIMPLE_DATE_FORMAT:yyyyMMdd";
-  private static final String TIME_ZONE_YAML_FIELD = "timezone";
-  private static final String DEFAULT_TIME_ZONE = "US/Pacific";
-  private static final List<String> DEFAULT_DIMENSIONS =
-      Collections.unmodifiableList(new ArrayList<>());
-
   /* -------- Request/Response field -------- */
   private static final String DATA_FIELD = "data";
   private static final String COLUMNS_FIELD = "columns";
   private static final String ROWS_FIELD = "rows";
+  private static final String DEFAULT_METRIC_COLUMN = "metric";
+  private static final String DEFAULT_TIME_COLUMN = "date";
   private static final String DATASET_FIELD = "datasetConfiguration";
   private static final String METRIC_FIELD = "metricConfiguration";
   private static final String DETECTION_FIELD = "detectionConfiguration";
@@ -115,14 +87,15 @@ public class AnomalyDetectionResource {
 
   /* -------- Others -------- */
   private static final String ONLINE_DATASOURCE = "OnlineThirdEyeDataSource";
-  private static final String ANOMALY_ENDPOINT_URL = "/userdashboard/anomalies";
+  private static final String DEFAULT_DETECTION_NAME = "online_detection";
+  private static final String DEFAULT_DATASET_NAME = "online_dataset";
+  private static final String DEFAULT_METRIC_NAME = "online_metric";
+  private static final String TEMPLATE_DETECTION_PATH = "detection-config-template.yml";
   private static final long POLLING_SLEEP_TIME = 5L;
   private static final long POLLING_TIMEOUT = 60 * 10L;
-  private static final int DEFAULT_TIME_DURATION = 1;
   private static final long MAX_ONLINE_PAYLOAD_SIZE = 10 * 1024 * 1024L;
   private static final int ANOMALIES_LIMIT = 500;
 
-  private final UserDashboardResource userDashboardResource;
   private final DetectionConfigManager detectionConfigDAO;
   private final DataProvider provider;
   private final MetricConfigManager metricConfigDAO;
@@ -138,7 +111,6 @@ public class AnomalyDetectionResource {
   private final AnomalySearcher anomalySearcher;
   private final ObjectMapper objectMapper;
   private final Yaml yaml;
-  private final Random random;
 
   @Inject
   public AnomalyDetectionResource(UserDashboardResource userDashboardResource) {
@@ -149,9 +121,7 @@ public class AnomalyDetectionResource {
     this.anomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
     this.taskDAO = DAORegistry.getInstance().getTaskDAO();
     this.evaluationDAO = DAORegistry.getInstance().getEvaluationManager();
-    this.userDashboardResource = userDashboardResource;
     this.objectMapper = new ObjectMapper();
-    this.random = new Random();
 
     TimeSeriesLoader timeseriesLoader =
         new DefaultTimeSeriesLoader(metricConfigDAO, datasetConfigDAO,
@@ -172,8 +142,6 @@ public class AnomalyDetectionResource {
     this.metricConfigValidator = new MetricConfigValidator();
     this.datasetConfigValidator = new DatasetConfigValidator();
     this.anomalySearcher = new AnomalySearcher();
-
-    // Read template from disk
     this.yaml = new Yaml();
   }
 
@@ -201,7 +169,7 @@ public class AnomalyDetectionResource {
     MetricConfigDTO metricConfigDTO = null;
     DetectionConfigDTO detectionConfigDTO;
     TaskDTO taskDTO;
-    Map<String, Object> anomalies = null;
+    Map<String, Object> anomalies;
     Response.Status responseStatus;
     Map<String, String> responseMessage = new HashMap<>();
     ObjectMapper objectMapper = new ObjectMapper();
@@ -355,12 +323,12 @@ public class AnomalyDetectionResource {
 
     // Default configuration
     datasetConfigDTO.setDataset(DEFAULT_DATASET_NAME + suffix);
-    datasetConfigDTO.setDimensions(DEFAULT_DIMENSIONS);
+    datasetConfigDTO.setDimensions(Collections.unmodifiableList(new ArrayList<>()));
     datasetConfigDTO.setTimeColumn(DEFAULT_TIME_COLUMN);
-    datasetConfigDTO.setTimeDuration(DEFAULT_TIME_DURATION);
-    datasetConfigDTO.setTimeUnit(DEFAULT_TIME_UNIT);
-    datasetConfigDTO.setTimeFormat(DEFAULT_TIME_FORMAT);
-    datasetConfigDTO.setTimezone(DEFAULT_TIME_ZONE);
+    datasetConfigDTO.setTimeDuration(1);
+    datasetConfigDTO.setTimeUnit(TimeUnit.DAYS);
+    datasetConfigDTO.setTimeFormat("SIMPLE_DATE_FORMAT:yyyyMMdd");
+    datasetConfigDTO.setTimezone("US/Pacific");
     datasetConfigDTO.setDataSource(ONLINE_DATASOURCE);
 
     // Customized configuration
@@ -369,21 +337,21 @@ public class AnomalyDetectionResource {
       Map<String, Object> datasetYaml =
           ConfigUtils.getMap(yaml.load(payloadNode.get(DATASET_FIELD).textValue()));
 
-      if (datasetYaml.containsKey(TIME_COLUMN_YAML_FIELD)) {
-        datasetConfigDTO.setTimeColumn((String) datasetYaml.get(TIME_COLUMN_YAML_FIELD));
+      if (datasetYaml.containsKey("timeColumn")) {
+        datasetConfigDTO.setTimeColumn((String) datasetYaml.get("timeColumn"));
       }
-      if (datasetYaml.containsKey(TIME_UNIT_YAML_FIELD)) {
+      if (datasetYaml.containsKey("timeUnit")) {
         datasetConfigDTO
-            .setTimeUnit(TimeUnit.valueOf((String) datasetYaml.get(TIME_UNIT_YAML_FIELD)));
+            .setTimeUnit(TimeUnit.valueOf((String) datasetYaml.get("timeUnit")));
       }
-      if (datasetYaml.containsKey(TIME_DURATION_YAML_FIELD)) {
-        datasetConfigDTO.setTimeDuration((Integer) datasetYaml.get(TIME_DURATION_YAML_FIELD));
+      if (datasetYaml.containsKey("timeDuration")) {
+        datasetConfigDTO.setTimeDuration((Integer) datasetYaml.get("timeDuration"));
       }
-      if (datasetYaml.containsKey(TIME_FORMAT_YAML_FIELD)) {
-        datasetConfigDTO.setTimeFormat((String) datasetYaml.get(TIME_FORMAT_YAML_FIELD));
+      if (datasetYaml.containsKey("timeFormat")) {
+        datasetConfigDTO.setTimeFormat((String) datasetYaml.get("timeFormat"));
       }
-      if (datasetYaml.containsKey(TIME_ZONE_YAML_FIELD)) {
-        datasetConfigDTO.setTimezone((String) datasetYaml.get(TIME_ZONE_YAML_FIELD));
+      if (datasetYaml.containsKey("timezone")) {
+        datasetConfigDTO.setTimezone((String) datasetYaml.get("timezone"));
       }
     }
 
@@ -406,7 +374,7 @@ public class AnomalyDetectionResource {
     metricConfigDTO.setAlias(ThirdEyeUtils
         .constructMetricAlias(DEFAULT_DATASET_NAME + suffix,
             DEFAULT_METRIC_NAME + suffix));
-    metricConfigDTO.setDatatype(DEFAULT_DATA_TYPE);
+    metricConfigDTO.setDatatype(MetricType.DOUBLE);
     metricConfigDTO.setDefaultAggFunction(MetricAggFunction.SUM);
     metricConfigDTO.setActive(true);
 
@@ -415,9 +383,9 @@ public class AnomalyDetectionResource {
       Map<String, Object> metricYaml =
           ConfigUtils.getMap(yaml.load(payloadNode.get(METRIC_FIELD).textValue()));
 
-      if (metricYaml.containsKey(DATATYPE_YAML_FIELD)) {
+      if (metricYaml.containsKey("datatype")) {
         metricConfigDTO
-            .setDatatype(MetricType.valueOf((String) metricYaml.get(DATATYPE_YAML_FIELD)));
+            .setDatatype(MetricType.valueOf((String) metricYaml.get("datatype")));
       }
     }
 
@@ -459,9 +427,9 @@ public class AnomalyDetectionResource {
     }
 
     // Do not support customized detection name as it is not a common use case
-    detectionYaml.put(DETECTION_YAML_FIELD, DEFAULT_DETECTION_NAME + suffix);
-    detectionYaml.put(DATASET_YAML_FIELD, datasetConfigDTO.getName());
-    detectionYaml.put(METRIC_YAML_FIELD, metricConfigDTO.getName());
+    detectionYaml.put("detectionName", DEFAULT_DETECTION_NAME + suffix);
+    detectionYaml.put("dataset", datasetConfigDTO.getName());
+    detectionYaml.put("metric", metricConfigDTO.getName());
 
     detectionConfigDTO =
         new DetectionConfigTranslator(this.yaml.dump(detectionYaml), this.provider).translate();
@@ -731,7 +699,7 @@ public class AnomalyDetectionResource {
       responseJson.put("status", taskStatus.name());
 
       if (responseStatus.equals(Response.Status.SEE_OTHER)) {
-        addLink(responseJson, "anomalies", ANOMALY_ENDPOINT_URL, "GET");
+        addLink(responseJson, "anomalies", "/userdashboard/anomalies", "GET");
       }
 
       return Response.status(responseStatus).entity(responseJson).build();
