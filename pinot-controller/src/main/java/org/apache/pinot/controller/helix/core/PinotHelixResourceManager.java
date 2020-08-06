@@ -40,6 +40,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
@@ -73,6 +74,7 @@ import org.apache.pinot.common.lineage.LineageEntryState;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.lineage.SegmentLineageUtils;
+import org.apache.pinot.common.messages.RoutingTableRebuildMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
@@ -84,6 +86,7 @@ import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.BrokerResourceStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Server;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
@@ -129,6 +132,10 @@ public class PinotHelixResourceManager {
   private static final long CACHE_ENTRY_EXPIRE_TIME_HOURS = 6L;
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
   public static final String APPEND = "APPEND";
+
+  // TODO: make this configurable
+  public static final long EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS = 10 * 60_000L; // 10 minutes
+  public static final long EXTERNAL_VIEW_CHECK_INTERVAL_MS = 1_000L; // 1 second
 
   private final Map<String, Map<String, Long>> _segmentCrcMap = new HashMap<>();
   private final Map<String, Map<String, Integer>> _lastKnownSegmentMetadataVersionMap = new HashMap<>();
@@ -1757,6 +1764,27 @@ public class PinotHelixResourceManager {
     }
   }
 
+  private void sendRoutingTableRebuildMessage(String tableNameWithType) {
+    RoutingTableRebuildMessage routingTableRebuildMessage = new RoutingTableRebuildMessage(tableNameWithType);
+
+    // Send table config refresh message to brokers
+    Criteria recipientCriteria = new Criteria();
+    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+    recipientCriteria.setInstanceName("%");
+    recipientCriteria.setResource(Helix.BROKER_RESOURCE_INSTANCE);
+    recipientCriteria.setSessionSpecific(true);
+    recipientCriteria.setPartition(tableNameWithType);
+    // Send message with no callback and infinite timeout on the recipient
+    int numMessagesSent =
+        _helixZkManager.getMessagingService().send(recipientCriteria, routingTableRebuildMessage, null, -1);
+    if (numMessagesSent > 0) {
+      // TODO: Would be nice if we can get the name of the instances to which messages were sent
+      LOGGER.info("Sent {} routing table rebuild messages to brokers for table: {}", numMessagesSent, tableNameWithType);
+    } else {
+      LOGGER.warn("No routing table rebuild message sent to brokers for table: {}", tableNameWithType);
+    }
+  }
+
   /**
    * Update the instance config given the broker instance id
    */
@@ -2333,12 +2361,6 @@ public class PinotHelixResourceManager {
             .format("Invalid segment lineage entry id (tableName='%s', segmentLineageEntryId='%s')", tableNameWithType,
                 segmentLineageEntryId));
 
-        // Check that all the segments from 'segmentsTo' exist in the table
-        Set<String> segmentsForTable = new HashSet<>(getSegmentsFor(tableNameWithType));
-        Preconditions.checkArgument(segmentsForTable.containsAll(lineageEntry.getSegmentsTo()), String.format(
-            "Not all segments from 'segmentsTo' are available in the table. (tableName = '%s', segmentsTo = '%s', "
-                + "segmentsFromTable = '%s')", tableNameWithType, lineageEntry.getSegmentsTo(), segmentsForTable));
-
         // NO-OPS if the entry is already completed
         if (lineageEntry.getState() == LineageEntryState.COMPLETED) {
           LOGGER.warn(
@@ -2347,6 +2369,15 @@ public class PinotHelixResourceManager {
           return true;
         }
 
+        // Check that all the segments from 'segmentsTo' exist in the table
+        Set<String> segmentsForTable = new HashSet<>(getSegmentsFor(tableNameWithType));
+        Preconditions.checkArgument(segmentsForTable.containsAll(lineageEntry.getSegmentsTo()), String.format(
+            "Not all segments from 'segmentsTo' are available in the table. (tableName = '%s', segmentsTo = '%s', "
+                + "segmentsFromTable = '%s')", tableNameWithType, lineageEntry.getSegmentsTo(), segmentsForTable));
+
+        // Check that all the segments from 'segmentsTo' become ONLINE in the external view
+        waitForSegmentsBecomeOnline(tableNameWithType, new HashSet<>(lineageEntry.getSegmentsTo()));
+
         // Update lineage entry
         LineageEntry newLineageEntry =
             new LineageEntry(lineageEntry.getSegmentsFrom(), lineageEntry.getSegmentsTo(), LineageEntryState.COMPLETED,
@@ -2354,7 +2385,15 @@ public class PinotHelixResourceManager {
         segmentLineage.updateLineageEntry(segmentLineageEntryId, newLineageEntry);
 
         // Write back to the lineage entry
-        return SegmentLineageAccessHelper.writeSegmentLineage(_propertyStore, segmentLineage, expectedVersion);
+        if (SegmentLineageAccessHelper.writeSegmentLineage(_propertyStore, segmentLineage, expectedVersion)) {
+          // If the segment lineage metadata is successfully updated, we need to trigger brokers to rebuild the
+          // routing table because it is possible that there has been no EV change but the routing result may be
+          // different after updating the lineage entry.
+          sendRoutingTableRebuildMessage(tableNameWithType);
+          return true;
+        } else {
+          return false;
+        }
       });
     } catch (Exception e) {
       String errorMsg = String
@@ -2367,6 +2406,37 @@ public class PinotHelixResourceManager {
     // Only successful attempt can reach here
     LOGGER.info("endReplaceSegments is successfully processed. (tableNameWithType = {}, segmentLineageEntryId = {})",
         tableNameWithType, segmentLineageEntryId);
+  }
+
+  private void waitForSegmentsBecomeOnline(String tableNameWithType, Set<String> segmentsToCheck)
+      throws InterruptedException, TimeoutException {
+    long endTimeMs = System.currentTimeMillis() + EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS;
+    do {
+      Set<String> onlineSegments = getOnlineSegmentsFromExternalView(tableNameWithType);
+      if (onlineSegments.containsAll(segmentsToCheck)) {
+        return;
+      }
+      Thread.sleep(EXTERNAL_VIEW_CHECK_INTERVAL_MS);
+    } while (System.currentTimeMillis() < endTimeMs);
+    throw new TimeoutException(String.format(
+        "Time out while waiting segments become ONLINE. (tableNameWithType = %s, segmentsToCheck = %s)",
+        tableNameWithType, segmentsToCheck));
+  }
+
+  private Set<String> getOnlineSegmentsFromExternalView(String tableNameWithType) {
+    ExternalView externalView = getTableExternalView(tableNameWithType);
+    Preconditions
+        .checkState(externalView != null, String.format("External view is null for table (%s)", tableNameWithType));
+    Map<String, Map<String, String>> segmentAssignment = externalView.getRecord().getMapFields();
+    Set<String> onlineSegments = new HashSet<>(HashUtil.getHashMapCapacity(segmentAssignment.size()));
+    for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
+      Map<String, String> instanceStateMap = entry.getValue();
+      if (instanceStateMap.containsValue(SegmentStateModel.ONLINE) || instanceStateMap
+          .containsValue(SegmentStateModel.CONSUMING)) {
+        onlineSegments.add(entry.getKey());
+      }
+    }
+    return onlineSegments;
   }
 
   /*

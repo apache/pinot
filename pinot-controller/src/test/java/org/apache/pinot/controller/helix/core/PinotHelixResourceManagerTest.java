@@ -512,7 +512,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
   }
 
   @Test
-  public void testBatchUpload()
+  public void testSegmentReplacement()
       throws IOException {
     // Create broker tenant on 1 Brokers
     Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 1, 0, 0);
