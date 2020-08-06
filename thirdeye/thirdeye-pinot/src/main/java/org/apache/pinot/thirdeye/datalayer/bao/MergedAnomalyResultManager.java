@@ -78,6 +78,8 @@ public interface MergedAnomalyResultManager extends AbstractManager<MergedAnomal
 
   List<MergedAnomalyResultDTO> findAnomaliesByMetricIdAndTimeRange(Long metricId, long start, long end);
 
+  MergedAnomalyResultDTO findParent(MergedAnomalyResultDTO entity);
+
   void updateAnomalyFeedback(MergedAnomalyResultDTO entity);
 
   MergedAnomalyResultBean convertMergeAnomalyDTO2Bean(MergedAnomalyResultDTO entity);
