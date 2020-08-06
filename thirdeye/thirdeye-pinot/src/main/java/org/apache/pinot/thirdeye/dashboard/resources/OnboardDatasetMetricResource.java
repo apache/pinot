@@ -20,6 +20,7 @@
 package org.apache.pinot.thirdeye.dashboard.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.inject.Singleton;
 import org.apache.pinot.thirdeye.datalayer.bao.OnboardDatasetMetricManager;
 import org.apache.pinot.thirdeye.datalayer.dto.OnboardDatasetMetricDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
@@ -46,6 +47,7 @@ import org.apache.commons.lang3.StringUtils;
  * Endpoints for adding datasets and metrics to be read by data sources
  */
 @Produces(MediaType.APPLICATION_JSON)
+@Singleton
 public class OnboardDatasetMetricResource {
 
   private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();

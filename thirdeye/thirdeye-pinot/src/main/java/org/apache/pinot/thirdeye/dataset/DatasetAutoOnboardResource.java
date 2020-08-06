@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.dataset;
 
+import com.google.inject.Singleton;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
@@ -35,6 +36,7 @@ import javax.ws.rs.core.MediaType;
 
 
 @Produces(MediaType.APPLICATION_JSON)
+@Singleton
 public class DatasetAutoOnboardResource {
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private final MetricConfigManager metricDAO;

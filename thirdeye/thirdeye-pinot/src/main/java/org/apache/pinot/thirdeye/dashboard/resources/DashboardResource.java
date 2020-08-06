@@ -20,6 +20,7 @@
 package org.apache.pinot.thirdeye.dashboard.resources;
 
 import com.google.inject.Inject;
+import com.google.inject.Singleton;
 import io.dropwizard.views.View;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -54,6 +55,7 @@ import java.util.List;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 
+@Singleton
 public class DashboardResource {
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry
       .getInstance();

@@ -25,6 +25,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import com.google.inject.Singleton;
 import java.net.URLDecoder;
 import java.util.Arrays;
 import java.util.Collections;
@@ -64,6 +65,7 @@ import static org.apache.pinot.thirdeye.common.constants.rca.MultiDimensionalSum
 import static org.apache.pinot.thirdeye.common.constants.rca.RootCauseResourceConstants.*;
 
 
+@Singleton
 public class SummaryResource {
   private static final Logger LOG = LoggerFactory.getLogger(SummaryResource.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();

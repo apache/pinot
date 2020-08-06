@@ -20,6 +20,7 @@
 package org.apache.pinot.thirdeye.dashboard.resources;
 
 import com.google.inject.Inject;
+import com.google.inject.Singleton;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.apache.pinot.thirdeye.api.Constants;
@@ -42,6 +43,7 @@ import javax.ws.rs.core.Response.Status;
  */
 @Produces(MediaType.APPLICATION_JSON)
 @Api(tags = {Constants.DASHBOARD_TAG})
+@Singleton
 public class AutoOnboardResource {
 
   private Map<String, List<AutoOnboard>> dataSourceToOnboardMap;

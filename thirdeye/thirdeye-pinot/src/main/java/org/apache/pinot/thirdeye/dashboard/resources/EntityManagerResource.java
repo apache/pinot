@@ -26,6 +26,7 @@ import static org.apache.pinot.thirdeye.dashboard.resources.ResourceUtils.ensure
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
 import com.google.inject.Inject;
+import com.google.inject.Singleton;
 import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.common.ThirdEyeConfiguration;
 import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
@@ -78,6 +79,7 @@ import org.slf4j.LoggerFactory;
 
 @Produces(MediaType.APPLICATION_JSON)
 @Api(tags = {Constants.DASHBOARD_TAG})
+@Singleton
 public class EntityManagerResource {
   private final AnomalyFunctionManager anomalyFunctionManager;
   private final MetricConfigManager metricConfigManager;

@@ -21,6 +21,7 @@
 package org.apache.pinot.thirdeye.detection;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.inject.Singleton;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiParam;
 import java.util.List;
@@ -35,6 +36,7 @@ import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry
 
 
 @Api(tags = {Constants.DETECTION_TAG})
+@Singleton
 public class DetectionConfigurationResource {
   private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static DetectionRegistry detectionRegistry = DetectionRegistry.getInstance();

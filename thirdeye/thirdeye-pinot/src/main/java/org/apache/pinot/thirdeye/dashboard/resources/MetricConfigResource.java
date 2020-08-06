@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.dashboard.resources;
 
+import com.google.inject.Singleton;
 import io.swagger.annotations.ApiOperation;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -58,6 +59,7 @@ import org.apache.pinot.thirdeye.util.JsonResponseUtil;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 
 @Produces(MediaType.APPLICATION_JSON)
+@Singleton
 public class MetricConfigResource {
   private static final Logger LOG = LoggerFactory.getLogger(MetricConfigResource.class);
 

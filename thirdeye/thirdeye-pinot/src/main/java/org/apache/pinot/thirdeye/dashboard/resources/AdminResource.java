@@ -20,6 +20,7 @@
 package org.apache.pinot.thirdeye.dashboard.resources;
 
 import com.google.inject.Inject;
+import com.google.inject.Singleton;
 import io.dropwizard.views.View;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -32,6 +33,7 @@ import org.apache.pinot.thirdeye.dashboard.views.ThirdEyeAdminView;
 
 @Api(tags = {Constants.ADMIN_TAG})
 @Produces(MediaType.APPLICATION_JSON)
+@Singleton
 public class AdminResource {
 
   private final DatasetConfigResource datasetConfigResource;

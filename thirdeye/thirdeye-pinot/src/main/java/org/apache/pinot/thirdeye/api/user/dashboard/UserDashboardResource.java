@@ -22,6 +22,7 @@ package org.apache.pinot.thirdeye.api.user.dashboard;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Collections2;
 import com.google.inject.Inject;
+import com.google.inject.Singleton;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -65,6 +66,7 @@ import org.slf4j.LoggerFactory;
  */
 @Api(tags = {Constants.DASHBOARD_TAG})
 @Produces(MediaType.APPLICATION_JSON)
+@Singleton
 public class UserDashboardResource {
   protected static final Logger LOG = LoggerFactory.getLogger(UserDashboardResource.class);
 

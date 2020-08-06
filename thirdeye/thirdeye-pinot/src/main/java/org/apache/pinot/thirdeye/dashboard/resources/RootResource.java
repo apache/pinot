@@ -21,6 +21,7 @@
 package org.apache.pinot.thirdeye.dashboard.resources;
 
 import com.google.inject.Inject;
+import com.google.inject.Singleton;
 import io.swagger.annotations.Api;
 import javax.ws.rs.Path;
 import org.apache.pinot.thirdeye.api.application.ApplicationResource;
@@ -42,6 +43,7 @@ import org.apache.pinot.thirdeye.detection.yaml.YamlResource;
  */
 @Path("/")
 @Api(tags = { "Root" })
+@Singleton
 public class RootResource {
 
   private final AlertResource alertResource;

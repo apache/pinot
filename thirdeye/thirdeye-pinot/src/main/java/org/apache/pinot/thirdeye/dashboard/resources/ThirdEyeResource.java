@@ -20,6 +20,7 @@
 package org.apache.pinot.thirdeye.dashboard.resources;
 
 import com.google.inject.Inject;
+import com.google.inject.Singleton;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -30,6 +31,7 @@ import org.apache.pinot.thirdeye.dashboard.views.ThirdEyeView;
 import io.dropwizard.views.View;
 
 @Produces(MediaType.APPLICATION_JSON)
+@Singleton
 public class ThirdEyeResource {
 
   private final AnomalyFlattenResource anomalyFlattenResource;
