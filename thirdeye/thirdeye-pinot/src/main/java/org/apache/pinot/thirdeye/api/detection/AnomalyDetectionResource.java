@@ -115,8 +115,6 @@ public class AnomalyDetectionResource {
 
   /* -------- Others -------- */
   private static final String ONLINE_DATASOURCE = "OnlineThirdEyeDataSource";
-  private static final String DETECTION_MYSQL_NAME_COLUMN = "name";
-  private static final String TASK_MYSQL_NAME_COLUMN = "name";
   private static final String ANOMALY_ENDPOINT_URL = "/userdashboard/anomalies";
   private static final long POLLING_SLEEP_TIME = 5L;
   private static final long POLLING_TIMEOUT = 60 * 10L;
@@ -303,22 +301,18 @@ public class AnomalyDetectionResource {
 
   void cleanExistingOnlineTask(String nameSuffix) {
     String metricName = DEFAULT_METRIC_NAME + nameSuffix;
-    List<MetricConfigDTO> metricConfigDTOS = metricConfigDAO.findByMetricName(metricName);
-    for (MetricConfigDTO metricConfigDTO : metricConfigDTOS) {
-      metricConfigDAO.deleteById(metricConfigDTO.getId());
-      LOG.info("Deleted existing metric: {}", metricConfigDTO);
-    }
+    int metricCnt = metricConfigDAO.deleteByPredicate(
+        Predicate.EQ("name", metricName));
+    LOG.info("Deleted existing {} metrics", metricCnt);
 
     String datasetName = DEFAULT_DATASET_NAME + nameSuffix;
-    DatasetConfigDTO datasetConfigDTO = datasetConfigDAO.findByDataset(datasetName);
-    if (datasetConfigDTO != null) {
-      datasetConfigDAO.delete(datasetConfigDTO);
-      LOG.info("Deleted existing dataset: {}", datasetConfigDTO);
-    }
+    int datasetCnt = datasetConfigDAO.deleteByPredicate(
+        Predicate.EQ("dataset", datasetName));
+    LOG.info("Deleted existing {} datasets", datasetCnt);
 
     String taskName = TaskConstants.TaskType.DETECTION.name() + nameSuffix;
-    taskDAO.deleteByPredicate(Predicate.EQ(TASK_MYSQL_NAME_COLUMN, taskName));
-    LOG.info("Deleted existing task with name: {}", taskName);
+    int taskCnt = taskDAO.deleteByPredicate(Predicate.EQ("name", taskName));
+    LOG.info("Deleted existing {} task", taskCnt);
   }
 
   boolean validateOnlineRequestPayload(JsonNode payloadNode) {
