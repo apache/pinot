@@ -481,7 +481,7 @@ public class AnomalyDetectionResource {
       throws JsonProcessingException {
     TaskDTO taskDTO = new TaskDTO();
     taskDTO.setJobName(
-        TaskConstants.TaskType.DETECTION.toString() + nameSuffix);
+        TaskConstants.TaskType.DETECTION_ONLINE.toString() + nameSuffix);
     taskDTO.setStatus(TaskConstants.TaskStatus.WAITING);
     taskDTO.setTaskType(TaskConstants.TaskType.DETECTION_ONLINE);
     DetectionPipelineTaskInfo taskInfo =
