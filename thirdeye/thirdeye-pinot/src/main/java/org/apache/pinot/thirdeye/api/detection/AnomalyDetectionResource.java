@@ -136,8 +136,9 @@ public class AnomalyDetectionResource {
   private final DatasetConfigValidator datasetConfigValidator;
   private final MetricConfigValidator metricConfigValidator;
   private final AnomalySearcher anomalySearcher;
-  private final ObjectMapper objectMapper = new ObjectMapper();
+  private final ObjectMapper objectMapper;
   private final Yaml yaml;
+  private final Random random;
 
   @Inject
   public AnomalyDetectionResource(UserDashboardResource userDashboardResource) {
@@ -149,6 +150,8 @@ public class AnomalyDetectionResource {
     this.taskDAO = DAORegistry.getInstance().getTaskDAO();
     this.evaluationDAO = DAORegistry.getInstance().getEvaluationManager();
     this.userDashboardResource = userDashboardResource;
+    this.objectMapper = new ObjectMapper();
+    this.random = new Random();
 
     TimeSeriesLoader timeseriesLoader =
         new DefaultTimeSeriesLoader(metricConfigDAO, datasetConfigDAO,
@@ -202,8 +205,8 @@ public class AnomalyDetectionResource {
     Response.Status responseStatus;
     Map<String, String> responseMessage = new HashMap<>();
     ObjectMapper objectMapper = new ObjectMapper();
-    // Use username to separate different requests. One user can only send one request at a time
-    String nameSuffix = "_" + principal.getName();
+    // Suffix format: _<user_name>_<uuid>
+    String nameSuffix = "_" + principal.getName() + "_" + UUID.randomUUID().toString();
 
     try {
       if (payload.getBytes().length > MAX_ONLINE_PAYLOAD_SIZE) {
