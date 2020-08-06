@@ -18,9 +18,14 @@
  */
 package org.apache.pinot.common.function;
 
+import org.apache.commons.lang3.StringUtils;
+
+
+/**
+ * NOTE: No underscore is allowed in the enum name.
+ */
 public enum AggregationFunctionType {
   // Aggregation functions for single-valued columns
-  // Please note that no underscore is allowed to be used in the enum.
   COUNT("count"),
   MIN("min"),
   MAX("max"),
@@ -39,7 +44,7 @@ public enum AggregationFunctionType {
   PERCENTILEEST("percentileEst"),
   PERCENTILETDIGEST("percentileTDigest"),
 
-  // geo aggregation functions
+  // Geo aggregation functions
   STUNION("STUnion"),
 
   // Aggregation functions for multi-valued columns
@@ -79,9 +84,10 @@ public enum AggregationFunctionType {
 
   /**
    * Returns the corresponding aggregation function type for the given function name.
+   * <p>NOTE: Underscores in the function name are ignored.
    */
   public static AggregationFunctionType getAggregationFunctionType(String functionName) {
-    String upperCaseFunctionName = functionName.toUpperCase();
+    String upperCaseFunctionName = StringUtils.remove(functionName, '_').toUpperCase();
     if (upperCaseFunctionName.startsWith("PERCENTILE")) {
       String remainingFunctionName = upperCaseFunctionName.substring(10);
       if (remainingFunctionName.isEmpty() || remainingFunctionName.matches("\\d+")) {
@@ -96,19 +102,15 @@ public enum AggregationFunctionType {
         return PERCENTILEESTMV;
       } else if (remainingFunctionName.equals("TDIGESTMV") || remainingFunctionName.matches("TDIGEST\\d+MV")) {
         return PERCENTILETDIGESTMV;
+      } else {
+        throw new IllegalArgumentException("Invalid aggregation function name: " + functionName);
+      }
+    } else {
+      try {
+        return AggregationFunctionType.valueOf(upperCaseFunctionName);
+      } catch (Exception e) {
+        throw new IllegalArgumentException("Invalid aggregation function name: " + functionName);
       }
     }
-    try {
-      return AggregationFunctionType.valueOf(upperCaseFunctionName);
-    } catch (Exception e) {
-      if (upperCaseFunctionName.contains("_")) {
-        try {
-          return getAggregationFunctionType(upperCaseFunctionName.replace("_", ""));
-        } catch (Exception e2) {
-          // throw IllegalArgumentException
-        }
-      }
-    }
-    throw new IllegalArgumentException("Invalid aggregation function name: " + functionName);
   }
 }

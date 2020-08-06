@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
 import java.util.List;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
@@ -37,6 +38,7 @@ public class AggregationFunctionFactory {
 
   /**
    * Given the function information, returns a new instance of the corresponding aggregation function.
+   * <p>NOTE: Underscores in the function name are ignored.
    * <p>NOTE: We pass the query context to this method because DISTINCT is currently modeled as an aggregation function
    *          and requires the order-by and limit information from the query.
    * <p>TODO: Consider modeling DISTINCT as unique selection instead of aggregation so that early-termination, limit and
@@ -44,13 +46,11 @@ public class AggregationFunctionFactory {
    */
   public static AggregationFunction getAggregationFunction(FunctionContext function, QueryContext queryContext) {
     try {
-      String upperCaseFunctionName = function.getFunctionName().toUpperCase();
-      AggregationFunctionType aggregationFunctionType =
-          AggregationFunctionType.getAggregationFunctionType(upperCaseFunctionName);
+      String upperCaseFunctionName = StringUtils.remove(function.getFunctionName(), '_').toUpperCase();
       List<ExpressionContext> arguments = function.getArguments();
       ExpressionContext firstArgument = arguments.get(0);
-      if (aggregationFunctionType.name().startsWith("PERCENTILE")) {
-        String remainingFunctionName = upperCaseFunctionName.replace("_", "").substring(10);
+      if (upperCaseFunctionName.startsWith("PERCENTILE")) {
+        String remainingFunctionName = upperCaseFunctionName.substring(10);
         int numArguments = arguments.size();
         if (numArguments == 1) {
           // Single argument percentile (e.g. Percentile99(foo), PercentileTDigest95(bar), etc.)
@@ -108,7 +108,7 @@ public class AggregationFunctionFactory {
         }
         throw new IllegalArgumentException("Invalid percentile function: " + function);
       } else {
-        switch (aggregationFunctionType) {
+        switch (AggregationFunctionType.valueOf(upperCaseFunctionName)) {
           case COUNT:
             return new CountAggregationFunction();
           case MIN:
