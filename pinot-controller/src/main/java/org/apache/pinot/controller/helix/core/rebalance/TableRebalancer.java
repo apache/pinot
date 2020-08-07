@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
 import org.I0Itec.zkclient.exception.ZkBadVersionException;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.AccessOption;
@@ -182,9 +181,8 @@ public class TableRebalancer {
       // get tiers with storageType = "pinotServer". This is the only type available right now.
       // Other types should be treated differently
       sortedTiers = TierConfigUtils
-          .getTiersForStorageType(tableConfig.getTierConfigsList(), TierFactory.PINOT_SERVER_STORAGE_TYPE,
+          .getSortedTiersForStorageType(tableConfig.getTierConfigsList(), TierFactory.PINOT_SERVER_STORAGE_TYPE,
               _helixManager);
-      sortedTiers.sort(TierFactory.getTierComparator());
 
       tierToInstancePartitionMap = new HashMap<>();
       for (Tier tier : sortedTiers) {
@@ -235,7 +233,7 @@ public class TableRebalancer {
     Map<String, Map<String, String>> targetAssignment;
     try {
       targetAssignment = segmentAssignment
-          .rebalanceTable(currentAssignment, instancePartitionsMap, tierToInstancePartitionMap, sortedTiers,
+          .rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers, tierToInstancePartitionMap,
               rebalanceConfig);
     } catch (Exception e) {
       LOGGER.warn("Caught exception while calculating target assignment for table: {}, aborting the rebalance",
@@ -296,7 +294,7 @@ public class TableRebalancer {
             currentIdealState = idealState;
             currentAssignment = currentIdealState.getRecord().getMapFields();
             targetAssignment = segmentAssignment
-                .rebalanceTable(currentAssignment, instancePartitionsMap, tierToInstancePartitionMap, sortedTiers,
+                .rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers, tierToInstancePartitionMap,
                     rebalanceConfig);
           } catch (Exception e1) {
             LOGGER.warn(
@@ -361,7 +359,7 @@ public class TableRebalancer {
           currentIdealState = idealState;
           currentAssignment = currentIdealState.getRecord().getMapFields();
           targetAssignment = segmentAssignment
-              .rebalanceTable(currentAssignment, instancePartitionsMap, tierToInstancePartitionMap, sortedTiers,
+              .rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers, tierToInstancePartitionMap,
                   rebalanceConfig);
           expectedVersion = currentIdealState.getRecord().getVersion();
         } catch (Exception e) {

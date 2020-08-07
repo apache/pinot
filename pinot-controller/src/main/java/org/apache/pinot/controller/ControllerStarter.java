@@ -684,7 +684,7 @@ public class ControllerStarter implements ServiceStartable {
     conf.setRealtimeSegmentValidationFrequencyInSeconds(3600);
     conf.setBrokerResourceValidationFrequencyInSeconds(3600);
     conf.setStatusCheckerFrequencyInSeconds(5 * 60);
-    conf.setSegmentRelocatorFrequencyInSeconds(60*60);
+    conf.setSegmentRelocatorFrequencyInSeconds(3600);
     conf.setStatusCheckerWaitForPushTimeInSeconds(10 * 60);
     conf.setTenantIsolationEnabled(true);
 

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core.assignment.segment;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -27,21 +26,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.TreeMap;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixManager;
-import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.tier.Tier;
-import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -89,30 +83,17 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentAssignment.class);
 
   private HelixManager _helixManager;
-  private TableConfig _tableConfig;
   private String _realtimeTableName;
   private int _replication;
 
   @Override
   public void init(HelixManager helixManager, TableConfig tableConfig) {
     _helixManager = helixManager;
-    _tableConfig = tableConfig;
     _realtimeTableName = tableConfig.getTableName();
     _replication = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
 
     LOGGER.info("Initialized RealtimeSegmentAssignment with replication: {} for table: {}", _replication,
         _realtimeTableName);
-  }
-
-  /**
-   * Returns a sorted list of Tiers from the TierConfigList in table config.
-   * Keeps only those which have "pinotServer" storage type.
-   */
-  @VisibleForTesting
-  protected List<Tier> getSortedTiersForPinotServerStorage(List<TierConfig> tierConfigList) {
-    return tierConfigList.stream().filter(t -> TierFactory.PINOT_SERVER_STORAGE_TYPE.equals(t.getStorageType()))
-        .map(t -> TierFactory.getTier(t, _helixManager)).sorted(TierFactory.getTierComparator())
-        .collect(Collectors.toList());
   }
 
   @Override
@@ -194,7 +175,7 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
   @Override
   public Map<String, Map<String, String>> rebalanceTable(Map<String, Map<String, String>> currentAssignment,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap,
-      @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap, @Nullable List<Tier> sortedTiers,
+      @Nullable List<Tier> sortedTiers, @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap,
       Configuration config) {
 
     InstancePartitions completedInstancePartitions = instancePartitionsMap.get(InstancePartitionsType.COMPLETED);
@@ -211,9 +192,8 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
     // Rebalance tiers first
     Map<String, Map<String, String>> nonTierAssignment = currentAssignment;
     List<Map<String, Map<String, String>>> newTierAssignments = null;
-    if (TierConfigUtils.shouldRelocateToTiers(_tableConfig)) {
+    if (sortedTiers != null) {
       Preconditions.checkState(tierInstancePartitionsMap != null, "Tier to instancePartitions map is null");
-      Preconditions.checkState(sortedTiers != null, "Sorted list of tiers is null");
       LOGGER.info("Rebalancing tiers: {} for table: {} with bootstrap: {}", tierInstancePartitionsMap.keySet(),
           _realtimeTableName, bootstrap);
 

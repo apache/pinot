@@ -18,16 +18,57 @@
  */
 package org.apache.pinot.common.tier;
 
+import com.google.common.collect.Lists;
+import java.util.Collections;
 import java.util.Comparator;
+import org.apache.pinot.common.utils.config.TierConfigUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
 /**
- * Tests the TierFactory methods for Tier creation and sorting
+ * Tests the utility methods for TierConfig
  */
-public class TierFactoryTest {
+public class TierConfigUtilsTest {
+
+  @Test
+  public void testShouldRelocateToTiers() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
+    Assert.assertFalse(TierConfigUtils.shouldRelocateToTiers(tableConfig));
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTierConfigList(null).build();
+    Assert.assertFalse(TierConfigUtils.shouldRelocateToTiers(tableConfig));
+
+    tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTierConfigList(Collections.emptyList())
+            .build();
+    Assert.assertFalse(TierConfigUtils.shouldRelocateToTiers(tableConfig));
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTierConfigList(Lists
+        .newArrayList(new TierConfig("myTier", TierFactory.TIME_BASED_SEGMENT_SELECTOR_TYPE, "10d",
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tag_OFFLINE"))).build();
+    Assert.assertTrue(TierConfigUtils.shouldRelocateToTiers(tableConfig));
+
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("myTable").build();
+    Assert.assertFalse(TierConfigUtils.shouldRelocateToTiers(tableConfig));
+
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("myTable").setTierConfigList(null).build();
+    Assert.assertFalse(TierConfigUtils.shouldRelocateToTiers(tableConfig));
+
+    tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("myTable").setTierConfigList(Collections.emptyList())
+            .build();
+    Assert.assertFalse(TierConfigUtils.shouldRelocateToTiers(tableConfig));
+
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("myTable").setTierConfigList(Lists
+        .newArrayList(new TierConfig("myTier", TierFactory.TIME_BASED_SEGMENT_SELECTOR_TYPE, "10d",
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tag_OFFLINE"))).build();
+    Assert.assertTrue(TierConfigUtils.shouldRelocateToTiers(tableConfig));
+  }
 
   /**
    * Tests conversion from {@code TierConfig} to {@code Tier} in the {@code TierFactory}
@@ -68,7 +109,7 @@ public class TierFactoryTest {
    */
   @Test
   public void testTierComparator() {
-    Comparator<Tier> tierComparator = TierFactory.getTierComparator();
+    Comparator<Tier> tierComparator = TierConfigUtils.getTierComparator();
 
     Tier tier1 =
         new Tier("tier1", new TimeBasedTierSegmentSelector(null, "30d"), new PinotServerTierStorage("tag_OFFLINE"));

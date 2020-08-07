@@ -58,26 +58,4 @@ public final class TierFactory {
 
     return new Tier(tierConfig.getName(), segmentSelector, storageSelector);
   }
-
-  /**
-   * Comparator for sorting the {@link Tier}.
-   * As of now, we have only 1 type of {@link TierSegmentSelector} and 1 type of {@link TierStorage}.
-   * Tier with an older age bucket in {@link TimeBasedTierSegmentSelector} should appear before a younger age bucket, in sort order
-   * TODO: As we add more types, this logic needs to be upgraded
-   */
-  public static Comparator<Tier> getTierComparator() {
-    return (o1, o2) -> {
-      TierSegmentSelector s1 = o1.getSegmentSelector();
-      TierSegmentSelector s2 = o2.getSegmentSelector();
-      Preconditions
-          .checkState(TIME_BASED_SEGMENT_SELECTOR_TYPE.equals(s1.getType()), "Unsupported segmentSelectorType class %s",
-              s1.getClass());
-      Preconditions
-          .checkState(TIME_BASED_SEGMENT_SELECTOR_TYPE.equals(s2.getType()), "Unsupported segmentSelectorType class %s",
-              s2.getClass());
-      Long period1 = ((TimeBasedTierSegmentSelector) s1).getSegmentAgeMillis();
-      Long period2 = ((TimeBasedTierSegmentSelector) s2).getSegmentAgeMillis();
-      return period2.compareTo(period1);
-    };
-  }
 }

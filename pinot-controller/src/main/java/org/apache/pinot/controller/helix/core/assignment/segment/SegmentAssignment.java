@@ -62,13 +62,13 @@ public interface SegmentAssignment {
    *
    * @param currentAssignment Current segment assignment of the table (map from segment name to instance state map)
    * @param instancePartitionsMap Map from type (OFFLINE|CONSUMING|COMPLETED) to instance partitions
-   * @param tierInstancePartitionsMap Map from tierName to instance partitions
    * @param sortedTiers List of Tiers sorted as per priority
+   * @param tierInstancePartitionsMap Map from tierName to instance partitions
    * @param config Configuration for the rebalance
    * @return Rebalanced assignment for the segments
    */
   Map<String, Map<String, String>> rebalanceTable(Map<String, Map<String, String>> currentAssignment,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap,
-      @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap, @Nullable List<Tier> sortedTiers,
+      @Nullable List<Tier> sortedTiers, @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap,
       Configuration config);
 }

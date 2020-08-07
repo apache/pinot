@@ -18,12 +18,17 @@
  */
 package org.apache.pinot.common.utils.config;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
+import org.apache.pinot.common.tier.TierSegmentSelector;
+import org.apache.pinot.common.tier.TierStorage;
+import org.apache.pinot.common.tier.TimeBasedTierSegmentSelector;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
 
@@ -31,7 +36,10 @@ import org.apache.pinot.spi.config.table.TierConfig;
 /**
  * Util methods for TierConfig
  */
-public class TierConfigUtils {
+public final class TierConfigUtils {
+
+  private TierConfigUtils() {
+  }
 
   /**
    * Returns whether relocation of segments to tiers has been enabled for this table
@@ -43,14 +51,35 @@ public class TierConfigUtils {
   /**
    * Gets tiers for given storage type from provided list of TierConfig
    */
-  public static List<Tier> getTiersForStorageType(List<TierConfig> tierConfigList, String storageType,
+  public static List<Tier> getSortedTiersForStorageType(List<TierConfig> tierConfigList, String storageType,
       HelixManager helixManager) {
-    List<Tier> tiers = new ArrayList<>();
+    List<Tier> sortedTiers = new ArrayList<>();
     for (TierConfig tierConfig : tierConfigList) {
       if (storageType.equals(tierConfig.getStorageType())) {
-        tiers.add(TierFactory.getTier(tierConfig, helixManager));
+        sortedTiers.add(TierFactory.getTier(tierConfig, helixManager));
       }
     }
-    return tiers;
+    sortedTiers.sort(TierConfigUtils.getTierComparator());
+    return sortedTiers;
+  }
+
+  /**
+   * Comparator for sorting the {@link Tier}.
+   * As of now, we have only 1 type of {@link TierSegmentSelector} and 1 type of {@link TierStorage}.
+   * Tier with an older age bucket in {@link TimeBasedTierSegmentSelector} should appear before a younger age bucket, in sort order
+   * TODO: As we add more types, this logic needs to be upgraded
+   */
+  public static Comparator<Tier> getTierComparator() {
+    return (o1, o2) -> {
+      TierSegmentSelector s1 = o1.getSegmentSelector();
+      TierSegmentSelector s2 = o2.getSegmentSelector();
+      Preconditions.checkState(TierFactory.TIME_BASED_SEGMENT_SELECTOR_TYPE.equals(s1.getType()),
+          "Unsupported segmentSelectorType class %s", s1.getClass());
+      Preconditions.checkState(TierFactory.TIME_BASED_SEGMENT_SELECTOR_TYPE.equals(s2.getType()),
+          "Unsupported segmentSelectorType class %s", s2.getClass());
+      Long period1 = ((TimeBasedTierSegmentSelector) s1).getSegmentAgeMillis();
+      Long period2 = ((TimeBasedTierSegmentSelector) s2).getSegmentAgeMillis();
+      return period2.compareTo(period1);
+    };
   }
 }

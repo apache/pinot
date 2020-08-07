@@ -54,8 +54,8 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
   public SegmentRelocator(PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics,
       ExecutorService executorService) {
-    super(SegmentRelocator.class.getSimpleName(), 60,
-        30, pinotHelixResourceManager, leadControllerManager,
+    super(SegmentRelocator.class.getSimpleName(), config.getSegmentRelocatorFrequencyInSeconds(),
+        config.getSegmentRelocatorInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
         controllerMetrics);
     _executorService = executorService;
   }

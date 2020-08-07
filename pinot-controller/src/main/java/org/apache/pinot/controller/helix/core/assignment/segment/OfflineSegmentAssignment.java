@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core.assignment.segment;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -28,24 +27,19 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixManager;
-import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.tier.Tier;
-import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
-import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,12 +75,10 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
   private String _offlineTableName;
   private int _replication;
   private String _partitionColumn;
-  private TableConfig _tableConfig;
 
   @Override
   public void init(HelixManager helixManager, TableConfig tableConfig) {
     _helixManager = helixManager;
-    _tableConfig = tableConfig;
     _offlineTableName = tableConfig.getTableName();
     _replication = tableConfig.getValidationConfig().getReplicationNumber();
     ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
@@ -173,7 +165,7 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
   @Override
   public Map<String, Map<String, String>> rebalanceTable(Map<String, Map<String, String>> currentAssignment,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap,
-      @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap, @Nullable List<Tier> sortedTiers,
+      @Nullable List<Tier> sortedTiers, @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap,
       Configuration config) {
     InstancePartitions offlineInstancePartitions = instancePartitionsMap.get(InstancePartitionsType.OFFLINE);
     Preconditions
@@ -185,9 +177,8 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
     Map<String, Map<String, String>> nonTierAssignment = currentAssignment;
     // Rebalance tiers first
     List<Map<String, Map<String, String>>> newTierAssignments = null;
-    if (TierConfigUtils.shouldRelocateToTiers(_tableConfig)) {
+    if (sortedTiers != null) {
       Preconditions.checkState(tierInstancePartitionsMap != null, "Tier to instancePartitions map is null");
-      Preconditions.checkState(sortedTiers != null, "Sorted list of tiers is null");
       LOGGER.info("Rebalancing tiers: {} for table: {} with bootstrap: {}", tierInstancePartitionsMap.keySet(),
           _offlineTableName, bootstrap);
 
