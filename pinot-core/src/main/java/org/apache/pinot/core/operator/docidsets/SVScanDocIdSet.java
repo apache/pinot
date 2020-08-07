@@ -18,20 +18,20 @@
  */
 package org.apache.pinot.core.operator.docidsets;
 
-import org.apache.pinot.core.operator.dociditerators.SVScanScanDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.SVScanDocIdIterator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 
 
 public final class SVScanDocIdSet implements FilterBlockDocIdSet {
-  private final SVScanScanDocIdIterator _docIdIterator;
+  private final SVScanDocIdIterator _docIdIterator;
 
   public SVScanDocIdSet(PredicateEvaluator predicateEvaluator, ForwardIndexReader<?> reader, int numDocs) {
-    _docIdIterator = new SVScanScanDocIdIterator(predicateEvaluator, reader, numDocs);
+    _docIdIterator = new SVScanDocIdIterator(predicateEvaluator, reader, numDocs);
   }
 
   @Override
-  public SVScanScanDocIdIterator iterator() {
+  public SVScanDocIdIterator iterator() {
     return _docIdIterator;
   }
 

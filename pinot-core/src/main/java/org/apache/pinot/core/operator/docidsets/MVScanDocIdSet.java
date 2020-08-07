@@ -18,21 +18,21 @@
  */
 package org.apache.pinot.core.operator.docidsets;
 
-import org.apache.pinot.core.operator.dociditerators.MVScanScanDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.MVScanDocIdIterator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 
 
 public final class MVScanDocIdSet implements FilterBlockDocIdSet {
-  private final MVScanScanDocIdIterator _docIdIterator;
+  private final MVScanDocIdIterator _docIdIterator;
 
   public MVScanDocIdSet(PredicateEvaluator predicateEvaluator, ForwardIndexReader<?> reader, int numDocs,
       int maxNumEntriesPerValue) {
-    _docIdIterator = new MVScanScanDocIdIterator(predicateEvaluator, reader, numDocs, maxNumEntriesPerValue);
+    _docIdIterator = new MVScanDocIdIterator(predicateEvaluator, reader, numDocs, maxNumEntriesPerValue);
   }
 
   @Override
-  public MVScanScanDocIdIterator iterator() {
+  public MVScanDocIdIterator iterator() {
     return _docIdIterator;
   }
 
