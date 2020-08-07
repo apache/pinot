@@ -54,7 +54,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 public final class AndDocIdSet implements FilterBlockDocIdSet {
   private final List<FilterBlockDocIdSet> _docIdSets;
   private final int _numDocs;
-  private final float FAST_SCANNING_MIN_THRESHOLD =0.1f;
+  private final float FAST_SCANNING_MIN_THRESHOLD =0f;
 
   public AndDocIdSet(List<FilterBlockDocIdSet> docIdSets, int numDocs) {
     _docIdSets = docIdSets;
@@ -136,9 +136,9 @@ public final class AndDocIdSet implements FilterBlockDocIdSet {
 
 
       if (numValueBasedDocIdIterators > 1 && ((float)docIds.getCardinality() / _numDocs > FAST_SCANNING_MIN_THRESHOLD)){
-        // If the number of bits set in docIds is at the same order of magnitude as totol _numDocs, use the fast scanning
+        // If the number of bits set in docIds is at the same order of magnitude as _numDocs, use the fast scanning
         docIds= ValueBasedScanDocIdIterator.applyAnd(docIds, valueBasedScanDocIdIterators);
-        // Do the applyAnd on expressionScanDocIdIterator in the end because we want
+        // Do the applyAnd on expressionScanDocIdIterator in the end because we want less projection ops
         for (ExpressionScanDocIdIterator expressionScanDocIdIterator : expressionScanDocIdIterators) {
           docIds = expressionScanDocIdIterator.applyAnd(docIds);
         }
