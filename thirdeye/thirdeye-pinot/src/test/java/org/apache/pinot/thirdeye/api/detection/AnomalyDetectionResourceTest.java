@@ -159,13 +159,46 @@ public class AnomalyDetectionResourceTest {
   @Test
   public void testGenerateMetricConfig() throws Exception {
     String payload = IOUtils.toString(this.getClass().getResourceAsStream("payload-good.json"));
-
+    JsonNode node = this.objectMapper.readTree(payload);
+    DatasetConfigDTO datasetConfigDTO = this.anomalyDetectionResource
+        .generateDatasetConfig(node, this.suffix);
     MetricConfigDTO metricConfigDTO = this.anomalyDetectionResource
-        .generateMetricConfig(this.objectMapper.readTree(payload), this.suffix);
+        .generateMetricConfig(node, this.suffix, datasetConfigDTO);
 
     // Do not support customized config names. Test this
     Assert.assertEquals(metricConfigDTO.getName(), DEFAULT_METRIC_NAME + this.suffix);
     Assert.assertNotNull(metricConfigDTO.getOnlineData());
+
+    this.anomalyDetectionResource.cleanExistingOnlineTask(this.suffix);
+
+    // Test customized metric and time column names - good
+    payload = IOUtils.toString(this.getClass().getResourceAsStream("payload-good-custom.json"));
+    node = this.objectMapper.readTree(payload);
+    datasetConfigDTO = this.anomalyDetectionResource
+        .generateDatasetConfig(node, this.suffix);
+    try {
+      // pass
+      this.anomalyDetectionResource
+          .generateMetricConfig(node, this.suffix, datasetConfigDTO);
+    } catch (IllegalArgumentException e) {
+      Assert.fail("Unexpected exception: " + e);
+    }
+    this.anomalyDetectionResource.cleanExistingOnlineTask(this.suffix);
+
+    // Test customized metric and time column names - bad
+    payload = IOUtils.toString(this.getClass().getResourceAsStream("payload-bad-custom.json"));
+    node = this.objectMapper.readTree(payload);
+    datasetConfigDTO = this.anomalyDetectionResource
+        .generateDatasetConfig(node, this.suffix);
+    try {
+      this.anomalyDetectionResource
+          .generateMetricConfig(node, this.suffix, datasetConfigDTO);
+      Assert.fail("Inconsistent metric name should throw illegal arg exception");
+    } catch (IllegalArgumentException e) {
+      // pass
+    } catch (Exception e) {
+      Assert.fail("Unexpected exception: " + e);
+    }
   }
 
   @Test
@@ -173,11 +206,10 @@ public class AnomalyDetectionResourceTest {
     String payload = IOUtils.toString(this.getClass().getResourceAsStream("payload-good.json"));
     JsonNode payloadNode = this.objectMapper.readTree(payload);
 
-    MetricConfigDTO metricConfigDTO =
-        this.anomalyDetectionResource.generateMetricConfig(payloadNode, this.suffix);
-
     DatasetConfigDTO datasetConfigDTO =
         this.anomalyDetectionResource.generateDatasetConfig(payloadNode, this.suffix);
+    MetricConfigDTO metricConfigDTO =
+        this.anomalyDetectionResource.generateMetricConfig(payloadNode, this.suffix, datasetConfigDTO);
 
     DetectionConfigDTO detectionConfigDTO = this.anomalyDetectionResource
         .generateDetectionConfig(payloadNode, this.suffix, datasetConfigDTO, metricConfigDTO, 0, 0);

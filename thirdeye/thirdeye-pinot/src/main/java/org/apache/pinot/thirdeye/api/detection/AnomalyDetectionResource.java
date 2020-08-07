@@ -25,6 +25,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
+import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
 import io.dropwizard.auth.Auth;
 import io.swagger.annotations.Api;
@@ -53,9 +54,7 @@ import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
 import org.apache.pinot.thirdeye.detection.*;
 import org.apache.pinot.thirdeye.detection.cache.builder.AnomaliesCacheBuilder;
 import org.apache.pinot.thirdeye.detection.cache.builder.TimeSeriesCacheBuilder;
-import org.apache.pinot.thirdeye.detection.validators.DatasetConfigValidator;
 import org.apache.pinot.thirdeye.detection.validators.DetectionConfigValidator;
-import org.apache.pinot.thirdeye.detection.validators.MetricConfigValidator;
 import org.apache.pinot.thirdeye.detection.yaml.DetectionConfigTuner;
 import org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTranslator;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
@@ -106,8 +105,6 @@ public class AnomalyDetectionResource {
   private final TaskManager taskDAO;
   private final DetectionPipelineLoader loader;
   private final DetectionConfigValidator detectionValidator;
-  private final DatasetConfigValidator datasetConfigValidator;
-  private final MetricConfigValidator metricConfigValidator;
   private final AnomalySearcher anomalySearcher;
   private final ObjectMapper objectMapper;
   private final Yaml yaml;
@@ -139,8 +136,6 @@ public class AnomalyDetectionResource {
         evaluationDAO, timeseriesLoader, aggregationLoader, loader,
         TimeSeriesCacheBuilder.getInstance(), AnomaliesCacheBuilder.getInstance());
     this.detectionValidator = new DetectionConfigValidator(this.provider);
-    this.metricConfigValidator = new MetricConfigValidator();
-    this.datasetConfigValidator = new DatasetConfigValidator();
     this.anomalySearcher = new AnomalySearcher();
     this.yaml = new Yaml();
   }
@@ -198,7 +193,7 @@ public class AnomalyDetectionResource {
       datasetConfigDTO = generateDatasetConfig(payloadNode, nameSuffix);
 
       // Create & save metric along with online data
-      metricConfigDTO = generateMetricConfig(payloadNode, nameSuffix);
+      metricConfigDTO = generateMetricConfig(payloadNode, nameSuffix, datasetConfigDTO);
 
       // Create & save detection
       detectionConfigDTO =
@@ -303,19 +298,9 @@ public class AnomalyDetectionResource {
       return false;
 
     JsonNode columnsNode = dataNode.get(COLUMNS_FIELD);
-    if (!columnsNode.isArray())
-      return false;
+    if (!columnsNode.isArray()) return false;
 
-    boolean hasTimeColumn = false, hasMetricColumn = false;
-    for (JsonNode columnNode : columnsNode) {
-      if (columnNode.textValue().equals(DEFAULT_TIME_COLUMN))
-        hasTimeColumn = true;
-      if (columnNode.textValue().equals(DEFAULT_METRIC_COLUMN))
-        hasMetricColumn = true;
-      if (hasTimeColumn && hasMetricColumn)
-        break;
-    }
-    return hasTimeColumn && hasMetricColumn;
+    return true;
   }
 
   DatasetConfigDTO generateDatasetConfig(JsonNode payloadNode, String suffix) {
@@ -355,15 +340,14 @@ public class AnomalyDetectionResource {
       }
     }
 
-    this.datasetConfigValidator.validateConfig(datasetConfigDTO);
-
     datasetConfigDAO.save(datasetConfigDTO);
     LOG.info("Created dataset with config {}", datasetConfigDTO);
 
     return datasetConfigDTO;
   }
 
-  MetricConfigDTO generateMetricConfig(JsonNode payloadNode, String suffix)
+  MetricConfigDTO generateMetricConfig(JsonNode payloadNode, String suffix,
+        DatasetConfigDTO datasetConfigDTO)
       throws JsonProcessingException {
     MetricConfigDTO metricConfigDTO = new MetricConfigDTO();
     JsonNode dataNode = payloadNode.get(DATA_FIELD);
@@ -383,27 +367,35 @@ public class AnomalyDetectionResource {
       Map<String, Object> metricYaml =
           ConfigUtils.getMap(yaml.load(payloadNode.get(METRIC_FIELD).textValue()));
 
+      // Append suffix to metric name
+      if (metricYaml.containsKey("metricColumn")) {
+        metricConfigDTO.setName(metricYaml.get("metricColumn") + suffix);
+      }
+
       if (metricYaml.containsKey("datatype")) {
         metricConfigDTO
             .setDatatype(MetricType.valueOf((String) metricYaml.get("datatype")));
       }
     }
 
-    // Reformat Metric column name to keep consistency with metric config
+    // Check if time & metric columns exist in adhoc data
     ArrayNode columnsNode = dataNode.withArray(COLUMNS_FIELD);
-    if (columnsNode.isArray()) {
-      int colIdx = 0;
-      for (; colIdx < columnsNode.size(); colIdx++) {
-        if (columnsNode.get(colIdx).textValue().equals(DEFAULT_METRIC_COLUMN)) {
-          break;
-        }
-      }
-      columnsNode.set(colIdx, new TextNode(DEFAULT_METRIC_NAME + suffix));
-    }
+    int[] colIndices = findTimeAndMetricColumns(columnsNode,
+        datasetConfigDTO.getTimeColumn(),
+        metricConfigDTO.getName().replace(suffix, ""));
+    int timeColIdx = colIndices[0];
+    int metricColIdx = colIndices[1];
+
+    Preconditions.checkArgument(metricColIdx>=0 && timeColIdx>=0,
+        String.format("metric: %s or time: %s not found in adhoc data.",
+            metricConfigDTO.getName().replace(suffix, ""),
+            datasetConfigDTO.getTimeColumn()));
+
+    // Append suffix to metric column name to keep consistency with configs
+    columnsNode.set(metricColIdx, new TextNode(metricConfigDTO.getName()));
+
     // TODO: should store online data into a new table
     metricConfigDTO.setOnlineData(this.objectMapper.writeValueAsString(dataNode));
-
-    this.metricConfigValidator.validateConfig(metricConfigDTO);
 
     metricConfigDAO.save(metricConfigDTO);
     LOG.info("Created metric with config {}", metricConfigDTO);
@@ -539,6 +531,22 @@ public class AnomalyDetectionResource {
       LOG.info("Deleted {} anomalies with metric {}",
           anomalyCnt, metricConfigDTO.getName());
     }
+  }
+
+  private int[] findTimeAndMetricColumns(JsonNode node, String timeColName, String metricColName) {
+    int metricColIdx = -1, timeColIdx = -1;
+    if (node.isArray()) {
+      for (int colIdx = 0; colIdx < node.size(); colIdx++) {
+        if (node.get(colIdx).textValue().equals(timeColName)) {
+          timeColIdx = colIdx;
+        }
+
+        if (node.get(colIdx).textValue().equals(metricColName)) {
+          metricColIdx = colIdx;
+        }
+      }
+    }
+    return new int[]{timeColIdx, metricColIdx};
   }
 
   /**
