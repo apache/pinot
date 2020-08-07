@@ -31,6 +31,7 @@ import org.apache.pinot.thirdeye.dashboard.resources.v2.ConfigResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.DataResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.DetectionAlertResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.alerts.AlertResource;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.anomalies.AnomalySearchResource;
 import org.apache.pinot.thirdeye.dataset.DatasetAutoOnboardResource;
 import org.apache.pinot.thirdeye.datasource.sql.resources.SqlDataSourceResource;
 import org.apache.pinot.thirdeye.detection.DetectionResource;
@@ -49,6 +50,7 @@ public class RootResource {
   private final AlertResource alertResource;
   private final AdminResource adminResource;
   private final AnomaliesResource anomaliesResource;
+  private final AnomalySearchResource anomalySearchResource;
   private final ApplicationResource applicationResource;
   private final AutoOnboardResource autoOnboardResource;
   private final CacheResource cacheResource;
@@ -71,6 +73,7 @@ public class RootResource {
       final AlertResource alertResource,
       final AdminResource adminResource,
       final AnomaliesResource anomaliesResource,
+      final AnomalySearchResource anomalySearchResource,
       final ApplicationResource applicationResource,
       final AutoOnboardResource autoOnboardResource,
       final CacheResource cacheResource,
@@ -90,6 +93,7 @@ public class RootResource {
     this.alertResource = alertResource;
     this.adminResource = adminResource;
     this.anomaliesResource = anomaliesResource;
+    this.anomalySearchResource = anomalySearchResource;
     this.applicationResource = applicationResource;
     this.autoOnboardResource = autoOnboardResource;
     this.cacheResource = cacheResource;
@@ -116,6 +120,11 @@ public class RootResource {
   @Path("anomalies")
   public AnomaliesResource getAnomaliesResource() {
     return anomaliesResource;
+  }
+
+  @Path("anomaly-search")
+  public AnomalySearchResource getAnomalySearchResource() {
+    return anomalySearchResource;
   }
 
   @Path("application")
