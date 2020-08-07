@@ -25,10 +25,26 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-public interface ValueBasedDocIdIterator extends ScanBasedDocIdIterator{
+/**
+ * The interface for SV and MV scanning iterator
+ */
+public interface ValueBasedScanDocIdIterator extends ScanBasedDocIdIterator{
+
+  /**
+   * For docId >= bitmapIterator.peekNext()
+   * Return the first docId that presents in both this ValueBasedDocIdIterator and the bitmapIterator
+   * (During this process bitmapIterator.next() will be called until bitmapIterator.peekNext() == return value)
+   */
   int fastAdvance(PeekableIntIterator bitmapIterator);
 
-  static MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds, List<ValueBasedDocIdIterator> valueIters){
+  /**
+   * applyAnd that intersects the [resulting bitmap of intersected indices] and [ALL the SV and MV scan iterators]
+   * Following the same manner as in AndDocIdIterator
+   * @param docIds resulting bitmap of intersected indices
+   * @param valueIters ALL the SV and MV scan iterators in this AND predicate
+   * @return intersected docIds
+   */
+  static MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds, List<ValueBasedScanDocIdIterator> valueIters){
     MutableRoaringBitmap result = new MutableRoaringBitmap();
     PeekableIntIterator docIdIterator = docIds.getIntIterator();
     while (docIdIterator.hasNext()){
