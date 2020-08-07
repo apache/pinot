@@ -331,38 +331,37 @@ public class BrokerRequestToQueryContextConverterTest {
       assertTrue(QueryContextUtils.isAggregationQuery(queryContext));
     }
 
-    // TODO: Uncomment the following part after CalciteSqlParser supports Having clause
     // Having (only supported in SQL format)
-//    {
-//      String sqlQuery = "SELECT SUM(foo), bar FROM testTable GROUP BY bar HAVING SUM(foo) IN (5, 10, 15)";
-//      QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(sqlQuery);
-//      List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
-//      assertEquals(selectExpressions.size(), 2);
-//      assertEquals(selectExpressions.get(0), ExpressionContext.forFunction(
-//          new FunctionContext(FunctionContext.Type.AGGREGATION, "sum",
-//              Collections.singletonList(ExpressionContext.forIdentifier("foo")))));
-//      assertEquals(selectExpressions.get(0).toString(), "sum(foo)");
-//      assertEquals(selectExpressions.get(1), ExpressionContext.forIdentifier("bar"));
-//      assertEquals(selectExpressions.get(1).toString(), "bar");
-//      assertTrue(queryContext.getAliasMap().isEmpty());
-//      assertNull(queryContext.getFilter());
-//      List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
-//      assertNotNull(groupByExpressions);
-//      assertEquals(groupByExpressions.size(), 1);
-//      assertEquals(groupByExpressions.get(0), ExpressionContext.forIdentifier("bar"));
-//      assertEquals(groupByExpressions.get(0).toString(), "bar");
-//      assertNull(queryContext.getOrderByExpressions());
-//      FilterContext havingFilter = queryContext.getHavingFilter();
-//      assertNotNull(havingFilter);
-//      assertEquals(havingFilter, new FilterContext(FilterContext.Type.PREDICATE, null, new InPredicate(ExpressionContext
-//          .forFunction(new FunctionContext(FunctionContext.Type.AGGREGATION, "sum",
-//              Collections.singletonList(ExpressionContext.forIdentifier("foo")))), Arrays.asList("5", "10", "15"))));
-//      assertEquals(havingFilter.toString(), "sum(foo) IN ('5','10','15')");
-//      assertEquals(queryContext.getLimit(), 10);
-//      assertEquals(queryContext.getOffset(), 0);
-//      assertEquals(QueryContextUtils.getAllColumns(queryContext), new HashSet<>(Arrays.asList("foo", "bar")));
-//      assertTrue(QueryContextUtils.isAggregationQuery(queryContext));
-//    }
+    {
+      String sqlQuery = "SELECT SUM(foo), bar FROM testTable GROUP BY bar HAVING SUM(foo) IN (5, 10, 15)";
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(sqlQuery);
+      List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
+      assertEquals(selectExpressions.size(), 2);
+      assertEquals(selectExpressions.get(0), ExpressionContext.forFunction(
+          new FunctionContext(FunctionContext.Type.AGGREGATION, "sum",
+              Collections.singletonList(ExpressionContext.forIdentifier("foo")))));
+      assertEquals(selectExpressions.get(0).toString(), "sum(foo)");
+      assertEquals(selectExpressions.get(1), ExpressionContext.forIdentifier("bar"));
+      assertEquals(selectExpressions.get(1).toString(), "bar");
+      assertTrue(queryContext.getAliasMap().isEmpty());
+      assertNull(queryContext.getFilter());
+      List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
+      assertNotNull(groupByExpressions);
+      assertEquals(groupByExpressions.size(), 1);
+      assertEquals(groupByExpressions.get(0), ExpressionContext.forIdentifier("bar"));
+      assertEquals(groupByExpressions.get(0).toString(), "bar");
+      assertNull(queryContext.getOrderByExpressions());
+      FilterContext havingFilter = queryContext.getHavingFilter();
+      assertNotNull(havingFilter);
+      assertEquals(havingFilter, new FilterContext(FilterContext.Type.PREDICATE, null, new InPredicate(ExpressionContext
+          .forFunction(new FunctionContext(FunctionContext.Type.AGGREGATION, "sum",
+              Collections.singletonList(ExpressionContext.forIdentifier("foo")))), Arrays.asList("5", "10", "15"))));
+      assertEquals(havingFilter.toString(), "sum(foo) IN ('5','10','15')");
+      assertEquals(queryContext.getLimit(), 10);
+      assertEquals(queryContext.getOffset(), 0);
+      assertEquals(QueryContextUtils.getAllColumns(queryContext), new HashSet<>(Arrays.asList("foo", "bar")));
+      assertTrue(QueryContextUtils.isAggregationQuery(queryContext));
+    }
 
     // DistinctCountThetaSketch (string literal and escape quote)
     {
