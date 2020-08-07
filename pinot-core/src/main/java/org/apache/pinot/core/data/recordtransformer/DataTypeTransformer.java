@@ -84,7 +84,7 @@ public class DataTypeTransformer implements RecordTransformer {
         continue;
       }
       PinotDataType dest = entry.getValue();
-      value = standardize(column, value, dest.isSingleValue());
+      value = standardize(record, column, value, dest.isSingleValue());
       // NOTE: The standardized value could be null for empty Collection/Map/Object[].
       if (value == null) {
         record.putValue(column, null);
@@ -126,15 +126,19 @@ public class DataTypeTransformer implements RecordTransformer {
    */
   @VisibleForTesting
   @Nullable
-  static Object standardize(String column, @Nullable Object value, boolean isSingleValue) {
+  static Object standardize(GenericRow record, String column, @Nullable Object value, boolean isSingleValue) {
     if (value == null) {
       return null;
     }
     if (value instanceof Collection) {
-      return standardizeCollection(column, (Collection) value, isSingleValue);
+      return standardizeCollection(record, column, (Collection) value, isSingleValue);
     }
     if (value instanceof Map) {
-      return standardizeCollection(column, ((Map) value).values(), isSingleValue);
+      Collection values = ((Map) value).values();
+      if (values.size() == 1) {
+        record.putValue(GenericRow.CONVERT_MAP_VALUE_TO_ARRAY_VALUE_KEY, Boolean.TRUE.toString());
+      }
+      return standardizeCollection(record, column, values, isSingleValue);
     }
     if (value instanceof Object[]) {
       Object[] values = (Object[]) value;
@@ -143,11 +147,11 @@ public class DataTypeTransformer implements RecordTransformer {
         return null;
       }
       if (numValues == 1) {
-        return standardize(column, values[0], isSingleValue);
+        return standardize(record, column, values[0], isSingleValue);
       }
       List<Object> standardizedValues = new ArrayList<>(numValues);
       for (Object singleValue : values) {
-        Object standardizedValue = standardize(column, singleValue, true);
+        Object standardizedValue = standardize(record, column, singleValue, true);
         if (standardizedValue != null) {
           standardizedValues.add(standardizedValue);
         }
@@ -166,17 +170,17 @@ public class DataTypeTransformer implements RecordTransformer {
     return value;
   }
 
-  private static Object standardizeCollection(String column, Collection collection, boolean isSingleValue) {
+  private static Object standardizeCollection(GenericRow record, String column, Collection collection, boolean isSingleValue) {
     int numValues = collection.size();
     if (numValues == 0) {
       return null;
     }
     if (numValues == 1) {
-      return standardize(column, collection.iterator().next(), isSingleValue);
+      return standardize(record, column, collection.iterator().next(), isSingleValue);
     }
     List<Object> standardizedValues = new ArrayList<>(numValues);
     for (Object singleValue : collection) {
-      Object standardizedValue = standardize(column, singleValue, true);
+      Object standardizedValue = standardize(record, column, singleValue, true);
       if (standardizedValue != null) {
         standardizedValues.add(standardizedValue);
       }

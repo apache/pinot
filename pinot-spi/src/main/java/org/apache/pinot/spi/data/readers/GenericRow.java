@@ -61,6 +61,12 @@ public class GenericRow {
    */
   public static final String SKIP_RECORD_KEY = "$SKIP_RECORD_KEY$";
 
+  /**
+   * This key is used to identify whether a map with only 1 entry is converted to a value of a array for multi-value column.
+   * This is necessary for us to identify whether there is any existing use case that is leveraging this way to fetch values.
+   */
+  public static final String CONVERT_MAP_VALUE_TO_ARRAY_VALUE_KEY = "$CONVERT_MAP_VALUE_TO_ARRAY_VALUE_KEY$";
+
   private final Map<String, Object> _fieldToValueMap = new HashMap<>();
   private final Set<String> _nullValueFields = new HashSet<>();
 

@@ -28,6 +28,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
@@ -154,10 +155,16 @@ public class SegmentFetcherAndLoader {
 
         // Retry will be done here.
         String localSegmentDir = downloadSegmentToLocal(uri, crypter, tableNameWithType, segmentName);
-        SegmentMetadata segmentMetadata = new SegmentMetadataImpl(new File(localSegmentDir));
+        SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(new File(localSegmentDir));
         _instanceDataManager.addOfflineSegment(tableNameWithType, segmentName, new File(localSegmentDir));
         LOGGER.info("Downloaded segment {} of table {} crc {} from controller", segmentName, tableNameWithType,
             segmentMetadata.getCrc());
+
+        // Emit server metric if the generated values of the segment are converted from map to array.
+        if (segmentMetadata.areValuesConvertedFromMapToArray()) {
+          _serverMetrics
+              .setValueOfTableGauge(tableNameWithType, ServerGauge.SEGMENT_VALUES_CONVERTED_FROM_MAP_TO_ARRAY, 1L);
+        }
       } else {
         LOGGER.info("Got already loaded segment {} of table {} crc {} again, will do nothing.", segmentName,
             tableNameWithType, localSegmentMetadata.getCrc());

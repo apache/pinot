@@ -18,20 +18,6 @@
  */
 package org.apache.pinot.core.segment.index.metadata;
 
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.DATETIME_COLUMNS;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.DIMENSIONS;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.METRICS;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_CREATOR_VERSION;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_NAME;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_PADDING_CHARACTER;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_VERSION;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.TABLE_NAME;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.TIME_COLUMN_NAME;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.TIME_UNIT;
-
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -75,6 +61,8 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 
+import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.*;
+
 
 public class SegmentMetadataImpl implements SegmentMetadata {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMetadataImpl.class);
@@ -104,6 +92,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private int _totalDocs;
   private long _segmentStartTime;
   private long _segmentEndTime;
+  private boolean _valuesConvertedFromMapToArray;
 
   /**
    * For segments on disk.
@@ -165,7 +154,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   public static PropertiesConfiguration getPropertiesConfiguration(File indexDir) {
     File metadataFile = SegmentDirectoryPaths.findMetadataFile(indexDir);
     Preconditions.checkNotNull(metadataFile, "Cannot find segment metadata file under directory: %s", indexDir);
-    
+
     return CommonsConfigurationUtils.fromFile(metadataFile);
   }
 
@@ -262,6 +251,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         _starTreeV2MetadataList.add(new StarTreeV2Metadata(
             segmentMetadataPropertiesConfiguration.subset(StarTreeV2Constants.MetadataKey.getStarTreePrefix(i))));
       }
+    }
+
+    if (segmentMetadataPropertiesConfiguration.containsKey(SEGMENT_CONVERT_MAP_VALUE_TO_ARRAY_VALUE)) {
+      _valuesConvertedFromMapToArray =
+          segmentMetadataPropertiesConfiguration.getBoolean(SEGMENT_CONVERT_MAP_VALUE_TO_ARRAY_VALUE);
     }
   }
 
@@ -487,6 +481,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Override
   public char getPaddingCharacter() {
     return _paddingCharacter;
+  }
+
+  public boolean areValuesConvertedFromMapToArray() {
+    return _valuesConvertedFromMapToArray;
   }
 
   /**

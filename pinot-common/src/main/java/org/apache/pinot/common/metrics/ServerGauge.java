@@ -40,7 +40,8 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   LAST_REALTIME_SEGMENT_COMPLETION_DURATION_SECONDS("seconds", false),
   REALTIME_OFFHEAP_MEMORY_USED("bytes", false),
   REALTIME_SEGMENT_NUM_PARTITIONS("realtimeSegmentNumPartitions", false),
-  LLC_SIMULTANEOUS_SEGMENT_BUILDS("llcSimultaneousSegmentBuilds", true);
+  LLC_SIMULTANEOUS_SEGMENT_BUILDS("llcSimultaneousSegmentBuilds", true),
+  SEGMENT_VALUES_CONVERTED_FROM_MAP_TO_ARRAY("segments", false);
 
   private final String gaugeName;
   private final String unit;

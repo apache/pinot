@@ -91,6 +91,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private int totalDocs;
   private int docIdCounter;
   private boolean _nullHandlingEnabled;
+  private boolean _convertMapToArray;
 
   private final Set<String> _textIndexColumns = new HashSet<>();
 
@@ -217,6 +218,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         // Initialize Null value vector map
         _nullValueVectorCreatorMap.put(columnName, new NullValueVectorCreator(_indexDir, columnName));
       }
+      _convertMapToArray = false;
     }
   }
 
@@ -304,6 +306,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   @Override
   public void indexRow(GenericRow row) {
+    _convertMapToArray |= Boolean.parseBoolean((String) row.getValue(GenericRow.CONVERT_MAP_VALUE_TO_ARRAY_VALUE_KEY));
     for (Map.Entry<String, ForwardIndexCreator> entry : _forwardIndexCreatorMap.entrySet()) {
       String columnName = entry.getKey();
       ForwardIndexCreator forwardIndexCreator = entry.getValue();
@@ -414,6 +417,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     String timeColumnName = config.getTimeColumnName();
     properties.setProperty(TIME_COLUMN_NAME, timeColumnName);
     properties.setProperty(SEGMENT_TOTAL_DOCS, String.valueOf(totalDocs));
+    properties.setProperty(SEGMENT_CONVERT_MAP_VALUE_TO_ARRAY_VALUE, _convertMapToArray);
 
     // Write time related metadata (start time, end time, time unit)
     if (timeColumnName != null) {
