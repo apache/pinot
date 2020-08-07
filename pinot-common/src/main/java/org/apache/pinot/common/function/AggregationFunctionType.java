@@ -18,6 +18,12 @@
  */
 package org.apache.pinot.common.function;
 
+import org.apache.commons.lang3.StringUtils;
+
+
+/**
+ * NOTE: No underscore is allowed in the enum name.
+ */
 public enum AggregationFunctionType {
   // Aggregation functions for single-valued columns
   COUNT("count"),
@@ -38,8 +44,8 @@ public enum AggregationFunctionType {
   PERCENTILEEST("percentileEst"),
   PERCENTILETDIGEST("percentileTDigest"),
 
-  // geo aggregation functions
-  ST_UNION("ST_Union"),
+  // Geo aggregation functions
+  STUNION("STUnion"),
 
   // Aggregation functions for multi-valued columns
   COUNTMV("countMV"),
@@ -78,9 +84,10 @@ public enum AggregationFunctionType {
 
   /**
    * Returns the corresponding aggregation function type for the given function name.
+   * <p>NOTE: Underscores in the function name are ignored.
    */
   public static AggregationFunctionType getAggregationFunctionType(String functionName) {
-    String upperCaseFunctionName = functionName.toUpperCase();
+    String upperCaseFunctionName = StringUtils.remove(functionName, '_').toUpperCase();
     if (upperCaseFunctionName.startsWith("PERCENTILE")) {
       String remainingFunctionName = upperCaseFunctionName.substring(10);
       if (remainingFunctionName.isEmpty() || remainingFunctionName.matches("\\d+")) {
