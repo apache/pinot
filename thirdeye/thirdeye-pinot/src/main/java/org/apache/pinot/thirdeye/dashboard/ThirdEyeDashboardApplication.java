@@ -44,6 +44,7 @@ import org.apache.pinot.thirdeye.common.ThirdEyeSwaggerBundle;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.dashboard.configs.ResourceConfiguration;
 import org.apache.pinot.thirdeye.dashboard.resources.AnomalyResource;
+import org.apache.pinot.thirdeye.dashboard.resources.DashboardResource;
 import org.apache.pinot.thirdeye.dashboard.resources.RootResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.AuthResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.RootCauseMetricResource;
@@ -115,6 +116,7 @@ public class ThirdEyeDashboardApplication
     injector = Guice.createInjector(new ThirdEyeDashboardModule(config, env, DAO_REGISTRY));
     Stream.of(
         AnomalyResource.class,
+        DashboardResource.class,
         RootCauseMetricResource.class,
         RootCauseSessionResource.class,
         RootCauseTemplateResource.class,

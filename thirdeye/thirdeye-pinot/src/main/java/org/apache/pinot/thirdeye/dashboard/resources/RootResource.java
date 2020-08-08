@@ -56,7 +56,6 @@ public class RootResource {
   private final CacheResource cacheResource;
   private final ConfigResource configResource;
   private final CustomizedEventResource customizedEventResource;
-  private final DashboardResource dashboardResource;
   private final DataResource dataResource;
   private final DatasetAutoOnboardResource datasetAutoOnboardResource;
   private final DetectionResource detectionResource;
@@ -79,7 +78,6 @@ public class RootResource {
       final CacheResource cacheResource,
       final ConfigResource configResource,
       final CustomizedEventResource customizedEventResource,
-      final DashboardResource dashboardResource,
       final DataResource dataResource,
       final DatasetAutoOnboardResource datasetAutoOnboardResource,
       final DetectionResource detectionResource,
@@ -99,7 +97,6 @@ public class RootResource {
     this.cacheResource = cacheResource;
     this.configResource = configResource;
     this.customizedEventResource = customizedEventResource;
-    this.dashboardResource = dashboardResource;
     this.dataResource = dataResource;
     this.datasetAutoOnboardResource = datasetAutoOnboardResource;
     this.detectionResource = detectionResource;
@@ -111,6 +108,7 @@ public class RootResource {
     this.userDashboardResource = userDashboardResource;
     this.yamlResource = yamlResource;
   }
+
 
   @Path("alerts")
   public AlertResource getAlertResource() {
@@ -150,11 +148,6 @@ public class RootResource {
   @Path("config")
   public ConfigResource getConfigResource() {
     return configResource;
-  }
-
-  @Path("dashboard")
-  public DashboardResource getDashboardResource() {
-    return dashboardResource;
   }
 
   @Path("data")
