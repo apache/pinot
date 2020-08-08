@@ -54,7 +54,11 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 public final class AndDocIdSet implements FilterBlockDocIdSet {
   private final List<FilterBlockDocIdSet> _docIdSets;
   private final int _numDocs;
+
+  // If the number of bits set in docIds is at the same order of magnitude as _numDocs, use the fast scanning
+  // during applyAnd, this will potentially skip consecutive zeros
   private final static float FAST_SCANNING_MIN_THRESHOLD = 0.1f;
+
 
   public AndDocIdSet(List<FilterBlockDocIdSet> docIdSets, int numDocs) {
     _docIdSets = docIdSets;
