@@ -164,7 +164,7 @@ public class SegmentLineageCleanupTest extends ControllerTest {
     Assert.assertTrue(Collections.disjoint(segmentsForTable, Arrays.asList("merged_1", "merged_2")));
     segmentLineage =
         SegmentLineageAccessHelper.getSegmentLineage(_helixResourceManager.getPropertyStore(), OFFLINE_TABLE_NAME);
-    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 0);
+    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 1);
   }
 
   private void waitForSegmentsToDelete(String tableNameWithType, int expectedNumSegmentsAfterDelete)
