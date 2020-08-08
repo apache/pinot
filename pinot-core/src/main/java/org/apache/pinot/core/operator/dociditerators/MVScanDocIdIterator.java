@@ -33,7 +33,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  * matching document ids.
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-public final class MVScanDocIdIterator implements ValueBasedScanDocIdIterator {
+public final class MVScanDocIdIterator implements ValueScanDocIdIterator {
   private final PredicateEvaluator _predicateEvaluator;
   private final ForwardIndexReader _reader;
   // TODO: Figure out a way to close the reader context

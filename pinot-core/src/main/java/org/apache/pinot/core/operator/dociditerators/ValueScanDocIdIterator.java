@@ -28,7 +28,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 /**
  * The interface for SV and MV scanning iterator
  */
-public interface ValueBasedScanDocIdIterator extends ScanBasedDocIdIterator{
+public interface ValueScanDocIdIterator extends ScanBasedDocIdIterator{
 
   /**
    * For docId >= bitmapIterator.peekNext()
@@ -44,7 +44,7 @@ public interface ValueBasedScanDocIdIterator extends ScanBasedDocIdIterator{
    * @param valueIters ALL the SV and MV scan iterators in this AND predicate
    * @return intersected docIds
    */
-  static MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds, List<ValueBasedScanDocIdIterator> valueIters){
+  static MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds, List<ValueScanDocIdIterator> valueIters){
     MutableRoaringBitmap result = new MutableRoaringBitmap();
     PeekableIntIterator docIdIterator = docIds.getIntIterator();
     while (docIdIterator.hasNext()){
