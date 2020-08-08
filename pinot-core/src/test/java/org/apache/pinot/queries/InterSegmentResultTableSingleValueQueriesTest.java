@@ -73,7 +73,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows = new ArrayList<>();
     rows.add(new Object[]{24516L});
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 0L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 0L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
     // group by
@@ -129,7 +129,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows = new ArrayList<>();
     rows.add(new Object[]{2146952047.0, 999813884.0});
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 49032L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
     query = "select max(column1) from testTable";
@@ -175,7 +175,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows = new ArrayList<>();
     rows.add(new Object[]{101116473.0, 20396372.0});
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 49032L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
     query = "SELECT MIN(column3) FROM testTable";
@@ -220,7 +220,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows = new ArrayList<>();
     rows.add(new Object[]{27503790384288.0, 12429178874916.0});
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 49032L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
     query = "SELECT SUM(column3) FROM testTable";
@@ -265,7 +265,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows = new ArrayList<>();
     rows.add(new Object[]{1121871038.680372, 506982332.9627998});
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 49032L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
     query = "select avg(column3) from testTable";
@@ -310,7 +310,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows = new ArrayList<>();
     rows.add(new Object[]{2045835574.0, 979417512.0});
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 49032L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
     query = "SELECT MINMAXRANGE(column1) FROM testTable";
@@ -356,7 +356,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows = new ArrayList<>();
     rows.add(new Object[]{1872, 4556});
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 49032L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
     query = "SELECT DISTINCTCOUNT(column3) FROM testTable";
@@ -401,7 +401,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows = new ArrayList<>();
     rows.add(new Object[]{1886L, 4492L});
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 49032L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
     query = "SELECT DISTINCTCOUNTHLL(column1) FROM testTable";
@@ -606,7 +606,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
       rows = new ArrayList<>();
       rows.add(new Object[]{1139674505.0, 505053732.0});
       QueriesTestUtils
-          .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
+          .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 49032L, 120000L, rows, expectedResultsSize,
               dataSchema);
 
       query = "SELECT PERCENTILE50(column3) FROM testTable";
@@ -652,7 +652,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows = new ArrayList<>();
     rows.add(new Object[]{1936730975.0, 899534534.0});
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 49032L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
     query = "SELECT PERCENTILE90(column3) FROM testTable";
@@ -697,7 +697,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows = new ArrayList<>();
     rows.add(new Object[]{2096857943.0, 947763150.0});
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 49032L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
     query = "SELECT PERCENTILE95(column3) FROM testTable";
@@ -742,7 +742,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows = new ArrayList<>();
     rows.add(new Object[]{2146232405.0, 990669195.0});
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 49032L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
     query = "SELECT PERCENTILE99(column3) FROM testTable";
@@ -787,7 +787,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows = new ArrayList<>();
     rows.add(new Object[]{1139674505L, 509607935L});
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 49032L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
     query = "SELECT PERCENTILEEST50(column3) FROM testTable";
@@ -832,7 +832,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows = new ArrayList<>();
     rows.add(new Object[]{1939865599L, 902299647L});
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 49032L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
     query = "SELECT PERCENTILEEST90(column3) FROM testTable";
@@ -877,7 +877,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows = new ArrayList<>();
     rows.add(new Object[]{2109734911L, 950009855L});
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 49032L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
     query = "SELECT PERCENTILEEST95(column3) FROM testTable";
@@ -922,7 +922,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows = new ArrayList<>();
     rows.add(new Object[]{2146232405L, 991952895L});
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 49032L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
     query = "SELECT PERCENTILEEST99(column3) FROM testTable";

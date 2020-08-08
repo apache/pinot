@@ -118,7 +118,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     aggregationOperator = getOperatorForPqlQueryWithFilter(BASE_QUERY);
     resultsBlock = aggregationOperator.nextBlock();
     executionStatistics = aggregationOperator.getExecutionStatistics();
-    QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 6129L, 84134L, 12258L, 30000L);
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 6129L, 80150L, 12258L, 30000L);
     aggregationResult = resultsBlock.getAggregationResult();
     Assert.assertEquals(((HyperLogLog) aggregationResult.get(0)).cardinality(), 17L);
     Assert.assertEquals(((HyperLogLog) aggregationResult.get(1)).cardinality(), 1197L);
