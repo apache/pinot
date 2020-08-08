@@ -23,6 +23,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.tier.TierFactory.TierSegmentSelectorType;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
@@ -31,6 +32,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
  * A {@link TierSegmentSelector} strategy which selects segments for a tier based on the age of the segment
  */
 public class TimeBasedTierSegmentSelector implements TierSegmentSelector {
+  private final String _type = TierSegmentSelectorType.TIME.toString();
   private final long _segmentAgeMillis;
   private final HelixManager _helixManager;
 
@@ -41,7 +43,7 @@ public class TimeBasedTierSegmentSelector implements TierSegmentSelector {
 
   @Override
   public String getType() {
-    return TierFactory.TIME_BASED_SEGMENT_SELECTOR_TYPE;
+    return _type;
   }
 
   /**

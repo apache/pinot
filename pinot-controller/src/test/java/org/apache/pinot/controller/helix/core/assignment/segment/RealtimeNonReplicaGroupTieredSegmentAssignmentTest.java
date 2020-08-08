@@ -29,7 +29,8 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.tier.PinotServerTierStorage;
 import org.apache.pinot.common.tier.Tier;
-import org.apache.pinot.common.tier.TierFactory;
+import org.apache.pinot.common.tier.TierFactory.TierSegmentSelectorType;
+import org.apache.pinot.common.tier.TierFactory.TierStorageType;
 import org.apache.pinot.common.tier.TierSegmentSelector;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -110,12 +111,12 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
     }
 
     List<TierConfig> tierConfigList = Lists.newArrayList(
-        new TierConfig(TIER_A_NAME, TierFactory.TIME_BASED_SEGMENT_SELECTOR_TYPE, "10d",
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_A_NAME),
-        new TierConfig(TIER_B_NAME, TierFactory.TIME_BASED_SEGMENT_SELECTOR_TYPE, "20d",
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_B_NAME),
-        new TierConfig(TIER_C_NAME, TierFactory.TIME_BASED_SEGMENT_SELECTOR_TYPE, "30d",
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_C_NAME));
+        new TierConfig(TIER_A_NAME, TierSegmentSelectorType.TIME.toString(), "10d",
+            TierStorageType.PINOT_SERVER.toString(), TAG_A_NAME),
+        new TierConfig(TIER_B_NAME, TierSegmentSelectorType.TIME.toString(), "20d",
+            TierStorageType.PINOT_SERVER.toString(), TAG_B_NAME),
+        new TierConfig(TIER_C_NAME, TierSegmentSelectorType.TIME.toString(), "30d",
+            TierStorageType.PINOT_SERVER.toString(), TAG_C_NAME));
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
             .setTierConfigList(tierConfigList).setLLC(true).build();

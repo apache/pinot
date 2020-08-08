@@ -24,7 +24,7 @@ package org.apache.pinot.common.tier;
 public interface TierSegmentSelector {
 
   /**
-   * The type of the segment selector (e.g. timeBased)
+   * The type of the segment selector (e.g. TIME)
    */
   String getType();
 

@@ -24,7 +24,7 @@ package org.apache.pinot.common.tier;
 public interface TierStorage {
 
   /**
-   * Returns the type of the storage (e.g. pinotServer)
+   * Returns the type of the storage (e.g. PINOT_SERVER)
    */
   String getType();
 }

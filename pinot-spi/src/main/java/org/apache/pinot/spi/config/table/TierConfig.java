@@ -35,13 +35,13 @@ public class TierConfig extends BaseJsonConfig {
   @JsonPropertyDescription("The strategy for selecting segments")
   private final String _segmentSelectorType;
 
-  @JsonPropertyDescription("For 'timeBased' segment selector, the period after which to select segments for this tier")
+  @JsonPropertyDescription("For 'TIME' segment selector, the period after which to select segments for this tier")
   private final String _segmentAge;
 
   @JsonPropertyDescription("The type of storage storage")
   private final String _storageType;
 
-  @JsonPropertyDescription("For 'pinotServer' storageSelector, the tag with which to identify servers for this tier.")
+  @JsonPropertyDescription("For 'PINOT_SERVER' storageSelector, the tag with which to identify servers for this tier.")
   private final String _serverTag;
 
   // TODO: only "serverTag" is supported currently. In next iteration, "InstanceAssignmentConfig _instanceAssignmentConfig" will be added here
@@ -81,5 +81,4 @@ public class TierConfig extends BaseJsonConfig {
   public String getServerTag() {
     return _serverTag;
   }
-
 }

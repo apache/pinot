@@ -26,6 +26,7 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
+import org.apache.pinot.common.tier.TierFactory.TierSegmentSelectorType;
 import org.apache.pinot.common.tier.TierSegmentSelector;
 import org.apache.pinot.common.tier.TierStorage;
 import org.apache.pinot.common.tier.TimeBasedTierSegmentSelector;
@@ -49,13 +50,13 @@ public final class TierConfigUtils {
   }
 
   /**
-   * Gets tiers for given storage type from provided list of TierConfig
+   * Gets sorted list of tiers for given storage type from provided list of TierConfig
    */
   public static List<Tier> getSortedTiersForStorageType(List<TierConfig> tierConfigList, String storageType,
       HelixManager helixManager) {
     List<Tier> sortedTiers = new ArrayList<>();
     for (TierConfig tierConfig : tierConfigList) {
-      if (storageType.equals(tierConfig.getStorageType())) {
+      if (storageType.equalsIgnoreCase(tierConfig.getStorageType())) {
         sortedTiers.add(TierFactory.getTier(tierConfig, helixManager));
       }
     }
@@ -73,9 +74,9 @@ public final class TierConfigUtils {
     return (o1, o2) -> {
       TierSegmentSelector s1 = o1.getSegmentSelector();
       TierSegmentSelector s2 = o2.getSegmentSelector();
-      Preconditions.checkState(TierFactory.TIME_BASED_SEGMENT_SELECTOR_TYPE.equals(s1.getType()),
+      Preconditions.checkState(TierSegmentSelectorType.TIME.toString().equalsIgnoreCase(s1.getType()),
           "Unsupported segmentSelectorType class %s", s1.getClass());
-      Preconditions.checkState(TierFactory.TIME_BASED_SEGMENT_SELECTOR_TYPE.equals(s2.getType()),
+      Preconditions.checkState(TierSegmentSelectorType.TIME.toString().equalsIgnoreCase(s2.getType()),
           "Unsupported segmentSelectorType class %s", s2.getClass());
       Long period1 = ((TimeBasedTierSegmentSelector) s1).getSegmentAgeMillis();
       Long period2 = ((TimeBasedTierSegmentSelector) s2).getSegmentAgeMillis();

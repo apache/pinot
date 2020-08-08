@@ -27,7 +27,8 @@ import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
-import org.apache.pinot.common.tier.TierFactory;
+import org.apache.pinot.common.tier.TierFactory.TierSegmentSelectorType;
+import org.apache.pinot.common.tier.TierFactory.TierStorageType;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
@@ -374,10 +375,10 @@ public class TableRebalancerClusterTest extends ControllerTest {
 
     // add tier config
     tableConfig.setTierConfigsList(Lists.newArrayList(
-        new TierConfig(TIER_A_NAME, TierFactory.TIME_BASED_SEGMENT_SELECTOR_TYPE, "7d",
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, TIER_A_NAME + "_OFFLINE"),
-        new TierConfig(TIER_B_NAME, TierFactory.TIME_BASED_SEGMENT_SELECTOR_TYPE, "15d",
-            TierFactory.PINOT_SERVER_STORAGE_TYPE,  TIER_B_NAME + "_OFFLINE")));
+        new TierConfig(TIER_A_NAME, TierSegmentSelectorType.TIME.toString(), "7d",
+            TierStorageType.PINOT_SERVER.toString(), TIER_A_NAME + "_OFFLINE"),
+        new TierConfig(TIER_B_NAME, TierSegmentSelectorType.TIME.toString(), "15d",
+            TierStorageType.PINOT_SERVER.toString(),  TIER_B_NAME + "_OFFLINE")));
     _helixResourceManager.updateTableConfig(tableConfig);
 
     // rebalance should change assignment
