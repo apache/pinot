@@ -28,7 +28,7 @@ jdk_version() {
     then
       ver=$(echo $line | sed -e 's/.*version "\(.*\)"\(.*\)/\1/; 1q')
       # on macOS, sed doesn't support '?'
-      if [ $ver = "1."* ]
+      if case $ver in "1."*) true;; *) false;; esac;
       then
         result=$(echo $ver | sed -e 's/1\.\([0-9]*\)\(.*\)/\1/; 1q')
       else
