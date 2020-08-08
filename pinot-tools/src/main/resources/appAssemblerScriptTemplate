@@ -19,29 +19,24 @@
 #
 
 jdk_version() {
-  local result
-  local java_cmd='java'
-  local IFS=$'\n'
+  IFS='
+'
   # remove \r for Cygwin
-  local lines=$("$java_cmd" -Xms32M -Xmx32M -version 2>&1 | tr '\r' '\n')
-  if [[ -z $java_cmd ]]
-  then
-    result=no_java
-  else
-    for line in $lines; do
-      if test -z $result && echo "$line" | grep -q 'version "'
+  lines=$(java -Xms32M -Xmx32M -version 2>&1 | tr '\r' '\n')
+  for line in $lines; do
+    if test -z $result && echo "$line" | grep -q 'version "'
+    then
+      ver=$(echo $line | sed -e 's/.*version "\(.*\)"\(.*\)/\1/; 1q')
+      # on macOS, sed doesn't support '?'
+      if [ $ver = "1."* ]
       then
-        local ver=$(echo $line | sed -e 's/.*version "\(.*\)"\(.*\)/\1/; 1q')
-        # on macOS, sed doesn't support '?'
-        if [[ $ver = "1."* ]]
-        then
-          result=$(echo $ver | sed -e 's/1\.\([0-9]*\)\(.*\)/\1/; 1q')
-        else
-          result=$(echo $ver | sed -e 's/\([0-9]*\)\(.*\)/\1/; 1q')
-        fi
+        result=$(echo $ver | sed -e 's/1\.\([0-9]*\)\(.*\)/\1/; 1q')
+      else
+        result=$(echo $ver | sed -e 's/\([0-9]*\)\(.*\)/\1/; 1q')
       fi
-    done
-  fi
+    fi
+  done
+  unset IFS
   echo "$result"
 }
 
@@ -138,7 +133,7 @@ fi
 JAVA_VER="$(jdk_version)"
 
 # For java 9 and later version, we need to explicitly set Pinot Plugins directory into classpath.
-if [[ "$JAVA_VER" -gt 8 ]] ; then
+if [ "$JAVA_VER" -gt 8 ] ; then
   # Set $PLUGINS_CLASSPATH for plugin jars to be put into classpath.
   # $PLUGINS_DIR and $PLUGINS_INCLUDE are used if $PLUGINS_CLASSPATH is not set.
   # $PLUGINS_DIR is the root directory of plugins directory, default to '"$BASEDIR"/plugins' if not set.
@@ -147,7 +142,7 @@ if [[ "$JAVA_VER" -gt 8 ]] ; then
     if [ -z "$PLUGINS_DIR" ] ; then
       PLUGINS_DIR="$BASEDIR"/plugins
     fi
-    if [[ -d "$PLUGINS_DIR" ]] ; then
+    if [ -d "$PLUGINS_DIR" ] ; then
       if [ -n "$PLUGINS_INCLUDE" ] ; then
         IFS=';' echo "$PLUGINS_INCLUDE" | read -ra PLUGINS_ARR
         for PLUGIN_JAR in "${PLUGINS_ARR[@]}"; do
@@ -189,7 +184,7 @@ if [ -z "$JAVA_OPTS" ] ; then
   ALL_JAVA_OPTS="@EXTRA_JVM_ARGUMENTS@"
 
   # For java 8, we set jvm system property `plugins.dir` to load Pinot plugins
-  if [[ "$JAVA_VER" -eq 8 ]] ; then
+  if [ "$JAVA_VER" -eq 8 ] ; then
     ALL_JAVA_OPTS="$ALL_JAVA_OPTS -Dplugins.dir=$BASEDIR/plugins"
   fi
 else
@@ -197,7 +192,7 @@ else
 fi
 
 # For java 9 and later, we need to set extra java options to access JDK’s internal APIs.
-if [[ "$JAVA_VER" -gt 8 ]] ; then
+if [ "$JAVA_VER" -gt 8 ] ; then
   ALL_JAVA_OPTS="--add-exports java.base/jdk.internal.ref=ALL-UNNAMED $ALL_JAVA_OPTS"
 fi
 
