@@ -139,7 +139,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
         .testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 240000L, 120000L, new String[]{"21", "1762"});
     // Test inter segments query with filter
     brokerResponse = getBrokerResponseForPqlQueryWithFilter(BASE_QUERY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 320600L, 49032L, 120000L,
         new String[]{"17", "1197"});
     // Test inter segments query with group-by
     brokerResponse = getBrokerResponseForPqlQuery(BASE_QUERY + GROUP_BY);

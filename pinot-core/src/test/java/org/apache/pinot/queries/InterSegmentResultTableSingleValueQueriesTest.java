@@ -92,7 +92,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows = new ArrayList<>();
     rows.add(new Object[]{"296467636", 17080L});
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 24516L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 24516L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
     // empty results
@@ -147,7 +147,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows = new ArrayList<>();
     rows.add(new Object[]{"296467636", 2146952047.0});
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 49032L, 120000L, rows, expectedResultsSize,
             dataSchema);
   }
 
@@ -193,7 +193,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows = new ArrayList<>();
     rows.add(new Object[]{"296467636", 20396372.0});
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 49032L, 120000L, rows, expectedResultsSize,
             dataSchema);
   }
 
@@ -238,7 +238,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows = new ArrayList<>();
     rows.add(new Object[]{"296467636", 8606725456500.0});
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 49032L, 120000L, rows, expectedResultsSize,
             dataSchema);
   }
 
@@ -283,7 +283,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows = new ArrayList<>();
     rows.add(new Object[]{"438926263", 999309554.0});
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 49032L, 120000L, rows, expectedResultsSize,
             dataSchema);
   }
 
@@ -328,7 +328,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows = new ArrayList<>();
     rows.add(new Object[]{"296467636", 2044094181.0});
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 49032L, 120000L, rows, expectedResultsSize,
             dataSchema);
   }
 
@@ -374,7 +374,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows = new ArrayList<>();
     rows.add(new Object[]{"296467636", 3289});
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 49032L, 120000, rows, expectedResultsSize,
             dataSchema);
   }
 
@@ -419,7 +419,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows = new ArrayList<>();
     rows.add(new Object[]{"296467636", 1324L});
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 49032L, 120000L, rows, expectedResultsSize,
             dataSchema);
   }
 
@@ -624,7 +624,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
       rows = new ArrayList<>();
       rows.add(new Object[]{"438926263", 999309554.0});
       QueriesTestUtils
-          .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
+          .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 49032L, 120000L, rows, expectedResultsSize,
               dataSchema);
     }
   }
@@ -670,7 +670,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows = new ArrayList<>();
     rows.add(new Object[]{"438926263", 999309554.0});
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 49032L, 120000L, rows, expectedResultsSize,
             dataSchema);
   }
 
@@ -715,7 +715,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows = new ArrayList<>();
     rows.add(new Object[]{"438926263", 999309554.0});
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 49032L, 120000L, rows, expectedResultsSize,
             dataSchema);
   }
 
@@ -760,7 +760,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows = new ArrayList<>();
     rows.add(new Object[]{"438926263", 999309554.0});
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 49032L, 120000L, rows, expectedResultsSize,
             dataSchema);
   }
 
@@ -805,7 +805,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows = new ArrayList<>();
     rows.add(new Object[]{"438926263", 999309554L});
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 49032L, 120000L, rows, expectedResultsSize,
             dataSchema);
   }
 
@@ -850,7 +850,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows = new ArrayList<>();
     rows.add(new Object[]{"438926263", 999309554L});
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 49032L, 120000L, rows, expectedResultsSize,
             dataSchema);
   }
 
@@ -895,7 +895,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows = new ArrayList<>();
     rows.add(new Object[]{"438926263", 999309554L});
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 49032L, 120000L, rows, expectedResultsSize,
             dataSchema);
   }
 
@@ -940,7 +940,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows = new ArrayList<>();
     rows.add(new Object[]{"438926263", 999309554L});
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 24516L, 320600L, 49032L, 120000L, rows, expectedResultsSize,
             dataSchema);
   }
 
