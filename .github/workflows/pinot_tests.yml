@@ -22,6 +22,8 @@ name: Pinot Tests
 on:
   pull_request:
     branches: [ master ]
+  schedule:
+    - cron: "0 19 * * *"
 
 jobs:
   unit-test:
@@ -70,3 +72,19 @@ jobs:
           java-version: ${{ matrix.java }}
       - name: Quickstart on JDK ${{ matrix.java }}
         run: .github/workflows/scripts/.pinot_quickstart.sh
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [unit-test, integration-test, quickstarts]
+    steps:
+      - uses: actions/checkout@v2
+      - name: deploy
+        uses: actions/setup-java@v1
+        with:
+          java-version: 1.8
+      - name: Code Publication
+        if : ${{ github.event_name == 'schedule' || github.event_name == 'pull_request'}}
+        env:
+          BINTRAY_USERNAME: ${{ secrets.BINTRAY_USERNAME }}
+          BINTRAY_KEY: ${{ secrets.BINTRAY_KEY }}
+        run: .github/workflows/scripts/.pinot_linkedin_nightly_build.sh
