@@ -1,22 +1,17 @@
-import { hash } from 'rsvp';
+import {hash} from 'rsvp';
 import Route from '@ember/routing/route';
 import moment from 'moment';
-import { inject as service } from '@ember/service';
-import { isPresent } from '@ember/utils';
-import { powerSort } from 'thirdeye-frontend/utils/manage-alert-utils';
-import {
-  getAnomalyFiltersByTimeRange,
-  getAnomalyFiltersByAnomalyId,
-  anomalyResponseObjNew } from 'thirdeye-frontend/utils/anomaly';
+import {inject as service} from '@ember/service';
+import {anomalyResponseObj, searchAnomaly} from 'thirdeye-frontend/utils/anomaly';
 import _ from 'lodash';
 import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
 
 const start = moment().subtract(1, 'day').valueOf();
 const end = moment().valueOf();
+const pagesize = 10;
 
 const queryParamsConfig = {
-  refreshModel: true,
-  replace: false
+  refreshModel: true, replace: false
 };
 
 export default Route.extend(AuthenticatedRouteMixin, {
@@ -33,14 +28,15 @@ export default Route.extend(AuthenticatedRouteMixin, {
 
   async model(params) {
     // anomalyIds param allows for clicking into the route from email and listing a specific set of anomalyIds
-    let { anomalyIds } = params;
-    const anomaliesById = anomalyIds ? await getAnomalyFiltersByAnomalyId(start, end, anomalyIds) : await getAnomalyFiltersByTimeRange(start, end);
-    const subscriptionGroups = await this.get('anomaliesApiService').querySubscriptionGroups(); // Get all subscription groups available
+    let {anomalyIds} = params;
+    let searchResult;
+    if (anomalyIds) {
+      anomalyIds = anomalyIds.split(",");
+    }
+    // query anomalies
+    searchResult = searchAnomaly(0, pagesize, anomalyIds ? null : start, anomalyIds ? null : end, anomalyIds);
     return hash({
-      updateAnomalies:  getAnomalyFiltersByTimeRange,
-      anomaliesById,
-      subscriptionGroups,
-      anomalyIds
+      updateAnomalies: searchAnomaly, anomalyIds, searchResult
     });
   },
 
@@ -51,87 +47,28 @@ export default Route.extend(AuthenticatedRouteMixin, {
     const defaultParams = {
       anomalyIds
     };
-    Object.assign(model, { ...defaultParams});
+    Object.assign(model, {...defaultParams});
     return model;
   },
 
   setupController(controller, model) {
-
     // This filter category is "secondary". To add more, add an entry here and edit the controller's "filterToPropertyMap"
-    const filterBlocksLocal = [
-      {
-        name: 'statusFilterMap',
-        title: 'Feedback Status',
-        type: 'select',
-        matchWidth: true,
-        filterKeys: []
-      },
-      {
-        name: 'functionFilterMap',
-        title: 'Alert Names',
-        type: 'select',
-        filterKeys: []
-      },
-      {
-        name: 'datasetFilterMap',
-        title: 'Dataset',
-        type: 'select',
-        filterKeys: []
-      },
-      {
-        name: 'metricFilterMap',
-        title: 'Metric',
-        type: 'select',
-        filterKeys: []
-      },
-      {
-        name: 'dimensionFilterMap',
-        title: 'Dimension',
-        type: 'select',
-        matchWidth: true,
-        filterKeys: []
-      },
-      {
-        name: 'subscriptionFilterMap',
-        title: 'Subscription Groups',
-        type: 'select',
-        filterKeys: []
-      }
-    ];
-
-    // Fill in select options for these filters ('filterKeys') based on alert properties from model.alerts
-    filterBlocksLocal.forEach((filter) => {
-      let filterKeys = [];
-      if (filter.name === "dimensionFilterMap" && isPresent(model.anomaliesById.searchFilters[filter.name])) {
-        const anomalyPropertyArray = Object.keys(model.anomaliesById.searchFilters[filter.name]);
-        anomalyPropertyArray.forEach(dimensionType => {
-          let group = Object.keys(model.anomaliesById.searchFilters[filter.name][dimensionType]);
-          group = group.map(dim => `${dimensionType}::${dim}`);
-          filterKeys = [...filterKeys, ...group];
-        });
-      } else if (filter.name === "statusFilterMap" && isPresent(model.anomaliesById.searchFilters[filter.name])){
-        let anomalyPropertyArray = Object.keys(model.anomaliesById.searchFilters[filter.name]);
-        anomalyPropertyArray = anomalyPropertyArray.map(prop => {
-          // get the right object
-          const mapping = anomalyResponseObjNew.filter(e => (e.status === prop));
-          // map the status to name
-          return mapping.length > 0 ? mapping[0].name : prop;
-        });
-        filterKeys = [ ...new Set(powerSort(anomalyPropertyArray, null))];
-      } else if (filter.name === "subscriptionFilterMap"){
-        filterKeys = this.get('store')
-          .peekAll('subscription-groups')
-          .sortBy('name')
-          .filter(group => (group.get('active') && group.get('yaml')))
-          .map(group => group.get('name'));
-      } else {
-        if (isPresent(model.anomaliesById.searchFilters[filter.name])) {
-          const anomalyPropertyArray = Object.keys(model.anomaliesById.searchFilters[filter.name]);
-          filterKeys = [ ...new Set(powerSort(anomalyPropertyArray, null))];
-        }
-      }
-      Object.assign(filter, { filterKeys });
-    });
+    const filterBlocksLocal = [{
+      name: 'alertName', title: 'Alert Names', type: 'search', filterKeys: []
+    }, {
+      name: 'dataset', title: 'Datasets', type: 'search', filterKeys: []
+    }, {
+      name: 'metric', title: 'Metrics', type: 'search', filterKeys: []
+    }, {
+      name: 'feedbackStatus',
+      title: 'Feedback Status',
+      type: 'select',
+      matchWidth: true,
+      filterKeys: anomalyResponseObj.map(f => f.name)
+    }, {
+      name: 'subscription', title: 'Subscription Groups', hasNullOption: true, // allow searches for 'none'
+      type: 'search', filterKeys: []
+    }];
 
     // Keep an initial copy of the secondary filter blocks in memory
     Object.assign(model, {
@@ -139,15 +76,9 @@ export default Route.extend(AuthenticatedRouteMixin, {
     });
     // Send filters to controller
     controller.setProperties({
-      model,
-      anomaliesById: model.anomaliesById,
-      resultsActive: true,
-      updateAnomalies: model.updateAnomalies,  //requires start and end time in epoch ex updateAnomalies(start, end)
-      filterBlocksLocal,
-      anomalyIdList: model.anomaliesById.anomalyIds,
-      anomaliesRange: [start, end],
-      subscriptionGroups: model.subscriptionGroups,
-      anomalyIds: this.get('anomalyIds')
+      model, resultsActive: true, updateAnomalies: model.updateAnomalies,  //requires start and end time in epoch ex updateAnomalies(start, end)
+      filterBlocksLocal, anomaliesRange: [start, end], anomalyIds: this.get('anomalyIds'), // url params
+      searchResult: model.searchResult
     });
   },
 
@@ -164,8 +95,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
       if (transition.intent.name && transition.intent.name !== 'logout') {
         this.set('session.store.fromUrl', {lastIntentTransition: transition});
       }
-    },
-    error() {
+    }, error() {
       // The `error` hook is also provided the failed
       // `transition`, which can be stored and later
       // `.retry()`d if desired.
@@ -180,9 +110,9 @@ export default Route.extend(AuthenticatedRouteMixin, {
     },
 
     /**
-    * Refresh route's model.
-    * @method refreshModel
-    */
+     * Refresh route's model.
+     * @method refreshModel
+     */
     refreshModel() {
       this.refresh();
     }
