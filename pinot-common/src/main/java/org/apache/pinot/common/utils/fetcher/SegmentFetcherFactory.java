@@ -26,6 +26,8 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.spi.crypt.PinotCrypter;
+import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,8 +37,9 @@ public class SegmentFetcherFactory {
   private SegmentFetcherFactory() {
   }
 
-  public static final String PROTOCOLS_KEY = "protocols";
-  public static final String SEGMENT_FETCHER_CLASS_KEY_SUFFIX = ".class";
+  static final String SEGMENT_FETCHER_CLASS_KEY_SUFFIX = ".class";
+  private static final String PROTOCOLS_KEY = "protocols";
+  private static final String ENCODED_SUFFIX = ".enc";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentFetcherFactory.class);
   private static final Map<String, SegmentFetcher> SEGMENT_FETCHER_MAP = new HashMap<>();
@@ -113,5 +116,25 @@ public class SegmentFetcherFactory {
   public static void fetchSegmentToLocal(String uri, File dest)
       throws Exception {
     fetchSegmentToLocal(new URI(uri), dest);
+  }
+
+  /**
+   * Fetches a segment from a URI location to a local file and decrypts it if needed
+   * @param uri remote segment location
+   * @param dest local file
+   */
+  public static void fetchAndDecryptSegmentToLocal(String uri, File dest, String crypterName)
+      throws Exception {
+    if (crypterName == null) {
+      fetchSegmentToLocal(uri, dest);
+    } else {
+      // download
+      File tempDownloadedFile = new File(dest, ENCODED_SUFFIX);
+      fetchSegmentToLocal(uri, tempDownloadedFile);
+
+      // decrypt
+      PinotCrypter crypter = PinotCrypterFactory.create(crypterName);
+      crypter.decrypt(tempDownloadedFile, dest);
+    }
   }
 }
