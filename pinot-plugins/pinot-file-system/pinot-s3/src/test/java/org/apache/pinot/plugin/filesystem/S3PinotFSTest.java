@@ -28,12 +28,16 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.io.IOUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Listeners;
 import org.testng.annotations.Test;
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.http.apache.ApacheHttpClient;
+import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
@@ -118,17 +122,20 @@ public class S3PinotFSTest {
   public void testListFilesInBucketNonRecursive()
       throws Exception {
     String[] originalFiles = new String[]{"a-list.txt", "b-list.txt", "c-list.txt"};
+    List<String> expectedFileNames = new ArrayList<>();
 
     for (String fileName : originalFiles) {
       createEmptyFile("", fileName);
+      expectedFileNames.add(String.format(FILE_FORMAT, SCHEME, BUCKET, fileName));
     }
 
     String[] actualFiles = _s3PinotFS.listFiles(URI.create(String.format(DIR_FORMAT, SCHEME, BUCKET)), false);
 
     actualFiles =
-        Arrays.stream(actualFiles).filter(x -> x.contains("list")).map(x -> x.substring(1)).toArray(String[]::new);
+        Arrays.stream(actualFiles).filter(x -> x.contains("list")).toArray(String[]::new);
     Assert.assertEquals(actualFiles.length, originalFiles.length);
-    Assert.assertTrue(Arrays.equals(actualFiles, originalFiles));
+
+    Assert.assertTrue(Arrays.equals(actualFiles, expectedFileNames.toArray()));
   }
 
   @Test
@@ -145,8 +152,9 @@ public class S3PinotFSTest {
 
     actualFiles = Arrays.stream(actualFiles).filter(x -> x.contains("list-2")).toArray(String[]::new);
     Assert.assertEquals(actualFiles.length, originalFiles.length);
+
     Assert.assertTrue(
-        Arrays.equals(Arrays.stream(originalFiles).map(x -> folder + DELIMITER + x).toArray(), actualFiles));
+        Arrays.equals(Arrays.stream(originalFiles).map(fileName -> String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + fileName)).toArray(), actualFiles));
   }
 
   @Test
@@ -161,7 +169,7 @@ public class S3PinotFSTest {
       String folderName = folder + DELIMITER + childFolder;
       for (String fileName : originalFiles) {
         createEmptyFile(folderName, fileName);
-        expectedResultList.add(folderName + DELIMITER + fileName);
+        expectedResultList.add(String.format(FILE_FORMAT, SCHEME, BUCKET, folderName + DELIMITER + fileName));
       }
     }
     String[] actualFiles = _s3PinotFS.listFiles(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folder)), true);
@@ -313,4 +321,5 @@ public class S3PinotFSTest {
     HeadObjectResponse headObjectResponse = _s3Client.headObject(S3TestUtils.getHeadObjectRequest(BUCKET, folderName));
     Assert.assertTrue(headObjectResponse.sdkHttpResponse().isSuccessful());
   }
+
 }
