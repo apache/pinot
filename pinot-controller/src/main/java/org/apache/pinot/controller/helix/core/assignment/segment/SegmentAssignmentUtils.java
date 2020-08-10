@@ -30,6 +30,8 @@ import java.util.Set;
 import java.util.TreeMap;
 import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
 import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.tier.Tier;
+import org.apache.pinot.common.tier.TierSegmentSelector;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.common.utils.Pairs;
 
@@ -324,6 +326,70 @@ public class SegmentAssignmentUtils {
 
     Map<String, Map<String, String>> getOfflineSegmentAssignment() {
       return _offlineSegmentAssignment;
+    }
+  }
+
+  /**
+   * Takes a segment assignment and splits them up based on which tiers the segments are eligible for. Only considers ONLINE segments.
+   * Tiers are selected according to the order provided in the tiers list.
+   */
+  static class TierSegmentAssignment {
+
+    private final Map<String, Map<String, Map<String, String>>> _tierNameToSegmentAssignmentMap = new TreeMap<>();
+    private final Map<String, Map<String, String>> _nonTierSegmentAssignment = new TreeMap<>();
+
+    /**
+     * Creates a TierSegmentAssignment from the given segmentAssignment
+     * @param tableNameWithType table to which the segment assignment belongs
+     * @param sortedTiers list of tiers, pre-sorted as per desired order by caller
+     * @param segmentAssignment segment assignment of the table
+     */
+    TierSegmentAssignment(String tableNameWithType, List<Tier> sortedTiers,
+        Map<String, Map<String, String>> segmentAssignment) {
+
+      // initialize tier to segmentAssignment map
+      sortedTiers.forEach(t -> _tierNameToSegmentAssignmentMap.put(t.getName(), new TreeMap<>()));
+
+      // iterate over all segments
+      for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
+        String segmentName = entry.getKey();
+        Map<String, String> instanceStateMap = entry.getValue();
+        boolean selected = false;
+
+        // only consider ONLINE segments for tiers
+        if (instanceStateMap.containsValue(SegmentStateModel.ONLINE)) {
+          // find an eligible tier for the segment, from the ordered list of tiers
+          for (Tier tier : sortedTiers) {
+            if (tier.getSegmentSelector().selectSegment(tableNameWithType, segmentName)) {
+              _tierNameToSegmentAssignmentMap.get(tier.getName()).put(segmentName, instanceStateMap);
+              selected = true;
+              break;
+            }
+          }
+        }
+
+        // if segment not eligible for any tier, put in ordinary segments map
+        if (!selected) {
+          _nonTierSegmentAssignment.put(segmentName, instanceStateMap);
+        }
+      }
+
+      // remove tiers with no eligible segments
+      _tierNameToSegmentAssignmentMap.entrySet().removeIf(e -> e.getValue().isEmpty());
+    }
+
+    /**
+     * Returns a map from tier name to segment assignments for segments which are eligible for that tier
+     */
+    public Map<String, Map<String, Map<String, String>>> getTierNameToSegmentAssignmentMap() {
+      return _tierNameToSegmentAssignmentMap;
+    }
+
+    /**
+     * Returns segment assignments of segments which were not eligible for any tier
+     */
+    public Map<String, Map<String, String>> getNonTierSegmentAssignment() {
+      return _nonTierSegmentAssignment;
     }
   }
 }

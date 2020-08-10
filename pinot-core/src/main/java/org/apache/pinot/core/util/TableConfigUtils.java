@@ -18,21 +18,25 @@
  */
 package org.apache.pinot.core.util;
 
+import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.core.data.function.FunctionEvaluator;
 import org.apache.pinot.core.data.function.FunctionEvaluatorFactory;
-import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IngestionConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
+import org.apache.pinot.spi.utils.TimeUtils;
 
 
 /**
@@ -46,14 +50,15 @@ public final class TableConfigUtils {
   }
 
   /**
-   * Validates the table config with the following rules:
-   * <ul>
-   *   <li>peerSegmentDownloadScheme in ValidationConfig must be http or https</li>
-   * </ul>
+   * Performs table config validations. Includes validations for the following:
+   * 1. Validation config
+   * 2. IngestionConfig
+   * 3. TierConfigs
    */
   public static void validate(TableConfig tableConfig) {
     validateValidationConfig(tableConfig);
     validateIngestionConfig(tableConfig.getIngestionConfig());
+    validateTierConfigList(tableConfig.getTierConfigsList());
   }
 
   /**
@@ -65,8 +70,7 @@ public final class TableConfigUtils {
   public static void validateTableName(TableConfig tableConfig) {
     String tableName = tableConfig.getTableName();
     if (tableName.contains(".")) {
-      throw new IllegalStateException(
-          "Table name: '" + tableName + "' containing '.' is not allowed");
+      throw new IllegalStateException("Table name: '" + tableName + "' containing '.' is not allowed");
     }
   }
 
@@ -78,8 +82,10 @@ public final class TableConfigUtils {
       }
       String peerSegmentDownloadScheme = validationConfig.getPeerSegmentDownloadScheme();
       if (peerSegmentDownloadScheme != null) {
-        if (!CommonConstants.HTTP_PROTOCOL.equalsIgnoreCase(peerSegmentDownloadScheme) && !CommonConstants.HTTPS_PROTOCOL.equalsIgnoreCase(peerSegmentDownloadScheme)) {
-          throw new IllegalStateException("Invalid value '" + peerSegmentDownloadScheme + "' for peerSegmentDownloadScheme. Must be one of http nor https" );
+        if (!CommonConstants.HTTP_PROTOCOL.equalsIgnoreCase(peerSegmentDownloadScheme)
+            && !CommonConstants.HTTPS_PROTOCOL.equalsIgnoreCase(peerSegmentDownloadScheme)) {
+          throw new IllegalStateException("Invalid value '" + peerSegmentDownloadScheme
+              + "' for peerSegmentDownloadScheme. Must be one of http nor https");
         }
       }
     }
@@ -114,7 +120,8 @@ public final class TableConfigUtils {
           String columnName = transformConfig.getColumnName();
           String transformFunction = transformConfig.getTransformFunction();
           if (columnName == null || transformFunction == null) {
-            throw new IllegalStateException("columnName/transformFunction cannot be null in TransformConfig " + transformConfig);
+            throw new IllegalStateException(
+                "columnName/transformFunction cannot be null in TransformConfig " + transformConfig);
           }
           if (!transformColumns.add(columnName)) {
             throw new IllegalStateException("Duplicate transform config found for column '" + columnName + "'");
@@ -136,8 +143,53 @@ public final class TableConfigUtils {
         }
         // TODO: remove this once we add support for derived columns/chained transform functions
         if (!Collections.disjoint(transformColumns, argumentColumns)) {
-          throw new IllegalStateException("Derived columns not supported yet. Cannot use a transform column as argument to another transform functions");
+          throw new IllegalStateException(
+              "Derived columns not supported yet. Cannot use a transform column as argument to another transform functions");
         }
+      }
+    }
+  }
+
+  /**
+   * Validates the tier configs
+   * Checks for the right segmentSelectorType and its required properties
+   * Checks for the right storageType and its required properties
+   */
+  private static void validateTierConfigList(@Nullable List<TierConfig> tierConfigList) {
+    if (tierConfigList == null) {
+      return;
+    }
+
+    Set<String> tierNames = new HashSet<>();
+    for (TierConfig tierConfig : tierConfigList) {
+      String tierName = tierConfig.getName();
+      Preconditions.checkState(!tierName.isEmpty(), "Tier name cannot be blank");
+      Preconditions.checkState(tierNames.add(tierName), "Tier name: %s already exists in tier configs", tierName);
+
+      String segmentSelectorType = tierConfig.getSegmentSelectorType();
+      String segmentAge = tierConfig.getSegmentAge();
+      if (segmentSelectorType.equalsIgnoreCase(TierFactory.TIME_SEGMENT_SELECTOR_TYPE)) {
+        Preconditions
+            .checkState(segmentAge != null, "Must provide 'segmentAge' for segmentSelectorType: %s in tier: %s",
+                segmentSelectorType, tierName);
+        Preconditions.checkState(TimeUtils.isPeriodValid(segmentAge),
+            "segmentAge: %s must be a valid period string (eg. 30d, 24h) in tier: %s", segmentAge, tierName);
+      } else {
+        throw new IllegalStateException(
+            "Unsupported segmentSelectorType: " + segmentSelectorType + " in tier: " + tierName);
+      }
+
+      String storageType = tierConfig.getStorageType();
+      String serverTag = tierConfig.getServerTag();
+      if (storageType.equalsIgnoreCase(TierFactory.PINOT_SERVER_STORAGE_TYPE)) {
+        Preconditions
+            .checkState(serverTag != null, "Must provide 'serverTag' for storageType: %s in tier: %s", storageType,
+                tierName);
+        Preconditions.checkState(TagNameUtils.isServerTag(serverTag),
+            "serverTag: %s must have a valid server tag format (<tenantName>_OFFLINE or <tenantName>_REALTIME) in tier: %s",
+            serverTag, tierName);
+      } else {
+        throw new IllegalStateException("Unsupported storageType: " + storageType + " in tier: " + tierName);
       }
     }
   }
