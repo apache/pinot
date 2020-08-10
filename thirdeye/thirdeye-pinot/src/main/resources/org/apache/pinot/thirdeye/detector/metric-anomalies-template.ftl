@@ -147,10 +147,7 @@
         </#if>
 
         <!-- RCA -->
-        <#if rootCauseHighlights?has_content
-        && rootCauseHighlights["cubeResults"]?has_content
-        && rootCauseHighlights["cubeResults"]["dimensions"]?has_content
-        && rootCauseHighlights["cubeResults"]["responseRows"]?has_content>
+        <#if cubeDimensions?has_content && cubeResponseRows?has_content>
             <@utils.addBlock title="Root Cause Analysis" align="left">
             <a href="${dashboardHost}/app/#/rootcause?anomalyId=${anomalyIds} style="text-decoration: none; color:#0073B1; font-size:12px; font-weight:bold;">(more)</a>
             <table border="0" align="center" style="table-layout: fixed; width:100%; padding:0; margin:0; border-collapse: collapse; text-align:left;">
@@ -162,7 +159,7 @@
                         <th>Top Anomalous Dimensions</th>
                       </tr>
                       <tr>
-                      <#list rootCauseHighlights["cubeResults"]["dimensions"] as dimension>
+                      <#list cubeDimensions as dimension>
                         <th style="text-align:left; padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">${dimension}</th>
                       </#list>
                       <th style="text-align:left; padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">Baseline</th>
@@ -172,7 +169,7 @@
                     </thead>
 
                     <tbody>
-                    <#list rootCauseHighlights["cubeResults"]["responseRows"] as dimSliceEntry>
+                    <#list cubeResponseRows as dimSliceEntry>
                       <#if dimSliceEntry["names"]?has_content>
                         <tr>
                           <#list dimSliceEntry["names"] as dimensionName>

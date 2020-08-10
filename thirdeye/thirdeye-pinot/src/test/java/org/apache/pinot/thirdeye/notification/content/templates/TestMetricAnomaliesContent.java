@@ -269,8 +269,8 @@ public class TestMetricAnomaliesContent {
     Map<String, Object> cubeResults = mapper.readValue(new File(
         cubeResponsePath), new TypeReference<Map<String, Object>>() {
     });
-    Map<String, Object> rootCauseHighlights = new HashMap<>(cubeResults);
-    model.put("rootCauseHighlights", rootCauseHighlights);
+    model.put("cubeDimensions", ConfigUtils.getMap(cubeResults.get("cubeResults")).get("dimensions"));
+    model.put("cubeResponseRows", ConfigUtils.getMap(cubeResults.get("cubeResults")).get("responseRows"));
 
     Writer out = new StringWriter();
     template.process(model, out);
@@ -312,25 +312,19 @@ public class TestMetricAnomaliesContent {
         .getSystemResource("test-email-rca-highlights-cube-algo-response.json").getPath();
     Map<String, Object> cubeResults = Collections.unmodifiableMap(mapper.readValue(
         new File(cubeResponsePath), new TypeReference<Map<String, Object>>() {}));
-    rootCauseHighlights.putAll(cubeResults);
-    rootCauseHighlights.put("cubeResult", ConfigUtils.getMap(rootCauseHighlights.get("cubeResults"))
-        .put("dimensions", null));
-    model.put("rootCauseHighlights", rootCauseHighlights);
+    model.put("cubeDimensions", null);
+    model.put("cubeResponseRows", ConfigUtils.getMap(cubeResults.get("cubeResults")).get("responseRows"));
     template.process(model, out);
-    rootCauseHighlights.putAll(cubeResults);
-    rootCauseHighlights.put("cubeResult", ConfigUtils.getMap(rootCauseHighlights.get("cubeResults"))
-        .put("dimensions", new ArrayList<>()));
+    model.put("cubeDimensions", new ArrayList<>());
+    model.put("cubeResponseRows", ConfigUtils.getMap(cubeResults.get("cubeResults")).get("responseRows"));
     template.process(model, out);
 
     // email template should not break even if dimension field under cubeResults are null or empty
-    rootCauseHighlights.putAll(cubeResults);
-    rootCauseHighlights.put("cubeResult", ConfigUtils.getMap(rootCauseHighlights.get("cubeResults"))
-        .put("responseRows", null));
-    model.put("rootCauseHighlights", rootCauseHighlights);
+    model.put("cubeDimensions", ConfigUtils.getMap(cubeResults.get("cubeResults")).get("dimensions"));
+    model.put("cubeResponseRows", null);
     template.process(model, out);
-    rootCauseHighlights.putAll(cubeResults);
-    rootCauseHighlights.put("cubeResult", ConfigUtils.getMap(rootCauseHighlights.get("cubeResults"))
-        .put("responseRows", new ArrayList<>()));
+    model.put("cubeDimensions", ConfigUtils.getMap(cubeResults.get("cubeResults")).get("dimensions"));
+    model.put("cubeResponseRows", new ArrayList<>());
     template.process(model, out);
   }
 }
