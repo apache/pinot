@@ -172,7 +172,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
               new URI(inputDirURI.getScheme(), inputFileURI.getSchemeSpecificPart(), inputFileURI.getFragment());
         }
         //copy input path to local
-        File localInputDataFile = new File(localInputTempDir, new File(inputFileURI).getName());
+        File localInputDataFile = new File(localInputTempDir, new File(inputFileURI.getPath()).getName());
         inputDirFS.copyToLocalFile(inputFileURI, localInputDataFile);
 
         //create task spec
