@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.math.DoubleMath;
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -35,9 +34,6 @@ import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.FunctionContext;
-import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
-import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import org.apache.pinot.parsers.CompilerConstants;
 
@@ -66,35 +62,6 @@ public class AggregationFunctionUtils {
       String column = aggregationInfo.getAggregationParams().get(CompilerConstants.COLUMN_KEY_IN_AGGREGATION_INFO);
       return Arrays.asList(column.split(CompilerConstants.AGGREGATION_FUNCTION_ARG_SEPARATOR));
     }
-  }
-
-  /**
-   * Creates a list of {@link AggregationFunction}s based on the given {@link QueryContext}.
-   */
-  public static List<AggregationFunction> getAggregationFunctions(QueryContext queryContext) {
-    List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
-    Set<FunctionContext> functions = new HashSet<>();
-    List<AggregationFunction> aggregationFunctions = new ArrayList<>();
-    for (ExpressionContext selectExpression : selectExpressions) {
-      FunctionContext function = selectExpression.getFunction();
-      if (function != null && function.getType() == FunctionContext.Type.AGGREGATION) {
-        // TODO: Deduplicate aggregation functions after deprecating the BrokerRequest. PQL relies on them to return the
-        //       correct columns.
-        functions.add(function);
-        aggregationFunctions.add(AggregationFunctionFactory.getAggregationFunction(function, queryContext));
-      }
-    }
-    // Add aggregation functions in the ORDER-BY clause but not in the SELECT clause
-    List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
-    if (orderByExpressions != null) {
-      for (OrderByExpressionContext orderByExpression : orderByExpressions) {
-        FunctionContext function = orderByExpression.getExpression().getFunction();
-        if (function != null && function.getType() == FunctionContext.Type.AGGREGATION && functions.add(function)) {
-          aggregationFunctions.add(AggregationFunctionFactory.getAggregationFunction(function, queryContext));
-        }
-      }
-    }
-    return aggregationFunctions;
   }
 
   /**
