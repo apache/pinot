@@ -28,6 +28,7 @@ import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.function.FunctionDefinitionRegistry;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.FilterOperator;
@@ -51,9 +52,12 @@ public class PinotQuery2BrokerRequestConverter {
     BrokerRequest brokerRequest = new BrokerRequest();
 
     //Query Source
-    QuerySource querySource = new QuerySource();
-    querySource.setTableName(pinotQuery.getDataSource().getTableName());
-    brokerRequest.setQuerySource(querySource);
+    DataSource dataSource = pinotQuery.getDataSource();
+    if (dataSource != null) {
+      QuerySource querySource = new QuerySource();
+      querySource.setTableName(dataSource.getTableName());
+      brokerRequest.setQuerySource(querySource);
+    }
 
     convertFilter(pinotQuery, brokerRequest);
 

@@ -37,9 +37,9 @@ import static org.testng.Assert.assertTrue;
 
 
 public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValueQueriesTest {
-  private static String SV_GROUP_BY = " group by column8";
-  private static String MV_GROUP_BY = " group by column7";
-  private static String ORDER_BY_ALIAS = " order by cnt_column6 DESC";
+  private static final String SV_GROUP_BY = " group by column8";
+  private static final String MV_GROUP_BY = " group by column7";
+  private static final String ORDER_BY_ALIAS = " order by cnt_column6 DESC";
 
   @Test
   public void testCountMV() {
@@ -157,7 +157,7 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(0), "cnt_column6");
 
     brokerResponse = getBrokerResponseForSqlQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentResultTable(brokerResponse, 62480L, 874176L, 62480L, 400000L,
+    QueriesTestUtils.testInterSegmentResultTable(brokerResponse, 62480L, 1101664L, 62480L, 400000L,
         Arrays.asList(new Long[][]{new Long[]{62480L}}), 1, expectedDataSchema);
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(0), "cnt_column6");
 
