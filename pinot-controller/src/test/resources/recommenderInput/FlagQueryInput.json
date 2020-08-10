@@ -1,0 +1,130 @@
+{
+  "schema":{
+    "schemaName": "tableSchema",
+    "dimensionFieldSpecs": [
+      {
+        "name": "a",
+        "dataType": "INT",
+        "cardinality":20,
+        "numValuesPerEntry":1
+      },
+      {
+        "name": "b",
+        "dataType": "DOUBLE",
+        "cardinality":6,
+        "numValuesPerEntry":1.5
+      },
+      {
+        "name": "c",
+        "dataType": "FLOAT",
+        "cardinality":7,
+        "numValuesPerEntry":1
+      },
+      {
+        "name": "d",
+        "dataType": "STRING",
+        "cardinality":41,
+        "numValuesPerEntry":2,
+        "averageLength" : 27
+      },
+      {
+        "name": "e",
+        "dataType": "LONG",
+        "cardinality":18,
+        "numValuesPerEntry":4
+      },
+      {
+        "name": "f",
+        "dataType": "DOUBLE",
+        "cardinality":13,
+        "numValuesPerEntry":3
+      },
+      {
+        "name": "g",
+        "dataType": "STRING",
+        "cardinality":6,
+        "numValuesPerEntry":2,
+        "averageLength" : 100
+      },
+      {
+        "name": "h",
+        "dataType": "BYTES",
+        "cardinality":12,
+        "numValuesPerEntry":1,
+        "averageLength" : 10
+      },
+      {
+        "name": "i",
+        "dataType": "STRING",
+        "singleValueField": false,
+        "cardinality":7,
+        "numValuesPerEntry":1,
+        "averageLength" : 25
+      },
+      {
+        "name": "j",
+        "dataType": "DOUBLE",
+        "cardinality":4,
+        "numValuesPerEntry":1.00000001
+      }
+    ],
+    "metricFieldSpecs": [
+      {
+        "name": "k",
+        "dataType": "DOUBLE",
+        "cardinality":10000,
+        "numValuesPerEntry":2,
+        "averageLength" : 100
+      },
+      {
+        "name": "l",
+        "dataType": "STRING",
+        "cardinality":10000,
+        "numValuesPerEntry":1,
+        "averageLength" : 10
+      },
+      {
+        "name": "m",
+        "dataType": "BYTES",
+        "cardinality":10000,
+        "numValuesPerEntry":1,
+        "averageLength" : 25
+      },
+      {
+        "name": "n",
+        "dataType": "DOUBLE",
+        "cardinality":10000,
+        "numValuesPerEntry":1
+      },
+      {
+        "name": "o",
+        "dataType": "DOUBLE",
+        "cardinality":10000,
+        "numValuesPerEntry":1,
+        "averageLength" : 25
+      },
+      {
+        "name": "p",
+        "dataType": "DOUBLE",
+        "cardinality":10000,
+        "numValuesPerEntry":1
+      }
+    ],
+    "timeFieldSpec": {
+      "incomingGranularitySpec": {
+        "dataType": "INT",
+        "name": "t",
+        "timeType": "DAYS",
+        "cardinality":10000,
+        "numValuesPerEntry":1
+      }
+    }
+  },
+  "queriesWithWeights":{
+    "select f from tableName": 0.1,
+    "select f from tableName where a =3": 0.1,
+    "not a valid query": 0.1,
+    "select g from tableName LIMIT 1000000000": 0.1
+  },
+  "numRecordsPerPush":1000000000
+}
