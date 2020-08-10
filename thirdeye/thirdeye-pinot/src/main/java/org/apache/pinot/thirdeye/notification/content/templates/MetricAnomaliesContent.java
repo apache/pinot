@@ -222,8 +222,8 @@ public class MetricAnomaliesContent extends BaseNotificationContent {
       String anomalyId = metricAnomalyReports.values().iterator().next().getAnomalyId();
       try {
         Map<String, Object> rcaHighlights = this.rcaClient.getRootCauseHighlights(Long.parseLong(anomalyId));
-        LOG.info("Setting rootCauseHighlights in email template " + rcaHighlights);
-        templateData.put("rootCauseHighlights", rcaHighlights);
+        templateData.put("cubeDimensions", ConfigUtils.getMap(rcaHighlights.get("cubeResults")).get("dimensions"));
+        templateData.put("cubeResponseRows", ConfigUtils.getMap(rcaHighlights.get("cubeResults")).get("responseRows"));
       } catch (Exception e) {
         // alert notification shouldn't fail if rca insights are not available
         LOG.error("Skip Embedding RCA in email. Failed to retrieve the RCA Highlights for anomaly " + anomalyId, e);
