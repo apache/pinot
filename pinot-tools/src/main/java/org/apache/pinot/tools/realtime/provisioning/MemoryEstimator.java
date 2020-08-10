@@ -247,7 +247,7 @@ public class MemoryEstimator {
               + "/" + DataSizeUtils.fromBytes(mappedMemoryPerHost);
           _consumingMemoryPerHost[i][j] = DataSizeUtils.fromBytes(totalMemoryForConsumingSegmentsPerHost);
           _optimalSegmentSize[i][j] = DataSizeUtils.fromBytes(completedSegmentSizeBytes);
-          _numSegmentsQueriedPerHost[i][j] = String.valueOf(numActiveSegmentsPerPartition);
+          _numSegmentsQueriedPerHost[i][j] = String.valueOf(numActiveSegmentsPerPartition * totalConsumingPartitionsPerHost);
         }
       }
     }

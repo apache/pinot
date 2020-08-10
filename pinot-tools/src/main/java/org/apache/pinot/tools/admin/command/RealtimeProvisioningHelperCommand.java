@@ -130,7 +130,7 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
 
   @Override
   public String toString() {
-    return ("RealtimeProvisioningHelperCommand -tableConfigFile " + _tableConfigFile + " -numPartitions "
+    return ("RealtimeProvisioningHelper -tableConfigFile " + _tableConfigFile + " -numPartitions "
         + _numPartitions + " -pushFrequency " + _pushFrequency + " -numHosts " + _numHosts + " -numHours " + _numHours
         + " -sampleCompletedSegmentDir " + _sampleCompletedSegmentDir + " -ingestionRate "
         + _ingestionRate + " -maxUsableHostMemory " + _maxUsableHostMemory + " -retentionHours " + _retentionHours);
@@ -163,6 +163,7 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
         .append("\nHowever, if most of your queries are going to be for (say) the last 96 hours, then you can specify that in -retentionHours")
         .append("\nDoing so will let this program assume that you are willing to take a page hit when querying older data")
         .append("\nand optimize memory and number of hosts accordingly.")
+        .append("\n See https://docs.pinot.apache.org/operators/operating-pinot/tuning/realtime for details");
         ;
     System.out.println(builder.toString());
   }
@@ -235,11 +236,11 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     displayResults(memoryEstimator.getOptimalSegmentSize(), numHosts, numHours);
     LOGGER.info("\nConsuming memory");
     displayResults(memoryEstimator.getConsumingMemoryPerHost(), numHosts, numHours);
-    LOGGER.info("\nNumber of segments queried per host");
+    LOGGER.info("\nTotal number of segments queried per host (for all partitions)");
     displayResults(memoryEstimator.getNumSegmentsQueriedPerHost(), numHosts, numHours);
     return true;
   }
-  
+
   private void displayOutputHeader(StringBuilder note) {
     System.out.println("\n============================================================\n" + toString());
     System.out.println(note.toString());
