@@ -27,19 +27,8 @@ import org.apache.pinot.spi.config.table.TierConfig;
  */
 public final class TierFactory {
 
-  /**
-   * Types of segmentSelectors for tiers
-   */
-  public enum TierSegmentSelectorType {
-    TIME
-  }
-
-  /**
-   * Types of storage for tiers
-   */
-  public enum TierStorageType {
-    PINOT_SERVER
-  }
+  public static final String TIME_SEGMENT_SELECTOR_TYPE = "time";
+  public static final String PINOT_SERVER_STORAGE_TYPE = "pinot_server";
 
   private TierFactory() {
   }
@@ -52,14 +41,14 @@ public final class TierFactory {
     TierStorage storageSelector;
 
     String segmentSelectorType = tierConfig.getSegmentSelectorType();
-    if (segmentSelectorType.equalsIgnoreCase(TierSegmentSelectorType.TIME.toString())) {
+    if (segmentSelectorType.equalsIgnoreCase(TierFactory.TIME_SEGMENT_SELECTOR_TYPE)) {
       segmentSelector = new TimeBasedTierSegmentSelector(helixManager, tierConfig.getSegmentAge());
     } else {
       throw new IllegalStateException("Unsupported segmentSelectorType: " + segmentSelectorType);
     }
 
     String storageSelectorType = tierConfig.getStorageType();
-    if (storageSelectorType.equalsIgnoreCase(TierStorageType.PINOT_SERVER.toString())) {
+    if (storageSelectorType.equalsIgnoreCase(TierFactory.PINOT_SERVER_STORAGE_TYPE)) {
       storageSelector = new PinotServerTierStorage(tierConfig.getServerTag());
     } else {
       throw new IllegalStateException("Unsupported storageType: " + storageSelectorType);

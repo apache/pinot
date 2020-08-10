@@ -40,7 +40,6 @@ import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.tier.PinotServerTierStorage;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
-import org.apache.pinot.common.tier.TierFactory.TierStorageType;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
@@ -182,7 +181,7 @@ public class TableRebalancer {
       // get tiers with storageType = "PINOT_SERVER". This is the only type available right now.
       // Other types should be treated differently
       sortedTiers = TierConfigUtils
-          .getSortedTiersForStorageType(tableConfig.getTierConfigsList(), TierStorageType.PINOT_SERVER.toString(),
+          .getSortedTiersForStorageType(tableConfig.getTierConfigsList(), TierFactory.PINOT_SERVER_STORAGE_TYPE,
               _helixManager);
 
       tierToInstancePartitionMap = new HashMap<>();

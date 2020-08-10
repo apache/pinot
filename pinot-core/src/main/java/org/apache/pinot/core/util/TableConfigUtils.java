@@ -25,8 +25,6 @@ import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.tier.TierFactory;
-import org.apache.pinot.common.tier.TierFactory.TierSegmentSelectorType;
-import org.apache.pinot.common.tier.TierFactory.TierStorageType;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.core.data.function.FunctionEvaluator;
@@ -170,7 +168,7 @@ public final class TableConfigUtils {
 
       String segmentSelectorType = tierConfig.getSegmentSelectorType();
       String segmentAge = tierConfig.getSegmentAge();
-      if (segmentSelectorType.equalsIgnoreCase(TierSegmentSelectorType.TIME.toString())) {
+      if (segmentSelectorType.equalsIgnoreCase(TierFactory.TIME_SEGMENT_SELECTOR_TYPE)) {
         Preconditions
             .checkState(segmentAge != null, "Must provide 'segmentAge' for segmentSelectorType: %s in tier: %s",
                 segmentSelectorType, tierName);
@@ -183,7 +181,7 @@ public final class TableConfigUtils {
 
       String storageType = tierConfig.getStorageType();
       String serverTag = tierConfig.getServerTag();
-      if (storageType.equalsIgnoreCase(TierStorageType.PINOT_SERVER.toString())) {
+      if (storageType.equalsIgnoreCase(TierFactory.PINOT_SERVER_STORAGE_TYPE)) {
         Preconditions
             .checkState(serverTag != null, "Must provide 'serverTag' for storageType: %s in tier: %s", storageType,
                 tierName);

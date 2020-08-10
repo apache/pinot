@@ -25,7 +25,6 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import org.apache.pinot.common.tier.TierFactory.TierSegmentSelectorType;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -64,7 +63,7 @@ public class TierSegmentSelectorTest {
 
     // segment is 8 days old. selected by 7d
     TimeBasedTierSegmentSelector segmentSelector = new TimeBasedTierSegmentSelector(helixManager, "7d");
-    Assert.assertEquals(segmentSelector.getType(), TierSegmentSelectorType.TIME.toString());
+    Assert.assertEquals(segmentSelector.getType(), TierFactory.TIME_SEGMENT_SELECTOR_TYPE);
     Assert.assertEquals(segmentSelector.getSegmentAgeMillis(), TimeUnit.DAYS.toMillis(7));
     Assert.assertTrue(segmentSelector.selectSegment(tableNameWithType, segmentName));
 

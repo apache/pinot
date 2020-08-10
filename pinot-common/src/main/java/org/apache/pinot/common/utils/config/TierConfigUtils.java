@@ -26,7 +26,6 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
-import org.apache.pinot.common.tier.TierFactory.TierSegmentSelectorType;
 import org.apache.pinot.common.tier.TierSegmentSelector;
 import org.apache.pinot.common.tier.TierStorage;
 import org.apache.pinot.common.tier.TimeBasedTierSegmentSelector;
@@ -74,9 +73,9 @@ public final class TierConfigUtils {
     return (o1, o2) -> {
       TierSegmentSelector s1 = o1.getSegmentSelector();
       TierSegmentSelector s2 = o2.getSegmentSelector();
-      Preconditions.checkState(TierSegmentSelectorType.TIME.toString().equalsIgnoreCase(s1.getType()),
+      Preconditions.checkState(TierFactory.TIME_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s1.getType()),
           "Unsupported segmentSelectorType class %s", s1.getClass());
-      Preconditions.checkState(TierSegmentSelectorType.TIME.toString().equalsIgnoreCase(s2.getType()),
+      Preconditions.checkState(TierFactory.TIME_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s2.getType()),
           "Unsupported segmentSelectorType class %s", s2.getClass());
       Long period1 = ((TimeBasedTierSegmentSelector) s1).getSegmentAgeMillis();
       Long period2 = ((TimeBasedTierSegmentSelector) s2).getSegmentAgeMillis();

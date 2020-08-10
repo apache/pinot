@@ -20,8 +20,7 @@ package org.apache.pinot.core.util;
 
 import com.google.common.collect.Lists;
 import java.util.Collections;
-import org.apache.pinot.common.tier.TierFactory.TierSegmentSelectorType;
-import org.apache.pinot.common.tier.TierFactory.TierStorageType;
+import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.spi.config.table.IngestionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -200,30 +199,30 @@ public class TableConfigUtilsTest {
 
     // 1 tier configs
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTierConfigList(Lists
-        .newArrayList(new TierConfig("tier1", TierSegmentSelectorType.TIME.toString(), "30d",
-            TierStorageType.PINOT_SERVER.toString(), "tier1_tag_OFFLINE"))).build();
+        .newArrayList(new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d",
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE"))).build();
     TableConfigUtils.validate(tableConfig);
 
     // 2 tier configs, case insensitive check
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTierConfigList(Lists
-        .newArrayList(new TierConfig("tier1", TierSegmentSelectorType.TIME.toString().toLowerCase(), "30d",
-                TierStorageType.PINOT_SERVER.toString(), "tier1_tag_OFFLINE"),
-            new TierConfig("tier2", TierSegmentSelectorType.TIME.toString(), "40d",
-                TierStorageType.PINOT_SERVER.toString().toLowerCase(), "tier2_tag_OFFLINE"))).build();
+        .newArrayList(new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE.toLowerCase(), "30d",
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE"),
+            new TierConfig("tier2", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "40d",
+                TierFactory.PINOT_SERVER_STORAGE_TYPE.toLowerCase(), "tier2_tag_OFFLINE"))).build();
     TableConfigUtils.validate(tableConfig);
 
     //realtime table
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testTable").setTimeColumnName("millis")
-        .setTierConfigList(Lists.newArrayList(new TierConfig("tier1", TierSegmentSelectorType.TIME.toString(), "30d",
-                TierStorageType.PINOT_SERVER.toString().toLowerCase(), "tier1_tag_OFFLINE"),
-            new TierConfig("tier2", TierSegmentSelectorType.TIME.toString().toLowerCase(), "40d",
-                TierStorageType.PINOT_SERVER.toString(), "tier2_tag_OFFLINE"))).build();
+        .setTierConfigList(Lists.newArrayList(new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d",
+                TierFactory.PINOT_SERVER_STORAGE_TYPE.toLowerCase(), "tier1_tag_OFFLINE"),
+            new TierConfig("tier2", TierFactory.TIME_SEGMENT_SELECTOR_TYPE.toLowerCase(), "40d",
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE"))).build();
     TableConfigUtils.validate(tableConfig);
 
     // tier name empty
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTierConfigList(Lists
         .newArrayList(
-            new TierConfig("", TierSegmentSelectorType.TIME.toString(), "30d", TierStorageType.PINOT_SERVER.toString(),
+            new TierConfig("", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", TierFactory.PINOT_SERVER_STORAGE_TYPE,
                 "tier1_tag_OFFLINE"))).build();
     try {
       TableConfigUtils.validate(tableConfig);
@@ -234,10 +233,10 @@ public class TableConfigUtilsTest {
 
     // tier name repeats
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTierConfigList(Lists
-        .newArrayList(new TierConfig("sameTierName", TierSegmentSelectorType.TIME.toString(), "30d",
-                TierStorageType.PINOT_SERVER.toString(), "tier1_tag_OFFLINE"),
-            new TierConfig("sameTierName", TierSegmentSelectorType.TIME.toString(), "100d",
-                TierStorageType.PINOT_SERVER.toString(), "tier2_tag_OFFLINE"))).build();
+        .newArrayList(new TierConfig("sameTierName", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d",
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE"),
+            new TierConfig("sameTierName", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "100d",
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE"))).build();
     try {
       TableConfigUtils.validate(tableConfig);
       Assert.fail("Should have failed due to duplicate tier name");
@@ -247,9 +246,9 @@ public class TableConfigUtilsTest {
 
     // segmentSelectorType invalid
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTierConfigList(Lists
-        .newArrayList(new TierConfig("tier1", TierSegmentSelectorType.TIME.toString(), "30d",
-                TierStorageType.PINOT_SERVER.toString(), "tier1_tag_OFFLINE"),
-            new TierConfig("tier2", "unsupportedSegmentSelector", "40d", TierStorageType.PINOT_SERVER.toString(),
+        .newArrayList(new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d",
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE"),
+            new TierConfig("tier2", "unsupportedSegmentSelector", "40d", TierFactory.PINOT_SERVER_STORAGE_TYPE,
                 "tier2_tag_OFFLINE"))).build();
     try {
       TableConfigUtils.validate(tableConfig);
@@ -260,10 +259,10 @@ public class TableConfigUtilsTest {
 
     // segmentAge not provided for TIME segmentSelectorType
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTierConfigList(Lists
-        .newArrayList(new TierConfig("tier1", TierSegmentSelectorType.TIME.toString(), null,
-                TierStorageType.PINOT_SERVER.toString(), "tier1_tag_OFFLINE"),
-            new TierConfig("tier2", TierSegmentSelectorType.TIME.toString(), "40d",
-                TierStorageType.PINOT_SERVER.toString(), "tier2_tag_OFFLINE"))).build();
+        .newArrayList(new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, null,
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE"),
+            new TierConfig("tier2", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "40d",
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE"))).build();
     try {
       TableConfigUtils.validate(tableConfig);
       Assert.fail("Should have failed due to missing segmentAge");
@@ -273,10 +272,10 @@ public class TableConfigUtilsTest {
 
     // segmentAge invalid
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTierConfigList(Lists
-        .newArrayList(new TierConfig("tier1", TierSegmentSelectorType.TIME.toString(), "30d",
-                TierStorageType.PINOT_SERVER.toString(), "tier1_tag_OFFLINE"),
-            new TierConfig("tier2", TierSegmentSelectorType.TIME.toString(), "3600",
-                TierStorageType.PINOT_SERVER.toString(), "tier2_tag_OFFLINE"))).build();
+        .newArrayList(new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d",
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE"),
+            new TierConfig("tier2", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "3600",
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE"))).build();
 
     try {
       TableConfigUtils.validate(tableConfig);
@@ -287,9 +286,9 @@ public class TableConfigUtilsTest {
 
     // storageType invalid
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTierConfigList(Lists
-        .newArrayList(new TierConfig("tier1", TierSegmentSelectorType.TIME.toString(), "30d", "unsupportedStorageType",
-            "tier1_tag_OFFLINE"), new TierConfig("tier2", TierSegmentSelectorType.TIME.toString(), "40d",
-            TierStorageType.PINOT_SERVER.toString(), "tier2_tag_OFFLINE"))).build();
+        .newArrayList(new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", "unsupportedStorageType",
+            "tier1_tag_OFFLINE"), new TierConfig("tier2", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "40d",
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE"))).build();
 
     try {
       TableConfigUtils.validate(tableConfig);
@@ -300,10 +299,10 @@ public class TableConfigUtilsTest {
 
     // serverTag not provided for PINOT_SERVER storageType
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTierConfigList(Lists
-        .newArrayList(new TierConfig("tier1", TierSegmentSelectorType.TIME.toString(), "30d",
-                TierStorageType.PINOT_SERVER.toString(), "tier1_tag_OFFLINE"),
-            new TierConfig("tier2", TierSegmentSelectorType.TIME.toString(), "40d",
-                TierStorageType.PINOT_SERVER.toString(), null))).build();
+        .newArrayList(new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d",
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE"),
+            new TierConfig("tier2", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "40d",
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, null))).build();
     try {
       TableConfigUtils.validate(tableConfig);
       Assert.fail("Should have failed due to ");
@@ -313,10 +312,10 @@ public class TableConfigUtilsTest {
 
     // serverTag invalid
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTierConfigList(Lists
-        .newArrayList(new TierConfig("tier1", TierSegmentSelectorType.TIME.toString(), "30d",
-                TierStorageType.PINOT_SERVER.toString(), "tier1_tag"),
-            new TierConfig("tier2", TierSegmentSelectorType.TIME.toString(), "40d",
-                TierStorageType.PINOT_SERVER.toString(), "tier2_tag_OFFLINE"))).build();
+        .newArrayList(new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d",
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag"),
+            new TierConfig("tier2", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "40d",
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE"))).build();
     try {
       TableConfigUtils.validate(tableConfig);
       Assert.fail("Should have failed due to invalid server tag");

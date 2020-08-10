@@ -18,14 +18,10 @@
  */
 package org.apache.pinot.common.tier;
 
-import org.apache.pinot.common.tier.TierFactory.TierStorageType;
-
-
 /**
  * Tier storage type which uses Pinot servers as storage
  */
 public class PinotServerTierStorage implements TierStorage {
-  private final String _type = TierStorageType.PINOT_SERVER.toString();
   private final String _tag;
 
   public PinotServerTierStorage(String tag) {
@@ -41,6 +37,6 @@ public class PinotServerTierStorage implements TierStorage {
 
   @Override
   public String getType() {
-    return _type;
+    return TierFactory.PINOT_SERVER_STORAGE_TYPE;
   }
 }

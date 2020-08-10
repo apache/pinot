@@ -27,8 +27,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.tier.TierFactory;
-import org.apache.pinot.common.tier.TierFactory.TierSegmentSelectorType;
-import org.apache.pinot.common.tier.TierFactory.TierStorageType;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.spi.config.table.CompletionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -281,10 +279,10 @@ public class TableConfigSerDeTest {
     {
       // With tier config
       List<TierConfig> tierConfigList = Lists.newArrayList(
-          new TierConfig("tierA", TierSegmentSelectorType.TIME.toString(), "10d",
-              TierStorageType.PINOT_SERVER.toString(), "tierA_tag_OFFLINE"),
-          new TierConfig("tierB", TierSegmentSelectorType.TIME.toString(), "30d",
-              TierStorageType.PINOT_SERVER.toString(), "tierB_tag_OFFLINE"));
+          new TierConfig("tierA", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d", TierFactory.PINOT_SERVER_STORAGE_TYPE,
+              "tierA_tag_OFFLINE"),
+          new TierConfig("tierB", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", TierFactory.PINOT_SERVER_STORAGE_TYPE,
+              "tierB_tag_OFFLINE"));
       TableConfig tableConfig = tableConfigBuilder.setTierConfigList(tierConfigList).build();
 
       checkTierConfigList(tableConfig);
@@ -410,14 +408,14 @@ public class TableConfigSerDeTest {
     assertNotNull(tierConfigsList);
     assertEquals(tierConfigsList.size(), 2);
     assertEquals(tierConfigsList.get(0).getName(), "tierA");
-    assertEquals(tierConfigsList.get(0).getSegmentSelectorType(), TierSegmentSelectorType.TIME.toString());
+    assertEquals(tierConfigsList.get(0).getSegmentSelectorType(), TierFactory.TIME_SEGMENT_SELECTOR_TYPE);
     assertEquals(tierConfigsList.get(0).getSegmentAge(), "10d");
-    assertEquals(tierConfigsList.get(0).getStorageType(), TierStorageType.PINOT_SERVER.toString());
+    assertEquals(tierConfigsList.get(0).getStorageType(), TierFactory.PINOT_SERVER_STORAGE_TYPE);
     assertEquals(tierConfigsList.get(0).getServerTag(), "tierA_tag_OFFLINE");
     assertEquals(tierConfigsList.get(1).getName(), "tierB");
-    assertEquals(tierConfigsList.get(1).getSegmentSelectorType(), TierSegmentSelectorType.TIME.toString());
+    assertEquals(tierConfigsList.get(1).getSegmentSelectorType(), TierFactory.TIME_SEGMENT_SELECTOR_TYPE);
     assertEquals(tierConfigsList.get(1).getSegmentAge(), "30d");
-    assertEquals(tierConfigsList.get(1).getStorageType(), TierStorageType.PINOT_SERVER.toString());
+    assertEquals(tierConfigsList.get(1).getStorageType(), TierFactory.PINOT_SERVER_STORAGE_TYPE);
     assertEquals(tierConfigsList.get(1).getServerTag(), "tierB_tag_OFFLINE");
   }
 

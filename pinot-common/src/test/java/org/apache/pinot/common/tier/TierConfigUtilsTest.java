@@ -21,8 +21,6 @@ package org.apache.pinot.common.tier;
 import com.google.common.collect.Lists;
 import java.util.Collections;
 import java.util.Comparator;
-import org.apache.pinot.common.tier.TierFactory.TierSegmentSelectorType;
-import org.apache.pinot.common.tier.TierFactory.TierStorageType;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -51,8 +49,8 @@ public class TierConfigUtilsTest {
     Assert.assertFalse(TierConfigUtils.shouldRelocateToTiers(tableConfig));
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTierConfigList(Lists
-        .newArrayList(new TierConfig("myTier", TierSegmentSelectorType.TIME.toString(), "10d",
-            TierStorageType.PINOT_SERVER.toString(), "tag_OFFLINE"))).build();
+        .newArrayList(new TierConfig("myTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d",
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tag_OFFLINE"))).build();
     Assert.assertTrue(TierConfigUtils.shouldRelocateToTiers(tableConfig));
 
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("myTable").build();
@@ -67,8 +65,8 @@ public class TierConfigUtilsTest {
     Assert.assertFalse(TierConfigUtils.shouldRelocateToTiers(tableConfig));
 
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("myTable").setTierConfigList(Lists
-        .newArrayList(new TierConfig("myTier", TierSegmentSelectorType.TIME.toString(), "10d",
-            TierStorageType.PINOT_SERVER.toString(), "tag_OFFLINE"))).build();
+        .newArrayList(new TierConfig("myTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d",
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tag_OFFLINE"))).build();
     Assert.assertTrue(TierConfigUtils.shouldRelocateToTiers(tableConfig));
   }
 
@@ -77,19 +75,20 @@ public class TierConfigUtilsTest {
    */
   @Test
   public void testGetTier() {
-    TierConfig tierConfig = new TierConfig("tier1", TierSegmentSelectorType.TIME.toString(), "30d",
-        TierStorageType.PINOT_SERVER.toString(), "tier1_tag_OFFLINE");
+    TierConfig tierConfig =
+        new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", TierFactory.PINOT_SERVER_STORAGE_TYPE,
+            "tier1_tag_OFFLINE");
     Tier tier = TierFactory.getTier(tierConfig, null);
     Assert.assertEquals(tier.getName(), "tier1");
     Assert.assertTrue(tier.getSegmentSelector() instanceof TimeBasedTierSegmentSelector);
-    Assert.assertEquals(tier.getSegmentSelector().getType(), TierSegmentSelectorType.TIME.toString());
+    Assert.assertEquals(tier.getSegmentSelector().getType(), TierFactory.TIME_SEGMENT_SELECTOR_TYPE);
     Assert.assertEquals(((TimeBasedTierSegmentSelector) tier.getSegmentSelector()).getSegmentAgeMillis(),
         30 * 24 * 60 * 60 * 1000L);
     Assert.assertTrue(tier.getStorage() instanceof PinotServerTierStorage);
-    Assert.assertEquals(tier.getStorage().getType(), TierStorageType.PINOT_SERVER.toString());
+    Assert.assertEquals(tier.getStorage().getType(), TierFactory.PINOT_SERVER_STORAGE_TYPE);
     Assert.assertEquals(((PinotServerTierStorage) tier.getStorage()).getTag(), "tier1_tag_OFFLINE");
 
-    tierConfig = new TierConfig("tier1", "unknown", "30d", TierStorageType.PINOT_SERVER.toString(), "tier1_tag_OFFLINE");
+    tierConfig = new TierConfig("tier1", "unknown", "30d", TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE");
     try {
       TierFactory.getTier(tierConfig, null);
       Assert.fail("Should have failed due to unsupported segmentSelectorType");
@@ -97,7 +96,7 @@ public class TierConfigUtilsTest {
       // expected
     }
 
-    tierConfig = new TierConfig("tier1", TierSegmentSelectorType.TIME.toString(), "30d", "unknown", "tier1_tag_OFFLINE");
+    tierConfig = new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", "unknown", "tier1_tag_OFFLINE");
     try {
       TierFactory.getTier(tierConfig, null);
       Assert.fail("Should've failed due to unsupported storageType");
