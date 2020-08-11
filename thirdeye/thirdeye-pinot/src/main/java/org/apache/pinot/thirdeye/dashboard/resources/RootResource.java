@@ -25,6 +25,7 @@ import com.google.inject.Singleton;
 import io.swagger.annotations.Api;
 import javax.ws.rs.Path;
 import org.apache.pinot.thirdeye.api.application.ApplicationResource;
+import org.apache.pinot.thirdeye.api.detection.AnomalyDetectionResource;
 import org.apache.pinot.thirdeye.api.user.dashboard.UserDashboardResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.AnomaliesResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.ConfigResource;
@@ -51,6 +52,7 @@ public class RootResource {
   private final AdminResource adminResource;
   private final AnomaliesResource anomaliesResource;
   private final AnomalySearchResource anomalySearchResource;
+  private final AnomalyDetectionResource anomalyDetectionResource;
   private final ApplicationResource applicationResource;
   private final AutoOnboardResource autoOnboardResource;
   private final CacheResource cacheResource;
@@ -73,6 +75,7 @@ public class RootResource {
       final AdminResource adminResource,
       final AnomaliesResource anomaliesResource,
       final AnomalySearchResource anomalySearchResource,
+      final AnomalyDetectionResource anomalyDetectionResource,
       final ApplicationResource applicationResource,
       final AutoOnboardResource autoOnboardResource,
       final CacheResource cacheResource,
@@ -92,6 +95,7 @@ public class RootResource {
     this.adminResource = adminResource;
     this.anomaliesResource = anomaliesResource;
     this.anomalySearchResource = anomalySearchResource;
+    this.anomalyDetectionResource = anomalyDetectionResource;
     this.applicationResource = applicationResource;
     this.autoOnboardResource = autoOnboardResource;
     this.cacheResource = cacheResource;
@@ -123,6 +127,11 @@ public class RootResource {
   @Path("anomaly-search")
   public AnomalySearchResource getAnomalySearchResource() {
     return anomalySearchResource;
+  }
+
+  @Path("anomaly-detection")
+  public AnomalyDetectionResource getAnomalyDetectionResource() {
+    return anomalyDetectionResource;
   }
 
   @Path("application")
