@@ -60,7 +60,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java: [ 1.8, 10, 11, 12, 13, 14-ea, 15-ea ]
+        java: [ 1.8, 10, 11, 12, 13, 14, 15-ea ]
     name: Pinot Quickstart on JDK ${{ matrix.java }}
     steps:
       - uses: actions/checkout@v2
