@@ -20,12 +20,14 @@
 package org.apache.pinot.thirdeye.detection;
 
 import org.apache.pinot.thirdeye.anomaly.task.TaskInfo;
-
+import org.apache.pinot.thirdeye.datalayer.pojo.DetectionConfigBean;
 
 public class DetectionPipelineTaskInfo implements TaskInfo {
   long configId;
   long start;
   long end;
+  boolean online;
+  DetectionConfigBean detectionConfigBean;
 
   public DetectionPipelineTaskInfo(long configId, long start, long end) {
     this.configId = configId;
@@ -59,5 +61,21 @@ public class DetectionPipelineTaskInfo implements TaskInfo {
 
   public void setEnd(long end) {
     this.end = end;
+  }
+
+  public boolean isOnline() {
+    return online;
+  }
+
+  public void setOnline(boolean online) {
+    this.online = online;
+  }
+
+  public DetectionConfigBean getDetectionConfigBean() {
+    return detectionConfigBean;
+  }
+
+  public void setDetectionConfigBean(DetectionConfigBean detectionConfigBean) {
+    this.detectionConfigBean = detectionConfigBean;
   }
 }

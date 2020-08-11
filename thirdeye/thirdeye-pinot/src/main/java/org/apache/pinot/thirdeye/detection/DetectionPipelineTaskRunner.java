@@ -21,6 +21,7 @@ package org.apache.pinot.thirdeye.detection;
 
 import java.util.Collections;
 import java.util.List;
+import com.google.common.base.Preconditions;
 import org.apache.pinot.thirdeye.anomaly.task.TaskContext;
 import org.apache.pinot.thirdeye.anomaly.task.TaskInfo;
 import org.apache.pinot.thirdeye.anomaly.task.TaskResult;
@@ -32,6 +33,7 @@ import org.apache.pinot.thirdeye.datalayer.bao.EvaluationManager;
 import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.EvaluationDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -54,9 +56,12 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
   private final DetectionConfigManager detectionDAO;
   private final MergedAnomalyResultManager anomalyDAO;
   private final EvaluationManager evaluationDAO;
+  private final TaskManager taskDAO;
   private final DetectionPipelineLoader loader;
   private final DataProvider provider;
   private final ModelMaintenanceFlow maintenanceFlow;
+
+  private static final Long dummyDetectionId = 123456789L;
 
   /**
    * Default constructor for ThirdEye task execution framework.
@@ -70,6 +75,7 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
     this.detectionDAO = DAORegistry.getInstance().getDetectionConfigManager();
     this.anomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
     this.evaluationDAO = DAORegistry.getInstance().getEvaluationManager();
+    this.taskDAO = DAORegistry.getInstance().getTaskDAO();
     MetricConfigManager metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     DatasetConfigManager datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
     EventManager eventDAO = DAORegistry.getInstance().getEventDAO();
@@ -105,6 +111,7 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
     this.evaluationDAO = evaluationDAO;
     this.loader = loader;
     this.provider = provider;
+    this.taskDAO = DAORegistry.getInstance().getTaskDAO();
     this.maintenanceFlow = new ModelRetuneFlow(this.provider, DetectionRegistry.getInstance());
   }
 
@@ -114,10 +121,20 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
 
     try {
       DetectionPipelineTaskInfo info = (DetectionPipelineTaskInfo) taskInfo;
+      DetectionConfigDTO config;
+      if (info.isOnline()) {
+        config = taskDAO.extractDetectionConfig(info);
+        // Online detection is not saved into DB so it does not have an ID
+        // To prevent later on pipeline throws a false error for null ID, use a dummy id here
+        config.setId(dummyDetectionId);
+        Preconditions.checkNotNull(config,
+            "Could not find detection config for online task info: " + info);
+      } else {
+        config = this.detectionDAO.findById(info.configId);
 
-      DetectionConfigDTO config = this.detectionDAO.findById(info.configId);
-      if (config == null) {
-        throw new IllegalArgumentException(String.format("Could not resolve config id %d", info.configId));
+        if (config == null) {
+          throw new IllegalArgumentException(String.format("Could not resolve config id %d", info.configId));
+        }
       }
 
       LOG.info("Start detection for config {} between {} and {}", config.getId(), info.start, info.end);
