@@ -413,7 +413,7 @@ public class ControllerStarter implements ServiceStartable {
       }
     });
 
-    _adminApp.start(_listenerConfigs, ListenerConfigUtil.shouldAdvertiseAsHttps(_listenerConfigs, _config));
+    _adminApp.start(_listenerConfigs);
 
     _listenerConfigs.stream().forEach(listenerConfig -> LOGGER.info("Controller services available at {}://{}:{}/",
         listenerConfig.getProtocol(), listenerConfig.getHost(), listenerConfig.getPort()));

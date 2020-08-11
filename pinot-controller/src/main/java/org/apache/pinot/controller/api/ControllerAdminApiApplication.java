@@ -104,7 +104,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     httpServer.addListener(listener);
   }
 
-  public void start(List<ListenerConfig> listenerConfigs, boolean advertiseHttps) {
+  public void start(List<ListenerConfig> listenerConfigs) {
     // ideally greater than reserved port but then port 80 is also valid
     Preconditions.checkNotNull(listenerConfigs);
 
@@ -122,7 +122,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
       throw new RuntimeException("Failed to start Http Server", e);
     }
 
-    setupSwagger(_httpServer, advertiseHttps);
+    setupSwagger(_httpServer);
 
     ClassLoader classLoader = ControllerAdminApiApplication.class.getClassLoader();
 
@@ -139,17 +139,13 @@ public class ControllerAdminApiApplication extends ResourceConfig {
         .map(port -> port.toString()).collect(Collectors.joining(",")));
   }
 
-  private void setupSwagger(HttpServer httpServer, boolean advertiseHttps) {
+  private void setupSwagger(HttpServer httpServer) {
     BeanConfig beanConfig = new BeanConfig();
     beanConfig.setTitle("Pinot Controller API");
     beanConfig.setDescription("APIs for accessing Pinot Controller information");
     beanConfig.setContact("https://github.com/apache/incubator-pinot");
     beanConfig.setVersion("1.0");
-    if (advertiseHttps) {
-      beanConfig.setSchemes(new String[]{CommonConstants.HTTPS_PROTOCOL});
-    } else {
-      beanConfig.setSchemes(new String[]{CommonConstants.HTTP_PROTOCOL});
-    }
+    beanConfig.setSchemes(new String[]{CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL});
     beanConfig.setBasePath("/");
     beanConfig.setResourcePackage(RESOURCE_PACKAGE);
     beanConfig.setScan(true);
@@ -160,7 +156,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     httpServer.getServerConfiguration().addHttpHandler(apiStaticHttpHandler, "/api/");
     httpServer.getServerConfiguration().addHttpHandler(apiStaticHttpHandler, "/help/");
 
-    URL swaggerDistLocation = loader.getResource("META-INF/resources/webjars/swagger-ui/2.2.2/");
+    URL swaggerDistLocation = loader.getResource("META-INF/resources/webjars/swagger-ui/2.2.10-1/");
     CLStaticHttpHandler swaggerDist = new CLStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
     httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
   }
