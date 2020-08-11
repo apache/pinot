@@ -394,10 +394,10 @@ public class S3PinotFS extends PinotFS {
         //Only add files and not directories
         if (!object.key().equals(fileUri.getPath()) && !object.key().endsWith(DELIMITER)) {
           String fileKey = object.key();
-          if(fileKey.startsWith(DELIMITER)){
+          if (fileKey.startsWith(DELIMITER)) {
             fileKey = fileKey.substring(1);
           }
-          builder.add(S3_SCHEME  + fileUri.getHost() + DELIMITER + fileKey);
+          builder.add(S3_SCHEME + fileUri.getHost() + DELIMITER + fileKey);
         }
       });
       return builder.build().toArray(new String[0]);
