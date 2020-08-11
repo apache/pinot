@@ -463,7 +463,7 @@ public class BrokerRequestToQueryContextConverterTest {
     // DistinctCountThetaSketch (string literal and escape quote)
     {
       String query =
-          "SELECT DISTINCTCOUNTTHETASKETCH(foo, 'nominalEntries=1000', 'bar=''a''', 'bar=''b''', 'bar=''a'' AND bar=''b''') FROM testTable WHERE foobar IN ('a', 'b')";
+          "SELECT DISTINCTCOUNTTHETASKETCH(foo, 'nominalEntries=1000', 'bar=''a''', 'bar=''b''', 'SET_INTERSECT($1, $2)') FROM testTable WHERE bar IN ('a', 'b')";
       QueryContext[] queryContexts = getQueryContexts(query, query);
       for (QueryContext queryContext : queryContexts) {
         FunctionContext function = queryContext.getSelectExpressions().get(0).getFunction();
@@ -474,9 +474,9 @@ public class BrokerRequestToQueryContextConverterTest {
         assertEquals(arguments.get(1), ExpressionContext.forLiteral("nominalEntries=1000"));
         assertEquals(arguments.get(2), ExpressionContext.forLiteral("bar='a'"));
         assertEquals(arguments.get(3), ExpressionContext.forLiteral("bar='b'"));
-        assertEquals(arguments.get(4), ExpressionContext.forLiteral("bar='a' AND bar='b'"));
+        assertEquals(arguments.get(4), ExpressionContext.forLiteral("SET_INTERSECT($1, $2)"));
         assertEquals(QueryContextUtils.getAllColumns(queryContext),
-            new HashSet<>(Arrays.asList("foo", "bar", "foobar")));
+            new HashSet<>(Arrays.asList("foo", "bar")));
         assertTrue(QueryContextUtils.isAggregationQuery(queryContext));
       }
     }

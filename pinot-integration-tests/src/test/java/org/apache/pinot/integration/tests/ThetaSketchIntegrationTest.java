@@ -126,26 +126,26 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
 
     // gender = female
     String query = "select distinctCountThetaSketch(thetaSketchCol, '', "
-        + "'dimName = ''gender''', 'dimValue = ''Female''', 'dimName = ''gender'' AND dimValue = ''Female''') from "
+        + "'dimName = ''gender''', 'dimValue = ''Female''', 'SET_INTERSECT($1, $2)') from "
         + DEFAULT_TABLE_NAME + " where dimName = 'gender' AND dimValue = 'Female'";
     runAndAssert(query, 50 + 60 + 70 + 110 + 120 + 130);
 
     // gender = male
     query = "select distinctCountThetaSketch(thetaSketchCol, '', "
-        + "'dimName = ''gender''', 'dimValue = ''Male''', 'dimName = ''gender'' AND dimValue = ''Male''') from "
+        + "'dimName = ''gender''', 'dimValue = ''Male''', 'SET_INTERSECT($1, $2)') from "
         + DEFAULT_TABLE_NAME + " where dimName = 'gender' AND dimValue = 'Male'";
     runAndAssert(query, 80 + 90 + 100 + 140 + 150 + 160);
 
     // course = math
     query = "select distinctCountThetaSketch(thetaSketchCol, '', "
-        + "'dimName = ''course''', 'dimValue = ''Math''', 'dimName = ''course'' AND dimValue = ''Math''') from "
+        + "'dimName = ''course''', 'dimValue = ''Math''', 'SET_INTERSECT($1, $2)') from "
         + DEFAULT_TABLE_NAME + " where dimName = 'course' AND dimValue = 'Math'";
     runAndAssert(query, 50 + 80 + 110 + 140);
 
     // gender = female AND course = math
     query = "select distinctCountThetaSketch(thetaSketchCol, '', "
         + "'dimName = ''gender''', 'dimValue = ''Female''', 'dimName = ''course''', 'dimValue = ''Math''', "
-        + "'(dimName = ''gender'' AND dimValue = ''Female'') AND (dimName = ''course'' AND dimValue = ''Math'')') from "
+        + "'SET_INTERSECT(SET_INTERSECT($1, $2), SET_INTERSECT($3, $4))') from "
         + DEFAULT_TABLE_NAME
         + " where (dimName = 'gender' AND dimValue = 'Female') OR (dimName = 'course' AND dimValue = 'Math')";
     runAndAssert(query, 50 + 110);
@@ -153,13 +153,13 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
     // gender = male OR course = biology
     query = "select distinctCountThetaSketch(thetaSketchCol, '', "
         + "'dimName = ''gender''', 'dimValue = ''Male''', 'dimName = ''course''', 'dimValue = ''Biology''', "
-        + "'(dimName = ''gender'' AND dimValue = ''Male'') OR (dimName = ''course'' AND dimValue = ''Biology'')') from "
+        + "'SET_UNION(SET_INTERSECT($1, $2), SET_INTERSECT($3, $4))') from "
         + DEFAULT_TABLE_NAME
         + " where (dimName = 'gender' AND dimValue = 'Male') OR (dimName = 'course' AND dimValue = 'Biology')";
     runAndAssert(query, 70 + 80 + 90 + 100 + 130 + 140 + 150 + 160);
 
     // group by gender
-    query = "select dimValue, distinctCountThetaSketch(thetaSketchCol, '', 'dimName = ''gender''', 'dimName = ''gender''') from "
+    query = "select dimValue, distinctCountThetaSketch(thetaSketchCol, '', 'dimName = ''gender''', '$1') from "
         + DEFAULT_TABLE_NAME + " where dimName = 'gender' AND (dimValue = 'Female' OR dimValue = 'Male') "
         + "group by dimValue";
     runAndAssert(query,
