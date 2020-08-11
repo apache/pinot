@@ -71,6 +71,7 @@ public class S3PinotFS extends PinotFS {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(S3PinotFS.class);
   private static final String DELIMITER = "/";
+  public static final String S3_SCHEME = "s3://";
   private S3Client _s3Client;
 
   @Override
@@ -320,8 +321,9 @@ public class S3PinotFS extends PinotFS {
     Path srcPath = Paths.get(srcUri.getPath());
     try {
       boolean copySucceeded = true;
-      for (String directoryEntry : listFiles(srcUri, true)) {
-        String directoryEntryPrefix = DELIMITER + directoryEntry;
+      for (String filePath : listFiles(srcUri, true)) {
+        URI srcFileURI = URI.create(filePath);
+        String directoryEntryPrefix =  srcFileURI.getPath();
         URI src = new URI(srcUri.getScheme(), srcUri.getHost(), directoryEntryPrefix, null);
         String relativeSrcPath = srcPath.relativize(Paths.get(directoryEntryPrefix)).toString();
         String dstPath = dstUri.resolve(relativeSrcPath).getPath();
@@ -391,7 +393,11 @@ public class S3PinotFS extends PinotFS {
       listObjectsV2Response.contents().stream().forEach(object -> {
         //Only add files and not directories
         if (!object.key().equals(fileUri.getPath()) && !object.key().endsWith(DELIMITER)) {
-          builder.add(object.key());
+          String fileKey = object.key();
+          if (fileKey.startsWith(DELIMITER)) {
+            fileKey = fileKey.substring(1);
+          }
+          builder.add(S3_SCHEME + fileUri.getHost() + DELIMITER + fileKey);
         }
       });
       return builder.build().toArray(new String[0]);
@@ -498,4 +504,5 @@ public class S3PinotFS extends PinotFS {
       throws IOException {
     super.close();
   }
+
 }
