@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Multimap;
+import com.google.inject.Singleton;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -98,9 +99,9 @@ import org.slf4j.LoggerFactory;
  *    b. Add a ExceptionMapper and register it in the dw environment
  *    c. Add a web filter / intercepter to catch and convert RTEs to web exception
  */
-@Path(value = "/data")
 @Produces(MediaType.APPLICATION_JSON)
 @Api(tags = {Constants.DASHBOARD_TAG})
+@Singleton
 public class DataResource {
   private static final Logger LOG = LoggerFactory.getLogger(DataResource.class);
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();

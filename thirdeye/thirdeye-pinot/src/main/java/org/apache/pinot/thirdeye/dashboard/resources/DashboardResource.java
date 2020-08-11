@@ -19,41 +19,16 @@
 
 package org.apache.pinot.thirdeye.dashboard.resources;
 
+import com.google.inject.Inject;
+import com.google.inject.Singleton;
 import io.dropwizard.views.View;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.URLDecoder;
-import java.util.Arrays;
-import java.util.List;
-import java.util.TreeSet;
-import java.util.concurrent.TimeUnit;
-
-import javax.ws.rs.DefaultValue;
-import javax.ws.rs.GET;
-import javax.ws.rs.Path;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.MediaType;
-
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
-import org.json.JSONArray;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.cache.LoadingCache;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.constant.MetricAggFunction;
 import org.apache.pinot.thirdeye.dashboard.Utils;
 import org.apache.pinot.thirdeye.dashboard.views.DashboardView;
-import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
-import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.MetricExpression;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
@@ -63,34 +38,50 @@ import org.apache.pinot.thirdeye.datasource.timeseries.TimeSeriesResponse;
 import org.apache.pinot.thirdeye.datasource.timeseries.TimeSeriesRow;
 import org.apache.pinot.thirdeye.datasource.timeseries.TimeSeriesRow.TimeSeriesMetric;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-@Path(value = "/dashboard")
+import javax.ws.rs.*;
+import javax.ws.rs.core.MediaType;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URLDecoder;
+import java.util.Arrays;
+import java.util.List;
+import java.util.TreeSet;
+import java.util.concurrent.TimeUnit;
+
+@Path("/dashboard")
+@Singleton
 public class DashboardResource {
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry
       .getInstance();
-  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final Logger LOG = LoggerFactory.getLogger(DashboardResource.class);
   private static final String DEFAULT_TIMEZONE_ID = "UTC";
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-  private QueryCache queryCache;
-  private LoadingCache<String, Long> datasetMaxDataTimeCache;
-  private LoadingCache<String, String> dimensionFiltersCache;
+  private final SummaryResource summaryResource;
+  private final QueryCache queryCache;
 
-  private MetricConfigManager metricConfigDAO;
-
-  public DashboardResource() {
+  @Inject
+  public DashboardResource(final SummaryResource summaryResource) {
+    this.summaryResource = summaryResource;
     this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
-    this.datasetMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getDatasetMaxDataTimeCache();
-    this.dimensionFiltersCache = CACHE_REGISTRY_INSTANCE.getDimensionFiltersCache();
-    this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
   }
 
   @GET
-  @Path(value = "/")
+  @Path("/")
   @Produces(MediaType.TEXT_HTML)
   public View getDashboardView() {
     return new DashboardView();
+  }
+
+  @Path("summary")
+  public SummaryResource getSummaryResource() {
+    return summaryResource;
   }
 
   @GET

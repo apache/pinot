@@ -20,12 +20,12 @@
 
 package org.apache.pinot.thirdeye.dashboard.resources.v2.anomalies;
 
+import com.google.inject.Singleton;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import java.util.List;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
-import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
@@ -36,9 +36,9 @@ import org.apache.pinot.thirdeye.api.Constants;
 /**
  * The type Anomaly search resource.
  */
-@Path(value = "/anomaly-search")
 @Produces(MediaType.APPLICATION_JSON)
 @Api(tags = {Constants.DETECTION_TAG})
+@Singleton
 public class AnomalySearchResource {
 
   private final AnomalySearcher anomalySearcher;

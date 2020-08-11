@@ -19,22 +19,43 @@
 
 package org.apache.pinot.thirdeye.dashboard.resources;
 
-import org.apache.pinot.thirdeye.api.Constants;
+import com.google.inject.Inject;
+import com.google.inject.Singleton;
+import io.dropwizard.views.View;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
-
+import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.dashboard.views.ThirdEyeAdminView;
 
-import io.dropwizard.views.View;
-
-@Path(value = "/thirdeye-admin")
-@Api(tags = {Constants.ADMIN_TAG } )
+@Api(tags = {Constants.ADMIN_TAG})
 @Produces(MediaType.APPLICATION_JSON)
+@Singleton
 public class AdminResource {
+
+  private final DatasetConfigResource datasetConfigResource;
+  private final MetricConfigResource metricConfigResource;
+
+  @Inject
+  public AdminResource(
+      final DatasetConfigResource datasetConfigResource,
+      final MetricConfigResource metricConfigResource) {
+    this.datasetConfigResource = datasetConfigResource;
+    this.metricConfigResource = metricConfigResource;
+  }
+
+  @Path("dataset-config")
+  public DatasetConfigResource getDatasetConfigResource() {
+    return datasetConfigResource;
+  }
+
+  @Path("metric-config")
+  public MetricConfigResource getMetricConfigResource() {
+    return metricConfigResource;
+  }
 
   @GET
   @Path(value = "/")

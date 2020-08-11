@@ -20,6 +20,7 @@
 package org.apache.pinot.thirdeye.api.application;
 
 import com.google.inject.Inject;
+import com.google.inject.Singleton;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import java.util.ArrayList;
@@ -49,8 +50,8 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.thirdeye.detection.yaml.translator.SubscriptionConfigTranslator.*;
 
 
-@Path(value = "/application")
 @Produces(MediaType.APPLICATION_JSON)
+@Singleton
 public class ApplicationResource {
   protected static final Logger LOG = LoggerFactory.getLogger(ApplicationResource.class);
 

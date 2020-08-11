@@ -68,7 +68,6 @@ import javax.ws.rs.core.UriBuilder;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
-@Path("/anomaly-detection")
 @Api(tags = { Constants.DETECTION_TAG })
 public class AnomalyDetectionResource {
   protected static final Logger LOG = LoggerFactory.getLogger(AnomalyDetectionResource.class);

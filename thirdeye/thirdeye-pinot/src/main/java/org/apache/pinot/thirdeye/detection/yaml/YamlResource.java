@@ -22,6 +22,7 @@ package org.apache.pinot.thirdeye.detection.yaml;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.RateLimiter;
+import com.google.inject.Singleton;
 import io.dropwizard.auth.Auth;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -112,8 +113,8 @@ import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 import static org.apache.pinot.thirdeye.detection.yaml.translator.SubscriptionConfigTranslator.*;
 
 
-@Path("/yaml")
 @Api(tags = {Constants.YAML_TAG})
+@Singleton
 public class YamlResource {
   protected static final Logger LOG = LoggerFactory.getLogger(YamlResource.class);
   private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();

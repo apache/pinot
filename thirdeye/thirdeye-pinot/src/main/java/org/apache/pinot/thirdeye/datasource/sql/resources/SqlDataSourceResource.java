@@ -1,6 +1,7 @@
 package org.apache.pinot.thirdeye.datasource.sql.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.inject.Singleton;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -12,9 +13,9 @@ import org.apache.pinot.thirdeye.datasource.sql.SqlDataset;
 import org.apache.pinot.thirdeye.datasource.sql.SqlResponseCacheLoader;
 import org.apache.pinot.thirdeye.datasource.sql.SqlUtils;
 
-@Path("/sql-data-source")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
+@Singleton
 public class SqlDataSourceResource {
 
   public SqlDataSourceResource() {}

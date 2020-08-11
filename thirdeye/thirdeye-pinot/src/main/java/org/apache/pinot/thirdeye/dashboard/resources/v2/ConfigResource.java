@@ -20,6 +20,7 @@
 package org.apache.pinot.thirdeye.dashboard.resources.v2;
 
 import com.google.inject.Inject;
+import com.google.inject.Singleton;
 import org.apache.pinot.thirdeye.config.ConfigNamespace;
 import org.apache.pinot.thirdeye.datalayer.bao.ConfigManager;
 import java.io.IOException;
@@ -38,8 +39,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-@Path(value = "/config")
 @Produces(MediaType.APPLICATION_JSON)
+@Singleton
 public class ConfigResource {
   private final static Logger LOG = LoggerFactory.getLogger(ConfigResource.class);
 
