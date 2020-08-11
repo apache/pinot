@@ -43,6 +43,18 @@ public class PinotControllerHealthCheck {
   @ApiOperation(value = "Check controller health")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Good")})
   @Produces(MediaType.TEXT_PLAIN)
+  public String checkHealthLegacy() {
+    if (StringUtils.isNotBlank(controllerConf.generateVipUrl())) {
+      return "GOOD";
+    }
+    return "";
+  }
+
+  @GET
+  @Path("health")
+  @ApiOperation(value = "Check controller health")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Good")})
+  @Produces(MediaType.TEXT_PLAIN)
   public String checkHealth() {
     if (StringUtils.isNotBlank(controllerConf.generateVipUrl())) {
       return "GOOD";
