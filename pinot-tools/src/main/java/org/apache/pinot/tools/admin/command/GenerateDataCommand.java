@@ -205,6 +205,11 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
           timeUnits.put(col, tfs.getIncomingGranularitySpec().getTimeType());
           break;
 
+        // forward compatibility with pattern generator
+        case DATE_TIME:
+        case COMPLEX:
+          break;
+
         default:
           throw new RuntimeException("Invalid field type.");
       }
