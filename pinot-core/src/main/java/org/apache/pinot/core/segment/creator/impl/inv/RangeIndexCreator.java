@@ -34,6 +34,7 @@ import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.query.utils.Pair;
 import org.apache.pinot.core.segment.creator.DictionaryBasedInvertedIndexCreator;
+import org.apache.pinot.core.segment.creator.RawValueBasedInvertedIndexCreator;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -65,7 +66,7 @@ import static org.apache.pinot.core.segment.creator.impl.V1Constants.Indexes.BIT
  *   </li>
  * </ul>
  */
-public final class RangeIndexCreator implements DictionaryBasedInvertedIndexCreator {
+public final class RangeIndexCreator implements RawValueBasedInvertedIndexCreator {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RangeIndexCreator.class);
 
@@ -165,26 +166,63 @@ public final class RangeIndexCreator implements DictionaryBasedInvertedIndexCrea
   }
 
   @Override
-  public void add(int dictId) {
-    _numberValueBuffer.put(_nextDocId, dictId);
-    _docIdBuffer.put(_nextDocId, _nextDocId);
-    _nextDocId = _nextDocId + 1;
+  public void add(int value) {
+    addValueToBuffer(value);
+    nextDoc();
   }
 
   @Override
-  public void add(int[] dictIds, int length) {
+  public void add(int[] values, int length) {
     for (int i = 0; i < length; i++) {
-      int dictId = dictIds[i];
-      _numberValueBuffer.put(_nextValueId, dictId);
-      _docIdBuffer.put(_nextValueId, _nextDocId);
-      _nextValueId = _nextValueId + 1;
+      addValueToBuffer(values[i]);
+      nextDoc();
     }
-    _nextDocId = _nextDocId + 1;
+    nextDoc();
   }
 
   @Override
-  public void addDoc(Object document, int docIdCounter) {
-    throw new IllegalStateException("Range index creator does not support Object type currently");
+  public void add(long value) {
+    addValueToBuffer(value);
+    nextDoc();
+  }
+
+  @Override
+  public void add(long[] values, int length) {
+    for (int i = 0; i < length; i++) {
+      addValueToBuffer(values[i]);
+      nextDoc();
+    }
+    nextDoc();
+  }
+
+  @Override
+  public void add(float value) {
+    addValueToBuffer(value);
+    nextDoc();
+  }
+
+  @Override
+  public void add(float[] values, int length) {
+    for (int i = 0; i < length; i++) {
+      addValueToBuffer(values[i]);
+      nextDoc();
+    }
+    nextDoc();
+  }
+
+  @Override
+  public void add(double value) {
+    addValueToBuffer(value);
+    nextDoc();
+  }
+
+  @Override
+  public void add(double[] values, int length) {
+    for (int i = 0; i < length; i++) {
+      addValueToBuffer(values[i]);
+      nextDoc();
+    }
+    nextDoc();
   }
 
   /**
@@ -397,6 +435,15 @@ public final class RangeIndexCreator implements DictionaryBasedInvertedIndexCrea
         throws IOException {
       destroyBuffer(_dataBuffer, _file);
     }
+  }
+
+  private void nextDoc() {
+    _nextDocId = _nextDocId + 1;
+  }
+
+  private void addValueToBuffer(Number value) {
+    _numberValueBuffer.put(_nextDocId, value);
+    _docIdBuffer.put(_nextDocId, _nextDocId);
   }
 
   void dump() {

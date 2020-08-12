@@ -34,6 +34,7 @@ import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
 import org.apache.pinot.core.segment.index.readers.forward.FixedBitMVForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
@@ -62,7 +63,7 @@ public class RangeIndexHandler {
     // Only create range index on dictionary-encoded unsorted columns
     for (String column : indexLoadingConfig.getRangeIndexColumns()) {
       ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
-      if (columnMetadata != null && !columnMetadata.isSorted() && columnMetadata.hasDictionary()) {
+      if (columnMetadata != null && !columnMetadata.isSorted()) {
         _rangeIndexColumns.add(columnMetadata);
       }
     }
@@ -102,7 +103,11 @@ public class RangeIndexHandler {
 
     // Create new range index for the column.
     LOGGER.info("Creating new range index for segment: {}, column: {}", _segmentName, column);
-    handleDictionaryBasedColumn(columnMetadata);
+    if (columnMetadata.hasDictionary()) {
+      handleDictionaryBasedColumn(columnMetadata);
+    } else {
+      handleNonDictionaryBasedColumn(columnMetadata);
+    }
 
     // For v3, write the generated range index file into the single file and remove it.
     if (_segmentVersion == SegmentVersion.v3) {
@@ -140,6 +145,44 @@ public class RangeIndexHandler {
     }
   }
 
+  private void handleNonDictionaryBasedColumn(ColumnMetadata columnMetadata)
+          throws IOException {
+    int numDocs = columnMetadata.getTotalDocs();
+    try (RangeIndexCreator creator = new RangeIndexCreator(_indexDir, columnMetadata.getFieldSpec(),
+            FieldSpec.DataType.INT, -1, -1, numDocs, columnMetadata.getTotalNumberOfEntries())) {
+      try (ForwardIndexReader forwardIndexReader = getForwardIndexReader(columnMetadata, _segmentWriter);
+           ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
+        if (columnMetadata.isSingleValue()) {
+          // Single-value column.
+          for (int i = 0; i < numDocs; i++) {
+            switch (columnMetadata.getDataType()) {
+              case INT: {
+                creator.add(forwardIndexReader.getInt(i, readerContext));
+                break;
+              }
+              case LONG: {
+                creator.add(forwardIndexReader.getInt(i, readerContext));
+                break;
+              }
+              case FLOAT: {
+                creator.add(forwardIndexReader.getInt(i, readerContext));
+                break;
+              }
+              case DOUBLE: {
+                creator.add(forwardIndexReader.getInt(i, readerContext));
+                break;
+              }
+              default: {
+                throw new RuntimeException("Range indexing is not supported");
+              }
+            }
+          }
+        }
+        creator.seal();
+      }
+    }
+  }
+
   private ForwardIndexReader<?> getForwardIndexReader(ColumnMetadata columnMetadata,
       SegmentDirectory.Writer segmentWriter)
       throws IOException {
@@ -147,10 +190,19 @@ public class RangeIndexHandler {
     int numRows = columnMetadata.getTotalDocs();
     int numBitsPerValue = columnMetadata.getBitsPerElement();
     if (columnMetadata.isSingleValue()) {
-      return new FixedBitSVForwardIndexReader(buffer, numRows, numBitsPerValue);
+      if (columnMetadata.hasDictionary()) {
+        return new FixedBitSVForwardIndexReader(buffer, numRows, numBitsPerValue);
+      } else {
+        return new FixedByteChunkSVForwardIndexReader(buffer, columnMetadata.getDataType());
+      }
     } else {
-      return new FixedBitMVForwardIndexReader(buffer, numRows, columnMetadata.getTotalNumberOfEntries(),
-          numBitsPerValue);
+      if (columnMetadata.hasDictionary()) {
+        return new FixedBitMVForwardIndexReader(buffer, numRows, columnMetadata.getTotalNumberOfEntries(),
+                numBitsPerValue);
+      } else {
+        throw new RuntimeException("Range indexing is not supported for multi value non-dictionary columns");
+      }
     }
   }
+
 }
