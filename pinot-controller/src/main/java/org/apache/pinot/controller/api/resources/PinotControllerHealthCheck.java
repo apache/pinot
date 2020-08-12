@@ -26,8 +26,13 @@ import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 import org.apache.commons.lang.StringUtils;
+import org.apache.pinot.common.metrics.ControllerMeter;
+import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.controller.ControllerConf;
 
 
@@ -38,15 +43,34 @@ public class PinotControllerHealthCheck {
   @Inject
   ControllerConf controllerConf;
 
+  @Inject
+  private ControllerMetrics controllerMetrics;
+
   @GET
   @Path("pinot-controller/admin")
   @ApiOperation(value = "Check controller health")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Good")})
   @Produces(MediaType.TEXT_PLAIN)
-  public String checkHealth() {
+  public String checkHealthLegacy() {
     if (StringUtils.isNotBlank(controllerConf.generateVipUrl())) {
       return "GOOD";
     }
     return "";
+  }
+
+  @GET
+  @Path("health")
+  @ApiOperation(value = "Check controller health")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Good")})
+  @Produces(MediaType.TEXT_PLAIN)
+  public String checkHealth() {
+    ServiceStatus.Status status = ServiceStatus.getServiceStatus();
+    if (status == ServiceStatus.Status.GOOD) {
+      controllerMetrics.addMeteredGlobalValue(ControllerMeter.HEALTHCHECK_OK_CALLS, 1);
+      return "OK";
+    }
+    controllerMetrics.addMeteredGlobalValue(ControllerMeter.HEALTHCHECK_BAD_CALLS, 1);
+    throw new WebApplicationException(String.format("Pinot broker status is %s", status),
+        Response.Status.SERVICE_UNAVAILABLE);
   }
 }
