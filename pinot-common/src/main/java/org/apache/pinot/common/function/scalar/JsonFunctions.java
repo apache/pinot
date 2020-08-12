@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.function;
+package org.apache.pinot.common.function.scalar;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.Map;
@@ -36,12 +36,14 @@ import org.apache.pinot.spi.utils.JsonUtils;
  *   </code>
  */
 public class JsonFunctions {
+  private JsonFunctions() {
+  }
 
   /**
    * Convert Map to Json String
    */
   @ScalarFunction
-  static String toJsonMapStr(Map map)
+  public static String toJsonMapStr(Map map)
       throws JsonProcessingException {
     return JsonUtils.objectToString(map);
   }
@@ -50,9 +52,8 @@ public class JsonFunctions {
    * Convert object to Json String
    */
   @ScalarFunction
-  static String json_format(Object object)
+  public static String jsonFormat(Object object)
       throws JsonProcessingException {
     return JsonUtils.objectToString(object);
   }
-
 }

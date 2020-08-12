@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.recordtransformer;
+package org.apache.pinot.common.utils;
 
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.core.data.recordtransformer.PinotDataType.*;
+import static org.apache.pinot.common.utils.PinotDataType.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
 

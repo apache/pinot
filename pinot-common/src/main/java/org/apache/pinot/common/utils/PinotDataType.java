@@ -16,8 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.recordtransformer;
+package org.apache.pinot.common.utils;
 
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.BytesUtils;
 
@@ -630,6 +631,35 @@ public enum PinotDataType {
       default:
         throw new UnsupportedOperationException(
             "Unsupported data type: " + dataType + " in field: " + fieldSpec.getName());
+    }
+  }
+
+  public static PinotDataType getPinotDataType(ColumnDataType columnDataType) {
+    switch (columnDataType) {
+      case INT:
+        return INTEGER;
+      case LONG:
+        return LONG;
+      case FLOAT:
+        return FLOAT;
+      case DOUBLE:
+        return DOUBLE;
+      case STRING:
+        return STRING;
+      case BYTES:
+        return BYTES;
+      case INT_ARRAY:
+        return INTEGER_ARRAY;
+      case LONG_ARRAY:
+        return LONG_ARRAY;
+      case FLOAT_ARRAY:
+        return FLOAT_ARRAY;
+      case DOUBLE_ARRAY:
+        return DOUBLE_ARRAY;
+      case STRING_ARRAY:
+        return STRING_ARRAY;
+      default:
+        throw new IllegalStateException("Cannot convert ColumnDataType: " + columnDataType + " to PinotDataType");
     }
   }
 }

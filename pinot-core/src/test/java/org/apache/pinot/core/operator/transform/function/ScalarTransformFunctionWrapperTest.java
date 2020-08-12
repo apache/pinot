@@ -44,7 +44,7 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
   @Test
   public void testStringUpperTransformFunction() {
     ExpressionContext expression =
-        QueryContextConverterUtils.getExpression(String.format("upper(%s)", STRING_ALPHANUM_SV_COLUMN));
+        QueryContextConverterUtils.getExpression(String.format("UPPER(%s)", STRING_ALPHANUM_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     Assert.assertEquals(transformFunction.getName(), "upper");
@@ -58,7 +58,7 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
   @Test
   public void testStringReverseTransformFunction() {
     ExpressionContext expression =
-        QueryContextConverterUtils.getExpression(String.format("reverse(%s)", STRING_ALPHANUM_SV_COLUMN));
+        QueryContextConverterUtils.getExpression(String.format("rEvErSe(%s)", STRING_ALPHANUM_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     Assert.assertEquals(transformFunction.getName(), "reverse");
@@ -72,7 +72,7 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
   @Test
   public void testStringSubStrTransformFunction() {
     ExpressionContext expression =
-        QueryContextConverterUtils.getExpression(String.format("substr(%s, 0, 2)", STRING_ALPHANUM_SV_COLUMN));
+        QueryContextConverterUtils.getExpression(String.format("sub_str(%s, 0, 2)", STRING_ALPHANUM_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     Assert.assertEquals(transformFunction.getName(), "substr");
@@ -83,7 +83,7 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     testTransformFunction(transformFunction, expectedValues);
 
     expression =
-        QueryContextConverterUtils.getExpression(String.format("substr(%s, 2, -1)", STRING_ALPHANUM_SV_COLUMN));
+        QueryContextConverterUtils.getExpression(String.format("substr(%s, '2', '-1')", STRING_ALPHANUM_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     Assert.assertEquals(transformFunction.getName(), "substr");

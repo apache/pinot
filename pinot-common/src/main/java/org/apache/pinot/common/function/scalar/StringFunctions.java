@@ -16,8 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.function;
-
+package org.apache.pinot.common.function.scalar;
 
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
@@ -33,6 +32,9 @@ import org.apache.pinot.common.function.annotations.ScalarFunction;
  * <code> SELECT UPPER(playerName) FROM baseballStats LIMIT 10 </code>
  */
 public class StringFunctions {
+  private StringFunctions() {
+  }
+
   private final static Pattern LTRIM = Pattern.compile("^\\s+");
   private final static Pattern RTRIM = Pattern.compile("\\s+$");
 
@@ -42,7 +44,7 @@ public class StringFunctions {
    * @return reversed input in from end to start
    */
   @ScalarFunction
-  static String reverse(String input) {
+  public static String reverse(String input) {
     return StringUtils.reverse(input);
   }
 
@@ -52,7 +54,7 @@ public class StringFunctions {
    * @return string in lower case format
    */
   @ScalarFunction
-  static String lower(String input) {
+  public static String lower(String input) {
     return input.toLowerCase();
   }
 
@@ -62,7 +64,7 @@ public class StringFunctions {
    * @return string in upper case format
    */
   @ScalarFunction
-  static String upper(String input) {
+  public static String upper(String input) {
     return input.toUpperCase();
   }
 
@@ -73,7 +75,7 @@ public class StringFunctions {
    * @return substring from beginIndex to end of the parent string
    */
   @ScalarFunction
-  static String substr(String input, Integer beginIndex) {
+  public static String substr(String input, int beginIndex) {
     return input.substring(beginIndex);
   }
 
@@ -88,7 +90,7 @@ public class StringFunctions {
    * @return substring from beginIndex to endIndex
    */
   @ScalarFunction
-  static String substr(String input, Integer beginIndex, Integer endIndex) {
+  public static String substr(String input, int beginIndex, int endIndex) {
     if (endIndex == -1) {
       return substr(input, beginIndex);
     }
@@ -103,7 +105,7 @@ public class StringFunctions {
    * @return The two input strings joined by the seperator
    */
   @ScalarFunction
-  static String concat(String input1, String input2, String seperator) {
+  public static String concat(String input1, String input2, String seperator) {
     String result = input1;
     result = result + seperator + input2;
     return result;
@@ -115,7 +117,7 @@ public class StringFunctions {
    * @return trim spaces from both ends of the string
    */
   @ScalarFunction
-  static String trim(String input) {
+  public static String trim(String input) {
     return input.trim();
   }
 
@@ -124,7 +126,7 @@ public class StringFunctions {
    * @return trim spaces from left side of the string
    */
   @ScalarFunction
-  static String ltrim(String input) {
+  public static String ltrim(String input) {
     return LTRIM.matcher(input).replaceAll("");
   }
 
@@ -133,7 +135,7 @@ public class StringFunctions {
    * @return trim spaces from right side of the string
    */
   @ScalarFunction
-  static String rtrim(String input) {
+  public static String rtrim(String input) {
     return RTRIM.matcher(input).replaceAll("");
   }
 
@@ -143,7 +145,7 @@ public class StringFunctions {
    * @return length of the string
    */
   @ScalarFunction
-  static Integer length(String input) {
+  public static int length(String input) {
     return input.length();
   }
 
@@ -156,7 +158,7 @@ public class StringFunctions {
    * @return start index of the Nth instance of subtring in main string
    */
   @ScalarFunction
-  static Integer strpos(String input, String find, Integer instance) {
+  public static int strpos(String input, String find, int instance) {
     return StringUtils.ordinalIndexOf(input, find, instance);
   }
 
@@ -167,7 +169,7 @@ public class StringFunctions {
    * @return true if string starts with prefix, false o.w.
    */
   @ScalarFunction
-  static Boolean startsWith(String input, String prefix) {
+  public static boolean startsWith(String input, String prefix) {
     return input.startsWith(prefix);
   }
 
@@ -178,7 +180,7 @@ public class StringFunctions {
    * @param substitute new substring to be replaced with target
    */
   @ScalarFunction
-  static String replace(String input, String find, String substitute) {
+  public static String replace(String input, String find, String substitute) {
     return input.replaceAll(find, substitute);
   }
 
@@ -190,7 +192,7 @@ public class StringFunctions {
    * @return string padded from the right side with pad to reach final size
    */
   @ScalarFunction
-  static String rpad(String input, Integer size, String pad) {
+  public static String rpad(String input, int size, String pad) {
     return StringUtils.rightPad(input, size, pad);
   }
 
@@ -202,7 +204,7 @@ public class StringFunctions {
    * @return string padded from the left side with pad to reach final size
    */
   @ScalarFunction
-  static String lpad(String input, Integer size, String pad) {
+  public static String lpad(String input, int size, String pad) {
     return StringUtils.leftPad(input, size, pad);
   }
 
@@ -212,7 +214,7 @@ public class StringFunctions {
    * @return the Unicode codepoint of the first character of the string
    */
   @ScalarFunction
-  static Integer codepoint(String input) {
+  public static int codepoint(String input) {
     return input.codePointAt(0);
   }
 
@@ -222,7 +224,7 @@ public class StringFunctions {
    * @return the character corresponding to the Unicode codepoint
    */
   @ScalarFunction
-  static String chr(Integer codepoint) {
+  public static String chr(int codepoint) {
     char[] result = Character.toChars(codepoint);
     return new String(result);
   }

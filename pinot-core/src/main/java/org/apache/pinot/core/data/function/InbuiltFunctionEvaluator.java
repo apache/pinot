@@ -20,9 +20,7 @@ package org.apache.pinot.core.data.function;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
@@ -55,8 +53,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
   private final ExecutableNode _rootNode;
   private final List<String> _arguments;
 
-  public InbuiltFunctionEvaluator(String functionExpression)
-      throws Exception {
+  public InbuiltFunctionEvaluator(String functionExpression) {
     _arguments = new ArrayList<>();
     ExpressionContext expression = QueryContextConverterUtils.getExpression(functionExpression);
     Preconditions
@@ -65,11 +62,9 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     _rootNode = planExecution(expression.getFunction());
   }
 
-  private ExecutableNode planExecution(FunctionContext function)
-      throws Exception {
+  private FunctionExecutionNode planExecution(FunctionContext function) {
     List<ExpressionContext> arguments = function.getArguments();
     int numArguments = arguments.size();
-    Class<?>[] argumentTypes = new Class<?>[numArguments];
     ExecutableNode[] childNodes = new ExecutableNode[numArguments];
     for (int i = 0; i < numArguments; i++) {
       ExpressionContext argument = arguments.get(i);
@@ -90,13 +85,9 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
           throw new IllegalStateException();
       }
       childNodes[i] = childNode;
-      argumentTypes[i] = childNode.getReturnType();
     }
 
-    String functionName = function.getFunctionName();
-    FunctionInfo functionInfo = FunctionRegistry.getFunctionByName(functionName);
-    Preconditions.checkState(functionInfo != null && functionInfo.isApplicable(argumentTypes),
-        "Failed to find function of name: %s with argument types: %s", functionName, Arrays.toString(argumentTypes));
+    FunctionInfo functionInfo = FunctionRegistry.getFunctionByName(function.getFunctionName());
     return new FunctionExecutionNode(functionInfo, childNodes);
   }
 
@@ -105,6 +96,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     return _arguments;
   }
 
+  @Override
   public Object evaluate(GenericRow row) {
     return _rootNode.execute(row);
   }
@@ -112,74 +104,53 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
   private interface ExecutableNode {
 
     Object execute(GenericRow row);
-
-    Class<?> getReturnType();
   }
 
   private static class FunctionExecutionNode implements ExecutableNode {
-    FunctionInvoker _functionInvoker;
-    ExecutableNode[] _argumentProviders;
-    Object[] _argInputs;
+    final FunctionInvoker _functionInvoker;
+    final ExecutableNode[] _argumentNodes;
+    final Object[] _arguments;
 
-    public FunctionExecutionNode(FunctionInfo functionInfo, ExecutableNode[] argumentProviders)
-        throws Exception {
+    FunctionExecutionNode(FunctionInfo functionInfo, ExecutableNode[] argumentNodes) {
       _functionInvoker = new FunctionInvoker(functionInfo);
-      _argumentProviders = argumentProviders;
-      _argInputs = new Object[_argumentProviders.length];
+      _argumentNodes = argumentNodes;
+      _arguments = new Object[_argumentNodes.length];
     }
 
+    @Override
     public Object execute(GenericRow row) {
-      for (int i = 0; i < _argumentProviders.length; i++) {
-        _argInputs[i] = _argumentProviders[i].execute(row);
+      int numArguments = _argumentNodes.length;
+      for (int i = 0; i < numArguments; i++) {
+        _arguments[i] = _argumentNodes[i].execute(row);
       }
-      return _functionInvoker.process(_argInputs);
-    }
-
-    public Class<?> getReturnType() {
-      return _functionInvoker.getReturnType();
+      _functionInvoker.convertTypes(_arguments);
+      return _functionInvoker.invoke(_arguments);
     }
   }
 
   private static class ConstantExecutionNode implements ExecutableNode {
-    private Object _value;
-    private Class<?> _returnType;
+    final String _value;
 
-    public ConstantExecutionNode(String value) {
-      if (NumberUtils.isCreatable(value)) {
-        _value = NumberUtils.createNumber(value);
-        _returnType = Number.class;
-      } else {
-        _value = value;
-        _returnType = String.class;
-      }
+    ConstantExecutionNode(String value) {
+      _value = value;
     }
 
     @Override
-    public Object execute(GenericRow row) {
+    public String execute(GenericRow row) {
       return _value;
-    }
-
-    @Override
-    public Class<?> getReturnType() {
-      return _returnType;
     }
   }
 
   private static class ColumnExecutionNode implements ExecutableNode {
-    private String _column;
+    final String _column;
 
-    public ColumnExecutionNode(String column) {
+    ColumnExecutionNode(String column) {
       _column = column;
     }
 
     @Override
     public Object execute(GenericRow row) {
       return row.getValue(_column);
-    }
-
-    @Override
-    public Class<?> getReturnType() {
-      return Object.class;
     }
   }
 }

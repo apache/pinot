@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.annotations.ScalarFunction;
 import org.reflections.Reflections;
 import org.reflections.scanners.MethodAnnotationsScanner;
@@ -104,6 +105,6 @@ public class FunctionRegistry {
   }
 
   private static String canonicalize(String functionName) {
-    return functionName.toLowerCase();
+    return StringUtils.remove(functionName, '_').toLowerCase();
   }
 }
