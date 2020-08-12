@@ -32,6 +32,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 import org.testng.collections.Lists;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
@@ -527,5 +528,32 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
 
     brokerResponse = getBrokerResponseForPqlQuery(query, new InstancePlanMakerImplV2(1000, 1000));
     assertTrue(brokerResponse.isNumGroupsLimitReached());
+  }
+
+  @Test
+  public void testGroupByMVColumns() {
+    String query = "SELECT COUNT(*), column7 FROM testTable GROUP BY column7 LIMIT 1000";
+    BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+    assertEquals(brokerResponse.getResultTable().getRows().size(), 359);
+    query = "SELECT COUNT(*), column5 FROM testTable GROUP BY column5 LIMIT 1000";
+    brokerResponse = getBrokerResponseForSqlQuery(query);
+    assertEquals(brokerResponse.getResultTable().getRows().size(), 9);
+    query = "SELECT COUNT(*), column3 FROM testTable GROUP BY column3 LIMIT 1000";
+    brokerResponse = getBrokerResponseForSqlQuery(query);
+    assertEquals(brokerResponse.getResultTable().getRows().size(), 5);
+    // Test groupby with one multi-value column and one non-dictionary single value column
+    query = "SELECT COUNT(*), column7, column5 FROM testTable GROUP BY column7, column5 LIMIT 1000";
+    brokerResponse = getBrokerResponseForSqlQuery(query);
+    assertEquals(brokerResponse.getResultTable().getRows().size(), 1000);
+    query = "SELECT COUNT(*), column7, column5 FROM testTable GROUP BY column5, column7 LIMIT 1000";
+    brokerResponse = getBrokerResponseForSqlQuery(query);
+    assertEquals(brokerResponse.getResultTable().getRows().size(), 1000);
+    // Test groupby with one multi-value column and one single value column
+    query = "SELECT COUNT(*), column3, column5 FROM testTable GROUP BY column3, column5 LIMIT 1000";
+    brokerResponse = getBrokerResponseForSqlQuery(query);
+    assertEquals(brokerResponse.getResultTable().getRows().size(), 41);
+    query = "SELECT COUNT(*), column3, column5 FROM testTable GROUP BY column5, column3 LIMIT 1000";
+    brokerResponse = getBrokerResponseForSqlQuery(query);
+    assertEquals(brokerResponse.getResultTable().getRows().size(), 41);
   }
 }
