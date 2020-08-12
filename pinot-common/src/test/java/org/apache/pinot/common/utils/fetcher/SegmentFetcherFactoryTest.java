@@ -95,6 +95,8 @@ public class SegmentFetcherFactoryTest {
     assertEquals(fakeCrypter._initCalled, 1);
     assertEquals(fakeCrypter._decryptCalled, 1);
     assertEquals(fakeCrypter._encryptCalled, 0);
+    assertEquals(fakeCrypter._originalPath, "foo/bar.enc");
+    assertEquals(fakeCrypter._decryptedPath, "foo/bar");
   }
 
   public static class FakeSegmentFetcher implements SegmentFetcher {
@@ -125,6 +127,8 @@ public class SegmentFetcherFactoryTest {
     private int _initCalled = 0;
     private int _encryptCalled = 0;
     private int _decryptCalled = 0;
+    private String _originalPath;
+    private String _decryptedPath;
 
     @Override
     public void init(PinotConfiguration config) {
@@ -132,13 +136,15 @@ public class SegmentFetcherFactoryTest {
     }
 
     @Override
-    public void encrypt(File decryptedFile, File encryptedFile) {
+    public void encrypt(File origFile, File encFile) {
       _encryptCalled++;
     }
 
     @Override
-    public void decrypt(File encryptedFile, File decryptedFile) {
+    public void decrypt(File origFile, File decFile) {
       _decryptCalled++;
+      _originalPath = origFile.getPath();
+      _decryptedPath = decFile.getPath();
     }
   }
 }

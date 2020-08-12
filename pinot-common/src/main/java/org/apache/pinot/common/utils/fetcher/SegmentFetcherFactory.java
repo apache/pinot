@@ -129,7 +129,7 @@ public class SegmentFetcherFactory {
       fetchSegmentToLocal(uri, dest);
     } else {
       // download
-      File tempDownloadedFile = new File(dest, ENCODED_SUFFIX);
+      File tempDownloadedFile = new File(dest.getPath() + ENCODED_SUFFIX);
       fetchSegmentToLocal(uri, tempDownloadedFile);
 
       // decrypt
