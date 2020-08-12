@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.api.resources;
+package org.apache.pinot.controller.util;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -64,7 +64,7 @@ public class ServerSegmentMetadataReader {
   public List<String> getSegmentMetadataFromServer(String tableNameWithType,
                                                    Map<String, List<String>> serversToSegmentsMap,
                                                    BiMap<String, String> endpoints, int timeoutMs) {
-    LOGGER.info("Reading segment metadata from servers for table {}.", tableNameWithType);
+    LOGGER.debug("Reading segment metadata from servers for table {}.", tableNameWithType);
     List<String> serverURLs = new ArrayList<>();
     for (Map.Entry<String, List<String>> serverToSegments : serversToSegmentsMap.entrySet()) {
       List<String> segments = serverToSegments.getValue();
@@ -124,7 +124,7 @@ public class ServerSegmentMetadataReader {
   public TableReloadStatus getSegmentReloadTime(String tableNameWithType,
                                                 Map<String, List<String>> serverToSegments,
                                                 BiMap<String, String> serverToEndpoint, int timeoutMs) {
-    LOGGER.info("Reading segment reload status from servers for table {}.", tableNameWithType);
+    LOGGER.debug("Reading segment reload status from servers for table {}.", tableNameWithType);
     List<String> serverURLs = new ArrayList<>();
     for (Map.Entry<String, List<String>> serverToSegmentsEntry : serverToSegments.entrySet()) {
       List<String> segments = serverToSegmentsEntry.getValue();
@@ -149,7 +149,7 @@ public class ServerSegmentMetadataReader {
           failedCounter++;
           continue;
         }
-        SegmentStatus segmentStatus = JsonUtils.inputStreamToObject(getMethod.getResponseBodyAsStream(), SegmentStatus.class);
+        SegmentStatus segmentStatus = JsonUtils.stringToObject(getMethod.getResponseBodyAsString(), SegmentStatus.class);
         segmentsStatus.add(segmentStatus);
       } catch (Exception e) {
         // Ignore individual exceptions because the exception has been logged in MultiGetRequest

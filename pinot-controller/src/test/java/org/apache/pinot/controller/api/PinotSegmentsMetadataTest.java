@@ -38,8 +38,8 @@ import java.util.concurrent.Executors;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.pinot.common.restlet.resources.SegmentStatus;
-import org.apache.pinot.controller.api.resources.ServerSegmentMetadataReader;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.mockito.stubbing.Answer;
 import org.slf4j.Logger;
@@ -251,7 +251,7 @@ public class PinotSegmentsMetadataTest {
       segmentMetadata = JsonUtils.objectToString(objectNode);
       SegmentStatus status = new SegmentStatus();
       status._segmentName = segment;
-      status._segmentReloadTime = "2020-07-18'T'20:20:20:200";
+      status._segmentReloadTimeUTC = "2020-07-18'T'20:20:20:200";
       segmentsReloadStatus.add(status);
     }
 

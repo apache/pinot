@@ -20,24 +20,34 @@ package org.apache.pinot.common.restlet.resources;
 
 /**
  * Holds segment last reload time status along with any errors for a segment with unsuccessful call to get reload times.
+ *
+ * NOTE: This class is being used in both the controller and the server. There is tight coupling between them.
+ * So, the API contract cannot be changed without changing or refactoring this class.
+ *
+ * TODO: refactor this class to be handled better. Make sure to have an extensible design that helps add more
  */
 public class SegmentStatus {
+  // Name of the segment itself
   public String _segmentName;
-  public String _segmentReloadTime;
+  // The last segment reload time in ISO date format (yyyy-MM-dd HH:mm:ss:SSS UTC)
+  // If the segment reload failed for a segment, then the value will be the previous segment reload was successful
+  public String _segmentReloadTimeUTC;
+  // If a segment load failed, then a status message is to be set - currently not done
+  // TODO: add message description to show why call to fetch reload status has errors
   public String _segmentReloadStatusMessage;
 
   public SegmentStatus() {
   }
 
-  public SegmentStatus(String segmentName, String segmentReloadTime, String segmentReloadStatusMessage) {
+  public SegmentStatus(String segmentName, String segmentReloadTimeUTC, String segmentReloadStatusMessage) {
     _segmentName = segmentName;
-    _segmentReloadTime = segmentReloadTime;
+    _segmentReloadTimeUTC = segmentReloadTimeUTC;
     _segmentReloadStatusMessage = segmentReloadStatusMessage;
   }
 
   @Override
   public String toString() {
-    return "{ segmentName: " + _segmentName + ", segmentReloadTime: " + _segmentReloadTime +
+    return "{ segmentName: " + _segmentName + ", segmentReloadTime: " + _segmentReloadTimeUTC +
         ", segmentReloadStatusMessage: " + _segmentReloadStatusMessage + " }";
   }
 }

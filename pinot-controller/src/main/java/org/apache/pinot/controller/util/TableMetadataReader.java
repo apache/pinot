@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.concurrent.Executor;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
-import org.apache.pinot.controller.api.resources.ServerSegmentMetadataReader;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -52,9 +51,8 @@ public class TableMetadataReader {
 
   /**
    * This helper method is used to retrieve the reload status for all segments of a table.
-   * Currently supports only OFFLINE tables.
+   * NOTE: Currently supports only OFFLINE tables.
    * @param tableNameWithType
-   * @param serverToSegmentsMap
    * @param timeoutMs
    * @return reload status object containing the refreshTime for each of the segments.
    * @throws InvalidConfigException

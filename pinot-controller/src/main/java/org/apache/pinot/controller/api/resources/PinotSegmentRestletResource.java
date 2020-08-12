@@ -58,6 +58,7 @@ import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
+import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
 import org.apache.pinot.controller.util.TableMetadataReader;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -84,7 +85,7 @@ import org.slf4j.LoggerFactory;
  *     <ul>
  *       <li>"/segments/{tableName}/{segmentName}/reload": reload a segment</li>
  *       <li>"/segments/{tableName}/reload": reload all segments</li>
- *       <li>"segments/{tableName}/reload-status": retrieve reload status of all segments</li>
+ *       <li>"segments/{tableName}/loadStatus": retrieve load status of all segments</li>
  *     </ul>
  *   </li>
  *   <li>
@@ -505,9 +506,9 @@ public class PinotSegmentRestletResource {
   }
 
   @GET
-  @Path("segments/{tableName}/reload-status")
+  @Path("segments/{tableName}/loadStatus")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Status of segment reload", notes = "Status of segment reload")
+  @ApiOperation(value = "Load status of a table segment", notes = "Load status of a table segment")
   public Map<String, ServerSegmentMetadataReader.TableReloadStatus> getReloadStatus(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr) {
@@ -567,8 +568,8 @@ public class PinotSegmentRestletResource {
 
   /**
    * This is a helper method to get the metadata for all segments for a given table name.
-   * @param tableNameWithType
-   * @return Map<SegmentName, SegmentMetadata>
+   * @param tableNameWithType name of the table along with its type
+   * @return Map<String, String>  metadata of the table segments -> map of segment name to its metadata
    * @throws InvalidConfigException
    * @throws IOException
    */

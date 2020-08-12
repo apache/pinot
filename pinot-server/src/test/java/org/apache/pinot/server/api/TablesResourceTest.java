@@ -278,6 +278,6 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(segmentStatus._segmentName, segmentMetadata.getName());
     final DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss:SSS' UTC'");
     String refreshTimeReadable = segmentMetadata.getRefreshTime() != Long.MIN_VALUE ? dateFormat.format(new Date(segmentMetadata.getRefreshTime())) : "";
-    Assert.assertEquals(segmentStatus._segmentReloadTime, refreshTimeReadable);
+    Assert.assertEquals(segmentStatus._segmentReloadTimeUTC, refreshTimeReadable);
   }
 }
