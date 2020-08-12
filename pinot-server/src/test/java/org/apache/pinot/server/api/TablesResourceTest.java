@@ -271,7 +271,7 @@ public class TablesResourceTest extends BaseResourceTest {
     IndexSegment defaultSegment = _offlineIndexSegments.get(0);
     String segmentMetadataPath =
         "/tables/" + TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME) + "/" + defaultSegment
-            .getSegmentName() + "/reload-status";
+            .getSegmentName() + "/loadStatus";
     SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) defaultSegment.getSegmentMetadata();
     SegmentStatus segmentStatus =
         JsonUtils.stringToObject(_webTarget.path(segmentMetadataPath).request().get(String.class), SegmentStatus.class);

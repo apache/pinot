@@ -109,7 +109,7 @@ public class ServerSegmentMetadataReader {
   }
 
   private String generateReloadStatusServerURL(String tableNameWithType, String segmentName, String endpoint) {
-    return String.format("http://%s/tables/%s/segments/%s/reload-status", endpoint, tableNameWithType, segmentName);
+    return String.format("http://%s/tables/%s/segments/%s/loadStatus", endpoint, tableNameWithType, segmentName);
   }
 
   /**
