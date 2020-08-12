@@ -1111,7 +1111,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     segmentLogger = LoggerFactory.getLogger(LLRealtimeSegmentDataManager.class.getName() + "_" + _segmentNameStr);
     _tableStreamName = _tableNameWithType + "_" + _streamTopic;
     _memoryManager = getMemoryManager(realtimeTableDataManager.getConsumerDir(), _segmentNameStr,
-        indexLoadingConfig.isRealtimeOffheapAllocation(), indexLoadingConfig.isDirectRealtimeOffheapAllocation(),
+        indexLoadingConfig.isRealtimeOffHeapAllocation(), indexLoadingConfig.isDirectRealtimeOffHeapAllocation(),
         serverMetrics);
 
     List<String> sortedColumns = indexLoadingConfig.getSortedColumns();
@@ -1155,7 +1155,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
     _segmentMaxRowCount = segmentMaxRowCount;
 
-    _isOffHeap = indexLoadingConfig.isRealtimeOffheapAllocation();
+    _isOffHeap = indexLoadingConfig.isRealtimeOffHeapAllocation();
 
     _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
 

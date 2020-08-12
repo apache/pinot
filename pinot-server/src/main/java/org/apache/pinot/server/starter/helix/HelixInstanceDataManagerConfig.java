@@ -103,7 +103,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
     for (String key: serverConfig.getKeys()) {
       LOGGER.info("InstanceDataManagerConfig, key: {} , value: {}", key, serverConfig.getProperty(key));
     }
-    
+
     checkRequiredKeys();
   }
 
@@ -172,7 +172,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   }
 
   @Override
-  public boolean isDirectRealtimeOffheapAllocation() {
+  public boolean isDirectRealtimeOffHeapAllocation() {
     return _instanceDataManagerConfiguration.getProperty(DIRECT_REALTIME_OFFHEAP_ALLOCATION, false);
   }
 
