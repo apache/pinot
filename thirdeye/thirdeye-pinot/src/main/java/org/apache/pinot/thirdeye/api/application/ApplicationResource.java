@@ -24,11 +24,15 @@ import com.google.inject.Singleton;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Stream;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -47,75 +51,109 @@ import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.thirdeye.dashboard.resources.ResourceUtils.ensureExists;
 import static org.apache.pinot.thirdeye.detection.yaml.translator.SubscriptionConfigTranslator.*;
 
 
 @Produces(MediaType.APPLICATION_JSON)
 @Singleton
 public class ApplicationResource {
+
   protected static final Logger LOG = LoggerFactory.getLogger(ApplicationResource.class);
 
-  private final ApplicationManager appDAO;
-  private final MergedAnomalyResultManager anomalyDAO;
-  private final DetectionConfigManager detectionDAO;
-  private final DetectionAlertConfigManager detectionAlertDAO;
+  private final ApplicationManager applicationManager;
+  private final MergedAnomalyResultManager mergedAnomalyResultManager;
+  private final DetectionConfigManager detectionConfigManager;
+  private final DetectionAlertConfigManager detectionAlertConfigManager;
 
   @Inject
-  public ApplicationResource(ApplicationManager appDAO,
-      MergedAnomalyResultManager anomalyDAO,
-      DetectionConfigManager detectionDAO,
-      DetectionAlertConfigManager detectionAlertDAO) {
-    this.appDAO = appDAO;
-    this.anomalyDAO = anomalyDAO;
-    this.detectionDAO = detectionDAO;
-    this.detectionAlertDAO = detectionAlertDAO;
+  public ApplicationResource(
+      ApplicationManager applicationManager,
+      MergedAnomalyResultManager mergedAnomalyResultManager,
+      DetectionConfigManager detectionConfigManager,
+      DetectionAlertConfigManager detectionAlertConfigManager) {
+    this.applicationManager = applicationManager;
+    this.mergedAnomalyResultManager = mergedAnomalyResultManager;
+    this.detectionConfigManager = detectionConfigManager;
+    this.detectionAlertConfigManager = detectionAlertConfigManager;
+  }
+
+  /**
+   * This API helps reset an application. The reset operation cleans all objects related to the
+   * application including alerts and anomalies providing a clean slate to play with.
+   */
+  @POST
+  @Path("reset/{name}")
+  public Response reset(
+      @ApiParam(value = "Name of the application") @PathParam("name") String name
+  ) {
+    // Call also ensures that application exists and throws an error if it doesn't
+    final ApplicationDTO application = getByName(name);
+
+    deleteDependents(name);
+    return Response.ok().build();
   }
 
   @DELETE
-  @Path("/delete/{application}")
+  @Path("/delete/{name}")
   @ApiOperation(value = "Delete an application along with associated subscriptions, functions and anomalies")
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
   public Response deleteApplication(
-      @ApiParam(value = "Name of the application to delete")
-      @PathParam("application") String application) throws Exception {
+      @ApiParam(value = "Name of the application") @PathParam("name") final String name
+  ) {
+    final ApplicationDTO application = getByName(name);
+    LOG.debug("[APPLICATION] deleting application " + name);
+
+    deleteDependents(name);
+    applicationManager.delete(application);
+
+    LOG.info("[APPLICATION] Successfully deleted application " + name);
+
     Map<String, String> responseMessage = new HashMap<>();
-    LOG.info("[APPLICATION] deleting application " + application);
-
-    try {
-      List<ApplicationDTO> appDTO = appDAO.findByPredicate(Predicate.EQ("application", application));
-      if (appDTO == null || appDTO.isEmpty()) {
-        responseMessage.put("message", "No application with name " + application + " was found.");
-        return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
-      }
-
-      List<DetectionAlertConfigDTO> subsGroupList = detectionAlertDAO.findByPredicate(Predicate.EQ("application", application));
-      LOG.info("[APPLICATION] Found " + subsGroupList.size() + " subscription groups under application " + application);
-      for (DetectionAlertConfigDTO subsGroup : subsGroupList) {
-        for (long id : ConfigUtils.getLongs(subsGroup.getProperties().get(PROP_DETECTION_CONFIG_IDS))) {
-          DetectionConfigDTO function = this.detectionDAO.findById(id);
-          if (function != null) {
-            List<MergedAnomalyResultDTO> anomalies =
-                new ArrayList<>(anomalyDAO.findByPredicate(Predicate.EQ("detectionConfigId", function.getId())));
-            for (MergedAnomalyResultDTO anomaly : anomalies) {
-              anomalyDAO.delete(anomaly);
-            }
-            detectionDAO.delete(function);
-            LOG.info("[APPLICATION] detection function " + function.getName() + " and all anomalies have been deleted.");
-          }
-        }
-        detectionAlertDAO.delete(subsGroup);
-        LOG.info("[APPLICATION] subscription group " + subsGroup.getName() + " deleted.");
-      }
-      appDAO.delete(appDTO.get(0));
-    } catch (Exception e) {
-      LOG.error("[APPLICATION] Error while deleting application " + application, e);
-      responseMessage.put("message", "Error while deleting application. Error = " + e.getMessage());
-      return Response.serverError().entity(responseMessage).build();
-    }
-
-    LOG.info("[APPLICATION] Successfully deleted application " + application);
     responseMessage.put("message", "Successfully deleted application.");
     return Response.ok().entity(responseMessage).build();
+  }
+
+  /**
+   * Get the first applicationDTO object by name. Throws error if it doesn't find any.
+   *
+   * @param name name of the application
+   * @return an {@link ApplicationDTO} object
+   */
+  private ApplicationDTO getByName(final String name) {
+    final List<ApplicationDTO> list = applicationManager
+        .findByPredicate(Predicate.EQ("application", name));
+
+    return ensureExists(Optional.of(list)
+        .map(Collection::stream)
+        .flatMap(Stream::findFirst)
+        .orElse(null), "Application not found: " + name);
+  }
+
+  private void deleteDependents(final String application) {
+    List<DetectionAlertConfigDTO> subsGroupList = detectionAlertConfigManager.findByPredicate(
+        Predicate.EQ("application", application));
+    LOG.debug(String.format("[APPLICATION] Found %d subscription groups under application %s",
+        subsGroupList.size(), application));
+
+    for (DetectionAlertConfigDTO subsGroup : subsGroupList) {
+      for (long id : ConfigUtils
+          .getLongs(subsGroup.getProperties().get(PROP_DETECTION_CONFIG_IDS))) {
+        DetectionConfigDTO function = this.detectionConfigManager.findById(id);
+        if (function != null) {
+          List<MergedAnomalyResultDTO> anomalies =
+              new ArrayList<>(
+                  mergedAnomalyResultManager
+                      .findByPredicate(Predicate.EQ("detectionConfigId", function.getId())));
+          anomalies.forEach(mergedAnomalyResultManager::delete);
+          detectionConfigManager.delete(function);
+          LOG.debug("[APPLICATION] detection function " + function.getName()
+              + " and all anomalies have been deleted.");
+        }
+      }
+      detectionAlertConfigManager.delete(subsGroup);
+      LOG.debug("[APPLICATION] subscription group " + subsGroup.getName() + " deleted.");
+    }
   }
 }
