@@ -50,6 +50,7 @@ import org.apache.pinot.thirdeye.datalayer.entity.JobIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.MergedAnomalyResultIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.MetricConfigIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.OnboardDatasetMetricIndex;
+import org.apache.pinot.thirdeye.datalayer.entity.OnlineDetectionDataIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.OverrideConfigIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.RawAnomalyResultIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.RootcauseSessionIndex;
@@ -77,6 +78,7 @@ import org.apache.pinot.thirdeye.datalayer.pojo.JobBean;
 import org.apache.pinot.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
 import org.apache.pinot.thirdeye.datalayer.pojo.MetricConfigBean;
 import org.apache.pinot.thirdeye.datalayer.pojo.OnboardDatasetMetricBean;
+import org.apache.pinot.thirdeye.datalayer.pojo.OnlineDetectionDataBean;
 import org.apache.pinot.thirdeye.datalayer.pojo.OverrideConfigBean;
 import org.apache.pinot.thirdeye.datalayer.pojo.RawAnomalyResultBean;
 import org.apache.pinot.thirdeye.datalayer.pojo.RootcauseSessionBean;
@@ -167,6 +169,8 @@ public class GenericPojoDao {
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, EvaluationIndex.class));
     pojoInfoMap.put(RootcauseTemplateBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, RootcauseTemplateIndex.class));
+    pojoInfoMap.put(OnlineDetectionDataBean.class,
+        newPojoInfo(DEFAULT_BASE_TABLE_NAME, OnlineDetectionDataIndex.class));
   }
 
   private static PojoInfo newPojoInfo(String baseTableName,

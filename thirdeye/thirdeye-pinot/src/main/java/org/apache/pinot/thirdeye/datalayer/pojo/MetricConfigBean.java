@@ -119,16 +119,6 @@ public class MetricConfigBean extends AbstractBean {
 
   private boolean dimensionAsMetric = false;
 
-  private String onlineData = "";
-
-  public String getOnlineData() {
-    return onlineData;
-  }
-
-  public void setOnlineData(String onlineData) {
-    this.onlineData = onlineData;
-  }
-
   public String getName() {
     return name;
   }

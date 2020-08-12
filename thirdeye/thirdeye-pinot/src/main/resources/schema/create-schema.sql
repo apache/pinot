@@ -437,3 +437,15 @@ create index rootcause_template_id_idx ON rootcause_template_index(base_id);
 create index rootcause_template_owner_idx ON rootcause_template_index(owner);
 create index rootcause_template_metric_idx on rootcause_template_index(metric_id);
 create index rootcause_template_config_application_idx ON rootcause_template_index(`application`);
+
+create table if not exists online_detection_data_index (
+    base_id bigint(20) not null,
+    dataset varchar(200),
+    metric varchar(200),
+    create_time timestamp default 0,
+    update_time timestamp default current_timestamp,
+    version int(10)
+) ENGINE=InnoDB;
+create index online_detection_data_id_idx ON online_detection_data_index(base_id);
+create index online_detection_data_dataset_idx ON online_detection_data_index(dataset);
+create index online_detection_data_metric_idx ON online_detection_data_index(metric);
