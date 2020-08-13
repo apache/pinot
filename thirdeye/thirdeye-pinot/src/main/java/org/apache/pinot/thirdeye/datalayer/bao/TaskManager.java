@@ -46,6 +46,8 @@ public interface TaskManager extends AbstractManager<TaskDTO>{
 
   List<TaskDTO> findByStatusAndTypeOrderByCreateTime(TaskStatus status, TaskConstants.TaskType type, int fetchSize, boolean asc);
 
+  List<TaskDTO> findByStatusAndTypeNotInOrderByCreateTime(TaskStatus status, TaskConstants.TaskType type, int fetchSize, boolean asc);
+
   List<TaskDTO> findByStatusAndWorkerId(Long workerId, TaskStatus status);
 
   boolean updateStatusAndWorkerId(Long workerId, Long id, Set<TaskStatus> allowedOldStatus, int expectedVersion);

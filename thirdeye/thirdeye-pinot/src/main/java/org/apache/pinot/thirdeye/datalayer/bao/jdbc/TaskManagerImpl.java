@@ -58,8 +58,14 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
   private static final String FIND_BY_STATUS_AND_TYPE_ORDER_BY_CREATE_TIME_ASC =
           " WHERE status = :status and type = :type order by startTime asc limit 10";
 
-  private static final String FIND_BY_STATUS_AND_TYPE__ORDER_BY_CREATE_TIME_DESC =
+  private static final String FIND_BY_STATUS_AND_TYPE_ORDER_BY_CREATE_TIME_DESC =
           " WHERE status = :status and type = :type order by startTime desc limit 10";
+
+  private static final String FIND_BY_STATUS_AND_TYPE_NOT_IN_ORDER_BY_CREATE_TIME_ASC =
+      " WHERE status = :status and type != :type order by startTime asc limit 10";
+
+  private static final String FIND_BY_STATUS_AND_TYPE_NOT_IN_ORDER_BY_CREATE_TIME_DESC =
+      " WHERE status = :status and type != :type order by startTime desc limit 10";
 
   private static final String FIND_BY_NAME_ORDER_BY_CREATE_TIME_ASC =
       " WHERE name = :name order by createTime asc limit ";
@@ -132,7 +138,24 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
     parameterMap.put("type", type.toString());
     List<TaskBean> list;
     String queryClause = (asc) ? FIND_BY_STATUS_AND_TYPE_ORDER_BY_CREATE_TIME_ASC
-            : FIND_BY_STATUS_AND_TYPE__ORDER_BY_CREATE_TIME_DESC;
+            : FIND_BY_STATUS_AND_TYPE_ORDER_BY_CREATE_TIME_DESC;
+    list = genericPojoDao.executeParameterizedSQL(queryClause, parameterMap, TaskBean.class);
+    List<TaskDTO> result = new ArrayList<>();
+    for (TaskBean bean : list) {
+      result.add(MODEL_MAPPER.map(bean, TaskDTO.class));
+    }
+    return result;
+  }
+
+  @Override
+  public List<TaskDTO> findByStatusAndTypeNotInOrderByCreateTime(TaskStatus status,
+      TaskConstants.TaskType type, int fetchSize, boolean asc) {
+    Map<String, Object> parameterMap = new HashMap<>();
+    parameterMap.put("status", status.toString());
+    parameterMap.put("type", type.toString());
+    List<TaskBean> list;
+    String queryClause = (asc) ? FIND_BY_STATUS_AND_TYPE_NOT_IN_ORDER_BY_CREATE_TIME_ASC
+        : FIND_BY_STATUS_AND_TYPE_NOT_IN_ORDER_BY_CREATE_TIME_DESC;
     list = genericPojoDao.executeParameterizedSQL(queryClause, parameterMap, TaskBean.class);
     List<TaskDTO> result = new ArrayList<>();
     for (TaskBean bean : list) {

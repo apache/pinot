@@ -194,10 +194,17 @@ public class TaskDriver {
         boolean orderAscending = System.currentTimeMillis() % 2 == 0;
 
         // find by task type to separate online task from a normal task
-        TaskType type = this.isOnline ? TaskType.DETECTION_ONLINE : TaskType.DETECTION;
-        anomalyTasks = taskDAO
-            .findByStatusAndTypeOrderByCreateTime(TaskStatus.WAITING, type, driverConfiguration.getTaskFetchSizeCap(),
-                orderAscending);
+        if (this.isOnline) {
+          anomalyTasks = taskDAO
+              .findByStatusAndTypeOrderByCreateTime(TaskStatus.WAITING,
+                  TaskType.DETECTION_ONLINE, driverConfiguration.getTaskFetchSizeCap(),
+                  orderAscending);
+        } else {
+          anomalyTasks = taskDAO
+              .findByStatusAndTypeNotInOrderByCreateTime(TaskStatus.WAITING,
+                  TaskType.DETECTION_ONLINE, driverConfiguration.getTaskFetchSizeCap(),
+                  orderAscending);
+        }
       } catch (Exception e) {
         hasFetchError = true;
         anomalyTasks.clear();
