@@ -22,6 +22,7 @@ package org.apache.pinot.thirdeye.cube.data.cube;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Multimap;
 import org.apache.pinot.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
+import org.apache.pinot.thirdeye.cube.additive.AdditiveDBClient;
 import org.apache.pinot.thirdeye.cube.data.dbrow.Dimensions;
 import org.apache.pinot.thirdeye.cube.cost.CostFunction;
 import java.io.File;
@@ -228,6 +229,11 @@ public class Cube { // the cube (Ca|Cb)
   private void initializeBasicInfo(CubeClient olapClient, Multimap<String, String> filterSets)
       throws Exception {
 
+    String metric = null;
+    if (olapClient instanceof AdditiveDBClient) {
+      metric = ((AdditiveDBClient)olapClient).getMetric();
+      filterSets.put("metric", metric);
+    }
     Row topAggValues = olapClient.getTopAggregatedValues(filterSets);
     CubeNode node = topAggValues.toNode();
 

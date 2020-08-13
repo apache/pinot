@@ -22,23 +22,22 @@ package org.apache.pinot.thirdeye.cube.data.dbclient;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.cube.data.dbrow.Dimensions;
 import org.apache.pinot.thirdeye.constant.MetricAggFunction;
 import org.apache.pinot.thirdeye.cube.data.dbrow.Row;
 import org.apache.pinot.thirdeye.dashboard.Utils;
-import org.apache.pinot.thirdeye.datasource.MetricExpression;
-import org.apache.pinot.thirdeye.datasource.MetricFunction;
-import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest;
-import org.apache.pinot.thirdeye.datasource.ThirdEyeResponse;
+import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datasource.*;
 import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
+import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
@@ -117,11 +116,19 @@ public abstract class BaseCubePinotClient<R extends Row> implements CubePinotCli
       List<CubeSpec> cubeSpecs, List<String> groupBy, Multimap<String, String> filterSets) throws ExecutionException {
 
     Map<CubeTag, ThirdEyeRequestMetricExpressions> requests = new HashMap<>();
+    MetricConfigDTO metricConfigDTO = null;
+    if (filterSets.containsKey("metric")) {
+      Collection<String> metric = filterSets.get("metric");
+      MetricConfigManager metricConfigDAO = DAORegistry.getInstance().getMetricConfigDAO();
+      metricConfigDTO = metricConfigDAO.findByMetricAndDataset((String) metric.toArray()[0], dataset);
+      filterSets.removeAll("metric");
+    }
 
     for (CubeSpec cubeSpec : cubeSpecs) {
       // Set dataset and metric
       List<MetricExpression> metricExpressions =
-          Utils.convertToMetricExpressions(cubeSpec.getMetric(), MetricAggFunction.AVG, dataset);
+          Utils.convertToMetricExpressions(cubeSpec.getMetric(),
+                  metricConfigDTO == null ? MetricAggFunction.AVG : metricConfigDTO.getDefaultAggFunction(), dataset);
       List<MetricFunction> metricFunctions = metricExpressions.get(0).computeMetricFunctions();
 
       ThirdEyeRequest.ThirdEyeRequestBuilder builder = ThirdEyeRequest.newBuilder();
