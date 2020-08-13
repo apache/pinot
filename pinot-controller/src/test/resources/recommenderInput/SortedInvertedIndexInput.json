@@ -128,7 +128,7 @@
     "select f from tableName where t between 1 and 1000": 2
   },
   "qps": 15000,
-  "numMessagesPerSecInKafKaTopic":1000,
+  "numMessagesPerSecInKafkaTopic":1000,
   "numRecordsPerPush":1000000000,
   "tableType": "HYBRID",
   "latencySLA": 500,

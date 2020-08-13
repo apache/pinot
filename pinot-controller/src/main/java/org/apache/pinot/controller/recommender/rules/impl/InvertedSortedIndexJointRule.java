@@ -18,22 +18,19 @@
  */
 package org.apache.pinot.controller.recommender.rules.impl;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.controller.recommender.rules.utils.FixedLenBitset;
-import org.apache.pinot.controller.recommender.rules.utils.QueryInvertedSortedIndexRecommender;
 import org.apache.pinot.controller.recommender.io.ConfigManager;
 import org.apache.pinot.controller.recommender.io.InputManager;
 import org.apache.pinot.controller.recommender.rules.AbstractRule;
 import org.apache.pinot.controller.recommender.rules.io.params.InvertedSortedIndexJointRuleParams;
+import org.apache.pinot.controller.recommender.rules.utils.FixedLenBitset;
 import org.apache.pinot.controller.recommender.rules.utils.PredicateParseResult;
+import org.apache.pinot.controller.recommender.rules.utils.QueryInvertedSortedIndexRecommender;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.*;
+import java.util.stream.Collectors;
 
 
 /**
@@ -124,8 +121,8 @@ public class InvertedSortedIndexJointRule extends AbstractRule {
     }
 
     if (!dimNameWeightPairRank.isEmpty()) {
-      if (_input.getOverWrittenConfigs().getIndexConfig().getSortedColumn().size()
-          > 0) { // if an overwritten sorted index presents
+      if (_input.getOverWrittenConfigs().getIndexConfig().isSortedColumnOverwritten()) {
+        // if an overwritten sorted index presents
         dimNameWeightPairRank.forEach(pair -> {
           _output.getIndexConfig().getInvertedIndexColumns()
               .add(pair.getLeft()); // Add recommendations to inverted index set
@@ -149,12 +146,11 @@ public class InvertedSortedIndexJointRule extends AbstractRule {
             .max(Comparator.comparing(pair -> // pick dimension with highest Cardinality as sorted index
                 _input.getCardinality(pair.getLeft())));
         if (sortedColumn.isPresent()) {
-          _output.getIndexConfig().getSortedColumn().add(sortedColumn.get().getLeft());
+          _output.getIndexConfig().setSortedColumn(sortedColumn.get().getLeft());
           dimNameWeightPairRank.stream().filter(pair -> pair != sortedColumn.get())
               .forEach(pair -> _output.getIndexConfig().getInvertedIndexColumns().add(pair.getLeft()));
         } else {
-          dimNameWeightPairRank
-              .forEach(pair -> _output.getIndexConfig().getInvertedIndexColumns().add(pair.getLeft()));
+          dimNameWeightPairRank.forEach(pair -> _output.getIndexConfig().getInvertedIndexColumns().add(pair.getLeft()));
         }
       }
     }
@@ -174,6 +170,7 @@ public class InvertedSortedIndexJointRule extends AbstractRule {
       PredicateParseResult currentCombination = evaluateCombination(n, r, parsedQuery);
       LOGGER.debug("findOptimalCombination: currentCombination: {}", currentCombination);
       double ratio = (optimalCombinationResult.getnESIWithIdx() - currentCombination.getnESIWithIdx()) / _totalNESI;
+      LOGGER.debug("ratio {}", ratio);
       if (ratio > _params.THRESHOLD_RATIO_MIN_GAIN_DIFF_BETWEEN_ITERATION) {
         optimalCombinationResult = currentCombination;
         iterationsWithoutGain = 0;
@@ -197,28 +194,39 @@ public class InvertedSortedIndexJointRule extends AbstractRule {
    * {@link PredicateParseResult#getnESI()} the nESI before applying any index
    * {@link PredicateParseResult#getnESIWithIdx()} the estimated nESI after applying optimal indices
    */
-  public PredicateParseResult evaluateCombination(int n, int r, List<List<PredicateParseResult>> parsedQuery) {
-    List<int[]> combinationIntArrays = generateCombinations(n, r);
-    LOGGER.debug("combinationIntArrays {}", combinationIntArrays);
+  public PredicateParseResult evaluateCombination(final int n, final int r,
+      List<List<PredicateParseResult>> parsedQuery) {
+    FixedLenBitset usedCols = new FixedLenBitset(n);
+    parsedQuery.forEach(list -> list.stream()
+        .filter(predicateParseResult -> (predicateParseResult.getCandidateDims().getCardinality() <= r))
+        .forEach(predicateParseResult -> usedCols.union(predicateParseResult.getCandidateDims())));
+    LOGGER.debug("totalUsed {}", usedCols.getCardinality());
+
+    List<Integer> usedColIDs = usedCols.getOffsets();
+    int nCapped = usedColIDs.size();
+    int rCapped = Math.min(r, nCapped);
+
+    int[] idToColID = new int[nCapped];
+    for (int i = 0; i < nCapped; i++) {
+      idToColID[i] = usedColIDs.get(i);
+    }
 
     // Enumerate all possible combinations of r-sized set, which will be applied indices on
-    List<FixedLenBitset> combinations = combinationIntArrays.parallelStream().map(combinationIntArray -> {
-      FixedLenBitset indices = new FixedLenBitset(n);
-      for (int j = 0; j < r; j++) {
-        indices.add(combinationIntArray[j]);
-      }
-      return indices;
-    }).collect(Collectors.toList());
+    List<int[]> combinationIntArrays = generateCombinations(nCapped, rCapped);
 
     // Calculate the total nESIWithIdx after applying each r-sized indices
     // and pick the top r-sized indices that minimize total nESIWithIdx
-    Optional<Pair<Double, FixedLenBitset>> optimal = combinations.parallelStream().map(fixedLenBitset -> {
+    Optional<Pair<Double, FixedLenBitset>> optimal = combinationIntArrays.parallelStream().map(combinationIntArray -> {
+      FixedLenBitset fixedLenBitset = new FixedLenBitset(n);
+      for (int j = 0; j < rCapped; j++) {
+        fixedLenBitset.add(idToColID[combinationIntArray[j]]);
+      }
       double nESIWithIdx = 0;
       for (List<PredicateParseResult> exclusiveRecommendations : parsedQuery) {
         double bestNESIWithIdx = exclusiveRecommendations.get(0).getnESI();
         for (PredicateParseResult predicateParseResult : exclusiveRecommendations) {
           if (fixedLenBitset.contains(predicateParseResult.getCandidateDims())) {
-            // If the dimensions of a candidate is a subsub set of the r-sized set
+            // If the dimensions of a candidate is a subset of the r-sized set
             bestNESIWithIdx = Math.min(bestNESIWithIdx, predicateParseResult.getnESIWithIdx());
           }
         }
@@ -226,12 +234,19 @@ public class InvertedSortedIndexJointRule extends AbstractRule {
       }
       return Pair.of(nESIWithIdx, fixedLenBitset);
     }).min(Comparator.comparing(Pair::getLeft));
-
-    return PredicateParseResult.PredicateParseResultBuilder.aPredicateParseResult()
-        .setCandidateDims(optimal.get().getRight())
-        .setIteratorEvalPriorityEnum(QueryInvertedSortedIndexRecommender.IteratorEvalPriorityEnum.INDEXED)
-        .setRecommendationPriorityEnum(QueryInvertedSortedIndexRecommender.RecommendationPriorityEnum.BITMAP)
-        .setnESI(_totalNESI).setPercentSelected(0).setnESIWithIdx(optimal.get().getLeft()).build();
+    if (optimal.isPresent()) {
+      return PredicateParseResult.PredicateParseResultBuilder.aPredicateParseResult()
+          .setCandidateDims(optimal.get().getRight())
+          .setIteratorEvalPriorityEnum(QueryInvertedSortedIndexRecommender.IteratorEvalPriorityEnum.INDEXED)
+          .setRecommendationPriorityEnum(QueryInvertedSortedIndexRecommender.RecommendationPriorityEnum.BITMAP)
+          .setnESI(_totalNESI).setPercentSelected(0).setnESIWithIdx(optimal.get().getLeft()).build();
+    } else {
+      return PredicateParseResult.PredicateParseResultBuilder.aPredicateParseResult()
+          .setCandidateDims(new FixedLenBitset(n))
+          .setIteratorEvalPriorityEnum(QueryInvertedSortedIndexRecommender.IteratorEvalPriorityEnum.INDEXED)
+          .setRecommendationPriorityEnum(QueryInvertedSortedIndexRecommender.RecommendationPriorityEnum.BITMAP)
+          .setnESI(_totalNESI).setPercentSelected(0).setnESIWithIdx(_totalNESI).build();
+    }
   }
 
   /**
@@ -241,6 +256,9 @@ public class InvertedSortedIndexJointRule extends AbstractRule {
    */
   public static List<int[]> generateCombinations(int n, int r) {
     List<int[]> combinations = new ArrayList<>();
+    if (r == 0) {
+      return combinations;
+    }
     int[] combination = new int[r];
 
     // initialize with lowest lexicographic combination

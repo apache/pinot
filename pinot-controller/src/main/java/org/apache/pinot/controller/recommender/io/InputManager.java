@@ -26,25 +26,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.google.common.annotations.VisibleForTesting;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.controller.recommender.exceptions.InvalidInputException;
 import org.apache.pinot.controller.recommender.io.metadata.FieldMetadata;
 import org.apache.pinot.controller.recommender.io.metadata.SchemaWithMetaData;
 import org.apache.pinot.controller.recommender.rules.RulesToExecute;
-import org.apache.pinot.controller.recommender.rules.io.params.BloomFilterRuleParams;
 import org.apache.pinot.controller.recommender.rules.io.params.FlagQueryRuleParams;
-import org.apache.pinot.controller.recommender.rules.io.params.InvertedSortedIndexJointRuleParams;
-import org.apache.pinot.controller.recommender.rules.io.params.NoDictionaryOnHeapDictionaryJointRuleParams;
-import org.apache.pinot.controller.recommender.rules.io.params.PartitionRuleParams;
+import org.apache.pinot.controller.recommender.rules.io.params.*;
 import org.apache.pinot.controller.recommender.rules.utils.FixedLenBitset;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
@@ -58,6 +47,10 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.lang.Math.max;
 import static java.lang.Math.pow;
@@ -76,10 +69,10 @@ public class InputManager {
   /******************************Deserialized from input json*********************************/
   // Basic input fields
 
-  public Long _qps;
-  public Long _numMessagesPerSecInKafKaTopic; // messages per sec for kafka to consume
-  public Long _numRecordsPerPush; // records per push for offline part of a table
-  public Long _latencySLA; // latency sla in ms
+  public Long _qps = DEFAULT_QPS;
+  public Long _numMessagesPerSecInKafkaTopic = DEFAULT_NUM_MESSAGES_PER_SEC_IN_KAFKA_TOPIC; // messages per sec for kafka to consume
+  public Long _numRecordsPerPush = DEFAULT_NUM_RECORDS_PER_PUSH; // records per push for offline part of a table
+  public Long _latencySLA = DEFAULT_LATENCY_SLA; // latency sla in ms
 
   public RulesToExecute _rulesToExecute = new RulesToExecute(); // dictates which rules to execute
   public Schema _schema = new Schema();
@@ -96,7 +89,7 @@ public class InputManager {
   // If the cardinality given by the customer is the global cardinality for the dataset (even potential data)
   // If true, the cardinality will be regulated see regulateCardinality()
   // TODO: Set to dsiabled for now, will discuss this in the next PR
-  public boolean useCardinalityNormalization = DEFAULT_USE_CARDINALITY_NORMALIZATION;
+  public boolean _useCardinalityNormalization = DEFAULT_USE_CARDINALITY_NORMALIZATION;
 
 
 
@@ -148,14 +141,14 @@ public class InputManager {
     reorderDimsAndBuildMap();
     registerColnameFieldType();
     validateQueries();
-    if (useCardinalityNormalization){
+    if (_useCardinalityNormalization){
       regulateCardinalityForAll();
     }
   }
   private void regulateCardinalityForAll(){
     double sampleSize;
     if (getTableType().equalsIgnoreCase(REALTIME)){
-      sampleSize = getSegmentFlushTime() * getNumMessagesPerSecInKafKaTopic();
+      sampleSize = getSegmentFlushTime() * getNumMessagesPerSecInKafkaTopic();
     }
     else{
       sampleSize = getNumRecordsPerPush();
@@ -199,14 +192,14 @@ public class InputManager {
   private void reorderDimsAndBuildMap()
       throws InvalidInputException {
 
-    Set<String> sortedColumn = _overWrittenConfigs.getIndexConfig().getSortedColumn();
+    String sortedColumn = _overWrittenConfigs.getIndexConfig().getSortedColumn();
     Set<String> invertedIndexColumns = _overWrittenConfigs.getIndexConfig().getInvertedIndexColumns();
     Set<String> rangeIndexColumns = _overWrittenConfigs.getIndexConfig().getRangeIndexColumns();
     Set<String> noDictionaryColumns = _overWrittenConfigs.getIndexConfig().getNoDictionaryColumns();
 
     /*Validate if there's conflict between NoDictionaryColumns and dimNamesWithAnyIndex*/
     Set<String> dimNamesWithAnyIndex = new HashSet<>();
-    dimNamesWithAnyIndex.addAll(sortedColumn);
+    dimNamesWithAnyIndex.add(sortedColumn);
     dimNamesWithAnyIndex.addAll(invertedIndexColumns);
     dimNamesWithAnyIndex.addAll(rangeIndexColumns);
     for (String colName : noDictionaryColumns) {
@@ -228,17 +221,17 @@ public class InputManager {
     _dimNames = new HashSet<>(_schema.getDimensionNames());
     _metricNames = new HashSet<>(_schema.getMetricNames());
     _dateTimeNames = new HashSet<>(_schema.getDateTimeNames());
-    try {
-      _dateTimeNames.add(getPrimaryTimeCol());
-    } catch (NullPointerException e) {
-      throw new InvalidInputException("No TimeFieldSpec specified in the schema!");
+
+    String primaryTimeCol;
+    if ((primaryTimeCol = getPrimaryTimeCol()) != null) {
+      _dateTimeNames.add(primaryTimeCol);
     }
 
     _intToColNameMap = new String[_dimNames.size() + _metricNames.size() + _dateTimeNames.size()];
     _colNameToIntMap = new HashMap<>();
 
     _dimNamesInvertedSortedIndexApplicable = new HashSet<>(_dimNames);
-    _dimNamesInvertedSortedIndexApplicable.removeAll(sortedColumn);
+    _dimNamesInvertedSortedIndexApplicable.remove(sortedColumn);
     _dimNamesInvertedSortedIndexApplicable.removeAll(invertedIndexColumns);
     _dimNamesInvertedSortedIndexApplicable.removeAll(noDictionaryColumns);
 
@@ -280,7 +273,7 @@ public class InputManager {
 
   @JsonSetter(nulls = Nulls.SKIP)
   public void setUseCardinalityNormalization(boolean cardinalityGlobal) {
-    useCardinalityNormalization = cardinalityGlobal;
+    _useCardinalityNormalization = cardinalityGlobal;
   }
 
   @JsonSetter(nulls = Nulls.SKIP)
@@ -330,8 +323,8 @@ public class InputManager {
   }
 
   @JsonSetter(nulls = Nulls.SKIP)
-  public void setNumMessagesPerSecInKafKaTopic(long numMessagesPerSecInKafKaTopic) {
-    _numMessagesPerSecInKafKaTopic = numMessagesPerSecInKafKaTopic;
+  public void setNumMessagesPerSecInKafkaTopic(long numMessagesPerSecInKafkaTopic) {
+    _numMessagesPerSecInKafkaTopic = numMessagesPerSecInKafkaTopic;
   }
 
   @JsonSetter(nulls = Nulls.SKIP)
@@ -385,7 +378,7 @@ public class InputManager {
   }
 
   public boolean isUseCardinalityNormalization() {
-    return useCardinalityNormalization;
+    return _useCardinalityNormalization;
   }
 
   public Set<String> getParsedQueries() {
@@ -442,9 +435,14 @@ public class InputManager {
   }
 
   //TODO: Currently Pinot is using only ONE time column specified by TimeFieldSpec
-  //TODO: Change the implementation after the new schema with multiple _dateTimeNames is in use
+  // Change the implementation after the new schema with multiple _dateTimeNames is in use
+  // Return the time column used in server level filtering
   public String getPrimaryTimeCol() {
-    return _schema.getTimeFieldSpec().getName();
+    if (_schema.getTimeFieldSpec() != null) {
+      return _schema.getTimeFieldSpec().getName();
+    } else {
+      return null;
+    }
   }
 
   public Set<String> getColNamesNoDictionary() {
@@ -471,8 +469,8 @@ public class InputManager {
     return _tableType;
   }
 
-  public long getNumMessagesPerSecInKafKaTopic() {
-    return _numMessagesPerSecInKafKaTopic;
+  public long getNumMessagesPerSecInKafkaTopic() {
+    return _numMessagesPerSecInKafkaTopic;
   }
 
   public long getNumRecordsPerPush() {
@@ -610,7 +608,7 @@ public class InputManager {
   }
 
   public boolean isPrimaryDateTime(String colName) {
-    return getPrimaryTimeCol().equalsIgnoreCase(colName);
+    return colName!=null && colName.equalsIgnoreCase(getPrimaryTimeCol());
   }
 
   public void estimateSizePerRecord()
