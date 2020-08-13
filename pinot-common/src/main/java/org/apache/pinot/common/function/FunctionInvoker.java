@@ -18,78 +18,117 @@
  */
 package org.apache.pinot.common.function;
 
+import com.google.common.base.Preconditions;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
-import java.util.concurrent.TimeUnit;
-import org.joda.time.Duration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.pinot.common.utils.PinotDataType;
 
 
 /**
- * A simple code to invoke a method in any class using reflection.
- * Eventually this will support annotations on the method but for now its a simple wrapper on any java method
+ * The {@code FunctionInvoker} is a wrapper on a java method which supports arguments type conversion and method
+ * invocation via reflection.
  */
 public class FunctionInvoker {
+  private final Method _method;
+  private final Class<?>[] _parameterClasses;
+  private final PinotDataType[] _parameterTypes;
+  private final Object _instance;
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(FunctionInvoker.class);
-  // Don't log more than 10 entries in 5 MINUTES
-  //TODO:Convert this functionality into a class that can be used in other places
-  private static long EXCEPTION_LIMIT_DURATION = TimeUnit.MINUTES.toMillis(5);
-  private static long EXCEPTION_LIMIT_RATE = 10;
-  private Method _method;
-  private Object _instance;
-  private int exceptionCount;
-  private long lastExceptionTime = 0;
-  private FunctionInfo _functionInfo;
-
-  public FunctionInvoker(FunctionInfo functionInfo)
-      throws Exception {
-    _functionInfo = functionInfo;
+  public FunctionInvoker(FunctionInfo functionInfo) {
     _method = functionInfo.getMethod();
-    _method.setAccessible(true);
-    Class<?> clazz = functionInfo.getClazz();
+    Class<?>[] parameterClasses = _method.getParameterTypes();
+    int numParameters = parameterClasses.length;
+    _parameterClasses = new Class<?>[numParameters];
+    _parameterTypes = new PinotDataType[numParameters];
+    for (int i = 0; i < numParameters; i++) {
+      Class<?> parameterClass = parameterClasses[i];
+      _parameterClasses[i] = parameterClass;
+      _parameterTypes[i] = FunctionUtils.getParameterType(parameterClass);
+    }
     if (Modifier.isStatic(_method.getModifiers())) {
       _instance = null;
     } else {
-      Constructor<?> constructor = clazz.getDeclaredConstructor();
-      constructor.setAccessible(true);
-      _instance = constructor.newInstance();
+      Class<?> clazz = functionInfo.getClazz();
+      try {
+        Constructor<?> constructor = functionInfo.getClazz().getDeclaredConstructor();
+        constructor.setAccessible(true);
+        _instance = constructor.newInstance();
+      } catch (Exception e) {
+        throw new IllegalStateException("Caught exception while constructing class: " + clazz, e);
+      }
     }
   }
 
-  public Class<?>[] getParameterTypes() {
-    return _method.getParameterTypes();
+  /**
+   * Returns the underlying java method.
+   */
+  public Method getMethod() {
+    return _method;
   }
 
-  public Class<?> getReturnType() {
+  /**
+   * Returns the class of the parameters.
+   */
+  public Class<?>[] getParameterClasses() {
+    return _parameterClasses;
+  }
+
+  /**
+   * Returns the PinotDataType of the parameters for type conversion purpose. Puts {@code null} for the parameter class
+   * that does not support type conversion.
+   */
+  public PinotDataType[] getParameterTypes() {
+    return _parameterTypes;
+  }
+
+  /**
+   * Converts the type of the given arguments to match the parameter classes. Leaves the argument as is if type
+   * conversion is not needed or supported.
+   */
+  public void convertTypes(Object[] arguments) {
+    int numParameters = _parameterClasses.length;
+    Preconditions.checkArgument(arguments.length == numParameters,
+        "Wrong number of arguments for method: %s, expected: %s, actual: %s", _method, numParameters, arguments.length);
+    for (int i = 0; i < numParameters; i++) {
+      // Skip conversion for null
+      Object argument = arguments[i];
+      if (argument == null) {
+        continue;
+      }
+      // Skip conversion if argument can be directly assigned
+      Class<?> parameterClass = _parameterClasses[i];
+      Class<?> argumentClass = argument.getClass();
+      if (parameterClass.isAssignableFrom(argumentClass)) {
+        continue;
+      }
+
+      PinotDataType parameterType = _parameterTypes[i];
+      PinotDataType argumentType = FunctionUtils.getArgumentType(argumentClass);
+      Preconditions.checkArgument(parameterType != null && argumentType != null,
+          "Cannot convert value from class: %s to class: %s", argumentClass, parameterClass);
+      arguments[i] = parameterType.convert(argument, argumentType);
+    }
+  }
+
+  /**
+   * Returns the class of the result value.
+   */
+  public Class<?> getResultClass() {
     return _method.getReturnType();
   }
 
-  public Object process(Object[] args) {
+  /**
+   * Invoke the function with the given arguments. The arguments should match the parameter classes. Use
+   * {@link #convertTypes(Object[])} to convert the argument types if needed before calling this method.
+   */
+  public Object invoke(Object[] arguments) {
     try {
-      return _method.invoke(_instance, _functionInfo.convertTypes(args));
-    } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
-      //most likely the exception is in the udf,  get the exceptio
-      Throwable cause = e.getCause();
-      if (cause == null) {
-        cause = e;
-      }
-      //some udf's might be configured incorrectly and we dont want to pollute the log
-      //keep track of the last time an exception was logged and reset the counter if the last exception is more than the EXCEPTION_LIMIT_DURATION
-      if (Duration.millis(System.currentTimeMillis() - lastExceptionTime).getStandardMinutes()
-          > EXCEPTION_LIMIT_DURATION) {
-        exceptionCount = 0;
-      }
-      if (exceptionCount < EXCEPTION_LIMIT_RATE) {
-        exceptionCount = exceptionCount + 1;
-        LOGGER.error("Exception invoking method:{} with args:{}, exception message: {}", _method.getName(),
-            Arrays.toString(args), cause.getMessage());
-      }
-      return null;
+      return _method.invoke(_instance, arguments);
+    } catch (Exception e) {
+      throw new IllegalStateException(
+          "Caught exception while invoking method: " + _method + " with arguments: " + Arrays.toString(arguments), e);
     }
   }
 }

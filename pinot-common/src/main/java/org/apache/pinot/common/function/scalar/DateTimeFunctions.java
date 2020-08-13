@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.function;
+package org.apache.pinot.common.function.scalar;
 
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.function.DateTimePatternHandler;
 import org.apache.pinot.common.function.annotations.ScalarFunction;
-import org.joda.time.format.DateTimeFormat;
 
 
 /**
@@ -65,11 +65,14 @@ import org.joda.time.format.DateTimeFormat;
  *   </code>
  */
 public class DateTimeFunctions {
+  private DateTimeFunctions() {
+  }
+
   /**
    * Convert epoch millis to epoch seconds
    */
   @ScalarFunction
-  static Long toEpochSeconds(Long millis) {
+  public static long toEpochSeconds(long millis) {
     return TimeUnit.MILLISECONDS.toSeconds(millis);
   }
 
@@ -77,7 +80,7 @@ public class DateTimeFunctions {
    * Convert epoch millis to epoch minutes
    */
   @ScalarFunction
-  static Long toEpochMinutes(Long millis) {
+  public static long toEpochMinutes(long millis) {
     return TimeUnit.MILLISECONDS.toMinutes(millis);
   }
 
@@ -85,7 +88,7 @@ public class DateTimeFunctions {
    * Convert epoch millis to epoch hours
    */
   @ScalarFunction
-  static Long toEpochHours(Long millis) {
+  public static long toEpochHours(long millis) {
     return TimeUnit.MILLISECONDS.toHours(millis);
   }
 
@@ -93,7 +96,7 @@ public class DateTimeFunctions {
    * Convert epoch millis to epoch days
    */
   @ScalarFunction
-  static Long toEpochDays(Long millis) {
+  public static long toEpochDays(long millis) {
     return TimeUnit.MILLISECONDS.toDays(millis);
   }
 
@@ -101,71 +104,71 @@ public class DateTimeFunctions {
    * Convert epoch millis to epoch seconds, round to nearest rounding bucket
    */
   @ScalarFunction
-  static Long toEpochSecondsRounded(Long millis, Number roundToNearest) {
-    return (TimeUnit.MILLISECONDS.toSeconds(millis) / roundToNearest.intValue()) * roundToNearest.intValue();
+  public static long toEpochSecondsRounded(long millis, long roundToNearest) {
+    return (TimeUnit.MILLISECONDS.toSeconds(millis) / roundToNearest) * roundToNearest;
   }
 
   /**
    * Convert epoch millis to epoch minutes, round to nearest rounding bucket
    */
   @ScalarFunction
-  static Long toEpochMinutesRounded(Long millis, Number roundToNearest) {
-    return (TimeUnit.MILLISECONDS.toMinutes(millis) / roundToNearest.intValue()) * roundToNearest.intValue();
+  public static long toEpochMinutesRounded(long millis, long roundToNearest) {
+    return (TimeUnit.MILLISECONDS.toMinutes(millis) / roundToNearest) * roundToNearest;
   }
 
   /**
    * Convert epoch millis to epoch hours, round to nearest rounding bucket
    */
   @ScalarFunction
-  static Long toEpochHoursRounded(Long millis, Number roundToNearest) {
-    return (TimeUnit.MILLISECONDS.toHours(millis) / roundToNearest.intValue()) * roundToNearest.intValue();
+  public static long toEpochHoursRounded(long millis, long roundToNearest) {
+    return (TimeUnit.MILLISECONDS.toHours(millis) / roundToNearest) * roundToNearest;
   }
 
   /**
    * Convert epoch millis to epoch days, round to nearest rounding bucket
    */
   @ScalarFunction
-  static Long toEpochDaysRounded(Long millis, Number roundToNearest) {
-    return (TimeUnit.MILLISECONDS.toDays(millis) / roundToNearest.intValue()) * roundToNearest.intValue();
+  public static long toEpochDaysRounded(long millis, long roundToNearest) {
+    return (TimeUnit.MILLISECONDS.toDays(millis) / roundToNearest) * roundToNearest;
   }
 
   /**
    * Convert epoch millis to epoch seconds, divided by given bucket, to get nSecondsSinceEpoch
    */
   @ScalarFunction
-  static Long toEpochSecondsBucket(Long millis, Number bucket) {
-    return TimeUnit.MILLISECONDS.toSeconds(millis) / bucket.intValue();
+  public static long toEpochSecondsBucket(long millis, long bucket) {
+    return TimeUnit.MILLISECONDS.toSeconds(millis) / bucket;
   }
 
   /**
    * Convert epoch millis to epoch minutes, divided by given bucket, to get nMinutesSinceEpoch
    */
   @ScalarFunction
-  static Long toEpochMinutesBucket(Long millis, Number bucket) {
-    return TimeUnit.MILLISECONDS.toMinutes(millis) / bucket.intValue();
+  public static long toEpochMinutesBucket(long millis, long bucket) {
+    return TimeUnit.MILLISECONDS.toMinutes(millis) / bucket;
   }
 
   /**
    * Convert epoch millis to epoch hours, divided by given bucket, to get nHoursSinceEpoch
    */
   @ScalarFunction
-  static Long toEpochHoursBucket(Long millis, Number bucket) {
-    return TimeUnit.MILLISECONDS.toHours(millis) / bucket.intValue();
+  public static long toEpochHoursBucket(long millis, long bucket) {
+    return TimeUnit.MILLISECONDS.toHours(millis) / bucket;
   }
 
   /**
    * Convert epoch millis to epoch days, divided by given bucket, to get nDaysSinceEpoch
    */
   @ScalarFunction
-  static Long toEpochDaysBucket(Long millis, Number bucket) {
-    return TimeUnit.MILLISECONDS.toDays(millis) / bucket.intValue();
+  public static long toEpochDaysBucket(long millis, long bucket) {
+    return TimeUnit.MILLISECONDS.toDays(millis) / bucket;
   }
 
   /**
    * Converts epoch seconds to epoch millis
    */
   @ScalarFunction
-  static Long fromEpochSeconds(Long seconds) {
+  public static long fromEpochSeconds(long seconds) {
     return TimeUnit.SECONDS.toMillis(seconds);
   }
 
@@ -173,63 +176,63 @@ public class DateTimeFunctions {
    * Converts epoch minutes to epoch millis
    */
   @ScalarFunction
-  static Long fromEpochMinutes(Number minutes) {
-    return TimeUnit.MINUTES.toMillis(minutes.longValue());
+  public static long fromEpochMinutes(long minutes) {
+    return TimeUnit.MINUTES.toMillis(minutes);
   }
 
   /**
    * Converts epoch hours to epoch millis
    */
   @ScalarFunction
-  static Long fromEpochHours(Number hours) {
-    return TimeUnit.HOURS.toMillis(hours.longValue());
+  public static long fromEpochHours(long hours) {
+    return TimeUnit.HOURS.toMillis(hours);
   }
 
   /**
    * Converts epoch days to epoch millis
    */
   @ScalarFunction
-  static Long fromEpochDays(Number daysSinceEpoch) {
-    return TimeUnit.DAYS.toMillis(daysSinceEpoch.longValue());
+  public static long fromEpochDays(long days) {
+    return TimeUnit.DAYS.toMillis(days);
   }
 
   /**
    * Converts nSecondsSinceEpoch (seconds that have been divided by a bucket), to epoch millis
    */
   @ScalarFunction
-  static Long fromEpochSecondsBucket(Long seconds, Number bucket) {
-    return TimeUnit.SECONDS.toMillis(seconds * bucket.intValue());
+  public static long fromEpochSecondsBucket(long seconds, long bucket) {
+    return TimeUnit.SECONDS.toMillis(seconds * bucket);
   }
 
   /**
    * Converts nMinutesSinceEpoch (minutes that have been divided by a bucket), to epoch millis
    */
   @ScalarFunction
-  static Long fromEpochMinutesBucket(Number minutes, Number bucket) {
-    return TimeUnit.MINUTES.toMillis(minutes.longValue() * bucket.intValue());
+  public static long fromEpochMinutesBucket(long minutes, long bucket) {
+    return TimeUnit.MINUTES.toMillis(minutes * bucket);
   }
 
   /**
    * Converts nHoursSinceEpoch (hours that have been divided by a bucket), to epoch millis
    */
   @ScalarFunction
-  static Long fromEpochHoursBucket(Number hours, Number bucket) {
-    return TimeUnit.HOURS.toMillis(hours.longValue() * bucket.intValue());
+  public static long fromEpochHoursBucket(long hours, long bucket) {
+    return TimeUnit.HOURS.toMillis(hours * bucket);
   }
 
   /**
    * Converts nDaysSinceEpoch (days that have been divided by a bucket), to epoch millis
    */
   @ScalarFunction
-  static Long fromEpochDaysBucket(Number daysSinceEpoch, Number bucket) {
-    return TimeUnit.DAYS.toMillis(daysSinceEpoch.longValue() * bucket.intValue());
+  public static long fromEpochDaysBucket(long days, long bucket) {
+    return TimeUnit.DAYS.toMillis(days * bucket);
   }
 
   /**
    * Converts epoch millis to DateTime string represented by pattern
    */
   @ScalarFunction
-  static String toDateTime(Long millis, String pattern) {
+  public static String toDateTime(long millis, String pattern) {
     return DateTimePatternHandler.parseEpochMillisToDateTimeString(millis, pattern);
   }
 
@@ -237,26 +240,24 @@ public class DateTimeFunctions {
    * Converts DateTime string represented by pattern to epoch millis
    */
   @ScalarFunction
-  static Long fromDateTime(String dateTimeString, String pattern) {
+  public static long fromDateTime(String dateTimeString, String pattern) {
     return DateTimePatternHandler.parseDateTimeStringToEpochMillis(dateTimeString, pattern);
   }
-
 
   /**
    * Round the given time value to nearest multiple
    * @return the original value but rounded to the nearest multiple of @param roundToNearest
    */
   @ScalarFunction
-  static Long round(Long timeValue, Number roundToNearest) {
-    long roundingValue = roundToNearest.longValue();
-    return (timeValue / roundingValue) * roundingValue;
+  public static long round(long timeValue, long roundToNearest) {
+    return (timeValue / roundToNearest) * roundToNearest;
   }
 
   /**
    * Return current time as epoch millis
    */
   @ScalarFunction
-  static Long now() {
+  public static long now() {
     return System.currentTimeMillis();
   }
 }

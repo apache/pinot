@@ -849,7 +849,8 @@ public class CalciteSqlParser {
         }
         try {
           FunctionInvoker invoker = new FunctionInvoker(functionInfo);
-          Object result = invoker.process(arguments);
+          invoker.convertTypes(arguments);
+          Object result = invoker.invoke(arguments);
           return RequestUtils.getLiteralExpression(result);
         } catch (Exception e) {
           throw new SqlCompilationException(new IllegalArgumentException("Unsupported function - " + funcName, e));

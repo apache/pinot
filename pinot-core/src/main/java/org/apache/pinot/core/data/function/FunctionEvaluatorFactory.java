@@ -87,18 +87,11 @@ public class FunctionEvaluatorFactory {
   }
 
   public static FunctionEvaluator getExpressionEvaluator(String transformExpression) {
-    FunctionEvaluator functionEvaluator;
-    try {
-      if (transformExpression.startsWith(GroovyFunctionEvaluator.getGroovyExpressionPrefix())) {
-        functionEvaluator = new GroovyFunctionEvaluator(transformExpression);
-      } else {
-        functionEvaluator = new InbuiltFunctionEvaluator(transformExpression);
-      }
-    } catch (Exception e) {
-      throw new IllegalStateException(
-          "Could not construct FunctionEvaluator for transformFunction: " + transformExpression, e);
+    if (transformExpression.startsWith(GroovyFunctionEvaluator.getGroovyExpressionPrefix())) {
+      return new GroovyFunctionEvaluator(transformExpression);
+    } else {
+      return new InbuiltFunctionEvaluator(transformExpression);
     }
-    return functionEvaluator;
   }
 
   private static String getDefaultMapKeysTransformExpression(String mapColumnName) {

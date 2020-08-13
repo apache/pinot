@@ -27,15 +27,15 @@ import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.geospatial.transform.function.StContainsFunction;
-import org.apache.pinot.core.geospatial.transform.function.StDistanceFunction;
 import org.apache.pinot.core.geospatial.transform.function.StAreaFunction;
 import org.apache.pinot.core.geospatial.transform.function.StAsBinaryFunction;
+import org.apache.pinot.core.geospatial.transform.function.StAsTextFunction;
+import org.apache.pinot.core.geospatial.transform.function.StContainsFunction;
+import org.apache.pinot.core.geospatial.transform.function.StDistanceFunction;
 import org.apache.pinot.core.geospatial.transform.function.StEqualsFunction;
 import org.apache.pinot.core.geospatial.transform.function.StGeogFromTextFunction;
 import org.apache.pinot.core.geospatial.transform.function.StGeogFromWKBFunction;
 import org.apache.pinot.core.geospatial.transform.function.StGeomFromTextFunction;
-import org.apache.pinot.core.geospatial.transform.function.StAsTextFunction;
 import org.apache.pinot.core.geospatial.transform.function.StGeomFromWKBFunction;
 import org.apache.pinot.core.geospatial.transform.function.StGeometryTypeFunction;
 import org.apache.pinot.core.geospatial.transform.function.StPointFunction;
@@ -176,12 +176,7 @@ public class TransformFunctionFactory {
           if (functionInfo == null) {
             throw new BadQueryRequestException("Unsupported transform function: " + functionName);
           }
-          try {
-            transformFunction = new ScalarTransformFunctionWrapper(functionName, functionInfo);
-          } catch (Exception e) {
-            throw new RuntimeException("Caught exception while constructing scalar transform function: " + functionName,
-                e);
-          }
+          transformFunction = new ScalarTransformFunctionWrapper(functionInfo);
         }
         List<ExpressionContext> arguments = function.getArguments();
         List<TransformFunction> transformFunctionArguments = new ArrayList<>(arguments.size());
