@@ -21,16 +21,12 @@ package org.apache.pinot.controller.util;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.BiMap;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.CompletionService;
 import java.util.concurrent.Executor;
 import org.apache.commons.httpclient.HttpConnectionManager;
-import org.apache.commons.httpclient.URI;
-import org.apache.commons.httpclient.methods.GetMethod;
-import org.apache.pinot.common.http.MultiGetRequest;
 import org.apache.pinot.common.restlet.resources.SegmentStatus;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
@@ -72,35 +68,27 @@ public class ServerSegmentMetadataReader {
         serverURLs.add(generateSegmentMetadataServerURL(tableNameWithType, segment, endpoints.get(serverToSegments.getKey())));
       }
     }
-    CompletionService<GetMethod> completionService =
-        new MultiGetRequest(_executor, _connectionManager).execute(serverURLs, timeoutMs);
+    BiMap<String, String> endpointsToServers = endpoints.inverse();
+    CompletionServiceHelper completionServiceHelper = new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
+    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
+        completionServiceHelper.doMultiGetRequest(serverURLs, tableNameWithType, timeoutMs);
     List<String> segmentsMetadata = new ArrayList<>();
 
-    BiMap<String, String> endpointsToServers = endpoints.inverse();
-    for (int i = 0; i < serverURLs.size(); i++) {
-      GetMethod getMethod = null;
+    int failedParses = 0;
+    for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
-        getMethod = completionService.take().get();
-        URI uri = getMethod.getURI();
-        String instance = endpointsToServers.get(uri.getHost() + ":" + uri.getPort());
-        if (getMethod.getStatusCode() >= 300) {
-          LOGGER.error("Server {} returned error: code: {}, message: {}", instance, getMethod.getStatusCode(),
-              getMethod.getResponseBodyAsString());
-          continue;
-        }
-        JsonNode segmentMetadata =
-            JsonUtils.inputStreamToJsonNode(getMethod.getResponseBodyAsStream());
+        JsonNode segmentMetadata = JsonUtils.stringToJsonNode(streamResponse.getValue());
         segmentsMetadata.add(JsonUtils.objectToString(segmentMetadata));
-      } catch (Exception e) {
-        // Ignore individual exceptions because the exception has been logged in MultiGetRequest
-        // Log the number of failed servers after gathering all responses
-      } finally {
-        if (Objects.nonNull(getMethod)) {
-          getMethod.releaseConnection();
-        }
+      } catch (IOException e) {
+        failedParses++;
+        LOGGER.error("Unable to parse server response due to an error: ", e);
       }
     }
-    LOGGER.info("Retrieved segment metadata from servers.");
+    if (failedParses != 0) {
+      LOGGER.warn("Failed to parse {} segment metadata responses from server.", failedParses);
+    }
+
+    LOGGER.debug("Retrieved segment metadata from servers.");
     return segmentsMetadata;
   }
 
@@ -132,39 +120,30 @@ public class ServerSegmentMetadataReader {
         serverURLs.add(generateReloadStatusServerURL(tableNameWithType, segment, serverToEndpoint.get(serverToSegmentsEntry.getKey())));
       }
     }
-    CompletionService<GetMethod> completionService =
-        new MultiGetRequest(_executor, _connectionManager).execute(serverURLs, timeoutMs);
+
     BiMap<String, String> endpointsToServers = serverToEndpoint.inverse();
+    CompletionServiceHelper completionServiceHelper = new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
+    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
+        completionServiceHelper.doMultiGetRequest(serverURLs, tableNameWithType, timeoutMs);
     List<SegmentStatus> segmentsStatus = new ArrayList<>();
-    int failedCounter = 0;
-    for (int i = 0; i < serverURLs.size(); i++) {
-      GetMethod getMethod = null;
+    int failedParses = 0;
+    for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
-        getMethod = completionService.take().get();
-        URI uri = getMethod.getURI();
-        String instance = endpointsToServers.get(uri.getHost() + ":" + uri.getPort());
-        if (getMethod.getStatusCode() >= 300) {
-          LOGGER.error("Server {} returned error: code: {}, message: {}", instance, getMethod.getStatusCode(),
-              getMethod.getResponseBodyAsString());
-          failedCounter++;
-          continue;
-        }
-        SegmentStatus segmentStatus = JsonUtils.stringToObject(getMethod.getResponseBodyAsString(), SegmentStatus.class);
+        SegmentStatus segmentStatus = JsonUtils.stringToObject(streamResponse.getValue(), SegmentStatus.class);
         segmentsStatus.add(segmentStatus);
-      } catch (Exception e) {
-        // Ignore individual exceptions because the exception has been logged in MultiGetRequest
-        // Log the number of failed servers after gathering all responses
-      } finally {
-        if (Objects.nonNull(getMethod)) {
-          getMethod.releaseConnection();
-        }
+      } catch (IOException e) {
+        failedParses++;
+        LOGGER.error("Unable to parse server response due to an error: ", e);
       }
+    }
+    if (failedParses != 0) {
+      LOGGER.warn("Failed to parse {} segment load status responses from server.", failedParses);
     }
 
     TableReloadStatus tableReloadStatus = new TableReloadStatus();
     tableReloadStatus._tableName = tableNameWithType;
     tableReloadStatus._segmentStatus = segmentsStatus;
-    tableReloadStatus._numSegmentsFailed = failedCounter;
+    tableReloadStatus._numSegmentsFailed = serviceResponse._failedResponseCount;
     return tableReloadStatus;
   }
 
