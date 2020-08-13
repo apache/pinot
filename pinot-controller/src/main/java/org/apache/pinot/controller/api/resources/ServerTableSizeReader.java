@@ -19,18 +19,16 @@
 package org.apache.pinot.controller.api.resources;
 
 import com.google.common.collect.BiMap;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletionService;
 import java.util.concurrent.Executor;
 import org.apache.commons.httpclient.HttpConnectionManager;
-import org.apache.commons.httpclient.URI;
-import org.apache.commons.httpclient.methods.GetMethod;
-import org.apache.pinot.common.http.MultiGetRequest;
 import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
 import org.apache.pinot.common.restlet.resources.TableSizeInfo;
+import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,40 +62,25 @@ public class ServerTableSizeReader {
       serverUrls.add(tableSizeUri);
     }
 
-    // TODO: use some service other than completion service so that we know which server encounters the error
-    CompletionService<GetMethod> completionService =
-        new MultiGetRequest(_executor, _connectionManager).execute(serverUrls, timeoutMs);
+    // Helper service to run a httpget call to the server
+    CompletionServiceHelper completionServiceHelper = new CompletionServiceHelper(_executor, _connectionManager,
+        endpointsToServers);
+    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
+        completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, timeoutMs);
     Map<String, List<SegmentSizeInfo>> serverToSegmentSizeInfoListMap = new HashMap<>();
-
-    for (int i = 0; i < numServers; i++) {
-      GetMethod getMethod = null;
+    int failedParses = 0;
+    for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
-        getMethod = completionService.take().get();
-        URI uri = getMethod.getURI();
-        String instance = endpointsToServers.get(uri.getHost() + ":" + uri.getPort());
-        if (getMethod.getStatusCode() >= 300) {
-          LOGGER.error("Server: {} returned error: {}", instance, getMethod.getStatusCode());
-          continue;
-        }
         TableSizeInfo tableSizeInfo =
-            JsonUtils.inputStreamToObject(getMethod.getResponseBodyAsStream(), TableSizeInfo.class);
-        serverToSegmentSizeInfoListMap.put(instance, tableSizeInfo.segments);
-      } catch (Exception e) {
-        // Ignore individual exceptions because the exception has been logged in MultiGetRequest
-        // Log the number of failed servers after gathering all responses
-      } finally {
-        if (getMethod != null) {
-          getMethod.releaseConnection();
-        }
+            JsonUtils.stringToObject(streamResponse.getValue(), TableSizeInfo.class);
+        serverToSegmentSizeInfoListMap.put(streamResponse.getKey(), tableSizeInfo.segments);
+      } catch (IOException e) {
+        failedParses++;
+        LOGGER.error("Unable to parse server response due to an error: ", e);
       }
     }
-
-    int numServersResponded = serverToSegmentSizeInfoListMap.size();
-    if (numServersResponded != numServers) {
-      LOGGER.warn("Finish reading segment sizes for table: {} with {}/{} servers responded", tableNameWithType,
-          numServersResponded, numServers);
-    } else {
-      LOGGER.info("Finish reading segment sizes for table: {}", tableNameWithType);
+    if (failedParses != 0) {
+      LOGGER.warn("Failed to parse {} segment size info responses from server.", failedParses);
     }
     return serverToSegmentSizeInfoListMap;
   }
