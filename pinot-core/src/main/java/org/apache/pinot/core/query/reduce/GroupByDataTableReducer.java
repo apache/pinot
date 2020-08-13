@@ -261,9 +261,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
 
   private IndexedTable getIndexedTable(DataSchema dataSchema, Collection<DataTable> dataTables) {
     int indexedTableCapacity = GroupByUtils.getTableCapacity(_queryContext);
-    IndexedTable indexedTable =
-        new ConcurrentIndexedTable(dataSchema, _aggregationFunctions, _queryContext.getOrderByExpressions(),
-            indexedTableCapacity);
+    IndexedTable indexedTable = new ConcurrentIndexedTable(dataSchema, _queryContext, indexedTableCapacity);
 
     for (DataTable dataTable : dataTables) {
       BiFunction[] functions = new BiFunction[_numColumns];
