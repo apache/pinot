@@ -28,37 +28,32 @@ public class GroupKeyTest {
   @Test
   public void testGetKeys() {
     GroupKeyGenerator.GroupKey groupKey = new GroupKeyGenerator.GroupKey();
-    groupKey._stringKey = "foo\tbar\t";
+    groupKey._stringKey = "foo\0bar\0";
     String[] keys = groupKey.getKeys();
     Assert.assertEquals(keys.length, 3);
     Assert.assertEquals(keys, new String[]{"foo", "bar", ""});
 
-    groupKey._stringKey = "foo\t\tbar";
+    groupKey._stringKey = "foo\0\0bar";
     keys = groupKey.getKeys();
     Assert.assertEquals(keys.length, 3);
     Assert.assertEquals(keys, new String[]{"foo", "", "bar"});
 
-    groupKey._stringKey = "\tfoo\tbar";
+    groupKey._stringKey = "\0foo\0bar";
     keys = groupKey.getKeys();
     Assert.assertEquals(keys.length, 3);
     Assert.assertEquals(keys, new String[]{"", "foo", "bar"});
 
-    groupKey._stringKey = "foo\t\t";
+    groupKey._stringKey = "foo\0\0";
     keys = groupKey.getKeys();
     Assert.assertEquals(keys.length, 3);
     Assert.assertEquals(keys, new String[]{"foo", "", ""});
 
-    groupKey._stringKey = "\t\t";
+    groupKey._stringKey = "\0\0";
     keys = groupKey.getKeys();
     Assert.assertEquals(keys.length, 3);
     Assert.assertEquals(keys, new String[]{"", "", ""});
 
-    groupKey._stringKey = "";
-    keys = groupKey.getKeys();
-    Assert.assertEquals(keys.length, 1);
-    Assert.assertEquals(keys, new String[]{""});
-
-    groupKey._stringKey = "\t";
+    groupKey._stringKey = "\0";
     keys = groupKey.getKeys();
     Assert.assertEquals(keys.length, 2);
     Assert.assertEquals(keys, new String[]{"", ""});

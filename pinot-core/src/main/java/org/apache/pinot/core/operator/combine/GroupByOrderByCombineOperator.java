@@ -155,33 +155,53 @@ public class GroupByOrderByCombineOperator extends BaseOperator<IntermediateResu
             // Merge aggregation group-by result.
             AggregationGroupByResult aggregationGroupByResult = intermediateResultsBlock.getAggregationGroupByResult();
             if (aggregationGroupByResult != null) {
-              // Get converter functions
-              Function[] converterFunctions = new Function[numGroupByExpressions];
-              for (int i = 0; i < numGroupByExpressions; i++) {
-                converterFunctions[i] = getConverterFunction(_dataSchema.getColumnDataType(i));
-              }
+              if (numGroupByExpressions == 1) {
+                // Get converter function
+                Function converterFunction = getConverterFunction(_dataSchema.getColumnDataType(0));
 
-              // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable.
-              Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
-              while (groupKeyIterator.hasNext()) {
-                Object[] columns = new Object[numColumns];
-                int columnIndex = 0;
-                GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
-                String[] stringKey = groupKey.getKeys();
-                Object[] objectKey = new Object[numGroupByExpressions];
-                for (int i = 0; i < stringKey.length; i++) {
-                  Object convertedKey = converterFunctions[i].apply(stringKey[i]);
-                  objectKey[columnIndex] = convertedKey;
-                  columns[columnIndex] = convertedKey;
-                  columnIndex++;
+                // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
+                Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
+                while (groupKeyIterator.hasNext()) {
+                  Object[] values = new Object[numColumns];
+                  GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
+                  Object convertedKey = converterFunction.apply(groupKey._stringKey);
+                  values[0] = convertedKey;
+                  for (int i = 0; i < numAggregationFunctions; i++) {
+                    values[i + 1] = aggregationGroupByResult.getResultForKey(groupKey, i);
+                  }
+                  Key key = new Key(new Object[]{convertedKey});
+                  Record record = new Record(values);
+                  _indexedTable.upsert(key, record);
                 }
-                for (int i = 0; i < numAggregationFunctions; i++) {
-                  columns[columnIndex] = aggregationGroupByResult.getResultForKey(groupKey, i);
-                  columnIndex++;
+              } else {
+                // Get converter functions
+                Function[] converterFunctions = new Function[numGroupByExpressions];
+                for (int i = 0; i < numGroupByExpressions; i++) {
+                  converterFunctions[i] = getConverterFunction(_dataSchema.getColumnDataType(i));
                 }
-                Key key = new Key(objectKey);
-                Record record = new Record(columns);
-                _indexedTable.upsert(key, record);
+
+                // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
+                Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
+                while (groupKeyIterator.hasNext()) {
+                  Object[] values = new Object[numColumns];
+                  int columnIndex = 0;
+                  GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
+                  String[] stringKeys = groupKey.getKeys();
+                  Object[] objectKeys = new Object[numGroupByExpressions];
+                  for (int i = 0; i < numGroupByExpressions; i++) {
+                    Object convertedKey = converterFunctions[i].apply(stringKeys[i]);
+                    objectKeys[columnIndex] = convertedKey;
+                    values[columnIndex] = convertedKey;
+                    columnIndex++;
+                  }
+                  for (int i = 0; i < numAggregationFunctions; i++) {
+                    values[columnIndex] = aggregationGroupByResult.getResultForKey(groupKey, i);
+                    columnIndex++;
+                  }
+                  Key key = new Key(objectKeys);
+                  Record record = new Record(values);
+                  _indexedTable.upsert(key, record);
+                }
               }
             }
           } catch (EarlyTerminationException e) {

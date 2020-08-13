@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.groupby;
 
 import java.util.Iterator;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 
 
@@ -26,7 +27,9 @@ import org.apache.pinot.core.operator.blocks.TransformBlock;
  * Interface for generating group keys.
  */
 public interface GroupKeyGenerator {
-  String DELIMITER = "\t";
+  // TODO: Remove LEGACY_DELIMITER after releasing 0.5.0
+  char LEGACY_DELIMITER = '\t';
+  char DELIMITER = '\0';
   int INVALID_ID = -1;
 
   /**
@@ -80,11 +83,14 @@ public interface GroupKeyGenerator {
     public String _stringKey;
 
     /**
-     * Returns the group key as an array
+     * Returns the group keys as a String array.
+     * NOTE: DO NOT use this method for single group-by expression, directly use _stringKey instead for performance
+     *       concern.
      */
     public String[] getKeys() {
-      // Set limit to -1 to prevent removing trailing empty strings
-      return _stringKey.split(GroupKeyGenerator.DELIMITER, -1);
+      assert _stringKey.indexOf(DELIMITER) != -1;
+      // Preserve all tokens to support empty strings
+      return StringUtils.splitPreserveAllTokens(_stringKey, GroupKeyGenerator.DELIMITER);
     }
   }
 }

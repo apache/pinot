@@ -65,7 +65,6 @@ import org.openjdk.jmh.runner.options.TimeValue;
 @State(Scope.Benchmark)
 @Fork(value = 1, jvmArgs = {"-server", "-Xmx8G", "-XX:MaxDirectMemorySize=16G"})
 public class BenchmarkCombineGroupBy {
-  private static final int TOP_N = 500;
   private static final int NUM_SEGMENTS = 4;
   private static final int NUM_RECORDS_PER_SEGMENT = 100_000;
   private static final int CARDINALITY_D1 = 500;
@@ -205,7 +204,7 @@ public class BenchmarkCombineGroupBy {
     }
 
     AggregationGroupByTrimmingService aggregationGroupByTrimmingService =
-        new AggregationGroupByTrimmingService(_aggregationFunctions, TOP_N);
+        new AggregationGroupByTrimmingService(_queryContext);
     List<Map<String, Object>> trimmedResults = aggregationGroupByTrimmingService.trimIntermediateResultsMap(resultsMap);
   }
 
