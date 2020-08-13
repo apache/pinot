@@ -21,6 +21,7 @@ package org.apache.pinot.common.utils.fetcher;
 import java.io.File;
 import java.net.URI;
 
+import java.util.List;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -63,5 +64,19 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
         return false;
       }
     });
+  }
+
+  @Override
+  public void fetchSegmentToLocalWithoutRetry(URI uri, File dest)
+      throws Exception {
+    try {
+      int statusCode = _httpClient.downloadFile(uri, dest);
+      _logger
+          .info("Downloaded segment from: {} to: {} of size: {}; Response status code: {}", uri, dest, dest.length(),
+              statusCode);
+    }  catch (Exception e) {
+      _logger.warn("Caught exception while downloading segment from: {} to: {}", uri, dest, e);
+      throw e;
+    }
   }
 }

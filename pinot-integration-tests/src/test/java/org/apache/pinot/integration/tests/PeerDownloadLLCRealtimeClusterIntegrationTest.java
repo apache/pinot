@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.integration.tests;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
@@ -32,10 +31,11 @@ import java.util.Random;
 import org.apache.avro.reflect.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.ZNRecord;
+import org.apache.helix.model.ExternalView;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.config.table.CompletionConfig;
-import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -44,34 +44,39 @@ import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.apache.pinot.util.TestUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerConf.ALLOW_HLC_TABLES;
 import static org.apache.pinot.controller.ControllerConf.ENABLE_SPLIT_COMMIT;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
 
 
 /**
  * Integration test that extends RealtimeClusterIntegrationTest but uses low-level Kafka consumer and a fake PinotFS as
  * the deep store for segments. This test enables the peer to peer segment download scheme to test Pinot servers can
- * download segments from peer servers even the deep store is down.
+ * download segments from peer servers even the deep store is down. This is done by controlled injection of failures in
+ * the fake PinotFS segment upload api (i.e., copyFromLocal) for all segments of even partition number.
+ *
+ * Besides standard tests, it also verifies that
+ * (1) All the segments on all servers are in either ONLINE or CONSUMING states
+ * (2) For segments failed during deep store upload, the corresponding segment download url string is empty in Zk.
  */
 public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegrationTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PeerDownloadLLCRealtimeClusterIntegrationTest.class);
+
   private static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
-  private static final String TEST_UPDATED_INVERTED_INDEX_QUERY =
-      "SELECT COUNT(*) FROM mytable WHERE DivActualElapsedTime = 305";
-  private static final List<String> UPDATED_INVERTED_INDEX_COLUMNS = Collections.singletonList("DivActualElapsedTime");
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
+  private static final int NUM_SERVERS = 2;
 
   private final boolean _isDirectAlloc = true; //Set as true; otherwise trigger indexing exception.
   private final boolean _isConsumerDirConfigured = true;
   private final boolean _enableSplitCommit = true;
   private final boolean _enableLeadControllerResource = RANDOM.nextBoolean();
-  private final long _startTime = System.currentTimeMillis();
   private static File PINOT_FS_ROOT_DIR;
 
   @BeforeClass
@@ -96,7 +101,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
 
   @Override
   public void startServer() {
-    startServers(2);
+    startServers(NUM_SERVERS);
   }
 
   @Override
@@ -106,10 +111,11 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
         new SegmentsValidationAndRetentionConfig();
     CompletionConfig completionConfig = new CompletionConfig("DOWNLOAD");
     segmentsValidationAndRetentionConfig.setCompletionConfig(completionConfig);
-    segmentsValidationAndRetentionConfig.setReplicasPerPartition(String.valueOf(this.getNumReplicas()));
+    segmentsValidationAndRetentionConfig.setReplicasPerPartition(String.valueOf(NUM_SERVERS));
     // Important: enable peer to peer download.
     segmentsValidationAndRetentionConfig.setPeerSegmentDownloadScheme("http");
     tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
+    tableConfig.getValidationConfig().setTimeColumnName(this.getTimeColumnName());
 
     sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString());
   }
@@ -121,7 +127,8 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     controllerConfig.put(ALLOW_HLC_TABLES, false);
     controllerConfig.put(ENABLE_SPLIT_COMMIT, _enableSplitCommit);
     // Override the data dir config.
-    controllerConfig.put(ControllerConf.DATA_DIR, "mockfs://" + getHelixClusterName() + "/");
+    controllerConfig.put(ControllerConf.DATA_DIR, "mockfs://" + getHelixClusterName());
+    controllerConfig.put(ControllerConf.LOCAL_TEMP_DIR, FileUtils.getTempDirectory().getAbsolutePath());
     // Use the mock PinotFS as the PinotFS.
     controllerConfig.put("pinot.controller.storage.factory.class.mockfs",
         "org.apache.pinot.integration.tests.PeerDownloadLLCRealtimeClusterIntegrationTest$MockPinotFS");
@@ -147,7 +154,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     configuration.setProperty(CommonConstants.Server.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY + ".class.mockfs",
         "org.apache.pinot.integration.tests.PeerDownloadLLCRealtimeClusterIntegrationTest$MockPinotFS");
     // Set the segment deep store uri.
-    configuration.setProperty("pinot.server.instance.segment.store.uri", "mockfs://" + getHelixClusterName() + "/");
+    configuration.setProperty("pinot.server.instance.segment.store.uri", "mockfs://" + getHelixClusterName());
     // For setting the HDFS segment fetcher.
     configuration.setProperty(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY + ".protocols", "file,http");
     if (_isConsumerDirConfigured) {
@@ -179,38 +186,43 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
   }
 
   @Test
-  public void testInvertedIndexTriggering()
-      throws Exception {
-    long numTotalDocs = getCountStarResult();
-
-    JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
-    assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-    assertTrue(queryResponse.get("numEntriesScannedInFilter").asLong() > 0L);
-
-    {
-      IndexingConfig config = getRealtimeTableConfig().getIndexingConfig();
-      config.setInvertedIndexColumns(UPDATED_INVERTED_INDEX_COLUMNS);
-      config.setBloomFilterColumns(null);
-
-      sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(getTableName()),
-          getRealtimeTableConfig().toJsonString());
-    }
-
-    sendPostRequest(_controllerRequestURLBuilder.forTableReload(getTableName(), "realtime"), null);
-
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        JsonNode queryResponse1 = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
-        // Total docs should not change during reload
-        assertEquals(queryResponse1.get("totalDocs").asLong(), numTotalDocs);
-        assertEquals(queryResponse1.get("numConsumingSegmentsQueried").asLong(), 2);
-        assertTrue(queryResponse1.get("minConsumingFreshnessTimeMs").asLong() > _startTime);
-        assertTrue(queryResponse1.get("minConsumingFreshnessTimeMs").asLong() < System.currentTimeMillis());
-        return queryResponse1.get("numEntriesScannedInFilter").asLong() == 0;
-      } catch (Exception e) {
-        throw new RuntimeException(e);
+  public void testSegmentDownloadURLs() {
+    // Verify that all segments of even partition number have empty download url in zk.
+    String zkSegmentsPath = "/SEGMENTS/" + TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    List<String> segmentNames = _propertyStore.getChildNames(zkSegmentsPath, 0);
+    for (String segmentName : segmentNames) {
+      ZNRecord znRecord = _propertyStore.get(zkSegmentsPath + "/" + segmentName, null, 0);
+      String downloadURL = znRecord.getSimpleField("segment.realtime.download.url");
+      String numberOfDoc = znRecord.getSimpleField("segment.total.docs");
+      if (numberOfDoc.equals("-1")) {
+        // This is a consuming segment so the download url is null.
+        Assert.assertNull(downloadURL);
+        continue;
       }
-    }, 600_000L, "Failed to generate inverted index");
+      int partition = Integer.parseInt(segmentName.split("__")[1]);
+      if (partition % 2 == 0) {
+        Assert.assertEquals("", downloadURL);
+      } else {
+        Assert.assertTrue(downloadURL.startsWith("mockfs://"));
+      }
+    }
+  }
+
+  @Test
+  public void testAllSegmentsAreOnlineOrConsuming() {
+    ExternalView externalView =
+        HelixHelper.getExternalViewForResource(_helixAdmin, getHelixClusterName(),
+            TableNameBuilder.REALTIME.tableNameWithType(getTableName()));
+    Assert.assertEquals("2", externalView.getReplicas());
+    // Verify for each segment e, the state of e in its 2 hosting servers is either ONLINE or CONSUMING
+    for(String segment : externalView.getPartitionSet()) {
+      Map<String, String> instanceToStateMap = externalView.getStateMap(segment);
+      Assert.assertEquals(2, instanceToStateMap.size());
+      for (Map.Entry<String, String> instanceState : instanceToStateMap.entrySet()) {
+        Assert.assertTrue("ONLINE".equalsIgnoreCase(instanceState.getValue()) || "CONSUMING"
+            .equalsIgnoreCase(instanceState.getValue()));
+      }
+    }
   }
 
   @Test(expectedExceptions = IOException.class)
@@ -223,10 +235,11 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
 
   // MockPinotFS is a localPinotFS whose root directory is configured as _basePath;
   public static class MockPinotFS extends PinotFS {
-    LocalPinotFS _localPinotFS;
+    LocalPinotFS _localPinotFS = new LocalPinotFS();
     File _basePath;
     @Override
     public void init(PinotConfiguration config) {
+      _localPinotFS.init(config);
       _basePath = PeerDownloadLLCRealtimeClusterIntegrationTest.PINOT_FS_ROOT_DIR;
     }
 
@@ -254,6 +267,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     public boolean doMove(URI srcUri, URI dstUri)
         throws IOException {
       try {
+        LOGGER.warn("Moving from {} to {}", srcUri, dstUri);
         return _localPinotFS.doMove(new URI(_basePath + srcUri.getPath()), new URI(_basePath + dstUri.getPath()));
       } catch (URISyntaxException e) {
         throw new IllegalArgumentException(e.getMessage());
@@ -303,12 +317,17 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     @Override
     public void copyToLocalFile(URI srcUri, File dstFile)
         throws Exception {
-      throw new UnsupportedOperationException();
+      _localPinotFS.copyToLocalFile(new URI(_basePath + srcUri.getPath()), dstFile);
     }
 
     @Override
     public void copyFromLocalFile(File srcFile, URI dstUri)
         throws Exception {
+      // Inject failures for segments whose partition number is even.
+      String[] parts = srcFile.getName().split("__");
+      if (parts.length > 2 && (Integer.parseInt(parts[1]) % 2 == 0)) {
+        throw new IllegalArgumentException(srcFile.getAbsolutePath());
+      }
       try {
         _localPinotFS.copyFromLocalFile(srcFile, new URI(_basePath + dstUri.getPath()));
       } catch (URISyntaxException e) {
