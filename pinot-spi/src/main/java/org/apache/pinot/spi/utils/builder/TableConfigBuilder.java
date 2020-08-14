@@ -87,6 +87,7 @@ public class TableConfigBuilder {
   private List<String> _rangeIndexColumns;
   private Map<String, String> _streamConfigs;
   private SegmentPartitionConfig _segmentPartitionConfig;
+  private boolean _nullHandlingEnabled;
 
   private TableCustomConfig _customConfig;
   private QuotaConfig _quotaConfig;
@@ -255,6 +256,11 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setNullHandlingEnabledConfig(boolean nullHandlingEnabled) {
+    _nullHandlingEnabled = nullHandlingEnabled;
+    return this;
+  }
+
   public TableConfigBuilder setCustomConfig(TableCustomConfig customConfig) {
     _customConfig = customConfig;
     return this;
@@ -344,6 +350,7 @@ public class TableConfigBuilder {
     indexingConfig.setRangeIndexColumns(_rangeIndexColumns);
     indexingConfig.setStreamConfigs(_streamConfigs);
     indexingConfig.setSegmentPartitionConfig(_segmentPartitionConfig);
+    indexingConfig.setNullHandlingEnabled(_nullHandlingEnabled);
 
     if (_customConfig == null) {
       _customConfig = new TableCustomConfig(null);

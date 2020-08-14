@@ -80,6 +80,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   private static final List<String> DEFAULT_BLOOM_FILTER_COLUMNS = Arrays.asList("FlightNum", "Origin");
   private static final List<String> DEFAULT_RANGE_INDEX_COLUMNS = Collections.singletonList("Origin");
   protected static final int DEFAULT_NUM_REPLICAS = 1;
+  protected static final boolean DEFAULT_NULL_HANDLING_ENABLED = false;
 
   protected final File _tempDir = new File(FileUtils.getTempDirectory(), getClass().getSimpleName());
   protected final File _segmentDir = new File(_tempDir, "segmentDir");
@@ -241,6 +242,11 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return null;
   }
 
+  @Nullable
+  protected boolean getNullHandlingEnabledConfig() {
+    return DEFAULT_NULL_HANDLING_ENABLED;
+  }
+
   /**
    * The following methods are based on the getters. Override the getters for non-default settings before calling these
    * methods.
@@ -273,7 +279,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
         .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
         .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
-        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).build();
+        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
+        .setNullHandlingEnabledConfig(getNullHandlingEnabledConfig()).build();
   }
 
   /**
@@ -333,7 +340,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
         .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
         .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setLLC(useLlc)
-        .setStreamConfigs(streamConfigs).build();
+        .setStreamConfigs(streamConfigs).setNullHandlingEnabledConfig(getNullHandlingEnabledConfig()).build();
   }
 
   /**
