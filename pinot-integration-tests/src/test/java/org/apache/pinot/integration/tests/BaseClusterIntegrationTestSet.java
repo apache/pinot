@@ -231,6 +231,16 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     testSqlQuery(query, Collections.singletonList(query));
     query = "SELECT MAX(ArrDelay), Month FROM mytable GROUP BY Month ORDER BY ABS(Month - 6) + MAX(ArrDelay)";
     testSqlQuery(query, Collections.singletonList(query));
+
+    // Post-aggregation in SELECT
+    query = "SELECT MAX(ArrDelay) + MAX(AirTime) FROM mytable";
+    testSqlQuery(query, Collections.singletonList(query));
+    query =
+        "SELECT MAX(ArrDelay) - MAX(AirTime), DaysSinceEpoch FROM mytable GROUP BY DaysSinceEpoch ORDER BY MAX(ArrDelay) - MIN(AirTime) DESC";
+    testSqlQuery(query, Collections.singletonList(query));
+    query =
+        "SELECT DaysSinceEpoch, MAX(ArrDelay) * 2 - MAX(AirTime) - 3 FROM mytable GROUP BY DaysSinceEpoch ORDER BY MAX(ArrDelay) - MIN(AirTime) DESC";
+    testSqlQuery(query, Collections.singletonList(query));
   }
 
   /**

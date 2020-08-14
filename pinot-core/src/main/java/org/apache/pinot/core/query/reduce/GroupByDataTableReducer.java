@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.reduce;
 
-import com.google.common.base.Preconditions;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -34,6 +33,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.GroupByResult;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
@@ -44,7 +44,6 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.FunctionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GroupByUtils;
@@ -67,10 +66,11 @@ public class GroupByDataTableReducer implements DataTableReducer {
   private final boolean _responseFormatSql;
   private final boolean _sqlQuery;
 
-  GroupByDataTableReducer(QueryContext queryContext, AggregationFunction[] aggregationFunctions) {
+  GroupByDataTableReducer(QueryContext queryContext) {
     _queryContext = queryContext;
-    _aggregationFunctions = aggregationFunctions;
-    _numAggregationFunctions = aggregationFunctions.length;
+    _aggregationFunctions = queryContext.getAggregationFunctions();
+    assert _aggregationFunctions != null;
+    _numAggregationFunctions = _aggregationFunctions.length;
     _groupByExpressions = queryContext.getGroupByExpressions();
     assert _groupByExpressions != null;
     _numGroupByExpressions = _groupByExpressions.size();
@@ -162,103 +162,49 @@ public class GroupByDataTableReducer implements DataTableReducer {
    */
   private void setSQLGroupByInResultTable(BrokerResponseNative brokerResponseNative, DataSchema dataSchema,
       Collection<DataTable> dataTables) {
-    DataSchema resultTableSchema = getSQLResultTableSchema(dataSchema);
     IndexedTable indexedTable = getIndexedTable(dataSchema, dataTables);
     Iterator<Record> sortedIterator = indexedTable.iterator();
+    DataSchema prePostAggregationDataSchema = getPrePostAggregationDataSchema(dataSchema);
     int limit = _queryContext.getLimit();
     List<Object[]> rows = new ArrayList<>(limit);
+    for (int i = 0; i < limit && sortedIterator.hasNext(); i++) {
+      Object[] row = sortedIterator.next().getValues();
+      for (int j = 0; j < _numAggregationFunctions; j++) {
+        int valueIndex = j + _numGroupByExpressions;
+        row[valueIndex] =
+            AggregationFunctionUtils.getSerializableValue(_aggregationFunctions[j].extractFinalResult(row[valueIndex]));
+      }
+      rows.add(row);
+    }
 
     if (_sqlQuery) {
       // SQL query with SQL group-by mode and response format
-      // NOTE: For SQL query, need to reorder the columns in the data table based on the select expressions.
 
-      int[] selectExpressionIndexMap = getSelectExpressionIndexMap();
-      int numSelectExpressions = selectExpressionIndexMap.length;
-      String[] columnNames = resultTableSchema.getColumnNames();
-      DataSchema.ColumnDataType[] columnDataTypes = resultTableSchema.getColumnDataTypes();
-      String[] reorderedColumnNames = new String[numSelectExpressions];
-      DataSchema.ColumnDataType[] reorderedColumnDataTypes = new DataSchema.ColumnDataType[numSelectExpressions];
-      resultTableSchema = new DataSchema(reorderedColumnNames, reorderedColumnDataTypes);
-      for (int i = 0; i < numSelectExpressions; i++) {
-        reorderedColumnNames[i] = columnNames[selectExpressionIndexMap[i]];
-        reorderedColumnDataTypes[i] = columnDataTypes[selectExpressionIndexMap[i]];
-      }
-      while (rows.size() < limit && sortedIterator.hasNext()) {
-        Record nextRecord = sortedIterator.next();
-        Object[] values = nextRecord.getValues();
-        for (int i = 0; i < _numAggregationFunctions; i++) {
-          int valueIndex = i + _numGroupByExpressions;
-          values[valueIndex] = AggregationFunctionUtils
-              .getSerializableValue(_aggregationFunctions[i].extractFinalResult(values[valueIndex]));
-        }
-
-        Object[] reorderedValues = new Object[numSelectExpressions];
-        for (int i = 0; i < numSelectExpressions; i++) {
-          reorderedValues[i] = values[selectExpressionIndexMap[i]];
-        }
-        rows.add(reorderedValues);
-      }
+      PostAggregationHandler postAggregationHandler =
+          new PostAggregationHandler(_queryContext, prePostAggregationDataSchema);
+      DataSchema resultTableSchema = postAggregationHandler.getResultDataSchema();
+      rows.replaceAll(postAggregationHandler::getResult);
+      brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, rows));
     } else {
       // PQL query with SQL group-by mode and response format
+      // NOTE: For PQL query, keep the order of columns as is (group-by expressions followed by aggregations), no need
+      //       to perform post-aggregation.
 
-      while (rows.size() < limit && sortedIterator.hasNext()) {
-        Record nextRecord = sortedIterator.next();
-        Object[] values = nextRecord.getValues();
-        for (int i = 0; i < _numAggregationFunctions; i++) {
-          int valueIndex = i + _numGroupByExpressions;
-          values[valueIndex] = AggregationFunctionUtils
-              .getSerializableValue(_aggregationFunctions[i].extractFinalResult(values[valueIndex]));
-        }
-        rows.add(values);
-      }
+      brokerResponseNative.setResultTable(new ResultTable(prePostAggregationDataSchema, rows));
     }
-
-    brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, rows));
   }
 
   /**
-   * Helper method to generate a map from the expression index in the select expressions to the column index in the data
-   * schema. This map is used to reorder the expressions according to the select expressions.
+   * Constructs the DataSchema for the rows before the post-aggregation (SQL mode).
    */
-  private int[] getSelectExpressionIndexMap() {
-    List<ExpressionContext> selectExpressions = _queryContext.getSelectExpressions();
-    List<ExpressionContext> groupByExpressions = _queryContext.getGroupByExpressions();
-    assert groupByExpressions != null;
-    int numSelectExpressions = selectExpressions.size();
-    int[] selectExpressionIndexMap = new int[numSelectExpressions];
-    int aggregationExpressionIndex = _numGroupByExpressions;
-    for (int i = 0; i < numSelectExpressions; i++) {
-      ExpressionContext selectExpression = selectExpressions.get(i);
-      if (selectExpression.getType() == ExpressionContext.Type.FUNCTION
-          && selectExpression.getFunction().getType() == FunctionContext.Type.AGGREGATION) {
-        selectExpressionIndexMap[i] = aggregationExpressionIndex++;
-      } else {
-        int indexInGroupByExpressions = groupByExpressions.indexOf(selectExpression);
-        Preconditions.checkState(indexInGroupByExpressions >= 0,
-            "Select expression: %s is not an aggregation expression and not contained in the group-by expressions");
-        selectExpressionIndexMap[i] = indexInGroupByExpressions;
-      }
+  private DataSchema getPrePostAggregationDataSchema(DataSchema dataSchema) {
+    String[] columnNames = dataSchema.getColumnNames();
+    ColumnDataType[] columnDataTypes = new ColumnDataType[_numColumns];
+    System.arraycopy(dataSchema.getColumnDataTypes(), 0, columnDataTypes, 0, _numGroupByExpressions);
+    for (int i = 0; i < _numAggregationFunctions; i++) {
+      columnDataTypes[i + _numGroupByExpressions] = _aggregationFunctions[i].getFinalResultColumnType();
     }
-    return selectExpressionIndexMap;
-  }
-
-  /**
-   * Constructs the final result table schema for sql mode execution
-   * The data type for the aggregations needs to be taken from the final result's data type
-   */
-  private DataSchema getSQLResultTableSchema(DataSchema dataSchema) {
-    String[] columns = dataSchema.getColumnNames();
-    DataSchema.ColumnDataType[] finalColumnDataTypes = new DataSchema.ColumnDataType[_numColumns];
-    int aggIdx = 0;
-    for (int i = 0; i < _numColumns; i++) {
-      if (i < _numGroupByExpressions) {
-        finalColumnDataTypes[i] = dataSchema.getColumnDataType(i);
-      } else {
-        finalColumnDataTypes[i] = _aggregationFunctions[aggIdx].getFinalResultColumnType();
-        aggIdx++;
-      }
-    }
-    return new DataSchema(columns, finalColumnDataTypes);
+    return new DataSchema(columnNames, columnDataTypes);
   }
 
   private IndexedTable getIndexedTable(DataSchema dataSchema, Collection<DataTable> dataTables) {
@@ -268,7 +214,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     for (DataTable dataTable : dataTables) {
       BiFunction[] functions = new BiFunction[_numColumns];
       for (int i = 0; i < _numColumns; i++) {
-        DataSchema.ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
+        ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
         BiFunction<Integer, Integer, Object> function;
         switch (columnDataType) {
           case INT:
@@ -394,10 +340,10 @@ public class GroupByDataTableReducer implements DataTableReducer {
    */
   private DataSchema getPQLResultTableSchema(AggregationFunction aggregationFunction) {
     String[] columnNames = new String[_numColumns];
-    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[_numColumns];
+    ColumnDataType[] columnDataTypes = new ColumnDataType[_numColumns];
     for (int i = 0; i < _numGroupByExpressions; i++) {
       columnNames[i] = _groupByExpressions.get(i).toString();
-      columnDataTypes[i] = DataSchema.ColumnDataType.STRING;
+      columnDataTypes[i] = ColumnDataType.STRING;
     }
     columnNames[_numGroupByExpressions] = aggregationFunction.getResultColumnName();
     columnDataTypes[_numGroupByExpressions] = aggregationFunction.getFinalResultColumnType();
