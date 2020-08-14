@@ -94,7 +94,7 @@ public enum TransformFunctionType {
     try {
       return TransformFunctionType.valueOf(upperCaseFunctionName);
     } catch (Exception e) {
-      if (FunctionRegistry.getFunctionByName(functionName) != null) {
+      if (FunctionRegistry.containsFunction(functionName)) {
         return SCALAR;
       }
       // Support function name of both jsonExtractScalar and json_extract_scalar

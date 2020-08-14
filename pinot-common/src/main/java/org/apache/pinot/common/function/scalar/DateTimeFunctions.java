@@ -21,15 +21,12 @@ package org.apache.pinot.common.function.scalar;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.function.DateTimePatternHandler;
 import org.apache.pinot.common.function.annotations.ScalarFunction;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 
 
 /**
  * Inbuilt date time related transform functions
- * TODO: Exhaustively add all time conversion functions
- *  eg:
- *   1) round(time, roundingValue) - round(minutes, 10), round(millis, 15:MINUTES)
- *   2) simple date time transformations
- *   3) convert(from_format, to_format, bucketing)
  *
  *   NOTE:
  *   <code>toEpochXXXBucket</code> methods are only needed to convert from TimeFieldSpec to DateTimeFieldSpec, to maintain the backward compatibility.
@@ -259,5 +256,300 @@ public class DateTimeFunctions {
   @ScalarFunction
   public static long now() {
     return System.currentTimeMillis();
+  }
+
+  /**
+   * The {@code timezoneId} for the following methods must be of a Joda-Time format:
+   * https://www.joda.org/joda-time/timezones.html
+   */
+
+  /**
+   * Returns the hour of the time zone offset.
+   */
+  @ScalarFunction
+  public static int timezoneHour(String timezoneId) {
+    return new DateTime(DateTimeZone.forID(timezoneId).getOffset(null), DateTimeZone.UTC).getHourOfDay();
+  }
+
+  /**
+   * Returns the minute of the time zone offset.
+   */
+  @ScalarFunction
+  public static int timezoneMinute(String timezoneId) {
+    return new DateTime(DateTimeZone.forID(timezoneId).getOffset(null), DateTimeZone.UTC).getMinuteOfHour();
+  }
+
+  /**
+   * Returns the year from the given epoch millis in UTC timezone.
+   */
+  @ScalarFunction
+  public static int year(long millis) {
+    return new DateTime(millis, DateTimeZone.UTC).getYear();
+  }
+
+  /**
+   * Returns the year from the given epoch millis and timezone id.
+   */
+  @ScalarFunction
+  public static int year(long millis, String timezoneId) {
+    return new DateTime(millis, DateTimeZone.forID(timezoneId)).getYear();
+  }
+
+  /**
+   * Returns the year of the ISO week from the given epoch millis in UTC timezone.
+   */
+  @ScalarFunction
+  public static int yearOfWeek(long millis) {
+    return new DateTime(millis, DateTimeZone.UTC).getWeekyear();
+  }
+
+  /**
+   * Returns the year of the ISO week from the given epoch millis and timezone id.
+   */
+  @ScalarFunction
+  public static int yearOfWeek(long millis, String timezoneId) {
+    return new DateTime(millis, DateTimeZone.forID(timezoneId)).getWeekyear();
+  }
+
+  /**
+   * An alias for yearOfWeek().
+   */
+  @ScalarFunction
+  public static int yow(long millis) {
+    return yearOfWeek(millis);
+  }
+
+  /**
+   * An alias for yearOfWeek().
+   */
+  @ScalarFunction
+  public static int yow(long millis, String timezoneId) {
+    return yearOfWeek(millis, timezoneId);
+  }
+
+  /**
+   * Returns the quarter of the year from the given epoch millis in UTC timezone. The value ranges from 1 to 4.
+   */
+  @ScalarFunction
+  public static int quarter(long millis) {
+    return (month(millis) - 1) / 3 + 1;
+  }
+
+  /**
+   * Returns the quarter of the year from the given epoch millis and timezone id. The value ranges from 1 to 4.
+   */
+  @ScalarFunction
+  public static int quarter(long millis, String timezoneId) {
+    return (month(millis, timezoneId) - 1) / 3 + 1;
+  }
+
+  /**
+   * Returns the month of the year from the given epoch millis in UTC timezone. The value ranges from 1 to 12.
+   */
+  @ScalarFunction
+  public static int month(long millis) {
+    return new DateTime(millis, DateTimeZone.UTC).getMonthOfYear();
+  }
+
+  /**
+   * Returns the month of the year from the given epoch millis and timezone id. The value ranges from 1 to 12.
+   */
+  @ScalarFunction
+  public static int month(long millis, String timezoneId) {
+    return new DateTime(millis, DateTimeZone.forID(timezoneId)).getMonthOfYear();
+  }
+
+  /**
+   * Returns the ISO week of the year from the given epoch millis in UTC timezone.The value ranges from 1 to 53.
+   */
+  @ScalarFunction
+  public static int week(long millis) {
+    return new DateTime(millis, DateTimeZone.UTC).getWeekOfWeekyear();
+  }
+
+  /**
+   * Returns the ISO week of the year from the given epoch millis and timezone id. The value ranges from 1 to 53.
+   */
+  @ScalarFunction
+  public static int week(long millis, String timezoneId) {
+    return new DateTime(millis, DateTimeZone.forID(timezoneId)).getWeekOfWeekyear();
+  }
+
+  /**
+   * An alias for week().
+   */
+  @ScalarFunction
+  public static int weekOfYear(long millis) {
+    return week(millis);
+  }
+
+  /**
+   * An alias for week().
+   */
+  @ScalarFunction
+  public static int weekOfYear(long millis, String timezoneId) {
+    return week(millis, timezoneId);
+  }
+
+  /**
+   * Returns the day of the year from the given epoch millis in UTC timezone. The value ranges from 1 to 366.
+   */
+  @ScalarFunction
+  public static int dayOfYear(long millis) {
+    return new DateTime(millis, DateTimeZone.UTC).getDayOfYear();
+  }
+
+  /**
+   * Returns the day of the year from the given epoch millis and timezone id. The value ranges from 1 to 366.
+   */
+  @ScalarFunction
+  public static int dayOfYear(long millis, String timezoneId) {
+    return new DateTime(millis, DateTimeZone.forID(timezoneId)).getDayOfYear();
+  }
+
+  /**
+   * An alias for dayOfYear().
+   */
+  @ScalarFunction
+  public static int doy(long millis) {
+    return dayOfYear(millis);
+  }
+
+  /**
+   * An alias for dayOfYear().
+   */
+  @ScalarFunction
+  public static int doy(long millis, String timezoneId) {
+    return dayOfYear(millis, timezoneId);
+  }
+
+  /**
+   * Returns the day of the month from the given epoch millis in UTC timezone. The value ranges from 1 to 31.
+   */
+  @ScalarFunction
+  public static int day(long millis) {
+    return new DateTime(millis, DateTimeZone.UTC).getDayOfMonth();
+  }
+
+  /**
+   * Returns the day of the month from the given epoch millis and timezone id. The value ranges from 1 to 31.
+   */
+  @ScalarFunction
+  public static int day(long millis, String timezoneId) {
+    return new DateTime(millis, DateTimeZone.forID(timezoneId)).getDayOfMonth();
+  }
+
+  /**
+   * An alias for day().
+   */
+  @ScalarFunction
+  public static int dayOfMonth(long millis) {
+    return day(millis);
+  }
+
+  /**
+   * An alias for day().
+   */
+  @ScalarFunction
+  public static int dayOfMonth(long millis, String timezoneId) {
+    return day(millis, timezoneId);
+  }
+
+  /**
+   * Returns the day of the week from the given epoch millis in UTC timezone. The value ranges from 1 (Monday) to 7
+   * (Sunday).
+   */
+  @ScalarFunction
+  public static int dayOfWeek(long millis) {
+    return new DateTime(millis, DateTimeZone.UTC).getDayOfWeek();
+  }
+
+  /**
+   * Returns the day of the week from the given epoch millis and timezone id. The value ranges from 1 (Monday) to 7
+   * (Sunday).
+   */
+  @ScalarFunction
+  public static int dayOfWeek(long millis, String timezoneId) {
+    return new DateTime(millis, DateTimeZone.forID(timezoneId)).getDayOfWeek();
+  }
+
+  /**
+   * An alias for dayOfWeek().
+   */
+  @ScalarFunction
+  public static int dow(long millis) {
+    return dayOfWeek(millis);
+  }
+
+  /**
+   * An alias for dayOfWeek().
+   */
+  @ScalarFunction
+  public static int dow(long millis, String timezoneId) {
+    return dayOfWeek(millis, timezoneId);
+  }
+
+  /**
+   * Returns the hour of the day from the given epoch millis in UTC timezone. The value ranges from 0 to 23.
+   */
+  @ScalarFunction
+  public static int hour(long millis) {
+    return new DateTime(millis, DateTimeZone.UTC).getHourOfDay();
+  }
+
+  /**
+   * Returns the hour of the day from the given epoch millis and timezone id. The value ranges from 0 to 23.
+   */
+  @ScalarFunction
+  public static int hour(long millis, String timezoneId) {
+    return new DateTime(millis, DateTimeZone.forID(timezoneId)).getHourOfDay();
+  }
+
+  /**
+   * Returns the minute of the hour from the given epoch millis in UTC timezone. The value ranges from 0 to 59.
+   */
+  @ScalarFunction
+  public static int minute(long millis) {
+    return new DateTime(millis, DateTimeZone.UTC).getMinuteOfHour();
+  }
+
+  /**
+   * Returns the minute of the hour from the given epoch millis and timezone id. The value ranges from 0 to 59.
+   */
+  @ScalarFunction
+  public static int minute(long millis, String timezoneId) {
+    return new DateTime(millis, DateTimeZone.forID(timezoneId)).getMinuteOfHour();
+  }
+
+  /**
+   * Returns the second of the minute from the given epoch millis in UTC timezone. The value ranges from 0 to 59.
+   */
+  @ScalarFunction
+  public static int second(long millis) {
+    return new DateTime(millis, DateTimeZone.UTC).getSecondOfMinute();
+  }
+
+  /**
+   * Returns the second of the minute from the given epoch millis and timezone id. The value ranges from 0 to 59.
+   */
+  @ScalarFunction
+  public static int second(long millis, String timezoneId) {
+    return new DateTime(millis, DateTimeZone.forID(timezoneId)).getSecondOfMinute();
+  }
+
+  /**
+   * Returns the millisecond of the second from the given epoch millis in UTC timezone. The value ranges from 0 to 999.
+   */
+  @ScalarFunction
+  public static int millisecond(long millis) {
+    return new DateTime(millis, DateTimeZone.UTC).getMillisOfSecond();
+  }
+
+  /**
+   * Returns the millisecond of the second from the given epoch millis and timezone id. The value ranges from 0 to 999.
+   */
+  @ScalarFunction
+  public static int millisecond(long millis, String timezoneId) {
+    return new DateTime(millis, DateTimeZone.forID(timezoneId)).getMillisOfSecond();
   }
 }

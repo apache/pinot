@@ -161,6 +161,9 @@ public class TransformFunctionFactory {
       case FUNCTION:
         FunctionContext function = expression.getFunction();
         String functionName = function.getFunctionName();
+        List<ExpressionContext> arguments = function.getArguments();
+        int numArguments = arguments.size();
+
         TransformFunction transformFunction;
         Class<? extends TransformFunction> transformFunctionClass = TRANSFORM_FUNCTION_MAP.get(functionName);
         if (transformFunctionClass != null) {
@@ -172,14 +175,15 @@ public class TransformFunctionFactory {
           }
         } else {
           // Scalar function
-          FunctionInfo functionInfo = FunctionRegistry.getFunctionByName(functionName);
+          FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
           if (functionInfo == null) {
-            throw new BadQueryRequestException("Unsupported transform function: " + functionName);
+            throw new BadQueryRequestException(
+                String.format("Unsupported function: %s with %d parameters", functionName, numArguments));
           }
           transformFunction = new ScalarTransformFunctionWrapper(functionInfo);
         }
-        List<ExpressionContext> arguments = function.getArguments();
-        List<TransformFunction> transformFunctionArguments = new ArrayList<>(arguments.size());
+
+        List<TransformFunction> transformFunctionArguments = new ArrayList<>(numArguments);
         for (ExpressionContext argument : arguments) {
           transformFunctionArguments.add(TransformFunctionFactory.get(argument, dataSourceMap));
         }

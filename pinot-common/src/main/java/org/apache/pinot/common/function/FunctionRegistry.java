@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.function;
 
+import com.google.common.base.Preconditions;
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
@@ -43,7 +44,7 @@ public class FunctionRegistry {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FunctionRegistry.class);
-  private static final Map<String, FunctionInfo> FUNCTION_INFO_MAP = new HashMap<>();
+  private static final Map<String, Map<Integer, FunctionInfo>> FUNCTION_INFO_MAP = new HashMap<>();
 
   /**
    * Registers the scalar functions via reflection.
@@ -91,17 +92,28 @@ public class FunctionRegistry {
    */
   public static void registerFunction(String functionName, Method method) {
     FunctionInfo functionInfo = new FunctionInfo(method, method.getDeclaringClass());
-    FUNCTION_INFO_MAP.put(canonicalize(functionName), functionInfo);
+    String canonicalName = canonicalize(functionName);
+    Map<Integer, FunctionInfo> functionInfoMap = FUNCTION_INFO_MAP.computeIfAbsent(canonicalName, k -> new HashMap<>());
+    Preconditions.checkState(functionInfoMap.put(method.getParameterCount(), functionInfo) == null,
+        "Function: %s with %s parameters is already registered", functionName, method.getParameterCount());
   }
 
   /**
-   * Returns the {@link FunctionInfo} associated with the given function name, or {@code null} if there is no method
-   * registered under the name. This method should be called after the FunctionRegistry is initialized and all methods
-   * are already registered.
+   * Returns {@code true} if the given function name is registered, {@code false} otherwise.
+   */
+  public static boolean containsFunction(String functionName) {
+    return FUNCTION_INFO_MAP.containsKey(canonicalize(functionName));
+  }
+
+  /**
+   * Returns the {@link FunctionInfo} associated with the given function name and number of parameters, or {@code null}
+   * if there is no matching method. This method should be called after the FunctionRegistry is initialized and all
+   * methods are already registered.
    */
   @Nullable
-  public static FunctionInfo getFunctionByName(String functionName) {
-    return FUNCTION_INFO_MAP.get(canonicalize(functionName));
+  public static FunctionInfo getFunctionInfo(String functionName, int numParameters) {
+    Map<Integer, FunctionInfo> functionInfoMap = FUNCTION_INFO_MAP.get(canonicalize(functionName));
+    return functionInfoMap != null ? functionInfoMap.get(numParameters) : null;
   }
 
   private static String canonicalize(String functionName) {

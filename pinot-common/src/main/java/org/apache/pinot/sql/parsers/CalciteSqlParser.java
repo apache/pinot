@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.calcite.config.Lex;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlDataTypeSpec;
@@ -825,26 +826,27 @@ public class CalciteSqlParser {
     return andExpression;
   }
 
-  protected static Expression invokeCompileTimeFunctionExpression(Expression funcExpr) {
-    if (funcExpr == null || funcExpr.getFunctionCall() == null) {
-      return funcExpr;
+  protected static Expression invokeCompileTimeFunctionExpression(@Nullable Expression expression) {
+    if (expression == null || expression.getFunctionCall() == null) {
+      return expression;
     }
-    Function function = funcExpr.getFunctionCall();
-    int functionOperandsLength = function.getOperandsSize();
+    Function function = expression.getFunctionCall();
+    List<Expression> operands = function.getOperands();
+    int numOperands = operands.size();
     boolean compilable = true;
-    for (int i = 0; i < functionOperandsLength; i++) {
-      Expression operand = invokeCompileTimeFunctionExpression(function.getOperands().get(i));
+    for (int i = 0; i < numOperands; i++) {
+      Expression operand = invokeCompileTimeFunctionExpression(operands.get(i));
       if (operand.getLiteral() == null) {
         compilable = false;
       }
-      function.getOperands().set(i, operand);
+      operands.set(i, operand);
     }
-    String funcName = function.getOperator();
+    String functionName = function.getOperator();
     if (compilable) {
-      FunctionInfo functionInfo = FunctionRegistry.getFunctionByName(funcName);
+      FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numOperands);
       if (functionInfo != null) {
-        Object[] arguments = new Object[functionOperandsLength];
-        for (int i = 0; i < functionOperandsLength; i++) {
+        Object[] arguments = new Object[numOperands];
+        for (int i = 0; i < numOperands; i++) {
           arguments[i] = function.getOperands().get(i).getLiteral().getFieldValue();
         }
         try {
@@ -853,11 +855,13 @@ public class CalciteSqlParser {
           Object result = invoker.invoke(arguments);
           return RequestUtils.getLiteralExpression(result);
         } catch (Exception e) {
-          throw new SqlCompilationException(new IllegalArgumentException("Unsupported function - " + funcName, e));
+          throw new SqlCompilationException(new RuntimeException(
+              "Caught exception while invoking method: " + functionInfo.getMethod() + " with arguments: " + Arrays
+                  .toString(arguments), e));
         }
       }
     }
-    return funcExpr;
+    return expression;
   }
 
   public static boolean isLiteralOnlyExpression(Expression e) {
