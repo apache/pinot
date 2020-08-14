@@ -377,6 +377,40 @@
     </dependency>
   </dependencies>
 
+  <profiles>
+  <profile>
+    <id>bigquery</id>
+    <dependencies>
+      <dependency>
+        <groupId>com.google.auth</groupId>
+        <artifactId>google-auth-library-oauth2-http</artifactId>
+      </dependency>
+      <dependency>
+        <groupId>com.google.api</groupId>
+        <artifactId>gax</artifactId>
+      </dependency>
+      <dependency>
+        <groupId>com.google.apis</groupId>
+        <artifactId>google-api-services-bigquery</artifactId>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.avro</groupId>
+        <artifactId>avro</artifactId>
+      </dependency>
+      <dependency>
+        <groupId>com.simba.googlebigquery</groupId>
+        <artifactId>jdbc42</artifactId>
+        <exclusions>
+          <exclusion>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+    </dependencies>
+  </profile>
+  </profiles>
+
   <build>
     <plugins>
       <plugin>
