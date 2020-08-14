@@ -16,7 +16,6 @@
 
 package org.apache.pinot.thirdeye.util;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -179,36 +178,63 @@ public class ThirdEyeUtilsTest {
   }
 
   @Test
-  public void testMergeAnomalyProperties() throws Exception {
-    final long now = System.currentTimeMillis();
-    final long bucketSize = 300_000;
-    final double parentVal = 1.0, childVal = 2.0;
-
+  public void testMergeAnomalyProperties() {
     Map<String, String> parentProperties = new HashMap<>();
     parentProperties.put("p1", "value1");
     parentProperties.put("p2", "value2");
     parentProperties.put("detectorComponentName", "rule1");
-    parentProperties.put("anomalyTimelinesView",
-        generateAnomalyTimelineView(now, bucketSize, 10, parentVal).toJsonString());
-
 
     Map<String, String> childProperties = new HashMap<>();
     childProperties.put("p1", "value3");
     childProperties.put("c1", "value4");
     childProperties.put("detectorComponentName", "rule2");
-    childProperties.put("anomalyTimelinesView",
-        generateAnomalyTimelineView(now + bucketSize, bucketSize, 10,  childVal).toJsonString());
 
     ThirdEyeUtils.mergeAnomalyProperties(parentProperties, childProperties);
     Assert.assertEquals(parentProperties.get("p1"), "value1");
     Assert.assertEquals(parentProperties.get("p2"), "value2");
     Assert.assertEquals(parentProperties.get("c1"), "value4");
     Assert.assertEquals(parentProperties.get("detectorComponentName"), "rule1,rule2");
+  }
+
+  @Test
+  public void testMergeAnomalySnapshotWithOverlap() throws Exception{
+    final long now = System.currentTimeMillis();
+    final long bucketSize = 300_000;
+    final double delta = 0.000001;
+    final double parentVal = 1.0, childVal = 2.0;
+    Map<String, String> parentProperties = new HashMap<>();
+    Map<String, String> childProperties = new HashMap<>();
+    parentProperties.put("anomalyTimelinesView",
+        generateAnomalyTimelineView(now, bucketSize, 10, parentVal).toJsonString());
+    childProperties.put("anomalyTimelinesView",
+        generateAnomalyTimelineView(now + bucketSize, bucketSize, 10,  childVal).toJsonString());
+    ThirdEyeUtils.mergeAnomalyProperties(parentProperties, childProperties);
     AnomalyTimelinesView merged = AnomalyTimelinesView.fromJsonString(parentProperties.get("anomalyTimelinesView"));
     Assert.assertEquals(merged.getTimeBuckets().size(), 11);
-    Assert.assertTrue(merged.getCurrentValues().get(0) - parentVal < 0.00001);
-    Assert.assertTrue(merged.getCurrentValues().get(1) - parentVal < 0.00001);
-    Assert.assertTrue(merged.getCurrentValues().get(10) - childVal < 0.00001);
+    Assert.assertTrue(Math.abs(merged.getCurrentValues().get(0) - parentVal) < delta);
+    Assert.assertTrue(Math.abs(merged.getCurrentValues().get(1) - parentVal) < delta);
+    Assert.assertTrue(Math.abs(merged.getCurrentValues().get(10) - childVal) < delta);
+  }
+
+  @Test
+  public void testMergeAnomalySnapshotWithGap() throws Exception{
+    final long now = System.currentTimeMillis();
+    final long bucketSize = 300_000;
+    final double delta = 0.000001;
+    final double parentVal = 1.0, childVal = 2.0;
+    Map<String, String> parentProperties = new HashMap<>();
+    Map<String, String> childProperties = new HashMap<>();
+    parentProperties.put("anomalyTimelinesView",
+        generateAnomalyTimelineView(now, bucketSize, 10, parentVal).toJsonString());
+    childProperties.put("anomalyTimelinesView",
+        generateAnomalyTimelineView(now + bucketSize * 20, bucketSize, 10,  childVal).toJsonString());
+    ThirdEyeUtils.mergeAnomalyProperties(parentProperties, childProperties);
+    AnomalyTimelinesView merged = AnomalyTimelinesView.fromJsonString(parentProperties.get("anomalyTimelinesView"));
+    Assert.assertEquals(merged.getTimeBuckets().size(), 20);
+    Assert.assertTrue(Math.abs(merged.getCurrentValues().get(0) - parentVal) < delta);
+    Assert.assertTrue(Math.abs(merged.getCurrentValues().get(1) - parentVal) < delta);
+    Assert.assertTrue(Math.abs(merged.getCurrentValues().get(19) - childVal) < delta);
+
   }
 
   private AnomalyTimelinesView generateAnomalyTimelineView(
