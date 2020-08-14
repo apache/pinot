@@ -532,30 +532,21 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       properties.setProperty(getKeyFor(column, DATETIME_GRANULARITY), dateTimeFieldSpec.getGranularity());
     }
 
-    String minValue = columnIndexCreationInfo.getMin().toString();
-    String maxValue = columnIndexCreationInfo.getMax().toString();
+    // NOTE: Min/max could be null for real-time aggregate metrics.
+    Object min = columnIndexCreationInfo.getMin();
+    Object max = columnIndexCreationInfo.getMax();
+    if (min != null && max != null) {
+      addColumnMinMaxValueInfo(properties, column, min.toString(), max.toString());
+    }
+
     String defaultNullValue = columnIndexCreationInfo.getDefaultNullValue().toString();
-    if (dataType == DataType.STRING) {
-      // Check special characters for STRING column
-      if (isValidPropertyValue(minValue)) {
-        properties.setProperty(getKeyFor(column, MIN_VALUE), minValue);
-      }
-      if (isValidPropertyValue(maxValue)) {
-        properties.setProperty(getKeyFor(column, MAX_VALUE), maxValue);
-      }
-      if (isValidPropertyValue(defaultNullValue)) {
-        properties.setProperty(getKeyFor(column, DEFAULT_NULL_VALUE), defaultNullValue);
-      }
-    } else {
-      properties.setProperty(getKeyFor(column, MIN_VALUE), minValue);
-      properties.setProperty(getKeyFor(column, MAX_VALUE), maxValue);
+    if (isValidPropertyValue(defaultNullValue)) {
       properties.setProperty(getKeyFor(column, DEFAULT_NULL_VALUE), defaultNullValue);
     }
   }
 
   public static void addColumnMinMaxValueInfo(PropertiesConfiguration properties, String column, String minValue,
       String maxValue) {
-    // Check special characters for STRING column
     if (isValidPropertyValue(minValue)) {
       properties.setProperty(getKeyFor(column, MIN_VALUE), minValue);
     }
