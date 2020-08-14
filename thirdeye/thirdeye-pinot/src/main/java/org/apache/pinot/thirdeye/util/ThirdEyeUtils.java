@@ -56,10 +56,12 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.thirdeye.anomaly.views.AnomalyTimelinesView;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
+import org.apache.pinot.thirdeye.dashboard.views.TimeBucket;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -84,7 +86,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.thirdeye.detection.wrapper.GrouperWrapper.PROP_DETECTOR_COMPONENT_NAME;
-
+import static org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO.TIME_SERIES_SNAPSHOT_KEY;
 
 public abstract class ThirdEyeUtils {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeUtils.class);
@@ -683,6 +685,19 @@ public abstract class ThirdEyeUtils {
           String component = ThirdEyeUtils.combineComponents(parent.get(PROP_DETECTOR_COMPONENT_NAME), child.get(PROP_DETECTOR_COMPONENT_NAME));
           parent.put(PROP_DETECTOR_COMPONENT_NAME, component);
         }
+        // combine time series snapshot of parent and child anomalies
+        if (key.equals(MergedAnomalyResultDTO.TIME_SERIES_SNAPSHOT_KEY)) {
+          try {
+            AnomalyTimelinesView parentTimeSeries = AnomalyTimelinesView
+                .fromJsonString(parent.get(TIME_SERIES_SNAPSHOT_KEY));
+            AnomalyTimelinesView childTimeSeries = AnomalyTimelinesView
+                .fromJsonString(child.get(TIME_SERIES_SNAPSHOT_KEY));
+            parent.put(TIME_SERIES_SNAPSHOT_KEY,
+                mergeTimeSeriesSnapshot(parentTimeSeries, childTimeSeries).toJsonString());
+          } catch (Exception e) {
+            LOG.warn("Unable to merge time series, so skipping...", e);
+          }
+        }
       }
     }
   }
@@ -744,5 +759,58 @@ public abstract class ThirdEyeUtils {
       throw new IllegalArgumentException("Invalid job name: " + jobName);
     }
     return Long.parseLong(parts[1]);
+  }
+
+  /**
+   * A helper function to merge time series snapshot of two anomalies. This function assumes that the time series of
+   * both parent and child anomalies are aligned with the metric granularity boundary.
+   * @param parent time series snapshot of parent anomaly
+   * @param child time series snapshot of parent anaomaly
+   * @return merged time series snapshot based on timestamps
+   */
+  private static AnomalyTimelinesView mergeTimeSeriesSnapshot(AnomalyTimelinesView parent, AnomalyTimelinesView child) {
+    AnomalyTimelinesView mergedTimeSeriesSnapshot = new AnomalyTimelinesView();
+    int i = 0 , j = 0;
+    while(i < parent.getTimeBuckets().size() && j < child.getTimeBuckets().size()) {
+      long parentTime = parent.getTimeBuckets().get(i).getCurrentStart();
+      long childTime = child.getTimeBuckets().get(j).getCurrentStart();
+      if (parentTime == childTime) {
+        // use the values in parent anomalies when the time series overlap
+        mergedTimeSeriesSnapshot.addTimeBuckets(parent.getTimeBuckets().get(i));
+        mergedTimeSeriesSnapshot.addCurrentValues(parent.getCurrentValues().get(i));
+        mergedTimeSeriesSnapshot.addBaselineValues(parent.getBaselineValues().get(i));
+        i++;
+        j++;
+      } else if (parentTime < childTime) {
+        mergedTimeSeriesSnapshot.addTimeBuckets(parent.getTimeBuckets().get(i));
+        mergedTimeSeriesSnapshot.addCurrentValues(parent.getCurrentValues().get(i));
+        mergedTimeSeriesSnapshot.addBaselineValues(parent.getBaselineValues().get(i));
+        i++;
+      } else {
+        mergedTimeSeriesSnapshot.addTimeBuckets(child.getTimeBuckets().get(j));
+        mergedTimeSeriesSnapshot.addCurrentValues(child.getCurrentValues().get(j));
+        mergedTimeSeriesSnapshot.addBaselineValues(child.getBaselineValues().get(j));
+        j++;
+      }
+    }
+    while (i < parent.getTimeBuckets().size()) {
+      mergedTimeSeriesSnapshot.addTimeBuckets(parent.getTimeBuckets().get(i));
+      mergedTimeSeriesSnapshot.addCurrentValues(parent.getCurrentValues().get(i));
+      mergedTimeSeriesSnapshot.addBaselineValues(parent.getBaselineValues().get(i));
+      i++;
+    }
+    while (j < child.getTimeBuckets().size()) {
+      mergedTimeSeriesSnapshot.addTimeBuckets(child.getTimeBuckets().get(j));
+      mergedTimeSeriesSnapshot.addCurrentValues(child.getCurrentValues().get(j));
+      mergedTimeSeriesSnapshot.addBaselineValues(child.getBaselineValues().get(j));
+      j++;
+    }
+    mergedTimeSeriesSnapshot.getSummary().putAll(parent.getSummary());
+    for (String key : child.getSummary().keySet()) {
+      if (!mergedTimeSeriesSnapshot.getSummary().containsKey(key)) {
+        mergedTimeSeriesSnapshot.getSummary().put(key, child.getSummary().get(key));
+      }
+    }
+    return mergedTimeSeriesSnapshot;
   }
 }
