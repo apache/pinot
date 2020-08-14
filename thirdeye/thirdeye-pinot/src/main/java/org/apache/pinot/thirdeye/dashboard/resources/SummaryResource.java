@@ -27,6 +27,7 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.google.inject.Singleton;
 import java.net.URLDecoder;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -50,8 +51,9 @@ import org.apache.pinot.thirdeye.cube.entry.MultiDimensionalSummary;
 import org.apache.pinot.thirdeye.cube.entry.MultiDimensionalSummaryCLITool;
 import org.apache.pinot.thirdeye.cube.ratio.RatioDBClient;
 import org.apache.pinot.thirdeye.cube.summary.SummaryResponse;
-import org.apache.pinot.thirdeye.dashboard.Utils;
+import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
@@ -70,6 +72,8 @@ public class SummaryResource {
   private static final Logger LOG = LoggerFactory.getLogger(SummaryResource.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
+  private static final MetricConfigManager metricConfigDAO = DAORegistry.getInstance().getMetricConfigDAO();
+  private static final DatasetConfigManager datasetConfigDAO = DAORegistry.getInstance().getDatasetConfigDAO();
 
   public static final String DEFAULT_TIMEZONE_ID = "UTC";
   public static final String DEFAULT_DEPTH = "3";
@@ -88,7 +92,6 @@ public class SummaryResource {
 
   private MetricConfigDTO fetchMetricConfig(String metricUrn, String metric, String dataset) {
     MetricConfigDTO metricConfigDTO;
-    MetricConfigManager metricConfigDAO = DAORegistry.getInstance().getMetricConfigDAO();
     if (StringUtils.isNotBlank(metricUrn)) {
       metricConfigDTO = metricConfigDAO.findById(MetricEntity.fromURN(metricUrn).getId());
     } else {
@@ -115,8 +118,12 @@ public class SummaryResource {
 
       Dimensions dimensions;
       if (StringUtils.isBlank(groupByDimensions) || JAVASCRIPT_NULL_STRING.equals(groupByDimensions)) {
-        dimensions =
-            MultiDimensionalSummaryCLITool.sanitizeDimensions(new Dimensions(Utils.getSchemaDimensionNames(datasetName)));
+        DatasetConfigDTO datasetConfigDTO = datasetConfigDAO.findByDataset(dataset);
+        List<String> dimensionNames = new ArrayList<>();
+        if (datasetConfigDTO != null) {
+          dimensionNames = datasetConfigDTO.getDimensions();
+        }
+        dimensions = MultiDimensionalSummaryCLITool.sanitizeDimensions(new Dimensions(dimensionNames));
       } else {
         dimensions = new Dimensions(Arrays.asList(groupByDimensions.trim().split(",")));
       }
@@ -241,9 +248,12 @@ public class SummaryResource {
         datasetName = metricConfigDTO.getDataset();
       }
 
-      List<String> allDimensions;
+      List<String> allDimensions = new ArrayList<>();
       if (StringUtils.isBlank(groupByDimensions) || JAVASCRIPT_NULL_STRING.equals(groupByDimensions)) {
-        allDimensions = Utils.getSchemaDimensionNames(dataset);
+        DatasetConfigDTO datasetConfigDTO = datasetConfigDAO.findByDataset(dataset);
+        if (datasetConfigDTO != null) {
+          allDimensions = datasetConfigDTO.getDimensions();
+        }
       } else {
         allDimensions = Arrays.asList(groupByDimensions.trim().split(","));
       }
@@ -342,8 +352,6 @@ public class SummaryResource {
       Multimap<String, String> dataFilters, int summarySize, int depth, List<List<String>> hierarchies,
       boolean doOneSideError) throws Exception {
     Preconditions.checkNotNull(metricConfigDTO);
-
-    MetricConfigManager metricConfigDAO = DAORegistry.getInstance().getMetricConfigDAO();
 
     // Construct regular expression parser
     String derivedMetricExpression = metricConfigDTO.getDerivedMetricExpression();
