@@ -58,8 +58,8 @@ import static org.testng.Assert.assertEquals;
 /**
  * Integration test that extends RealtimeClusterIntegrationTest but uses low-level Kafka consumer and a fake PinotFS as
  * the deep store for segments. This test enables the peer to peer segment download scheme to test Pinot servers can
- * download segments from peer servers even the deep store is down. This is done by controlled injection of failures in
- * the fake PinotFS segment upload api (i.e., copyFromLocal) for all segments of even partition number.
+ * download segments from peer servers even the deep store is down. This is done by injection of failures in
+ * the fake PinotFS segment upload api (i.e., copyFromLocal) for all segments whose seq number mod 5 is 0.
  *
  * Besides standard tests, it also verifies that
  * (1) All the segments on all servers are in either ONLINE or CONSUMING states
@@ -72,6 +72,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
   private static final int NUM_SERVERS = 2;
+  public static final int UPLOAD_FAILURE_MOD = 5;
 
   private final boolean _isDirectAlloc = true; //Set as true; otherwise trigger indexing exception.
   private final boolean _isConsumerDirConfigured = true;
@@ -199,8 +200,8 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
         Assert.assertNull(downloadURL);
         continue;
       }
-      int partition = Integer.parseInt(segmentName.split("__")[1]);
-      if (partition % 2 == 0) {
+      int seqNum = Integer.parseInt(segmentName.split("__")[2]);
+      if (seqNum % UPLOAD_FAILURE_MOD == 0) {
         Assert.assertEquals("", downloadURL);
       } else {
         Assert.assertTrue(downloadURL.startsWith("mockfs://"));
@@ -323,9 +324,9 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     @Override
     public void copyFromLocalFile(File srcFile, URI dstUri)
         throws Exception {
-      // Inject failures for segments whose partition number is even.
+      // Inject failures for segments whose seq number mod 5 is 0.
       String[] parts = srcFile.getName().split("__");
-      if (parts.length > 2 && (Integer.parseInt(parts[1]) % 2 == 0)) {
+      if (parts.length > 3 && (Integer.parseInt(parts[2]) % UPLOAD_FAILURE_MOD == 0)) {
         throw new IllegalArgumentException(srcFile.getAbsolutePath());
       }
       try {

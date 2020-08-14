@@ -47,8 +47,8 @@ import org.slf4j.LoggerFactory;
 public class PeerServerSegmentFinder {
   private static final Logger _logger = LoggerFactory.getLogger(PeerServerSegmentFinder.class);
   private static final int MAX_NUM_ATTEMPTS = 5;
-  private static final int INITIAL_DELAY_MS = 100;
-  private static final double DELAY_SCALE_FACTOR = 1.5;
+  private static final int INITIAL_DELAY_MS = 500;
+  private static final double DELAY_SCALE_FACTOR = 2;
 
   /**
    *
