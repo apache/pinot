@@ -149,32 +149,38 @@ public class RangeIndexHandler {
           throws IOException {
     int numDocs = columnMetadata.getTotalDocs();
     try (RangeIndexCreator creator = new RangeIndexCreator(_indexDir, columnMetadata.getFieldSpec(),
-            FieldSpec.DataType.INT, -1, -1, numDocs, columnMetadata.getTotalNumberOfEntries())) {
+            columnMetadata.getDataType(), -1, -1, numDocs, columnMetadata.getTotalNumberOfEntries())) {
       try (ForwardIndexReader forwardIndexReader = getForwardIndexReader(columnMetadata, _segmentWriter);
            ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
         if (columnMetadata.isSingleValue()) {
           // Single-value column.
-          for (int i = 0; i < numDocs; i++) {
-            switch (columnMetadata.getDataType()) {
-              case INT: {
+          switch (columnMetadata.getDataType()) {
+            case INT: {
+              for (int i = 0; i < numDocs; i++) {
                 creator.add(forwardIndexReader.getInt(i, readerContext));
-                break;
               }
-              case LONG: {
-                creator.add(forwardIndexReader.getInt(i, readerContext));
-                break;
+              break;
+            }
+            case LONG: {
+              for (int i = 0; i < numDocs; i++) {
+                creator.add(forwardIndexReader.getLong(i, readerContext));
               }
-              case FLOAT: {
-                creator.add(forwardIndexReader.getInt(i, readerContext));
-                break;
+              break;
+            }
+            case FLOAT: {
+              for (int i = 0; i < numDocs; i++) {
+                creator.add(forwardIndexReader.getFloat(i, readerContext));
               }
-              case DOUBLE: {
-                creator.add(forwardIndexReader.getInt(i, readerContext));
-                break;
+              break;
+            }
+            case DOUBLE: {
+              for (int i = 0; i < numDocs; i++) {
+                creator.add(forwardIndexReader.getDouble(i, readerContext));
               }
-              default: {
-                throw new RuntimeException("Range indexing is not supported");
-              }
+              break;
+            }
+            default: {
+              throw new RuntimeException("Range indexing is not supported");
             }
           }
         }
