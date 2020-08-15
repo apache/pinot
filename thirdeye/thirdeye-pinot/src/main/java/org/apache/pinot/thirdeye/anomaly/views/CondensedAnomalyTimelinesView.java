@@ -42,6 +42,7 @@ import org.joda.time.Minutes;
  */
 public class CondensedAnomalyTimelinesView {
   public static final int DEFAULT_MAX_LENGTH = 1024 * 10; // 10 kilobytes
+  public static final int DEFAULT_DECIMAL_DIGITS = 3; // only keep 3 decimal digits
   private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   public static final Long DEFAULT_MIN_BUCKET_UNIT = Minutes.ONE.toStandardDuration().getMillis();
 
@@ -182,7 +183,31 @@ public class CondensedAnomalyTimelinesView {
    * @return a compressed CondensedAnomalyTimelinesView
    */
   public CondensedAnomalyTimelinesView compress() {
+    if (timeStamps.size() == 0) {
+      return this;
+    }
+    try {
+      if (this.toJsonString().length() > DEFAULT_MAX_LENGTH) {
+        // First try rounding up
+        roundUp();
+      }
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException("Unable to parse view to json string", e);
+    }
     return compress(DEFAULT_MAX_LENGTH);
+  }
+
+  private void roundUp() {
+    List<Double> roundedObservedValues = new ArrayList<>();
+    List<Double> roundedExpectedValues = new ArrayList<>();
+    for (int i = 0; i < timeStamps.size(); i++) {
+      Double roundedObservedValue = Math.round(currentValues.get(i) * (Math.pow(10, DEFAULT_DECIMAL_DIGITS))) / (Math.pow(10, DEFAULT_DECIMAL_DIGITS));
+      Double roundedExpectedValue = Math.round(baselineValues.get(i) * (Math.pow(10, DEFAULT_DECIMAL_DIGITS))) / (Math.pow(10, DEFAULT_DECIMAL_DIGITS));
+      roundedObservedValues.add(roundedObservedValue);
+      roundedExpectedValues.add(roundedExpectedValue);
+    }
+    this.currentValues = roundedObservedValues;
+    this.baselineValues = roundedExpectedValues;
   }
 
   /**
