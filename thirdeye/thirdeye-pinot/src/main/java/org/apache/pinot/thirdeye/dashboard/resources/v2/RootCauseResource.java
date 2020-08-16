@@ -66,7 +66,7 @@ public class RootCauseResource {
   private static final long ANALYSIS_RANGE_MAX = TimeUnit.DAYS.toMillis(32);
   private static final long ANOMALY_RANGE_MAX = TimeUnit.DAYS.toMillis(32);
   private static final long BASELINE_RANGE_MAX = ANOMALY_RANGE_MAX;
-  private static final int DEFAULT_HIGHLIGHT_CUBE_SUMMARY_SIZE = 3;
+  private static final int DEFAULT_HIGHLIGHT_CUBE_SUMMARY_SIZE = 4;
   private static final int DEFAULT_HIGHLIGHT_CUBE_DEPTH = 3;
 
   private final List<RootCauseEntityFormatter> formatters;

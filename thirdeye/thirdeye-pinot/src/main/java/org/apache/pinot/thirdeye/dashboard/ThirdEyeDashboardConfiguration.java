@@ -20,7 +20,6 @@
 package org.apache.pinot.thirdeye.dashboard;
 
 import org.apache.pinot.thirdeye.common.ThirdEyeConfiguration;
-import org.apache.pinot.thirdeye.dashboard.RootCauseConfiguration;
 import org.apache.pinot.thirdeye.dashboard.configs.AuthConfiguration;
 import org.apache.pinot.thirdeye.dashboard.configs.ResourceConfiguration;
 import java.util.List;
