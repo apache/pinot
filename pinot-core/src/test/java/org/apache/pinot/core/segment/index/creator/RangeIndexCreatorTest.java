@@ -101,24 +101,28 @@ public class RangeIndexCreatorTest {
         for (int rangeId = 0; rangeId < rangeStartArray.length; rangeId++) {
             ImmutableRoaringBitmap bitmap = rangeIndexReader.getDocIds(rangeId);
             for (int docId : bitmap.toArray()) {
-                switch (dataType) {
-                    case INT: {
-                        checkInt(rangeStartArray, rangeId, values, docId);
-                        break;
-                    }
-                    case LONG: {
-                        checkLong(rangeStartArray, rangeId, values, docId);
-                        break;
-                    }
-                    case FLOAT: {
-                        checkFloat(rangeStartArray, rangeId, values, docId);
-                        break;
-                    }
-                    case DOUBLE: {
-                        checkDouble(rangeStartArray, rangeId, values, docId);
-                        break;
-                    }
-                }
+                checkValueForDocId(dataType, values, rangeStartArray, rangeId, docId);
+            }
+        }
+    }
+
+    private void checkValueForDocId(FieldSpec.DataType dataType, Number[] values, Number[] rangeStartArray, int rangeId, int docId) {
+        switch (dataType) {
+            case INT: {
+                checkInt(rangeStartArray, rangeId, values, docId);
+                break;
+            }
+            case LONG: {
+                checkLong(rangeStartArray, rangeId, values, docId);
+                break;
+            }
+            case FLOAT: {
+                checkFloat(rangeStartArray, rangeId, values, docId);
+                break;
+            }
+            case DOUBLE: {
+                checkDouble(rangeStartArray, rangeId, values, docId);
+                break;
             }
         }
     }
@@ -262,13 +266,7 @@ public class RangeIndexCreatorTest {
             dis.read(bytes, 0, (int) serializedBitmapLength);
             bitmaps[i] = new ImmutableRoaringBitmap(ByteBuffer.wrap(bytes));
             for (int docId : bitmaps[i].toArray()) {
-                if (i != numRanges - 1) {
-                    Assert.assertTrue(
-                            rangeStart[i].intValue() <= values[docId].intValue() && values[docId].intValue() < rangeStart[i + 1]
-                                    .intValue(), "rangestart:" + rangeStart[i] + " value:" + values[docId]);
-                } else {
-                    Assert.assertTrue(rangeStart[i].intValue() <= values[docId].intValue());
-                }
+                checkValueForDocId(dataType, values, rangeStart, i, docId);
             }
         }
     }

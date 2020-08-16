@@ -523,12 +523,12 @@ public final class RangeIndexCreator implements RawValueBasedInvertedIndexCreato
 
     @Override
     public void put(int position, Number value) {
-      _buffer.putInt(position << 3, value.intValue());
+      _buffer.putLong(position << 3, value.longValue());
     }
 
     @Override
     public Number get(int position) {
-      return _buffer.getInt(position << 3);
+      return _buffer.getLong(position << 3);
     }
 
     @Override
@@ -548,17 +548,17 @@ public final class RangeIndexCreator implements RawValueBasedInvertedIndexCreato
 
     @Override
     public void put(int position, Number value) {
-      _buffer.putInt(position << 2, value.intValue());
+      _buffer.putFloat(position << 2, value.intValue());
     }
 
     @Override
     public Number get(int position) {
-      return _buffer.getInt(position << 2);
+      return _buffer.getFloat(position << 2);
     }
 
     @Override
     public int compare(Number val1, Number val2) {
-      return Long.compare(val1.longValue(), val2.longValue());
+      return Float.compare(val1.floatValue(), val2.floatValue());
     }
   }
 
@@ -573,17 +573,17 @@ public final class RangeIndexCreator implements RawValueBasedInvertedIndexCreato
 
     @Override
     public void put(int position, Number value) {
-      _buffer.putInt(position << 3, value.intValue());
+      _buffer.putDouble(position << 3, value.doubleValue());
     }
 
     @Override
     public Number get(int position) {
-      return _buffer.getInt(position << 3);
+      return _buffer.getDouble(position << 3);
     }
 
     @Override
     public int compare(Number val1, Number val2) {
-      return Long.compare(val1.longValue(), val2.longValue());
+      return Double.compare(val1.doubleValue(), val2.doubleValue());
     }
   }
 }
