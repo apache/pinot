@@ -256,7 +256,7 @@ public class TableConfigBuilder {
     return this;
   }
 
-  public TableConfigBuilder setNullHandlingEnabledConfig(boolean nullHandlingEnabled) {
+  public TableConfigBuilder setNullHandlingEnabled(boolean nullHandlingEnabled) {
     _nullHandlingEnabled = nullHandlingEnabled;
     return this;
   }
