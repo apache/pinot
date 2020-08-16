@@ -242,7 +242,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return null;
   }
 
-  @Nullable
   protected boolean getNullHandlingEnabledConfig() {
     return DEFAULT_NULL_HANDLING_ENABLED;
   }
@@ -280,7 +279,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
         .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
         .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
-        .setNullHandlingEnabledConfig(getNullHandlingEnabledConfig()).build();
+        .setNullHandlingEnabled(getNullHandlingEnabledConfig()).build();
   }
 
   /**
@@ -340,7 +339,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
         .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
         .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setLLC(useLlc)
-        .setStreamConfigs(streamConfigs).setNullHandlingEnabledConfig(getNullHandlingEnabledConfig()).build();
+        .setStreamConfigs(streamConfigs).setNullHandlingEnabled(getNullHandlingEnabledConfig()).build();
   }
 
   /**

@@ -113,7 +113,6 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
   }
 
   @Override
-  @Nullable
   protected boolean getNullHandlingEnabledConfig() {
     return true;
   }
@@ -126,24 +125,21 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
   @Test
   public void testTotalCount()
       throws Exception {
-    String pqlQuery = "SELECT count(*) FROM " + getTableName();
-    String sqlQuery = "SELECT count(*) FROM " + getTableName();
-    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
+    String query = "SELECT count(*) FROM " + getTableName();
+    testQuery(query, Collections.singletonList(query));
   }
 
   @Test
   public void testCountWithNullDescription()
           throws Exception {
-    String pqlQuery = "SELECT count(*) FROM " + getTableName() + " where description IS NOT NULL";
-    String sqlQuery = "SELECT count(*) FROM " + getTableName() + " where description IS NOT NULL";
-    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
+    String query = "SELECT count(*) FROM " + getTableName() + " where description IS NOT NULL";
+    testQuery(query, Collections.singletonList(query));
   }
 
   @Test
   public void testCountWithNullDescriptionAndSalary()
           throws Exception {
-    String pqlQuery = "SELECT count(*) FROM " + getTableName() + " where description IS NOT NULL AND salary IS NOT NULL";
-    String sqlQuery = "SELECT count(*) FROM " + getTableName() + " where description IS NOT NULL AND salary IS NOT NULL";
-    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
+    String query = "SELECT count(*) FROM " + getTableName() + " where description IS NOT NULL AND salary IS NOT NULL";
+    testQuery(query, Collections.singletonList(query));
   }
 }
