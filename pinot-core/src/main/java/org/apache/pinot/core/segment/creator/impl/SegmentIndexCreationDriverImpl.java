@@ -127,6 +127,10 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     }
   }
 
+  public RecordReader getRecordReader() {
+    return recordReader;
+  }
+
   public void init(SegmentGeneratorConfig config, RecordReader recordReader) {
     init(config, new RecordReaderSegmentCreationDataSource(recordReader),
         CompositeTransformer.getDefaultTransformer(config.getTableConfig(), config.getSchema()));
