@@ -33,7 +33,7 @@ import org.slf4j.LoggerFactory;
 public class Connection {
   private static final Logger LOGGER = LoggerFactory.getLogger(Connection.class);
   private final PinotClientTransport _transport;
-  private BrokerSelector _brokerSelector;
+  private final BrokerSelector _brokerSelector;
   private List<String> _brokerList;
 
   Connection(List<String> brokerList, PinotClientTransport transport) {
@@ -97,6 +97,18 @@ public class Connection {
   }
 
   /**
+   * Executes a Pinot Request and returns the Response.
+   *
+   * @param request The request to execute
+   * @return The BrokerResponse for the request.
+   * @throws PinotClientException If an exception occurs while processing the query
+   */
+  public BrokerResponse executeRequest(Request request)
+      throws PinotClientException {
+    return executeRequest(null, request);
+  }
+
+  /**
    * Executes a PQL query.
    *
    * Deprecated as we will soon be removing support for pql endpoint
@@ -132,6 +144,27 @@ public class Connection {
   }
 
   /**
+   * Executes a Pinot Request and returns the received BrokerResponse.
+   *
+   * @param request The request to execute
+   * @return Broker response received
+   * @throws PinotClientException If an exception occurs while processing the query
+   */
+  public BrokerResponse executeRequest(String tableName, Request request)
+      throws PinotClientException {
+    String brokerHostPort = _brokerSelector.selectBroker(tableName);
+    if (brokerHostPort == null) {
+      throw new PinotClientException(
+          "Could not find broker to query for table: " + (tableName == null ? "null" : tableName));
+    }
+    BrokerResponse response = _transport.executeQuery(brokerHostPort, request);
+    if (response.hasExceptions()) {
+      throw new PinotClientException("Query had processing exceptions: \n" + response.getExceptions());
+    }
+    return response;
+  }
+
+  /**
    * Executes a PQL query asynchronously.
    *
    * Deprecated as we will soon be removing support for pql endpoint
@@ -163,6 +196,24 @@ public class Connection {
     }
     final Future<BrokerResponse> responseFuture = _transport.executeQueryAsync(brokerHostPort, request);
     return new ResultSetGroupFuture(responseFuture);
+  }
+
+  /**
+   * Executes a Pinot Request asynchronously.
+   *
+   * @param request The request to execute
+   * @return A future containing the response of the query
+   * @throws PinotClientException If an exception occurs while processing the query
+   */
+  public Future<BrokerResponse> executeRequestAsync(Request request)
+      throws PinotClientException {
+    String brokerHostPort = _brokerSelector.selectBroker(null);
+    if (brokerHostPort == null) {
+      throw new PinotClientException(
+          "Could not find broker to query for statement: " + (request.getQuery() == null ? "null"
+              : request.getQuery()));
+    }
+    return _transport.executeQueryAsync(brokerHostPort, request);
   }
 
   /**

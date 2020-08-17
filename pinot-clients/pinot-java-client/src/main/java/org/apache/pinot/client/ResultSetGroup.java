@@ -54,6 +54,10 @@ public class ResultSetGroup {
     }
   }
 
+  public static ResultSetGroup fromBrokerResponse(BrokerResponse response) {
+    return new ResultSetGroup(response);
+  }
+
   /**
    * Returns the number of result sets in this result set group, or 0 if there are no result sets; there is one result
    * set per aggregation function in the original query and one result set in the case of a selection query.
