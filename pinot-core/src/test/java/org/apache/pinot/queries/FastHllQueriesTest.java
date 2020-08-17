@@ -107,7 +107,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
 
     // Test inner segment queries
     // Test base query
-    AggregationOperator aggregationOperator = getOperatorForQuery(BASE_QUERY);
+    AggregationOperator aggregationOperator = getOperatorForPqlQuery(BASE_QUERY);
     IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
     ExecutionStatistics executionStatistics = aggregationOperator.getExecutionStatistics();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 30000L, 0L, 60000L, 30000L);
@@ -115,7 +115,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     Assert.assertEquals(((HyperLogLog) aggregationResult.get(0)).cardinality(), 21L);
     Assert.assertEquals(((HyperLogLog) aggregationResult.get(1)).cardinality(), 1762L);
     // Test query with filter
-    aggregationOperator = getOperatorForQueryWithFilter(BASE_QUERY);
+    aggregationOperator = getOperatorForPqlQueryWithFilter(BASE_QUERY);
     resultsBlock = aggregationOperator.nextBlock();
     executionStatistics = aggregationOperator.getExecutionStatistics();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 6129L, 84134L, 12258L, 30000L);
@@ -123,7 +123,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     Assert.assertEquals(((HyperLogLog) aggregationResult.get(0)).cardinality(), 17L);
     Assert.assertEquals(((HyperLogLog) aggregationResult.get(1)).cardinality(), 1197L);
     // Test query with group-by
-    AggregationGroupByOperator aggregationGroupByOperator = getOperatorForQuery(BASE_QUERY + GROUP_BY);
+    AggregationGroupByOperator aggregationGroupByOperator = getOperatorForPqlQuery(BASE_QUERY + GROUP_BY);
     resultsBlock = aggregationGroupByOperator.nextBlock();
     executionStatistics = aggregationGroupByOperator.getExecutionStatistics();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 30000L, 0L, 90000L, 30000L);

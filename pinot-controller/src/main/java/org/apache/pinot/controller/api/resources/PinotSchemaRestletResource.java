@@ -170,9 +170,11 @@ public class PinotSchemaRestletResource {
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully validated schema"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
   public String validateSchema(FormDataMultiPart multiPart) {
     Schema schema = getSchemaFromMultiPart(multiPart);
-    if (!SchemaUtils.validate(schema, LOGGER)) {
-      throw new ControllerApplicationException(LOGGER, "Invalid schema. Check controller logs",
-          Response.Status.BAD_REQUEST);
+    try {
+      SchemaUtils.validate(schema);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER,
+          "Invalid schema: " + schema.getSchemaName() + ". Reason: " + e.getMessage(), Response.Status.BAD_REQUEST, e);
     }
     return schema.toPrettyJsonString();
   }
@@ -185,9 +187,11 @@ public class PinotSchemaRestletResource {
       + "from 'GET /schema/{schemaName}'. This allows us to validate schema before apply.")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully validated schema"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
   public String validateSchema(Schema schema) {
-    if (!SchemaUtils.validate(schema, LOGGER)) {
-      throw new ControllerApplicationException(LOGGER, "Invalid schema. Check controller logs",
-          Response.Status.BAD_REQUEST);
+    try {
+      SchemaUtils.validate(schema);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER,
+          "Invalid schema: " + schema.getSchemaName() + ". Reason: " + e.getMessage(), Response.Status.BAD_REQUEST, e);
     }
     return schema.toPrettyJsonString();
   }
@@ -196,12 +200,14 @@ public class PinotSchemaRestletResource {
    * Internal method to add schema
    * @param schema  schema
    * @param override  set to true to override the existing schema with the same name
-   * @return
    */
   private SuccessResponse addSchema(Schema schema, boolean override) {
-    if (!SchemaUtils.validate(schema, LOGGER)) {
-      throw new ControllerApplicationException(LOGGER, "Cannot add invalid schema " + schema.getSchemaName(),
-          Response.Status.BAD_REQUEST);
+    try {
+      SchemaUtils.validate(schema);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER,
+          "Cannot add invalid schema: " + schema.getSchemaName() + ". Reason: " + e.getMessage(),
+          Response.Status.BAD_REQUEST, e);
     }
 
     try {
@@ -227,9 +233,12 @@ public class PinotSchemaRestletResource {
    * @return
    */
   private SuccessResponse updateSchema(String schemaName, Schema schema, boolean reload) {
-    if (!SchemaUtils.validate(schema, LOGGER)) {
-      throw new ControllerApplicationException(LOGGER, "Cannot add invalid schema: " + schemaName,
-          Response.Status.BAD_REQUEST);
+    try {
+      SchemaUtils.validate(schema);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER,
+          "Cannot add invalid schema: " + schemaName + ". Reason: " + e.getMessage(),
+          Response.Status.BAD_REQUEST, e);
     }
 
     if (schemaName != null && !schema.getSchemaName().equals(schemaName)) {

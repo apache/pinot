@@ -47,6 +47,11 @@ public interface ColumnIndexContainer extends Closeable {
   InvertedIndexReader<?> getRangeIndex();
 
   /**
+   * Returns the text index for the column, or {@code null} if it does not exist.
+   */
+  InvertedIndexReader<?> getTextIndex();
+
+  /**
    * Returns the dictionary for the column, or {@code null} if it does not exist.
    */
   Dictionary getDictionary();

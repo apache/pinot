@@ -97,7 +97,7 @@ public class FakeStreamConfigUtils {
       FileUtils.deleteDirectory(outputDir);
     }
     File avroTarFile = getResourceFile(AVRO_TAR_FILE);
-    return TarGzCompressionUtils.unTar(avroTarFile, outputDir);
+    return TarGzCompressionUtils.untar(avroTarFile, outputDir);
   }
 
   /**

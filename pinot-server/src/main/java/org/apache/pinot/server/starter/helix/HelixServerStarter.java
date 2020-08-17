@@ -159,13 +159,13 @@ public class HelixServerStarter implements ServiceStartable {
         _serverConf.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtil
             .getHostnameOrAddress() : NetUtil.getHostAddress());
     _port = _serverConf.getProperty(KEY_OF_SERVER_NETTY_PORT, DEFAULT_SERVER_NETTY_PORT);
-    
+
     _instanceId = Optional.ofNullable(_serverConf.getProperty(CONFIG_OF_INSTANCE_ID))
 
         // InstanceId is not configured. Fallback to an auto generated config.
         .orElseGet(this::initializeDefaultInstanceId);
   }
-  
+
   private String initializeDefaultInstanceId() {
     String instanceId = PREFIX_OF_SERVER_INSTANCE + _host + "_" + _port;
 
@@ -367,8 +367,9 @@ public class HelixServerStarter implements ServiceStartable {
         .init(_serverConf.subset(SegmentCompletionProtocol.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
     ServerConf serverInstanceConfig = DefaultHelixStarterServerConfig.getDefaultHelixServerConfig(_serverConf);
     _serverInstance = new ServerInstance(serverInstanceConfig, _helixManager);
+    ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
-    SegmentFetcherAndLoader fetcherAndLoader = new SegmentFetcherAndLoader(_serverConf, instanceDataManager);
+    SegmentFetcherAndLoader fetcherAndLoader = new SegmentFetcherAndLoader(_serverConf, instanceDataManager, serverMetrics);
     StateModelFactory<?> stateModelFactory =
         new SegmentOnlineOfflineStateModelFactory(_instanceId, instanceDataManager, fetcherAndLoader);
     _helixManager.getStateMachineEngine()
@@ -400,7 +401,6 @@ public class HelixServerStarter implements ServiceStartable {
     _adminApiApplication.start(adminApiPort);
     setAdminApiPort(adminApiPort);
 
-    ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
     // Register message handler factory
     SegmentMessageHandlerFactory messageHandlerFactory =
         new SegmentMessageHandlerFactory(fetcherAndLoader, instanceDataManager, serverMetrics);
@@ -643,7 +643,7 @@ public class HelixServerStarter implements ServiceStartable {
     properties.put(KEY_OF_SERVER_NETTY_PORT, port);
     properties.put(CONFIG_OF_INSTANCE_DATA_DIR, "/tmp/PinotServer/test" + port + "/index");
     properties.put(CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, "/tmp/PinotServer/test" + port + "/segmentTar");
-    
+
     HelixServerStarter serverStarter =
         new HelixServerStarter("quickstart", "localhost:2191", new PinotConfiguration(properties));
     serverStarter.start();

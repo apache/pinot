@@ -27,6 +27,19 @@ import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.geospatial.transform.function.StAreaFunction;
+import org.apache.pinot.core.geospatial.transform.function.StAsBinaryFunction;
+import org.apache.pinot.core.geospatial.transform.function.StAsTextFunction;
+import org.apache.pinot.core.geospatial.transform.function.StContainsFunction;
+import org.apache.pinot.core.geospatial.transform.function.StDistanceFunction;
+import org.apache.pinot.core.geospatial.transform.function.StEqualsFunction;
+import org.apache.pinot.core.geospatial.transform.function.StGeogFromTextFunction;
+import org.apache.pinot.core.geospatial.transform.function.StGeogFromWKBFunction;
+import org.apache.pinot.core.geospatial.transform.function.StGeomFromTextFunction;
+import org.apache.pinot.core.geospatial.transform.function.StGeomFromWKBFunction;
+import org.apache.pinot.core.geospatial.transform.function.StGeometryTypeFunction;
+import org.apache.pinot.core.geospatial.transform.function.StPointFunction;
+import org.apache.pinot.core.geospatial.transform.function.StPolygonFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.AbsTransformFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.CeilTransformFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.ExpTransformFunction;
@@ -78,6 +91,7 @@ public class TransformFunctionFactory {
           put(TransformFunctionType.VALUEIN.getName().toLowerCase(), ValueInTransformFunction.class);
           put(TransformFunctionType.MAPVALUE.getName().toLowerCase(), MapValueTransformFunction.class);
 
+          put(TransformFunctionType.GROOVY.getName().toLowerCase(), GroovyTransformFunction.class);
           put(TransformFunctionType.CASE.getName().toLowerCase(), CaseTransformFunction.class);
 
           put(TransformFunctionType.EQUALS.getName().toLowerCase(), EqualsTransformFunction.class);
@@ -87,6 +101,27 @@ public class TransformFunctionFactory {
               GreaterThanOrEqualTransformFunction.class);
           put(TransformFunctionType.LESS_THAN.getName().toLowerCase(), LessThanTransformFunction.class);
           put(TransformFunctionType.LESS_THAN_OR_EQUAL.getName().toLowerCase(), LessThanOrEqualTransformFunction.class);
+          // geo functions
+          // geo constructors
+          put(TransformFunctionType.ST_GEOG_FROM_TEXT.getName().toLowerCase(), StGeogFromTextFunction.class);
+          put(TransformFunctionType.ST_GEOG_FROM_WKB.getName().toLowerCase(), StGeogFromWKBFunction.class);
+          put(TransformFunctionType.ST_GEOM_FROM_TEXT.getName().toLowerCase(), StGeomFromTextFunction.class);
+          put(TransformFunctionType.ST_GEOM_FROM_WKB.getName().toLowerCase(), StGeomFromWKBFunction.class);
+          put(TransformFunctionType.ST_POINT.getName().toLowerCase(), StPointFunction.class);
+          put(TransformFunctionType.ST_POLYGON.getName().toLowerCase(), StPolygonFunction.class);
+
+          // geo measurements
+          put(TransformFunctionType.ST_AREA.getName().toLowerCase(), StAreaFunction.class);
+          put(TransformFunctionType.ST_DISTANCE.getName().toLowerCase(), StDistanceFunction.class);
+          put(TransformFunctionType.ST_GEOMETRY_TYPE.getName().toLowerCase(), StGeometryTypeFunction.class);
+
+          // geo outputs
+          put(TransformFunctionType.ST_AS_BINARY.getName().toLowerCase(), StAsBinaryFunction.class);
+          put(TransformFunctionType.ST_AS_TEXT.getName().toLowerCase(), StAsTextFunction.class);
+
+          // geo relationship
+          put(TransformFunctionType.ST_CONTAINS.getName().toLowerCase(), StContainsFunction.class);
+          put(TransformFunctionType.ST_EQUALS.getName().toLowerCase(), StEqualsFunction.class);
         }
       };
 
@@ -126,6 +161,9 @@ public class TransformFunctionFactory {
       case FUNCTION:
         FunctionContext function = expression.getFunction();
         String functionName = function.getFunctionName();
+        List<ExpressionContext> arguments = function.getArguments();
+        int numArguments = arguments.size();
+
         TransformFunction transformFunction;
         Class<? extends TransformFunction> transformFunctionClass = TRANSFORM_FUNCTION_MAP.get(functionName);
         if (transformFunctionClass != null) {
@@ -137,19 +175,15 @@ public class TransformFunctionFactory {
           }
         } else {
           // Scalar function
-          FunctionInfo functionInfo = FunctionRegistry.getFunctionByName(functionName);
+          FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
           if (functionInfo == null) {
-            throw new BadQueryRequestException("Unsupported transform function: " + functionName);
+            throw new BadQueryRequestException(
+                String.format("Unsupported function: %s with %d parameters", functionName, numArguments));
           }
-          try {
-            transformFunction = new ScalarTransformFunctionWrapper(functionName, functionInfo);
-          } catch (Exception e) {
-            throw new RuntimeException("Caught exception while constructing scalar transform function: " + functionName,
-                e);
-          }
+          transformFunction = new ScalarTransformFunctionWrapper(functionInfo);
         }
-        List<ExpressionContext> arguments = function.getArguments();
-        List<TransformFunction> transformFunctionArguments = new ArrayList<>(arguments.size());
+
+        List<TransformFunction> transformFunctionArguments = new ArrayList<>(numArguments);
         for (ExpressionContext argument : arguments) {
           transformFunctionArguments.add(TransformFunctionFactory.get(argument, dataSourceMap));
         }

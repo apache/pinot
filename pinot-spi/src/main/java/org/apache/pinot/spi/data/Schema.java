@@ -400,19 +400,11 @@ public final class Schema {
    * Validates a pinot schema.
    * <p>The following validations are performed:
    * <ul>
-   *   <li>For dimension, time, date time fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, STRING</li>
+   *   <li>For dimension, time, date time fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, STRING, BYTES</li>
    *   <li>For non-derived metric fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE</li>
    * </ul>
-   *
-   * @param ctxLogger Logger used to log the message (if null, the current class logger is used)
-   * @return Whether schema is valid
    */
-  public boolean validate(Logger ctxLogger) {
-    if (ctxLogger == null) {
-      ctxLogger = LOGGER;
-    }
-
-    // Log ALL the schema errors that may be present.
+  public void validate() {
     for (FieldSpec fieldSpec : _fieldSpecMap.values()) {
       FieldType fieldType = fieldSpec.getFieldType();
       DataType dataType = fieldSpec.getDataType();
@@ -430,8 +422,8 @@ public final class Schema {
             case BYTES:
               break;
             default:
-              ctxLogger.info("Unsupported data type: {} in DIMENSION/TIME field: {}", dataType, fieldName);
-              return false;
+              throw new IllegalStateException(
+                  "Unsupported data type: " + dataType + " in DIMENSION/TIME field: " + fieldName);
           }
           break;
         case METRIC:
@@ -443,8 +435,7 @@ public final class Schema {
             case BYTES:
               break;
             default:
-              ctxLogger.info("Unsupported data type: {} in METRIC field: {}", dataType, fieldName);
-              return false;
+              throw new IllegalStateException("Unsupported data type: " + dataType + " in METRIC field: " + fieldName);
           }
           break;
         case COMPLEX:
@@ -454,16 +445,12 @@ public final class Schema {
             case LIST:
               break;
             default:
-              ctxLogger.info("Unsupported data type: {} in COMPLEX field: {}", dataType, fieldName);
-              return false;
+              throw new IllegalStateException("Unsupported data type: " + dataType + " in COMPLEX field: " + fieldName);
           }
         default:
-          ctxLogger.info("Unsupported field type: {} for field: {}", dataType, fieldName);
-          return false;
+          throw new IllegalStateException("Unsupported data type: " + dataType + " for field: " + fieldName);
       }
     }
-
-    return true;
   }
 
   public static class SchemaBuilder {
@@ -572,8 +559,10 @@ public final class Schema {
     }
 
     public Schema build() {
-      if (!_schema.validate(LOGGER)) {
-        throw new RuntimeException("Invalid schema");
+      try {
+        _schema.validate();
+      } catch (Exception e) {
+        throw new RuntimeException("Invalid schema", e);
       }
       return _schema;
     }

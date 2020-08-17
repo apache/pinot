@@ -49,16 +49,9 @@ public class V1DefaultColumnHandler extends BaseDefaultColumnHandler {
       removeColumnV1Indices(column);
     }
 
-    Set<String> textIndexColumns = indexLoadingConfig.getTextIndexColumns();
-
     // For ADD and UPDATE action, create new dictionary and forward index, and update column metadata
     if (action.isAddAction() || action.isUpdateAction()) {
-      if (textIndexColumns.contains(column)) {
-        // create forward index for this text index enabled column
-        createV1ForwardIndexForTextIndex(column, indexLoadingConfig);
-      } else {
-        createColumnV1Indices(column);
-      }
+      createColumnV1Indices(column);
     }
   }
 }

@@ -464,6 +464,57 @@ body {
   }
 }
 
+.te-horizontal-forecast {
+  &__container {
+    display: flex;
+    clear: both;
+  }
+
+  &__fit-container {
+    display: flex;
+    clear: both;
+    margin-top: 10px;
+  }
+
+  &__label-column {
+    list-style: none;
+    display: flex;
+    align-items: stretch;
+    flex-direction: column;
+    padding-left: 16px;
+
+    &:last-child {
+      margin-right: 0;
+    }
+  }
+
+  &__fit-value {
+    list-style: none;
+    display: flex;
+    align-items: stretch;
+    flex-direction: column;
+    padding-left: 60px;
+    padding-right: 16px;
+
+    &:last-child {
+      margin-right: 0;
+    }
+  }
+
+  &__forecast-value {
+    list-style: none;
+    display: flex;
+    align-items: stretch;
+    flex-direction: column;
+    padding-left: 25px;
+    padding-right: 16px;
+
+    &:last-child {
+      margin-right: 0;
+    }
+  }
+}
+
 .te-horizontal-cards {
   &--hidden {
     visibility: hidden;

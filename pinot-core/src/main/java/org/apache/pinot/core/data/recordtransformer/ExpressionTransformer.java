@@ -20,6 +20,8 @@ package org.apache.pinot.core.data.recordtransformer;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -36,12 +38,19 @@ public class ExpressionTransformer implements RecordTransformer {
 
   private final Map<String, FunctionEvaluator> _expressionEvaluators = new HashMap<>();
 
-  public ExpressionTransformer(Schema schema) {
+  public ExpressionTransformer(TableConfig tableConfig, Schema schema) {
+    if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getTransformConfigs() != null) {
+      for (TransformConfig transformConfig : tableConfig.getIngestionConfig().getTransformConfigs()) {
+        _expressionEvaluators.put(transformConfig.getColumnName(),
+            FunctionEvaluatorFactory.getExpressionEvaluator(transformConfig.getTransformFunction()));
+      }
+    }
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      if (!fieldSpec.isVirtualColumn()) {
+      String fieldName = fieldSpec.getName();
+      if (!fieldSpec.isVirtualColumn() && !_expressionEvaluators.containsKey(fieldName)) {
         FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
         if (functionEvaluator != null) {
-          _expressionEvaluators.put(fieldSpec.getName(), functionEvaluator);
+          _expressionEvaluators.put(fieldName, functionEvaluator);
         }
       }
     }

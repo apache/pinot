@@ -39,21 +39,29 @@ public class CompositeTransformer implements RecordTransformer {
    * <p>NOTE: DO NOT CHANGE THE ORDER OF THE RECORD TRANSFORMERS
    * <ul>
    *   <li>
-   *     {@link ExpressionTransformer} before everyone else, so that we get the real columns for other transformers to work on
+   *     {@link ExpressionTransformer} before everyone else, so that we get the real columns for other transformers to
+   *     work on
    *   </li>
    *   <li>
    *     {@link FilterTransformer} after ExpressionTransformer, so that we have source as well as destination columns
    *   </li>
    *   <li>
-   *     We put {@link SanitizationTransformer} after {@link DataTypeTransformer} so that before sanitation, all values
-   *     follow the data types defined in the {@link Schema}.
+   *     {@link DataTypeTransformer} after FilterTransformer to convert values to comply with the schema
+   *   </li>
+   *   <li>
+   *     {@link NullValueTransformer} after {@link DataTypeTransformer} because empty Collection/Map/Object[] will be
+   *     replaced with null in DataTypeTransformer
+   *   </li>
+   *   <li>
+   *     {@link SanitizationTransformer} after {@link NullValueTransformer} so that before sanitation, all values are
+   *     non-null and follow the data types defined in the schema
    *   </li>
    * </ul>
    */
   public static CompositeTransformer getDefaultTransformer(TableConfig tableConfig, Schema schema) {
     return new CompositeTransformer(Arrays
-        .asList(new ExpressionTransformer(schema), new FilterTransformer(tableConfig), new NullValueTransformer(schema),
-            new DataTypeTransformer(schema), new SanitizationTransformer(schema)));
+        .asList(new ExpressionTransformer(tableConfig, schema), new FilterTransformer(tableConfig),
+            new DataTypeTransformer(schema), new NullValueTransformer(schema), new SanitizationTransformer(schema)));
   }
 
   /**

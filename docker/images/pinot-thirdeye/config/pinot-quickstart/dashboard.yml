@@ -1,3 +1,5 @@
+logging:
+  type: external
 authConfig:
   authEnabled: false
   authKey: ""
@@ -24,6 +26,8 @@ alerterConfiguration:
     smtpHost: localhost
     smtpPort: 25
 server:
+  requestLog:
+    type: external
   type: default
   applicationConnectors:
     - type: http

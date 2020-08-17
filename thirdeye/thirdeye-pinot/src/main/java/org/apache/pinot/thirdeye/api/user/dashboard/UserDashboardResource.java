@@ -21,6 +21,8 @@ package org.apache.pinot.thirdeye.api.user.dashboard;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Collections2;
+import com.google.inject.Inject;
+import com.google.inject.Singleton;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -63,8 +65,8 @@ import org.slf4j.LoggerFactory;
  * Endpoints for user-customized dashboards (currently alerts only)
  */
 @Api(tags = {Constants.DASHBOARD_TAG})
-@Path(value = "/userdashboard")
 @Produces(MediaType.APPLICATION_JSON)
+@Singleton
 public class UserDashboardResource {
   protected static final Logger LOG = LoggerFactory.getLogger(UserDashboardResource.class);
 
@@ -76,9 +78,11 @@ public class UserDashboardResource {
   private final DetectionConfigManager detectionDAO;
   private final DetectionAlertConfigManager detectionAlertDAO;
 
-
-  public UserDashboardResource(MergedAnomalyResultManager anomalyDAO, MetricConfigManager metricDAO,
-      DatasetConfigManager datasetDAO, DetectionConfigManager detectionDAO,
+  @Inject
+  public UserDashboardResource(MergedAnomalyResultManager anomalyDAO,
+      MetricConfigManager metricDAO,
+      DatasetConfigManager datasetDAO,
+      DetectionConfigManager detectionDAO,
       DetectionAlertConfigManager detectionAlertDAO) {
     this.anomalyDAO = anomalyDAO;
     this.metricDAO = metricDAO;
@@ -87,7 +91,7 @@ public class UserDashboardResource {
     this.detectionAlertDAO = detectionAlertDAO;
   }
 
-  List<AnomalySummary> queryAnomalies(Long start, Long end, String application, String group, String metric,
+  public List<AnomalySummary> queryAnomalies(Long start, Long end, String application, String group, String metric,
       String dataset, List<MetricDatasetPair> metricDatasetPairs, boolean fetchTrueAnomaly, Integer limit) {
     if (limit == null) {
       LOG.warn("No upper limit specified while fetching anomalies. Defaulting to " + ANOMALIES_LIMIT_DEFAULT);

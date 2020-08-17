@@ -80,6 +80,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
 
     File tempDataDir = new File(new File(MINION_CONTEXT.getDataDir(), taskType), "tmp-" + UUID.randomUUID());
     Preconditions.checkState(tempDataDir.mkdirs());
+    String crypterName = getTableConfig(tableNameWithType).getValidationConfig().getCrypterClassName();
 
     try {
       List<File> inputSegmentFiles = new ArrayList<>();
@@ -87,14 +88,11 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         // Download the segment file
         File tarredSegmentFile = new File(tempDataDir, "tarredSegmentFile_" + i);
         LOGGER.info("Downloading segment from {} to {}", downloadURLs[i], tarredSegmentFile.getAbsolutePath());
-        SegmentFetcherFactory.fetchSegmentToLocal(downloadURLs[i], tarredSegmentFile);
+        SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(downloadURLs[i], tarredSegmentFile, crypterName);
 
         // Un-tar the segment file
         File segmentDir = new File(tempDataDir, "segmentDir_" + i);
-        TarGzCompressionUtils.unTar(tarredSegmentFile, segmentDir);
-        File[] files = segmentDir.listFiles();
-        Preconditions.checkState(files != null && files.length == 1);
-        File indexDir = files[0];
+        File indexDir = TarGzCompressionUtils.untar(tarredSegmentFile, segmentDir).get(0);
         inputSegmentFiles.add(indexDir);
       }
 
@@ -109,14 +107,13 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
 
       int numOutputSegments = segmentConversionResults.size();
       List<File> tarredSegmentFiles = new ArrayList<>(numOutputSegments);
-      for (int i = 0; i < numOutputSegments; i++) {
+      for (SegmentConversionResult segmentConversionResult : segmentConversionResults) {
         // Tar the converted segment
-        SegmentConversionResult segmentConversionResult = segmentConversionResults.get(i);
         File convertedIndexDir = segmentConversionResult.getFile();
-        File convertedTarredSegmentFile = new File(TarGzCompressionUtils
-            .createTarGzOfDirectory(convertedIndexDir.getPath(),
-                new File(convertedTarredSegmentDir, segmentConversionResult.getSegmentName()).getPath()));
-        tarredSegmentFiles.add(convertedTarredSegmentFile);
+        File convertedSegmentTarFile = new File(convertedTarredSegmentDir,
+            segmentConversionResult.getSegmentName() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+        TarGzCompressionUtils.createTarGzFile(convertedIndexDir, convertedSegmentTarFile);
+        tarredSegmentFiles.add(convertedSegmentTarFile);
       }
 
       // Check whether the task get cancelled before uploading the segment

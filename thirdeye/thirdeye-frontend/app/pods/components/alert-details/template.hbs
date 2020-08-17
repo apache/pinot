@@ -236,6 +236,39 @@
                     <p>{{material-design-icon
                       name='error-outline'
                     }} {{trainingMessage}}
+                      <span>
+                        <i class="glyphicon glyphicon-question-sign"></i>
+                        {{#tooltip-on-element side='right' class="te-tooltip te-tooltip--large te-tooltip--cover" as |popover|}}
+                          <div class="te-tooltip__header">
+                            <span class="te-tooltip__title">Train Period</span>
+                          </div>
+
+                          <div class="te-horizontal-forecast__fit-container">
+                            <ul class="te-horizontal-forecast__label-column">
+                              <li class="te-horizontal-forecast__title">Fit Start</li>
+                              <li class="te-horizontal-forecast__title">Fit End</li>
+                            </ul>
+
+                            <ul class="te-horizontal-forecast__fit-value">
+                              <li class="te-horizontal-forecast__date">{{trainingTooltipDateTimes.fitStart}}</li>
+                              <li class="te-horizontal-forecast__date">{{trainingTooltipDateTimes.fitEnd}}</li>
+                            </ul>
+                          </div>
+
+                          <div class="te-horizontal-forecast__container">
+                            <ul class="te-horizontal-forecast__label-column">
+                              <li class="te-horizontal-forecast__title">Forecast Start</li>
+                              <li class="te-horizontal-forecast__title">Forecast End</li>
+                            </ul>
+
+                            <ul class="te-horizontal-forecast__forecast-value">
+                              <li class="te-horizontal-forecast__date">{{trainingTooltipDateTimes.forecastStart}}</li>
+                              <li class="te-horizontal-forecast__date">{{trainingTooltipDateTimes.forecastEnd}}</li>
+                            </ul>
+                          </div>
+
+                        {{/tooltip-on-element}}
+                      </span>
                     </p>
                   </div>
               </div>

@@ -26,10 +26,12 @@ import java.util.concurrent.Future;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.CombineGroupByOperator;
-import org.apache.pinot.core.operator.CombineGroupByOrderByOperator;
-import org.apache.pinot.core.operator.CombineOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.combine.AggregationOnlyCombineOperator;
+import org.apache.pinot.core.operator.combine.GroupByCombineOperator;
+import org.apache.pinot.core.operator.combine.GroupByOrderByCombineOperator;
+import org.apache.pinot.core.operator.combine.SelectionOnlyCombineOperator;
+import org.apache.pinot.core.operator.combine.SelectionOrderByCombineOperator;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
@@ -158,18 +160,26 @@ public class CombinePlanNode implements PlanNode {
       }
     }
 
-    // TODO: use the same combine operator for both aggregation and selection query.
-    if (QueryContextUtils.isAggregationQuery(_queryContext) && _queryContext.getGroupByExpressions() != null) {
-      // Aggregation group-by query
-      QueryOptions queryOptions = new QueryOptions(_queryContext.getQueryOptions());
-      // new Combine operator only when GROUP_BY_MODE explicitly set to SQL
-      if (queryOptions.isGroupByModeSQL()) {
-        return new CombineGroupByOrderByOperator(operators, _queryContext, _executorService, _timeOutMs);
+    if (QueryContextUtils.isAggregationQuery(_queryContext)) {
+      if (_queryContext.getGroupByExpressions() == null) {
+        // Aggregation only
+        return new AggregationOnlyCombineOperator(operators, _queryContext, _executorService, _timeOutMs);
+      } else {
+        // Aggregation group-by
+        QueryOptions queryOptions = new QueryOptions(_queryContext.getQueryOptions());
+        if (queryOptions.isGroupByModeSQL()) {
+          return new GroupByOrderByCombineOperator(operators, _queryContext, _executorService, _timeOutMs);
+        }
+        return new GroupByCombineOperator(operators, _queryContext, _executorService, _timeOutMs, _numGroupsLimit);
       }
-      return new CombineGroupByOperator(operators, _queryContext, _executorService, _timeOutMs, _numGroupsLimit);
     } else {
-      // Selection or aggregation only query
-      return new CombineOperator(operators, _queryContext, _executorService, _timeOutMs);
+      if (_queryContext.getLimit() == 0 || _queryContext.getOrderByExpressions() == null) {
+        // Selection only
+        return new SelectionOnlyCombineOperator(operators, _queryContext, _executorService, _timeOutMs);
+      } else {
+        // Selection order-by
+        return new SelectionOrderByCombineOperator(operators, _queryContext, _executorService, _timeOutMs);
+      }
     }
   }
 }

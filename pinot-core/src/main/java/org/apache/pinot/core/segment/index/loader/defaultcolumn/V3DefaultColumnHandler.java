@@ -63,27 +63,17 @@ public class V3DefaultColumnHandler extends BaseDefaultColumnHandler {
     FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
     Preconditions.checkNotNull(fieldSpec);
     boolean isSingleValue = fieldSpec.isSingleValueField();
-
-    Set<String> textIndexColumns = indexLoadingConfig.getTextIndexColumns();
-    if (textIndexColumns.contains(column)) {
-      // create forward index for this text index enabled column
-      createV1ForwardIndexForTextIndex(column, indexLoadingConfig);
-      // Write forward index to V3 format
-      File forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
-      LoaderUtils.writeIndexToV3Format(_segmentWriter, column, forwardIndexFile, ColumnIndexType.FORWARD_INDEX);
+    // Create new dictionary and forward index, and update column metadata
+    createColumnV1Indices(column);
+    // Write index to V3 format.
+    File dictionaryFile = new File(_indexDir, column + V1Constants.Dict.FILE_EXTENSION);
+    File forwardIndexFile;
+    if (isSingleValue) {
+      forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
     } else {
-      // Create new dictionary and forward index, and update column metadata
-      createColumnV1Indices(column);
-      // Write index to V3 format.
-      File dictionaryFile = new File(_indexDir, column + V1Constants.Dict.FILE_EXTENSION);
-      File forwardIndexFile;
-      if (isSingleValue) {
-        forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
-      } else {
-        forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
-      }
-      LoaderUtils.writeIndexToV3Format(_segmentWriter, column, dictionaryFile, ColumnIndexType.DICTIONARY);
-      LoaderUtils.writeIndexToV3Format(_segmentWriter, column, forwardIndexFile, ColumnIndexType.FORWARD_INDEX);
+      forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
     }
+    LoaderUtils.writeIndexToV3Format(_segmentWriter, column, dictionaryFile, ColumnIndexType.DICTIONARY);
+    LoaderUtils.writeIndexToV3Format(_segmentWriter, column, forwardIndexFile, ColumnIndexType.FORWARD_INDEX);
   }
 }

@@ -28,7 +28,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.realtime.provisioning.MemoryEstimator;
 import org.kohsuke.args4j.Option;
@@ -44,10 +43,12 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeProvisioningHelperCommand.class);
 
-  private static final int MEMORY_STR_LEN = 9;
+  private static final int MEMORY_STR_LEN = 16;
   private static final String COMMA_SEPARATOR = ",";
   private static final int DEFAULT_RETENTION_FOR_HOURLY_PUSH = 24;
   private static final int DEFAULT_RETENTION_FOR_DAILY_PUSH = 72;
+  private static final int DEFAULT_RETENTION_FOR_WEEKLY_PUSH = 24*7 + 72;
+  private static final int DEFAULT_RETENTION_FOR_MONTHLY_PUSH = 24*31 + 72;
 
   @Option(name = "-tableConfigFile", required = true, metaVar = "<String>")
   private String _tableConfigFile;
@@ -55,12 +56,14 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
   @Option(name = "-numPartitions", required = true, metaVar = "<int>", usage = "number of stream partitions for the table")
   private int _numPartitions;
 
-  @Option(name = "-retentionHours", metaVar = "<int>", usage =
-      "Number of hours the segments will need to be retained in memory. "
-          + "\nThe realtime segments will need to be in memory only until the offline segments are available and used for queries"
-          + "\nThis will be picked from the table config  by looking at the segmentPushFrequency (72h if daily, 24h if hourly, buffer added as TimeBoundaryService doesn't query the last offline timestamp), "
-          + "\nIt can be overridden using this option")
+  @Option(name = "-retentionHours", metaVar = "<int>", usage = "Number of recent hours queried most often"
+      + "\n\t(-pushFrequency is ignored)")
   private int _retentionHours;
+
+  @Option(name = "-pushFrequency", metaVar = "<String>", usage =
+      "Frequency with which offline table pushes happen, if this is a hybrid table"
+          + "\n\t(hourly,daily,weekly,monthly). Do not specify if realtime-only table")
+  private String _pushFrequency;
 
   @Option(name = "-numHosts", metaVar = "<String>", usage = "number of hosts as comma separated values (default 2,4,6,8,10,12,14,16)")
   private String _numHosts = "2,4,6,8,10,12,14,16";
@@ -71,8 +74,8 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
   @Option(name = "-sampleCompletedSegmentDir", required = true, metaVar = "<String>", usage = "Consume from the topic for n hours and provide the path of the segment dir after it completes")
   private String _sampleCompletedSegmentDir;
 
-  @Option(name = "-periodSampleSegmentConsumed", required = true, metaVar = "<String>", usage = "Period for which the sample segment was consuming in format 4h, 5h30m, 40m etc")
-  private String _periodSampleSegmentConsumed;
+  @Option(name = "-ingestionRate", required = true, metaVar = "<String>", usage = "Avg number of messages per second ingested on any one stream partition (assumed all partitions are uniform)")
+  private int _ingestionRate;
 
   @Option(name = "-maxUsableHostMemory", required = false, metaVar = "<String>", usage = "Maximum memory per host that can be used for pinot data (e.g. 250G, 100M). Default 48g")
   private String _maxUsableHostMemory = "48G";
@@ -87,6 +90,11 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
 
   public RealtimeProvisioningHelperCommand setNumPartitions(int numPartitions) {
     _numPartitions = numPartitions;
+    return this;
+  }
+
+  public RealtimeProvisioningHelperCommand setPushFrequency(String pushFrequency) {
+    _pushFrequency = pushFrequency;
     return this;
   }
 
@@ -115,17 +123,17 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     return this;
   }
 
-  public RealtimeProvisioningHelperCommand setPeriodSampleSegmentConsumed(String periodSampleSegmentConsumed) {
-    _periodSampleSegmentConsumed = periodSampleSegmentConsumed;
+  public RealtimeProvisioningHelperCommand setIngestionRate(int ingestionRate) {
+    _ingestionRate = ingestionRate;
     return this;
   }
 
   @Override
   public String toString() {
-    return ("RealtimeProvisioningHelperCommand -tableConfigFile " + _tableConfigFile + " -numPartitions "
-        + _numPartitions + " -retentionHours " + _retentionHours + " -numHosts " + _numHosts + " -numHours " + _numHours
-        + " -sampleCompletedSegmentDir " + _sampleCompletedSegmentDir + " -periodSampleSegmentConsumed "
-        + _periodSampleSegmentConsumed + "-maxUsableMemory " + _maxUsableHostMemory);
+    return ("RealtimeProvisioningHelper -tableConfigFile " + _tableConfigFile + " -numPartitions "
+        + _numPartitions + " -pushFrequency " + _pushFrequency + " -numHosts " + _numHosts + " -numHours " + _numHours
+        + " -sampleCompletedSegmentDir " + _sampleCompletedSegmentDir + " -ingestionRate "
+        + _ingestionRate + " -maxUsableHostMemory " + _maxUsableHostMemory + " -retentionHours " + _retentionHours);
   }
 
   @Override
@@ -146,6 +154,21 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
   }
 
   @Override
+  public void printExamples() {
+    StringBuilder builder = new StringBuilder();
+    builder.append("\n\nThis command allows you to estimate the capacity needed for provisioning realtime hosts")
+        .append("It assumes that there is no upper limit to the amount of memory you can mmap")
+        .append("\nIf you have a hybrid table, then consult the push frequency setting in your offline table specify it in the -pushFrequency argument")
+        .append("\nIf you have a realtime-only table, then the default behavior is to assume that your queries need all data in memory all the time")
+        .append("\nHowever, if most of your queries are going to be for (say) the last 96 hours, then you can specify that in -retentionHours")
+        .append("\nDoing so will let this program assume that you are willing to take a page hit when querying older data")
+        .append("\nand optimize memory and number of hosts accordingly.")
+        .append("\n See https://docs.pinot.apache.org/operators/operating-pinot/tuning/realtime for details");
+        ;
+    System.out.println(builder.toString());
+  }
+
+  @Override
   public boolean execute()
       throws IOException {
     LOGGER.info("Executing command: {}", toString());
@@ -158,17 +181,36 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
       throw new RuntimeException("Exception in reading table config from file " + _tableConfigFile, e);
     }
 
+    StringBuilder note = new StringBuilder();
+    note.append("\nNote:\n");
     int numReplicas = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
-    if (_retentionHours == 0) {
-      if (tableConfig.getValidationConfig().getSegmentPushFrequency().equalsIgnoreCase("hourly")) {
-        _retentionHours = DEFAULT_RETENTION_FOR_HOURLY_PUSH;
+    int tableRetentionHours = (int) TimeUnit.valueOf(tableConfig.getValidationConfig().getRetentionTimeUnit())
+            .toHours(Long.parseLong(tableConfig.getValidationConfig().getRetentionTimeValue()));
+    if (_retentionHours > 0) {
+      note.append("\n* Table retention and push frequency ignored for determining retentionHours since it is specified in command");
+    } else {
+      if (_pushFrequency == null) {
+        // This is a realtime-only table. Pick up the retention time
+        _retentionHours = tableRetentionHours;
+        note.append("\n* Retention hours taken from tableConfig");
       } else {
-        _retentionHours = DEFAULT_RETENTION_FOR_DAILY_PUSH;
+        if ("hourly".equalsIgnoreCase(_pushFrequency)) {
+          _retentionHours = DEFAULT_RETENTION_FOR_HOURLY_PUSH;
+        } else if ("daily".equalsIgnoreCase(_pushFrequency)) {
+          _retentionHours = DEFAULT_RETENTION_FOR_DAILY_PUSH;
+        } else if ("weekly".equalsIgnoreCase(_pushFrequency)) {
+          _retentionHours = DEFAULT_RETENTION_FOR_WEEKLY_PUSH;
+        } else if ("monthly".equalsIgnoreCase(_pushFrequency)) {
+          _retentionHours = DEFAULT_RETENTION_FOR_MONTHLY_PUSH;
+        } else {
+          throw new IllegalArgumentException("Illegal value for pushFrequency: '" + _pushFrequency + "'");
+        }
+        note.append("\n* Retention hours taken from pushFrequency");
       }
     }
 
-    int[] numHosts = Arrays.stream(_numHosts.split(COMMA_SEPARATOR)).mapToInt(Integer::parseInt).toArray();
-    int[] numHours = Arrays.stream(_numHours.split(COMMA_SEPARATOR)).mapToInt(Integer::parseInt).toArray();
+    int[] numHosts = Arrays.stream(_numHosts.split(COMMA_SEPARATOR)).mapToInt(Integer::parseInt).sorted().toArray();
+    int[] numHours = Arrays.stream(_numHours.split(COMMA_SEPARATOR)).mapToInt(Integer::parseInt).sorted().toArray();
 
     int totalConsumingPartitions = _numPartitions * numReplicas;
 
@@ -177,26 +219,31 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     // Completed: Use multiple (completedSize,numHours) data points to calculate completed size for our numHours
     File sampleCompletedSegmentFile = new File(_sampleCompletedSegmentDir);
 
-    long sampleSegmentConsumedSeconds =
-        TimeUnit.SECONDS.convert(TimeUtils.convertPeriodToMillis(_periodSampleSegmentConsumed), TimeUnit.MILLISECONDS);
-
     long maxUsableHostMemBytes = DataSizeUtils.toBytes(_maxUsableHostMemory);
 
     MemoryEstimator memoryEstimator =
-        new MemoryEstimator(tableConfig, sampleCompletedSegmentFile, sampleSegmentConsumedSeconds,
-            maxUsableHostMemBytes);
+        new MemoryEstimator(tableConfig, sampleCompletedSegmentFile, _ingestionRate, maxUsableHostMemBytes, tableRetentionHours);
     File sampleStatsHistory = memoryEstimator.initializeStatsHistory();
     memoryEstimator
         .estimateMemoryUsed(sampleStatsHistory, numHosts, numHours, totalConsumingPartitions, _retentionHours);
 
+    note.append("\n* See https://docs.pinot.apache.org/operators/operating-pinot/tuning/realtime");
     // TODO: Make a recommendation of what config to choose by considering more inputs such as qps
-    LOGGER.info("\nMemory used per host");
-    displayResults(memoryEstimator.getTotalMemoryPerHost(), numHosts, numHours);
+    displayOutputHeader(note);
+    LOGGER.info("\nMemory used per host (Active/Mapped)");
+    displayResults(memoryEstimator.getActiveMemoryPerHost(), numHosts, numHours);
     LOGGER.info("\nOptimal segment size");
     displayResults(memoryEstimator.getOptimalSegmentSize(), numHosts, numHours);
     LOGGER.info("\nConsuming memory");
     displayResults(memoryEstimator.getConsumingMemoryPerHost(), numHosts, numHours);
+    LOGGER.info("\nTotal number of segments queried per host (for all partitions)");
+    displayResults(memoryEstimator.getNumSegmentsQueriedPerHost(), numHosts, numHours);
     return true;
+  }
+
+  private void displayOutputHeader(StringBuilder note) {
+    System.out.println("\n============================================================\n" + toString());
+    System.out.println(note.toString());
   }
 
   /**

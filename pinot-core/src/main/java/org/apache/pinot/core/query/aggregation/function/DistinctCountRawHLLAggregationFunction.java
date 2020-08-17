@@ -49,11 +49,6 @@ public class DistinctCountRawHLLAggregationFunction extends BaseSingleInputAggre
   }
 
   @Override
-  public void accept(AggregationFunctionVisitorBase visitor) {
-    _distinctCountHLLAggregationFunction.accept(visitor);
-  }
-
-  @Override
   public AggregationResultHolder createAggregationResultHolder() {
     return _distinctCountHLLAggregationFunction.createAggregationResultHolder();
   }

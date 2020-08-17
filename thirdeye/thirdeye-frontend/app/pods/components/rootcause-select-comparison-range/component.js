@@ -1,4 +1,4 @@
-import { computed } from '@ember/object';
+import { computed, set } from '@ember/object';
 import Component from '@ember/component';
 import $ from 'jquery';
 import {
@@ -37,6 +37,8 @@ export default Component.extend({
   onChange: null, // func (start, end, compareMode)
   slider: null,
   sliderOptionsCache: null,
+  showBaselineModal: false,
+  customBaselineValue: 'wo1w',
 
   rangeOptions: {
     'Last hour': [makeTime().subtract(1, 'hours').startOf('hour'), makeTime().startOf('hours').add(1, 'hours')],
@@ -48,23 +50,15 @@ export default Component.extend({
   compareModeOptions: [
     {
       groupName: 'Weekly',
-      options: [ 'wo1w', 'wo2w', 'wo3w', 'wo4w', 'mean4w', 'median4w', 'min4w', 'max4w' ]
-    },
-    {
-      groupName: 'Hourly',
-      options: [ 'ho1h', 'ho2h', 'ho3h', 'ho6h', 'mean6h', 'median6h', 'min6h', 'max6h' ]
-    },
-    {
-      groupName: 'Daily',
-      options: [ 'do1d', 'do2d', 'do3d', 'do4d', 'mean4d', 'median4d', 'min4d', 'max4d' ]
-    },
-    {
-      groupName: 'Monthly',
-      options: [ 'mo1m', 'mo2m', 'mo3m', 'mo6m', 'mean6m', 'median6m', 'min6m', 'max6m' ]
+      options: [ 'wo1w', 'wo2w', 'wo3w', 'mean4w', 'median4w' ]
     },
     {
       groupName: 'Algorithm',
-      options: [ 'predicted', 'none' ]
+      options: [ 'predicted' ]
+    },
+    {
+      groupName: 'Custom Baseline Selector',
+      options: ['custom']
     }
   ],
 
@@ -185,9 +179,26 @@ export default Component.extend({
       onChange(makeTime(start).valueOf(), makeTime(end).valueOf(), compareMode);
     },
 
+    updateCustomBaseline(baseline) {
+      set(this, 'customBaselineValue', baseline);
+    },
+
+    onBaseline() {
+      set(this, 'showBaselineModal', false);
+      this.send('onCompareMode', this.get('customBaselineValue'));
+    },
+
+    onCancel() {
+      set(this, 'showBaselineModal', false);
+    },
+
     onCompareMode(compareMode) {
-      const { anomalyRange, onChange } = this.getProperties('anomalyRange', 'onChange');
-      onChange(anomalyRange[0], anomalyRange[1], compareMode);
+      if (compareMode === 'custom') {
+        set(this, 'showBaselineModal', true);
+      } else {
+        const { anomalyRange, onChange } = this.getProperties('anomalyRange', 'onChange');
+        onChange(anomalyRange[0], anomalyRange[1], compareMode);
+      }
     }
   }
 });

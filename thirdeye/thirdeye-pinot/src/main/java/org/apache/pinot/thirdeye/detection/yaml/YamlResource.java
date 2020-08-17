@@ -22,6 +22,7 @@ package org.apache.pinot.thirdeye.detection.yaml;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.RateLimiter;
+import com.google.inject.Singleton;
 import io.dropwizard.auth.Auth;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -112,8 +113,8 @@ import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 import static org.apache.pinot.thirdeye.detection.yaml.translator.SubscriptionConfigTranslator.*;
 
 
-@Path("/yaml")
 @Api(tags = {Constants.YAML_TAG})
+@Singleton
 public class YamlResource {
   protected static final Logger LOG = LoggerFactory.getLogger(YamlResource.class);
   private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -225,9 +226,9 @@ public class YamlResource {
   /*
    * Create a yaml onboarding task. It runs 1 month replay and re-tune the pipeline.
    */
-  private void createYamlOnboardingTask(long configId, long tuningWindowStart, long tuningWindowEnd) throws Exception {
+  private void createYamlOnboardingTask(DetectionConfigDTO detectionConfig, long tuningWindowStart, long tuningWindowEnd) throws Exception {
     YamlOnboardingTaskInfo info = new YamlOnboardingTaskInfo();
-    info.setConfigId(configId);
+    info.setConfigId(detectionConfig.getId());
     if (tuningWindowStart == 0L && tuningWindowEnd == 0L) {
       // default tuning window 28 days
       tuningWindowEnd = System.currentTimeMillis();
@@ -236,10 +237,17 @@ public class YamlResource {
     info.setTuningWindowStart(tuningWindowStart);
     info.setTuningWindowEnd(tuningWindowEnd);
     info.setEnd(System.currentTimeMillis());
-    info.setStart(info.getEnd() - ONBOARDING_REPLAY_LOOKBACK);
+
+    long lastTimestamp = detectionConfig.getLastTimestamp();
+    // If no value is present, set the default lookback
+    if (lastTimestamp < 0) {
+      lastTimestamp = info.getEnd() - ONBOARDING_REPLAY_LOOKBACK;
+    }
+    info.setStart(lastTimestamp);
+
     String taskInfoJson = OBJECT_MAPPER.writeValueAsString(info);
 
-    TaskDTO taskDTO = TaskUtils.buildTask(configId, taskInfoJson, TaskConstants.TaskType.YAML_DETECTION_ONBOARD);
+    TaskDTO taskDTO = TaskUtils.buildTask(detectionConfig.getId(), taskInfoJson, TaskConstants.TaskType.YAML_DETECTION_ONBOARD);
     long taskId = this.taskDAO.save(taskDTO);
     LOG.info("Created {} task {} with taskId {}", TaskConstants.TaskType.YAML_DETECTION_ONBOARD, taskDTO, taskId);
   }
@@ -299,8 +307,8 @@ public class YamlResource {
   public Response createYamlAlert(
       @Auth ThirdEyePrincipal user,
       @ApiParam(value =  "a json contains both subscription and detection yaml as string")  String payload,
-      @ApiParam("tuning window start time for tunable components") @QueryParam("startTime") long startTime,
-      @ApiParam("tuning window end time for tunable components") @QueryParam("endTime") long endTime) throws Exception {
+      @ApiParam("tuning window start time for tunable components") @QueryParam("startTime") long tuningStartTime,
+      @ApiParam("tuning window end time for tunable components") @QueryParam("endTime") long tuningEndTime) throws Exception {
     Map<String, String> responseMessage = new HashMap<>();
 
     // validate the payload
@@ -323,7 +331,7 @@ public class YamlResource {
       String detectionYaml = yamls.get(PROP_DETECTION);
       Preconditions.checkArgument(StringUtils.isNotBlank(detectionYaml), "detection yaml is missing");
 
-      detectionConfigId = createDetectionConfig(detectionYaml, startTime, endTime);
+      detectionConfigId = createDetectionConfig(detectionYaml, tuningStartTime, tuningEndTime);
     } catch (IllegalArgumentException e) {
       return processBadRequestResponse(PROP_DETECTION, YamlOperations.CREATING.name(), payload, e);
     } catch (Exception e) {
@@ -376,14 +384,14 @@ public class YamlResource {
     return createDetectionConfig(yamlDetectionConfig, 0, 0);
   }
 
-  long createDetectionConfig(@NotNull String payload, long startTime, long endTime) throws Exception {
+  long createDetectionConfig(@NotNull String payload, long tuningStartTime, long tuningEndTime) throws Exception {
     // if can't acquire alert onboarding QPS permit, throw an exception
     if (!this.onboardingRateLimiter.tryAcquire()) {
       throw new RuntimeException(
           String.format("Server is busy handling create detection requests. Please retry later. QPS quota: %f", this.onboardingRateLimiter.getRate()));
     }
 
-    DetectionConfigDTO detectionConfig = buildDetectionConfigFromYaml(startTime, endTime, payload, null);
+    DetectionConfigDTO detectionConfig = buildDetectionConfigFromYaml(tuningStartTime, tuningEndTime, payload, null);
 
     // Check for duplicates
     List<DetectionConfigDTO> detectionConfigDTOS = detectionConfigDAO
@@ -398,7 +406,7 @@ public class YamlResource {
     Preconditions.checkNotNull(id, "Error while saving the detection pipeline");
 
     // create an yaml onboarding task to run replay and tuning
-    createYamlOnboardingTask(detectionConfig.getId(), startTime, endTime);
+    createYamlOnboardingTask(detectionConfig, tuningStartTime, tuningEndTime);
 
     return detectionConfig.getId();
   }
@@ -429,7 +437,7 @@ public class YamlResource {
       return processServerErrorResponse(PROP_DETECTION, YamlOperations.CREATING.name(), payload, e);
     }
 
-    LOG.info("Detection created with id " + detectionConfigId + " using payload " + payload);
+    LOG.info("Detection created with id " + detectionConfigId);
     responseMessage.put("message", "Alert was created successfully.");
     responseMessage.put("more-info", "Record saved with id " + detectionConfigId);
     return Response.ok().entity(responseMessage).build();
@@ -603,7 +611,7 @@ public class YamlResource {
       return processServerErrorResponse(PROP_DETECTION, YamlOperations.CREATING.name() + "/" + YamlOperations.UPDATING.name(), payload, e);
     }
 
-    LOG.info("Detection Config created/updated with id " + detectionConfigId + " using payload " + payload);
+    LOG.info("Detection Config created/updated with id " + detectionConfigId);
     responseMessage.put("message", "The alert was created/updated successfully.");
     responseMessage.put("more-info", "Record saved/updated with id " + detectionConfigId);
     return Response.ok().entity(responseMessage).build();
@@ -671,7 +679,7 @@ public class YamlResource {
       return processServerErrorResponse(PROP_DETECTION, YamlOperations.CREATING.name() + "/" + YamlOperations.UPDATING.name(), payload, e);
     }
 
-    LOG.info("Subscription config created/updated with id " + subscriptionConfigId + " using payload " + payload);
+    LOG.info("Subscription config created/updated with id " + subscriptionConfigId);
     responseMessage.put("message", "The subscription group was created/updated successfully.");
     responseMessage.put("more-info", "Record saved/updated with id " + subscriptionConfigId);
     return Response.ok().entity(responseMessage).build();
@@ -715,7 +723,7 @@ public class YamlResource {
       return processServerErrorResponse(PROP_SUBSCRIPTION, YamlOperations.CREATING.name(), payload, e);
     }
 
-    LOG.info("Notification group created with id " + subscriptionConfigId + " using payload " + payload);
+    LOG.info("Notification group created with id " + subscriptionConfigId);
     responseMessage.put("message", "The subscription group was created successfully.");
     responseMessage.put("detectionAlertConfigId", String.valueOf(subscriptionConfigId));
     return Response.ok().entity(responseMessage).build();
@@ -1059,22 +1067,25 @@ public class YamlResource {
    * Query all detection yaml configurations and optionally filter, then format as JSON and enhance with
    * detection config id, isActive, and createdBy information
    *
+   * NOTE: it is limited to list and filter the most recent 100 alerts only due to possible OOM issues.
+   *
    * @param dataset The dataset param passed by the client in the REST API call.
    * @param metric The metric param passed by the client in the REST API call.
    * @return the yaml configuration converted in to JSON, with enhanced information from detection config DTO.
    */
+  @Deprecated
   private List<Map<String, Object>> queryDetectionConfigurations(String dataset, String metric) {
     List<Map<String, Object>> yamls;
     if (dataset == null && metric == null) {
       yamls = this.detectionConfigDAO
-          .findAll()
+          .list(100, 0)
           .parallelStream()
           .map(config -> formatConfigOrNull(config))
           .filter(c -> c!= null)
           .collect(Collectors.toList());
     } else {
       yamls = this.detectionConfigDAO
-          .findAll()
+          .list(100, 0)
           .parallelStream()
           .map(config -> formatConfigOrNull(config))
           .filter(c -> c!= null)
@@ -1096,8 +1107,12 @@ public class YamlResource {
    */
   @GET
   @Path("/list")
-  @ApiOperation("Get the list of all detection YAML configurations as JSON enhanced with additional information, optionally filtered.")
+  @ApiOperation(
+      "Get the list of all detection YAML configurations as JSON enhanced with additional information, optionally filtered."
+          + "IMPORTANT NOTE: This endpoint is deprecated because it is not scalable. Please use the /alerts endpoint instead. "
+          + "For now, it is limited to list and filter the most recent 100 alerts only. ")
   @Produces(MediaType.APPLICATION_JSON)
+  @Deprecated
   public Response listYamls(
       @ApiParam("Dataset the detection configurations should be filtered by") @QueryParam("dataset") String dataset,
       @ApiParam("Metric the detection configurations should be filtered by") @QueryParam("metric") String metric){

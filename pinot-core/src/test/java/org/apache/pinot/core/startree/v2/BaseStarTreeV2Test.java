@@ -184,7 +184,8 @@ abstract class BaseStarTreeV2Test<R, A> {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromPQL(query);
 
     // Aggregations
-    AggregationFunction[] aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(queryContext);
+    AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
+    assert aggregationFunctions != null;
     int numAggregations = aggregationFunctions.length;
     List<AggregationFunctionColumnPair> functionColumnPairs = new ArrayList<>(numAggregations);
     for (AggregationFunction aggregationFunction : aggregationFunctions) {

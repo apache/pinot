@@ -33,6 +33,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
+    <phase.prop>package</phase.prop>
   </properties>
   <dependencies>
     <dependency>

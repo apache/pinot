@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.broker.requesthandler;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.util.Random;
-
 import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -29,10 +31,6 @@ import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.yammer.metrics.core.MetricsRegistry;
 
 
 public class LiteralOnlyBrokerRequestTest {
@@ -92,8 +90,8 @@ public class LiteralOnlyBrokerRequestTest {
   public void testBrokerRequestHandler()
       throws Exception {
     SingleConnectionBrokerRequestHandler requestHandler =
-        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), null, null, null,
-            new BrokerMetrics("", new MetricsRegistry(), false), null);
+        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), null, null, null, null,
+            new BrokerMetrics("", new MetricsRegistry(), false));
     long randNum = RANDOM.nextLong();
     byte[] randBytes = new byte[12];
     RANDOM.nextBytes(randBytes);
@@ -119,8 +117,8 @@ public class LiteralOnlyBrokerRequestTest {
   public void testBrokerRequestHandlerWithAsFunction()
       throws Exception {
     SingleConnectionBrokerRequestHandler requestHandler =
-        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), null, null, null,
-            new BrokerMetrics("", new MetricsRegistry(), false), null);
+        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), null, null, null, null,
+            new BrokerMetrics("", new MetricsRegistry(), false));
     long currentTsMin = System.currentTimeMillis();
     JsonNode request = new ObjectMapper().readTree(
         "{\"sql\":\"SELECT now() as currentTs, fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z') as firstDayOf2020\"}");

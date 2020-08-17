@@ -188,7 +188,7 @@ public class LocalPinotFSTest {
     localPinotFS.touch(nonExistingFile.toURI());
     Assert.assertTrue(nonExistingFile.exists());
     long currentTime = System.currentTimeMillis();
-    Assert.assertTrue(localPinotFS.lastModified(nonExistingFile.toURI()) < currentTime);
+    Assert.assertTrue(localPinotFS.lastModified(nonExistingFile.toURI()) <= currentTime);
     Thread.sleep(1000L);
     // update last modified.
     localPinotFS.touch(nonExistingFile.toURI());

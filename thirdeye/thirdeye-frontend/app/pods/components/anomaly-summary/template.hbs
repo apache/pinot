@@ -44,6 +44,11 @@
           </th>
           <th class="te-anomaly-table__cell-head">
             <a class="te-anomaly-table__cell-link">
+              Anomaly Type
+            </a>
+          </th>
+          <th class="te-anomaly-table__cell-head">
+            <a class="te-anomaly-table__cell-link">
               Feedback
             </a>
           </th>
@@ -74,7 +79,14 @@
               </li>
             </ul>
            </td>
-           <td class="te-anomaly-table__cell">
+          <td class="te-anomaly-table__cell">
+            <ul class="te-anomaly-table__list te-anomaly-table__list--left">
+              <li class="te-anomaly-table__list-item te-anomaly-table__list-item--stronger">
+                {{anomaly.type}}
+              </li>
+            </ul>
+          </td>
+          <td class="te-anomaly-table__cell">
               {{#if renderStatusIcon}}
                 {{#if anomaly.showResponseSaved}}
                   <i class="te-anomaly-table__icon--status glyphicon glyphicon-ok-circle"></i>

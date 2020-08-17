@@ -42,11 +42,6 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
   }
 
   @Override
-  public void accept(AggregationFunctionVisitorBase visitor) {
-    visitor.visit(this);
-  }
-
-  @Override
   public AggregationResultHolder createAggregationResultHolder() {
     return new DoubleAggregationResultHolder(DEFAULT_INITIAL_VALUE);
   }

@@ -32,6 +32,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.DetectionConfigBean;
+import org.apache.pinot.thirdeye.detection.DetectionPipelineTaskInfo;
 import org.joda.time.DateTime;
 
 import com.google.inject.persist.Transactional;
@@ -51,6 +54,18 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
 
   private static final String FIND_BY_STATUS_ORDER_BY_CREATE_TIME_DESC =
       " WHERE status = :status order by startTime desc limit 10";
+
+  private static final String FIND_BY_STATUS_AND_TYPE_ORDER_BY_CREATE_TIME_ASC =
+          " WHERE status = :status and type = :type order by startTime asc limit 10";
+
+  private static final String FIND_BY_STATUS_AND_TYPE_ORDER_BY_CREATE_TIME_DESC =
+          " WHERE status = :status and type = :type order by startTime desc limit 10";
+
+  private static final String FIND_BY_STATUS_AND_TYPE_NOT_IN_ORDER_BY_CREATE_TIME_ASC =
+      " WHERE status = :status and type != :type order by startTime asc limit 10";
+
+  private static final String FIND_BY_STATUS_AND_TYPE_NOT_IN_ORDER_BY_CREATE_TIME_DESC =
+      " WHERE status = :status and type != :type order by startTime desc limit 10";
 
   private static final String FIND_BY_NAME_ORDER_BY_CREATE_TIME_ASC =
       " WHERE name = :name order by createTime asc limit ";
@@ -108,6 +123,39 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
     parameterMap.put("status", status.toString());
     List<TaskBean> list;
     String queryClause = (asc) ? FIND_BY_STATUS_ORDER_BY_CREATE_TIME_ASC : FIND_BY_STATUS_ORDER_BY_CREATE_TIME_DESC;
+    list = genericPojoDao.executeParameterizedSQL(queryClause, parameterMap, TaskBean.class);
+    List<TaskDTO> result = new ArrayList<>();
+    for (TaskBean bean : list) {
+      result.add(MODEL_MAPPER.map(bean, TaskDTO.class));
+    }
+    return result;
+  }
+
+  @Override
+  public List<TaskDTO> findByStatusAndTypeOrderByCreateTime(TaskStatus status, TaskConstants.TaskType type, int fetchSize, boolean asc) {
+    Map<String, Object> parameterMap = new HashMap<>();
+    parameterMap.put("status", status.toString());
+    parameterMap.put("type", type.toString());
+    List<TaskBean> list;
+    String queryClause = (asc) ? FIND_BY_STATUS_AND_TYPE_ORDER_BY_CREATE_TIME_ASC
+            : FIND_BY_STATUS_AND_TYPE_ORDER_BY_CREATE_TIME_DESC;
+    list = genericPojoDao.executeParameterizedSQL(queryClause, parameterMap, TaskBean.class);
+    List<TaskDTO> result = new ArrayList<>();
+    for (TaskBean bean : list) {
+      result.add(MODEL_MAPPER.map(bean, TaskDTO.class));
+    }
+    return result;
+  }
+
+  @Override
+  public List<TaskDTO> findByStatusAndTypeNotInOrderByCreateTime(TaskStatus status,
+      TaskConstants.TaskType type, int fetchSize, boolean asc) {
+    Map<String, Object> parameterMap = new HashMap<>();
+    parameterMap.put("status", status.toString());
+    parameterMap.put("type", type.toString());
+    List<TaskBean> list;
+    String queryClause = (asc) ? FIND_BY_STATUS_AND_TYPE_NOT_IN_ORDER_BY_CREATE_TIME_ASC
+        : FIND_BY_STATUS_AND_TYPE_NOT_IN_ORDER_BY_CREATE_TIME_DESC;
     list = genericPojoDao.executeParameterizedSQL(queryClause, parameterMap, TaskBean.class);
     List<TaskDTO> result = new ArrayList<>();
     for (TaskBean bean : list) {
@@ -225,5 +273,17 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
       LOG.warn("Could not retrieve task backlog size. Defaulting to -1.", e);
       return -1;
     }
+  }
+
+  @Override
+  public void populateDetectionConfig(DetectionConfigDTO detectionConfigDTO, DetectionPipelineTaskInfo taskInfo) {
+    DetectionConfigBean bean = convertDTO2Bean(detectionConfigDTO, DetectionConfigBean.class);
+    taskInfo.setDetectionConfigBean(bean);
+  }
+
+  @Override
+  public DetectionConfigDTO extractDetectionConfig(DetectionPipelineTaskInfo taskInfo) {
+    DetectionConfigBean detectionConfigBean = taskInfo.getDetectionConfigBean();
+    return MODEL_MAPPER.map(detectionConfigBean, DetectionConfigDTO.class);
   }
 }

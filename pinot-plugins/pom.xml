@@ -36,6 +36,7 @@
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
     <plugin.type />
+    <phase.prop>none</phase.prop>
   </properties>
 
   <modules>
@@ -74,7 +75,7 @@
             <version>3.2.1</version>
             <executions>
               <execution>
-                <phase>package</phase>
+                <phase>${phase.prop}</phase>
                 <goals>
                   <goal>shade</goal>
                 </goals>
@@ -106,21 +107,6 @@
                 </configuration>
               </execution>
             </executions>
-          </plugin>
-          <plugin>
-            <artifactId>maven-clean-plugin</artifactId>
-            <version>3.1.0</version>
-            <configuration>
-              <filesets>
-                <fileset>
-                  <directory>${pinot.root}/pinot-plugins/target/plugins/</directory>
-                  <includes>
-                    <include>**/*.pom</include>
-                  </includes>
-                  <followSymlinks>false</followSymlinks>
-                </fileset>
-              </filesets>
-            </configuration>
           </plugin>
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>

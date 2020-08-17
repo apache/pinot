@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.segment.index.readers;
 
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+
+
 /**
  * DocId dictionary for the segment
  */
@@ -39,6 +42,11 @@ public class DocIdDictionary extends BaseImmutableDictionary {
     } else {
       return intValue;
     }
+  }
+
+  @Override
+  public DataType getValueType() {
+    return DataType.INT;
   }
 
   @Override

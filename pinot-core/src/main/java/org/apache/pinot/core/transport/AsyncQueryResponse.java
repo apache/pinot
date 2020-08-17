@@ -39,6 +39,8 @@ public class AsyncQueryResponse {
   private final CountDownLatch _countDownLatch;
   private final long _maxEndTimeMs;
 
+  private volatile Exception _brokerRequestSendException;
+
   public AsyncQueryResponse(QueryRouter queryRouter, long requestId, Set<ServerRoutingInstance> serversQueried,
       long startTimeMs, long timeoutMs) {
     _queryRouter = queryRouter;
@@ -104,5 +106,13 @@ public class AsyncQueryResponse {
     if (serverResponse != null && serverResponse.getDataTable() == null) {
       markQueryFailed();
     }
+  }
+
+  public Exception getBrokerRequestSendException() {
+    return _brokerRequestSendException;
+  }
+
+  void setBrokerRequestSendException(Exception brokerRequestSendException) {
+    _brokerRequestSendException = brokerRequestSendException;
   }
 }

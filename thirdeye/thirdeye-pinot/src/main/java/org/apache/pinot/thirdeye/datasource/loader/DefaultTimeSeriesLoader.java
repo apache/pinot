@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.datasource.loader;
 
+import com.google.inject.Inject;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
@@ -41,7 +42,11 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
   private final QueryCache queryCache;
   private final TimeSeriesCache timeSeriesCache;
 
-  public DefaultTimeSeriesLoader(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, QueryCache queryCache, TimeSeriesCache cache) {
+  @Inject
+  public DefaultTimeSeriesLoader(MetricConfigManager metricDAO,
+      DatasetConfigManager datasetDAO,
+      QueryCache queryCache,
+      TimeSeriesCache cache) {
     this.metricDAO = metricDAO;
     this.datasetDAO = datasetDAO;
     this.queryCache = queryCache;

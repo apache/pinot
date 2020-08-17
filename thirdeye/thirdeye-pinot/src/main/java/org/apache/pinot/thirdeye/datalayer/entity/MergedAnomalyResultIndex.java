@@ -35,6 +35,7 @@ public class MergedAnomalyResultIndex extends AbstractIndexEntity {
   String metric;
   DimensionMap dimensions;
   boolean notified;
+  boolean child;
 
   public long getDetectionConfigId() {
     return detectionConfigId;
@@ -114,5 +115,13 @@ public class MergedAnomalyResultIndex extends AbstractIndexEntity {
 
   public void setNotified(boolean notified) {
     this.notified = notified;
+  }
+
+  public boolean isChild() {
+    return child;
+  }
+
+  public void setChild(boolean child) {
+    this.child = child;
   }
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.index.column;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
@@ -62,6 +63,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   private final ForwardIndexReader<?> _forwardIndex;
   private final InvertedIndexReader<?> _invertedIndex;
   private final InvertedIndexReader<?> _rangeIndex;
+  private final InvertedIndexReader<?> _textIndex;
   private final BaseImmutableDictionary _dictionary;
   private final BloomFilterReader _bloomFilterReader;
   private final NullValueVectorReaderImpl _nullValueVectorReader;
@@ -88,6 +90,15 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       _nullValueVectorReader = new NullValueVectorReaderImpl(nullValueVectorBuffer);
     } else {
       _nullValueVectorReader = null;
+    }
+
+    if (loadTextIndex) {
+      Preconditions.checkState(segmentReader.hasIndexFor(columnName, ColumnIndexType.TEXT_INDEX));
+      Map<String, Map<String, String>> columnProperties = indexLoadingConfig.getColumnProperties();
+      _textIndex = new LuceneTextIndexReader(columnName, segmentIndexDir, metadata.getTotalDocs(),
+          columnProperties.get(columnName));
+    } else {
+      _textIndex = null;
     }
 
     PinotDataBuffer fwdIndexBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.FORWARD_INDEX);
@@ -140,13 +151,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       _dictionary = null;
       _bloomFilterReader = null;
       _rangeIndex = null;
-      if (loadTextIndex) {
-        Map<String, Map<String, String>> columnProperties = indexLoadingConfig.getColumnProperties();
-        _invertedIndex = new LuceneTextIndexReader(columnName, segmentIndexDir, metadata.getTotalDocs(),
-            columnProperties.get(columnName));
-      } else {
-        _invertedIndex = null;
-      }
+      _invertedIndex = null;
     }
   }
 
@@ -163,6 +168,11 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   @Override
   public InvertedIndexReader<?> getRangeIndex() {
     return _rangeIndex;
+  }
+
+  @Override
+  public InvertedIndexReader<?> getTextIndex() {
+    return _textIndex;
   }
 
   @Override
@@ -250,6 +260,9 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     }
     if (_dictionary != null) {
       _dictionary.close();
+    }
+    if (_textIndex != null) {
+      _textIndex.close();
     }
   }
 }

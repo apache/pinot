@@ -45,8 +45,9 @@ public class SplitSegmentCommitter implements SegmentCommitter {
   }
 
   @Override
-  public SegmentCompletionProtocol.Response commit(LLRealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor) {
-    final File segmentTarFile = new File(segmentBuildDescriptor.getSegmentTarFilePath());
+  public SegmentCompletionProtocol.Response commit(
+      LLRealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor) {
+    File segmentTarFile = segmentBuildDescriptor.getSegmentTarFile();
 
     SegmentCompletionProtocol.Response segmentCommitStartResponse = _protocolHandler.segmentCommitStart(_params);
     if (!segmentCommitStartResponse.getStatus()
@@ -55,11 +56,11 @@ public class SplitSegmentCommitter implements SegmentCommitter {
       return SegmentCompletionProtocol.RESP_FAILED;
     }
 
-    URI segmentLocation = _segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(_params.getSegmentName()));
+    String segmentLocation = uploadSegment(segmentTarFile, _segmentUploader, _params);
     if (segmentLocation == null) {
       return SegmentCompletionProtocol.RESP_FAILED;
     }
-    _params.withSegmentLocation(segmentLocation.toString());
+    _params.withSegmentLocation(segmentLocation);
 
     SegmentCompletionProtocol.Response commitEndResponse =
         _protocolHandler.segmentCommitEndWithMetadata(_params, segmentBuildDescriptor.getMetadataFiles());
@@ -69,5 +70,15 @@ public class SplitSegmentCommitter implements SegmentCommitter {
       return SegmentCompletionProtocol.RESP_FAILED;
     }
     return commitEndResponse;
+  }
+
+  // Return null iff the segment upload fails.
+  protected String uploadSegment(File segmentTarFile, SegmentUploader segmentUploader,
+      SegmentCompletionProtocol.Request.Params params) {
+    URI segmentLocation = segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(params.getSegmentName()));
+    if (segmentLocation != null) {
+      return segmentLocation.toString();
+    }
+    return null;
   }
 }

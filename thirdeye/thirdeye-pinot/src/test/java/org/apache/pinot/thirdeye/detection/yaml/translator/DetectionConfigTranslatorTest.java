@@ -62,7 +62,7 @@ public class DetectionConfigTranslatorTest {
     datasetConfigDTO.setDataset("test_dataset");
     datasetConfigDTO.setTimeUnit(TimeUnit.DAYS);
     datasetConfigDTO.setTimeDuration(1);
-    datasetConfigDTO.setDataSource(PinotThirdEyeDataSource.DATA_SOURCE_NAME);
+    datasetConfigDTO.setDataSource(PinotThirdEyeDataSource.class.getSimpleName());
     daoRegistry.getDatasetConfigDAO().save(datasetConfigDTO);
 
     this.yaml = new Yaml();

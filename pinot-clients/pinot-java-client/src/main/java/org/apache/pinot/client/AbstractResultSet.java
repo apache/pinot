@@ -22,6 +22,12 @@ package org.apache.pinot.client;
  * Shared implementation between the different ResultSets.
  */
 abstract class AbstractResultSet implements ResultSet {
+
+  @Override
+  public String getColumnDataType(int columnIndex) {
+    return null;
+  }
+
   @Override
   public int getInt(int rowIndex) {
     return getInt(rowIndex, 0);

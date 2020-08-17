@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby.utils;
 
+import org.apache.pinot.spi.utils.ByteArray;
+
+
 /**
  * Abstract base class for {@link ValueToIdMap} interface.
  */
@@ -48,6 +51,11 @@ public abstract class BaseValueToIdMap implements ValueToIdMap {
   }
 
   @Override
+  public int put(ByteArray value) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public int getInt(int id) {
     throw new UnsupportedOperationException();
   }
@@ -69,6 +77,11 @@ public abstract class BaseValueToIdMap implements ValueToIdMap {
 
   @Override
   public String getString(int id) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public ByteArray getBytes(int id) {
     throw new UnsupportedOperationException();
   }
 }

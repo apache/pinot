@@ -35,10 +35,12 @@ public class Constants {
   public static final String INSTANCE_TAG = "Instance";
   public static final String SCHEMA_TAG = "Schema";
   public static final String TENANT_TAG = "Tenant";
+  public static final String BROKER_TAG = "Broker";
   public static final String SEGMENT_TAG = "Segment";
   public static final String TASK_TAG = "Task";
   public static final String LEAD_CONTROLLER_TAG = "Leader";
   public static final String TABLE_NAME = "tableName";
+  public static final String ZOOKEEPER = "Zookeeper";
 
   public static TableType validateTableType(String tableTypeStr) {
     if (tableTypeStr == null || tableTypeStr.isEmpty()) {

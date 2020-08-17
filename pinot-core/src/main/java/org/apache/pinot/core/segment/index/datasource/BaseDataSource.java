@@ -34,18 +34,21 @@ public abstract class BaseDataSource implements DataSource {
   private final Dictionary _dictionary;
   private final InvertedIndexReader<?> _invertedIndex;
   private final InvertedIndexReader<?> _rangeIndex;
+  private final InvertedIndexReader<?> _textIndex;
   private final BloomFilterReader _bloomFilter;
   private final NullValueVectorReader _nullValueVector;
 
   public BaseDataSource(DataSourceMetadata dataSourceMetadata, ForwardIndexReader<?> forwardIndex,
       @Nullable Dictionary dictionary, @Nullable InvertedIndexReader<?> invertedIndex,
-      @Nullable InvertedIndexReader<?> rangeIndex, @Nullable BloomFilterReader bloomFilter,
+      @Nullable InvertedIndexReader<?> rangeIndex, @Nullable InvertedIndexReader<?> textIndex,
+      @Nullable BloomFilterReader bloomFilter,
       @Nullable NullValueVectorReader nullValueVector) {
     _dataSourceMetadata = dataSourceMetadata;
     _forwardIndex = forwardIndex;
     _dictionary = dictionary;
     _invertedIndex = invertedIndex;
     _rangeIndex = rangeIndex;
+    _textIndex = textIndex;
     _bloomFilter = bloomFilter;
     _nullValueVector = nullValueVector;
   }
@@ -76,6 +79,12 @@ public abstract class BaseDataSource implements DataSource {
   @Override
   public InvertedIndexReader<?> getRangeIndex() {
     return _rangeIndex;
+  }
+
+  @Nullable
+  @Override
+  public InvertedIndexReader<?> getTextIndex() {
+    return _textIndex;
   }
 
   @Nullable

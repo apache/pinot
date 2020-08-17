@@ -146,6 +146,6 @@ public class GitHubEventsQuickstart {
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q5)));
     printStatus(Color.GREEN, "***************************************************");
 
-    printStatus(Color.GREEN, "You can always go to http://localhost:9000/query/ to play around in the query console");
+    printStatus(Color.GREEN, "You can always go to http://localhost:9000 to play around in the query console");
   }
 }

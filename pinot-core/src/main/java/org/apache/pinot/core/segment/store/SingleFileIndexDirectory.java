@@ -120,7 +120,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     File[] textIndexFiles = segmentDirectory.listFiles(new FilenameFilter() {
       @Override
       public boolean accept(File dir, String name) {
-        return name.endsWith(suffix) && name.startsWith(column);
+        return name.equals(column + suffix);
       }
     });
     if (textIndexFiles.length > 0) {
@@ -199,7 +199,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     File mapFile = new File(segmentDirectory, INDEX_MAP_FILE);
 
     PropertiesConfiguration mapConfig = CommonsConfigurationUtils.fromFile(mapFile);
-    
+
     for (String key: CommonsConfigurationUtils.getKeys(mapConfig)) {
       // column names can have '.' in it hence scan from backwards
       // parsing names like "column.name.dictionary.startOffset"

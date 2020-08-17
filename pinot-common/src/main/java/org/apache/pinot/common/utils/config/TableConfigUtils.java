@@ -26,7 +26,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.helix.ZNRecord;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.IngestionConfig;
@@ -37,8 +36,8 @@ import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableCustomConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TenantConfig;
+import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
@@ -132,9 +131,16 @@ public class TableConfigUtils {
       ingestionConfig = JsonUtils.stringToObject(ingestionConfigString, IngestionConfig.class);
     }
 
+    List<TierConfig> tierConfigList = null;
+    String tierConfigListString = simpleFields.get(TableConfig.TIER_CONFIGS_LIST_KEY);
+    if (tierConfigListString != null) {
+      tierConfigList = JsonUtils.stringToObject(tierConfigListString, new TypeReference<List<TierConfig>>() {
+      });
+    }
+
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
         quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList, upsertConfig,
-        ingestionConfig);
+        ingestionConfig, tierConfigList);
   }
 
   public static ZNRecord toZNRecord(TableConfig tableConfig)
@@ -184,55 +190,13 @@ public class TableConfigUtils {
     if (ingestionConfig != null) {
       simpleFields.put(TableConfig.INGESTION_CONFIG_KEY, JsonUtils.objectToString(ingestionConfig));
     }
+    List<TierConfig> tierConfigList = tableConfig.getTierConfigsList();
+    if (tierConfigList != null) {
+      simpleFields.put(TableConfig.TIER_CONFIGS_LIST_KEY, JsonUtils.objectToString(tierConfigList));
+    }
 
     ZNRecord znRecord = new ZNRecord(tableConfig.getTableName());
     znRecord.setSimpleFields(simpleFields);
     return znRecord;
-  }
-
-  /**
-   * Validates the table config with the following rules:
-   * <ul>
-   *   <li>Text index column must be raw</li>
-   *   <li>peerSegmentDownloadScheme in ValidationConfig must be http or https</li>
-   * </ul>
-   */
-  public static void validate(TableConfig tableConfig) {
-    validateFieldConfigList(tableConfig);
-    validateValidationConfig(tableConfig);
-  }
-
-  private static void validateFieldConfigList(TableConfig tableConfig) {
-    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
-    if (fieldConfigList != null) {
-      List<String> noDictionaryColumns = tableConfig.getIndexingConfig().getNoDictionaryColumns();
-      for (FieldConfig fieldConfig : fieldConfigList) {
-        if (fieldConfig.getIndexType() == FieldConfig.IndexType.TEXT) {
-          // For Text index column, it must be raw (no-dictionary)
-          // NOTE: Check both encodingType and noDictionaryColumns before migrating indexing configs into field configs
-          String column = fieldConfig.getName();
-          if (fieldConfig.getEncodingType() != FieldConfig.EncodingType.RAW || noDictionaryColumns == null
-              || !noDictionaryColumns.contains(column)) {
-            throw new IllegalStateException(
-                "Text index column: " + column + " must be raw (no-dictionary) in both FieldConfig and IndexingConfig");
-          }
-        }
-      }
-    }
-  }
-
-  private static void validateValidationConfig(TableConfig tableConfig) {
-    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-    if (validationConfig != null) {
-      if (tableConfig.getTableType() == TableType.REALTIME && validationConfig.getTimeColumnName() == null) {
-        throw new IllegalStateException("Must provide time column in real-time table config");
-      }
-      String peerSegmentDownloadScheme = validationConfig.getPeerSegmentDownloadScheme();
-      if (peerSegmentDownloadScheme != null) {
-        if (!CommonConstants.HTTP_PROTOCOL.equalsIgnoreCase(peerSegmentDownloadScheme) && !CommonConstants.HTTPS_PROTOCOL.equalsIgnoreCase(peerSegmentDownloadScheme)) {
-          throw new IllegalStateException("Invalid value '" + peerSegmentDownloadScheme + "' for peerSegmentDownloadScheme. Must be one of http nor https" );
-        }
-      }
-    }
   }
 }

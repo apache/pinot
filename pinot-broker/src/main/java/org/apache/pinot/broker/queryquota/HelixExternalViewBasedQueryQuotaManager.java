@@ -25,6 +25,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.I0Itec.zkclient.exception.ZkNoNodeException;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixConstants;
 import org.apache.helix.HelixManager;
@@ -57,14 +58,17 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   private static final int TIME_RANGE_IN_SECOND = 1;
 
   private final BrokerMetrics _brokerMetrics;
+  private final String _instanceId;
   private final AtomicInteger _lastKnownBrokerResourceVersion = new AtomicInteger(-1);
   private final Map<String, QueryQuotaEntity> _rateLimiterMap = new ConcurrentHashMap<>();
 
   private HelixManager _helixManager;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
+  private volatile boolean _queryRateLimitDisabled;
 
-  public HelixExternalViewBasedQueryQuotaManager(BrokerMetrics brokerMetrics) {
+  public HelixExternalViewBasedQueryQuotaManager(BrokerMetrics brokerMetrics, String instanceId) {
     _brokerMetrics = brokerMetrics;
+    _instanceId = instanceId;
   }
 
   @Override
@@ -72,16 +76,22 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     Preconditions.checkState(_helixManager == null, "HelixExternalViewBasedQueryQuotaManager is already initialized");
     _helixManager = helixManager;
     _propertyStore = _helixManager.getHelixPropertyStore();
+    getQueryQuotaEnabledFlagFromInstanceConfig();
   }
 
   @Override
   public void processClusterChange(HelixConstants.ChangeType changeType) {
     Preconditions
-        .checkState(changeType == HelixConstants.ChangeType.EXTERNAL_VIEW, "Illegal change type: " + changeType);
-    ExternalView brokerResourceEV = HelixHelper
-        .getExternalViewForResource(_helixManager.getClusterManagmentTool(), _helixManager.getClusterName(),
-            CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
-    processQueryQuotaChange(brokerResourceEV);
+        .checkState(changeType == HelixConstants.ChangeType.EXTERNAL_VIEW
+            || changeType == HelixConstants.ChangeType.INSTANCE_CONFIG, "Illegal change type: " + changeType);
+    if (changeType == HelixConstants.ChangeType.EXTERNAL_VIEW) {
+      ExternalView brokerResourceEV = HelixHelper
+          .getExternalViewForResource(_helixManager.getClusterManagmentTool(), _helixManager.getClusterName(),
+              CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+      processQueryRateLimitingExternalViewChange(brokerResourceEV);
+    } else {
+      processQueryRateLimitingInstanceConfigChange();
+    }
   }
 
   public void initOrUpdateTableQueryQuota(String tableNameWithType) {
@@ -192,6 +202,9 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     LOGGER.info(
         "Rate limiter for table: {} has been initialized. Overall rate: {}. Per-broker rate: {}. Number of online broker instances: {}. Table config stat version: {}",
         tableNameWithType, overallRate, perBrokerRate, onlineCount, stat.getVersion());
+    if (isQueryRateLimitDisabled()) {
+      LOGGER.info("Query rate limiting is currently disabled for this broker. So it won't take effect immediately.");
+    }
   }
 
   /**
@@ -202,6 +215,10 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
    */
   @Override
   public boolean acquire(String tableName) {
+    // Return true if query quota is disabled in the current broker.
+    if (isQueryRateLimitDisabled()) {
+      return true;
+    }
     LOGGER.debug("Trying to acquire token for table: {}", tableName);
     String offlineTableName = null;
     String realtimeTableName = null;
@@ -274,7 +291,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   /**
    * Process query quota change when number of online brokers has changed.
    */
-  public void processQueryQuotaChange(ExternalView currentBrokerResource) {
+  public void processQueryRateLimitingExternalViewChange(ExternalView currentBrokerResource) {
     LOGGER.info("Start processing qps quota change.");
     long startTime = System.currentTimeMillis();
 
@@ -352,11 +369,40 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
         numRebuilt++;
       }
     }
+    if (isQueryRateLimitDisabled()) {
+      LOGGER.info("Query rate limiting is currently disabled for this broker. So it won't take effect immediately.");
+    }
     _lastKnownBrokerResourceVersion.set(currentVersionNumber);
     long endTime = System.currentTimeMillis();
     LOGGER
         .info("Processed query quota change in {}ms, {} out of {} query quota configs rebuilt.", (endTime - startTime),
             numRebuilt, _rateLimiterMap.size());
+  }
+
+  /**
+   * Process query quota state change when instance config gets changed
+   */
+  public void processQueryRateLimitingInstanceConfigChange() {
+    getQueryQuotaEnabledFlagFromInstanceConfig();
+  }
+
+  private void getQueryQuotaEnabledFlagFromInstanceConfig() {
+    try {
+      Map<String, String> instanceConfigsMap =
+          HelixHelper.getInstanceConfigsMapFor(_instanceId, _helixManager.getClusterName(), _helixManager.getClusterManagmentTool());
+      String queryRateLimitDisabled = instanceConfigsMap.getOrDefault(CommonConstants.Helix.QUERY_RATE_LIMIT_DISABLED, "false");
+      _queryRateLimitDisabled = Boolean.parseBoolean(queryRateLimitDisabled);
+      LOGGER.info("Set query rate limiting to: {} for all {} tables in this broker.", _queryRateLimitDisabled ? "DISABLED" : "ENABLED",
+          _rateLimiterMap.size());
+    } catch (ZkNoNodeException e) {
+      // It's a brand new broker. Skip checking instance config.
+      _queryRateLimitDisabled = false;
+    }
+    _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.QUERY_RATE_LIMIT_DISABLED, _queryRateLimitDisabled ? 1L : 0L);
+  }
+
+  public boolean isQueryRateLimitDisabled() {
+    return _queryRateLimitDisabled;
   }
 
   /**

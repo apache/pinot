@@ -212,4 +212,13 @@ export default function(server) {
   server.get('/session/query', () => {
     return {};
   });
+
+  server.post('/rootcause/template/saveDimensionAnalysis', () => {
+    const hardCodedId = 1;
+    return hardCodedId;
+  });
+
+  server.get('/rootcause/template/search', () => {
+    return [];
+  });
 }

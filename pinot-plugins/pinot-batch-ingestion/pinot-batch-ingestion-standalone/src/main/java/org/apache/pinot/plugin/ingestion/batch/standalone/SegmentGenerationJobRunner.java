@@ -172,7 +172,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
               new URI(inputDirURI.getScheme(), inputFileURI.getSchemeSpecificPart(), inputFileURI.getFragment());
         }
         //copy input path to local
-        File localInputDataFile = new File(localInputTempDir, new File(inputFileURI).getName());
+        File localInputDataFile = new File(localInputTempDir, new File(inputFileURI.getPath()).getName());
         inputDirFS.copyToLocalFile(inputFileURI, localInputDataFile);
 
         //create task spec
@@ -194,7 +194,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
         String segmentTarFileName = segmentName + Constants.TAR_GZ_FILE_EXT;
         File localSegmentTarFile = new File(localOutputTempDir, segmentTarFileName);
         LOGGER.info("Tarring segment from: {} to: {}", localSegmentDir, localSegmentTarFile);
-        TarGzCompressionUtils.createTarGzOfDirectory(localSegmentDir.getPath(), localSegmentTarFile.getPath());
+        TarGzCompressionUtils.createTarGzFile(localSegmentDir, localSegmentTarFile);
         long uncompressedSegmentSize = FileUtils.sizeOf(localSegmentDir);
         long compressedSegmentSize = FileUtils.sizeOf(localSegmentTarFile);
         LOGGER.info("Size for segment: {}, uncompressed: {}, compressed: {}", segmentName,

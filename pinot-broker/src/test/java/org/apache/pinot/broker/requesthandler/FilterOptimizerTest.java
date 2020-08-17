@@ -22,6 +22,8 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.core.requesthandler.BrokerRequestOptimizer;
+import org.apache.pinot.core.requesthandler.FlattenNestedPredicatesFilterQueryTreeOptimizer;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.testng.Assert;
 import org.testng.annotations.Test;

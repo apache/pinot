@@ -27,9 +27,17 @@ public class CommonConstants {
   public static final String HTTP_PROTOCOL = "http";
   public static final String HTTPS_PROTOCOL = "https";
 
+  public static class Table {
+    public static final String PUSH_FREQUENCY_HOURLY = "hourly";
+    public static final String PUSH_FREQUENCY_DAILY = "daily";
+    public static final String PUSH_FREQUENCY_WEEKLY = "weekly";
+    public static final String PUSH_FREQUENCY_MONTHLY = "monthly";
+  }
+
   public static class Helix {
     public static final String IS_SHUTDOWN_IN_PROGRESS = "shutdownInProgress";
     public static final String QUERIES_DISABLED = "queriesDisabled";
+    public static final String QUERY_RATE_LIMIT_DISABLED = "queryRateLimitDisabled";
 
     public static final String INSTANCE_CONNECTED_METRIC_NAME = "helix.connected";
 
@@ -111,6 +119,9 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_FLAPPING_TIME_WINDOW_MS = "pinot.broker.flapping.timeWindowMs";
     public static final String CONFIG_OF_SERVER_FLAPPING_TIME_WINDOW_MS = "pinot.server.flapping.timeWindowMs";
     public static final String CONFIG_OF_MINION_FLAPPING_TIME_WINDOW_MS = "pinot.minion.flapping.timeWindowMs";
+    public static final String CONFIG_OF_HELIX_INSTANCE_MAX_STATE_TRANSITIONS =
+        "pinot.helix.instance.state.maxStateTransitions";
+    public static final String DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS = "100000";
     public static final String DEFAULT_FLAPPING_TIME_WINDOW_MS = "1";
 
     public static final String PINOT_SERVICE_ROLE = "pinot.service.role";
@@ -244,7 +255,7 @@ public class CommonConstants {
         "pinot.server.shutdown.resourceCheckIntervalMs";
     public static final long DEFAULT_SHUTDOWN_RESOURCE_CHECK_INTERVAL_MS = 10_000L;
 
-    public static final String DEFAULT_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE = "TIME";
+    public static final String DEFAULT_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE = "ALL";
 
     public static final String PINOT_SERVER_METRICS_PREFIX = "pinot.server.metrics.prefix";
 
@@ -339,6 +350,7 @@ public class CommonConstants {
     public static final String FLUSH_THRESHOLD_SIZE = "segment.flush.threshold.size";
     public static final String FLUSH_THRESHOLD_TIME = "segment.flush.threshold.time";
     public static final String PARTITION_METADATA = "segment.partition.metadata";
+    public static final String PEER_SEGMENT_DOWNLOAD_SCHEME = "peer://";
     /**
      * This field is used for parallel push protection to lock the segment globally.
      * We put the segment upload start timestamp so that if the previous push failed without unlock the segment, the

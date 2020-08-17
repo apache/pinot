@@ -46,7 +46,8 @@ public class AggregationPlanNode implements PlanNode {
 
   public AggregationPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
     _indexSegment = indexSegment;
-    _aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(queryContext);
+    _aggregationFunctions = queryContext.getAggregationFunctions();
+    assert _aggregationFunctions != null;
 
     List<StarTreeV2> starTrees = indexSegment.getStarTrees();
     if (starTrees != null) {
@@ -83,7 +84,8 @@ public class AggregationPlanNode implements PlanNode {
 
     Set<ExpressionContext> expressionsToTransform =
         AggregationFunctionUtils.collectExpressionsToTransform(_aggregationFunctions, null);
-    _transformPlanNode = new TransformPlanNode(_indexSegment, queryContext, expressionsToTransform);
+    _transformPlanNode =
+        new TransformPlanNode(_indexSegment, queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL);
     _starTreeTransformPlanNode = null;
   }
 

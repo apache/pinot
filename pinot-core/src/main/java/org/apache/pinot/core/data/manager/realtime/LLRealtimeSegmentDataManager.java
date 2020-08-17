@@ -36,6 +36,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
@@ -58,6 +59,7 @@ import org.apache.pinot.core.realtime.converter.RealtimeSegmentConverter;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
 import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
@@ -143,22 +145,20 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   @VisibleForTesting
   public class SegmentBuildDescriptor {
-    final String _segmentTarFilePath;
+    final File _segmentTarFile;
     final Map<String, File> _metadataFileMap;
     final StreamPartitionMsgOffset _offset;
     final long _waitTimeMillis;
     final long _buildTimeMillis;
-    final String _segmentDirPath;
     final long _segmentSizeBytes;
 
-    public SegmentBuildDescriptor(String segmentTarFilePath, Map<String, File> metadataFileMap, StreamPartitionMsgOffset offset,
-        String segmentDirPath, long buildTimeMillis, long waitTimeMillis, long segmentSizeBytes) {
-      _segmentTarFilePath = segmentTarFilePath;
+    public SegmentBuildDescriptor(@Nullable File segmentTarFile, @Nullable Map<String, File> metadataFileMap,
+        StreamPartitionMsgOffset offset, long buildTimeMillis, long waitTimeMillis, long segmentSizeBytes) {
+      _segmentTarFile = segmentTarFile;
       _metadataFileMap = metadataFileMap;
       _offset = _streamPartitionMsgOffsetFactory.create(offset);
       _buildTimeMillis = buildTimeMillis;
       _waitTimeMillis = waitTimeMillis;
-      _segmentDirPath = segmentDirPath;
       _segmentSizeBytes = segmentSizeBytes;
     }
 
@@ -174,8 +174,14 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       return _waitTimeMillis;
     }
 
-    public String getSegmentTarFilePath() {
-      return _segmentTarFilePath;
+    @Nullable
+    public File getSegmentTarFile() {
+      return _segmentTarFile;
+    }
+
+    @Nullable
+    public Map<String, File> getMetadataFiles() {
+      return _metadataFileMap;
     }
 
     public long getSegmentSizeBytes() {
@@ -183,15 +189,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
 
     public void deleteSegmentFile() {
-      // If segment build fails with an exception then we will not be able to create a segment file and
-      // the file name will be null.
-      if (_segmentTarFilePath != null) {
-        FileUtils.deleteQuietly(new File(_segmentTarFilePath));
+      if (_segmentTarFile != null) {
+        FileUtils.deleteQuietly(_segmentTarFile);
       }
-    }
-
-    public Map<String, File> getMetadataFiles() {
-      return _metadataFileMap;
     }
   }
 
@@ -667,18 +667,14 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
-  private File makeSegmentDirPath() {
-    return new File(_resourceDataDir, _segmentZKMetadata.getSegmentName());
-  }
-
   // Side effect: Modifies _segmentBuildDescriptor if we do not have a valid built segment file and we
   // built the segment successfully.
   protected void buildSegmentForCommit(long buildTimeLeaseMs) {
     try {
       if (_segmentBuildDescriptor != null && _segmentBuildDescriptor.getOffset().compareTo(_currentOffset) == 0) {
         // Double-check that we have the file, just in case.
-        String segTarFile = _segmentBuildDescriptor.getSegmentTarFilePath();
-        if (new File(segTarFile).exists()) {
+        File segmentTarFile = _segmentBuildDescriptor.getSegmentTarFile();
+        if (segmentTarFile != null && segmentTarFile.exists()) {
           return;
         }
       }
@@ -753,53 +749,62 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       final long waitTimeMillis = lockAquireTimeMillis - startTimeMillis;
       segmentLogger
           .info("Successfully built segment in {} ms, after lockWaitTime {} ms", buildTimeMillis, waitTimeMillis);
-      File destDir = makeSegmentDirPath();
-      FileUtils.deleteQuietly(destDir);
-      try {
-        FileUtils.moveDirectory(tempSegmentFolder.listFiles()[0], destDir);
-        if (forCommit) {
-          TarGzCompressionUtils.createTarGzOfDirectory(destDir.getAbsolutePath());
-        }
-      } catch (IOException e) {
-        segmentLogger.error("Exception during move/tar segment", e);
-        FileUtils.deleteQuietly(tempSegmentFolder);
-        return null;
-      }
-      final long segmentSizeBytes = FileUtils.sizeOfDirectory(destDir);
-      FileUtils.deleteQuietly(tempSegmentFolder);
 
+      File dataDir = new File(_resourceDataDir);
+      File indexDir = new File(dataDir, _segmentNameStr);
+      FileUtils.deleteQuietly(indexDir);
+
+      File[] tempFiles = tempSegmentFolder.listFiles();
+      assert tempFiles != null;
+      File tempIndexDir = tempFiles[0];
+      try {
+        FileUtils.moveDirectory(tempIndexDir, indexDir);
+      } catch (IOException e) {
+        segmentLogger.error("Caught exception while moving index directory from: {} to: {}", tempIndexDir, indexDir, e);
+        return null;
+      } finally {
+        FileUtils.deleteQuietly(tempSegmentFolder);
+      }
+
+      long segmentSizeBytes = FileUtils.sizeOfDirectory(indexDir);
       _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LAST_REALTIME_SEGMENT_CREATION_DURATION_SECONDS,
           TimeUnit.MILLISECONDS.toSeconds(buildTimeMillis));
       _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LAST_REALTIME_SEGMENT_CREATION_WAIT_TIME_SECONDS,
           TimeUnit.MILLISECONDS.toSeconds(waitTimeMillis));
 
       if (forCommit) {
-        File[] segmentfiles = destDir.listFiles();
-        if (segmentfiles == null || segmentfiles.length == 0) {
-          segmentLogger.error("The index dir is empty: {}", destDir);
-          return null;
-        }
-        // segmentfiles[0] is the sub directory with version name (e.g., V3).
-        File metadataFileName = new File(segmentfiles[0], V1Constants.MetadataKeys.METADATA_FILE_NAME);
-        if (!metadataFileName.exists()) {
+        File segmentTarFile = new File(dataDir, _segmentNameStr + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+        try {
+          TarGzCompressionUtils.createTarGzFile(indexDir, segmentTarFile);
+        } catch (IOException e) {
           segmentLogger
-              .error("File does not exist in {} for {}.", destDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
-          return null;
-        }
-        File creationMetaFile = new File(segmentfiles[0], V1Constants.SEGMENT_CREATION_META);
-        if (!creationMetaFile.exists()) {
-          segmentLogger.error("File does not exist in {} for {}.", destDir, V1Constants.SEGMENT_CREATION_META);
+              .error("Caught exception while taring index directory from: {} to: {}", indexDir, segmentTarFile, e);
           return null;
         }
 
+        File metadataFile = SegmentDirectoryPaths.findMetadataFile(indexDir);
+        if (metadataFile == null) {
+          segmentLogger
+              .error("Failed to find file: {} under index directory: {}", V1Constants.MetadataKeys.METADATA_FILE_NAME,
+                  indexDir);
+          return null;
+        }
+        File creationMetaFile = SegmentDirectoryPaths.findCreationMetaFile(indexDir);
+        if (creationMetaFile == null) {
+          segmentLogger
+              .error("Failed to find file: {} under index directory: {}", V1Constants.SEGMENT_CREATION_META, indexDir);
+          return null;
+        }
         Map<String, File> metadataFiles = new HashMap<>();
-        metadataFiles.put(V1Constants.MetadataKeys.METADATA_FILE_NAME, metadataFileName);
+        metadataFiles.put(V1Constants.MetadataKeys.METADATA_FILE_NAME, metadataFile);
         metadataFiles.put(V1Constants.SEGMENT_CREATION_META, creationMetaFile);
-        return new SegmentBuildDescriptor(destDir.getAbsolutePath() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION,
-            metadataFiles, _currentOffset, null, buildTimeMillis, waitTimeMillis, segmentSizeBytes);
+
+        return new SegmentBuildDescriptor(segmentTarFile, metadataFiles, _currentOffset, buildTimeMillis,
+            waitTimeMillis, segmentSizeBytes);
+      } else {
+        return new SegmentBuildDescriptor(null, null, _currentOffset, buildTimeMillis, waitTimeMillis,
+            segmentSizeBytes);
       }
-      return new SegmentBuildDescriptor(null, null, _currentOffset, destDir.getAbsolutePath(), buildTimeMillis,
-          waitTimeMillis, segmentSizeBytes);
     } catch (InterruptedException e) {
       segmentLogger.error("Interrupted while waiting for semaphore");
       return null;
@@ -813,10 +818,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   protected boolean commitSegment(String controllerVipUrl, boolean isSplitCommit) {
-    final String segTarFileName = _segmentBuildDescriptor.getSegmentTarFilePath();
-    File segTarFile = new File(segTarFileName);
-    if (!segTarFile.exists()) {
-      throw new RuntimeException("Segment file does not exist:" + segTarFileName);
+    File segmentTarFile = _segmentBuildDescriptor.getSegmentTarFile();
+    if (segmentTarFile == null || !segmentTarFile.exists()) {
+      throw new RuntimeException("Segment file does not exist: " + segmentTarFile);
     }
     SegmentCompletionProtocol.Response commitResponse = commit(controllerVipUrl, isSplitCommit);
 
@@ -842,24 +846,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
 
     SegmentCommitter segmentCommitter;
-
-    if (isSplitCommit) {
-      // TODO: make segment uploader used in the segment committer configurable.
-      SegmentUploader segmentUploader;
-      try {
-        segmentUploader =
-            new Server2ControllerSegmentUploader(segmentLogger, _protocolHandler.getFileUploadDownloadClient(),
-                _protocolHandler.getSegmentCommitUploadURL(params, controllerVipUrl), _segmentNameStr,
-                ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), _serverMetrics);
-      } catch (URISyntaxException e) {
-        segmentLogger.error("Segment commit upload url error: ", e);
-        return SegmentCompletionProtocol.RESP_NOT_SENT;
-      }
-      segmentCommitter = _segmentCommitterFactory.createSplitSegmentCommitter(params, segmentUploader);
-    } else {
-      segmentCommitter = _segmentCommitterFactory.createDefaultSegmentCommitter(params);
+    try {
+      segmentCommitter = _segmentCommitterFactory.createSegmentCommitter(isSplitCommit, params, controllerVipUrl);
+    } catch (URISyntaxException e) {
+      segmentLogger.error("Failed to create a segment committer: ", e);
+      return SegmentCompletionProtocol.RESP_NOT_SENT;
     }
-
     return segmentCommitter.commit(_segmentBuildDescriptor);
   }
 
@@ -1119,7 +1111,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     segmentLogger = LoggerFactory.getLogger(LLRealtimeSegmentDataManager.class.getName() + "_" + _segmentNameStr);
     _tableStreamName = _tableNameWithType + "_" + _streamTopic;
     _memoryManager = getMemoryManager(realtimeTableDataManager.getConsumerDir(), _segmentNameStr,
-        indexLoadingConfig.isRealtimeOffheapAllocation(), indexLoadingConfig.isDirectRealtimeOffheapAllocation(),
+        indexLoadingConfig.isRealtimeOffHeapAllocation(), indexLoadingConfig.isDirectRealtimeOffHeapAllocation(),
         serverMetrics);
 
     List<String> sortedColumns = indexLoadingConfig.getSortedColumns();
@@ -1163,7 +1155,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
     _segmentMaxRowCount = segmentMaxRowCount;
 
-    _isOffHeap = indexLoadingConfig.isRealtimeOffheapAllocation();
+    _isOffHeap = indexLoadingConfig.isRealtimeOffHeapAllocation();
 
     _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
 
@@ -1264,7 +1256,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       _consumeEndTime = now + minConsumeTimeMillis;
     }
 
-    _segmentCommitterFactory = new SegmentCommitterFactory(segmentLogger, _protocolHandler);
+    _segmentCommitterFactory = new SegmentCommitterFactory(segmentLogger, _protocolHandler, tableConfig, indexLoadingConfig, serverMetrics);
 
     segmentLogger
         .info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}", _llcSegmentName,

@@ -41,7 +41,7 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     String query = "SELECT * FROM testTable LIMIT 0";
 
     // Test query without filter
-    EmptySelectionOperator emptySelectionOperator = getOperatorForQuery(query);
+    EmptySelectionOperator emptySelectionOperator = getOperatorForPqlQuery(query);
     IntermediateResultsBlock resultsBlock = emptySelectionOperator.nextBlock();
     ExecutionStatistics executionStatistics = emptySelectionOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 0L);
@@ -61,7 +61,7 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertTrue(resultsBlock.getSelectionResult().isEmpty());
 
     // Test query with filter
-    emptySelectionOperator = getOperatorForQueryWithFilter(query);
+    emptySelectionOperator = getOperatorForPqlQueryWithFilter(query);
     resultsBlock = emptySelectionOperator.nextBlock();
     executionStatistics = emptySelectionOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 0L);
@@ -85,7 +85,7 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     String query = "SELECT * FROM testTable";
 
     // Test query without filter
-    BaseOperator<IntermediateResultsBlock> selectionOnlyOperator = getOperatorForQuery(query);
+    BaseOperator<IntermediateResultsBlock> selectionOnlyOperator = getOperatorForPqlQuery(query);
     IntermediateResultsBlock resultsBlock = selectionOnlyOperator.nextBlock();
     ExecutionStatistics executionStatistics = selectionOnlyOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 10L);
@@ -110,7 +110,7 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(firstRow[columnIndexMap.get("column6")], new int[]{2147483647});
 
     // Test query with filter
-    selectionOnlyOperator = getOperatorForQueryWithFilter(query);
+    selectionOnlyOperator = getOperatorForPqlQueryWithFilter(query);
     resultsBlock = selectionOnlyOperator.nextBlock();
     executionStatistics = selectionOnlyOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 10L);
@@ -140,7 +140,7 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     String query = "SELECT" + SELECTION + " FROM testTable";
 
     // Test query without filter
-    BaseOperator<IntermediateResultsBlock> selectionOnlyOperator = getOperatorForQuery(query);
+    BaseOperator<IntermediateResultsBlock> selectionOnlyOperator = getOperatorForPqlQuery(query);
     IntermediateResultsBlock resultsBlock = selectionOnlyOperator.nextBlock();
     ExecutionStatistics executionStatistics = selectionOnlyOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 10L);
@@ -165,7 +165,7 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(firstRow[columnIndexMap.get("column6")], new int[]{2147483647});
 
     // Test query with filter
-    selectionOnlyOperator = getOperatorForQueryWithFilter(query);
+    selectionOnlyOperator = getOperatorForPqlQueryWithFilter(query);
     resultsBlock = selectionOnlyOperator.nextBlock();
     executionStatistics = selectionOnlyOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 10L);
@@ -195,12 +195,13 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     String query = "SELECT" + SELECTION + " FROM testTable" + ORDER_BY;
 
     // Test query without filter
-    BaseOperator<IntermediateResultsBlock> selectionOrderByOperator = getOperatorForQuery(query);
+    BaseOperator<IntermediateResultsBlock> selectionOrderByOperator = getOperatorForPqlQuery(query);
     IntermediateResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
     ExecutionStatistics executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 100000L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 400000L);
+    // 100000 * (2 order-by columns + 1 docId column) + 10 * (2 non-order-by columns)
+    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 300020L);
     Assert.assertEquals(executionStatistics.getNumTotalDocs(), 100000L);
     DataSchema selectionDataSchema = resultsBlock.getDataSchema();
     Map<String, Integer> columnIndexMap = computeColumnNameToIndexMap(selectionDataSchema);
@@ -220,12 +221,13 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(lastRow[columnIndexMap.get("column6")], new int[]{1252});
 
     // Test query with filter
-    selectionOrderByOperator = getOperatorForQueryWithFilter(query);
+    selectionOrderByOperator = getOperatorForPqlQueryWithFilter(query);
     resultsBlock = selectionOrderByOperator.nextBlock();
     executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 15620L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 275416L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 62480L);
+    // 15620 * (2 order-by columns + 1 docId column) + 10 * (2 non-order-by columns)
+    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 46880L);
     Assert.assertEquals(executionStatistics.getNumTotalDocs(), 100000L);
     selectionDataSchema = resultsBlock.getDataSchema();
     columnIndexMap = computeColumnNameToIndexMap(selectionDataSchema);

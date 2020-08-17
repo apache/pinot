@@ -40,6 +40,16 @@ public interface ThirdEyeDataSource {
 
   /**
    * Returns max dateTime in millis for the dataset
+   * @param dataset name of the dataset
+   * @return the time corresponding to the earliest available data point.
+   * @throws Exception
+   */
+  default long getMinDataTime(String dataset) throws Exception {
+    return -1L;
+  }
+
+  /**
+   * Returns max dateTime in millis for the dataset
    * @param dataset
    * @return
    * @throws Exception

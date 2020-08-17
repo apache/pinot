@@ -18,6 +18,22 @@
     {{mode}}
   {{/power-select}}
 </div>
+
+{{!-- Custom Baseline Modal --}}
+{{#te-modal
+  isMicroModal=true
+  cancelButtonText="Cancel"
+  submitButtonText="Submit"
+  submitAction=(action "onBaseline")
+  cancelAction=(action "onCancel")
+  isShowingModal=showBaselineModal
+  headerText="Custom Baseline"
+}}
+  {{rootcause-custom-baseline
+    bubbleBaseline=(action "updateCustomBaseline")
+  }}
+{{/te-modal}}
+
 <div class="col-xs-9">
   <!-- Investigation range slider -->
   <div class="date-slider date-slider--offset">

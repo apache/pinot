@@ -25,13 +25,26 @@ import java.lang.annotation.Target;
 
 
 /**
- * Annotation Class for Scalar Functions
- * Methods annotated using the interface are registered in the FunctionsRegistry
- * and can be used as UDFs during Querying
+ * Annotation Class for Scalar Functions.
+ *
+ * Methods annotated using the interface are registered in the FunctionsRegistry, and can be used for transform and
+ * filtering during record ingestion, and transform and post-aggregation during query execution.
+ *
+ * NOTE:
+ *   1. The annotated method must be under the package of name 'org.apache.pinot.*.function.*' to be auto-registered.
+ *   2. The following parameter types are supported for auto type conversion:
+ *     - int/Integer
+ *     - long/Long
+ *     - float/Float
+ *     - double/Double
+ *     - String
+ *     - byte[]
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
 public @interface ScalarFunction {
-    boolean enabled() default true;
-    String name() default "";
+
+  boolean enabled() default true;
+
+  String name() default "";
 }

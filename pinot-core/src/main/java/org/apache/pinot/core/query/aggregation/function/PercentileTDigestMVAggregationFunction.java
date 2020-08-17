@@ -49,11 +49,6 @@ public class PercentileTDigestMVAggregationFunction extends PercentileTDigestAgg
   }
 
   @Override
-  public void accept(AggregationFunctionVisitorBase visitor) {
-    visitor.visit(this);
-  }
-
-  @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     double[][] valuesArray = blockValSetMap.get(_expression).getDoubleValuesMV();

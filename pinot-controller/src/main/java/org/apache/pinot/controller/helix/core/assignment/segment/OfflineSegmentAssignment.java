@@ -27,12 +27,15 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
+import javax.annotation.Nullable;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
@@ -161,19 +164,77 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
 
   @Override
   public Map<String, Map<String, String>> rebalanceTable(Map<String, Map<String, String>> currentAssignment,
-      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, Configuration config) {
-    InstancePartitions instancePartitions = instancePartitionsMap.get(InstancePartitionsType.OFFLINE);
-    Preconditions.checkState(instancePartitions != null, "Failed to find OFFLINE instance partitions for table: %s",
-        _offlineTableName);
+      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap,
+      @Nullable List<Tier> sortedTiers, @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap,
+      Configuration config) {
+    InstancePartitions offlineInstancePartitions = instancePartitionsMap.get(InstancePartitionsType.OFFLINE);
+    Preconditions
+        .checkState(offlineInstancePartitions != null, "Failed to find OFFLINE instance partitions for table: %s",
+            _offlineTableName);
     boolean bootstrap =
         config.getBoolean(RebalanceConfigConstants.BOOTSTRAP, RebalanceConfigConstants.DEFAULT_BOOTSTRAP);
-    LOGGER.info("Rebalancing table: {} with instance partitions: {}, bootstrap: {}", _offlineTableName,
-        instancePartitions, bootstrap);
-    checkReplication(instancePartitions);
 
+    Map<String, Map<String, String>> nonTierAssignment = currentAssignment;
+    // Rebalance tiers first
+    List<Map<String, Map<String, String>>> newTierAssignments = null;
+    if (sortedTiers != null) {
+      Preconditions.checkState(tierInstancePartitionsMap != null, "Tier to instancePartitions map is null");
+      LOGGER.info("Rebalancing tiers: {} for table: {} with bootstrap: {}", tierInstancePartitionsMap.keySet(),
+          _offlineTableName, bootstrap);
+
+      // Get tier to segment assignment map i.e. current assignments split by tiers they are eligible for
+      SegmentAssignmentUtils.TierSegmentAssignment tierSegmentAssignment =
+          new SegmentAssignmentUtils.TierSegmentAssignment(_offlineTableName, sortedTiers, currentAssignment);
+      Map<String, Map<String, Map<String, String>>> tierNameToSegmentAssignmentMap =
+          tierSegmentAssignment.getTierNameToSegmentAssignmentMap();
+
+      // For each tier, calculate new assignment using instancePartitions for that tier
+      newTierAssignments = new ArrayList<>(tierNameToSegmentAssignmentMap.size());
+      for (Map.Entry<String, Map<String, Map<String, String>>> entry : tierNameToSegmentAssignmentMap.entrySet()) {
+        String tierName = entry.getKey();
+        Map<String, Map<String, String>> tierCurrentAssignment = entry.getValue();
+
+        InstancePartitions tierInstancePartitions = tierInstancePartitionsMap.get(tierName);
+        Preconditions
+            .checkNotNull(tierInstancePartitions, "Failed to find instance partitions for tier: %s of table: %s",
+                tierName, _offlineTableName);
+        checkReplication(tierInstancePartitions);
+
+        LOGGER.info("Rebalancing tier: {} for table: {} with bootstrap: {}, instance partitions: {}", tierName,
+            _offlineTableName, bootstrap, tierInstancePartitions);
+        newTierAssignments.add(reassignSegments(tierName, tierCurrentAssignment, tierInstancePartitions, bootstrap));
+      }
+
+      // Rest of the operations should happen only on segments which were not already assigned as part of tiers
+      nonTierAssignment = tierSegmentAssignment.getNonTierSegmentAssignment();
+    }
+
+    LOGGER.info("Rebalancing table: {} with instance partitions: {}, bootstrap: {}", _offlineTableName,
+        offlineInstancePartitions, bootstrap);
+    checkReplication(offlineInstancePartitions);
+    Map<String, Map<String, String>> newAssignment =
+        reassignSegments(InstancePartitionsType.OFFLINE.toString(), nonTierAssignment, offlineInstancePartitions,
+            bootstrap);
+
+    // add tier assignments, if available
+    if (CollectionUtils.isNotEmpty(newTierAssignments)) {
+      newTierAssignments.forEach(newAssignment::putAll);
+    }
+
+    LOGGER.info("Rebalanced table: {}, number of segments to be moved to each instance: {}", _offlineTableName,
+        SegmentAssignmentUtils.getNumSegmentsToBeMovedPerInstance(currentAssignment, newAssignment));
+    return newAssignment;
+  }
+
+  /**
+   * Rebalances segments in the current assignment using the instancePartitions and returns new assignment
+   */
+  private Map<String, Map<String, String>> reassignSegments(String instancePartitionType,
+      Map<String, Map<String, String>> currentAssignment, InstancePartitions instancePartitions, boolean bootstrap) {
     Map<String, Map<String, String>> newAssignment;
     if (bootstrap) {
-      LOGGER.info("Bootstrapping segment assignment for table: {}", _offlineTableName);
+      LOGGER.info("Bootstrapping segment assignment for {} segments of table: {}", instancePartitionType,
+          _offlineTableName);
 
       // When bootstrap is enabled, start with an empty assignment and reassign all segments
       newAssignment = new TreeMap<>();
@@ -209,9 +270,6 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
         }
       }
     }
-
-    LOGGER.info("Rebalanced table: {}, number of segments to be moved to each instance: {}", _offlineTableName,
-        SegmentAssignmentUtils.getNumSegmentsToBeMovedPerInstance(currentAssignment, newAssignment));
     return newAssignment;
   }
 

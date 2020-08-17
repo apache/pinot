@@ -22,6 +22,7 @@ package org.apache.pinot.thirdeye.datasource.csv;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.Multimap;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.constant.MetricAggFunction;
@@ -75,6 +76,11 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource {
   TranslateDelegator translator;
 
   /**
+   * DataSource name
+   */
+  String name;
+
+  /**
    * Factory method of CSVThirdEyeDataSource. Construct a CSVThirdEyeDataSource using data frames.
    *
    * @param dataSets the data sets
@@ -114,6 +120,7 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource {
   CSVThirdEyeDataSource(Map<String, DataFrame> dataSets, Map<Long, String> metricNameMap) {
     this.dataSets = dataSets;
     this.translator = new StaticTranslator(metricNameMap);
+    this.name = CSVThirdEyeDataSource.class.getSimpleName();
   }
 
   /**
@@ -132,6 +139,7 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource {
 
     this.dataSets = dataframes;
     this.translator = new DAOTranslator();
+    this.name = MapUtils.getString(properties, "name", CSVThirdEyeDataSource.class.getSimpleName());
   }
 
   /**
@@ -140,7 +148,7 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource {
    */
   @Override
   public String getName() {
-    return CSVThirdEyeDataSource.class.getSimpleName();
+    return this.name;
   }
 
   /**

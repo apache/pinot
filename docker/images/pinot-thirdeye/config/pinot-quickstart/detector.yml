@@ -1,8 +1,8 @@
 logging:
-  level: INFO
-  loggers:
-    org.hibernate.engine.internal: WARN
+  type: external
 server:
+  requestLog:
+    type: external
   type: default
   rootPath: '/api/*'
   applicationContextPath: /

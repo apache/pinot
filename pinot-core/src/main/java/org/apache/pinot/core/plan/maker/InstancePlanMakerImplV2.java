@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
+import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.plan.AggregationGroupByOrderByPlanNode;
 import org.apache.pinot.core.plan.AggregationGroupByPlanNode;
@@ -157,7 +158,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   /**
    * Returns {@code true} if the given aggregation-only without filter QueryContext can be solved with dictionary,
    * {@code false} otherwise.
-   * <p>Aggregations supported: MIN, MAX, MINMAXRANGE, DISTINCTCOUNT
+   * <p>Aggregations supported: MIN, MAX, MIN_MAX_RANGE, DISTINCT_COUNT, SEGMENT_PARTITIONED_DISTINCT_COUNT
    */
   @VisibleForTesting
   static boolean isFitForDictionaryBasedPlan(QueryContext queryContext, IndexSegment indexSegment) {
@@ -165,7 +166,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     for (ExpressionContext expression : selectExpressions) {
       FunctionContext function = expression.getFunction();
       String functionName = function.getFunctionName();
-      if(!AggregationFunctionUtils.isFitForDictionaryBasedComputation(functionName)) {
+      if (!AggregationFunctionUtils.isFitForDictionaryBasedComputation(functionName)) {
         return false;
       }
 
@@ -175,7 +176,13 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       }
       String column = argument.getIdentifier();
       Dictionary dictionary = indexSegment.getDataSource(column).getDictionary();
-      if (dictionary == null || !dictionary.isSorted()) {
+      if (dictionary == null) {
+        return false;
+      }
+      // TODO: Remove this check because MutableDictionary maintains min/max value
+      // NOTE: DISTINCT_COUNT and SEGMENT_PARTITIONED_DISTINCT_COUNT does not require sorted dictionary
+      if (!dictionary.isSorted() && !functionName.equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNT.name())
+          && !functionName.equalsIgnoreCase(AggregationFunctionType.SEGMENTPARTITIONEDDISTINCTCOUNT.name())) {
         return false;
       }
     }

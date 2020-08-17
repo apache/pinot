@@ -132,7 +132,7 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
     //init all file systems
     List<PinotFSSpec> pinotFSSpecs = _spec.getPinotFSSpecs();
     for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
-      new PinotConfiguration(pinotFSSpec);
+      PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
     }
 
     //Get pinotFS for input
@@ -282,11 +282,11 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
   }
 
   protected void packPluginsToDistributedCache(Job job) {
-    String pluginsRootDir = PluginManager.get().getPluginsRootDir();
-    if (new File(pluginsRootDir).exists()) {
+    File pluginsRootDir = new File(PluginManager.get().getPluginsRootDir());
+    if (pluginsRootDir.exists()) {
       File pluginsTarGzFile = new File(PINOT_PLUGINS_TAR_GZ);
       try {
-        TarGzCompressionUtils.createTarGzOfDirectory(pluginsRootDir, pluginsTarGzFile.getPath());
+        TarGzCompressionUtils.createTarGzFile(pluginsRootDir, pluginsTarGzFile);
       } catch (IOException e) {
         LOGGER.error("Failed to tar plugins directory", e);
         throw new RuntimeException(e);

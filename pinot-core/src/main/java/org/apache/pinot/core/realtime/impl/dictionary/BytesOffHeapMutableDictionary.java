@@ -26,6 +26,7 @@ import java.util.Arrays;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.io.writer.impl.MutableOffHeapByteArrayStore;
 import org.apache.pinot.core.query.request.context.predicate.RangePredicate;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 
@@ -130,6 +131,11 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
 
     Arrays.sort(sortedValues);
     return sortedValues;
+  }
+
+  @Override
+  public DataType getValueType() {
+    return DataType.BYTES;
   }
 
   @Override

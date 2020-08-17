@@ -61,6 +61,13 @@ public interface DataSource {
   InvertedIndexReader<?> getRangeIndex();
 
   /**
+   * Returns the text index for the column if exists, or {@code null} if not.
+   * <p>TODO: Have a separate interface for text index.
+   */
+  @Nullable
+  InvertedIndexReader<?> getTextIndex();
+
+  /**
    * Returns the bloom filter for the column if exists, or {@code null} if not.
    */
   @Nullable

@@ -168,7 +168,7 @@ public class ThirdEyeRequest {
     private String filterClause;
     private final List<String> groupBy;
     private TimeGranularity groupByTimeGranularity;
-    private String dataSource = PinotThirdEyeDataSource.DATA_SOURCE_NAME;
+    private String dataSource;
     private int limit;
 
     public ThirdEyeRequestBuilder() {

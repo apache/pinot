@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.core.operator.docvalsets;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
@@ -50,6 +52,12 @@ public class TransformBlockValSet implements BlockValSet {
   @Override
   public boolean isSingleValue() {
     return _transformFunction.getResultMetadata().isSingleValue();
+  }
+
+  @Nullable
+  @Override
+  public Dictionary getDictionary() {
+    return _transformFunction.getDictionary();
   }
 
   @Override

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.index.readers;
 
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BytesUtils;
 
 
@@ -42,6 +43,11 @@ public class ConstantValueStringDictionary extends BaseImmutableDictionary {
       return -2;
     }
     return 0;
+  }
+
+  @Override
+  public DataType getValueType() {
+    return DataType.STRING;
   }
 
   @Override

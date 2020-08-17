@@ -45,6 +45,14 @@ public interface ResultSet {
   String getColumnName(int columnIndex);
 
   /**
+   * Returns the column type at a given index.
+   *
+   * @param columnIndex The index of the column for which to retrieve the name
+   * @return The data type of the column at the given column index. null if data type is not supported
+   */
+  String getColumnDataType(int columnIndex);
+
+  /**
    * Obtains the integer value for the given row.
    *
    * @param rowIndex The index of the row

@@ -2,7 +2,8 @@
   "tableName": "complexWebsite",
   "segmentsConfig" : {
     "replication" : "1",
-    "schemaName" : "complexWebsite"
+    "schemaName" : "complexWebsite",
+    "timeColumnName": "hoursSinceEpoch"
   },
   "tableIndexConfig" : {
     "invertedIndexColumns" : [],

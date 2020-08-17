@@ -24,7 +24,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.lineage.LineageEntry;
+import org.apache.pinot.common.lineage.LineageEntryState;
+import org.apache.pinot.common.lineage.SegmentLineage;
+import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -40,6 +45,8 @@ import org.apache.pinot.controller.helix.core.retention.strategy.TimeRetentionSt
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.spi.utils.retry.RetryPolicies;
+import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,6 +57,9 @@ import org.slf4j.LoggerFactory;
  */
 public class RetentionManager extends ControllerPeriodicTask<Void> {
   public static final long OLD_LLC_SEGMENTS_RETENTION_IN_MILLIS = TimeUnit.DAYS.toMillis(5L);
+
+  public static final long LINEAGE_ENTRY_CLEANUP_RETENTION_IN_MILLIS = TimeUnit.DAYS.toMillis(1L); // 1 day
+  private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RetentionManager.class);
 
@@ -109,6 +119,9 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     } else {
       manageRetentionForRealtimeTable(tableNameWithType, retentionStrategy);
     }
+
+    // Delete segments based on segment lineage and clean up segment lineage metadata
+    manageSegmentLineageCleanupForTable(tableNameWithType);
   }
 
   private void manageRetentionForOfflineTable(String offlineTableName, RetentionStrategy retentionStrategy) {
@@ -176,5 +189,71 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       Set<String> states = new HashSet<>(stateMap.values());
       return states.size() == 1 && states.contains(CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE);
     }
+  }
+
+  private void manageSegmentLineageCleanupForTable(String tableNameWithType) {
+    try {
+      DEFAULT_RETRY_POLICY.attempt(() -> {
+        // Fetch segment lineage
+        ZNRecord segmentLineageZNRecord = SegmentLineageAccessHelper
+            .getSegmentLineageZNRecord(_pinotHelixResourceManager.getPropertyStore(), tableNameWithType);
+        if (segmentLineageZNRecord == null) {
+          return true;
+        }
+        SegmentLineage segmentLineage = SegmentLineage.fromZNRecord(segmentLineageZNRecord);
+        int expectedVersion = segmentLineageZNRecord.getVersion();
+
+        // 1. The original segments can be deleted once the merged segments are successfully uploaded
+        // 2. The zombie lineage entry & merged segments should be deleted if the segment replacement failed in
+        //    the middle
+        Set<String> segmentsForTable = new HashSet<>(_pinotHelixResourceManager.getSegmentsFor(tableNameWithType));
+        List<String> segmentsToDelete = new ArrayList<>();
+        for (String lineageEntryId : segmentLineage.getLineageEntryIds()) {
+          LineageEntry lineageEntry = segmentLineage.getLineageEntry(lineageEntryId);
+          if (lineageEntry.getState() == LineageEntryState.COMPLETED) {
+            Set<String> sourceSegments = new HashSet<>(lineageEntry.getSegmentsFrom());
+            sourceSegments.retainAll(segmentsForTable);
+            if (sourceSegments.isEmpty()) {
+              // If the lineage state is 'COMPLETED' and segmentFrom are removed, it is safe clean up
+              // the lineage entry
+              segmentLineage.deleteLineageEntry(lineageEntryId);
+            } else {
+              // If the lineage state is 'COMPLETED', it is safe to delete all segments from 'segmentsFrom'
+              segmentsToDelete.addAll(sourceSegments);
+            }
+          } else if (lineageEntry.getState() == LineageEntryState.IN_PROGRESS) {
+            // If the lineage state is 'IN_PROGRESS', we need to clean up the zombie lineage entry and its segments
+            if (lineageEntry.getTimestamp() < System.currentTimeMillis() - LINEAGE_ENTRY_CLEANUP_RETENTION_IN_MILLIS) {
+              Set<String> destinationSegments = new HashSet<>(lineageEntry.getSegmentsTo());
+              destinationSegments.retainAll(segmentsForTable);
+              if (destinationSegments.isEmpty()) {
+                // If the lineage state is 'IN_PROGRESS' and source segments are already removed, it is safe to clean up
+                // the lineage entry. Deleting lineage will allow the task scheduler to re-schedule the source segments
+                // to be merged again.
+                segmentLineage.deleteLineageEntry(lineageEntryId);
+              } else {
+                // If the lineage state is 'IN_PROGRESS', it is safe to delete all segments from 'segmentsTo'
+                segmentsToDelete.addAll(destinationSegments);
+              }
+            }
+          }
+        }
+
+        // Write back to the lineage entry
+        if (SegmentLineageAccessHelper
+            .writeSegmentLineage(_pinotHelixResourceManager.getPropertyStore(), segmentLineage, expectedVersion)) {
+          // Delete segments based on the segment lineage
+          _pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentsToDelete);
+          return true;
+        } else {
+          return false;
+        }
+      });
+    } catch (Exception e) {
+      String errorMsg = String.format("Failed to clean up the segment lineage. (tableName = %s)", tableNameWithType);
+      LOGGER.error(errorMsg, e);
+      throw new RuntimeException(errorMsg, e);
+    }
+    LOGGER.info("Segment lineage metadata clean-up is successfully processed for table: {}", tableNameWithType);
   }
 }

@@ -37,6 +37,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.MetricConfigBean;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datasource.MetadataSourceConfig;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -60,7 +61,7 @@ public class AutoOnboardPinotMetricsServiceTest {
     DAORegistry daoRegistry = DAORegistry.getInstance();
     datasetConfigDAO = daoRegistry.getDatasetConfigDAO();
     metricConfigDAO = daoRegistry.getMetricConfigDAO();
-    testAutoLoadPinotMetricsService = new AutoOnboardPinotMetadataSource(null, null);
+    testAutoLoadPinotMetricsService = new AutoOnboardPinotMetadataSource(new MetadataSourceConfig(), null);
     schema = Schema.fromInputSteam(ClassLoader.getSystemResourceAsStream("sample-pinot-schema.json"));
     Map<String, String> pinotCustomConfigs = new HashMap<>();
     pinotCustomConfigs.put("configKey1", "configValue1");

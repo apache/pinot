@@ -18,6 +18,11 @@
  */
 package org.apache.pinot.core.query.pruner;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import org.apache.pinot.core.data.manager.SegmentDataManager;
+import org.apache.pinot.core.data.manager.TableDataManager;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -31,7 +36,31 @@ public interface SegmentPruner {
   void init(PinotConfiguration config);
 
   /**
-   * Returns <code>true</code> if the segment can be pruned based on the query request.
+   * Prunes the segments based on the query request, returns the segments that are not pruned. The pruned segments need
+   * to be released by calling {@link TableDataManager#releaseSegment(SegmentDataManager)}.
+   * <p>Override this method or {@link #prune(IndexSegment, ServerQueryRequest)} for the pruner logic.
    */
-  boolean prune(IndexSegment segment, ServerQueryRequest queryRequest);
+  default List<SegmentDataManager> prune(TableDataManager tableDataManager,
+      List<SegmentDataManager> segmentDataManagers, ServerQueryRequest queryRequest) {
+    if (segmentDataManagers.isEmpty()) {
+      return Collections.emptyList();
+    }
+    List<SegmentDataManager> remainingSegmentDataManagers = new ArrayList<>(segmentDataManagers.size());
+    for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+      if (prune(segmentDataManager.getSegment(), queryRequest)) {
+        tableDataManager.releaseSegment(segmentDataManager);
+      } else {
+        remainingSegmentDataManagers.add(segmentDataManager);
+      }
+    }
+    return remainingSegmentDataManagers;
+  }
+
+  /**
+   * Returns {@code true} if the segment can be pruned based on the query request.
+   * <p>Override this method or {@link #prune(TableDataManager, List, ServerQueryRequest)} for the pruner logic.
+   */
+  default boolean prune(IndexSegment segment, ServerQueryRequest queryRequest) {
+    throw new UnsupportedOperationException();
+  }
 }

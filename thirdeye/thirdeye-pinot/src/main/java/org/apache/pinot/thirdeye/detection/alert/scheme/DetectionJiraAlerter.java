@@ -21,7 +21,6 @@ package org.apache.pinot.thirdeye.detection.alert.scheme;
 
 import com.atlassian.jira.rest.client.api.domain.Issue;
 import com.google.common.base.Preconditions;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -142,7 +141,7 @@ public class DetectionJiraAlerter extends DetectionAlertScheme {
     List<AnomalyResult> anomalyResultListOfGroup = new ArrayList<>(anomalies);
     anomalyResultListOfGroup.sort(COMPARATOR_DESC);
 
-    BaseNotificationContent content = super.buildNotificationContent(jiraClientConfig);
+    BaseNotificationContent content = getNotificationContent(jiraClientConfig);
 
     return new JiraContentFormatter(this.jiraAdminConfig, jiraClientConfig, content, this.teConfig, subsetSubsConfig)
         .getJiraEntity(notification.getDimensionFilters(), anomalyResultListOfGroup);

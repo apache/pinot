@@ -18,13 +18,11 @@
  */
 package org.apache.pinot.core.operator;
 
-import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.core.common.Block;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.common.DataBlockCache;
 import org.apache.pinot.core.common.DataFetcher;
 import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 
@@ -33,16 +31,12 @@ public class ProjectionOperator extends BaseOperator<ProjectionBlock> {
   private static final String OPERATOR_NAME = "ProjectionOperator";
 
   private final Map<String, DataSource> _dataSourceMap;
-  private final Map<String, DataSourceMetadata> _dataSourceMetadataMap;
   private final BaseOperator<DocIdSetBlock> _docIdSetOperator;
   private final DataBlockCache _dataBlockCache;
 
-  public ProjectionOperator(Map<String, DataSource> dataSourceMap, BaseOperator<DocIdSetBlock> docIdSetOperator) {
+  public ProjectionOperator(Map<String, DataSource> dataSourceMap,
+      @Nullable BaseOperator<DocIdSetBlock> docIdSetOperator) {
     _dataSourceMap = dataSourceMap;
-    _dataSourceMetadataMap = new HashMap<>(dataSourceMap.size());
-    for (Map.Entry<String, DataSource> entry : dataSourceMap.entrySet()) {
-      _dataSourceMetadataMap.put(entry.getKey(), entry.getValue().getDataSourceMetadata());
-    }
     _docIdSetOperator = docIdSetOperator;
     _dataBlockCache = new DataBlockCache(new DataFetcher(dataSourceMap));
   }
@@ -58,12 +52,14 @@ public class ProjectionOperator extends BaseOperator<ProjectionBlock> {
 
   @Override
   protected ProjectionBlock getNextBlock() {
+    // NOTE: Should not be called when _docIdSetOperator is null.
+    assert _docIdSetOperator != null;
     DocIdSetBlock docIdSetBlock = _docIdSetOperator.nextBlock();
     if (docIdSetBlock == null) {
       return null;
     } else {
       _dataBlockCache.initNewBlock(docIdSetBlock.getDocIdSet(), docIdSetBlock.getSearchableLength());
-      return new ProjectionBlock(_dataSourceMetadataMap, _dataBlockCache, docIdSetBlock);
+      return new ProjectionBlock(_dataSourceMap, _dataBlockCache);
     }
   }
 
@@ -74,6 +70,6 @@ public class ProjectionOperator extends BaseOperator<ProjectionBlock> {
 
   @Override
   public ExecutionStatistics getExecutionStatistics() {
-    return _docIdSetOperator.getExecutionStatistics();
+    return _docIdSetOperator != null ? _docIdSetOperator.getExecutionStatistics() : new ExecutionStatistics(0, 0, 0, 0);
   }
 }

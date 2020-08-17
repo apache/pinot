@@ -18,17 +18,14 @@
  */
 package org.apache.pinot.broker.broker.helix;
 
+import com.google.common.collect.ImmutableList;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import javax.annotation.Nullable;
-
-import org.apache.commons.configuration.BaseConfiguration;
-import org.apache.commons.configuration.Configuration;
-import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixConstants.ChangeType;
 import org.apache.helix.HelixDataAccessor;
@@ -61,14 +58,12 @@ import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.utils.helix.TableCache;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.collect.ImmutableList;
-import com.yammer.metrics.core.MetricsRegistry;
 
 
 @SuppressWarnings("unused")
@@ -106,7 +101,8 @@ public class HelixBrokerStarter implements ServiceStartable {
     this(brokerConf, clusterName, zkServer, null);
   }
 
-  public HelixBrokerStarter(PinotConfiguration brokerConf, String clusterName, String zkServer, @Nullable String brokerHost)
+  public HelixBrokerStarter(PinotConfiguration brokerConf, String clusterName, String zkServer,
+      @Nullable String brokerHost)
       throws Exception {
     _brokerConf = brokerConf;
     setupHelixSystemProperties();
@@ -123,7 +119,7 @@ public class HelixBrokerStarter implements ServiceStartable {
     _brokerId = _brokerConf.getProperty(Helix.Instance.INSTANCE_ID_KEY,
         Helix.PREFIX_OF_BROKER_INSTANCE + brokerHost + "_" + _brokerConf
             .getProperty(Helix.KEY_OF_BROKER_QUERY_PORT, Helix.DEFAULT_BROKER_QUERY_PORT));
-    
+
     _brokerConf.addProperty(Broker.CONFIG_OF_BROKER_ID, _brokerId);
   }
 
@@ -190,17 +186,15 @@ public class HelixBrokerStarter implements ServiceStartable {
     _helixAdmin = _spectatorHelixManager.getClusterManagmentTool();
     _propertyStore = _spectatorHelixManager.getHelixPropertyStore();
     _helixDataAccessor = _spectatorHelixManager.getHelixDataAccessor();
+
     // Fetch cluster level config from ZK
-    ConfigAccessor configAccessor = _spectatorHelixManager.getConfigAccessor();
     HelixConfigScope helixConfigScope =
         new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(_clusterName).build();
-    Map<String, String> configMap = configAccessor.get(helixConfigScope, Arrays
+    Map<String, String> configMap = _helixAdmin.getConfig(helixConfigScope, Arrays
         .asList(Helix.ENABLE_CASE_INSENSITIVE_KEY, Helix.DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY,
             Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY));
-    if (Boolean.parseBoolean(configMap.get(Helix.ENABLE_CASE_INSENSITIVE_KEY)) || Boolean
-        .parseBoolean(configMap.get(Helix.DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY))) {
-      _brokerConf.setProperty(Helix.ENABLE_CASE_INSENSITIVE_KEY, true);
-    }
+    boolean caseInsensitive = Boolean.parseBoolean(configMap.get(Helix.ENABLE_CASE_INSENSITIVE_KEY)) || Boolean
+        .parseBoolean(configMap.get(Helix.DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY));
     String log2mStr = configMap.get(Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY);
     if (log2mStr != null) {
       try {
@@ -229,13 +223,14 @@ public class HelixBrokerStarter implements ServiceStartable {
     _routingManager.init(_spectatorHelixManager);
     _accessControlFactory = AccessControlFactory.loadFactory(_brokerConf.subset(Broker.ACCESS_CONTROL_CONFIG_PREFIX));
     HelixExternalViewBasedQueryQuotaManager queryQuotaManager =
-        new HelixExternalViewBasedQueryQuotaManager(_brokerMetrics);
+        new HelixExternalViewBasedQueryQuotaManager(_brokerMetrics, _brokerId);
     queryQuotaManager.init(_spectatorHelixManager);
     // Initialize FunctionRegistry before starting the broker request handler
     FunctionRegistry.init();
+    TableCache tableCache = new TableCache(_propertyStore, caseInsensitive);
     _brokerRequestHandler =
         new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory, queryQuotaManager,
-            _brokerMetrics, _propertyStore);
+            tableCache, _brokerMetrics);
 
     int brokerQueryPort = _brokerConf.getProperty(Helix.KEY_OF_BROKER_QUERY_PORT, Helix.DEFAULT_BROKER_QUERY_PORT);
     LOGGER.info("Starting broker admin application on port: {}", brokerQueryPort);
@@ -252,6 +247,7 @@ public class HelixBrokerStarter implements ServiceStartable {
       instanceConfigChangeHandler.init(_spectatorHelixManager);
     }
     _instanceConfigChangeHandlers.add(_routingManager);
+    _instanceConfigChangeHandlers.add(queryQuotaManager);
     for (ClusterChangeHandler liveInstanceChangeHandler : _liveInstanceChangeHandlers) {
       liveInstanceChangeHandler.init(_spectatorHelixManager);
     }
@@ -310,8 +306,9 @@ public class HelixBrokerStarter implements ServiceStartable {
       }
     }
 
-    double minResourcePercentForStartup = _brokerConf.getProperty(
-        Broker.CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START, Broker.DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START);
+    double minResourcePercentForStartup = _brokerConf
+        .getProperty(Broker.CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START,
+            Broker.DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START);
 
     LOGGER.info("Registering service status handler");
     ServiceStatus.setServiceStatusCallback(_brokerId, new ServiceStatus.MultipleCallbackServiceStatusCallback(
@@ -394,12 +391,13 @@ public class HelixBrokerStarter implements ServiceStartable {
     return _brokerRequestHandler;
   }
 
-  public static HelixBrokerStarter getDefault() throws Exception {
+  public static HelixBrokerStarter getDefault()
+      throws Exception {
     Map<String, Object> properties = new HashMap<>();
-    
+
     properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, 5001);
     properties.put(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
-    
+
     return new HelixBrokerStarter(new PinotConfiguration(properties), "quickstart", "localhost:2122");
   }
 

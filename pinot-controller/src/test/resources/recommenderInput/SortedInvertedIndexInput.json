@@ -1,0 +1,157 @@
+{
+  "schema":{
+    "schemaName": "tableSchema",
+    "dimensionFieldSpecs": [
+      {
+        "name": "a",
+        "dataType": "INT",
+        "cardinality":20,
+        "numValuesPerEntry":1
+      },
+      {
+        "name": "b",
+        "dataType": "DOUBLE",
+        "cardinality":6,
+        "numValuesPerEntry":1.5
+      },
+      {
+        "name": "c",
+        "dataType": "FLOAT",
+        "cardinality":7,
+        "numValuesPerEntry":1
+      },
+      {
+        "name": "d",
+        "dataType": "STRING",
+        "cardinality":41,
+        "numValuesPerEntry":2,
+        "averageLength" : 27
+      },
+      {
+        "name": "e",
+        "dataType": "LONG",
+        "cardinality":18,
+        "numValuesPerEntry":4
+      },
+      {
+        "name": "f",
+        "dataType": "DOUBLE",
+        "cardinality":13,
+        "numValuesPerEntry":3
+      },
+      {
+        "name": "g",
+        "dataType": "STRING",
+        "cardinality":6,
+        "numValuesPerEntry":2,
+        "averageLength" : 100
+      },
+      {
+        "name": "h",
+        "dataType": "BYTES",
+        "cardinality":12,
+        "numValuesPerEntry":1,
+        "averageLength" : 10
+      },
+      {
+        "name": "i",
+        "dataType": "STRING",
+        "singleValueField": false,
+        "cardinality":7,
+        "numValuesPerEntry":1,
+        "averageLength" : 25
+      },
+      {
+        "name": "j",
+        "dataType": "DOUBLE",
+        "cardinality":4,
+        "numValuesPerEntry":1.00000001
+      }
+    ],
+    "metricFieldSpecs": [
+      {
+        "name": "k",
+        "dataType": "DOUBLE",
+        "cardinality":10000,
+        "numValuesPerEntry":2,
+        "averageLength" : 100
+      },
+      {
+        "name": "l",
+        "dataType": "STRING",
+        "cardinality":10000,
+        "numValuesPerEntry":1,
+        "averageLength" : 10
+      },
+      {
+        "name": "m",
+        "dataType": "BYTES",
+        "cardinality":10000,
+        "numValuesPerEntry":1,
+        "averageLength" : 25
+      },
+      {
+        "name": "n",
+        "dataType": "DOUBLE",
+        "cardinality":10000,
+        "numValuesPerEntry":1
+      },
+      {
+        "name": "o",
+        "dataType": "DOUBLE",
+        "cardinality":10000,
+        "numValuesPerEntry":1,
+        "averageLength" : 25
+      },
+      {
+        "name": "p",
+        "dataType": "DOUBLE",
+        "cardinality":10000,
+        "numValuesPerEntry":1
+      }
+    ],
+    "timeFieldSpec": {
+      "incomingGranularitySpec": {
+        "dataType": "INT",
+        "name": "t",
+        "timeType": "DAYS",
+        "cardinality":10000,
+        "numValuesPerEntry":1
+      }
+    }
+  },
+  "queriesWithWeights":{
+    "select i from tableName where b in (2,4) and ((a in (1,2,3) and e = 4) or c = 7) and d in ('#VALUES', 23) and t > 500": 1,
+    "select j from tableName where (a=3 and (h = 5 or f >34) and REGEXP_LIKE(i, 'as*')) or ((f = 3  or j in ('#VALUES', 4)) and REGEXP_LIKE(d, 'fl*'))": 2,
+    "select f from tableName where (a=0 or (b=1 and (e in ('#VALUES',2) or c=7))) and TEXT_MATCH(d, 'dasd') and MAX(MAX(h,i),j)=4 and t<3": 4,
+    "select f from tableName where (a=0 and b=1) or c=7 or (d = 7 and e =1)": 2,
+    "select f from tableName where t between 1 and 1000": 2
+  },
+  "qps": 15000,
+  "numMessagesPerSecInKafKaTopic":1000,
+  "numRecordsPerPush":1000000000,
+  "tableType": "HYBRID",
+  "latencySLA": 500,
+
+  "rulesToExecute": {
+    "recommendInvertedSortedIndexJoint": true
+  },
+  "partitionRuleParams": {
+    "THRESHOLD_MAX_LATENCY_SLA_PARTITION": 1001
+  },
+  "bloomFilterRuleParams": {
+    "THRESHOLD_MIN_PERCENT_EQ_BLOOMFILTER" : 0.51
+  },
+  "invertedSortedIndexJointRuleParams": {
+    "THRESHOLD_RATIO_MIN_GAIN_DIFF_BETWEEN_ITERATION" : 0.06
+  },
+  "noDictionaryOnHeapDictionaryJointRuleParams": {
+    "THRESHOLD_MIN_PERCENT_DICTIONARY_STORAGE_SAVE" : 0.96
+  },
+  "overWrittenConfigs": {
+    "indexConfig": {
+      "invertedIndexColumns": ["a","b"],
+      "rangeIndexColumns": ["f"]
+    }
+  }
+}

@@ -42,6 +42,8 @@ import org.apache.pinot.broker.routing.instanceselector.InstanceSelector;
 import org.apache.pinot.broker.routing.instanceselector.InstanceSelectorFactory;
 import org.apache.pinot.broker.routing.segmentpruner.SegmentPruner;
 import org.apache.pinot.broker.routing.segmentpruner.SegmentPrunerFactory;
+import org.apache.pinot.broker.routing.segmentselector.SegmentPreSelector;
+import org.apache.pinot.broker.routing.segmentselector.SegmentPreSelectorFactory;
 import org.apache.pinot.broker.routing.segmentselector.SegmentSelector;
 import org.apache.pinot.broker.routing.segmentselector.SegmentSelectorFactory;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
@@ -312,14 +314,17 @@ public class RoutingManager implements ClusterChangeHandler {
 
     Set<String> enabledInstances = _enabledServerInstanceMap.keySet();
 
+    SegmentPreSelector segmentPreSelector =
+        SegmentPreSelectorFactory.getSegmentPreSelector(tableConfig, _propertyStore);
+    Set<String> preSelectedOnlineSegments = segmentPreSelector.preSelect(onlineSegments);
     SegmentSelector segmentSelector = SegmentSelectorFactory.getSegmentSelector(tableConfig);
-    segmentSelector.init(externalView, onlineSegments);
+    segmentSelector.init(externalView, preSelectedOnlineSegments);
     List<SegmentPruner> segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
     for (SegmentPruner segmentPruner : segmentPruners) {
-      segmentPruner.init(externalView, onlineSegments);
+      segmentPruner.init(externalView, preSelectedOnlineSegments);
     }
     InstanceSelector instanceSelector = InstanceSelectorFactory.getInstanceSelector(tableConfig, _brokerMetrics);
-    instanceSelector.init(enabledInstances, externalView, onlineSegments);
+    instanceSelector.init(enabledInstances, externalView, preSelectedOnlineSegments);
 
     // Add time boundary manager if both offline and real-time part exist for a hybrid table
     TimeBoundaryManager timeBoundaryManager = null;
@@ -363,8 +368,8 @@ public class RoutingManager implements ClusterChangeHandler {
     Long queryTimeoutMs = queryConfig != null ? queryConfig.getTimeoutMs() : null;
 
     RoutingEntry routingEntry =
-        new RoutingEntry(tableNameWithType, segmentSelector, segmentPruners, instanceSelector, externalViewVersion,
-            timeBoundaryManager, queryTimeoutMs);
+        new RoutingEntry(tableNameWithType, segmentPreSelector, segmentSelector, segmentPruners, instanceSelector,
+            externalViewVersion, timeBoundaryManager, queryTimeoutMs);
     if (_routingEntryMap.put(tableNameWithType, routingEntry) == null) {
       LOGGER.info("Built routing for table: {}", tableNameWithType);
     } else {
@@ -471,6 +476,7 @@ public class RoutingManager implements ClusterChangeHandler {
 
   private static class RoutingEntry {
     final String _tableNameWithType;
+    final SegmentPreSelector _segmentPreSelector;
     final SegmentSelector _segmentSelector;
     final List<SegmentPruner> _segmentPruners;
     final InstanceSelector _instanceSelector;
@@ -481,10 +487,11 @@ public class RoutingManager implements ClusterChangeHandler {
     // Time boundary manager is only available for the offline part of the hybrid table
     transient TimeBoundaryManager _timeBoundaryManager;
 
-    RoutingEntry(String tableNameWithType, SegmentSelector segmentSelector, List<SegmentPruner> segmentPruners,
-        InstanceSelector instanceSelector, int lastUpdateExternalViewVersion,
+    RoutingEntry(String tableNameWithType, SegmentPreSelector segmentPreSelector, SegmentSelector segmentSelector,
+        List<SegmentPruner> segmentPruners, InstanceSelector instanceSelector, int lastUpdateExternalViewVersion,
         @Nullable TimeBoundaryManager timeBoundaryManager, @Nullable Long queryTimeoutMs) {
       _tableNameWithType = tableNameWithType;
+      _segmentPreSelector = segmentPreSelector;
       _segmentSelector = segmentSelector;
       _segmentPruners = segmentPruners;
       _instanceSelector = instanceSelector;
@@ -518,13 +525,14 @@ public class RoutingManager implements ClusterChangeHandler {
     // inconsistency between components, which is fine because the inconsistency only exists for the newly changed
     // segments and only lasts for a very short time.
     void onExternalViewChange(ExternalView externalView, Set<String> onlineSegments) {
-      _segmentSelector.onExternalViewChange(externalView, onlineSegments);
+      Set<String> preSelectedOnlineSegments = _segmentPreSelector.preSelect(onlineSegments);
+      _segmentSelector.onExternalViewChange(externalView, preSelectedOnlineSegments);
       for (SegmentPruner segmentPruner : _segmentPruners) {
-        segmentPruner.onExternalViewChange(externalView, onlineSegments);
+        segmentPruner.onExternalViewChange(externalView, preSelectedOnlineSegments);
       }
-      _instanceSelector.onExternalViewChange(externalView, onlineSegments);
+      _instanceSelector.onExternalViewChange(externalView, preSelectedOnlineSegments);
       if (_timeBoundaryManager != null) {
-        _timeBoundaryManager.onExternalViewChange(externalView, onlineSegments);
+        _timeBoundaryManager.onExternalViewChange(externalView, preSelectedOnlineSegments);
       }
       _lastUpdateExternalViewVersion = externalView.getStat().getVersion();
     }

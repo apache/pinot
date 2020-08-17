@@ -42,18 +42,26 @@ public class PinotFSFactoryTest {
   public void testCustomizedSegmentFetcherFactory() {
     Map<String, Object> properties = new HashMap<>();
     properties.put("class.file", LocalPinotFS.class.getName());
+
     properties.put("class.test", TestPinotFS.class.getName());
+    properties.put("test.accessKey", "v1");
+    properties.put("test.secretKey", "V2");
+    properties.put("test.region", "us-east");
     PinotFSFactory.init(new PinotConfiguration(properties));
 
     PinotFS testPinotFS = PinotFSFactory.create("test");
     Assert.assertTrue(testPinotFS instanceof TestPinotFS);
     Assert.assertEquals(((TestPinotFS) testPinotFS).getInitCalled(), 1);
+    Assert.assertEquals(((TestPinotFS) testPinotFS).getConfiguration().getProperty("accessKey"), "v1");
+    Assert.assertEquals(((TestPinotFS) testPinotFS).getConfiguration().getProperty("secretKey"), "V2");
+    Assert.assertEquals(((TestPinotFS) testPinotFS).getConfiguration().getProperty("region"), "us-east");
 
     Assert.assertTrue(PinotFSFactory.create("file") instanceof LocalPinotFS);
   }
 
   public static class TestPinotFS extends PinotFS {
     public int initCalled = 0;
+    private PinotConfiguration _configuration;
 
     public int getInitCalled() {
       return initCalled;
@@ -61,7 +69,12 @@ public class PinotFSFactoryTest {
 
     @Override
     public void init(PinotConfiguration configuration) {
+      _configuration = configuration;
       initCalled++;
+    }
+
+    public PinotConfiguration getConfiguration() {
+      return _configuration;
     }
 
     @Override

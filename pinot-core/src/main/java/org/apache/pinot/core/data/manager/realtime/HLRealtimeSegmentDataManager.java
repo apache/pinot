@@ -23,6 +23,7 @@ import com.google.common.util.concurrent.Uninterruptibles;
 import com.yammer.metrics.core.Meter;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.TimerTask;
@@ -190,10 +191,10 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setNoDictionaryColumns(indexLoadingConfig.getNoDictionaryColumns())
             .setVarLengthDictionaryColumns(indexLoadingConfig.getVarLengthDictionaryColumns())
             .setInvertedIndexColumns(invertedIndexColumns).setRealtimeSegmentZKMetadata(realtimeSegmentZKMetadata)
-            .setOffHeap(indexLoadingConfig.isRealtimeOffheapAllocation()).setMemoryManager(
+            .setOffHeap(indexLoadingConfig.isRealtimeOffHeapAllocation()).setMemoryManager(
             getMemoryManager(realtimeTableDataManager.getConsumerDir(), _segmentName,
-                indexLoadingConfig.isRealtimeOffheapAllocation(),
-                indexLoadingConfig.isDirectRealtimeOffheapAllocation(), serverMetrics))
+                indexLoadingConfig.isRealtimeOffHeapAllocation(),
+                indexLoadingConfig.isDirectRealtimeOffHeapAllocation(), serverMetrics))
             .setStatsHistory(realtimeTableDataManager.getStatsHistory())
             .setNullHandlingEnabled(indexingConfig.isNullHandlingEnabled()).build();
     _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfig);
@@ -286,9 +287,8 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           RealtimeSegmentConverter converter =
               new RealtimeSegmentConverter(_realtimeSegment, tempSegmentFolder.getAbsolutePath(), schema,
                   _tableNameWithType, tableConfig, realtimeSegmentZKMetadata.getSegmentName(), _sortedColumn,
-                  HLRealtimeSegmentDataManager.this._invertedIndexColumns, _noDictionaryColumns,
-                  _varLengthDictionaryColumns, null/*StarTreeIndexSpec*/,
-                  indexingConfig.isNullHandlingEnabled()); // Star tree not supported for HLC.
+                  _invertedIndexColumns, Collections.emptyList(), _noDictionaryColumns, _varLengthDictionaryColumns,
+                  indexingConfig.isNullHandlingEnabled());
 
           _segmentLogger.info("Trying to build segment");
           final long buildStartTime = System.nanoTime();

@@ -969,6 +969,22 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testQuery(query, Collections.singletonList(query));
   }
 
+  @Test
+  public void testQueryWithSameAlias()
+      throws Exception {
+    //test repeated columns in selection query
+    String query = "SELECT ArrTime AS ArrTime, Carrier AS Carrier, DaysSinceEpoch AS DaysSinceEpoch FROM mytable ORDER BY DaysSinceEpoch DESC";
+    testQuery(query, Collections.singletonList(query));
+
+    //test repeated columns in selection query
+    query = "SELECT ArrTime AS ArrTime, DaysSinceEpoch AS DaysSinceEpoch, Carrier AS Carrier FROM mytable ORDER BY Carrier DESC";
+    testQuery(query, Collections.singletonList(query));
+
+    //test repeated columns in selection query
+    query = "SELECT ArrTime AS ArrTime, DaysSinceEpoch AS DaysSinceEpoch, Carrier AS Carrier FROM mytable ORDER BY Carrier DESC, ArrTime DESC";
+    testQuery(query, Collections.singletonList(query));
+  }
+
   @AfterClass
   public void tearDown()
       throws Exception {
@@ -1074,25 +1090,66 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     String pql = "SELECT DISTINCT(Carrier) FROM mytable LIMIT 1000000";
     String sql = "SELECT DISTINCT Carrier FROM mytable";
     testQuery(pql, Collections.singletonList(sql));
+    pql = "SELECT DISTINCT Carrier FROM mytable LIMIT 1000000";
+    testSqlQuery(pql, Collections.singletonList(sql));
 
     pql = "SELECT DISTINCT(Carrier, DestAirportID) FROM mytable LIMIT 1000000";
     sql = "SELECT DISTINCT Carrier, DestAirportID FROM mytable";
     testQuery(pql, Collections.singletonList(sql));
+    pql = "SELECT DISTINCT Carrier, DestAirportID FROM mytable LIMIT 1000000";
+    testSqlQuery(pql, Collections.singletonList(sql));
 
     pql = "SELECT DISTINCT(Carrier, DestAirportID, DestStateName) FROM mytable LIMIT 1000000";
     sql = "SELECT DISTINCT Carrier, DestAirportID, DestStateName FROM mytable";
     testQuery(pql, Collections.singletonList(sql));
+    pql = "SELECT DISTINCT Carrier, DestAirportID, DestStateName FROM mytable LIMIT 1000000";
+    testSqlQuery(pql, Collections.singletonList(sql));
 
     pql = "SELECT DISTINCT(Carrier, DestAirportID, DestCityName) FROM mytable LIMIT 1000000";
     sql = "SELECT DISTINCT Carrier, DestAirportID, DestCityName FROM mytable";
     testQuery(pql, Collections.singletonList(sql));
+    pql = "SELECT DISTINCT Carrier, DestAirportID, DestCityName FROM mytable LIMIT 1000000";
+    testSqlQuery(pql, Collections.singletonList(sql));
+  }
+
+  @Test
+  public void testNonAggregationGroupByQuery()
+      throws Exception {
+    // by default 10 rows will be returned, so use high limit
+    String pql = "SELECT Carrier FROM mytable GROUP BY Carrier LIMIT 1000000";
+    String sql = "SELECT Carrier FROM mytable GROUP BY Carrier";
+    testSqlQuery(pql, Collections.singletonList(sql));
+
+    pql = "SELECT Carrier, DestAirportID FROM mytable GROUP BY Carrier, DestAirportID LIMIT 1000000";
+    sql = "SELECT Carrier, DestAirportID FROM mytable GROUP BY Carrier, DestAirportID";
+    testSqlQuery(pql, Collections.singletonList(sql));
+
+    pql = "SELECT Carrier, DestAirportID, DestStateName FROM mytable GROUP BY Carrier, DestAirportID, DestStateName LIMIT 1000000";
+    sql = "SELECT Carrier, DestAirportID, DestStateName FROM mytable GROUP BY Carrier, DestAirportID, DestStateName";
+    testSqlQuery(pql, Collections.singletonList(sql));
+
+    pql = "SELECT Carrier, DestAirportID, DestCityName FROM mytable GROUP BY Carrier, DestAirportID, DestCityName LIMIT 1000000";
+    sql = "SELECT Carrier, DestAirportID, DestCityName FROM mytable GROUP BY Carrier, DestAirportID, DestCityName";
+    testSqlQuery(pql, Collections.singletonList(sql));
+
+    pql = "SELECT ArrTime-DepTime FROM mytable GROUP BY ArrTime, DepTime LIMIT 1000000";
+    sql = "SELECT ArrTime-DepTime FROM mytable GROUP BY ArrTime, DepTime";
+    testSqlQuery(pql, Collections.singletonList(sql));
+
+    pql = "SELECT ArrTime-DepTime,ArrTime/3,DepTime*2 FROM mytable GROUP BY ArrTime, DepTime LIMIT 1000000";
+    sql = "SELECT ArrTime-DepTime,ArrTime/3,DepTime*2 FROM mytable GROUP BY ArrTime, DepTime";
+    testSqlQuery(pql, Collections.singletonList(sql));
+
+    pql = "SELECT ArrTime+DepTime FROM mytable GROUP BY ArrTime + DepTime LIMIT 1000000";
+    sql = "SELECT ArrTime+DepTime FROM mytable GROUP BY ArrTime + DepTime";
+    testSqlQuery(pql, Collections.singletonList(sql));
   }
 
   @Test
   public void testCaseInsensitivity() {
     int daysSinceEpoch = 16138;
     long secondsSinceEpoch = 16138 * 24 * 60 * 60;
-    List<String> queries = Arrays.asList("SELECT * FROM mytable",
+    List<String> baseQueries = Arrays.asList("SELECT * FROM mytable",
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable",
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by DaysSinceEpoch limit 10000",
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by timeConvert(DaysSinceEpoch,'DAYS','SECONDS') DESC limit 10000",
@@ -1101,23 +1158,83 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + daysSinceEpoch,
         "SELECT MAX(timeConvert(DaysSinceEpoch,'DAYS','SECONDS')) FROM mytable",
         "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')");
-    queries.replaceAll(query -> query.replace("mytable", "MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch"));
+    List<String> queries = new ArrayList<>();
+    baseQueries.forEach(q -> queries.add(q.replace("mytable", "MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch")));
+    baseQueries.forEach(q -> queries.add(q.replace("mytable", "MYDB.MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch")));
 
-    // Wait for at most 10 seconds for broker to get the ZK callback of the schema change
-    TestUtils.waitForCondition(aVoid -> {
+    for (String query : queries) {
       try {
-        for (String query : queries) {
-          JsonNode response = postQuery(query);
-          // NOTE: When table does not exist, we will get 'BrokerResourceMissingError'.
-          //       When column does not exist, all segments will be pruned and 'numSegmentsProcessed' will be 0.
-          return response.get("exceptions").size() == 0 && response.get("numSegmentsProcessed").asInt() > 0;
-        }
+        postQuery(query);
       } catch (Exception e) {
         // Fail the test when exception caught
-        throw new RuntimeException(e);
+        throw new RuntimeException("Got Exceptions from query - " + query);
       }
-      return true;
-    }, 10_000L, "Failed to get results for case-insensitive queries");
+    }
+  }
+
+  @Test
+  public void testColumnNameContainsTableName() {
+    int daysSinceEpoch = 16138;
+    long secondsSinceEpoch = 16138 * 24 * 60 * 60;
+    List<String> baseQueries = Arrays.asList("SELECT * FROM mytable",
+        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable",
+        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by DaysSinceEpoch limit 10000",
+        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by timeConvert(DaysSinceEpoch,'DAYS','SECONDS') DESC limit 10000",
+        "SELECT count(*) FROM mytable WHERE DaysSinceEpoch = " + daysSinceEpoch,
+        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch,
+        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + daysSinceEpoch,
+        "SELECT MAX(timeConvert(DaysSinceEpoch,'DAYS','SECONDS')) FROM mytable",
+        "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')");
+    List<String> queries = new ArrayList<>();
+    baseQueries.forEach(q -> queries.add(q.replace("DaysSinceEpoch", "mytable.DAYSSinceEpOch")));
+    baseQueries.forEach(q -> queries.add(q.replace("DaysSinceEpoch", "mytable.DAYSSinceEpOch")));
+
+    for (String query : queries) {
+      try {
+        postQuery(query);
+      } catch (Exception e) {
+        // Fail the test when exception caught
+        throw new RuntimeException("Got Exceptions from query - " + query);
+      }
+    }
+  }
+
+  @Test
+  public void testCaseInsensitivityWithColumnNameContainsTableName() {
+    int daysSinceEpoch = 16138;
+    long secondsSinceEpoch = 16138 * 24 * 60 * 60;
+    List<String> baseQueries = Arrays.asList("SELECT * FROM mytable",
+        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable",
+        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by DaysSinceEpoch limit 10000",
+        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by timeConvert(DaysSinceEpoch,'DAYS','SECONDS') DESC limit 10000",
+        "SELECT count(*) FROM mytable WHERE DaysSinceEpoch = " + daysSinceEpoch,
+        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch,
+        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + daysSinceEpoch,
+        "SELECT MAX(timeConvert(DaysSinceEpoch,'DAYS','SECONDS')) FROM mytable",
+        "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')");
+    List<String> queries = new ArrayList<>();
+    baseQueries.forEach(q -> queries.add(q.replace("mytable", "MYTABLE").replace("DaysSinceEpoch", "MYTABLE.DAYSSinceEpOch")));
+    baseQueries.forEach(q -> queries.add(q.replace("mytable", "MYDB.MYTABLE").replace("DaysSinceEpoch", "MYTABLE.DAYSSinceEpOch")));
+
+    for (String query : queries) {
+      try {
+        postQuery(query);
+      } catch (Exception e) {
+        // Fail the test when exception caught
+        throw new RuntimeException("Got Exceptions from query - " + query);
+      }
+    }
+  }
+
+  @Test
+  public void testQuerySourceWithDatabaseName()
+      throws Exception {
+    // by default 10 rows will be returned, so use high limit
+    String pql = "SELECT DISTINCT(Carrier) FROM mytable LIMIT 1000000";
+    String sql = "SELECT DISTINCT Carrier FROM mytable";
+    testQuery(pql, Collections.singletonList(sql));
+    pql = "SELECT DISTINCT Carrier FROM db.mytable LIMIT 1000000";
+    testSqlQuery(pql, Collections.singletonList(sql));
   }
 
   @Test
@@ -1146,5 +1263,22 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(postQuery(query).get("aggregationResults").get(0).get("value").asLong(), expectedResults[10]);
     assertEquals(postSqlQuery(query, _brokerBaseApiUrl).get("resultTable").get("rows").get(0).get(0).asLong(),
         expectedResults[10]);
+  }
+
+  @Test
+  public void testAggregationFunctionsWithUnderscore()
+      throws Exception {
+    String query;
+
+    // The Accurate value is 6538.
+    query = "SELECT distinct_count(FlightNum) FROM mytable ";
+    assertEquals(postQuery(query).get("aggregationResults").get(0).get("value").asLong(), 6538);
+    assertEquals(postSqlQuery(query, _brokerBaseApiUrl).get("resultTable").get("rows").get(0).get(0).asLong(), 6538);
+
+    // The Accurate value is 6538.
+    query = "SELECT c_o_u_n_t(FlightNum) FROM mytable ";
+    assertEquals(postQuery(query).get("aggregationResults").get(0).get("value").asLong(), 115545);
+    assertEquals(postSqlQuery(query, _brokerBaseApiUrl).get("resultTable").get("rows").get(0).get(0).asLong(), 115545);
+
   }
 }

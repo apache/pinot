@@ -25,6 +25,7 @@ import org.apache.pinot.thirdeye.anomaly.task.TaskDriverConfiguration;
 import org.apache.pinot.thirdeye.auto.onboard.AutoOnboardConfiguration;
 import org.apache.pinot.thirdeye.common.ThirdEyeConfiguration;
 import java.util.List;
+import org.apache.pinot.thirdeye.common.restclient.ThirdEyeRestClientConfiguration;
 
 
 public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
@@ -39,6 +40,7 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   private boolean pinotProxy = false;
   private boolean scheduler = false;
   private boolean worker = false;
+  private boolean onlineWorker = false;
   private boolean detectionPipeline = false;
   private boolean detectionAlert = false;
   private boolean dataAvailabilityEventListener = false;
@@ -51,11 +53,20 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   private MonitorConfiguration monitorConfiguration = new MonitorConfiguration();
   private AutoOnboardConfiguration autoOnboardConfiguration = new AutoOnboardConfiguration();
   private TaskDriverConfiguration taskDriverConfiguration = new TaskDriverConfiguration();
+  private ThirdEyeRestClientConfiguration teRestConfig = new ThirdEyeRestClientConfiguration();
   private DataAvailabilitySchedulingConfiguration
       dataAvailabilitySchedulingConfiguration = new DataAvailabilitySchedulingConfiguration();
   private String failureFromAddress;
   private String failureToAddress;
   private List<String> holidayCountriesWhitelist;
+
+  public ThirdEyeRestClientConfiguration getThirdEyeRestClientConfiguration() {
+    return teRestConfig;
+  }
+
+  public void setThirdEyeRestClientConfiguration(ThirdEyeRestClientConfiguration teRestConfig) {
+    this.teRestConfig = teRestConfig;
+  }
 
   public HolidayEventsLoaderConfiguration getHolidayEventsLoaderConfiguration() {
     return holidayEventsLoaderConfiguration;
@@ -135,6 +146,14 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
 
   public void setWorker(boolean worker) {
     this.worker = worker;
+  }
+
+  public boolean isOnlineWorker() {
+    return onlineWorker;
+  }
+
+  public void setOnlineWorker(boolean onlineWorker) {
+    this.onlineWorker = onlineWorker;
   }
 
   public boolean isMonitor() {

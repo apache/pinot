@@ -41,6 +41,7 @@ import org.apache.pinot.thirdeye.datalayer.bao.OnboardDatasetMetricManager;
 import org.apache.pinot.thirdeye.datalayer.bao.OverrideConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.RootcauseSessionManager;
+import org.apache.pinot.thirdeye.datalayer.bao.RootcauseTemplateManager;
 import org.apache.pinot.thirdeye.datalayer.bao.SessionManager;
 import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.AlertConfigManagerImpl;
@@ -65,8 +66,10 @@ import org.apache.pinot.thirdeye.datalayer.bao.jdbc.OnboardDatasetMetricManagerI
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.OverrideConfigManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.RawAnomalyResultManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.RootcauseSessionManagerImpl;
+import org.apache.pinot.thirdeye.datalayer.bao.jdbc.RootcauseTemplateManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.SessionManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.TaskManagerImpl;
+import org.apache.pinot.thirdeye.datalayer.dto.RootcauseTemplateDTO;
 import org.apache.pinot.thirdeye.datalayer.util.DaoProviderUtil;
 
 /**
@@ -172,6 +175,10 @@ public class DAORegistry {
 
   public RootcauseSessionManager getRootcauseSessionDAO() {
     return DaoProviderUtil.getInstance(RootcauseSessionManagerImpl.class);
+  }
+
+  public RootcauseTemplateManager getRootcauseTemplateDao() {
+    return DaoProviderUtil.getInstance(RootcauseTemplateManagerImpl.class);
   }
 
   public SessionManager getSessionDAO() {

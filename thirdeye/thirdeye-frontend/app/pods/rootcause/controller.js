@@ -100,6 +100,8 @@ export default Controller.extend({
 
   callgraphService: service('services/rootcause-callgraph-cache'),
 
+  sessionTemplateService:  service('services/rootcause-template'),
+
   //
   // user details
   //
@@ -790,7 +792,7 @@ export default Controller.extend({
    * @private
    */
   _onCheckSessionTimer() {
-    const { sessionId } = getProperties(this, 'sessionId');
+    const { sessionId, context, sessionTemplateService } = getProperties(this, 'sessionId', 'context', 'sessionTemplateService');
 
     if (!sessionId) { return; }
 
@@ -1032,11 +1034,21 @@ export default Controller.extend({
      * @returns {undefined}
      */
     onSessionSave() {
-      const { sessionService, sessionCanSave } = getProperties(this, 'sessionService', 'sessionCanSave');
+      const { sessionService, sessionCanSave, sessionTemplateService, context} = getProperties(this, 'sessionService', 'sessionCanSave', 'sessionTemplateService', 'context');
 
       if (sessionCanSave) {
         const session = this._makeSession();
-
+        const contextMetricUrns = filterPrefix(context.urns, 'thirdeye:metric:');
+        const metricUrn = contextMetricUrns[0]
+        sessionTemplateService.saveDimensionAnalysisAsync(
+          metricUrn,
+          session.customTableSettings.dimensions,
+          session.customTableSettings.excludedDimensions,
+          session.customTableSettings.orderType == "manual",
+          session.customTableSettings.oneSideError,
+          session.customTableSettings.summarySize,
+          session.customTableSettings.depth
+        );
         return sessionService
           .saveAsync(session)
           .then(sessionId => this._updateSession(sessionId))

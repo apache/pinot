@@ -33,7 +33,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.compress.archivers.ArchiveException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -46,7 +45,6 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.data.manager.BaseTableDataManager;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
@@ -55,6 +53,7 @@ import org.apache.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.loader.LoaderUtils;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
+import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.core.util.SchemaUtils;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -95,6 +94,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   // the minimum interval between updates to RealtimeSegmentStatsHistory as 30 minutes. This way it is
   // likely that we get fresh data each time instead of multiple copies of roughly same data.
   private static final int MIN_INTERVAL_BETWEEN_STATS_UPDATES_MINUTES = 30;
+
   public RealtimeTableDataManager(Semaphore segmentBuildSemaphore) {
     _segmentBuildSemaphore = segmentBuildSemaphore;
   }
@@ -297,32 +297,39 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   private void downloadSegmentFromDeepStore(String segmentName, IndexLoadingConfig indexLoadingConfig, String uri) {
-    File tempSegmentFolder = new File(_indexDir, "tmp-" + segmentName + "." + System.currentTimeMillis());
-    File tempFile = new File(_indexDir, segmentName + ".tar.gz");
+    File segmentTarFile = new File(_indexDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
     try {
-      SegmentFetcherFactory.fetchSegmentToLocal(uri, tempFile);
-      _logger.info("Downloaded file from {} to {}; Length of downloaded file: {}", uri, tempFile, tempFile.length());
-      untarAndMoveSegment(segmentName, indexLoadingConfig, tempSegmentFolder, tempFile);
+      SegmentFetcherFactory.fetchSegmentToLocal(uri, segmentTarFile);
+      _logger.info("Downloaded file from {} to {}; Length of downloaded file: {}", uri, segmentTarFile,
+          segmentTarFile.length());
+      untarAndMoveSegment(segmentName, indexLoadingConfig, segmentTarFile);
     } catch (Exception e) {
       _logger.warn("Failed to download segment {} from deep store: ", segmentName, e);
       throw new RuntimeException(e);
     } finally {
-      FileUtils.deleteQuietly(tempFile);
-      FileUtils.deleteQuietly(tempSegmentFolder);
+      FileUtils.deleteQuietly(segmentTarFile);
     }
   }
 
-  // Uncompressed a tared tempFile into tmp dir tempSegmentFolder and replace the existing segment.
-  private void untarAndMoveSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, File tempSegmentFolder,
-      File tempFile)
-      throws IOException, ArchiveException {
-    TarGzCompressionUtils.unTar(tempFile, tempSegmentFolder);
-    _logger.info("Uncompressed file {} into tmp dir {}", tempFile, tempSegmentFolder);
-    final File segmentFolder = new File(_indexDir, segmentName);
-    FileUtils.deleteQuietly(segmentFolder);
-    FileUtils.moveDirectory(tempSegmentFolder.listFiles()[0], segmentFolder);
-    _logger.info("Replacing LLC Segment {}", segmentName);
-    replaceLLSegment(segmentName, indexLoadingConfig);
+  /**
+   * Untars the new segment and replaces the existing segment.
+   */
+  private void untarAndMoveSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, File segmentTarFile)
+      throws IOException {
+    // TODO: This could leave temporary directories in _indexDir if JVM shuts down before the temporary directory is
+    //       deleted. Consider cleaning up all temporary directories when starting the server.
+    File tempSegmentDir = new File(_indexDir, "tmp-" + segmentName + "." + System.currentTimeMillis());
+    try {
+      File tempIndexDir = TarGzCompressionUtils.untar(segmentTarFile, tempSegmentDir).get(0);
+      _logger.info("Uncompressed file {} into tmp dir {}", segmentTarFile, tempSegmentDir);
+      File indexDir = new File(_indexDir, segmentName);
+      FileUtils.deleteQuietly(indexDir);
+      FileUtils.moveDirectory(tempIndexDir, indexDir);
+      _logger.info("Replacing LLC Segment {}", segmentName);
+      replaceLLSegment(segmentName, indexLoadingConfig);
+    } finally {
+      FileUtils.deleteQuietly(tempSegmentDir);
+    }
   }
 
   private boolean isPeerSegmentDownloadEnabled(TableConfig tableConfig) {
@@ -334,22 +341,20 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   private void downloadSegmentFromPeer(String segmentName, String downloadScheme,
       IndexLoadingConfig indexLoadingConfig) {
-    File tempSegmentFolder = new File(_indexDir, "tmp-" + segmentName + "." + System.currentTimeMillis());
-    File tempFile = new File(_indexDir, segmentName + ".tar.gz");
+    File segmentTarFile = new File(_indexDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
     try {
       // First find servers hosting the segment in a ONLINE state.
       List<URI> peerSegmentURIs = PeerServerSegmentFinder.getPeerServerURIs(segmentName, downloadScheme, _helixManager);
       // Next download the segment from a randomly chosen server using configured scheme.
-      SegmentFetcherFactory.getSegmentFetcher(downloadScheme).fetchSegmentToLocal(peerSegmentURIs, tempFile);
-      _logger.info("Fetched segment {} from: {} to: {} of size: {}", segmentName, peerSegmentURIs, tempFile,
-          tempFile.length());
-      untarAndMoveSegment(segmentName, indexLoadingConfig, tempSegmentFolder, tempFile);
+      SegmentFetcherFactory.getSegmentFetcher(downloadScheme).fetchSegmentToLocal(peerSegmentURIs, segmentTarFile);
+      _logger.info("Fetched segment {} from: {} to: {} of size: {}", segmentName, peerSegmentURIs, segmentTarFile,
+          segmentTarFile.length());
+      untarAndMoveSegment(segmentName, indexLoadingConfig, segmentTarFile);
     } catch (Exception e) {
       _logger.warn("Download and move segment {} from peer with scheme {} failed.", segmentName, downloadScheme, e);
       throw new RuntimeException(e);
     } finally {
-      FileUtils.deleteQuietly(tempFile);
-      FileUtils.deleteQuietly(tempSegmentFolder);
+      FileUtils.deleteQuietly(segmentTarFile);
     }
   }
 
@@ -397,8 +402,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    * If we add more validations, it may make sense to split this method into multiple validation methods.
    * But then, we are trying to figure out all the invalid cases before we return from this method...
    *
-   * @param schema
-   * @param indexingConfig
    * @return true if schema is valid.
    */
   private boolean isValid(Schema schema, IndexingConfig indexingConfig) {
@@ -417,10 +420,12 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       }
     }
     // 2. We want to get the schema errors, if any, even if isValid is false;
-    if (!SchemaUtils.validate(schema, _logger)) {
+    try {
+      SchemaUtils.validate(schema);
+    } catch (Exception e) {
+      _logger.error("Caught exception while validating schema: {}", schema.getSchemaName(), e);
       isValid = false;
     }
-
     return isValid;
   }
 }

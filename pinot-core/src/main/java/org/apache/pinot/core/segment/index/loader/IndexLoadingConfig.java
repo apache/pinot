@@ -41,6 +41,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
  */
 public class IndexLoadingConfig {
   private static final int DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT = 2;
+  private static final String SEGMENT_STORE_URI = "segment.store.uri";
 
   private ReadMode _readMode = ReadMode.DEFAULT_MODE;
   private List<String> _sortedColumns = Collections.emptyList();
@@ -59,9 +60,10 @@ public class IndexLoadingConfig {
   private ColumnMinMaxValueGeneratorMode _columnMinMaxValueGeneratorMode = ColumnMinMaxValueGeneratorMode.DEFAULT_MODE;
   private int _realtimeAvgMultiValueCount = DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT;
   private boolean _enableSplitCommit;
-  private boolean _isRealtimeOffheapAllocation;
-  private boolean _isDirectRealtimeOffheapAllocation;
+  private boolean _isRealtimeOffHeapAllocation;
+  private boolean _isDirectRealtimeOffHeapAllocation;
   private boolean _enableSplitCommitEndWithMetadata;
+  private String _segmentStoreURI;
 
   // constructed from FieldConfig
   private Map<String, Map<String, String>> _columnProperties = new HashMap<>();
@@ -158,10 +160,6 @@ public class IndexLoadingConfig {
       for (FieldConfig fieldConfig : fieldConfigList) {
         String column = fieldConfig.getName();
         if (fieldConfig.getIndexType() == FieldConfig.IndexType.TEXT) {
-          if (fieldConfig.getEncodingType() != FieldConfig.EncodingType.RAW || !_noDictionaryColumns.contains(column)) {
-            throw new UnsupportedOperationException(
-                "Text index is currently not supported on dictionary encoded column: " + column);
-          }
           _textIndexColumns.add(column);
         }
       }
@@ -181,14 +179,15 @@ public class IndexLoadingConfig {
 
     _enableSplitCommit = instanceDataManagerConfig.isEnableSplitCommit();
 
-    _isRealtimeOffheapAllocation = instanceDataManagerConfig.isRealtimeOffHeapAllocation();
-    _isDirectRealtimeOffheapAllocation = instanceDataManagerConfig.isDirectRealtimeOffheapAllocation();
+    _isRealtimeOffHeapAllocation = instanceDataManagerConfig.isRealtimeOffHeapAllocation();
+    _isDirectRealtimeOffHeapAllocation = instanceDataManagerConfig.isDirectRealtimeOffHeapAllocation();
 
     String avgMultiValueCount = instanceDataManagerConfig.getAvgMultiValueCount();
     if (avgMultiValueCount != null) {
       _realtimeAvgMultiValueCount = Integer.valueOf(avgMultiValueCount);
     }
     _enableSplitCommitEndWithMetadata = instanceDataManagerConfig.isEnableSplitCommitEndWithMetadata();
+    _segmentStoreURI = instanceDataManagerConfig.getConfig().getProperty(SEGMENT_STORE_URI);
   }
 
   /**
@@ -324,17 +323,21 @@ public class IndexLoadingConfig {
     return _enableSplitCommitEndWithMetadata;
   }
 
-  public boolean isRealtimeOffheapAllocation() {
-    return _isRealtimeOffheapAllocation;
+  public boolean isRealtimeOffHeapAllocation() {
+    return _isRealtimeOffHeapAllocation;
   }
 
-  public boolean isDirectRealtimeOffheapAllocation() {
-    return _isDirectRealtimeOffheapAllocation;
+  public boolean isDirectRealtimeOffHeapAllocation() {
+    return _isDirectRealtimeOffHeapAllocation;
   }
 
   public ColumnMinMaxValueGeneratorMode getColumnMinMaxValueGeneratorMode() {
     return _columnMinMaxValueGeneratorMode;
   }
+
+
+  public String getSegmentStoreURI() { return _segmentStoreURI; }
+
 
   /**
    * For tests only.

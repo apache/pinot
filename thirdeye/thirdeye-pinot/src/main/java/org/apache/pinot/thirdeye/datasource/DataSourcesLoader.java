@@ -71,8 +71,7 @@ public class DataSourcesLoader {
        // use class simple name as key, this enforces that there cannot be more than one data source of the same type
        String name = thirdeyeDataSource.getName();
        if (dataSourceMap.containsKey(name)) {
-         throw new IllegalStateException("Data source " + name + " already exists. "
-             + "There can be only ONE datasource of each type");
+         throw new IllegalStateException("Data source " + name + " already exists.");
        }
        dataSourceMap.put(name, thirdeyeDataSource);
      } catch (Exception e) {

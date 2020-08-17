@@ -20,72 +20,97 @@ package org.apache.pinot.core.operator.query;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.PriorityQueue;
+import java.util.Set;
+import org.apache.pinot.common.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.common.RowBasedBlockValueFetcher;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
+import org.apache.pinot.core.operator.ProjectionOperator;
+import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.roaringbitmap.IntIterator;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
+/**
+ * Operator for selection order-by queries.
+ * <p>The operator uses a priority queue to sort the rows and return the top rows based on the order-by expressions.
+ * <p>It is optimized to fetch only the values needed for the ordering purpose and the final result:
+ * <ul>
+ *   <li>
+ *     When all the output expressions are ordered, the operator fetches all the output expressions and insert them into
+ *     the priority queue because all the values are needed for ordering.
+ *   </li>
+ *   <li>
+ *     Otherwise, the operator fetches only the order-by expressions and the virtual document id column and insert them
+ *     into the priority queue. After getting the top rows, the operator does a second round scan only on the document
+ *     ids for the top rows for the non-order-by output expressions. This optimization can significantly reduce the
+ *     scanning and improve the query performance when most/all of the output expressions are not ordered (e.g. SELECT *
+ *     FROM table ORDER BY col).
+ *   </li>
+ * </ul>
+ */
 public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "SelectionOrderByOperator";
 
   private final IndexSegment _indexSegment;
-  private final TransformOperator _transformOperator;
+  // Deduped order-by expressions followed by output expressions from SelectionOperatorUtils.extractExpressions()
   private final List<ExpressionContext> _expressions;
-  private final TransformResultMetadata[] _expressionMetadata;
-  private final DataSchema _dataSchema;
+  private final TransformOperator _transformOperator;
+  private final List<OrderByExpressionContext> _orderByExpressions;
+  private final TransformResultMetadata[] _orderByExpressionMetadata;
   private final int _numRowsToKeep;
   private final PriorityQueue<Object[]> _rows;
 
   private int _numDocsScanned = 0;
+  private long _numEntriesScannedPostFilter = 0;
 
   public SelectionOrderByOperator(IndexSegment indexSegment, QueryContext queryContext,
       List<ExpressionContext> expressions, TransformOperator transformOperator) {
     _indexSegment = indexSegment;
-    _transformOperator = transformOperator;
     _expressions = expressions;
+    _transformOperator = transformOperator;
 
-    int numExpressions = _expressions.size();
-    _expressionMetadata = new TransformResultMetadata[numExpressions];
-    String[] columnNames = new String[numExpressions];
-    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numExpressions];
-    for (int i = 0; i < numExpressions; i++) {
-      ExpressionContext expression = _expressions.get(i);
-      TransformResultMetadata expressionMetadata = _transformOperator.getResultMetadata(expression);
-      _expressionMetadata[i] = expressionMetadata;
-      columnNames[i] = expression.toString();
-      columnDataTypes[i] =
-          DataSchema.ColumnDataType.fromDataType(expressionMetadata.getDataType(), expressionMetadata.isSingleValue());
+    _orderByExpressions = queryContext.getOrderByExpressions();
+    assert _orderByExpressions != null;
+    int numOrderByExpressions = _orderByExpressions.size();
+    _orderByExpressionMetadata = new TransformResultMetadata[numOrderByExpressions];
+    for (int i = 0; i < numOrderByExpressions; i++) {
+      ExpressionContext expression = _orderByExpressions.get(i).getExpression();
+      _orderByExpressionMetadata[i] = _transformOperator.getResultMetadata(expression);
     }
-    _dataSchema = new DataSchema(columnNames, columnDataTypes);
 
-    List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
-    assert orderByExpressions != null;
     _numRowsToKeep = queryContext.getOffset() + queryContext.getLimit();
     _rows = new PriorityQueue<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
-        getComparator(orderByExpressions));
+        getComparator());
   }
 
-  private Comparator<Object[]> getComparator(List<OrderByExpressionContext> orderByExpressions) {
+  private Comparator<Object[]> getComparator() {
     // Compare all single-value columns
-    int numOrderByExpressions = orderByExpressions.size();
+    int numOrderByExpressions = _orderByExpressions.size();
     List<Integer> valueIndexList = new ArrayList<>(numOrderByExpressions);
     for (int i = 0; i < numOrderByExpressions; i++) {
-      if (_expressionMetadata[i].isSingleValue()) {
+      if (_orderByExpressionMetadata[i].isSingleValue()) {
         valueIndexList.add(i);
       }
     }
@@ -98,8 +123,8 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     for (int i = 0; i < numValuesToCompare; i++) {
       int valueIndex = valueIndexList.get(i);
       valueIndices[i] = valueIndex;
-      dataTypes[i] = _expressionMetadata[valueIndex].getDataType();
-      multipliers[i] = orderByExpressions.get(valueIndex).isAsc() ? -1 : 1;
+      dataTypes[i] = _orderByExpressionMetadata[valueIndex].getDataType();
+      multipliers[i] = _orderByExpressions.get(valueIndex).isAsc() ? -1 : 1;
     }
 
     return (o1, o2) -> {
@@ -141,26 +166,154 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     };
   }
 
+  public IndexSegment getIndexSegment() {
+    return _indexSegment;
+  }
+
   @Override
   protected IntermediateResultsBlock getNextBlock() {
+    if (_expressions.size() == _orderByExpressions.size()) {
+      return computeAllOrdered();
+    } else {
+      return computePartiallyOrdered();
+    }
+  }
+
+  /**
+   * Helper method to compute the result when all the output expressions are ordered.
+   */
+  private IntermediateResultsBlock computeAllOrdered() {
+    int numExpressions = _expressions.size();
+
+    // Fetch all the expressions and insert them into the priority queue
+    BlockValSet[] blockValSets = new BlockValSet[numExpressions];
+    int numColumnsProjected = _transformOperator.getNumColumnsProjected();
     TransformBlock transformBlock;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
-      int numExpressions = _expressions.size();
-      BlockValSet[] blockValSets = new BlockValSet[numExpressions];
       for (int i = 0; i < numExpressions; i++) {
         ExpressionContext expression = _expressions.get(i);
         blockValSets[i] = transformBlock.getBlockValueSet(expression);
       }
       RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
-
       int numDocsFetched = transformBlock.getNumDocs();
-      _numDocsScanned += numDocsFetched;
       for (int i = 0; i < numDocsFetched; i++) {
         SelectionOperatorUtils.addToPriorityQueue(blockValueFetcher.getRow(i), _rows, _numRowsToKeep);
       }
+      _numDocsScanned += numDocsFetched;
+      _numEntriesScannedPostFilter += numDocsFetched * numColumnsProjected;
     }
 
-    return new IntermediateResultsBlock(_dataSchema, _rows);
+    // Create the data schema
+    String[] columnNames = new String[numExpressions];
+    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numExpressions];
+    for (int i = 0; i < numExpressions; i++) {
+      columnNames[i] = _expressions.get(i).toString();
+      TransformResultMetadata expressionMetadata = _orderByExpressionMetadata[i];
+      columnDataTypes[i] =
+          DataSchema.ColumnDataType.fromDataType(expressionMetadata.getDataType(), expressionMetadata.isSingleValue());
+    }
+    DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
+
+    return new IntermediateResultsBlock(dataSchema, _rows);
+  }
+
+  /**
+   * Helper method to compute the result when not all the output expressions are ordered.
+   */
+  private IntermediateResultsBlock computePartiallyOrdered() {
+    int numExpressions = _expressions.size();
+    int numOrderByExpressions = _orderByExpressions.size();
+
+    // Fetch the order-by expressions and docIds and insert them into the priority queue
+    BlockValSet[] blockValSets = new BlockValSet[numOrderByExpressions + 1];
+    int numColumnsProjected = _transformOperator.getNumColumnsProjected();
+    TransformBlock transformBlock;
+    while ((transformBlock = _transformOperator.nextBlock()) != null) {
+      for (int i = 0; i < numOrderByExpressions; i++) {
+        ExpressionContext expression = _orderByExpressions.get(i).getExpression();
+        blockValSets[i] = transformBlock.getBlockValueSet(expression);
+      }
+      blockValSets[numOrderByExpressions] = transformBlock.getBlockValueSet(BuiltInVirtualColumn.DOCID);
+      RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
+      int numDocsFetched = transformBlock.getNumDocs();
+      for (int i = 0; i < numDocsFetched; i++) {
+        // NOTE: We pre-allocate the complete row so that we can fill up the non-order-by output expression values later
+        //       without creating extra rows or re-constructing the priority queue. We can change the values in-place
+        //       because the comparator only compare the values for the order-by expressions.
+        Object[] row = new Object[numExpressions];
+        blockValueFetcher.getRow(i, row, 0);
+        SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
+      }
+      _numDocsScanned += numDocsFetched;
+      _numEntriesScannedPostFilter += numDocsFetched * numColumnsProjected;
+    }
+
+    // Copy the rows (shallow copy so that any modification will also be reflected to the priority queue) into a list,
+    // and store the document ids into a bitmap
+    int numRows = _rows.size();
+    List<Object[]> rowList = new ArrayList<>(numRows);
+    MutableRoaringBitmap docIds = new MutableRoaringBitmap();
+    for (Object[] row : _rows) {
+      rowList.add(row);
+      int docId = (int) row[numOrderByExpressions];
+      docIds.add(docId);
+    }
+
+    // Sort the rows with docIds to match the order of the bitmap (bitmap always returns values in ascending order)
+    rowList.sort(Comparator.comparingInt(o -> (int) o[numOrderByExpressions]));
+
+    // Construct a new TransformOperator to fetch the non-order-by expressions for the top rows
+    List<ExpressionContext> nonOrderByExpressions = _expressions.subList(numOrderByExpressions, numExpressions);
+    Set<String> columns = new HashSet<>();
+    for (ExpressionContext expressionContext : nonOrderByExpressions) {
+      expressionContext.getColumns(columns);
+    }
+    int numColumns = columns.size();
+    Map<String, DataSource> dataSourceMap = new HashMap<>();
+    for (String column : columns) {
+      dataSourceMap.put(column, _indexSegment.getDataSource(column));
+    }
+    ProjectionOperator projectionOperator =
+        new ProjectionOperator(dataSourceMap, new BitmapDocIdSetOperator(docIds, numRows));
+    TransformOperator transformOperator = new TransformOperator(projectionOperator, nonOrderByExpressions);
+
+    // Fill the non-order-by expression values
+    int numNonOrderByExpressions = nonOrderByExpressions.size();
+    blockValSets = new BlockValSet[numNonOrderByExpressions];
+    int rowBaseId = 0;
+    while ((transformBlock = transformOperator.nextBlock()) != null) {
+      for (int i = 0; i < numNonOrderByExpressions; i++) {
+        ExpressionContext expression = nonOrderByExpressions.get(i);
+        blockValSets[i] = transformBlock.getBlockValueSet(expression);
+      }
+      RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
+      int numDocsFetched = transformBlock.getNumDocs();
+      for (int i = 0; i < numDocsFetched; i++) {
+        blockValueFetcher.getRow(i, rowList.get(rowBaseId + i), numOrderByExpressions);
+      }
+      _numEntriesScannedPostFilter += numDocsFetched * numColumns;
+      rowBaseId += numDocsFetched;
+    }
+
+    // Create the data schema
+    String[] columnNames = new String[numExpressions];
+    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numExpressions];
+    for (int i = 0; i < numExpressions; i++) {
+      columnNames[i] = _expressions.get(i).toString();
+    }
+    for (int i = 0; i < numOrderByExpressions; i++) {
+      TransformResultMetadata expressionMetadata = _orderByExpressionMetadata[i];
+      columnDataTypes[i] =
+          DataSchema.ColumnDataType.fromDataType(expressionMetadata.getDataType(), expressionMetadata.isSingleValue());
+    }
+    for (int i = 0; i < numNonOrderByExpressions; i++) {
+      TransformResultMetadata expressionMetadata = transformOperator.getResultMetadata(nonOrderByExpressions.get(i));
+      columnDataTypes[numOrderByExpressions + i] =
+          DataSchema.ColumnDataType.fromDataType(expressionMetadata.getDataType(), expressionMetadata.isSingleValue());
+    }
+    DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
+
+    return new IntermediateResultsBlock(dataSchema, _rows);
   }
 
   @Override
@@ -171,9 +324,38 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
   @Override
   public ExecutionStatistics getExecutionStatistics() {
     long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
-    long numEntriesScannedPostFilter = (long) _numDocsScanned * _transformOperator.getNumColumnsProjected();
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
-    return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
+    return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, _numEntriesScannedPostFilter,
         numTotalDocs);
+  }
+
+  private static class BitmapDocIdSetOperator extends BaseOperator<DocIdSetBlock> {
+    static final String OPERATOR_NAME = "BitmapDocIdSetOperator";
+
+    final IntIterator _docIdIterator;
+    final int[] _docIdBuffer;
+
+    BitmapDocIdSetOperator(ImmutableRoaringBitmap docIds, int numDocs) {
+      _docIdIterator = docIds.getIntIterator();
+      _docIdBuffer = new int[Math.min(numDocs, DocIdSetPlanNode.MAX_DOC_PER_CALL)];
+    }
+
+    @Override
+    protected DocIdSetBlock getNextBlock() {
+      int numDocIdsFilled = 0;
+      while (numDocIdsFilled < DocIdSetPlanNode.MAX_DOC_PER_CALL && _docIdIterator.hasNext()) {
+        _docIdBuffer[numDocIdsFilled++] = _docIdIterator.next();
+      }
+      if (numDocIdsFilled > 0) {
+        return new DocIdSetBlock(_docIdBuffer, numDocIdsFilled);
+      } else {
+        return null;
+      }
+    }
+
+    @Override
+    public String getOperatorName() {
+      return OPERATOR_NAME;
+    }
   }
 }

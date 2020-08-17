@@ -20,7 +20,6 @@ package org.apache.pinot.queries;
 
 import java.io.File;
 import java.net.URL;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -68,7 +67,6 @@ public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
   private static final String AVRO_DATA = "data" + File.separator + "test_data-sv.avro";
   private static final String SEGMENT_NAME = "testTable_126164076_167572854";
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "SingleValueQueriesTest");
-  private static final int NUM_SEGMENTS = 2;
 
   // Hard-coded query filter.
   private static final String QUERY_FILTER =
@@ -127,15 +125,7 @@ public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
       throws Exception {
     ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
     _indexSegment = immutableSegment;
-    int numSegments = getNumSegments();
-    _indexSegments = new ArrayList<>(numSegments);
-    for (int i = 0; i < numSegments; i++) {
-      _indexSegments.add(immutableSegment);
-    }
-  }
-
-  protected int getNumSegments() {
-    return NUM_SEGMENTS;
+    _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
   }
 
   @AfterClass

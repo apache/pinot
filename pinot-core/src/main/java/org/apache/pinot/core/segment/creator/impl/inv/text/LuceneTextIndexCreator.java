@@ -115,6 +115,7 @@ public class LuceneTextIndexCreator implements InvertedIndexCreator {
 
   @Override
   public void addDoc(Object document, int docIdCounter) {
+    // text index on SV column
     Document docToIndex = new Document();
     docToIndex.add(new TextField(_textColumn, document.toString(), Field.Store.NO));
     docToIndex.add(new StoredField(LUCENE_INDEX_DOC_ID_COLUMN_NAME, docIdCounter));

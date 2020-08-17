@@ -179,18 +179,15 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    *   <li>Selecting some columns with filter that does not match any record</li>
    * </ul>
    */
-  @Test
-  public void testDistinctInnerSegment()
+  private void testDistinctInnerSegmentHelper(String[] queries, boolean isPql)
       throws Exception {
     _indexSegment = createSegment(0, generateRecords(0));
     try {
       {
         // Test selecting all columns
-        String query =
-            "SELECT DISTINCT(intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn) FROM testTable LIMIT 10000";
 
         // Check data schema
-        DistinctTable distinctTable = getDistinctTableInnerSegment(query);
+        DistinctTable distinctTable = getDistinctTableInnerSegment(queries[0], isPql);
         DataSchema dataSchema = distinctTable.getDataSchema();
         assertEquals(dataSchema.getColumnNames(),
             new String[]{"intColumn", "longColumn", "floatColumn", "doubleColumn", "stringColumn", "bytesColumn"});
@@ -220,11 +217,9 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       }
       {
         // Test selecting some columns with filter
-        String query =
-            "SELECT DISTINCT(stringColumn, bytesColumn, floatColumn) FROM testTable WHERE intColumn >= 60 LIMIT 10000";
 
         // Check data schema
-        DistinctTable distinctTable = getDistinctTableInnerSegment(query);
+        DistinctTable distinctTable = getDistinctTableInnerSegment(queries[1], isPql);
         DataSchema dataSchema = distinctTable.getDataSchema();
         assertEquals(dataSchema.getColumnNames(), new String[]{"stringColumn", "bytesColumn", "floatColumn"});
         assertEquals(dataSchema.getColumnDataTypes(),
@@ -250,10 +245,9 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       }
       {
         // Test selecting some columns order by BYTES column
-        String query = "SELECT DISTINCT(intColumn, bytesColumn) FROM testTable ORDER BY bytesColumn LIMIT 5";
 
         // Check data schema
-        DistinctTable distinctTable = getDistinctTableInnerSegment(query);
+        DistinctTable distinctTable = getDistinctTableInnerSegment(queries[2], isPql);
         DataSchema dataSchema = distinctTable.getDataSchema();
         assertEquals(dataSchema.getColumnNames(), new String[]{"intColumn", "bytesColumn"});
         assertEquals(dataSchema.getColumnDataTypes(), new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.BYTES});
@@ -274,11 +268,9 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       {
         // Test selecting some columns with transform, filter, order-by and limit. Spaces in 'add' are intentional
         // to ensure that AggregationFunction arguments are standardized (to remove spaces).
-        String query =
-            "SELECT DISTINCT(ADD ( intColumn,  floatColumn  ), stringColumn) FROM testTable WHERE longColumn < 60 ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10";
 
         // Check data schema
-        DistinctTable distinctTable = getDistinctTableInnerSegment(query);
+        DistinctTable distinctTable = getDistinctTableInnerSegment(queries[3], isPql);
         DataSchema dataSchema = distinctTable.getDataSchema();
         assertEquals(dataSchema.getColumnNames(), new String[]{"add(intColumn,floatColumn)", "stringColumn"});
         assertEquals(dataSchema.getColumnDataTypes(),
@@ -297,11 +289,9 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       }
       {
         // Test selecting some columns with filter that does not match any record
-        String query =
-            "SELECT DISTINCT(floatColumn, longColumn) FROM testTable WHERE stringColumn = 'a' ORDER BY longColumn LIMIT 10";
 
         // Check data schema, where data type should be STRING for all columns
-        DistinctTable distinctTable = getDistinctTableInnerSegment(query);
+        DistinctTable distinctTable = getDistinctTableInnerSegment(queries[4], isPql);
         DataSchema dataSchema = distinctTable.getDataSchema();
         assertEquals(dataSchema.getColumnNames(), new String[]{"floatColumn", "longColumn"});
         assertEquals(dataSchema.getColumnDataTypes(),
@@ -315,11 +305,63 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     }
   }
 
+
+  /**
+   * Test DISTINCT query within a single segment.
+   * <p>The following query types are tested:
+   * <ul>
+   *   <li>Selecting all columns</li>
+   *   <li>Selecting some columns with filter</li>
+   *   <li>Selecting some columns order by BYTES column</li>
+   *   <li>Selecting some columns transform, filter, order-by and limit</li>
+   *   <li>Selecting some columns with filter that does not match any record</li>
+   * </ul>
+   */
+  @Test
+  public void testDistinctInnerSegment()
+      throws Exception {
+    testDistinctInnerSegmentHelper(new String[]{
+        "SELECT DISTINCT(intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn) FROM testTable LIMIT 10000",
+        "SELECT DISTINCT(stringColumn, bytesColumn, floatColumn) FROM testTable WHERE intColumn >= 60 LIMIT 10000",
+        "SELECT DISTINCT(intColumn, bytesColumn) FROM testTable ORDER BY bytesColumn LIMIT 5",
+        "SELECT DISTINCT(ADD ( intColumn,  floatColumn  ), stringColumn) FROM testTable WHERE longColumn < 60 ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10",
+        "SELECT DISTINCT(floatColumn, longColumn) FROM testTable WHERE stringColumn = 'a' ORDER BY longColumn LIMIT 10"
+    }, true);
+  }
+
+  /**
+   * Test Non-Aggregation GroupBy query rewrite to Distinct query within a single segment.
+   * <p>The following query types are tested:
+   * <ul>
+   *   <li>Selecting all columns</li>
+   *   <li>Selecting some columns with filter</li>
+   *   <li>Selecting some columns order by BYTES column</li>
+   *   <li>Selecting some columns transform, filter, order-by and limit</li>
+   *   <li>Selecting some columns with filter that does not match any record</li>
+   * </ul>
+   */
+  @Test
+  public void testNonAggGroupByRewriteToDistinctInnerSegment()
+      throws Exception {
+    testDistinctInnerSegmentHelper(new String[]{
+        "SELECT intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn FROM testTable GROUP BY intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn LIMIT 10000",
+        "SELECT stringColumn, bytesColumn, floatColumn FROM testTable WHERE intColumn >= 60 GROUP BY stringColumn, bytesColumn, floatColumn LIMIT 10000",
+        "SELECT intColumn, bytesColumn FROM testTable GROUP BY intColumn, bytesColumn ORDER BY bytesColumn LIMIT 5",
+        "SELECT ADD ( intColumn,  floatColumn  ), stringColumn FROM testTable WHERE longColumn < 60 GROUP BY ADD ( intColumn,  floatColumn  ), stringColumn ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10",
+        "SELECT floatColumn, longColumn FROM testTable WHERE stringColumn = 'a' GROUP BY floatColumn, longColumn ORDER BY longColumn LIMIT 10"
+    }, false);
+  }
+
   /**
    * Helper method to get the DistinctTable result for one single segment for the given query.
    */
-  private DistinctTable getDistinctTableInnerSegment(String query) {
-    AggregationOperator aggregationOperator = getOperatorForQuery(query);
+  private DistinctTable getDistinctTableInnerSegment(String query, boolean isPql) {
+    AggregationOperator aggregationOperator;
+    if (isPql) {
+      aggregationOperator = getOperatorForPqlQuery(query);
+    } else {
+      aggregationOperator = getOperatorForSqlQuery(query);
+    }
     List<Object> aggregationResult = aggregationOperator.nextBlock().getAggregationResult();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 1);
@@ -347,8 +389,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    *   </li>
    * </ul>
    */
-  @Test
-  public void testDistinctInterSegment()
+  private void testDistinctInterSegmentHelper(String[] pqlQueries, String[] sqlQueries)
       throws Exception {
     ImmutableSegment segment0 = createSegment(0, generateRecords(0));
     ImmutableSegment segment1 = createSegment(1, generateRecords(1000));
@@ -356,10 +397,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     try {
       {
         // Test selecting all columns
-        String pqlQuery =
-            "SELECT DISTINCT(intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn) FROM testTable LIMIT 10000";
-        String sqlQuery =
-            "SELECT DISTINCT intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn FROM testTable LIMIT 10000";
+        String pqlQuery = pqlQueries[0];
+        String sqlQuery = sqlQueries[0];
 
         // Check data schema
         BrokerResponseNative pqlResponse = getBrokerResponseForPqlQuery(pqlQuery);
@@ -411,10 +450,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       }
       {
         // Test selecting some columns with filter
-        String pqlQuery =
-            "SELECT DISTINCT(stringColumn, bytesColumn, floatColumn) FROM testTable WHERE intColumn >= 60 LIMIT 10000";
-        String sqlQuery =
-            "SELECT DISTINCT stringColumn, bytesColumn, floatColumn FROM testTable WHERE intColumn >= 60 LIMIT 10000";
+        String pqlQuery = pqlQueries[1];
+        String sqlQuery = sqlQueries[1];
 
         // Check data schema
         BrokerResponseNative pqlResponse = getBrokerResponseForPqlQuery(pqlQuery);
@@ -460,8 +497,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       }
       {
         // Test selecting some columns order by BYTES column
-        String pqlQuery = "SELECT DISTINCT(intColumn, bytesColumn) FROM testTable ORDER BY bytesColumn LIMIT 5";
-        String sqlQuery = "SELECT DISTINCT intColumn, bytesColumn FROM testTable ORDER BY bytesColumn LIMIT 5";
+        String pqlQuery = pqlQueries[2];
+        String sqlQuery = sqlQueries[2];
 
         // Check data schema
         BrokerResponseNative pqlResponse = getBrokerResponseForPqlQuery(pqlQuery);
@@ -498,10 +535,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       }
       {
         // Test selecting some columns with transform, filter, order-by and limit
-        String pqlQuery =
-            "SELECT DISTINCT(ADD(intColumn, floatColumn), stringColumn) FROM testTable WHERE longColumn < 60 ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10";
-        String sqlQuery =
-            "SELECT DISTINCT ADD(intColumn, floatColumn), stringColumn FROM testTable WHERE longColumn < 60 ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10";
+        String pqlQuery = pqlQueries[3];
+        String sqlQuery = sqlQueries[3];
 
         // Check data schema
         BrokerResponseNative pqlResponse = getBrokerResponseForPqlQuery(pqlQuery);
@@ -537,10 +572,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       }
       {
         // Test selecting some columns with filter that does not match any record
-        String pqlQuery =
-            "SELECT DISTINCT(floatColumn, longColumn) FROM testTable WHERE stringColumn = 'a' ORDER BY longColumn LIMIT 10";
-        String sqlQuery =
-            "SELECT DISTINCT floatColumn, longColumn FROM testTable WHERE stringColumn = 'a' ORDER BY longColumn LIMIT 10";
+        String pqlQuery = pqlQueries[4];
+        String sqlQuery = sqlQueries[4];
 
         // Check data schema, where data type should be STRING for all columns
         BrokerResponseNative pqlResponse = getBrokerResponseForPqlQuery(pqlQuery);
@@ -564,10 +597,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       {
         // Test selecting some columns with filter that does not match any record in one segment but matches some
         // records in the other segment
-        String pqlQuery =
-            "SELECT DISTINCT(intColumn) FROM testTable WHERE floatColumn > 200 ORDER BY intColumn ASC LIMIT 5";
-        String sqlQuery =
-            "SELECT DISTINCT intColumn FROM testTable WHERE floatColumn > 200 ORDER BY intColumn ASC LIMIT 5";
+        String pqlQuery = pqlQueries[5];
+        String sqlQuery = sqlQueries[5];
 
         // Check data schema
         BrokerResponseNative pqlResponse = getBrokerResponseForPqlQuery(pqlQuery);
@@ -599,10 +630,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       {
         // Test electing some columns with filter that does not match any record in one server but matches some records
         // in the other server
-        String pqlQuery =
-            "SELECT DISTINCT(longColumn) FROM testTable WHERE doubleColumn < 200 ORDER BY longColumn DESC LIMIT 5";
-        String sqlQuery =
-            "SELECT DISTINCT longColumn FROM testTable WHERE doubleColumn < 200 ORDER BY longColumn DESC LIMIT 5";
+        String pqlQuery = pqlQueries[6];
+        String sqlQuery = sqlQueries[6];
 
         QueryContext pqlQueryContext = QueryContextConverterUtils.getQueryContextFromPQL(pqlQuery);
         BrokerResponseNative pqlResponse = queryServersWithDifferentSegments(pqlQueryContext, segment0, segment1);
@@ -643,6 +672,93 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     }
   }
 
+  /**
+   * Test DISTINCT query across multiple segments and servers (2 servers, each with 2 segments).
+   * <p>Both PQL and SQL format are tested.
+   * <p>The following query types are tested:
+   * <ul>
+   *   <li>Selecting all columns</li>
+   *   <li>Selecting some columns with filter</li>
+   *   <li>Selecting some columns order by BYTES column</li>
+   *   <li>Selecting some columns transform, filter, order-by and limit</li>
+   *   <li>Selecting some columns with filter that does not match any record</li>
+   *   <li>
+   *     Selecting some columns with filter that does not match any record in one segment but matches some records in
+   *     the other segment
+   *   </li>
+   *   <li>
+   *     Selecting some columns with filter that does not match any record in one server but matches some records in the
+   *     other server
+   *   </li>
+   * </ul>
+   */
+  @Test
+  public void testDistinctInterSegment()
+      throws Exception {
+    String[] pqlQueries = new String[] {
+        "SELECT DISTINCT(intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn) FROM testTable LIMIT 10000",
+        "SELECT DISTINCT(stringColumn, bytesColumn, floatColumn) FROM testTable WHERE intColumn >= 60 LIMIT 10000",
+        "SELECT DISTINCT(intColumn, bytesColumn) FROM testTable ORDER BY bytesColumn LIMIT 5",
+        "SELECT DISTINCT(ADD(intColumn, floatColumn), stringColumn) FROM testTable WHERE longColumn < 60 ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10",
+        "SELECT DISTINCT(floatColumn, longColumn) FROM testTable WHERE stringColumn = 'a' ORDER BY longColumn LIMIT 10",
+        "SELECT DISTINCT(intColumn) FROM testTable WHERE floatColumn > 200 ORDER BY intColumn ASC LIMIT 5",
+        "SELECT DISTINCT(longColumn) FROM testTable WHERE doubleColumn < 200 ORDER BY longColumn DESC LIMIT 5",
+    };
+    String[] sqlQueries = new String[] {
+        "SELECT DISTINCT intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn FROM testTable LIMIT 10000",
+        "SELECT DISTINCT stringColumn, bytesColumn, floatColumn FROM testTable WHERE intColumn >= 60 LIMIT 10000",
+        "SELECT DISTINCT intColumn, bytesColumn FROM testTable ORDER BY bytesColumn LIMIT 5",
+        "SELECT DISTINCT ADD(intColumn, floatColumn), stringColumn FROM testTable WHERE longColumn < 60 ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10",
+        "SELECT DISTINCT floatColumn, longColumn FROM testTable WHERE stringColumn = 'a' ORDER BY longColumn LIMIT 10",
+        "SELECT DISTINCT intColumn FROM testTable WHERE floatColumn > 200 ORDER BY intColumn ASC LIMIT 5",
+        "SELECT DISTINCT longColumn FROM testTable WHERE doubleColumn < 200 ORDER BY longColumn DESC LIMIT 5",
+    };
+    testDistinctInterSegmentHelper(pqlQueries, sqlQueries);
+  }
+
+  /**
+   * Test Non-Aggregation GroupBy query rewrite to Distinct query across multiple segments and servers (2 servers, each with 2 segments).
+   * <p>Only SQL format are tested.
+   * <p>The following query types are tested:
+   * <ul>
+   *   <li>Selecting all columns</li>
+   *   <li>Selecting some columns with filter</li>
+   *   <li>Selecting some columns order by BYTES column</li>
+   *   <li>Selecting some columns transform, filter, order-by and limit</li>
+   *   <li>Selecting some columns with filter that does not match any record</li>
+   *   <li>
+   *     Selecting some columns with filter that does not match any record in one segment but matches some records in
+   *     the other segment
+   *   </li>
+   *   <li>
+   *     Selecting some columns with filter that does not match any record in one server but matches some records in the
+   *     other server
+   *   </li>
+   * </ul>
+   */
+  @Test
+  public void testNonAggGroupByRewriteToDistinctInterSegment()
+      throws Exception {
+    String[] pqlQueries = new String[] {
+        "SELECT DISTINCT(intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn) FROM testTable LIMIT 10000",
+        "SELECT DISTINCT(stringColumn, bytesColumn, floatColumn) FROM testTable WHERE intColumn >= 60 LIMIT 10000",
+        "SELECT DISTINCT(intColumn, bytesColumn) FROM testTable ORDER BY bytesColumn LIMIT 5",
+        "SELECT DISTINCT(ADD(intColumn, floatColumn), stringColumn) FROM testTable WHERE longColumn < 60 ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10",
+        "SELECT DISTINCT(floatColumn, longColumn) FROM testTable WHERE stringColumn = 'a' ORDER BY longColumn LIMIT 10",
+        "SELECT DISTINCT(intColumn) FROM testTable WHERE floatColumn > 200 ORDER BY intColumn ASC LIMIT 5",
+        "SELECT DISTINCT(longColumn) FROM testTable WHERE doubleColumn < 200 ORDER BY longColumn DESC LIMIT 5",
+    };
+    String[] sqlQueries = new String[] {
+        "SELECT intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn FROM testTable GROUP BY intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn LIMIT 10000",
+        "SELECT stringColumn, bytesColumn, floatColumn FROM testTable WHERE intColumn >= 60 GROUP BY stringColumn, bytesColumn, floatColumn LIMIT 10000",
+        "SELECT intColumn, bytesColumn FROM testTable GROUP BY intColumn, bytesColumn ORDER BY bytesColumn LIMIT 5",
+        "SELECT ADD(intColumn, floatColumn), stringColumn FROM testTable WHERE longColumn < 60 GROUP BY ADD(intColumn, floatColumn), stringColumn ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10",
+        "SELECT floatColumn, longColumn FROM testTable WHERE stringColumn = 'a' GROUP BY floatColumn, longColumn ORDER BY longColumn LIMIT 10",
+        "SELECT intColumn FROM testTable WHERE floatColumn > 200 GROUP BY intColumn ORDER BY intColumn ASC LIMIT 5",
+        "SELECT longColumn FROM testTable WHERE doubleColumn < 200 GROUP BY longColumn ORDER BY longColumn DESC LIMIT 5",
+    };
+    testDistinctInterSegmentHelper(pqlQueries, sqlQueries);
+  }
   /**
    * Helper method to query 2 servers with different segments. Server0 will have 2 copies of segment0; Server1 will have
    * 2 copies of segment1.

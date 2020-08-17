@@ -50,6 +50,7 @@ import org.apache.pinot.thirdeye.datalayer.entity.OnboardDatasetMetricIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.OverrideConfigIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.RawAnomalyResultIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.RootcauseSessionIndex;
+import org.apache.pinot.thirdeye.datalayer.entity.RootcauseTemplateIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.SessionIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.TaskIndex;
 import io.dropwizard.jackson.Jackson;
@@ -213,6 +214,8 @@ public abstract class DaoProviderUtil {
             convertCamelCaseToUnderscore(DetectionAlertConfigIndex.class.getSimpleName()));
         entityMappingHolder.register(conn, EvaluationIndex.class,
             convertCamelCaseToUnderscore(EvaluationIndex.class.getSimpleName()));
+        entityMappingHolder.register(conn, RootcauseTemplateIndex.class,
+            convertCamelCaseToUnderscore(RootcauseTemplateIndex.class.getSimpleName()));
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
