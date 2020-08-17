@@ -37,7 +37,6 @@ import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.SimpleIndexedTable;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.util.trace.TraceRunnable;
@@ -57,13 +56,11 @@ import org.openjdk.jmh.runner.options.TimeValue;
 
 @State(Scope.Benchmark)
 public class BenchmarkIndexedTable {
-
-  private int CAPACITY = 800;
-  private int NUM_RECORDS = 1000;
-  private Random _random = new Random();
+  private static final int CAPACITY = 800;
+  private static final int NUM_RECORDS = 1000;
+  private static final Random RANDOM = new Random();
 
   private QueryContext _queryContext;
-  private AggregationFunction[] _aggregationFunctions;
   private DataSchema _dataSchema;
 
   private List<String> _d1;
@@ -90,8 +87,6 @@ public class BenchmarkIndexedTable {
 
     _queryContext = QueryContextConverterUtils
         .getQueryContextFromPQL("SELECT sum(m1), max(m2) FROM testTable GROUP BY d1, d2 ORDER BY sum(m1) TOP 500");
-    _aggregationFunctions = _queryContext.getAggregationFunctions();
-    assert _aggregationFunctions != null;
     _dataSchema = new DataSchema(new String[]{"d1", "d2", "sum(m1)", "max(m2)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
 
@@ -105,8 +100,8 @@ public class BenchmarkIndexedTable {
 
   private Record getNewRecord() {
     Object[] columns =
-        new Object[]{_d1.get(_random.nextInt(_d1.size())), _d2.get(_random.nextInt(_d2.size())), (double) _random
-            .nextInt(1000), (double) _random.nextInt(1000)};
+        new Object[]{_d1.get(RANDOM.nextInt(_d1.size())), _d2.get(RANDOM.nextInt(_d2.size())), (double) RANDOM
+            .nextInt(1000), (double) RANDOM.nextInt(1000)};
     return new Record(columns);
   }
 
@@ -118,8 +113,7 @@ public class BenchmarkIndexedTable {
     int numSegments = 10;
 
     // make 1 concurrent table
-    IndexedTable concurrentIndexedTable =
-        new ConcurrentIndexedTable(_dataSchema, _aggregationFunctions, _queryContext.getOrderByExpressions(), CAPACITY);
+    IndexedTable concurrentIndexedTable = new ConcurrentIndexedTable(_dataSchema, _queryContext, CAPACITY);
 
     // 10 parallel threads putting 10k records into the table
 
@@ -167,8 +161,7 @@ public class BenchmarkIndexedTable {
     for (int i = 0; i < numSegments; i++) {
 
       // make 10 indexed tables
-      IndexedTable simpleIndexedTable =
-          new SimpleIndexedTable(_dataSchema, _aggregationFunctions, _queryContext.getOrderByExpressions(), CAPACITY);
+      IndexedTable simpleIndexedTable = new SimpleIndexedTable(_dataSchema, _queryContext, CAPACITY);
       simpleIndexedTables.add(simpleIndexedTable);
 
       // put 10k records in each indexed table, in parallel
