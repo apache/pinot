@@ -70,6 +70,7 @@ public class AnomalySearcher {
    * @return the result
    */
   public Map<String, Object> search(AnomalySearchFilter searchFilter, int limit, int offset) {
+    // default dummy predicate, the base id can't be 0
     Predicate predicate = Predicate.NEQ("baseId", 0);
     // hide child anomaly unless queried with ids
     if (searchFilter.getAnomalyIds().isEmpty()) {
