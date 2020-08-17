@@ -41,7 +41,6 @@ import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.anomaly.AnomalyType;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import org.apache.pinot.thirdeye.anomaly.alert.util.DataReportHelper;
 import org.apache.pinot.thirdeye.anomaly.events.EventFilter;
 import org.apache.pinot.thirdeye.anomaly.events.EventType;
 import org.apache.pinot.thirdeye.anomaly.events.HolidayEventProvider;
@@ -217,7 +216,6 @@ public abstract class BaseNotificationContent implements NotificationContent {
     templateData.put("startTime", getDateString(startTime));
     templateData.put("endTime", getDateString(endTime));
     templateData.put("timeZone", getTimezoneString(dateTimeZone));
-    templateData.put("dateFormat", new DataReportHelper.DateFormatMethod(timeZone));
     templateData.put("notifiedCount", precisionRecallEvaluator.getTotalAlerts());
     templateData.put("feedbackCount", precisionRecallEvaluator.getTotalResponses());
     templateData.put("trueAlertCount", precisionRecallEvaluator.getTrueAnomalies());

@@ -147,30 +147,30 @@
         </#if>
 
         <!-- RCA -->
-        <#if rootCauseHighlights?has_content>
+        <#if cubeDimensions?has_content && cubeResponseRows?has_content>
             <@utils.addBlock title="Root Cause Analysis" align="left">
             <a href="${dashboardHost}/app/#/rootcause?anomalyId=${anomalyIds} style="text-decoration: none; color:#0073B1; font-size:12px; font-weight:bold;">(more)</a>
             <table border="0" align="center" style="table-layout: fixed; width:100%; padding:0; margin:0; border-collapse: collapse; text-align:left;">
-              <#list rootCauseHighlights?keys as rootCauseHighlightKey>
-                <tr style="border-bottom: 1px solid #C7D1D8; padding: 16px;">
-                  <div>
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Top Anomalous Dimensions</th>
-                        </tr>
-                        <tr>
-                        <#list rootCauseHighlights[rootCauseHighlightKey]["dimensions"] as dimension>
-                          <th style="text-align:left; padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">${dimension}</th>
-                        </#list>
-                        <th style="text-align:left; padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">Baseline</th>
-                        <th style="text-align:left; padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">Current</th>
-                        <th style="text-align:left; padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">% Change</th>
-                        </tr>
-                      </thead>
+              <tr style="border-bottom: 1px solid #C7D1D8; padding: 16px;">
+                <div>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Top Anomalous Dimensions</th>
+                      </tr>
+                      <tr>
+                      <#list cubeDimensions as dimension>
+                        <th style="text-align:left; padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">${dimension}</th>
+                      </#list>
+                      <th style="text-align:left; padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">Baseline</th>
+                      <th style="text-align:left; padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">Current</th>
+                      <th style="text-align:left; padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">% Change</th>
+                      </tr>
+                    </thead>
 
-                      <tbody>
-                      <#list rootCauseHighlights[rootCauseHighlightKey]["responseRows"] as dimSliceEntry>
+                    <tbody>
+                    <#list cubeResponseRows as dimSliceEntry>
+                      <#if dimSliceEntry["names"]?has_content>
                         <tr>
                           <#list dimSliceEntry["names"] as dimensionName>
                             <td style="color: rgba(0,0,0,0.9); font-size:12px; line-height:20px;">${dimensionName}</td>
@@ -183,12 +183,12 @@
                           </#if>
                           <td style="color:${positive?string('#3A8C18','#ee1620')}; font-size:12px; line-height:20px; text-align:center;">${dimSliceEntry["percentageChange"]}</td>
                         </tr>
-                      </#list>
-                      </tbody>
-                    </table>
-                  </div>
-                </tr>
-              </#list>
+                      </#if>
+                    </#list>
+                    </tbody>
+                  </table>
+                </div>
+              </tr>
             </table>
           </@utils.addBlock>
         </#if>

@@ -42,6 +42,7 @@
     <reactivestream.version>1.0.3</reactivestream.version>
     <s3mock.version>2.1.19</s3mock.version>
     <javax.version>3.1.0</javax.version>
+    <phase.prop>package</phase.prop>
   </properties>
 
   <dependencyManagement>

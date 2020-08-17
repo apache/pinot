@@ -92,7 +92,7 @@ public class RootCauseResource {
 
     // In the highlights api we retrieve only the top 3 results across 3 dimensions.
     // TODO: polish the results to make it more meaningful
-    String cubeHighlights = this.summaryResource.buildSummary(
+    Map<String, Object> cubeHighlights = this.summaryResource.getDataCubeSummary(
         anomalyDTO.getMetricUrn(), anomalyDTO.getCollection(), anomalyDTO.getMetric(),
         anomalyDTO.getStartTime(), anomalyDTO.getEndTime(),
         anomalyDTO.getStartTime() - TimeUnit.DAYS.toMillis(7),

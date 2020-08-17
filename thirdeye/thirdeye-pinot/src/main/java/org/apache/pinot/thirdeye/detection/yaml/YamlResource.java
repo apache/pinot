@@ -22,6 +22,7 @@ package org.apache.pinot.thirdeye.detection.yaml;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.RateLimiter;
+import com.google.inject.Singleton;
 import io.dropwizard.auth.Auth;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -112,8 +113,8 @@ import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 import static org.apache.pinot.thirdeye.detection.yaml.translator.SubscriptionConfigTranslator.*;
 
 
-@Path("/yaml")
 @Api(tags = {Constants.YAML_TAG})
+@Singleton
 public class YamlResource {
   protected static final Logger LOG = LoggerFactory.getLogger(YamlResource.class);
   private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -436,7 +437,7 @@ public class YamlResource {
       return processServerErrorResponse(PROP_DETECTION, YamlOperations.CREATING.name(), payload, e);
     }
 
-    LOG.info("Detection created with id " + detectionConfigId + " using payload " + payload);
+    LOG.info("Detection created with id " + detectionConfigId);
     responseMessage.put("message", "Alert was created successfully.");
     responseMessage.put("more-info", "Record saved with id " + detectionConfigId);
     return Response.ok().entity(responseMessage).build();
@@ -610,7 +611,7 @@ public class YamlResource {
       return processServerErrorResponse(PROP_DETECTION, YamlOperations.CREATING.name() + "/" + YamlOperations.UPDATING.name(), payload, e);
     }
 
-    LOG.info("Detection Config created/updated with id " + detectionConfigId + " using payload " + payload);
+    LOG.info("Detection Config created/updated with id " + detectionConfigId);
     responseMessage.put("message", "The alert was created/updated successfully.");
     responseMessage.put("more-info", "Record saved/updated with id " + detectionConfigId);
     return Response.ok().entity(responseMessage).build();
@@ -678,7 +679,7 @@ public class YamlResource {
       return processServerErrorResponse(PROP_DETECTION, YamlOperations.CREATING.name() + "/" + YamlOperations.UPDATING.name(), payload, e);
     }
 
-    LOG.info("Subscription config created/updated with id " + subscriptionConfigId + " using payload " + payload);
+    LOG.info("Subscription config created/updated with id " + subscriptionConfigId);
     responseMessage.put("message", "The subscription group was created/updated successfully.");
     responseMessage.put("more-info", "Record saved/updated with id " + subscriptionConfigId);
     return Response.ok().entity(responseMessage).build();
@@ -722,7 +723,7 @@ public class YamlResource {
       return processServerErrorResponse(PROP_SUBSCRIPTION, YamlOperations.CREATING.name(), payload, e);
     }
 
-    LOG.info("Notification group created with id " + subscriptionConfigId + " using payload " + payload);
+    LOG.info("Notification group created with id " + subscriptionConfigId);
     responseMessage.put("message", "The subscription group was created successfully.");
     responseMessage.put("detectionAlertConfigId", String.valueOf(subscriptionConfigId));
     return Response.ok().entity(responseMessage).build();

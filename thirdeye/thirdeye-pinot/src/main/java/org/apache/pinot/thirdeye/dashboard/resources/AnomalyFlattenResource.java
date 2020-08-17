@@ -20,6 +20,8 @@
 package org.apache.pinot.thirdeye.dashboard.resources;
 
 import com.google.common.base.Preconditions;
+import com.google.inject.Inject;
+import com.google.inject.Singleton;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -58,8 +60,8 @@ import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
 /**
  * Provide a table combining metrics data and anomaly feedback for UI representation
  */
-@Path("thirdeye/table")
 @Api(tags = {Constants.ANOMALY_TAG})
+@Singleton
 public class AnomalyFlattenResource {
   private final MergedAnomalyResultManager mergedAnomalyResultDAO;
   private final MetricConfigManager metricConfigDAO;
@@ -73,7 +75,9 @@ public class AnomalyFlattenResource {
   private static final int DEFAULT_THREAD_POOLS_SIZE = 5;
   private static final long DEFAULT_TIME_OUT_IN_MINUTES = 1;
 
-  public AnomalyFlattenResource(MergedAnomalyResultManager mergedAnomalyResultDAO, DatasetConfigManager datasetConfgDAO,
+  @Inject
+  public AnomalyFlattenResource(MergedAnomalyResultManager mergedAnomalyResultDAO,
+      DatasetConfigManager datasetConfgDAO,
       MetricConfigManager metricConfigDAO) {
     this.mergedAnomalyResultDAO = mergedAnomalyResultDAO;
     this.datasetConfgDAO = datasetConfgDAO;

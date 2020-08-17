@@ -52,7 +52,8 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
     _indexSegment = indexSegment;
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
     _numGroupsLimit = numGroupsLimit;
-    _aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(queryContext);
+    _aggregationFunctions = queryContext.getAggregationFunctions();
+    assert _aggregationFunctions != null;
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     assert groupByExpressions != null;
     _groupByExpressions = groupByExpressions.toArray(new ExpressionContext[0]);

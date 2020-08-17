@@ -40,6 +40,7 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   private boolean pinotProxy = false;
   private boolean scheduler = false;
   private boolean worker = false;
+  private boolean onlineWorker = false;
   private boolean detectionPipeline = false;
   private boolean detectionAlert = false;
   private boolean dataAvailabilityEventListener = false;
@@ -145,6 +146,14 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
 
   public void setWorker(boolean worker) {
     this.worker = worker;
+  }
+
+  public boolean isOnlineWorker() {
+    return onlineWorker;
+  }
+
+  public void setOnlineWorker(boolean onlineWorker) {
+    this.onlineWorker = onlineWorker;
   }
 
   public boolean isMonitor() {

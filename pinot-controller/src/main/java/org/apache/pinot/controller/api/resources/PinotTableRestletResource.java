@@ -52,6 +52,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
+import org.apache.pinot.controller.recommender.RecommenderDriver;
 import org.apache.pinot.core.util.ReplicationUtils;
 import org.apache.pinot.core.util.TableConfigUtils;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
@@ -138,6 +139,18 @@ public class PinotTableRestletResource {
       } else {
         throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
       }
+    }
+  }
+
+  @PUT
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/tables/recommender")
+  @ApiOperation(value = "Recommend config", notes = "Recommend a config with input json")
+  public String recommendConfig(String inputStr) {
+    try {
+      return RecommenderDriver.run(inputStr);
+    }catch (Exception e){
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     }
   }
 

@@ -1,0 +1,146 @@
+{
+  "schema":{
+    "schemaName": "tableSchema",
+    "dimensionFieldSpecs": [
+      {
+        "name": "a",
+        "dataType": "INT",
+        "cardinality":20,
+        "numValuesPerEntry":1
+      },
+      {
+        "name": "b",
+        "dataType": "DOUBLE",
+        "cardinality":6,
+        "numValuesPerEntry":1.5
+      },
+      {
+        "name": "c",
+        "dataType": "STRING",
+        "cardinality": 100000000,
+        "numValuesPerEntry":2,
+        "averageLength" : 100
+      },
+      {
+        "name": "d",
+        "dataType": "STRING",
+        "cardinality": 1000000,
+        "numValuesPerEntry":1,
+        "averageLength" : 150
+      },
+      {
+        "name": "e",
+        "dataType": "LONG",
+        "cardinality":10000000,
+        "numValuesPerEntry":4
+      },
+      {
+        "name": "f",
+        "dataType": "DOUBLE",
+        "cardinality":20,
+        "numValuesPerEntry":3
+      },
+      {
+        "name": "g",
+        "dataType": "STRING",
+        "cardinality":6,
+        "numValuesPerEntry":2,
+        "averageLength" : 100
+      },
+      {
+        "name": "h",
+        "dataType": "BYTES",
+        "cardinality":12,
+        "numValuesPerEntry":1,
+        "averageLength" : 10
+      },
+      {
+        "name": "i",
+        "dataType": "STRING",
+        "cardinality":7,
+        "numValuesPerEntry":1,
+        "averageLength" : 25
+      },
+      {
+        "name": "j",
+        "dataType": "DOUBLE",
+        "cardinality":4,
+        "numValuesPerEntry":1
+      }
+    ],
+    "metricFieldSpecs": [
+      {
+        "name": "k",
+        "dataType": "DOUBLE",
+        "cardinality":10000,
+        "numValuesPerEntry":2,
+        "averageLength" : 100
+      },
+      {
+        "name": "l",
+        "dataType": "STRING",
+        "cardinality":10000,
+        "numValuesPerEntry":1,
+        "averageLength" : 10
+      },
+      {
+        "name": "m",
+        "dataType": "BYTES",
+        "cardinality":10000,
+        "numValuesPerEntry":1,
+        "averageLength" : 25
+      },
+      {
+        "name": "n",
+        "dataType": "DOUBLE",
+        "cardinality":10000,
+        "numValuesPerEntry":1
+      },
+      {
+        "name": "o",
+        "dataType": "DOUBLE",
+        "cardinality":10000,
+        "numValuesPerEntry":1,
+        "averageLength" : 25
+      },
+      {
+        "name": "p",
+        "dataType": "DOUBLE",
+        "cardinality":10000,
+        "numValuesPerEntry":1
+      }
+    ],
+    "timeFieldSpec": {
+      "incomingGranularitySpec": {
+        "dataType": "INT",
+        "name": "t",
+        "timeType": "DAYS",
+        "cardinality":10000,
+        "numValuesPerEntry":1
+      }
+    }
+  },
+  "queriesWithWeights": {
+    "select k, l from tableName where ( a = 4 and b=5 ) or ( a in ('#VALUES', 3) and b=5 ) or ( a in (1, 2, 3) and b in (1, 2, 3, 4 ,5) )": 1,
+    "select k, l from tableName where t>1 and t<10 and c > 4": 1,
+    "select k, l from tableName where a = 4 and c < 4 ": 1,
+    "select k, l from tableName where a = 4 and c <> 4": 1,
+    "select k, l from tableName where a = 4 and c not in (4,5)": 1,
+    "select k, l from tableName where b = 4 or b not in (4,5)": 1,
+    "select k, l from tableName where b = 4 or b not in (4,5,6,7,8)": 1,
+    "select k, l from tableName where b = 4 or b in (4,5,6,7,8)": 1,
+    "select k, l from tableName where b = 4 or b between 3 and 4": 1
+  },
+
+  "qps": 250,
+  "numKafkaPartitions": 32,
+  "numRecordsPerPush":10000000,
+  "tableType": "HYBRID",
+  "latencySLA": 500,
+
+  "overWrittenConfigs": {
+    "indexConfig": {
+      "noDictionaryColumns": ["d"]
+    }
+  }
+}

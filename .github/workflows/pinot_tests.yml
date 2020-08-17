@@ -37,11 +37,8 @@ jobs:
           RUN_INTEGRATION_TESTS: false
         run: .github/workflows/scripts/.pinot_test.sh
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v1
-        with:
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: true
+        run: |
+          bash <(curl -s https://codecov.io/bash) -cF unittests
 
   integration-test:
     runs-on: ubuntu-latest
@@ -56,17 +53,14 @@ jobs:
           RUN_INTEGRATION_TESTS: true
         run: .github/workflows/scripts/.pinot_test.sh
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v1
-        with:
-          flags: integrationtests
-          name: codecov-umbrella
-          fail_ci_if_error: true
+        run: |
+          bash <(curl -s https://codecov.io/bash) -cF integration
 
   quickstarts:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java: [ 1.8, 10, 11, 12, 13, 14-ea, 15-ea ]
+        java: [ 1.8, 10, 11, 12, 13, 14, 15-ea ]
     name: Pinot Quickstart on JDK ${{ matrix.java }}
     steps:
       - uses: actions/checkout@v2

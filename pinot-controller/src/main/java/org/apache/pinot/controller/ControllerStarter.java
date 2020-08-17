@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.controller;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.primitives.Longs;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -31,11 +35,9 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.io.FileUtils;
-import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
@@ -70,7 +72,7 @@ import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.realtime.PinotRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
-import org.apache.pinot.controller.helix.core.relocation.RealtimeSegmentRelocator;
+import org.apache.pinot.controller.helix.core.relocation.SegmentRelocator;
 import org.apache.pinot.controller.helix.core.retention.RetentionManager;
 import org.apache.pinot.controller.helix.core.statemodel.LeadControllerResourceMasterSlaveStateModelFactory;
 import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
@@ -89,11 +91,6 @@ import org.apache.pinot.spi.services.ServiceStartable;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.primitives.Longs;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.yammer.metrics.core.MetricsRegistry;
 
 
 public class ControllerStarter implements ServiceStartable {
@@ -129,7 +126,7 @@ public class ControllerStarter implements ServiceStartable {
   private OfflineSegmentIntervalChecker _offlineSegmentIntervalChecker;
   private RealtimeSegmentValidationManager _realtimeSegmentValidationManager;
   private BrokerResourceValidationManager _brokerResourceValidationManager;
-  private RealtimeSegmentRelocator _realtimeSegmentRelocator;
+  private SegmentRelocator _segmentRelocator;
   private RetentionManager _retentionManager;
   private SegmentStatusChecker _segmentStatusChecker;
   private PinotTaskManager _taskManager;
@@ -416,7 +413,7 @@ public class ControllerStarter implements ServiceStartable {
       }
     });
 
-    _adminApp.start(_listenerConfigs, ListenerConfigUtil.shouldAdvertiseAsHttps(_listenerConfigs, _config));
+    _adminApp.start(_listenerConfigs);
 
     _listenerConfigs.stream().forEach(listenerConfig -> LOGGER.info("Controller services available at {}://{}:{}/",
         listenerConfig.getProtocol(), listenerConfig.getHost(), listenerConfig.getPort()));
@@ -578,10 +575,9 @@ public class ControllerStarter implements ServiceStartable {
     _segmentStatusChecker =
         new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);
     periodicTasks.add(_segmentStatusChecker);
-    _realtimeSegmentRelocator =
-        new RealtimeSegmentRelocator(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
-            _executorService);
-    periodicTasks.add(_realtimeSegmentRelocator);
+    _segmentRelocator = new SegmentRelocator(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
+        _executorService);
+    periodicTasks.add(_segmentRelocator);
 
     return periodicTasks;
   }
@@ -688,7 +684,7 @@ public class ControllerStarter implements ServiceStartable {
     conf.setRealtimeSegmentValidationFrequencyInSeconds(3600);
     conf.setBrokerResourceValidationFrequencyInSeconds(3600);
     conf.setStatusCheckerFrequencyInSeconds(5 * 60);
-    conf.setRealtimeSegmentRelocatorFrequency("1h");
+    conf.setSegmentRelocatorFrequencyInSeconds(3600);
     conf.setStatusCheckerWaitForPushTimeInSeconds(10 * 60);
     conf.setTenantIsolationEnabled(true);
 

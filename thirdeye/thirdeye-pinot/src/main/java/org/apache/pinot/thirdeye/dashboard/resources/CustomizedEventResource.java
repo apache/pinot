@@ -19,6 +19,8 @@
 
 package org.apache.pinot.thirdeye.dashboard.resources;
 
+import com.google.inject.Inject;
+import com.google.inject.Singleton;
 import org.apache.pinot.thirdeye.anomaly.events.EventType;
 import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.ResourceUtils;
@@ -39,8 +41,8 @@ import javax.ws.rs.QueryParam;
 /**
  * Customized events resource.
  */
-@Path(value = "/events")
 @Api(tags = {Constants.RCA_TAG})
+@Singleton
 public class CustomizedEventResource {
 
   private final EventManager eventDAO;
@@ -50,6 +52,7 @@ public class CustomizedEventResource {
    *
    * @param eventDAO the event dao
    */
+  @Inject
   public CustomizedEventResource(EventManager eventDAO) {
     this.eventDAO = eventDAO;
   }

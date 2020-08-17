@@ -45,8 +45,6 @@ public class ListenerConfigUtilTest {
     Assert.assertEquals(listenerConfigs.size(), 1);
 
     assertLegacyListener(listenerConfigs.get(0));
-
-    Assert.assertTrue(ListenerConfigUtil.shouldAdvertiseAsHttps(listenerConfigs, controllerConf));
   }
 
   /**
@@ -70,8 +68,6 @@ public class ListenerConfigUtilTest {
 
     assertLegacyListener(legacyListener);
     assertHttpsListener(httpsListener, "10.0.0.10", 9443);
-
-    Assert.assertFalse(ListenerConfigUtil.shouldAdvertiseAsHttps(listenerConfigs, controllerConf));
   }
 
   /**
@@ -116,8 +112,6 @@ public class ListenerConfigUtilTest {
     Assert.assertEquals(listenerConfigs.size(), 1);
 
     assertHttpsListener(listenerConfigs.get(0), "0.0.0.0", 9443);
-
-    Assert.assertTrue(ListenerConfigUtil.shouldAdvertiseAsHttps(listenerConfigs, controllerConf));
   }
 
   /**

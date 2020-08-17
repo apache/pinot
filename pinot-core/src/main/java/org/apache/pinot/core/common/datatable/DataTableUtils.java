@@ -25,10 +25,8 @@ import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.core.util.QueryOptions;
 
 
@@ -88,8 +86,10 @@ public class DataTableUtils {
    */
   public static DataTable buildEmptyDataTable(QueryContext queryContext)
       throws IOException {
+    AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
+
     // Selection query.
-    if (!QueryContextUtils.isAggregationQuery(queryContext)) {
+    if (aggregationFunctions == null) {
       List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
       int numSelectExpressions = selectExpressions.size();
       String[] columnNames = new String[numSelectExpressions];
@@ -104,7 +104,6 @@ public class DataTableUtils {
     }
 
     // Aggregation query.
-    AggregationFunction[] aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(queryContext);
     int numAggregations = aggregationFunctions.length;
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     if (groupByExpressions != null) {

@@ -60,8 +60,7 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
     String mergedSegmentName = configs.get(MinionConstants.MergeRollupTask.MERGED_SEGMENT_NAME_KEY);
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
 
-    TableConfig tableConfig =
-        ZKMetadataProvider.getTableConfig(MINION_CONTEXT.getHelixPropertyStore(), tableNameWithType);
+    TableConfig tableConfig = getTableConfig(tableNameWithType);
 
     MergeRollupSegmentConverter rollupSegmentConverter =
         new MergeRollupSegmentConverter.Builder().setMergeType(mergeType).setTableName(tableNameWithType)

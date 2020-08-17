@@ -456,6 +456,24 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
     return this.getAnomaliesForMetricBeanAndTimeRange(mbean, start, end);
   }
 
+  @Override
+  public MergedAnomalyResultDTO findParent(MergedAnomalyResultDTO entity) {
+    List<MergedAnomalyResultBean> candidates = genericPojoDao.get(Predicate.AND(
+        Predicate.EQ("detectionConfigId", entity.getDetectionConfigId()),
+        Predicate.LE("startTime", entity.getStartTime()),
+        Predicate.GE("endTime", entity.getEndTime())), MergedAnomalyResultBean.class);
+    for (MergedAnomalyResultBean candidate : candidates) {
+      if (candidate.getChildIds() != null && !candidate.getChildIds().isEmpty()) {
+        for (Long id : candidate.getChildIds()) {
+          if (entity.getId().equals(id)) {
+            return convertMergedAnomalyBean2DTO(candidate, new HashSet<>(Collections.singleton(candidate.getId())));
+          }
+        }
+      }
+    }
+    return null;
+  }
+
   private List<MergedAnomalyResultDTO> getAnomaliesForMetricBeanAndTimeRange(MetricConfigBean mbean, long start, long end) {
 
     LOG.info("Fetching anomalies for metric '{}' and dataset '{}'", mbean.getName(), mbean.getDataset());

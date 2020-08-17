@@ -86,13 +86,6 @@
     <json.version>20170516</json.version>
     <log4j2.version>2.12.0</log4j2.version>
   </properties>
-
-  <distributionManagement>
-    <repository>
-      <id>bintray-linkedin-maven</id>
-      <url>https://api.bintray.com/maven/linkedin/maven/thirdeye/;publish=1</url>
-    </repository>
-  </distributionManagement>
   
   <licenses>
     <license>

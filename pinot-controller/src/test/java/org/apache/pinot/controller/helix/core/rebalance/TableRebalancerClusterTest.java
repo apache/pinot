@@ -18,23 +18,29 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance;
 
+import com.google.common.collect.Lists;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
+import org.apache.pinot.spi.config.tenant.Tenant;
+import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.AfterClass;
@@ -53,6 +59,12 @@ public class TableRebalancerClusterTest extends ControllerTest {
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
   private static final int NUM_REPLICAS = 3;
   private static final String SEGMENT_NAME_PREFIX = "segment_";
+
+  private static final String TIERED_TABLE_NAME = "testTable";
+  private static final String OFFLINE_TIERED_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(TIERED_TABLE_NAME);
+  private static final String NO_TIER_NAME = "noTier";
+  private static final String TIER_A_NAME = "tierA";
+  private static final String TIER_B_NAME = "tierB";
 
   @BeforeClass
   public void setUp()
@@ -302,6 +314,95 @@ public class TableRebalancerClusterTest extends ControllerTest {
     }
 
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
+  }
+
+  /**
+   * Tests rebalance with tier configs
+   * Add 10 segments, with segment metadat end time 3 days apart starting from now to 30 days ago
+   * 1. run rebalance - should see no change
+   * 2. add nodes for tiers and run rebalance - should see no change
+   * 3. add tier config and run rebalance - should see changed assignment
+   */
+  @Test
+  public void testRebalanceWithTiers()
+      throws Exception {
+    int numServers = 3;
+    for (int i = 0; i < numServers; i++) {
+      addFakeServerInstanceToAutoJoinHelixCluster(NO_TIER_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + i, false);
+    }
+    _helixResourceManager.createServerTenant(new Tenant(TenantRole.SERVER, NO_TIER_NAME, numServers, numServers, 0));
+
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TIERED_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
+            .setServerTenant(NO_TIER_NAME).build();
+    // Create the table
+    _helixResourceManager.addTable(tableConfig);
+
+    // Add the segments
+    int numSegments = 10;
+    long nowInDays = TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis());
+    // keep decreasing end time from today in steps of 3. 3 segments don't move. 3 segment on tierA. 4 segments on tierB
+    for (int i = 0; i < numSegments; i++) {
+      _helixResourceManager.addNewSegment(TIERED_TABLE_NAME, SegmentMetadataMockUtils
+          .mockSegmentMetadataWithEndTimeInfo(TIERED_TABLE_NAME, SEGMENT_NAME_PREFIX + i, nowInDays), null);
+      nowInDays -= 3;
+    }
+    Map<String, Map<String, String>> oldSegmentAssignment =
+        _helixResourceManager.getTableIdealState(OFFLINE_TIERED_TABLE_NAME).getRecord().getMapFields();
+
+    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager);
+    RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, new BaseConfiguration());
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
+    // Segment assignment should not change
+    assertEquals(rebalanceResult.getSegmentAssignment(), oldSegmentAssignment);
+
+    // add 3 nodes tierA, 3 nodes tierB
+    for (int i = 0; i < 3; i++) {
+      addFakeServerInstanceToAutoJoinHelixCluster(TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + i, false);
+    }
+    _helixResourceManager.createServerTenant(new Tenant(TenantRole.SERVER, TIER_A_NAME, 3, 3, 0));
+    for (int i = 0; i < 3; i++) {
+      addFakeServerInstanceToAutoJoinHelixCluster(TIER_B_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + i, false);
+    }
+    _helixResourceManager.createServerTenant(new Tenant(TenantRole.SERVER, TIER_B_NAME, 3, 3, 0));
+
+    // rebalance is NOOP and no change in assignment caused by new instances
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, new BaseConfiguration());
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
+    // Segment assignment should not change
+    assertEquals(rebalanceResult.getSegmentAssignment(), oldSegmentAssignment);
+
+    // add tier config
+    tableConfig.setTierConfigsList(Lists.newArrayList(
+        new TierConfig(TIER_A_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "7d",
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, TIER_A_NAME + "_OFFLINE"),
+        new TierConfig(TIER_B_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "15d",
+            TierFactory.PINOT_SERVER_STORAGE_TYPE,  TIER_B_NAME + "_OFFLINE")));
+    _helixResourceManager.updateTableConfig(tableConfig);
+
+    // rebalance should change assignment
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, new BaseConfiguration());
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+
+    // check that segments have moved to tiers
+    Map<String, Map<String, String>> tierSegmentAssignment = rebalanceResult.getSegmentAssignment();
+    for (Map.Entry<String, Map<String, String>> entry : tierSegmentAssignment.entrySet()) {
+      int segId = Integer.parseInt(entry.getKey().split("_")[1]);
+      Map<String, String> instanceStateMap = entry.getValue();
+      String expectedPrefix;
+      if (segId > 4) {
+        expectedPrefix = TIER_B_NAME + "_" + SERVER_INSTANCE_ID_PREFIX;
+      } else if (segId > 2) {
+        expectedPrefix = TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX;
+      } else {
+        expectedPrefix = NO_TIER_NAME + "_" + SERVER_INSTANCE_ID_PREFIX;
+      }
+      for (String instance : instanceStateMap.keySet()) {
+        assertTrue(instance.startsWith(expectedPrefix));
+      }
+    }
+
+    _helixResourceManager.deleteOfflineTable(TIERED_TABLE_NAME);
   }
 
   @AfterClass

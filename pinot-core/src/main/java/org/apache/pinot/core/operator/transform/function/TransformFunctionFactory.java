@@ -27,15 +27,15 @@ import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.geospatial.transform.function.StContainsFunction;
-import org.apache.pinot.core.geospatial.transform.function.StDistanceFunction;
 import org.apache.pinot.core.geospatial.transform.function.StAreaFunction;
 import org.apache.pinot.core.geospatial.transform.function.StAsBinaryFunction;
+import org.apache.pinot.core.geospatial.transform.function.StAsTextFunction;
+import org.apache.pinot.core.geospatial.transform.function.StContainsFunction;
+import org.apache.pinot.core.geospatial.transform.function.StDistanceFunction;
 import org.apache.pinot.core.geospatial.transform.function.StEqualsFunction;
 import org.apache.pinot.core.geospatial.transform.function.StGeogFromTextFunction;
 import org.apache.pinot.core.geospatial.transform.function.StGeogFromWKBFunction;
 import org.apache.pinot.core.geospatial.transform.function.StGeomFromTextFunction;
-import org.apache.pinot.core.geospatial.transform.function.StAsTextFunction;
 import org.apache.pinot.core.geospatial.transform.function.StGeomFromWKBFunction;
 import org.apache.pinot.core.geospatial.transform.function.StGeometryTypeFunction;
 import org.apache.pinot.core.geospatial.transform.function.StPointFunction;
@@ -161,6 +161,9 @@ public class TransformFunctionFactory {
       case FUNCTION:
         FunctionContext function = expression.getFunction();
         String functionName = function.getFunctionName();
+        List<ExpressionContext> arguments = function.getArguments();
+        int numArguments = arguments.size();
+
         TransformFunction transformFunction;
         Class<? extends TransformFunction> transformFunctionClass = TRANSFORM_FUNCTION_MAP.get(functionName);
         if (transformFunctionClass != null) {
@@ -172,19 +175,15 @@ public class TransformFunctionFactory {
           }
         } else {
           // Scalar function
-          FunctionInfo functionInfo = FunctionRegistry.getFunctionByName(functionName);
+          FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
           if (functionInfo == null) {
-            throw new BadQueryRequestException("Unsupported transform function: " + functionName);
+            throw new BadQueryRequestException(
+                String.format("Unsupported function: %s with %d parameters", functionName, numArguments));
           }
-          try {
-            transformFunction = new ScalarTransformFunctionWrapper(functionName, functionInfo);
-          } catch (Exception e) {
-            throw new RuntimeException("Caught exception while constructing scalar transform function: " + functionName,
-                e);
-          }
+          transformFunction = new ScalarTransformFunctionWrapper(functionInfo);
         }
-        List<ExpressionContext> arguments = function.getArguments();
-        List<TransformFunction> transformFunctionArguments = new ArrayList<>(arguments.size());
+
+        List<TransformFunction> transformFunctionArguments = new ArrayList<>(numArguments);
         for (ExpressionContext argument : arguments) {
           transformFunctionArguments.add(TransformFunctionFactory.get(argument, dataSourceMap));
         }

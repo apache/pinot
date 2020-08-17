@@ -19,20 +19,14 @@
 
 package org.apache.pinot.thirdeye.dashboard.resources;
 
+import com.google.inject.Inject;
+import com.google.inject.Singleton;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.auto.onboard.AutoOnboard;
 import org.apache.pinot.thirdeye.auto.onboard.AutoOnboardUtility;
 import org.apache.pinot.thirdeye.common.ThirdEyeConfiguration;
-import org.apache.pinot.thirdeye.datasource.DataSourceConfig;
-import org.apache.pinot.thirdeye.datasource.DataSources;
-import org.apache.pinot.thirdeye.datasource.DataSourcesLoader;
-import org.apache.pinot.thirdeye.datasource.MetadataSourceConfig;
-import java.lang.reflect.Constructor;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.ws.rs.POST;
@@ -42,21 +36,19 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
-import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * Endpoints for triggering adhoc onboard on auto onboard services
  */
-@Path(value = "/autoOnboard")
 @Produces(MediaType.APPLICATION_JSON)
 @Api(tags = {Constants.DASHBOARD_TAG})
+@Singleton
 public class AutoOnboardResource {
 
   private Map<String, List<AutoOnboard>> dataSourceToOnboardMap;
 
+  @Inject
   public AutoOnboardResource(ThirdEyeConfiguration thirdeyeConfig) {
     dataSourceToOnboardMap = AutoOnboardUtility.getDataSourceToAutoOnboardMap(thirdeyeConfig.getDataSourcesAsUrl());
   }

@@ -1,0 +1,69 @@
+{
+  "schema":{
+    "schemaName": "tableSchema",
+    "dimensionFieldSpecs": [
+      {
+        "name": "a",
+        "dataType": "INT",
+        "cardinality":256,
+        "numValuesPerEntry":1
+      },
+      {
+        "name": "b",
+        "dataType": "DOUBLE",
+        "cardinality":257,
+        "numValuesPerEntry":1
+      },
+      {
+        "name": "c",
+        "dataType": "DOUBLE",
+        "cardinality":2000,
+        "numValuesPerEntry":4
+      },
+      {
+        "name": "d",
+        "dataType": "STRING",
+        "cardinality":1000,
+        "numValuesPerEntry":2,
+        "averageLength" : 27
+      }
+    ],
+    "metricFieldSpecs": [
+      {
+        "name": "k",
+        "dataType": "DOUBLE",
+        "cardinality":65537,
+        "numValuesPerEntry":2
+      }
+    ],
+    "timeFieldSpec": {
+      "incomingGranularitySpec": {
+        "dataType": "INT",
+        "name": "t",
+        "timeType": "DAYS",
+        "cardinality":10000,
+        "numValuesPerEntry":1
+      }
+    }
+  },
+
+  "queriesWithWeights":{
+    "select i from tableName where b in (2,4) and ((a in (1,2,3) and e = 4) or c = 7) and d in ('#VALUES', 23) and t > 500": 1,
+    "select j from tableName where (a=3 and (h = 5 or f >34) and REGEXP_LIKE(i, 'as*')) or ((f = 3  or j in ('#VALUES', 4)) and REGEXP_LIKE(d, 'fl*'))": 2,
+    "select f from tableName where (a=0 or (b=1 and (e in ('#VALUES',2) or c=7))) and TEXT_MATCH(d, 'dasd') and MAX(MAX(h,i),j)=4 and t<3": 4,
+    "select f from tableName where (a=0 and b=1) or c=7 or (d = 7 and e =1)": 2,
+    "select f from tableName where t between 1 and 1000": 2
+  },
+
+  "qps": 15000,
+  "numMessagesPerSecInKafKaTopic":1000,
+  "numRecordsPerPush":1000000000,
+  "tableType": "HYBRID",
+  "latencySLA": 500,
+
+  "overWrittenConfigs": {
+    "indexConfig": {
+      "noDictionaryColumns": ["a"]
+    }
+  }
+}

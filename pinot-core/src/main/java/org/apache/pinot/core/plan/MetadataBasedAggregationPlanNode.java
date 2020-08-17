@@ -25,7 +25,6 @@ import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.query.MetadataBasedAggregationOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
@@ -47,7 +46,8 @@ public class MetadataBasedAggregationPlanNode implements PlanNode {
    */
   public MetadataBasedAggregationPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
     _indexSegment = indexSegment;
-    _aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(queryContext);
+    _aggregationFunctions = queryContext.getAggregationFunctions();
+    assert _aggregationFunctions != null;
     _dataSourceMap = new HashMap<>();
     for (AggregationFunction aggregationFunction : _aggregationFunctions) {
       if (aggregationFunction.getType() != AggregationFunctionType.COUNT) {

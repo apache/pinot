@@ -25,7 +25,6 @@ import java.util.concurrent.locks.Lock;
 import javax.annotation.Nullable;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
@@ -43,6 +42,7 @@ import org.apache.pinot.spi.crypt.PinotCrypter;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -196,16 +196,22 @@ public class SegmentFetcherAndLoader {
     File tempTarFile = new File(tempDir, segmentName + TAR_GZ_SUFFIX);
     File tempSegmentDir = new File(tempDir, segmentName);
     try {
-      SegmentFetcherFactory.fetchSegmentToLocal(uri, tempDownloadFile);
-      if (crypter != null) {
-        crypter.decrypt(tempDownloadFile, tempTarFile);
-      } else {
-        tempTarFile = tempDownloadFile;
+      try {
+        SegmentFetcherFactory.fetchSegmentToLocal(uri, tempDownloadFile);
+        if (crypter != null) {
+          crypter.decrypt(tempDownloadFile, tempTarFile);
+        } else {
+          tempTarFile = tempDownloadFile;
+        }
+        LOGGER.info("Downloaded tarred segment: {} for table: {} from: {} to: {}, file length: {}", segmentName,
+            tableName, uri, tempTarFile, tempTarFile.length());
+      } catch (AttemptsExceededException e) {
+        LOGGER.error("Attempts exceeded when downloading segment: {} for table: {} from: {} to: {}", segmentName,
+            tableName, uri, tempTarFile);
+        _serverMetrics.addMeteredTableValue(tableName, ServerMeter.SEGMENT_DOWNLOAD_FAILURES, 1L);
+        Utils.rethrowException(e);
+        return null;
       }
-
-      LOGGER
-          .info("Downloaded tarred segment: {} for table: {} from: {} to: {}, file length: {}", segmentName, tableName,
-              uri, tempTarFile, tempTarFile.length());
 
       try {
         // If an exception is thrown when untarring, it means the tar file is broken OR not found after the retry.
@@ -220,6 +226,8 @@ public class SegmentFetcherAndLoader {
         LOGGER.info("Successfully downloaded segment: {} for table: {} to: {}", segmentName, tableName, indexDir);
         return indexDir.getAbsolutePath();
       } catch (Exception e) {
+        LOGGER.error("Exception when untarring segment: {} for table: {} from {} to {}", segmentName, tableName,
+            tempTarFile, tempSegmentDir);
         _serverMetrics.addMeteredTableValue(tableName, ServerMeter.UNTAR_FAILURES, 1L);
         Utils.rethrowException(e);
         return null;

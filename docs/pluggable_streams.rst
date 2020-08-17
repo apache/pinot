@@ -268,6 +268,62 @@ confluent schema registry:
     }
   }
 
+Here is another example which uses SSL based authentication to talk with kafka
+and schema-registry. Notice there are two sets of SSL options, ones starting with
+`ssl.` are for kafka consumer and ones with `stream.kafka.decoder.prop.schema.registry.`
+are for `SchemaRegistryClient` used by `KafkaConfluentSchemaRegistryAvroMessageDecoder`.
+
+
+.. code-block:: none
+
+  {
+    "tableName": "meetupRsvp",
+    "tableType": "REALTIME",
+    "segmentsConfig": {
+      "timeColumnName": "mtime",
+      "timeType": "MILLISECONDS",
+      "segmentPushType": "APPEND",
+      "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+      "schemaName": "meetupRsvp",
+      "replication": "1",
+      "replicasPerPartition": "1"
+    },
+    "tenants": {},
+    "tableIndexConfig": {
+      "loadMode": "MMAP",
+      "streamConfigs": {
+        "streamType": "kafka",
+        "stream.kafka.consumer.type": "LowLevel",
+        "stream.kafka.topic.name": "meetupRSVPEvents",
+        "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.inputformat.avro.confluent.KafkaConfluentSchemaRegistryAvroMessageDecoder",
+        "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
+        "stream.kafka.zk.broker.url": "localhost:2191/kafka",
+        "stream.kafka.broker.list": "localhost:19092",
+
+        "schema.registry.url": "",
+        "security.protocol": "",
+        "ssl.truststore.location": "",
+        "ssl.keystore.location": "",
+        "ssl.truststore.password": "",
+        "ssl.keystore.password": "",
+        "ssl.key.password": "",
+
+        "stream.kafka.decoder.prop.schema.registry.rest.url": "",
+        "stream.kafka.decoder.prop.schema.registry.ssl.truststore.location": "",
+        "stream.kafka.decoder.prop.schema.registry.ssl.keystore.location": "",
+        "stream.kafka.decoder.prop.schema.registry.ssl.truststore.password": "",
+        "stream.kafka.decoder.prop.schema.registry.ssl.keystore.password": "",
+        "stream.kafka.decoder.prop.schema.registry.ssl.keystore.type": "",
+        "stream.kafka.decoder.prop.schema.registry.ssl.truststore.type": "",
+        "stream.kafka.decoder.prop.schema.registry.ssl.key.password": "",
+        "stream.kafka.decoder.prop.schema.registry.ssl.protocol": "",
+      }
+    },
+    "metadata": {
+      "customConfigs": {}
+    }
+  }
+
 Upgrade from Kafka 0.9 connector to Kafka 2.x connector
 -------------------------------------------------------
 

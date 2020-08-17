@@ -25,10 +25,13 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import com.google.inject.Singleton;
 import java.net.URLDecoder;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.ws.rs.DefaultValue;
@@ -48,8 +51,9 @@ import org.apache.pinot.thirdeye.cube.entry.MultiDimensionalSummary;
 import org.apache.pinot.thirdeye.cube.entry.MultiDimensionalSummaryCLITool;
 import org.apache.pinot.thirdeye.cube.ratio.RatioDBClient;
 import org.apache.pinot.thirdeye.cube.summary.SummaryResponse;
-import org.apache.pinot.thirdeye.dashboard.Utils;
+import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
@@ -63,11 +67,13 @@ import static org.apache.pinot.thirdeye.common.constants.rca.MultiDimensionalSum
 import static org.apache.pinot.thirdeye.common.constants.rca.RootCauseResourceConstants.*;
 
 
-@Path(value = "/dashboard")
+@Singleton
 public class SummaryResource {
   private static final Logger LOG = LoggerFactory.getLogger(SummaryResource.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
+  private static final MetricConfigManager metricConfigDAO = DAORegistry.getInstance().getMetricConfigDAO();
+  private static final DatasetConfigManager datasetConfigDAO = DAORegistry.getInstance().getDatasetConfigDAO();
 
   public static final String DEFAULT_TIMEZONE_ID = "UTC";
   public static final String DEFAULT_DEPTH = "3";
@@ -86,7 +92,6 @@ public class SummaryResource {
 
   private MetricConfigDTO fetchMetricConfig(String metricUrn, String metric, String dataset) {
     MetricConfigDTO metricConfigDTO;
-    MetricConfigManager metricConfigDAO = DAORegistry.getInstance().getMetricConfigDAO();
     if (StringUtils.isNotBlank(metricUrn)) {
       metricConfigDTO = metricConfigDAO.findById(MetricEntity.fromURN(metricUrn).getId());
     } else {
@@ -95,25 +100,10 @@ public class SummaryResource {
     return metricConfigDTO;
   }
 
-  @GET
-  @Path(value = "/summary/autoDimensionOrder")
-  @Produces(MediaType.APPLICATION_JSON)
-  public String buildSummary(
-      @QueryParam(METRIC_URN) String metricUrn,
-      @QueryParam("dataset") String dataset,
-      @QueryParam("metric") String metric,
-      @QueryParam(CURRENT_START) long currentStartInclusive,
-      @QueryParam(CURRENT_END) long currentEndExclusive,
-      @QueryParam(BASELINE_START) long baselineStartInclusive,
-      @QueryParam(BASELINE_END) long baselineEndExclusive,
-      @QueryParam("dimensions") String groupByDimensions,
-      @QueryParam("filters") String filterJsonPayload,
-      @QueryParam(CUBE_SUMMARY_SIZE) int summarySize,
-      @QueryParam(CUBE_DEPTH) @DefaultValue(DEFAULT_DEPTH) int depth,
-      @QueryParam(CUBE_DIM_HIERARCHIES) @DefaultValue(DEFAULT_HIERARCHIES) String hierarchiesPayload,
-      @QueryParam(CUBE_ONE_SIDE_ERROR) @DefaultValue(DEFAULT_ONE_SIDE_ERROR) boolean doOneSideError,
-      @QueryParam(CUBE_EXCLUDED_DIMENSIONS) @DefaultValue(DEFAULT_EXCLUDED_DIMENSIONS) String excludedDimensions,
-      @QueryParam(TIME_ZONE) @DefaultValue(DEFAULT_TIMEZONE_ID) String timeZone) throws Exception {
+  private SummaryResponse buildDataCubeSummary(String metricUrn, String dataset, String metric, long currentStartInclusive,
+      long currentEndExclusive, long baselineStartInclusive, long baselineEndExclusive, String groupByDimensions,
+      String filterJsonPayload, int summarySize, int depth, String hierarchiesPayload, boolean doOneSideError,
+      String excludedDimensions, String timeZone) throws Exception {
     if (summarySize < 1) summarySize = 1;
 
     String metricName = metric;
@@ -128,8 +118,12 @@ public class SummaryResource {
 
       Dimensions dimensions;
       if (StringUtils.isBlank(groupByDimensions) || JAVASCRIPT_NULL_STRING.equals(groupByDimensions)) {
-        dimensions =
-            MultiDimensionalSummaryCLITool.sanitizeDimensions(new Dimensions(Utils.getSchemaDimensionNames(datasetName)));
+        DatasetConfigDTO datasetConfigDTO = datasetConfigDAO.findByDataset(dataset);
+        List<String> dimensionNames = new ArrayList<>();
+        if (datasetConfigDTO != null) {
+          dimensionNames = datasetConfigDTO.getDimensions();
+        }
+        dimensions = MultiDimensionalSummaryCLITool.sanitizeDimensions(new Dimensions(dimensionNames));
       } else {
         dimensions = new Dimensions(Arrays.asList(groupByDimensions.trim().split(",")));
       }
@@ -172,11 +166,62 @@ public class SummaryResource {
         response = SummaryResponse.buildNotAvailableResponse(datasetName, metricName);
       }
     }
+
+    return response;
+  }
+
+  @GET
+  @Path("autoDimensionOrder/v2")
+  @Produces(MediaType.APPLICATION_JSON)
+  public Map<String, Object> getDataCubeSummary(
+      @QueryParam(METRIC_URN) String metricUrn,
+      @QueryParam("dataset") String dataset,
+      @QueryParam("metric") String metric,
+      @QueryParam(CURRENT_START) long currentStartInclusive,
+      @QueryParam(CURRENT_END) long currentEndExclusive,
+      @QueryParam(BASELINE_START) long baselineStartInclusive,
+      @QueryParam(BASELINE_END) long baselineEndExclusive,
+      @QueryParam("dimensions") String groupByDimensions,
+      @QueryParam("filters") String filterJsonPayload,
+      @QueryParam(CUBE_SUMMARY_SIZE) int summarySize,
+      @QueryParam(CUBE_DEPTH) @DefaultValue(DEFAULT_DEPTH) int depth,
+      @QueryParam(CUBE_DIM_HIERARCHIES) @DefaultValue(DEFAULT_HIERARCHIES) String hierarchiesPayload,
+      @QueryParam(CUBE_ONE_SIDE_ERROR) @DefaultValue(DEFAULT_ONE_SIDE_ERROR) boolean doOneSideError,
+      @QueryParam(CUBE_EXCLUDED_DIMENSIONS) @DefaultValue(DEFAULT_EXCLUDED_DIMENSIONS) String excludedDimensions,
+      @QueryParam(TIME_ZONE) @DefaultValue(DEFAULT_TIMEZONE_ID) String timeZone) throws Exception {
+    SummaryResponse response = buildDataCubeSummary(metricUrn, metric, dataset, currentStartInclusive, currentEndExclusive, baselineStartInclusive,
+        baselineEndExclusive, groupByDimensions, filterJsonPayload, summarySize, depth, hierarchiesPayload,
+        doOneSideError, excludedDimensions, timeZone);
+    return OBJECT_MAPPER.convertValue(response, Map.class);
+  }
+
+  @GET
+  @Path("autoDimensionOrder")
+  @Produces(MediaType.APPLICATION_JSON)
+  public String buildSummary(
+      @QueryParam(METRIC_URN) String metricUrn,
+      @QueryParam("dataset") String dataset,
+      @QueryParam("metric") String metric,
+      @QueryParam(CURRENT_START) long currentStartInclusive,
+      @QueryParam(CURRENT_END) long currentEndExclusive,
+      @QueryParam(BASELINE_START) long baselineStartInclusive,
+      @QueryParam(BASELINE_END) long baselineEndExclusive,
+      @QueryParam("dimensions") String groupByDimensions,
+      @QueryParam("filters") String filterJsonPayload,
+      @QueryParam(CUBE_SUMMARY_SIZE) int summarySize,
+      @QueryParam(CUBE_DEPTH) @DefaultValue(DEFAULT_DEPTH) int depth,
+      @QueryParam(CUBE_DIM_HIERARCHIES) @DefaultValue(DEFAULT_HIERARCHIES) String hierarchiesPayload,
+      @QueryParam(CUBE_ONE_SIDE_ERROR) @DefaultValue(DEFAULT_ONE_SIDE_ERROR) boolean doOneSideError,
+      @QueryParam(CUBE_EXCLUDED_DIMENSIONS) @DefaultValue(DEFAULT_EXCLUDED_DIMENSIONS) String excludedDimensions,
+      @QueryParam(TIME_ZONE) @DefaultValue(DEFAULT_TIMEZONE_ID) String timeZone) throws Exception {
+    SummaryResponse response = buildDataCubeSummary(metricUrn, metric, dataset, currentStartInclusive, currentEndExclusive, baselineStartInclusive,
+        baselineEndExclusive, groupByDimensions, filterJsonPayload, summarySize, depth, hierarchiesPayload,
+        doOneSideError, excludedDimensions, timeZone);
     return OBJECT_MAPPER.writeValueAsString(response);
   }
 
   @GET
-  @Path(value = "/summary/manualDimensionOrder")
+  @Path("manualDimensionOrder")
   @Produces(MediaType.APPLICATION_JSON)
   public String buildSummaryManualDimensionOrder(
       @QueryParam(METRIC_URN) String metricUrn,
@@ -203,9 +248,12 @@ public class SummaryResource {
         datasetName = metricConfigDTO.getDataset();
       }
 
-      List<String> allDimensions;
+      List<String> allDimensions = new ArrayList<>();
       if (StringUtils.isBlank(groupByDimensions) || JAVASCRIPT_NULL_STRING.equals(groupByDimensions)) {
-        allDimensions = Utils.getSchemaDimensionNames(dataset);
+        DatasetConfigDTO datasetConfigDTO = datasetConfigDAO.findByDataset(dataset);
+        if (datasetConfigDTO != null) {
+          allDimensions = datasetConfigDTO.getDimensions();
+        }
       } else {
         allDimensions = Arrays.asList(groupByDimensions.trim().split(","));
       }
@@ -304,8 +352,6 @@ public class SummaryResource {
       Multimap<String, String> dataFilters, int summarySize, int depth, List<List<String>> hierarchies,
       boolean doOneSideError) throws Exception {
     Preconditions.checkNotNull(metricConfigDTO);
-
-    MetricConfigManager metricConfigDAO = DAORegistry.getInstance().getMetricConfigDAO();
 
     // Construct regular expression parser
     String derivedMetricExpression = metricConfigDTO.getDerivedMetricExpression();

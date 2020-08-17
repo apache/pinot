@@ -39,18 +39,16 @@ import org.slf4j.LoggerFactory;
 public abstract class BaseChunkSVForwardIndexReader implements ForwardIndexReader<BaseChunkSVForwardIndexReader.ChunkReaderContext> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseChunkSVForwardIndexReader.class);
 
-  protected final int _chunkSize;
-  protected final int _numDocsPerChunk;
+  protected final PinotDataBuffer _dataBuffer;
+  protected final DataType _valueType;
   protected final int _numChunks;
+  protected final int _numDocsPerChunk;
   protected final int _lengthOfLongestEntry;
   protected final boolean _isCompressed;
+  protected final ChunkDecompressor _chunkDecompressor;
+  protected final PinotDataBuffer _dataHeader;
+  protected final int _headerEntryChunkOffsetSize;
   protected final PinotDataBuffer _rawData;
-
-  private final PinotDataBuffer _dataBuffer;
-  private final DataType _valueType;
-  private final PinotDataBuffer _dataHeader;
-  private final ChunkDecompressor _chunkDecompressor;
-  private final int _headerEntryChunkOffsetSize;
 
   public BaseChunkSVForwardIndexReader(PinotDataBuffer dataBuffer, DataType valueType) {
     _dataBuffer = dataBuffer;
@@ -89,7 +87,6 @@ public abstract class BaseChunkSVForwardIndexReader implements ForwardIndexReade
       _chunkDecompressor = ChunkCompressorFactory.getDecompressor(ChunkCompressorFactory.CompressionType.SNAPPY);
     }
 
-    _chunkSize = (_lengthOfLongestEntry * _numDocsPerChunk);
     _headerEntryChunkOffsetSize = BaseChunkSVForwardIndexWriter.getHeaderEntryChunkOffsetSize(version);
 
     // Slice out the header from the data buffer.
@@ -146,7 +143,7 @@ public abstract class BaseChunkSVForwardIndexReader implements ForwardIndexReade
    * @param chunkId Id of the chunk for which to return the position.
    * @return Position (offset) of the chunk in the data.
    */
-  private long getChunkPosition(int chunkId) {
+  protected long getChunkPosition(int chunkId) {
     if (_headerEntryChunkOffsetSize == Integer.BYTES) {
       return _dataHeader.getInt(chunkId * _headerEntryChunkOffsetSize);
     } else {

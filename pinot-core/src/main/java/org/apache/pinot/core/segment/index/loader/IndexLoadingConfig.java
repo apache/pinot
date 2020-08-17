@@ -60,8 +60,8 @@ public class IndexLoadingConfig {
   private ColumnMinMaxValueGeneratorMode _columnMinMaxValueGeneratorMode = ColumnMinMaxValueGeneratorMode.DEFAULT_MODE;
   private int _realtimeAvgMultiValueCount = DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT;
   private boolean _enableSplitCommit;
-  private boolean _isRealtimeOffheapAllocation;
-  private boolean _isDirectRealtimeOffheapAllocation;
+  private boolean _isRealtimeOffHeapAllocation;
+  private boolean _isDirectRealtimeOffHeapAllocation;
   private boolean _enableSplitCommitEndWithMetadata;
   private String _segmentStoreURI;
 
@@ -179,8 +179,8 @@ public class IndexLoadingConfig {
 
     _enableSplitCommit = instanceDataManagerConfig.isEnableSplitCommit();
 
-    _isRealtimeOffheapAllocation = instanceDataManagerConfig.isRealtimeOffHeapAllocation();
-    _isDirectRealtimeOffheapAllocation = instanceDataManagerConfig.isDirectRealtimeOffheapAllocation();
+    _isRealtimeOffHeapAllocation = instanceDataManagerConfig.isRealtimeOffHeapAllocation();
+    _isDirectRealtimeOffHeapAllocation = instanceDataManagerConfig.isDirectRealtimeOffHeapAllocation();
 
     String avgMultiValueCount = instanceDataManagerConfig.getAvgMultiValueCount();
     if (avgMultiValueCount != null) {
@@ -323,12 +323,12 @@ public class IndexLoadingConfig {
     return _enableSplitCommitEndWithMetadata;
   }
 
-  public boolean isRealtimeOffheapAllocation() {
-    return _isRealtimeOffheapAllocation;
+  public boolean isRealtimeOffHeapAllocation() {
+    return _isRealtimeOffHeapAllocation;
   }
 
-  public boolean isDirectRealtimeOffheapAllocation() {
-    return _isDirectRealtimeOffheapAllocation;
+  public boolean isDirectRealtimeOffHeapAllocation() {
+    return _isDirectRealtimeOffHeapAllocation;
   }
 
   public ColumnMinMaxValueGeneratorMode getColumnMinMaxValueGeneratorMode() {

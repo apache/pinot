@@ -262,6 +262,44 @@ public class TestMergedAnomalyResultManager{
     Assert.assertEquals(read.getChildren().iterator().next().getChildren().iterator().next().getChildren().iterator().next().getStartTime(), 1600);
   }
 
+  @Test
+  public void testFindParent() {
+    MergedAnomalyResultDTO top = new MergedAnomalyResultDTO();
+    top.setDetectionConfigId(1L);
+    top.setStartTime(1000);
+    top.setEndTime(3000);
+
+    MergedAnomalyResultDTO child1 = new MergedAnomalyResultDTO();
+    child1.setDetectionConfigId(1L);
+    child1.setStartTime(1000);
+    child1.setEndTime(2000);
+
+    MergedAnomalyResultDTO child2 = new MergedAnomalyResultDTO();
+    child2.setDetectionConfigId(1L);
+    child2.setStartTime(1200);
+    child2.setEndTime(1800);
+
+    MergedAnomalyResultDTO child3 = new MergedAnomalyResultDTO();
+    child3.setDetectionConfigId(1L);
+    child3.setStartTime(1500);
+    child3.setEndTime(3000);
+
+    child1.setChildren(new HashSet<>(Collections.singletonList(child2)));
+    top.setChildren(new HashSet<>(Arrays.asList(child1, child3)));
+
+    long topId = this.mergedAnomalyResultDAO.save(top);
+    MergedAnomalyResultDTO topNode = this.mergedAnomalyResultDAO.findById(topId);
+    MergedAnomalyResultDTO parent = null;
+    MergedAnomalyResultDTO leafNode = null;
+    for (MergedAnomalyResultDTO intermediate : topNode.getChildren()) {
+      if (!intermediate.getChildren().isEmpty()) {
+        parent = intermediate;
+        leafNode = intermediate.getChildren().iterator().next();
+      }
+    }
+    Assert.assertNotNull(parent);
+    Assert.assertEquals(parent, this.mergedAnomalyResultDAO.findParent(leafNode));
+  }
 
   public static DetectionConfigDTO mockDetectionConfig() {
     DetectionConfigDTO detectionConfig = new DetectionConfigDTO();

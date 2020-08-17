@@ -118,9 +118,15 @@ public class ThirdEyeAnomalyApplication
         requestStatisticsLogger.start();
 
         if (config.isWorker()) {
-          taskDriver = new TaskDriver(config);
+          taskDriver = new TaskDriver(config, false);
           taskDriver.start();
         }
+
+        if (config.isOnlineWorker()) {
+          taskDriver = new TaskDriver(config, true);
+          taskDriver.start();
+        }
+
         if (config.isMonitor()) {
           monitorJobScheduler = new MonitorJobScheduler(config.getMonitorConfiguration());
           monitorJobScheduler.start();

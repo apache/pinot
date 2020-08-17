@@ -19,6 +19,8 @@
 
 package org.apache.pinot.thirdeye.dashboard.resources;
 
+import com.google.inject.Inject;
+import com.google.inject.Singleton;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -28,9 +30,30 @@ import org.apache.pinot.thirdeye.dashboard.views.ThirdEyeView;
 
 import io.dropwizard.views.View;
 
-@Path(value = "/thirdeye")
 @Produces(MediaType.APPLICATION_JSON)
+@Singleton
 public class ThirdEyeResource {
+
+  private final AnomalyFlattenResource anomalyFlattenResource;
+  private final EntityManagerResource entityManagerResource;
+
+  @Inject
+  public ThirdEyeResource(
+      final AnomalyFlattenResource anomalyFlattenResource,
+      final EntityManagerResource entityManagerResource) {
+    this.anomalyFlattenResource = anomalyFlattenResource;
+    this.entityManagerResource = entityManagerResource;
+  }
+
+  @Path("table")
+  public AnomalyFlattenResource getAnomalyFlattenResource() {
+    return anomalyFlattenResource;
+  }
+
+  @Path("entity")
+  public EntityManagerResource getEntityManagerResource() {
+    return entityManagerResource;
+  }
 
   @GET
   @Path(value = "/")

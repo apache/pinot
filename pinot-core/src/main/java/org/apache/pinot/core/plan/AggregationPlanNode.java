@@ -46,7 +46,8 @@ public class AggregationPlanNode implements PlanNode {
 
   public AggregationPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
     _indexSegment = indexSegment;
-    _aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(queryContext);
+    _aggregationFunctions = queryContext.getAggregationFunctions();
+    assert _aggregationFunctions != null;
 
     List<StarTreeV2> starTrees = indexSegment.getStarTrees();
     if (starTrees != null) {

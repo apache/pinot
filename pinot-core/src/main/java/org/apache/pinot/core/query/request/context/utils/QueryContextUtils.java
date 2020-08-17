@@ -21,9 +21,9 @@ package org.apache.pinot.core.query.request.context.utils;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.FilterContext;
-import org.apache.pinot.core.query.request.context.FunctionContext;
 import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
@@ -35,6 +35,7 @@ public class QueryContextUtils {
   /**
    * Returns all the columns (IDENTIFIER expressions) in the given query.
    */
+  @SuppressWarnings({"rawtypes", "unchecked"})
   public static Set<String> getAllColumns(QueryContext query) {
     Set<String> columns = new HashSet<>();
 
@@ -51,15 +52,28 @@ public class QueryContextUtils {
         expression.getColumns(columns);
       }
     }
+    FilterContext havingFilter = query.getHavingFilter();
+    if (havingFilter != null) {
+      havingFilter.getColumns(columns);
+    }
     List<OrderByExpressionContext> orderByExpressions = query.getOrderByExpressions();
     if (orderByExpressions != null) {
       for (OrderByExpressionContext orderByExpression : orderByExpressions) {
         orderByExpression.getColumns(columns);
       }
     }
-    FilterContext havingFilter = query.getHavingFilter();
-    if (havingFilter != null) {
-      havingFilter.getColumns(columns);
+
+    // NOTE: Also gather columns from the input expressions of the aggregation functions because for certain types of
+    //       aggregation (e.g. DistinctCountThetaSketch), some input expressions are compiled while constructing the
+    //       aggregation function.
+    AggregationFunction[] aggregationFunctions = query.getAggregationFunctions();
+    if (aggregationFunctions != null) {
+      for (AggregationFunction aggregationFunction : aggregationFunctions) {
+        List<ExpressionContext> inputExpressions = aggregationFunction.getInputExpressions();
+        for (ExpressionContext expression : inputExpressions) {
+          expression.getColumns(columns);
+        }
+      }
     }
 
     return columns;
@@ -67,24 +81,8 @@ public class QueryContextUtils {
 
   /**
    * Returns {@code true} if the given query is an aggregation query, {@code false} otherwise.
-   * <p>A query is an aggregation query if there are aggregation functions in the SELECT clause or ORDER-BY clause.
    */
   public static boolean isAggregationQuery(QueryContext query) {
-    for (ExpressionContext selectExpression : query.getSelectExpressions()) {
-      FunctionContext function = selectExpression.getFunction();
-      if (function != null && function.getType() == FunctionContext.Type.AGGREGATION) {
-        return true;
-      }
-    }
-    List<OrderByExpressionContext> orderByExpressions = query.getOrderByExpressions();
-    if (orderByExpressions != null) {
-      for (OrderByExpressionContext orderByExpression : orderByExpressions) {
-        FunctionContext function = orderByExpression.getExpression().getFunction();
-        if (function != null && function.getType() == FunctionContext.Type.AGGREGATION) {
-          return true;
-        }
-      }
-    }
-    return false;
+    return query.getAggregationFunctions() != null;
   }
 }

@@ -56,9 +56,6 @@ import org.apache.pinot.tools.admin.command.VerifyClusterStateCommand;
 import org.apache.pinot.tools.admin.command.VerifySegmentState;
 import org.apache.pinot.tools.segment.converter.PinotSegmentConvertCommand;
 import org.apache.pinot.tools.segment.converter.SegmentMergeCommand;
-import org.apache.pinot.tools.tuner.CollectMetadataForIndexTuning;
-import org.apache.pinot.tools.tuner.EntriesScannedQuantileReport;
-import org.apache.pinot.tools.tuner.IndexTunerCommand;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
@@ -124,9 +121,6 @@ public class PinotAdministrator {
       @SubCommand(name = "RealtimeProvisioningHelper", impl = RealtimeProvisioningHelperCommand.class),
       @SubCommand(name = "MergeSegments", impl = SegmentMergeCommand.class),
       @SubCommand(name = "CheckOfflineSegmentIntervals", impl = OfflineSegmentIntervalCheckerCommand.class),
-      @SubCommand(name = "CollectMetadataForIndexTuning", impl = CollectMetadataForIndexTuning.class),
-      @SubCommand(name = "EntriesScannedQuantileReport", impl = EntriesScannedQuantileReport.class),
-      @SubCommand(name = "IndexTuner", impl = IndexTunerCommand.class),
       @SubCommand(name = "AnonymizeData", impl = AnonymizeDataCommand.class),
       @SubCommand(name = "GitHubEventsQuickStart", impl = GitHubEventsQuickStartCommand.class),
       @SubCommand(name = "StreamGitHubEvents", impl = StreamGitHubEventsCommand.class)

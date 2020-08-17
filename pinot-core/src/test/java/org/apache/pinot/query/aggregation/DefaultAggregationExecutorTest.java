@@ -40,7 +40,6 @@ import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.query.aggregation.AggregationExecutor;
 import org.apache.pinot.core.query.aggregation.DefaultAggregationExecutor;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
@@ -135,7 +134,8 @@ public class DefaultAggregationExecutorTest {
     ProjectionOperator projectionOperator = new ProjectionOperator(dataSourceMap, docIdSetOperator);
     TransformOperator transformOperator = new TransformOperator(projectionOperator, expressions);
     TransformBlock transformBlock = transformOperator.nextBlock();
-    AggregationFunction[] aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(_queryContext);
+    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
+    assert aggregationFunctions != null;
     AggregationExecutor aggregationExecutor = new DefaultAggregationExecutor(aggregationFunctions);
     aggregationExecutor.aggregate(transformBlock);
     List<Object> result = aggregationExecutor.getResult();

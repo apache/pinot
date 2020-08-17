@@ -818,10 +818,10 @@ select mapKeys(mapField) from baseballStats where DIV(numberOfGames,10) = 100
 select mapKey(mapField,k1) from baseballStats where DIV(numberOfGames,10) = 100
 select mapKey(mapField,k1) from baseballStats where mapKey(mapField,k1) = 'v1'
 SELECT count(c1), sum(c1), min(c1), max(c1), avg(c1), minmaxrange(c1), distinctcount(c1), distinctcounthll(c1) FROM foo
-SELECT distinctcountrawhll(c1), fasthll(c1), percentile(c1), percentileest(c1), percentiletdigest(c1) FROM foo
+SELECT distinctcountrawhll(c1), fasthll(c1), percentile90(c1), percentileest95(c1), percentiletdigest(c1, 99) FROM foo
 SELECT countmv(c1), summv(c1), minmv(c1), maxmv(c1), avgmv(c1), minmaxrangemv(c1), distinctcountmv(c1), distinctcounthllmv(c1) FROM foo
-SELECT distinctcountrawhllmv(c1), fasthllmv(c1), percentilemv(c1), percentileestmv(c1), percentiletdigestmv(c1) FROM foo
+SELECT distinctcountrawhllmv(c1), fasthllmv(c1), percentile90mv(c1), percentileest95mv(c1), percentiletdigestmv(c1, 99) FROM foo
 SELECT count(c1), sum(add(c1,c2)), min(div(c1,c2)), max(sub(c1,c2)), avg(add(c1,c2)), minmaxrange(add(c1,c2)), distinctcount(sub(c1,c2)), distinctcounthll(c1) FROM foo
-SELECT distinctcountrawhll(sub(c1,c2)), fasthll(div(c1,c2)), percentile(sub(c1,c2)), percentileest(add(c1,c2)), percentiletdigest(add(c1,c2)) FROM foo
+SELECT distinctcountrawhll(sub(c1,c2)), fasthll(div(c1,c2)), percentile90(sub(c1,c2)), percentileest95(add(c1,c2)), percentiletdigest(add(c1,c2), 99) FROM foo
 SELECT countmv(c1), summv(add(c1,c2)), minmv(div(c1,c2)), maxmv(sub(c1,c2)), avgmv(add(c1,c2)), minmaxrangemv(min(c1,c2)), distinctcountmv(add(c1,c2)), distinctcounthllmv(min(c1,c2)) FROM foo
-SELECT distinctcountrawhllmv(c1), fasthllmv(add(sub(c1,c2),div(c1,c2))), percentilemv(min(c1,c2)), percentileestmv(add(c1,c2)), percentiletdigestmv(min(c1,c2)) FROM foo
+SELECT distinctcountrawhllmv(c1), fasthllmv(add(sub(c1,c2),div(c1,c2))), percentile90mv(min(c1,c2)), percentileest95mv(add(c1,c2)), percentiletdigestmv(min(c1,c2), 99) FROM foo

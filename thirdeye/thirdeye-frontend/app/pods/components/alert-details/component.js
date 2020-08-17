@@ -39,6 +39,7 @@ const TIME_PICKER_INCREMENT = 5; // tells date picker hours field how granularly
 const UI_DATE_FORMAT = 'MMM D, YYYY hh:mm a'; // format for date picker to use (usually varies by route or metric)
 const DISPLAY_DATE_FORMAT = 'YYYY-MM-DD HH:mm'; // format used consistently across app to display custom date range
 const ANOMALY_LEGEND_THRESHOLD = 20; // If number of anomalies is larger than this threshold, don't show the legend
+const FORECAST_STRING = 'FORECAST';
 
 export default Component.extend({
   anomaliesApiService: service('services/api/anomalies'),
@@ -83,7 +84,7 @@ export default Component.extend({
   openReportModal: false,
   missingAnomalyProps: {},
   uniqueTimeSeries: [],
-  selectedRule: null,
+  selectedRule: {},
   isLoadingTimeSeries: false,
   granularity: null,
   alertYaml: null,
@@ -184,10 +185,11 @@ export default Component.extend({
       const uniqueTimeSeries = get(this, 'uniqueTimeSeries');
       if (uniqueTimeSeries) {
         return [...new Set(uniqueTimeSeries.map(series => series.detectorName))].map(detector => {
-          const nameOnly = detector.split(':')[0];
+          const [ nameOnly, ruleType ] = detector.split(':');
           return {
             detectorName: detector,
-            name: nameOnly
+            name: nameOnly,
+            type: ruleType
           };
         });
       }
@@ -467,16 +469,35 @@ export default Component.extend({
     'selectedBaseline',
     function() {
       const {
-        analysisRange, displayRange, selectedBaseline
-      } = this.getProperties('analysisRange', 'displayRange', 'selectedBaseline');
-      return (analysisRange[0] !== displayRange[0] && selectedBaseline === 'predicted');
+        selectedRule, selectedBaseline
+      } = this.getProperties('selectedRule', 'selectedBaseline');
+      return (selectedRule.type === FORECAST_STRING && selectedBaseline === 'predicted');
+    }
+  ),
+
+  trainingTooltipDateTimes: computed(
+    'analysisRange',
+    'displayRange',
+    'isTrainingDisplayed',
+    function() {
+      const {
+        analysisRange,
+        displayRange
+      } = this.getProperties('analysisRange', 'displayRange');
+      const dateTimes = {
+        fitStart: `${moment(displayRange[0]).format(TABLE_DATE_FORMAT)}`,
+        fitEnd: `${moment(analysisRange[0]).format(TABLE_DATE_FORMAT)}`,
+        forecastStart: `${moment(analysisRange[0]).format(TABLE_DATE_FORMAT)}`,
+        forecastEnd: `${moment(analysisRange[1]).format(TABLE_DATE_FORMAT)}`
+      };
+      return dateTimes;
     }
   ),
 
   trainingMessage: computed(
     'analysisRange',
     'displayRange',
-    'isTrainingMessage',
+    'isTrainingDisplayed',
     function() {
       const {
         analysisRange, displayRange
@@ -828,9 +849,12 @@ export default Component.extend({
    * @type {Object[]} - array of objects, each of which represents each date pill
    */
   pill: computed(
-    'analysisRange', 'startDate', 'endDate',
+    'analysisRange', 'startDate', 'endDate', 'selectedRule',
     function() {
-      const analysisRange = get(this, 'analysisRange');
+      const {
+        analysisRange,
+        selectedRule
+      } = this.getProperties('analysisRange', 'selectedRule');
       const startDate = Number(analysisRange[0]);
       const endDate = Number(analysisRange[1]);
       const predefinedRanges = {
@@ -839,7 +863,7 @@ export default Component.extend({
         'Last 30 Days': [moment().subtract(1, 'month').startOf('day'), moment().startOf('day')],
         'Last 3 Months': [moment().subtract(3, 'month').startOf('day'), moment().startOf('day')]
       };
-      if (!this.get('isPreviewMode')) {
+      if (selectedRule.type === FORECAST_STRING) {
         const futureRanges = {
           'Next 48 Hours': [moment().add(48, 'hour').startOf('hour'), moment().startOf('hour')],
           'Next Week': [moment().add(1, 'week').startOf('day'), moment().startOf('day')],
@@ -886,9 +910,11 @@ export default Component.extend({
           set(this, 'selectedDimension', firstDimension);
           if (applicationAnomalies.predictions && Array.isArray(applicationAnomalies.predictions) && (typeof applicationAnomalies.predictions[0] === 'object')){
             const detectorName = applicationAnomalies.predictions[0].detectorName;
+            const [ nameOnly, ruleType ] = detectorName.split(':');
             const selectedRule = {
               detectorName,
-              name: detectorName.split(':')[0]
+              name: nameOnly,
+              type: ruleType
             };
             set(this, 'selectedRule', selectedRule);
           }

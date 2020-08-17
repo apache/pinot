@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.queries;
 
+import static org.apache.pinot.core.query.aggregation.function.DistinctCountThetaSketchAggregationFunction.MergeFunction;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -41,6 +43,7 @@ import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -54,6 +57,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
@@ -117,60 +121,79 @@ public class DistinctCountThetaSketchTest extends BaseQueriesTest {
     testThetaSketches(true, true);
   }
 
+  @Test(expectedExceptions = BadQueryRequestException.class, dataProvider = "badQueries")
+  public void testInvalidNoPredicates(final String query) {
+    getBrokerResponseForSqlQuery(query);
+  }
+
+  @DataProvider(name = "badQueries")
+  public Object[][] badQueries() {
+    return new Object[][] {
+        // need at least 4 arguments in agg func
+        {"select distinctCountThetaSketch(colTS, 'nominalEntries=123', '$0') from testTable"},
+        // substitution arguments should start at $1
+        {"select distinctCountThetaSketch(colTS, 'nominalEntries=123', 'colA = 1', '$0') from testTable"},
+        // substituting variable has numeric value higher than the number of predicates provided
+        {"select distinctCountThetaSketch(colTS, 'nominalEntries=123', 'colA = 1', '$5') from testTable"},
+        // SET_DIFF requires exactly 2 arguments
+        {"select distinctCountThetaSketch(colTS, 'nominalEntries=123', 'colA = 1', 'SET_DIFF($1)') from testTable"},
+        // invalid merging function
+        {"select distinctCountThetaSketch(colTS, 'nominalEntries=123', 'colA = 1', 'asdf') from testTable"},
+        // union with < 2 arguments
+        {"select distinctCountThetaSketch(colTS, 'nominalEntries=123', 'colA = 1', 'SET_UNION($1)')"},
+        // intersect with < 2 arguments
+        {"select distinctCountThetaSketch(colTS, 'nominalEntries=123', 'colA = 1', 'SET_INTERSECT($1)')"}
+    };
+  }
+
   private void testThetaSketches(boolean groupBy, boolean sql) {
     String tsQuery, distinctQuery;
     String thetaSketchParams = "nominalEntries=1001";
 
     List<String> predicateStrings = Collections.singletonList("colA = 1");
+    String substitution = "$1";
     String whereClause = Strings.join(predicateStrings, " or ");
-    tsQuery = buildQuery(whereClause, thetaSketchParams, predicateStrings, whereClause, groupBy, false);
+    tsQuery = buildQuery(whereClause, thetaSketchParams, predicateStrings, substitution, groupBy, false);
     distinctQuery = buildQuery(whereClause, null, null, null, groupBy, false);
     testQuery(tsQuery, distinctQuery, groupBy, sql, false);
 
-    tsQuery = buildQuery(whereClause, thetaSketchParams, predicateStrings, whereClause, groupBy, true);
+    tsQuery = buildQuery(whereClause, thetaSketchParams, predicateStrings, substitution, groupBy, true);
     testQuery(tsQuery, distinctQuery, groupBy, sql, true);
 
     // Test Intersection (AND)
     predicateStrings = Arrays.asList("colA = 1", "colB >= 2.0", "colC <> 'colC_1'");
+    substitution = "SET_INTERSECT($1, $2, $3)";
     whereClause = Strings.join(predicateStrings, " and ");
-    tsQuery = buildQuery(whereClause, thetaSketchParams, predicateStrings, whereClause, groupBy, false);
+    tsQuery = buildQuery(whereClause, thetaSketchParams, predicateStrings, substitution, groupBy, false);
     distinctQuery = buildQuery(whereClause, null, null, null, groupBy, false);
     testQuery(tsQuery, distinctQuery, groupBy, sql, false);
 
-    tsQuery = buildQuery(whereClause, thetaSketchParams, predicateStrings, whereClause, groupBy, true);
+    tsQuery = buildQuery(whereClause, thetaSketchParams, predicateStrings, substitution, groupBy, true);
     testQuery(tsQuery, distinctQuery, groupBy, sql, true);
 
     // Test Union (OR)
     predicateStrings = Arrays.asList("colA = 1", "colB = 1.9");
+    substitution = "SET_UNION($1, $2)";
     whereClause = Strings.join(predicateStrings, " or ");
-    tsQuery = buildQuery(whereClause, thetaSketchParams, predicateStrings, whereClause, groupBy, false);
+    tsQuery = buildQuery(whereClause, thetaSketchParams, predicateStrings, substitution, groupBy, false);
     distinctQuery = buildQuery(whereClause, null, null, null, groupBy, false);
     testQuery(tsQuery, distinctQuery, groupBy, sql, false);
 
-    tsQuery = buildQuery(whereClause, thetaSketchParams, predicateStrings, whereClause, groupBy, true);
+    tsQuery = buildQuery(whereClause, thetaSketchParams, predicateStrings, substitution, groupBy, true);
     testQuery(tsQuery, distinctQuery, groupBy, sql, true);
 
     // Test complex predicates
     predicateStrings = Arrays.asList("colA in (1, 2)", "colB not in (3.0)", "colC between 'colC_1' and 'colC_5'");
+    // operator precedence. ORs are evaluated after ANDs
+    substitution = "SET_UNION(SET_INTERSECT($1, $2), SET_INTERSECT($1, $3))";
     whereClause =
         predicateStrings.get(0) + " and " + predicateStrings.get(1) + " or " + predicateStrings.get(0) + " and "
             + predicateStrings.get(2);
-    tsQuery = buildQuery(whereClause, thetaSketchParams, predicateStrings, whereClause, groupBy, false);
+    tsQuery = buildQuery(whereClause, thetaSketchParams, predicateStrings, substitution, groupBy, false);
     distinctQuery = buildQuery(whereClause, null, null, null, groupBy, false);
     testQuery(tsQuery, distinctQuery, groupBy, sql, false);
 
-    tsQuery = buildQuery(whereClause, thetaSketchParams, predicateStrings, whereClause, groupBy, true);
-    testQuery(tsQuery, distinctQuery, groupBy, sql, true);
-
-    // Test without predicate arguments
-    whereClause =
-        predicateStrings.get(0) + " and " + predicateStrings.get(1) + " or " + predicateStrings.get(0) + " and "
-            + predicateStrings.get(2);
-    tsQuery = buildQuery(whereClause, thetaSketchParams, Collections.emptyList(), whereClause, groupBy, false);
-    distinctQuery = buildQuery(whereClause, null, null, null, groupBy, false);
-    testQuery(tsQuery, distinctQuery, groupBy, sql, false);
-
-    tsQuery = buildQuery(whereClause, thetaSketchParams, predicateStrings, whereClause, groupBy, true);
+    tsQuery = buildQuery(whereClause, thetaSketchParams, predicateStrings, substitution, groupBy, true);
     testQuery(tsQuery, distinctQuery, groupBy, sql, true);
   }
 
