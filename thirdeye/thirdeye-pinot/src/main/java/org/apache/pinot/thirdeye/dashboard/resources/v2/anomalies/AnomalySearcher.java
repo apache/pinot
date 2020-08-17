@@ -70,7 +70,12 @@ public class AnomalySearcher {
    * @return the result
    */
   public Map<String, Object> search(AnomalySearchFilter searchFilter, int limit, int offset) {
-    Predicate predicate = Predicate.EQ("child", false);
+    // default dummy predicate, the base id can't be 0
+    Predicate predicate = Predicate.NEQ("baseId", 0);
+    // hide child anomaly unless queried with ids
+    if (searchFilter.getAnomalyIds().isEmpty()) {
+      predicate = Predicate.EQ("child", false);
+    }
     if (searchFilter.getStartTime() != null) {
       predicate = Predicate.AND(predicate, Predicate.LT("startTime", searchFilter.getEndTime()));
     }
@@ -152,5 +157,4 @@ public class AnomalySearcher {
     }
     return ImmutableMap.of("count", count, "limit", limit, "offset", offset, "elements", results);
   }
-
 }

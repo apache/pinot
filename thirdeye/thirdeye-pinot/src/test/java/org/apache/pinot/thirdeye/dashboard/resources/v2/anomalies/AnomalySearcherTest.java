@@ -37,7 +37,7 @@ import org.testng.annotations.Test;
 public class AnomalySearcherTest {
   private DAOTestBase testDAOProvider;
   private MergedAnomalyResultManager anomalyDAO;
-
+  private MergedAnomalyResultDTO anomaly4;
   @BeforeClass
   public void beforeClass() {
     testDAOProvider = DAOTestBase.getInstance();
@@ -45,6 +45,7 @@ public class AnomalySearcherTest {
     MergedAnomalyResultDTO anomaly1 = new MergedAnomalyResultDTO();
     MergedAnomalyResultDTO anomaly2 = new MergedAnomalyResultDTO();
     MergedAnomalyResultDTO anomaly3 = new MergedAnomalyResultDTO();
+    anomaly4 = new MergedAnomalyResultDTO();
 
     anomaly1.setStartTime(1L);
     anomaly1.setEndTime(2L);
@@ -54,9 +55,13 @@ public class AnomalySearcherTest {
     anomaly2.setCollection("test_dataset_2");
     anomaly3.setStartTime(5L);
     anomaly3.setEndTime(6L);
+    anomaly4.setStartTime(1L);
+    anomaly4.setEndTime(3L);
+    anomaly4.setChild(true);
     anomalyDAO.save(anomaly1);
     anomalyDAO.save(anomaly2);
     anomalyDAO.save(anomaly3);
+    anomalyDAO.save(anomaly4);
   }
 
   @Test
@@ -85,4 +90,19 @@ public class AnomalySearcherTest {
     Assert.assertEquals(anomalies.size(), 1);
     Assert.assertEquals(anomalies.get(0), anomalyDAO.findById(1L));
   }
+
+  @Test
+  public void testSearchWithFiltersChild() {
+    AnomalySearcher anomalySearcher = new AnomalySearcher();
+    Map<String, Object> result = anomalySearcher.search(
+        new AnomalySearchFilter(1L, 3L, Collections.emptyList(), Collections.emptyList(), Collections.emptyList(),
+            Collections.emptyList(), Collections.emptyList(), Collections.singletonList(anomaly4.getId())), 10, 0);
+    Assert.assertEquals(result.get("count"), 1L);
+    Assert.assertEquals(result.get("limit"), 10);
+    Assert.assertEquals(result.get("offset"), 0);
+    List<MergedAnomalyResultDTO> anomalies = ConfigUtils.getList(result.get("elements"));
+    Assert.assertEquals(anomalies.size(), 1);
+    Assert.assertEquals(anomalies.get(0), anomalyDAO.findById(anomaly4.getId()));
+  }
+
 }
