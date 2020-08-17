@@ -140,9 +140,7 @@ public class GroupByOrderByCombineOperator extends BaseOperator<IntermediateResu
             try {
               if (_dataSchema == null) {
                 _dataSchema = intermediateResultsBlock.getDataSchema();
-                _indexedTable =
-                    new ConcurrentIndexedTable(_dataSchema, aggregationFunctions, _queryContext.getOrderByExpressions(),
-                        _indexedTableCapacity);
+                _indexedTable = new ConcurrentIndexedTable(_dataSchema, _queryContext, _indexedTableCapacity);
               }
             } finally {
               _initLock.unlock();
