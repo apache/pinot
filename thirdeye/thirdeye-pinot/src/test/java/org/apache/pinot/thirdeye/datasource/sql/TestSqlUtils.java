@@ -100,7 +100,7 @@ public class TestSqlUtils {
     String timeFormat = TimeSpec.SINCE_EPOCH_FORMAT;
     TimeSpec timeSpec = new TimeSpec("date", timeGranularity, timeFormat);
     String actualSql = SqlUtils.getSql(request, this.metricFunction, HashMultimap.create(), timeSpec, this.dataset);
-    String expected = "SELECT date, country, SUM(metric) AS SUM_metric FROM table WHERE  date = 18383 GROUP BY date, country ORDER BY SUM(metric) DESC LIMIT 100";
+    String expected = "SELECT date, country, SUM(metric) AS SUM_metric FROM table WHERE  date = 18383 GROUP BY date, country ORDER BY SUM_metric DESC LIMIT 100";
     Assert.assertEquals(actualSql, expected);
   }
 
