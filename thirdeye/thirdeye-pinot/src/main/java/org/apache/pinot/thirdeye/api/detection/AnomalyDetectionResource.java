@@ -60,6 +60,7 @@ import org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTransl
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
@@ -77,10 +78,17 @@ public class AnomalyDetectionResource {
   private static final String COLUMNS_FIELD = "columns";
   private static final String ROWS_FIELD = "rows";
   private static final String DEFAULT_TIME_COLUMN = "date";
-  private static final String DATASET_FIELD = "datasetConfiguration";
-  private static final String METRIC_FIELD = "metricConfiguration";
-  private static final String DETECTION_FIELD = "detectionConfiguration";
+  private static final String DATASET_FIELD = "dataset-configuration";
+  private static final String METRIC_FIELD = "metric-configuration";
+  private static final String DETECTION_FIELD = "detection-configuration";
   private static final String ANOMALIES_FIELD = "anomalies";
+  private static final String DATASET_CONFIG_TIME_COLUMN = "timeColumn";
+  private static final String DATASET_CONFIG_TIME_UNIT = "timeUnit";
+  private static final String DATASET_CONFIG_TIME_DURATION = "timeDuration";
+  private static final String DATASET_CONFIG_TIME_FORMAT = "timeFormat";
+  private static final String DATASET_CONFIG_TIME_ZONE = "timezone";
+  private static final String METRIC_CONFIG_DATA_TYPE = "datatype";
+  private static final String METRIC_CONFIG_METRIC_COLUMN = "metricColumn";
 
   /* -------- Others -------- */
   private static final String ONLINE_DATASOURCE = "OnlineThirdEyeDataSource";
@@ -137,7 +145,11 @@ public class AnomalyDetectionResource {
         TimeSeriesCacheBuilder.getInstance(), AnomaliesCacheBuilder.getInstance());
     this.detectionValidator = new DetectionConfigValidator(this.provider);
     this.anomalySearcher = new AnomalySearcher();
-    this.yaml = new Yaml();
+
+    DumperOptions options = new DumperOptions();
+    options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+    options.setPrettyFlow(true);
+    this.yaml = new Yaml(options);
   }
 
   /**
@@ -155,8 +167,9 @@ public class AnomalyDetectionResource {
   @Consumes(MediaType.APPLICATION_JSON)
   @ApiOperation("Request an anomaly detection online task")
   public Response onlineApi(
-          @QueryParam("start") long start,
-          @QueryParam("end") long end,
+          @QueryParam("start") Long start,
+          @QueryParam("end") Long end,
+          @QueryParam("data-id") Long dataId,
           @ApiParam("jsonPayload") String payload,
           @Auth ThirdEyePrincipal principal) {
     DatasetConfigDTO datasetConfigDTO = null;
@@ -166,13 +179,15 @@ public class AnomalyDetectionResource {
     Map<String, Object> anomalies;
     Response.Status responseStatus;
     Map<String, String> responseMessage = new HashMap<>();
-    ObjectMapper objectMapper = new ObjectMapper();
-    // Suffix format: _<user_name>_<uuid>
-    String nameSuffix = "_" + principal.getName() + "_" + UUID.randomUUID().toString();
+    String nameSuffix = generateSuffix(principal);
+    boolean dataRegistered = dataId != null;
 
     // TODO: refactor code to resolve request configurations in one place (e.g. default/customized config names)
 
     try {
+      Preconditions.checkNotNull(start, "Detection start time is not provided");
+      Preconditions.checkNotNull(end, "Detection end time is not provided");
+
       if (payload.getBytes().length > MAX_ONLINE_PAYLOAD_SIZE) {
         responseStatus = Response.Status.BAD_REQUEST;
         responseMessage.put("message", "Payload too large");
@@ -181,20 +196,35 @@ public class AnomalyDetectionResource {
 
       JsonNode payloadNode = objectMapper.readTree(payload);
 
-      if (!validateOnlineRequestPayload(payloadNode)) {
-        responseStatus = Response.Status.BAD_REQUEST;
-        responseMessage.put("message", "Invalid request payload");
-        return Response.status(responseStatus).entity(responseMessage).build();
+      Preconditions.checkArgument(validateOnlineRequestPayload(payloadNode, dataRegistered),
+          "Invalid request payload");
+
+      if (!dataRegistered) {
+        // Create & save dataset
+        datasetConfigDTO = generateDatasetConfig(payloadNode, nameSuffix);
+
+        // Create & save metric
+        metricConfigDTO = generateMetricConfig(payloadNode, nameSuffix);
+
+        // Save online data
+        saveOnlineDetectionData(payloadNode, datasetConfigDTO, metricConfigDTO);
+      } else {
+        // Data is already registered and dataset/metric config should also have been created
+        OnlineDetectionDataDTO onlineDetectionDataDTO = onlineDetectionDataDAO.findById(dataId);
+        Preconditions.checkNotNull(onlineDetectionDataDTO, "Data not found: " + dataId);
+
+        String datasetName = onlineDetectionDataDTO.getDataset();
+        String metricName = onlineDetectionDataDTO.getMetric();
+
+        datasetConfigDTO = datasetConfigDAO.findByDataset(datasetName);
+        metricConfigDTO = metricConfigDAO.findByMetricAndDataset(metricName, datasetName);
+
+        Preconditions.checkNotNull(datasetConfigDTO,
+            "Dataset not found for data id: " + dataId);
+
+        Preconditions.checkNotNull(metricConfigDTO,
+            "Metric not found for data id: " + dataId);
       }
-
-      // Create & save dataset
-      datasetConfigDTO = generateDatasetConfig(payloadNode, nameSuffix);
-
-      // Create & save metric
-      metricConfigDTO = generateMetricConfig(payloadNode, nameSuffix);
-
-      // Save online data
-      saveOnlineDetectionData(payloadNode, datasetConfigDTO, metricConfigDTO);
 
       // Create & save detection
       detectionConfigDTO =
@@ -239,11 +269,11 @@ public class AnomalyDetectionResource {
 
       // Build success response
       JsonNode anomalyNode = objectMapper.convertValue(anomalies, JsonNode.class);
-      JsonNode detectionConfigNode =
-          objectMapper.convertValue(detectionConfigDTO.getYaml(), JsonNode.class);
       ObjectNode responseNode = objectMapper.createObjectNode();
       responseNode.set(ANOMALIES_FIELD, anomalyNode);
-      responseNode.set(DETECTION_FIELD, detectionConfigNode);
+      responseNode.set(DETECTION_FIELD, objectMapper.convertValue(detectionConfigDTO.getYaml(), JsonNode.class));
+      responseNode.set(DATASET_FIELD, objectMapper.convertValue(translateDatasetToYaml(datasetConfigDTO), JsonNode.class));
+      responseNode.set(METRIC_FIELD, objectMapper.convertValue(translateMetricToYaml(metricConfigDTO), JsonNode.class));
 
       responseStatus = Response.Status.OK;
       return Response.status(responseStatus).entity(objectMapper.writeValueAsString(responseNode))
@@ -261,14 +291,13 @@ public class AnomalyDetectionResource {
       processException(e, responseMessage);
       return Response.status(responseStatus).entity(responseMessage).build();
     } finally {
-      // Online service is stateless
-      cleanStates(metricConfigDTO, datasetConfigDTO);
+      cleanStates(metricConfigDTO, datasetConfigDTO, dataRegistered);
     }
   }
 
-  boolean validateOnlineRequestPayload(JsonNode payloadNode) {
+  boolean validateOnlineRequestPayload(JsonNode payloadNode, boolean dataRegistered) {
     if (!payloadNode.has(DATA_FIELD))
-      return false;
+      return dataRegistered;
 
     JsonNode dataNode = payloadNode.get(DATA_FIELD);
     if (!dataNode.has(COLUMNS_FIELD) || !dataNode.has(ROWS_FIELD))
@@ -278,6 +307,16 @@ public class AnomalyDetectionResource {
     if (!columnsNode.isArray()) return false;
 
     return true;
+  }
+
+  boolean validateOnlineDetectionData(JsonNode dataNode, String timeColumnName, String metricColumnName) {
+    // Check if time & metric columns exist in adhoc data
+    ArrayNode columnsNode = dataNode.withArray(COLUMNS_FIELD);
+    int[] colIndices = findTimeAndMetricColumns(columnsNode,
+        timeColumnName, metricColumnName);
+    int timeColIdx = colIndices[0];
+    int metricColIdx = colIndices[1];
+    return metricColIdx>=0 && timeColIdx>=0;
   }
 
   DatasetConfigDTO generateDatasetConfig(JsonNode payloadNode, String suffix) {
@@ -290,31 +329,11 @@ public class AnomalyDetectionResource {
     datasetConfigDTO.setTimeDuration(1);
     datasetConfigDTO.setTimeUnit(TimeUnit.DAYS);
     datasetConfigDTO.setTimeFormat("SIMPLE_DATE_FORMAT:yyyyMMdd");
-    datasetConfigDTO.setTimezone("US/Pacific");
     datasetConfigDTO.setDataSource(ONLINE_DATASOURCE);
 
     // Customized configuration
     if (payloadNode.has(DATASET_FIELD)) {
-
-      Map<String, Object> datasetYaml =
-          ConfigUtils.getMap(yaml.load(payloadNode.get(DATASET_FIELD).textValue()));
-
-      if (datasetYaml.containsKey("timeColumn")) {
-        datasetConfigDTO.setTimeColumn((String) datasetYaml.get("timeColumn"));
-      }
-      if (datasetYaml.containsKey("timeUnit")) {
-        datasetConfigDTO
-            .setTimeUnit(TimeUnit.valueOf((String) datasetYaml.get("timeUnit")));
-      }
-      if (datasetYaml.containsKey("timeDuration")) {
-        datasetConfigDTO.setTimeDuration((Integer) datasetYaml.get("timeDuration"));
-      }
-      if (datasetYaml.containsKey("timeFormat")) {
-        datasetConfigDTO.setTimeFormat((String) datasetYaml.get("timeFormat"));
-      }
-      if (datasetYaml.containsKey("timezone")) {
-        datasetConfigDTO.setTimezone((String) datasetYaml.get("timezone"));
-      }
+      updateDatasetCustomFields(payloadNode, datasetConfigDTO);
     }
 
     datasetConfigDAO.save(datasetConfigDTO);
@@ -338,18 +357,7 @@ public class AnomalyDetectionResource {
 
     // Customized configuration
     if (payloadNode.has(METRIC_FIELD)) {
-      Map<String, Object> metricYaml =
-          ConfigUtils.getMap(yaml.load(payloadNode.get(METRIC_FIELD).textValue()));
-
-      // Customized metric name
-      if (metricYaml.containsKey("metricColumn")) {
-        metricConfigDTO.setName((String) metricYaml.get("metricColumn"));
-      }
-
-      if (metricYaml.containsKey("datatype")) {
-        metricConfigDTO
-            .setDatatype(MetricType.valueOf((String) metricYaml.get("datatype")));
-      }
+      updateMetricCustomFields(payloadNode, metricConfigDTO);
     }
 
     metricConfigDAO.save(metricConfigDTO);
@@ -420,7 +428,7 @@ public class AnomalyDetectionResource {
     return taskDTO;
   }
 
-  long saveOnlineDetectionData(JsonNode payloadNode,
+  OnlineDetectionDataDTO saveOnlineDetectionData(JsonNode payloadNode,
       DatasetConfigDTO datasetConfigDTO, MetricConfigDTO metricConfigDTO)
         throws JsonProcessingException {
     JsonNode dataNode = payloadNode.get(DATA_FIELD);
@@ -429,12 +437,7 @@ public class AnomalyDetectionResource {
     String metricName = metricConfigDTO.getName();
 
     // Check if time & metric columns exist in adhoc data
-    ArrayNode columnsNode = dataNode.withArray(COLUMNS_FIELD);
-    int[] colIndices = findTimeAndMetricColumns(columnsNode,
-        timeColumnName, metricName);
-    int timeColIdx = colIndices[0];
-    int metricColIdx = colIndices[1];
-    Preconditions.checkArgument(metricColIdx>=0 && timeColIdx>=0,
+    Preconditions.checkArgument(validateOnlineDetectionData(dataNode, timeColumnName, metricName),
         String.format("metric: %s or time: %s not found in adhoc data.",
             metricName, timeColumnName));
 
@@ -444,12 +447,12 @@ public class AnomalyDetectionResource {
     onlineDetectionDataDTO.setMetric(metricName);
     onlineDetectionDataDTO.setOnlineDetectionData(this.objectMapper.writeValueAsString(dataNode));
 
-    long id = onlineDetectionDataDAO.save(onlineDetectionDataDTO);
+    onlineDetectionDataDAO.save(onlineDetectionDataDTO);
 
     LOG.info("Saved online data with dataset: {} and metric: {}",
         onlineDetectionDataDTO.getDataset(), onlineDetectionDataDTO.getMetric());
 
-    return id;
+    return onlineDetectionDataDTO;
   }
 
   private TaskDTO pollingTask(long taskId) {
@@ -498,8 +501,11 @@ public class AnomalyDetectionResource {
     return anomalies;
   }
 
-  private void cleanStates(MetricConfigDTO metricConfigDTO, DatasetConfigDTO datasetConfigDTO) {
-    // Clean up ad hoc data
+  private void cleanStates(MetricConfigDTO metricConfigDTO, DatasetConfigDTO datasetConfigDTO,
+      boolean dataRegistered) {
+    // Registered online data should not be cleaned
+    if (dataRegistered) return;
+
     if (datasetConfigDTO != null) {
       int onlineDetectionDataCnt = onlineDetectionDataDAO
           .deleteByPredicate(Predicate.EQ("dataset", datasetConfigDTO.getName()));
@@ -531,6 +537,313 @@ public class AnomalyDetectionResource {
     return new int[]{timeColIdx, metricColIdx};
   }
 
+  String generateSuffix(ThirdEyePrincipal principal) {
+    // Suffix format: _<user_name>_<uuid>
+    return "_" + principal.getName() + "_" + UUID.randomUUID().toString();
+  }
+
+  private void updateDatasetCustomFields(JsonNode payloadNode, DatasetConfigDTO datasetConfigDTO) {
+    Map<String, Object> datasetYaml =
+        ConfigUtils.getMap(yaml.load(payloadNode.get(DATASET_FIELD).textValue()));
+
+    if (datasetYaml.containsKey(DATASET_CONFIG_TIME_COLUMN)) {
+      datasetConfigDTO.setTimeColumn((String) datasetYaml.get(DATASET_CONFIG_TIME_COLUMN));
+    }
+    if (datasetYaml.containsKey(DATASET_CONFIG_TIME_UNIT)) {
+      datasetConfigDTO
+          .setTimeUnit(TimeUnit.valueOf((String) datasetYaml.get(DATASET_CONFIG_TIME_UNIT)));
+    }
+    if (datasetYaml.containsKey(DATASET_CONFIG_TIME_DURATION)) {
+      datasetConfigDTO.setTimeDuration((Integer) datasetYaml.get(DATASET_CONFIG_TIME_DURATION));
+    }
+    if (datasetYaml.containsKey(DATASET_CONFIG_TIME_FORMAT)) {
+      datasetConfigDTO.setTimeFormat((String) datasetYaml.get(DATASET_CONFIG_TIME_FORMAT));
+    }
+    if (datasetYaml.containsKey(DATASET_CONFIG_TIME_ZONE)) {
+      datasetConfigDTO.setTimezone((String) datasetYaml.get(DATASET_CONFIG_TIME_ZONE));
+    }
+  }
+
+  private void updateMetricCustomFields(JsonNode payloadNode, MetricConfigDTO metricConfigDTO) {
+    Map<String, Object> metricYaml =
+        ConfigUtils.getMap(yaml.load(payloadNode.get(METRIC_FIELD).textValue()));
+
+    // Customized metric name
+    if (metricYaml.containsKey(METRIC_CONFIG_METRIC_COLUMN)) {
+      metricConfigDTO.setName((String) metricYaml.get(METRIC_CONFIG_METRIC_COLUMN));
+    }
+
+    if (metricYaml.containsKey(METRIC_CONFIG_DATA_TYPE)) {
+      metricConfigDTO
+          .setDatatype(MetricType.valueOf((String) metricYaml.get(METRIC_CONFIG_DATA_TYPE)));
+    }
+  }
+
+  /**
+   * Register the online detection ad-hoc data with optional customized dataset and metric configurations.
+   *
+   * @param payload     payload in request including online data
+   * @param principal user who sent this request. It's used to separate different config names
+   * @return a message containing an ID referring to the ad-hoc data. This ID can be used to perform
+   * CRUD operations on the registered data.
+   */
+  @POST
+  @Path("/data")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.APPLICATION_JSON)
+  @ApiOperation("Register ad hoc data used in online service and created dataset/metric configs")
+  public Response createOnlineData(@ApiParam("jsonPayload") String payload,
+      @Auth ThirdEyePrincipal principal) {
+    Response.Status responseStatus;
+    Map<String, String> responseMessage = new HashMap<>();
+    ObjectMapper objectMapper = new ObjectMapper();
+    DatasetConfigDTO datasetConfigDTO;
+    MetricConfigDTO metricConfigDTO;
+    String suffix = generateSuffix(principal);
+
+    try {
+      JsonNode payloadNode = objectMapper.readTree(payload);
+
+      if (!validateOnlineRequestPayload(payloadNode, false)) {
+        responseStatus = Response.Status.BAD_REQUEST;
+        responseMessage.put("message", "Invalid request payload");
+        return Response.status(responseStatus).entity(responseMessage).build();
+      }
+
+      // Create & save dataset
+      datasetConfigDTO = generateDatasetConfig(payloadNode, suffix);
+
+      // Create & save metric
+      metricConfigDTO = generateMetricConfig(payloadNode, suffix);
+
+      // Save online data
+      OnlineDetectionDataDTO onlineDetectionDataDTO =
+          saveOnlineDetectionData(payloadNode, datasetConfigDTO, metricConfigDTO);
+
+      responseMessage.put("data-id", "" + onlineDetectionDataDTO.getId());
+
+      return Response.ok().entity(responseMessage).build();
+    } catch (JsonProcessingException e) {
+      LOG.error("Error: {}", e.getMessage());
+      responseStatus = Response.Status.BAD_REQUEST;
+      responseMessage.put("message", "Invalid request payload");
+      processException(e, responseMessage);
+      return Response.status(responseStatus).entity(responseMessage).build();
+    } catch (Exception e) {
+      LOG.error("Error: {}", e.getMessage());
+      responseStatus = Response.Status.INTERNAL_SERVER_ERROR;
+      responseMessage.put("message", "Failed to register data.");
+      processException(e, responseMessage);
+      return Response.status(responseStatus).entity(responseMessage).build();
+    }
+  }
+
+  /**
+   * Update the online detection ad-hoc data with optional customized dataset and metric configurations.
+   *
+   * @param payload payload in request including online data
+   * @param dataId the ID referring to the online detection ad-hoc data
+   * @param principal user who sent this request. It's used to separate different config names
+   * @return a message containing an ID referring to the ad-hoc data. This ID can be used to perform
+   * CRUD operations on the registered data.
+   */
+  @PUT
+  @Path("/data/{data-id}")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.APPLICATION_JSON)
+  @ApiOperation("Update ad hoc data used in online service and corresponding dataset/metric configs")
+  public Response updateOnlineData(
+      @ApiParam("jsonPayload") String payload,
+      @PathParam("data-id") Long dataId,
+      @Auth ThirdEyePrincipal principal) {
+    Preconditions.checkNotNull(dataId, "online detection data id is null");
+
+    Response.Status responseStatus;
+    Map<String, String> responseMessage = new HashMap<>();
+    DatasetConfigDTO datasetConfigDTO;
+    MetricConfigDTO metricConfigDTO;
+
+    try {
+      JsonNode payloadNode = objectMapper.readTree(payload);
+
+      Preconditions.checkArgument(payloadNode.has(DATA_FIELD), "Update should have new data");
+
+      OnlineDetectionDataDTO onlineDetectionDataDTO = onlineDetectionDataDAO.findById(dataId);
+      Preconditions.checkNotNull(onlineDetectionDataDTO,
+          "Online detection data not found " + dataId);
+
+      LOG.info("Find online detection data with dataset {} and metric {}",
+          onlineDetectionDataDTO.getDataset(), onlineDetectionDataDTO.getMetric());
+
+      // Find existing dataset config
+      datasetConfigDTO = datasetConfigDAO.findByDataset(onlineDetectionDataDTO.getDataset());
+      Preconditions.checkNotNull(datasetConfigDTO,
+          "No corresponding dataset found for online data " + dataId);
+
+      // Find existing metric config
+      metricConfigDTO = metricConfigDAO.findByMetricAndDataset(
+          onlineDetectionDataDTO.getMetric(), onlineDetectionDataDTO.getDataset());
+      Preconditions.checkNotNull(metricConfigDTO,
+          "No corresponding metric found for online data " + dataId);
+
+      // Update dataset config
+      onlineDetectionDataDTO = doUpdateOnlineData(payloadNode, datasetConfigDTO,
+          metricConfigDTO, onlineDetectionDataDTO);
+
+      responseMessage.put("data-id", "" + onlineDetectionDataDTO.getId());
+      responseStatus = Response.Status.OK;
+
+      return Response.status(responseStatus).entity(responseMessage).build();
+    } catch (JsonProcessingException e) {
+      LOG.error("Error: {}", e.getMessage());
+      responseStatus = Response.Status.BAD_REQUEST;
+      responseMessage.put("message", "Invalid request payload");
+      processException(e, responseMessage);
+      return Response.status(responseStatus).entity(responseMessage).build();
+    } catch (Exception e) {
+      LOG.error("Error: {}", e.getMessage());
+      responseStatus = Response.Status.INTERNAL_SERVER_ERROR;
+      responseMessage.put("message", "Failed executing anomaly detection service.");
+      processException(e, responseMessage);
+      return Response.status(responseStatus).entity(responseMessage).build();
+    }
+  }
+
+  OnlineDetectionDataDTO doUpdateOnlineData(JsonNode payloadNode,
+      DatasetConfigDTO datasetConfigDTO, MetricConfigDTO metricConfigDTO,
+      OnlineDetectionDataDTO onlineDetectionDataDTO) throws JsonProcessingException {
+    if (payloadNode.has(DATASET_FIELD)) {
+      updateDatasetCustomFields(payloadNode, datasetConfigDTO);
+      LOG.info("Update dataset config to {}", datasetConfigDTO);
+    }
+
+    // Update metric config
+    if (payloadNode.has(METRIC_FIELD)) {
+      updateMetricCustomFields(payloadNode, metricConfigDTO);
+      onlineDetectionDataDTO.setMetric(metricConfigDTO.getName());
+      LOG.info("Update metric config to {}", metricConfigDTO);
+    }
+
+    JsonNode dataNode = payloadNode.get(DATA_FIELD);
+
+    Preconditions.checkArgument(
+        validateOnlineDetectionData(dataNode, datasetConfigDTO.getTimeColumn(), metricConfigDTO.getName()),
+        String.format("metric: %s or time: %s not found in adhoc data.",
+            metricConfigDTO.getName(), datasetConfigDTO.getTimeColumn()));
+
+    onlineDetectionDataDTO.setOnlineDetectionData(this.objectMapper.writeValueAsString(dataNode));
+
+    datasetConfigDAO.update(datasetConfigDTO);
+    metricConfigDAO.update(metricConfigDTO);
+    onlineDetectionDataDAO.update(onlineDetectionDataDTO);
+    LOG.info("Save updated online detection data for {}", onlineDetectionDataDTO.getId());
+
+    return onlineDetectionDataDTO;
+  }
+
+  /**
+   * Delete the online detection ad-hoc data with optional customized dataset and metric configurations.
+   *
+   * @param dataId the ID referring to the online detection ad-hoc data
+   * @return a message containing an ID referring to the ad-hoc data. This ID can be used to perform
+   * CRUD operations on the registered data.
+   */
+  @DELETE
+  @Path("/data/{data-id}")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.APPLICATION_JSON)
+  @ApiOperation("Delete ad hoc data used in online service and corresponding dataset/metric configs")
+  public Response deleteOnlineData(@PathParam("data-id") Long dataId) {
+    Preconditions.checkNotNull(dataId, "online detection data id is null");
+
+    Response.Status responseStatus;
+    Map<String, String> responseMessage = new HashMap<>();
+
+    try {
+      long cnt = onlineDetectionDataDAO.deleteById(dataId);
+      responseStatus = Response.Status.OK;
+      LOG.info("Deleted {} online detection data by id {}", cnt, dataId);
+      responseMessage.put("data-id", ""+dataId);
+      return Response.status(responseStatus).entity(responseMessage).build();
+    } catch (Exception e) {
+      LOG.error("Error: {}", e.getMessage());
+      responseStatus = Response.Status.INTERNAL_SERVER_ERROR;
+      responseMessage.put("message", "Failed executing anomaly detection service.");
+      processException(e, responseMessage);
+      return Response.status(responseStatus).entity(responseMessage).build();
+    }
+  }
+
+  /**
+   * Query the online detection ad-hoc data with optional customized dataset and metric configurations.
+   *
+   * @param dataId the ID referring to the online detection ad-hoc data
+   * @return a message containing the online ad-hoc data and corresponding dataset and metric configurations.
+   */
+  @GET
+  @Path("/data/{data-id}")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.APPLICATION_JSON)
+  @ApiOperation("Get ad hoc data used in online service and corresponding dataset/metric configs")
+  public Response getOnlineData(@PathParam("data-id") Long dataId) {
+    Preconditions.checkNotNull(dataId, "online detection data id is null");
+
+    Response.Status responseStatus;
+    Map<String, String> responseMessage = new HashMap<>();
+
+    try {
+      OnlineDetectionDataDTO onlineDetectionDataDTO = onlineDetectionDataDAO.findById(dataId);
+      Preconditions.checkNotNull(onlineDetectionDataDTO,
+          "Online detection data not found " + dataId);
+
+      LOG.info("Find online detection data with dataset {} and metric {}",
+          onlineDetectionDataDTO.getDataset(), onlineDetectionDataDTO.getMetric());
+
+      DatasetConfigDTO datasetConfigDTO = datasetConfigDAO.findByDataset(onlineDetectionDataDTO.getDataset());
+      Preconditions.checkNotNull(datasetConfigDTO,
+          "No corresponding dataset found for online data " + dataId);
+
+      MetricConfigDTO metricConfigDTO = metricConfigDAO.findByMetricAndDataset(
+          onlineDetectionDataDTO.getMetric(), onlineDetectionDataDTO.getDataset());
+      Preconditions.checkNotNull(metricConfigDTO,
+          "No corresponding metric found for online data " + dataId);
+
+      ObjectNode responseNode = objectMapper.createObjectNode();
+      responseNode.set(DATA_FIELD, objectMapper.readTree(onlineDetectionDataDTO.getOnlineDetectionData()));
+      responseNode.set(DATASET_FIELD, objectMapper.convertValue(translateDatasetToYaml(datasetConfigDTO), JsonNode.class));
+      responseNode.set(METRIC_FIELD, objectMapper.convertValue(translateMetricToYaml(metricConfigDTO), JsonNode.class));
+
+      responseStatus = Response.Status.OK;
+
+      return Response.status(responseStatus).entity(responseNode).build();
+    } catch (Exception e) {
+      LOG.error("Error: {}", e.getMessage());
+      responseStatus = Response.Status.INTERNAL_SERVER_ERROR;
+      responseMessage.put("message", "Failed executing anomaly detection service.");
+      processException(e, responseMessage);
+      return Response.status(responseStatus).entity(responseMessage).build();
+    }
+  }
+
+  String translateMetricToYaml(MetricConfigDTO metricConfigDTO) {
+    Map<String, String> configurations = new HashMap<>();
+    configurations.put(METRIC_CONFIG_DATA_TYPE, metricConfigDTO.getDatatype().toString());
+    configurations.put(METRIC_CONFIG_METRIC_COLUMN, metricConfigDTO.getName());
+
+    return yaml.dump(configurations);
+  }
+
+  String translateDatasetToYaml(DatasetConfigDTO datasetConfigDTO) {
+    Map<String, String> configurations = new HashMap<>();
+    configurations.put(DATASET_CONFIG_TIME_COLUMN, datasetConfigDTO.getTimeColumn());
+    configurations.put(DATASET_CONFIG_TIME_UNIT, datasetConfigDTO.getTimeUnit().toString());
+    configurations.put(DATASET_CONFIG_TIME_DURATION, datasetConfigDTO.getTimeDuration().toString());
+    configurations.put(DATASET_CONFIG_TIME_FORMAT, datasetConfigDTO.getTimeFormat());
+    configurations.put(DATASET_CONFIG_TIME_ZONE, datasetConfigDTO.getTimezone());
+
+    return yaml.dump(configurations);
+  }
+
   /**
    * Given a detection config name, run a anomaly detection task using this detection config
    * asynchronously. It will return a task ID for query the task status later.
@@ -548,7 +861,7 @@ public class AnomalyDetectionResource {
   public Response taskSubmitApi(
       @QueryParam("start") long start,
       @QueryParam("end") long end,
-      @QueryParam("detectionName") String detectionName) {
+      @QueryParam("detection-name") String detectionName) {
     long ts = System.currentTimeMillis();
     Map<String, String> responseMessage = new HashMap<>();
     try {
@@ -595,8 +908,7 @@ public class AnomalyDetectionResource {
 
       // Build HATEOAS response
       ObjectNode responseJson = buildResponseJson(
-          UriBuilder.fromResource(AnomalyDetectionResource.class)
-              .path(AnomalyDetectionResource.class, "taskSubmitApi")
+          UriBuilder.fromPath("/anomaly-detection/tasks")
               .build().toString(), "POST");
 
       Response.Status responseStatus = Response.Status.CREATED;
@@ -606,11 +918,10 @@ public class AnomalyDetectionResource {
         return Response.status(responseStatus).entity(responseJson).build();
       }
 
-      responseJson.put("taskId", taskId);
-      addLink(responseJson, "taskStatus",
-          UriBuilder.fromResource(AnomalyDetectionResource.class)
-                .path(AnomalyDetectionResource.class, "taskStatusApi")
-                .resolveTemplate("taskId", taskId)
+      responseJson.put("task-id", taskId);
+      addLink(responseJson, "task-status",
+          UriBuilder.fromPath("/anomaly-detection/task/{task-id}")
+                .resolveTemplate("task-id", taskId)
                 .build().toString(), "GET");
 
       return Response.status(responseStatus).entity(responseJson).build();
@@ -651,11 +962,11 @@ public class AnomalyDetectionResource {
    * @return a message containing the status of the task and HATEOAS links
    */
   @GET
-  @Path("/task/{taskId}")
+  @Path("/task/{task-id}")
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.TEXT_PLAIN)
   @ApiOperation("Query a task status")
-  public Response taskStatusApi(@PathParam("taskId") long taskId) {
+  public Response taskStatusApi(@PathParam("task-id") long taskId) {
     Map<String, String> responseMessage = new HashMap<>();
 
     try {
@@ -683,11 +994,10 @@ public class AnomalyDetectionResource {
 
       // Build HATEOAS response
       ObjectNode responseJson = buildResponseJson(
-          UriBuilder.fromResource(AnomalyDetectionResource.class)
-              .path(AnomalyDetectionResource.class, "taskStatusApi")
-              .resolveTemplate("taskId", taskId).build().toString(), "GET");
+          UriBuilder.fromPath("/anomaly-detection/task/{task-id}")
+              .resolveTemplate("task-id", taskId).build().toString(), "GET");
 
-      responseJson.put("status", taskStatus.name());
+      responseJson.put("task-status", taskStatus.name());
 
       if (responseStatus.equals(Response.Status.SEE_OTHER)) {
         addLink(responseJson, "anomalies", "/userdashboard/anomalies", "GET");
