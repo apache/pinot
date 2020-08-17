@@ -20,6 +20,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.thirdeye.anomaly.views.AnomalyTimelinesView;
+import org.apache.pinot.thirdeye.dashboard.views.TimeBucket;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -192,5 +194,62 @@ public class ThirdEyeUtilsTest {
     Assert.assertEquals(parentProperties.get("p2"), "value2");
     Assert.assertEquals(parentProperties.get("c1"), "value4");
     Assert.assertEquals(parentProperties.get("detectorComponentName"), "rule1,rule2");
+  }
+
+  @Test
+  public void testMergeAnomalySnapshotWithOverlap() throws Exception{
+    final long now = System.currentTimeMillis();
+    final long bucketSize = 300_000;
+    final double delta = 0.000001;
+    final double parentVal = 1.0, childVal = 2.0;
+    Map<String, String> parentProperties = new HashMap<>();
+    Map<String, String> childProperties = new HashMap<>();
+    parentProperties.put("anomalyTimelinesView",
+        generateAnomalyTimelineView(now, bucketSize, 10, parentVal).toJsonString());
+    childProperties.put("anomalyTimelinesView",
+        generateAnomalyTimelineView(now + bucketSize, bucketSize, 10,  childVal).toJsonString());
+    ThirdEyeUtils.mergeAnomalyProperties(parentProperties, childProperties);
+    AnomalyTimelinesView merged = AnomalyTimelinesView.fromJsonString(parentProperties.get("anomalyTimelinesView"));
+    Assert.assertEquals(merged.getTimeBuckets().size(), 11);
+    Assert.assertTrue(Math.abs(merged.getCurrentValues().get(0) - parentVal) < delta);
+    Assert.assertTrue(Math.abs(merged.getCurrentValues().get(1) - parentVal) < delta);
+    Assert.assertTrue(Math.abs(merged.getCurrentValues().get(10) - childVal) < delta);
+  }
+
+  @Test
+  public void testMergeAnomalySnapshotWithGap() throws Exception{
+    final long now = System.currentTimeMillis();
+    final long bucketSize = 300_000;
+    final double delta = 0.000001;
+    final double parentVal = 1.0, childVal = 2.0;
+    Map<String, String> parentProperties = new HashMap<>();
+    Map<String, String> childProperties = new HashMap<>();
+    parentProperties.put("anomalyTimelinesView",
+        generateAnomalyTimelineView(now, bucketSize, 10, parentVal).toJsonString());
+    childProperties.put("anomalyTimelinesView",
+        generateAnomalyTimelineView(now + bucketSize * 20, bucketSize, 10,  childVal).toJsonString());
+    ThirdEyeUtils.mergeAnomalyProperties(parentProperties, childProperties);
+    AnomalyTimelinesView merged = AnomalyTimelinesView.fromJsonString(parentProperties.get("anomalyTimelinesView"));
+    Assert.assertEquals(merged.getTimeBuckets().size(), 20);
+    Assert.assertTrue(Math.abs(merged.getCurrentValues().get(0) - parentVal) < delta);
+    Assert.assertTrue(Math.abs(merged.getCurrentValues().get(1) - parentVal) < delta);
+    Assert.assertTrue(Math.abs(merged.getCurrentValues().get(19) - childVal) < delta);
+
+  }
+
+  private AnomalyTimelinesView generateAnomalyTimelineView(
+      long startMillis, long bucketSizeMillis, int numBucket, double metricVal) {
+    AnomalyTimelinesView res = new AnomalyTimelinesView();
+    for (int i = 0; i < numBucket; i++) {
+      res.addTimeBuckets(new TimeBucket(
+          bucketSizeMillis * i + startMillis,
+          (bucketSizeMillis + 1) * i +startMillis,
+          bucketSizeMillis * i + startMillis,
+          (bucketSizeMillis + 1) * i +startMillis
+      ));
+      res.addBaselineValues(metricVal);
+      res.addCurrentValues(metricVal);
+    }
+    return res;
   }
 }
