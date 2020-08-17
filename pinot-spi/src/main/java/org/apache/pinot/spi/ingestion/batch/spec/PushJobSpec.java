@@ -45,8 +45,8 @@ public class PushJobSpec implements Serializable {
    * Used in SegmentUriPushJobRunner, which is used to composite the segment uri to send to pinot controller.
    * The URI sends to controller is in the format ${segmentUriPrefix}${segmentPath}${segmentUriSuffix}
    */
-  private String _segmentUriPrefix;
-  private String _segmentUriSuffix;
+  private String _segmentUriPrefix = "";
+  private String _segmentUriSuffix = "";
 
   public String getSegmentUriPrefix() {
     return _segmentUriPrefix;
