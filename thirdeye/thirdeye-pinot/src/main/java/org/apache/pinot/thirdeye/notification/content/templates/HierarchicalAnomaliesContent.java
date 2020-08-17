@@ -169,8 +169,8 @@ public class HierarchicalAnomaliesContent extends BaseNotificationContent {
         getTimezoneString(dateTimeZone),
         getIssueType(anomaly),
         anomaly.getType().getLabel(),
-        ThirdEyeStringUtils.encodeCompactedProperties(props)
-
+        ThirdEyeStringUtils.encodeCompactedProperties(props),
+        anomaly.getMetricUrn()
     );
 
     List<String> affectedCountries = getMatchedFilterValues(anomaly, "country");

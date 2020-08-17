@@ -27,10 +27,13 @@ import org.apache.pinot.thirdeye.anomaly.events.HolidayEventsLoader;
 import org.apache.pinot.thirdeye.anomaly.events.MockEventsLoader;
 import org.apache.pinot.thirdeye.anomaly.monitor.MonitorJobScheduler;
 import org.apache.pinot.thirdeye.anomaly.task.TaskDriver;
+import org.apache.pinot.thirdeye.common.restclient.ThirdEyeRestClientConfiguration;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.auto.onboard.AutoOnboardService;
 import org.apache.pinot.thirdeye.common.BaseThirdEyeApplication;
 import org.apache.pinot.thirdeye.common.ThirdEyeSwaggerBundle;
+import org.apache.pinot.thirdeye.common.utils.SessionUtils;
+import org.apache.pinot.thirdeye.datalayer.dto.SessionDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.pinot.resources.PinotDataSourceResource;
@@ -115,9 +118,15 @@ public class ThirdEyeAnomalyApplication
         requestStatisticsLogger.start();
 
         if (config.isWorker()) {
-          taskDriver = new TaskDriver(config);
+          taskDriver = new TaskDriver(config, false);
           taskDriver.start();
         }
+
+        if (config.isOnlineWorker()) {
+          taskDriver = new TaskDriver(config, true);
+          taskDriver.start();
+        }
+
         if (config.isMonitor()) {
           monitorJobScheduler = new MonitorJobScheduler(config.getMonitorConfiguration());
           monitorJobScheduler.start();
@@ -164,6 +173,10 @@ public class ThirdEyeAnomalyApplication
           modelDownloaderManager = new ModelDownloaderManager(config.getModelDownloaderConfig());
           modelDownloaderManager.start();
         }
+        if (config.getThirdEyeRestClientConfiguration() != null) {
+          ThirdEyeRestClientConfiguration restClientConfig = config.getThirdEyeRestClientConfiguration();
+          updateAdminSession(restClientConfig.getAdminUser(), restClientConfig.getSessionKey());
+        }
       }
 
       @Override
@@ -194,5 +207,17 @@ public class ThirdEyeAnomalyApplication
         }
       }
     });
+  }
+
+  private void updateAdminSession(String adminUser, String sessionKey) {
+    SessionDTO savedSession = DAO_REGISTRY.getSessionDAO().findBySessionKey(sessionKey);
+    long expiryMillis = System.currentTimeMillis() + TimeUnit.DAYS.toMillis(365);
+    if (savedSession == null) {
+      SessionDTO sessionDTO = SessionUtils.buildServiceAccount(adminUser, sessionKey, expiryMillis);
+      DAO_REGISTRY.getSessionDAO().save(sessionDTO);
+    } else {
+      savedSession.setExpirationTime(expiryMillis);
+      DAO_REGISTRY.getSessionDAO().update(savedSession);
+    }
   }
 }

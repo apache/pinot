@@ -39,7 +39,6 @@ import org.slf4j.LoggerFactory;
 public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(UploadSegmentCommand.class);
   private static final String SEGMENT_UPLOADER = "segmentUploader";
-  private static final String TAR_GZIP = ".tar.gz";
 
   @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
   private String _controllerHost;
@@ -110,28 +109,29 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
     FileUtils.deleteQuietly(tempDir);
     FileUtils.forceMkdir(tempDir);
 
-    LOGGER.info("Executing command: " + toString());
-    File dir = new File(_segmentDir);
-    File[] files = dir.listFiles();
-    Preconditions.checkNotNull(files);
+    LOGGER.info("Executing command: {}", toString());
+    File segmentDir = new File(_segmentDir);
+    File[] segmentFiles = segmentDir.listFiles();
+    Preconditions.checkNotNull(segmentFiles);
 
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       URI uploadSegmentHttpURI =
           FileUploadDownloadClient.getUploadSegmentHttpURI(_controllerHost, Integer.parseInt(_controllerPort));
-      for (File file : files) {
-        File tgzFile = file;
-
-        if (file.isDirectory()) {
-          LOGGER.info("Compressing segment {}", file.getName());
-
-          String srcDir = file.getAbsolutePath();
-          String tgzFileName = TarGzCompressionUtils
-              .createTarGzOfDirectory(srcDir, tempDir.getAbsolutePath() + File.separator + file.getName() + TAR_GZIP);
-          tgzFile = new File(tgzFileName);
+      for (File segmentFile : segmentFiles) {
+        File segmentTarFile;
+        if (segmentFile.isDirectory()) {
+          // Tar the segment directory
+          String segmentName = segmentFile.getName();
+          LOGGER.info("Compressing segment: {}", segmentName);
+          segmentTarFile = new File(tempDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+          TarGzCompressionUtils.createTarGzFile(segmentFile, segmentTarFile);
+        } else {
+          segmentTarFile = segmentFile;
         }
 
-        LOGGER.info("Uploading segment {}", tgzFile.getName());
-        fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, tgzFile.getName(), tgzFile, _tableName);
+        LOGGER.info("Uploading segment tar file: {}", segmentTarFile);
+        fileUploadDownloadClient
+            .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, _tableName);
       }
     } finally {
       // Delete the temporary working directory.

@@ -1,0 +1,81 @@
+{
+  "schema":{
+    "schemaName": "tableSchema",
+    "dimensionFieldSpecs": [
+      {
+        "name": "a",
+        "dataType": "STRING",
+        "cardinality":20,
+        "numValuesPerEntry":1
+      },
+      {
+        "name": "b",
+        "dataType": "BYTES",
+        "cardinality":6,
+        "numValuesPerEntry":2
+      },
+      {
+        "name": "c",
+        "dataType": "BYTES",
+        "cardinality":7,
+        "numValuesPerEntry":1
+      },
+      {
+        "name": "d",
+        "dataType": "STRING",
+        "cardinality":41,
+        "numValuesPerEntry":2,
+        "averageLength" : 27
+      },
+      {
+        "name": "e",
+        "dataType": "LONG",
+        "cardinality":18,
+        "numValuesPerEntry":4
+      }
+    ],
+    "metricFieldSpecs": [
+      {
+        "name": "k",
+        "dataType": "DOUBLE",
+        "cardinality":10000,
+        "numValuesPerEntry":2,
+        "averageLength" : 100
+      },
+      {
+        "name": "l",
+        "dataType": "STRING",
+        "cardinality":10000,
+        "numValuesPerEntry":1,
+        "averageLength" : 10
+      },
+      {
+        "name": "m",
+        "dataType": "BYTES",
+        "cardinality":10000,
+        "numValuesPerEntry":1,
+        "averageLength" : 25
+      }
+    ],
+    "timeFieldSpec": {
+      "incomingGranularitySpec": {
+        "dataType": "INT",
+        "name": "t",
+        "timeType": "DAYS",
+        "cardinality":10000,
+        "numValuesPerEntry":1
+      }
+    }
+  },
+  "queriesWithWeights":{
+    "select f from tableName": 0.1,
+    "select f from tableName where a =3": 0.1,
+    "not a valid query": 0.1,
+    "select g from tableName LIMIT 1000000000": 0.1
+  },
+  "overWrittenConfigs": {
+    "indexConfig": {
+      "noDictionaryColumns": ["b","c","l"]
+    }
+  }
+}

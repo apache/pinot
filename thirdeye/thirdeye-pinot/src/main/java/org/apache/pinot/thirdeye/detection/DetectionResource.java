@@ -20,6 +20,8 @@
 package org.apache.pinot.thirdeye.detection;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.inject.Inject;
+import com.google.inject.Singleton;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -95,9 +97,9 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
-@Path("/detection")
 @Produces(MediaType.APPLICATION_JSON)
 @Api(tags = {Constants.DETECTION_TAG})
+@Singleton
 public class DetectionResource {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionResource.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -118,8 +120,13 @@ public class DetectionResource {
   private final DetectionConfigFormatter detectionConfigFormatter;
   private final DetectionAlertConfigFormatter subscriptionConfigFormatter;
   private final AggregationLoader aggregationLoader;
+  private final DetectionConfigurationResource detectionConfigurationResource;
 
-  public DetectionResource() {
+  @Inject
+  public DetectionResource(
+      final DetectionConfigurationResource detectionConfigurationResource) {
+    this.detectionConfigurationResource = detectionConfigurationResource;
+
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     this.datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
     this.eventDAO = DAORegistry.getInstance().getEventDAO();
@@ -143,6 +150,11 @@ public class DetectionResource {
         AnomaliesCacheBuilder.getInstance());
     this.detectionConfigFormatter = new DetectionConfigFormatter(metricDAO, datasetDAO);
     this.subscriptionConfigFormatter = new DetectionAlertConfigFormatter();
+  }
+
+  @Path("rule")
+  public DetectionConfigurationResource getDetectionConfigurationResource() {
+    return detectionConfigurationResource;
   }
 
   @Path("/{id}")

@@ -35,13 +35,14 @@
   <url>https://pinot.apache.org</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
-    <aws.sdk.version>2.11.12</aws.sdk.version>
+    <aws.sdk.version>2.13.46</aws.sdk.version>
     <netty.version>4.1.42.Final</netty.version>
-    <http.client.version>4.5.5</http.client.version>
+    <http.client.version>4.5.9</http.client.version>
     <http.core.version>4.4.9</http.core.version>
     <reactivestream.version>1.0.3</reactivestream.version>
     <s3mock.version>2.1.19</s3mock.version>
     <javax.version>3.1.0</javax.version>
+    <phase.prop>package</phase.prop>
   </properties>
 
   <dependencyManagement>

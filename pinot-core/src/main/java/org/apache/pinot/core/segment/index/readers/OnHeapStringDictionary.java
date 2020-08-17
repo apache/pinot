@@ -20,8 +20,9 @@ package org.apache.pinot.core.segment.index.readers;
 
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.Arrays;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /**
@@ -80,6 +81,11 @@ public class OnHeapStringDictionary extends OnHeapDictionary {
       return _paddingByte == 0 ? Arrays.binarySearch(_unpaddedStrings, stringValue)
           : Arrays.binarySearch(_paddedStrings, padString(stringValue));
     }
+  }
+
+  @Override
+  public DataType getValueType() {
+    return DataType.STRING;
   }
 
   @Override

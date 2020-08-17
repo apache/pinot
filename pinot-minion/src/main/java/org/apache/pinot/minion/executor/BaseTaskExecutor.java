@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.minion.executor;
 
+import com.google.common.base.Preconditions;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.minion.MinionContext;
+import org.apache.pinot.spi.config.table.TableConfig;
 
 
 public abstract class BaseTaskExecutor implements PinotTaskExecutor {
@@ -29,5 +32,12 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
   @Override
   public void cancel() {
     _cancelled = true;
+  }
+
+  protected TableConfig getTableConfig(String tableNameWithType) {
+    TableConfig tableConfig =
+        ZKMetadataProvider.getTableConfig(MINION_CONTEXT.getHelixPropertyStore(), tableNameWithType);
+    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
+    return tableConfig;
   }
 }

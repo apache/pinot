@@ -70,11 +70,6 @@ public class DistinctCountRawThetaSketchAggregationFunction implements Aggregati
   }
 
   @Override
-  public void accept(AggregationFunctionVisitorBase visitor) {
-    _thetaSketchAggregationFunction.accept(visitor);
-  }
-
-  @Override
   public AggregationResultHolder createAggregationResultHolder() {
     return _thetaSketchAggregationFunction.createAggregationResultHolder();
   }

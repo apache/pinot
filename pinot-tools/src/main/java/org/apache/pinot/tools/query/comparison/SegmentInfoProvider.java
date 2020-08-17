@@ -26,13 +26,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 
 
 /**
@@ -96,9 +96,7 @@ public class SegmentInfoProvider {
     if (segmentFile.isFile()) {
       tmpDir = File.createTempFile(SEGMENT_INFO_PROVIDER, null, new File(TMP_DIR));
       FileUtils.deleteQuietly(tmpDir);
-      tmpDir.mkdir();
-      TarGzCompressionUtils.unTar(segmentFile, tmpDir);
-      segmentDir = tmpDir.listFiles()[0];
+      segmentDir = TarGzCompressionUtils.untar(segmentFile, tmpDir).get(0);
     } else {
       segmentDir = segmentFile;
     }

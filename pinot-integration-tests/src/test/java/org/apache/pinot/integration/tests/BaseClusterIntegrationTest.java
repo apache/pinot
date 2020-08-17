@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -37,6 +38,7 @@ import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.IngestionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -234,6 +236,11 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return TagNameUtils.DEFAULT_TENANT_NAME;
   }
 
+  @Nullable
+  protected IngestionConfig getIngestionConfig() {
+    return null;
+  }
+
   /**
    * The following methods are based on the getters. Override the getters for non-default settings before calling these
    * methods.
@@ -266,7 +273,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
         .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
         .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
-        .setServerTenant(getServerTenant()).build();
+        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).build();
   }
 
   /**
@@ -325,7 +332,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
         .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
         .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
-        .setServerTenant(getServerTenant()).setLLC(useLlc).setStreamConfigs(streamConfigs).build();
+        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setLLC(useLlc)
+        .setStreamConfigs(streamConfigs).build();
   }
 
   /**
@@ -398,7 +406,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       throws Exception {
     URL resourceUrl = BaseClusterIntegrationTest.class.getClassLoader().getResource(getAvroTarFileName());
     Assert.assertNotNull(resourceUrl);
-    return TarGzCompressionUtils.unTar(new File(resourceUrl.getFile()), outputDir);
+    return TarGzCompressionUtils.untar(new File(resourceUrl.getFile()), outputDir);
   }
 
   /**
@@ -410,6 +418,37 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       throws Exception {
     ClusterIntegrationTestUtils.pushAvroIntoKafka(avroFiles, "localhost:" + getBaseKafkaPort(), getKafkaTopic(),
         getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn());
+  }
+
+  protected List<File> getAllAvroFiles()
+          throws Exception {
+    // Unpack the Avro files
+    int numSegments = unpackAvroData(_tempDir).size();
+
+    // Avro files has to be ordered as time series data
+    List<File> avroFiles = new ArrayList<>(numSegments);
+    for (int i = 1; i <= numSegments; i++) {
+      avroFiles.add(new File(_tempDir, "On_Time_On_Time_Performance_2014_" + i + ".avro"));
+    }
+
+    return avroFiles;
+  }
+
+  protected List<File> getOfflineAvroFiles(List<File> avroFiles, int numOfflineSegments) {
+    List<File> offlineAvroFiles = new ArrayList<>(numOfflineSegments);
+    for (int i = 0; i < numOfflineSegments; i++) {
+      offlineAvroFiles.add(avroFiles.get(i));
+    }
+    return offlineAvroFiles;
+  }
+
+  protected List<File> getRealtimeAvroFiles(List<File> avroFiles, int numRealtimeSegments) {
+    int numSegments = avroFiles.size();
+    List<File> realtimeAvroFiles = new ArrayList<>(numRealtimeSegments);
+    for (int i = numSegments - numRealtimeSegments; i < numSegments; i++) {
+      realtimeAvroFiles.add(avroFiles.get(i));
+    }
+    return realtimeAvroFiles;
   }
 
   protected void startKafka() {

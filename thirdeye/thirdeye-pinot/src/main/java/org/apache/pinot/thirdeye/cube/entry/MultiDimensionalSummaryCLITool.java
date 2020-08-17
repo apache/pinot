@@ -25,11 +25,9 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Multimap;
 import org.apache.pinot.thirdeye.cube.additive.AdditiveDBClient;
-import org.apache.pinot.thirdeye.cube.additive.AdditiveRow;
 import org.apache.pinot.thirdeye.cube.data.dbrow.Dimensions;
 import org.apache.pinot.thirdeye.cube.cost.BalancedCostFunction;
 import org.apache.pinot.thirdeye.cube.cost.CostFunction;
-import org.apache.pinot.thirdeye.cube.data.dbclient.CubePinotClient;
 import org.apache.pinot.thirdeye.dashboard.Utils;
 import org.apache.pinot.thirdeye.cube.summary.SummaryResponse;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
@@ -55,6 +53,9 @@ import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.thirdeye.common.constants.rca.MultiDimensionalSummaryConstants.*;
+import static org.apache.pinot.thirdeye.common.constants.rca.RootCauseResourceConstants.*;
+
 
 public class MultiDimensionalSummaryCLITool {
   private static final Logger LOG = LoggerFactory.getLogger(MultiDimensionalSummaryCLITool.class);
@@ -78,7 +79,7 @@ public class MultiDimensionalSummaryCLITool {
     options.addOption(dimensions);
 
     Option excludedDimensions =
-        Option.builder("notDim").longOpt("excludedDimensions").desc("dimension names to be excluded").hasArg()
+        Option.builder("notDim").longOpt(CUBE_EXCLUDED_DIMENSIONS).desc("dimension names to be excluded").hasArg()
             .argName("LIST").build();
     options.addOption(excludedDimensions);
 
@@ -87,45 +88,45 @@ public class MultiDimensionalSummaryCLITool {
     options.addOption(filters);
 
     Option currentStart =
-        Option.builder("cstart").longOpt("currentStart").desc("current start time inclusive").hasArg().argName("MILLIS")
+        Option.builder("cstart").longOpt(CURRENT_START).desc("current start time inclusive").hasArg().argName("MILLIS")
             .required().build();
     options.addOption(currentStart);
 
     Option currentEnd =
-        Option.builder("cend").longOpt("currentEnd").desc("current end time exclusive").hasArg().argName("MILLIS")
+        Option.builder("cend").longOpt(CURRENT_END).desc("current end time exclusive").hasArg().argName("MILLIS")
             .required().build();
     options.addOption(currentEnd);
 
     Option baselineStart =
-        Option.builder("bstart").longOpt("baselineStart").desc("baseline start time inclusive").hasArg()
+        Option.builder("bstart").longOpt(BASELINE_START).desc("baseline start time inclusive").hasArg()
             .argName("MILLIS").required().build();
     options.addOption(baselineStart);
 
     Option baselineEnd =
-        Option.builder("bend").longOpt("baselineEnd").desc("baseline end time exclusive").hasArg().argName("MILLIS")
+        Option.builder("bend").longOpt(BASELINE_END).desc("baseline end time exclusive").hasArg().argName("MILLIS")
             .required().build();
     options.addOption(baselineEnd);
 
     Option size =
-        Option.builder("size").longOpt("summarySize").desc("size of summary").hasArg().argName("NUMBER").build();
+        Option.builder("size").longOpt(CUBE_SUMMARY_SIZE).desc("size of summary").hasArg().argName("NUMBER").build();
     options.addOption(size);
 
-    Option depth = Option.builder("depth").desc("number of top dimensions").hasArg().argName("NUMBER").build();
+    Option depth = Option.builder(CUBE_DEPTH).desc("number of top dimensions").hasArg().argName("NUMBER").build();
     options.addOption(depth);
 
-    Option hierarchies = Option.builder("h").longOpt("hierarchies")
+    Option hierarchies = Option.builder("h").longOpt(CUBE_DIM_HIERARCHIES)
         .desc("dimension hierarchies (a list of lists in Json format)").hasArg().argName("JSON")
         .build();
     options.addOption(hierarchies);
 
-    Option oneSideError = Option.builder("oneSideError").desc("enable one side error summary").build();
+    Option oneSideError = Option.builder(CUBE_ONE_SIDE_ERROR).desc("enable one side error summary").build();
     options.addOption(oneSideError);
 
-    Option manualOrder = Option.builder("manualOrder").desc("use manual dimension order").build();
+    Option manualOrder = Option.builder(CUBE_MANUAL_ORDER).desc("use manual dimension order").build();
     options.addOption(manualOrder);
 
     Option dateTimeZone =
-        Option.builder("timeZone").desc("time zone id in Joda library").hasArg().argName("ID").build();
+        Option.builder(TIME_ZONE).desc("time zone id in Joda library").hasArg().argName("ID").build();
     options.addOption(dateTimeZone);
 
     Option costFunctionClass = Option.builder("cost").longOpt("costFunction").desc(
@@ -198,21 +199,21 @@ public class MultiDimensionalSummaryCLITool {
       String dataset = commandLine.getOptionValue("dataset");
       String metricName = commandLine.getOptionValue("metric");
       String dimensionString = commandLine.getOptionValue("dimensionString", "");
-      String excludedDimensionString = commandLine.getOptionValue("excludedDimensions", "");
+      String excludedDimensionString = commandLine.getOptionValue(CUBE_EXCLUDED_DIMENSIONS, "");
       String filterJson = commandLine.getOptionValue("filters", "{}");
-      long currentStart = Long.parseLong(commandLine.getOptionValue("currentStart"));
-      long currentEnd = Long.parseLong(commandLine.getOptionValue("currentEnd"));
-      long baselineStart = Long.parseLong(commandLine.getOptionValue("baselineStart"));
-      long baselineEnd = Long.parseLong(commandLine.getOptionValue("baselineEnd"));
+      long currentStart = Long.parseLong(commandLine.getOptionValue(CURRENT_START));
+      long currentEnd = Long.parseLong(commandLine.getOptionValue(CURRENT_END));
+      long baselineStart = Long.parseLong(commandLine.getOptionValue(BASELINE_START));
+      long baselineEnd = Long.parseLong(commandLine.getOptionValue(BASELINE_END));
 
       int summarySize = Integer.parseInt(commandLine.getOptionValue("size", "10"));
-      int depth = Integer.parseInt(commandLine.getOptionValue("depth", "3"));
-      String hierarchiesJson = commandLine.getOptionValue("hierarchies", "[]");
+      int depth = Integer.parseInt(commandLine.getOptionValue(CUBE_DEPTH, "3"));
+      String hierarchiesJson = commandLine.getOptionValue(CUBE_DIM_HIERARCHIES, "[]");
       if (commandLine.hasOption("manual")) {
         depth = 0;
       }
-      boolean oneSideError = commandLine.hasOption("oneSideError");
-      String dateTimeZoneId = commandLine.getOptionValue("timeZone", DateTimeZone.UTC.getID());
+      boolean oneSideError = commandLine.hasOption(CUBE_ONE_SIDE_ERROR);
+      String dateTimeZoneId = commandLine.getOptionValue(TIME_ZONE, DateTimeZone.UTC.getID());
       DateTimeZone timeZone = DateTimeZone.forID(dateTimeZoneId);
 
       // Create cost function

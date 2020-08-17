@@ -47,6 +47,7 @@ public class AutoOnboardMockDataSource extends AutoOnboard {
 
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;
+  private final String dataSourceName;
 
   /**
    * Constructor for dependency injection
@@ -57,6 +58,7 @@ public class AutoOnboardMockDataSource extends AutoOnboard {
     super(metadataSourceConfig);
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     this.datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
+    this.dataSourceName = MapUtils.getString(metadataSourceConfig.getProperties(), "name", MockThirdEyeDataSource.class.getSimpleName());
   }
 
   @Override
@@ -80,7 +82,7 @@ public class AutoOnboardMockDataSource extends AutoOnboard {
 
       DatasetConfigDTO datasetConfig = new DatasetConfigDTO();
       datasetConfig.setDataset(datasetName);
-      datasetConfig.setDataSource(MockThirdEyeDataSource.class.getSimpleName());
+      datasetConfig.setDataSource(this.dataSourceName);
       datasetConfig.setDimensions(sortedDimensions);
       datasetConfig.setTimezone(MapUtils.getString(dataset, "timezone", "America/Los_Angeles"));
       datasetConfig.setTimeDuration(ThirdEyeUtils.getTimeDuration(granularity));

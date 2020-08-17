@@ -20,10 +20,8 @@ package org.apache.pinot.core.query.reduce;
 
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 
 
 /**
@@ -36,12 +34,12 @@ public final class ResultReducerFactory {
    * Constructs the right result reducer based on the given query context.
    */
   public static DataTableReducer getResultReducer(QueryContext queryContext) {
-    if (!QueryContextUtils.isAggregationQuery(queryContext)) {
+    AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
+    if (aggregationFunctions == null) {
       // Selection query
       return new SelectionDataTableReducer(queryContext);
     } else {
       // Aggregation query
-      AggregationFunction[] aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(queryContext);
       if (queryContext.getGroupByExpressions() == null) {
         // Aggregation only query
         if (aggregationFunctions.length == 1 && aggregationFunctions[0].getType() == AggregationFunctionType.DISTINCT) {

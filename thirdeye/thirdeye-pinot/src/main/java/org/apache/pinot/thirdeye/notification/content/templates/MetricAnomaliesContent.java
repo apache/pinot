@@ -23,18 +23,6 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import java.util.Properties;
-import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.util.ThirdEyeStringUtils;
-import org.apache.pinot.thirdeye.datasource.DAORegistry;
-import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import org.apache.pinot.thirdeye.anomaly.alert.util.AlertScreenshotHelper;
-import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
-import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
-import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
-import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -42,9 +30,22 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import org.apache.pinot.thirdeye.anomaly.alert.util.AlertScreenshotHelper;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
+import org.apache.pinot.thirdeye.auth.ThirdEyePrincipal;
+import org.apache.pinot.thirdeye.common.restclient.ThirdEyeRcaRestClient;
+import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.util.ThirdEyeStringUtils;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.notification.content.BaseNotificationContent;
-import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
-import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,13 +58,27 @@ public class MetricAnomaliesContent extends BaseNotificationContent {
   private static final Logger LOG = LoggerFactory.getLogger(MetricAnomaliesContent.class);
 
   private DetectionConfigManager configDAO = null;
+  private ThirdEyeRcaRestClient rcaClient;
 
-  public MetricAnomaliesContent() {}
+  public MetricAnomaliesContent() {
+  }
+
+  // For testing
+  public MetricAnomaliesContent(ThirdEyeRcaRestClient rcaClient) {
+    this.rcaClient = rcaClient;
+  }
 
   @Override
   public void init(Properties properties, ThirdEyeAnomalyConfiguration configuration) {
     super.init(properties, configuration);
     this.configDAO = DAORegistry.getInstance().getDetectionConfigManager();
+
+    if (this.rcaClient == null) {
+      ThirdEyePrincipal principal = new ThirdEyePrincipal();
+      principal.setName(this.thirdEyeAnomalyConfig.getThirdEyeRestClientConfiguration().getAdminUser());
+      principal.setSessionKey(this.thirdEyeAnomalyConfig.getThirdEyeRestClientConfiguration().getSessionKey());
+      this.rcaClient = new ThirdEyeRcaRestClient(principal, this.thirdEyeAnomalyConfig.getDashboardHost());
+    }
   }
 
   @Override
@@ -148,7 +163,8 @@ public class MetricAnomaliesContent extends BaseNotificationContent {
           getTimezoneString(dateTimeZone),
           getIssueType(anomaly),
           anomaly.getType().getLabel(),
-          ThirdEyeStringUtils.encodeCompactedProperties(props)
+          ThirdEyeStringUtils.encodeCompactedProperties(props),
+          anomaly.getMetricUrn()
       );
 
       // dimension filters / values
@@ -198,6 +214,21 @@ public class MetricAnomaliesContent extends BaseNotificationContent {
     templateData.put("detectionToAnomalyDetailsMap", functionAnomalyReports.asMap());
     templateData.put("metricToAnomalyDetailsMap", metricAnomalyReports.asMap());
     templateData.put("functionToId", functionToId);
+
+    // Display RCA highlights in email only if report contains anomalies belonging to a single metric.
+    // Note: Once we have a sophisticated rca highlight support and users start seeing value, we'll
+    // enable it for all the metrics.
+    if (this.rcaClient != null && metricAnomalyReports.keySet().size() == 1) {
+      String anomalyId = metricAnomalyReports.values().iterator().next().getAnomalyId();
+      try {
+        Map<String, Object> rcaHighlights = this.rcaClient.getRootCauseHighlights(Long.parseLong(anomalyId));
+        templateData.put("cubeDimensions", ConfigUtils.getMap(rcaHighlights.get("cubeResults")).get("dimensions"));
+        templateData.put("cubeResponseRows", ConfigUtils.getMap(rcaHighlights.get("cubeResults")).get("responseRows"));
+      } catch (Exception e) {
+        // alert notification shouldn't fail if rca insights are not available
+        LOG.error("Skip Embedding RCA in email. Failed to retrieve the RCA Highlights for anomaly " + anomalyId, e);
+      }
+    }
 
     return templateData;
   }

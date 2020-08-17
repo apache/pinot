@@ -124,7 +124,8 @@ public class OfflineNonReplicaGroupSegmentAssignmentTest {
     Arrays.fill(expectedNumSegmentsAssignedPerInstance, numSegmentsPerInstance);
     assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
     // Current assignment should already be balanced
-    assertEquals(_segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, new BaseConfiguration()),
+    assertEquals(_segmentAssignment
+            .rebalanceTable(currentAssignment, _instancePartitionsMap, null, null, new BaseConfiguration()),
         currentAssignment);
   }
 
@@ -142,7 +143,7 @@ public class OfflineNonReplicaGroupSegmentAssignmentTest {
     Configuration rebalanceConfig = new BaseConfiguration();
     rebalanceConfig.setProperty(RebalanceConfigConstants.BOOTSTRAP, true);
     Map<String, Map<String, String>> newAssignment =
-        _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, rebalanceConfig);
+        _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, null, null, rebalanceConfig);
     assertEquals(newAssignment.size(), NUM_SEGMENTS);
     List<String> sortedSegments = new ArrayList<>(SEGMENTS);
     sortedSegments.sort(null);

@@ -32,9 +32,18 @@ import org.apache.commons.lang3.builder.ToStringBuilder;
  */
 public class DataSourceConfig {
 
+  private String name;
   private String className;
   private Map<String, Object> properties = new HashMap<>();
   private List<MetadataSourceConfig> metadataSourceConfigs = new ArrayList<>();
+
+  public String getName() {
+    return name;
+  }
+
+  public void setName(String name) {
+    this.name = name;
+  }
 
   public String getClassName() {
     return className;

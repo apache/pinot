@@ -33,6 +33,8 @@ import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.MapConfiguration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -186,14 +188,14 @@ public class PinotConfiguration {
 
       return propertiesConfiguration;
     } catch (ConfigurationException e) {
-      throw new RuntimeException("Could not read properties from " + configPath, e);
+      throw new IllegalArgumentException("Could not read properties from " + configPath, e);
     }
   }
 
   private static Map<String, Object> relaxConfigurationKeys(Configuration configuration) {
-    return CommonsConfigurationUtils.getKeysStream(configuration)
+    return CommonsConfigurationUtils.getKeysStream(configuration).distinct()
 
-        .collect(Collectors.toMap(PinotConfiguration::relaxPropertyName, key -> getProperty(key, configuration)));
+        .collect(Collectors.toMap(PinotConfiguration::relaxPropertyName, key -> configuration.getProperty(key)));
   }
 
   private static Map<String, String> relaxEnvironmentVariables(Map<String, String> environmentVariables) {

@@ -20,6 +20,7 @@ package org.apache.pinot.core.operator.query;
 
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -63,23 +64,58 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
     for (AggregationFunction aggregationFunction : _aggregationFunctions) {
       String column = ((ExpressionContext) aggregationFunction.getInputExpressions().get(0)).getIdentifier();
       Dictionary dictionary = _dictionaryMap.get(column);
+      int dictionarySize = dictionary.length();
       switch (aggregationFunction.getType()) {
         case MAX:
-          aggregationResults.add(dictionary.getDoubleValue(dictionary.length() - 1));
+          aggregationResults.add(dictionary.getDoubleValue(dictionarySize - 1));
           break;
         case MIN:
           aggregationResults.add(dictionary.getDoubleValue(0));
           break;
         case MINMAXRANGE:
-          aggregationResults.add(
-              new MinMaxRangePair(dictionary.getDoubleValue(0), dictionary.getDoubleValue(dictionary.length() - 1)));
+          aggregationResults
+              .add(new MinMaxRangePair(dictionary.getDoubleValue(0), dictionary.getDoubleValue(dictionarySize - 1)));
           break;
         case DISTINCTCOUNT:
-          IntOpenHashSet set = new IntOpenHashSet(128);
-          for (int dictId = 0; dictId < dictionary.length(); dictId++) {
-            set.add(dictionary.get(dictId).hashCode());
+          IntOpenHashSet set = new IntOpenHashSet(dictionarySize);
+          switch (dictionary.getValueType()) {
+            case INT:
+              for (int dictId = 0; dictId < dictionarySize; dictId++) {
+                set.add(dictionary.getIntValue(dictId));
+              }
+              break;
+            case LONG:
+              for (int dictId = 0; dictId < dictionarySize; dictId++) {
+                set.add(Long.hashCode(dictionary.getLongValue(dictId)));
+              }
+              break;
+            case FLOAT:
+              for (int dictId = 0; dictId < dictionarySize; dictId++) {
+                set.add(Float.hashCode(dictionary.getFloatValue(dictId)));
+              }
+              break;
+            case DOUBLE:
+              for (int dictId = 0; dictId < dictionarySize; dictId++) {
+                set.add(Double.hashCode(dictionary.getDoubleValue(dictId)));
+              }
+              break;
+            case STRING:
+              for (int dictId = 0; dictId < dictionarySize; dictId++) {
+                set.add(dictionary.getStringValue(dictId).hashCode());
+              }
+              break;
+            case BYTES:
+              for (int dictId = 0; dictId < dictionarySize; dictId++) {
+                set.add(Arrays.hashCode(dictionary.getBytesValue(dictId)));
+              }
+              break;
+            default:
+              throw new IllegalStateException();
           }
           aggregationResults.add(set);
+          break;
+        case SEGMENTPARTITIONEDDISTINCTCOUNT:
+          aggregationResults.add((long) dictionarySize);
           break;
         default:
           throw new IllegalStateException(

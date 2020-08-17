@@ -33,6 +33,7 @@ import org.apache.pinot.spi.ingestion.batch.spec.ExecutionFrameworkSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.GroovyTemplateUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
@@ -41,6 +42,9 @@ import org.yaml.snakeyaml.Yaml;
 public class IngestionJobLauncher {
 
   public static final Logger LOGGER = LoggerFactory.getLogger(IngestionJobLauncher.class);
+  public static final String JOB_SPEC_FORMAT = "job-spec-format";
+  public static final String JSON = "json";
+  public static final String YAML = "yaml";
 
   public static SegmentGenerationJobSpec getSegmentGenerationJobSpec(String jobSpecFilePath, String propertyFilePath,
       Map<String, Object> context) {
@@ -57,21 +61,33 @@ public class IngestionJobLauncher {
     if (context != null) {
       propertiesMap.putAll(context);
     }
-    String yamlTemplate;
+    String jobSpecTemplate;
     try {
-      yamlTemplate = IOUtils.toString(new BufferedReader(new FileReader(jobSpecFilePath)));
+      jobSpecTemplate = IOUtils.toString(new BufferedReader(new FileReader(jobSpecFilePath)));
     } catch (IOException e) {
       throw new RuntimeException(String.format("Unable to read ingestion job spec file [%s].", jobSpecFilePath), e);
     }
-    String yamlStr;
+    String jobSpecStr;
     try {
-      yamlStr = GroovyTemplateUtils.renderTemplate(yamlTemplate, propertiesMap);
+      jobSpecStr = GroovyTemplateUtils.renderTemplate(jobSpecTemplate, propertiesMap);
     } catch (Exception e) {
       throw new RuntimeException(String
           .format("Unable to render templates on ingestion job spec template file - [%s] with propertiesMap - [%s].",
               jobSpecFilePath, Arrays.toString(propertiesMap.entrySet().toArray())), e);
     }
-    return new Yaml().loadAs(yamlStr, SegmentGenerationJobSpec.class);
+
+    String jobSpecFormat = (String) propertiesMap.getOrDefault(JOB_SPEC_FORMAT, YAML);
+    if (jobSpecFormat.equals(JSON)) {
+      try {
+        return JsonUtils.stringToObject(jobSpecStr, SegmentGenerationJobSpec.class);
+      } catch (IOException e) {
+        throw new RuntimeException(String
+            .format("Unable to parse job spec - [%s] to JSON with propertiesMap - [%s]", jobSpecFilePath,
+                Arrays.toString(propertiesMap.entrySet().toArray())), e);
+      }
+    }
+
+    return new Yaml().loadAs(jobSpecStr, SegmentGenerationJobSpec.class);
   }
 
   public static void runIngestionJob(SegmentGenerationJobSpec spec) {

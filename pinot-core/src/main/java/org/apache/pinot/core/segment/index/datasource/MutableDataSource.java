@@ -23,9 +23,9 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.data.partition.PartitionFunction;
-import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -40,9 +40,10 @@ public class MutableDataSource extends BaseDataSource {
       @Nullable PartitionFunction partitionFunction, int partitionId, @Nullable Comparable minValue,
       @Nullable Comparable maxValue, ForwardIndexReader forwardIndex, @Nullable Dictionary dictionary,
       @Nullable InvertedIndexReader invertedIndex, @Nullable InvertedIndexReader rangeIndex,
-      @Nullable BloomFilterReader bloomFilter, @Nullable NullValueVectorReader nullValueVector) {
+      @Nullable InvertedIndexReader textIndex, @Nullable BloomFilterReader bloomFilter,
+      @Nullable NullValueVectorReader nullValueVector) {
     super(new MutableDataSourceMetadata(fieldSpec, numDocs, numValues, maxNumValuesPerMVEntry, partitionFunction,
-            partitionId, minValue, maxValue), forwardIndex, dictionary, invertedIndex, rangeIndex, bloomFilter,
+            partitionId, minValue, maxValue), forwardIndex, dictionary, invertedIndex, rangeIndex, textIndex, bloomFilter,
         nullValueVector);
   }
 

@@ -20,13 +20,10 @@
 package org.apache.pinot.thirdeye.datasource.pinot;
 
 import com.google.common.base.Preconditions;
-import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.LoadingCache;
-import com.google.common.cache.RemovalListener;
-import com.google.common.cache.RemovalNotification;
-import com.google.common.cache.Weigher;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -61,15 +58,15 @@ import org.slf4j.LoggerFactory;
 public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
   private static final Logger LOG = LoggerFactory.getLogger(PinotThirdEyeDataSource.class);
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
-  public static final String DATA_SOURCE_NAME = PinotThirdEyeDataSource.class.getSimpleName();
   private static final String PINOT = "Pinot";
+  private String name;
 
   private static final long CONNECTION_TIMEOUT = 60000;
 
   public static final String CACHE_LOADER_CLASS_NAME_STRING = "cacheLoaderClassName";
   protected LoadingCache<RelationalQuery, ThirdEyeResultSetGroup> pinotResponseCache;
 
-  protected PinotDataSourceMaxTime pinotDataSourceMaxTime;
+  protected PinotDataSourceTimeQuery pinotDataSourceTimeQuery;
   protected PinotDataSourceDimensionFilters pinotDataSourceDimensionFilters;
 
   /**
@@ -83,8 +80,9 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
     PinotResponseCacheLoader pinotResponseCacheLoader = new PinotControllerResponseCacheLoader(pinotThirdEyeDataSourceConfig);
     pinotResponseCache = ThirdEyeUtils.buildResponseCache(pinotResponseCacheLoader);
 
-    pinotDataSourceMaxTime = new PinotDataSourceMaxTime(this);
+    pinotDataSourceTimeQuery = new PinotDataSourceTimeQuery(this);
     pinotDataSourceDimensionFilters = new PinotDataSourceDimensionFilters(this);
+    name = pinotThirdEyeDataSourceConfig.getName() != null ? pinotThirdEyeDataSourceConfig.getName() : PinotThirdEyeDataSource.class.getSimpleName();
   }
 
 
@@ -100,8 +98,9 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
     pinotResponseCacheLoader.init(properties);
     pinotResponseCache = ThirdEyeUtils.buildResponseCache(pinotResponseCacheLoader);
 
-    pinotDataSourceMaxTime = new PinotDataSourceMaxTime(this);
+    pinotDataSourceTimeQuery = new PinotDataSourceTimeQuery(this);
     pinotDataSourceDimensionFilters = new PinotDataSourceDimensionFilters(this);
+    name = MapUtils.getString(properties, "name", PinotThirdEyeDataSource.class.getSimpleName());
   }
 
   /**
@@ -137,7 +136,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
 
   @Override
   public String getName() {
-    return DATA_SOURCE_NAME;
+    return this.name;
   }
 
   @Override
@@ -316,7 +315,12 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
 
   @Override
   public long getMaxDataTime(String dataset) throws Exception {
-    return pinotDataSourceMaxTime.getMaxDateTime(dataset);
+    return pinotDataSourceTimeQuery.getMaxDateTime(dataset);
+  }
+
+  @Override
+  public long getMinDataTime(final String dataset) throws Exception {
+    return pinotDataSourceTimeQuery.getMinDateTime(dataset);
   }
 
   @Override
@@ -343,7 +347,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
   protected PinotThirdEyeDataSource(String host, int port) {
     this.controllerHost = new HttpHost(host, port);
     this.controllerClient = HttpClients.createDefault();
-    this.pinotDataSourceMaxTime = new PinotDataSourceMaxTime(this);
+    this.pinotDataSourceTimeQuery = new PinotDataSourceTimeQuery(this);
     this.pinotDataSourceDimensionFilters = new PinotDataSourceDimensionFilters(this);
     LOG.info("Created PinotThirdEyeDataSource with controller {}", controllerHost);
   }

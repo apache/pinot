@@ -112,6 +112,7 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
   static final String PROP_CRON = "cron";
   static final String PROP_TYPE = "type";
   static final String PROP_NAME = "name";
+  static final String PROP_LAST_TIMESTAMP = "lastTimestamp";
 
   private static final String PROP_DETECTION_NAME = "detectionName";
   private static final String PROP_DESC_NAME = "description";
@@ -180,8 +181,14 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     config.setName(MapUtils.getString(yamlConfigMap, PROP_DETECTION_NAME));
     config.setDescription(MapUtils.getString(yamlConfigMap, PROP_DESC_NAME));
     config.setDescription(MapUtils.getString(yamlConfigMap, PROP_DESC_NAME));
-    config.setLastTimestamp(System.currentTimeMillis());
     config.setOwners(filterOwners(ConfigUtils.getList(yamlConfigMap.get(PROP_OWNERS))));
+
+    /*
+     * The lastTimestamp value is used as a checkpoint/high watermark for onboarding data.
+     * This implies that data entries post this timestamp will be processed for
+     * anomalies.
+     */
+    config.setLastTimestamp(longValue(yamlConfigMap.get(PROP_LAST_TIMESTAMP)));
 
     config.setProperties(detectionProperties);
     config.setDataQualityProperties(qualityProperties);
@@ -194,9 +201,16 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     List<DatasetConfigDTO> datasetConfigs = this.metricAttributesMap.getAllDatasets();
     if (MapUtils.getString(yamlConfigMap, PROP_CRON) == null
         && datasetConfigs.stream().allMatch(c -> c.bucketTimeGranularity().getUnit().equals(TimeUnit.DAYS))
-        && datasetConfigs.stream().allMatch(c -> c.getDataSource().equals(PinotThirdEyeDataSource.DATA_SOURCE_NAME))) {
+        && datasetConfigs.stream().allMatch(c -> c.getDataSource().equals(PinotThirdEyeDataSource.class.getSimpleName()))) {
       config.setDataAvailabilitySchedule(true);
     }
     return config;
+  }
+
+  private static long longValue(final Object o) {
+    if (o instanceof Number) {
+      return ((Number) o).longValue();
+    }
+    return -1;
   }
 }

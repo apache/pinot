@@ -18,9 +18,16 @@
  */
 package org.apache.pinot.core.data.recordtransformer;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -32,6 +39,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  * {@link NullValueTransformer} and {@link ExpressionTransformer}). After this, all values should be of the desired data
  * types.
  */
+@SuppressWarnings("rawtypes")
 public class DataTypeTransformer implements RecordTransformer {
   private static final Map<Class, PinotDataType> SINGLE_VALUE_TYPE_MAP = new HashMap<>();
   private static final Map<Class, PinotDataType> MULTI_VALUE_TYPE_MAP = new HashMap<>();
@@ -73,10 +81,15 @@ public class DataTypeTransformer implements RecordTransformer {
     for (Map.Entry<String, PinotDataType> entry : _dataTypes.entrySet()) {
       String column = entry.getKey();
       Object value = record.getValue(column);
-
-      // Convert List value to Object[]
-      if (value instanceof List) {
-        value = ((List) value).toArray();
+      if (value == null) {
+        continue;
+      }
+      PinotDataType dest = entry.getValue();
+      value = standardize(column, value, dest.isSingleValue());
+      // NOTE: The standardized value could be null for empty Collection/Map/Object[].
+      if (value == null) {
+        record.putValue(column, null);
+        continue;
       }
 
       // Convert data type if necessary
@@ -95,7 +108,6 @@ public class DataTypeTransformer implements RecordTransformer {
           source = PinotDataType.OBJECT;
         }
       }
-      PinotDataType dest = entry.getValue();
       if (source != dest) {
         value = dest.convert(value, source);
       }
@@ -103,5 +115,82 @@ public class DataTypeTransformer implements RecordTransformer {
       record.putValue(column, value);
     }
     return record;
+  }
+
+  /**
+   * Standardize the value into supported types.
+   * <ul>
+   *   <li>Empty Collection/Map/Object[] will be standardized to null</li>
+   *   <li>Single-entry Collection/Map/Object[] will be standardized to single value (map key is ignored)</li>
+   *   <li>Multi-entries Collection/Map/Object[] will be standardized to Object[] (map key is ignored)</li>
+   * </ul>
+   */
+  @VisibleForTesting
+  @Nullable
+  static Object standardize(String column, @Nullable Object value, boolean isSingleValue) {
+    if (value == null) {
+      return null;
+    }
+    if (value instanceof Collection) {
+      return standardizeCollection(column, (Collection) value, isSingleValue);
+    }
+    if (value instanceof Map) {
+      return standardizeCollection(column, ((Map) value).values(), isSingleValue);
+    }
+    if (value instanceof Object[]) {
+      Object[] values = (Object[]) value;
+      int numValues = values.length;
+      if (numValues == 0) {
+        return null;
+      }
+      if (numValues == 1) {
+        return standardize(column, values[0], isSingleValue);
+      }
+      List<Object> standardizedValues = new ArrayList<>(numValues);
+      for (Object singleValue : values) {
+        Object standardizedValue = standardize(column, singleValue, true);
+        if (standardizedValue != null) {
+          standardizedValues.add(standardizedValue);
+        }
+      }
+      int numStandardizedValues = standardizedValues.size();
+      if (numStandardizedValues == 0) {
+        return null;
+      }
+      if (numStandardizedValues == 1) {
+        return standardizedValues.get(0);
+      }
+      Preconditions.checkState(!isSingleValue, "Cannot read single-value from Object[]: %s for column: %s",
+          Arrays.toString(values), column);
+      return standardizedValues.toArray();
+    }
+    return value;
+  }
+
+  private static Object standardizeCollection(String column, Collection collection, boolean isSingleValue) {
+    int numValues = collection.size();
+    if (numValues == 0) {
+      return null;
+    }
+    if (numValues == 1) {
+      return standardize(column, collection.iterator().next(), isSingleValue);
+    }
+    List<Object> standardizedValues = new ArrayList<>(numValues);
+    for (Object singleValue : collection) {
+      Object standardizedValue = standardize(column, singleValue, true);
+      if (standardizedValue != null) {
+        standardizedValues.add(standardizedValue);
+      }
+    }
+    int numStandardizedValues = standardizedValues.size();
+    if (numStandardizedValues == 0) {
+      return null;
+    }
+    if (numStandardizedValues == 1) {
+      return standardizedValues.get(0);
+    }
+    Preconditions
+        .checkState(!isSingleValue, "Cannot read single-value from Collection: %s for column: %s", collection, column);
+    return standardizedValues.toArray();
   }
 }

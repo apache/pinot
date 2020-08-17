@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.data;
 
+import com.google.common.base.Preconditions;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.EnumUtils;
 import org.apache.pinot.spi.utils.EqualityUtils;
@@ -101,9 +102,7 @@ public class DateTimeFormatUnitSpec {
   private DateTimeTransformUnit _dateTimeTransformUnit = null;
 
   public DateTimeFormatUnitSpec(String unit) {
-    if (!isValidUnitSpec(unit)) {
-      throw new IllegalArgumentException("Unit must belong to enum TimeUnit or DateTimeTransformUnit");
-    }
+    validateUnitSpec(unit);
     if (EnumUtils.isValidEnum(TimeUnit.class, unit)) {
       _timeUnit = TimeUnit.valueOf(unit);
     }
@@ -120,11 +119,10 @@ public class DateTimeFormatUnitSpec {
     return _dateTimeTransformUnit;
   }
 
-  public static boolean isValidUnitSpec(String unit) {
-    if (EnumUtils.isValidEnum(TimeUnit.class, unit) || EnumUtils.isValidEnum(DateTimeTransformUnit.class, unit)) {
-      return true;
-    }
-    return false;
+  public static void validateUnitSpec(String unit) {
+    Preconditions.checkState(
+        EnumUtils.isValidEnum(TimeUnit.class, unit) || EnumUtils.isValidEnum(DateTimeTransformUnit.class, unit),
+        "Unit: %s must belong to enum TimeUnit or DateTimeTransformUnit", unit);
   }
 
   @Override

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.data.recordtransformer;
 
-import java.util.Arrays;
 import java.util.Collections;
 import org.apache.pinot.spi.config.table.IngestionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -47,7 +46,8 @@ public class RecordTransformerTest {
       // For sanitation
       .addSingleValueDimension("svStringWithNullCharacters", DataType.STRING)
       .addSingleValueDimension("svStringWithLengthLimit", DataType.STRING).build();
-  private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+  private static final TableConfig TABLE_CONFIG =
+      new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
 
   static {
     SCHEMA.getFieldSpecFor("svStringWithLengthLimit").setMaxLength(2);
@@ -61,13 +61,13 @@ public class RecordTransformerTest {
     GenericRow record = new GenericRow();
     record.putValue("svInt", (byte) 123);
     record.putValue("svLong", (char) 123);
-    record.putValue("svFloat", Arrays.asList((short) 123, 456));
-    record.putValue("svDouble", new String[]{"123", "456"});
+    record.putValue("svFloat", Collections.singletonList((short) 123));
+    record.putValue("svDouble", new String[]{"123"});
     record.putValue("svBytes", "7b7b"/*new byte[]{123, 123}*/);
     record.putValue("mvInt", new Object[]{123L});
     record.putValue("mvLong", Collections.singletonList(123f));
     record.putValue("mvFloat", new Double[]{123d});
-    record.putValue("mvDouble", Collections.singletonList(123));
+    record.putValue("mvDouble", Collections.singletonMap("key", 123));
     record.putValue("svStringWithNullCharacters", "1\0002\0003");
     record.putValue("svStringWithLengthLimit", "123");
     return record;
@@ -79,27 +79,28 @@ public class RecordTransformerTest {
 
     // expression false, not filtered
     GenericRow genericRow = getRecord();
-    tableConfig.setIngestionConfig(new IngestionConfig(new FilterConfig("Groovy({svInt > 123}, svInt)")));
+    tableConfig.setIngestionConfig(new IngestionConfig(new FilterConfig("Groovy({svInt > 123}, svInt)"), null));
     RecordTransformer transformer = new FilterTransformer(tableConfig);
     transformer.transform(genericRow);
     Assert.assertFalse(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
 
     // expression true, filtered
     genericRow = getRecord();
-    tableConfig.setIngestionConfig(new IngestionConfig(new FilterConfig("Groovy({svInt <= 123}, svInt)")));
+    tableConfig.setIngestionConfig(new IngestionConfig(new FilterConfig("Groovy({svInt <= 123}, svInt)"), null));
     transformer = new FilterTransformer(tableConfig);
     transformer.transform(genericRow);
     Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
 
     // value not found
     genericRow = getRecord();
-    tableConfig.setIngestionConfig(new IngestionConfig(new FilterConfig("Groovy({notPresent == 123}, notPresent)")));
+    tableConfig
+        .setIngestionConfig(new IngestionConfig(new FilterConfig("Groovy({notPresent == 123}, notPresent)"), null));
     transformer = new FilterTransformer(tableConfig);
     transformer.transform(genericRow);
     Assert.assertFalse(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
 
     // invalid function
-    tableConfig.setIngestionConfig(new IngestionConfig(new FilterConfig("Groovy(svInt == 123)")));
+    tableConfig.setIngestionConfig(new IngestionConfig(new FilterConfig("Groovy(svInt == 123)"), null));
     try {
       new FilterTransformer(tableConfig);
       Assert.fail("Should have failed constructing FilterTransformer");
@@ -109,11 +110,11 @@ public class RecordTransformerTest {
 
     // multi value column
     genericRow = getRecord();
-    tableConfig.setIngestionConfig(new IngestionConfig(new FilterConfig("Groovy({svFloat.max() < 500}, svFloat)")));
+    tableConfig
+        .setIngestionConfig(new IngestionConfig(new FilterConfig("Groovy({svFloat.max() < 500}, svFloat)"), null));
     transformer = new FilterTransformer(tableConfig);
     transformer.transform(genericRow);
     Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
-
   }
 
   @Test
@@ -157,19 +158,6 @@ public class RecordTransformerTest {
   public void testNullValueTransformer() {
     RecordTransformer transformer = new NullValueTransformer(SCHEMA);
     GenericRow record = new GenericRow();
-    for (int i = 0; i < NUM_ROUNDS; i++) {
-      record = transformer.transform(record);
-      assertNotNull(record);
-      validateNullValueTransformerResult(record);
-    }
-
-    record.clear();
-    record.putValue("svInt", Collections.emptyList());
-    record.putValue("svLong", new String[0]);
-    record.putValue("svFloat", null);
-    record.putValue("mvInt", Collections.emptyList());
-    record.putValue("mvLong", new Object[0]);
-    record.putValue("mvFloat", null);
     for (int i = 0; i < NUM_ROUNDS; i++) {
       record = transformer.transform(record);
       assertNotNull(record);

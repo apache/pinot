@@ -37,6 +37,19 @@
     {
       "dataType": "STRING",
       "name": "group_name"
+    },
+    {
+      "dataType": "DOUBLE",
+      "name": "group_lat"
+    },
+    {
+      "dataType": "DOUBLE",
+      "name": "group_lon"
+    },
+    {
+      "dataType": "BYTES",
+      "name": "location",
+      "transformFunction": "stPoint(group_lon, group_lat)"
     }
   ],
   "dateTimeFieldSpecs": [

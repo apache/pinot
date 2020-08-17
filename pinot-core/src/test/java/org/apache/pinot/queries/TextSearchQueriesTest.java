@@ -30,6 +30,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
@@ -89,8 +90,10 @@ public class TextSearchQueriesTest extends BaseQueriesTest {  private static fin
 
   private static final String QUERY_LOG_TEXT_COL_NAME = "QUERY_LOG_TEXT_COL";
   private static final String SKILLS_TEXT_COL_NAME = "SKILLS_TEXT_COL";
+  private static final String SKILLS_TEXT_COL_DICT_NAME = "SKILLS_TEXT_COL_DICT";
   private static final String INT_COL_NAME = "INT_COL";
-  private static final List<String> TEXT_INDEX_COLUMNS = Arrays.asList(QUERY_LOG_TEXT_COL_NAME, SKILLS_TEXT_COL_NAME);
+  private static final List<String> RAW_TEXT_INDEX_COLUMNS = Arrays.asList(QUERY_LOG_TEXT_COL_NAME, SKILLS_TEXT_COL_NAME);
+  private static final List<String> DICT_TEXT_INDEX_COLUMNS = Arrays.asList(SKILLS_TEXT_COL_DICT_NAME);
   private static final int INT_BASE_VALUE = 1000;
 
   private final List<GenericRow> _rows = new ArrayList<>();
@@ -120,7 +123,11 @@ public class TextSearchQueriesTest extends BaseQueriesTest {  private static fin
 
     buildSegment();
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    indexLoadingConfig.setTextIndexColumns(new HashSet<>(TEXT_INDEX_COLUMNS));
+    Set<String> textIndexColumns = new HashSet<>();
+    textIndexColumns.addAll(RAW_TEXT_INDEX_COLUMNS);
+    textIndexColumns.addAll(DICT_TEXT_INDEX_COLUMNS);
+    indexLoadingConfig.setTextIndexColumns(textIndexColumns);
+    indexLoadingConfig.setInvertedIndexColumns(new HashSet<>(DICT_TEXT_INDEX_COLUMNS));
     ImmutableSegment immutableSegment =
         ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
     _indexSegment = immutableSegment;
@@ -137,17 +144,22 @@ public class TextSearchQueriesTest extends BaseQueriesTest {  private static fin
       throws Exception {
     List<GenericRow> rows = createTestData();
 
-    List<FieldConfig> fieldConfigs = new ArrayList<>(TEXT_INDEX_COLUMNS.size());
-    for (String textIndexColumn : TEXT_INDEX_COLUMNS) {
+    List<FieldConfig> fieldConfigs = new ArrayList<>(RAW_TEXT_INDEX_COLUMNS.size() + DICT_TEXT_INDEX_COLUMNS.size());
+    for (String textIndexColumn : RAW_TEXT_INDEX_COLUMNS) {
       fieldConfigs
           .add(new FieldConfig(textIndexColumn, FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null));
     }
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setNoDictionaryColumns(TEXT_INDEX_COLUMNS)
-            .setFieldConfigList(fieldConfigs).build();
+    for (String textIndexColumn : DICT_TEXT_INDEX_COLUMNS) {
+      fieldConfigs
+          .add(new FieldConfig(textIndexColumn, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null));
+    }
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setNoDictionaryColumns(RAW_TEXT_INDEX_COLUMNS).setInvertedIndexColumns(DICT_TEXT_INDEX_COLUMNS)
+        .setFieldConfigList(fieldConfigs).build();
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension(QUERY_LOG_TEXT_COL_NAME, FieldSpec.DataType.STRING)
         .addSingleValueDimension(SKILLS_TEXT_COL_NAME, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(SKILLS_TEXT_COL_DICT_NAME, FieldSpec.DataType.STRING)
         .addMetric(INT_COL_NAME, FieldSpec.DataType.INT).build();
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(INDEX_DIR.getPath());
@@ -191,8 +203,10 @@ public class TextSearchQueriesTest extends BaseQueriesTest {  private static fin
         row.putField(QUERY_LOG_TEXT_COL_NAME, line);
         if (counter >= skillCount) {
           row.putField(SKILLS_TEXT_COL_NAME, "software engineering");
+          row.putField(SKILLS_TEXT_COL_DICT_NAME, "software engineering");
         } else {
           row.putField(SKILLS_TEXT_COL_NAME, skills[counter]);
+          row.putField(SKILLS_TEXT_COL_DICT_NAME, skills[counter]);
         }
         rows.add(row);
         counter++;
@@ -623,6 +637,11 @@ public class TextSearchQueriesTest extends BaseQueriesTest {  private static fin
     query = "SELECT COUNT(*) FROM MyTable WHERE INT_COL >= 1010 AND TEXT_MATCH(SKILLS_TEXT_COL, '\"distributed systems\"') LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
 
+    query = "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE INT_COL >= 1010 AND TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"Distributed systems\"') LIMIT 50000";
+    testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
+    query = "SELECT COUNT(*) FROM MyTable WHERE INT_COL >= 1010 AND TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"distributed systems\"') LIMIT 50000";
+    testTextSearchAggregationQueryHelper(query, expected.size());
+
     // TEST 2: combine an index based doc id iterator (text_match) with scan based doc id iterator (range <= ) using AND
     expected = new ArrayList<>();
     expected.add(new Serializable[]{1005, "Distributed systems, Java, C++, Go, distributed query engines for analytics and data warehouses, Machine learning, spark, Kubernetes, transaction processing"});
@@ -634,8 +653,16 @@ public class TextSearchQueriesTest extends BaseQueriesTest {  private static fin
     query = "SELECT COUNT(*) FROM MyTable WHERE INT_COL <= 1010 AND TEXT_MATCH(SKILLS_TEXT_COL, '\"distributed systems\"') LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
 
+    query = "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE INT_COL <= 1010 AND TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"Distributed systems\"') LIMIT 50000";
+    testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
+    query = "SELECT COUNT(*) FROM MyTable WHERE INT_COL <= 1010 AND TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"distributed systems\"') LIMIT 50000";
+    testTextSearchAggregationQueryHelper(query, expected.size());
+
     // TEST 3: combine an index based doc id iterator (text_match) with scan based doc id iterator (range >= ) using OR
     query = "SELECT COUNT(*) FROM MyTable WHERE INT_COL >= 1010 OR TEXT_MATCH(SKILLS_TEXT_COL, '\"distributed systems\"') LIMIT 50000";
+    testTextSearchAggregationQueryHelper(query, 24142);
+
+    query = "SELECT COUNT(*) FROM MyTable WHERE INT_COL >= 1010 OR TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"distributed systems\"') LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, 24142);
 
     // TEST 4: combine an index based doc id iterator (text_match) with scan based doc id iterator (range <= ) using OR
@@ -660,6 +687,11 @@ public class TextSearchQueriesTest extends BaseQueriesTest {  private static fin
     query = "SELECT COUNT(*) FROM MyTable WHERE INT_COL <= 1010 OR TEXT_MATCH(SKILLS_TEXT_COL, '\"distributed systems\"') LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
 
+    query = "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE INT_COL <= 1010 OR TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"Distributed systems\"') LIMIT 50000";
+    testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
+    query = "SELECT COUNT(*) FROM MyTable WHERE INT_COL <= 1010 OR TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"distributed systems\"') LIMIT 50000";
+    testTextSearchAggregationQueryHelper(query, expected.size());
+
     // TEST 5: combine an index based doc id iterator (text_match) with sorted inverted index doc id iterator (equality) using AND
     expected = new ArrayList<>();
     expected.add(new Serializable[]{1017, "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems, concurrency, multi-threading, C++, CPU processing, Java"});
@@ -667,6 +699,11 @@ public class TextSearchQueriesTest extends BaseQueriesTest {  private static fin
     query = "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE INT_COL = 1017 AND TEXT_MATCH(SKILLS_TEXT_COL, '\"Distributed systems\"') LIMIT 50000";
     testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
     query = "SELECT COUNT(*) FROM MyTable WHERE INT_COL = 1017 AND TEXT_MATCH(SKILLS_TEXT_COL, '\"distributed systems\"') LIMIT 50000";
+    testTextSearchAggregationQueryHelper(query, expected.size());
+
+    query = "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE INT_COL = 1017 AND TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"Distributed systems\"') LIMIT 50000";
+    testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
+    query = "SELECT COUNT(*) FROM MyTable WHERE INT_COL = 1017 AND TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"distributed systems\"') LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
 
     // TEST 6: combine an index based doc id iterator (text_match) with sorted inverted index doc id iterator (equality) using OR
@@ -681,6 +718,11 @@ public class TextSearchQueriesTest extends BaseQueriesTest {  private static fin
     query = "SELECT INT_COL FROM MyTable WHERE INT_COL = 1017 OR TEXT_MATCH(SKILLS_TEXT_COL, '\"Distributed systems\"') LIMIT 50000";
     testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
     query = "SELECT COUNT(*) FROM MyTable WHERE INT_COL = 1017 OR TEXT_MATCH(SKILLS_TEXT_COL, '\"distributed systems\"') LIMIT 50000";
+    testTextSearchAggregationQueryHelper(query, expected.size());
+
+    query = "SELECT INT_COL FROM MyTable WHERE INT_COL = 1017 OR TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"Distributed systems\"') LIMIT 50000";
+    testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
+    query = "SELECT COUNT(*) FROM MyTable WHERE INT_COL = 1017 OR TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"distributed systems\"') LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
 
     // TEST 7: combine an index based doc id iterator (text_match) with another index based doc id iterator (text_match) using AND
@@ -713,6 +755,39 @@ public class TextSearchQueriesTest extends BaseQueriesTest {  private static fin
     query = "SELECT INT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, 'apache') OR TEXT_MATCH(SKILLS_TEXT_COL, '\"Distributed systems\"') LIMIT 50000";
     testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, 'apache') OR TEXT_MATCH(SKILLS_TEXT_COL, '\"Distributed systems\"') LIMIT 50000";
+    testTextSearchAggregationQueryHelper(query, expected.size());
+
+    // since we support text index on dictionary encoded columns, the column might
+    // also have native pinot inverted index in addition to text index.
+    // so this query tests the exact match on the text column which will use the
+    // native inverted index.
+    expected = new ArrayList<>();
+    expected.add(new Serializable[]{1004});
+    query = "SELECT INT_COL FROM MyTable WHERE SKILLS_TEXT_COL_DICT = 'Machine learning, Tensor flow, Java, Stanford university,' LIMIT 50000";
+    testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
+    query = "SELECT COUNT(*) FROM MyTable WHERE SKILLS_TEXT_COL_DICT = 'Machine learning, Tensor flow, Java, Stanford university,' LIMIT 50000";
+    testTextSearchAggregationQueryHelper(query, expected.size());
+
+    // since we support text index on dictionary encoded columns, the column might
+    // also have native pinot inverted index in addition to text index.
+    // so this query tests the exact match on the text column which will use the
+    // native inverted index along with text match on the text column which will
+    // use the text index
+    expected = new ArrayList<>();
+    expected.add(new Serializable[]{1003});
+    expected.add(new Serializable[]{1004});
+    expected.add(new Serializable[]{1005});
+    expected.add(new Serializable[]{1006});
+    expected.add(new Serializable[]{1007});
+    expected.add(new Serializable[]{1010});
+    expected.add(new Serializable[]{1011});
+    expected.add(new Serializable[]{1016});
+    expected.add(new Serializable[]{1019});
+    expected.add(new Serializable[]{1020});
+
+    query = "SELECT INT_COL FROM MyTable WHERE SKILLS_TEXT_COL_DICT = 'Machine learning, Tensor flow, Java, Stanford university,' OR TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"machine learning\"') LIMIT 50000";
+    testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
+    query = "SELECT COUNT(*) FROM MyTable WHERE SKILLS_TEXT_COL_DICT = 'Machine learning, Tensor flow, Java, Stanford university,' OR TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"machine learning\"') LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
   }
 
@@ -1066,7 +1141,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {  private static fin
   private void testTextSearchSelectQueryHelper(String query, int expectedResultSize, boolean compareGrepOutput,
       List<Serializable[]> expectedResults)
       throws Exception {
-    SelectionOnlyOperator operator = getOperatorForQuery(query);
+    SelectionOnlyOperator operator = getOperatorForPqlQuery(query);
     IntermediateResultsBlock operatorResult = operator.nextBlock();
     List<Object[]> resultset = (List<Object[]>) operatorResult.getSelectionResult();
     Assert.assertNotNull(resultset);
@@ -1108,7 +1183,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {  private static fin
   }
 
   private void testTextSearchAggregationQueryHelper(String query, int expectedCount) {
-    AggregationOperator operator = getOperatorForQuery(query);
+    AggregationOperator operator = getOperatorForPqlQuery(query);
     IntermediateResultsBlock operatorResult = operator.nextBlock();
     long count = (Long) operatorResult.getAggregationResult().get(0);
     Assert.assertEquals(expectedCount, count);
@@ -1118,6 +1193,9 @@ public class TextSearchQueriesTest extends BaseQueriesTest {  private static fin
   public void testInterSegment() {
     String query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"Machine learning\" AND \"Tensor flow\"') LIMIT 50000";
     testInterSegmentAggregationQueryHelper(query, 12);
+    query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"Machine learning\" AND \"Tensor flow\"') LIMIT 50000";
+    testInterSegmentAggregationQueryHelper(query, 12);
+
     query = "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"Machine learning\" AND \"Tensor flow\"') LIMIT 50000";
     List<Serializable[]> expected = new ArrayList<>();
     expected.add(new Serializable[]{1004, "Machine learning, Tensor flow, Java, Stanford university,"});
@@ -1133,12 +1211,20 @@ public class TextSearchQueriesTest extends BaseQueriesTest {  private static fin
     expected.add(new Serializable[]{1007, "C++, Python, Tensor flow, database kernel, storage, indexing and transaction processing, building large scale systems, Machine learning"});
     expected.add(new Serializable[]{1016, "CUDA, GPU processing, Tensor flow, Pandas, Python, Jupyter notebook, spark, Machine learning, building high performance scalable systems"});
     testInterSegmentSelectionQueryHelper(query, expected);
+    query = "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"Machine learning\" AND \"Tensor flow\"') LIMIT 50000";
+    testInterSegmentSelectionQueryHelper(query, expected);
 
     // try arbitrary filters in search expressions
     query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '(\"distributed systems\" AND apache) OR (Java AND C++)') LIMIT 50000";
     testInterSegmentAggregationQueryHelper(query, 36);
+    query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, '(\"distributed systems\" AND apache) OR (Java AND C++)') LIMIT 50000";
+    testInterSegmentAggregationQueryHelper(query, 36);
+
     query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '(\"distributed systems\" AND apache) AND (Java AND C++)') LIMIT 50000";
     testInterSegmentAggregationQueryHelper(query, 4);
+    query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, '(\"distributed systems\" AND apache) AND (Java AND C++)') LIMIT 50000";
+    testInterSegmentAggregationQueryHelper(query, 4);
+
     query = "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '(\"distributed systems\" AND apache) AND (Java AND C++)') LIMIT 50000";
     expected = new ArrayList<>();
     expected.add(new Serializable[]{1017, "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems, concurrency, multi-threading, C++, CPU processing, Java"});
@@ -1146,8 +1232,15 @@ public class TextSearchQueriesTest extends BaseQueriesTest {  private static fin
     expected.add(new Serializable[]{1017, "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems, concurrency, multi-threading, C++, CPU processing, Java"});
     expected.add(new Serializable[]{1017, "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems, concurrency, multi-threading, C++, CPU processing, Java"});
     testInterSegmentSelectionQueryHelper(query, expected);
+
+    query = "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, '(\"distributed systems\" AND apache) AND (Java AND C++)') LIMIT 50000";
+    testInterSegmentSelectionQueryHelper(query, expected);
+
     query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '(\"apache spark\" OR \"query processing\") AND \"machine learning\"') LIMIT 50000";
     testInterSegmentAggregationQueryHelper(query, 4);
+    query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, '(\"apache spark\" OR \"query processing\") AND \"machine learning\"') LIMIT 50000";
+    testInterSegmentAggregationQueryHelper(query, 4);
+
     query = "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '(\"apache spark\" OR \"query processing\") AND \"machine learning\"') LIMIT 50000";
     expected = new ArrayList<>();
     expected.add(new Serializable[]{1020, "Databases, columnar query processing, Apache Arrow, distributed systems, Machine learning, cluster management, docker image building and distribution"});
@@ -1156,19 +1249,34 @@ public class TextSearchQueriesTest extends BaseQueriesTest {  private static fin
     expected.add(new Serializable[]{1020, "Databases, columnar query processing, Apache Arrow, distributed systems, Machine learning, cluster management, docker image building and distribution"});
     testInterSegmentSelectionQueryHelper(query, expected);
 
+    query = "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, '(\"apache spark\" OR \"query processing\") AND \"machine learning\"') LIMIT 50000";
+    testInterSegmentSelectionQueryHelper(query, expected);
+
     // query with only stop-words. they should not be indexed
     query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, 'a and or in the are')";
+    testInterSegmentAggregationQueryHelper(query, 0);
+    query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, 'a and or in the are')";
     testInterSegmentAggregationQueryHelper(query, 0);
     // analyzer should prune/ignore the stop words from search expression and consider everything else for a match
     query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"learned a lot\"')";
     testInterSegmentAggregationQueryHelper(query, 4);
+    query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"learned a lot\"')";
+    testInterSegmentAggregationQueryHelper(query, 4);
     query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"indexing and transaction processing\"')";
+    testInterSegmentAggregationQueryHelper(query, 12);
+    query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"indexing and transaction processing\"')";
     testInterSegmentAggregationQueryHelper(query, 12);
     query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"docker image building and distribution\"')";
     testInterSegmentAggregationQueryHelper(query, 8);
+    query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"docker image building and distribution\"')";
+    testInterSegmentAggregationQueryHelper(query, 8);
     query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"distributed query engines for analytics and data warehouses\"')";
     testInterSegmentAggregationQueryHelper(query, 8);
+    query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"distributed query engines for analytics and data warehouses\"')";
+    testInterSegmentAggregationQueryHelper(query, 8);
     query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"worked in NGO\"')";
+    testInterSegmentAggregationQueryHelper(query, 4);
+    query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"worked in NGO\"')";
     testInterSegmentAggregationQueryHelper(query, 4);
   }
 

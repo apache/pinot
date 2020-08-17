@@ -25,6 +25,7 @@ import org.apache.helix.messaging.handling.MessageHandlerFactory;
 import org.apache.helix.model.Message;
 import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManager;
 import org.apache.pinot.broker.routing.RoutingManager;
+import org.apache.pinot.common.messages.RoutingTableRebuildMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
 import org.slf4j.Logger;
@@ -58,6 +59,8 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
         return new RefreshSegmentMessageHandler(new SegmentRefreshMessage(message), context);
       case TableConfigRefreshMessage.REFRESH_TABLE_CONFIG_MSG_SUB_TYPE:
         return new RefreshTableConfigMessageHandler(new TableConfigRefreshMessage(message), context);
+      case RoutingTableRebuildMessage.REBUILD_ROUTING_TABLE_MSG_SUB_TYPE:
+        return new RebuildRoutingTableMessageHandler(new RoutingTableRebuildMessage(message), context);
       default:
         // NOTE: Log a warning and return no-op message handler for unsupported message sub-types. This can happen when
         //       a new message sub-type is added, and the sender gets deployed first while receiver is still running the
@@ -122,6 +125,30 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
     @Override
     public void onError(Exception e, ErrorCode code, ErrorType type) {
       LOGGER.error("Got error while refreshing table config for table: {} (error code: {}, error type: {})",
+          _tableNameWithType, code, type, e);
+    }
+  }
+
+  private class RebuildRoutingTableMessageHandler extends MessageHandler {
+    final String _tableNameWithType;
+
+    RebuildRoutingTableMessageHandler(RoutingTableRebuildMessage routingTableRebuildMessage,
+        NotificationContext context) {
+      super(routingTableRebuildMessage, context);
+      _tableNameWithType = routingTableRebuildMessage.getTableNameWithType();
+    }
+
+    @Override
+    public HelixTaskResult handleMessage() {
+      _routingManager.buildRouting(_tableNameWithType);
+      HelixTaskResult result = new HelixTaskResult();
+      result.setSuccess(true);
+      return result;
+    }
+
+    @Override
+    public void onError(Exception e, ErrorCode code, ErrorType type) {
+      LOGGER.error("Got error while rebuilding routing table for table: {} (error code: {}, error type: {})",
           _tableNameWithType, code, type, e);
     }
   }

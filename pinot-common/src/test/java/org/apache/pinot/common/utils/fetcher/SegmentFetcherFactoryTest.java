@@ -29,6 +29,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.pinot.spi.crypt.PinotCrypter;
+import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.annotations.Test;
 
@@ -54,16 +56,16 @@ public class SegmentFetcherFactoryTest {
     properties.put("protocols", Arrays.asList(HTTP_PROTOCOL, HTTPS_PROTOCOL, TEST_PROTOCOL, "foo"));
     properties.put("http.foo", "bar");
     properties.put(TEST_PROTOCOL + SegmentFetcherFactory.SEGMENT_FETCHER_CLASS_KEY_SUFFIX,
-        TestSegmentFetcher.class.getName());
+        FakeSegmentFetcher.class.getName());
     SegmentFetcherFactory.init(new PinotConfiguration(properties));
 
     assertEquals(SegmentFetcherFactory.getSegmentFetcher(HTTP_PROTOCOL).getClass(), HttpSegmentFetcher.class);
     assertEquals(SegmentFetcherFactory.getSegmentFetcher(HTTPS_PROTOCOL).getClass(), HttpsSegmentFetcher.class);
     assertEquals(SegmentFetcherFactory.getSegmentFetcher(FILE_PROTOCOL).getClass(), PinotFSSegmentFetcher.class);
     assertEquals(SegmentFetcherFactory.getSegmentFetcher("foo").getClass(), PinotFSSegmentFetcher.class);
-    assertEquals(SegmentFetcherFactory.getSegmentFetcher(TEST_PROTOCOL).getClass(), TestSegmentFetcher.class);
+    assertEquals(SegmentFetcherFactory.getSegmentFetcher(TEST_PROTOCOL).getClass(), FakeSegmentFetcher.class);
 
-    TestSegmentFetcher testFileFetcher = (TestSegmentFetcher) SegmentFetcherFactory.getSegmentFetcher(TEST_PROTOCOL);
+    FakeSegmentFetcher testFileFetcher = (FakeSegmentFetcher) SegmentFetcherFactory.getSegmentFetcher(TEST_PROTOCOL);
     assertEquals(testFileFetcher._initCalled, 1);
     assertEquals(testFileFetcher._fetchFileToLocalCalled, 0);
 
@@ -74,9 +76,30 @@ public class SegmentFetcherFactoryTest {
     SegmentFetcherFactory.fetchSegmentToLocal(TEST_URI, new File("foo/bar"));
     assertEquals(testFileFetcher._initCalled, 1);
     assertEquals(testFileFetcher._fetchFileToLocalCalled, 2);
+
+    // setup crypter
+    properties.put("class.fakePinotCrypter", FakePinotCrypter.class.getName());
+    PinotCrypterFactory.init(new PinotConfiguration(properties));
+    FakePinotCrypter fakeCrypter = (FakePinotCrypter) PinotCrypterFactory.create("fakePinotCrypter");
+
+    SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(TEST_URI, new File("foo/bar"), null);
+    assertEquals(testFileFetcher._initCalled, 1);
+    assertEquals(testFileFetcher._fetchFileToLocalCalled, 3);
+    assertEquals(fakeCrypter._initCalled, 1);
+    assertEquals(fakeCrypter._decryptCalled, 0);
+    assertEquals(fakeCrypter._encryptCalled, 0);
+
+    SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(TEST_URI, new File("foo/bar"), "fakePinotCrypter");
+    assertEquals(testFileFetcher._initCalled, 1);
+    assertEquals(testFileFetcher._fetchFileToLocalCalled, 4);
+    assertEquals(fakeCrypter._initCalled, 1);
+    assertEquals(fakeCrypter._decryptCalled, 1);
+    assertEquals(fakeCrypter._encryptCalled, 0);
+    assertEquals(fakeCrypter._originalPath, "foo/bar.enc");
+    assertEquals(fakeCrypter._decryptedPath, "foo/bar");
   }
 
-  public static class TestSegmentFetcher implements SegmentFetcher {
+  public static class FakeSegmentFetcher implements SegmentFetcher {
     private int _initCalled = 0;
     private int _fetchFileToLocalCalled = 0;
 
@@ -96,6 +119,32 @@ public class SegmentFetcherFactoryTest {
     public void fetchSegmentToLocal(List<URI> uri, File dest)
         throws Exception {
       throw new UnsupportedOperationException();
+    }
+  }
+
+  public static class FakePinotCrypter implements PinotCrypter {
+
+    private int _initCalled = 0;
+    private int _encryptCalled = 0;
+    private int _decryptCalled = 0;
+    private String _originalPath;
+    private String _decryptedPath;
+
+    @Override
+    public void init(PinotConfiguration config) {
+      _initCalled++;
+    }
+
+    @Override
+    public void encrypt(File origFile, File encFile) {
+      _encryptCalled++;
+    }
+
+    @Override
+    public void decrypt(File origFile, File decFile) {
+      _decryptCalled++;
+      _originalPath = origFile.getPath();
+      _decryptedPath = decFile.getPath();
     }
   }
 }

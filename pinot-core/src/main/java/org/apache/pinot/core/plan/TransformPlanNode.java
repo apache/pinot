@@ -25,7 +25,6 @@ import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 
 
 /**
@@ -36,40 +35,16 @@ public class TransformPlanNode implements PlanNode {
   private final ProjectionPlanNode _projectionPlanNode;
 
   public TransformPlanNode(IndexSegment indexSegment, QueryContext queryContext,
-      Collection<ExpressionContext> expressions) {
+      Collection<ExpressionContext> expressions, int maxDocsPerCall) {
     _expressions = expressions;
     Set<String> projectionColumns = new HashSet<>();
     for (ExpressionContext expression : expressions) {
       expression.getColumns(projectionColumns);
     }
-    _projectionPlanNode = new ProjectionPlanNode(indexSegment, projectionColumns,
-        new DocIdSetPlanNode(indexSegment, queryContext, getMaxDocsPerCall(queryContext)));
-  }
-
-  /**
-   * Helper method to get the max number of documents returned in each block.
-   */
-  private int getMaxDocsPerCall(QueryContext queryContext) {
-    if (QueryContextUtils.isAggregationQuery(queryContext)) {
-      // Aggregation query
-      return DocIdSetPlanNode.MAX_DOC_PER_CALL;
-    } else {
-      // Selection query
-      int limit = queryContext.getLimit();
-      if (limit > 0) {
-        if (queryContext.getOrderByExpressions() == null) {
-          // For selection-only queries, select minimum number of documents
-          return Math.min(limit, DocIdSetPlanNode.MAX_DOC_PER_CALL);
-        } else {
-          // Selection order-by query
-          return DocIdSetPlanNode.MAX_DOC_PER_CALL;
-        }
-      } else {
-        // For LIMIT 0 queries, fetch at least 1 document per DocIdSetPlanNode's requirement
-        // TODO: Skip the filtering phase and document fetching for LIMIT 0 case
-        return 1;
-      }
-    }
+    // NOTE: Skip creating DocIdSetPlanNode when maxDocsPerCall is 0 (for selection query with LIMIT 0).
+    DocIdSetPlanNode docIdSetPlanNode =
+        maxDocsPerCall > 0 ? new DocIdSetPlanNode(indexSegment, queryContext, maxDocsPerCall) : null;
+    _projectionPlanNode = new ProjectionPlanNode(indexSegment, projectionColumns, docIdSetPlanNode);
   }
 
   @Override

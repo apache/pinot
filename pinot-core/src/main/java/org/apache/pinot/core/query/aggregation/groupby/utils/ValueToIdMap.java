@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby.utils;
 
+import org.apache.pinot.spi.utils.ByteArray;
+
+
 /**
  * Interface for mapping primitive values to contiguous id's.
  */
@@ -34,6 +37,8 @@ public interface ValueToIdMap {
 
   int put(String value);
 
+  int put(ByteArray value);
+
   int getInt(int id);
 
   long getLong(int id);
@@ -43,4 +48,6 @@ public interface ValueToIdMap {
   double getDouble(int id);
 
   String getString(int id);
+
+  ByteArray getBytes(int id);
 }

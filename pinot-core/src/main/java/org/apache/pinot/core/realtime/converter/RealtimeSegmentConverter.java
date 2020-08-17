@@ -20,6 +20,7 @@ package org.apache.pinot.core.realtime.converter;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -75,21 +76,6 @@ public class RealtimeSegmentConverter {
     _varLengthDictionaryColumns = varLengthDictionaryColumns;
     _nullHandlingEnabled = nullHandlingEnabled;
     _textIndexColumns = textIndexColumns;
-  }
-
-  public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, String outputPath, Schema schema,
-      String tableName, TableConfig tableConfig, String segmentName, String sortedColumn,
-      List<String> invertedIndexColumns, List<String> noDictionaryColumns, List<String> varLengthDictionaryColumns,
-      boolean nullHandlingEnabled) {
-    this(realtimeSegment, outputPath, schema, tableName, tableConfig, segmentName, sortedColumn,
-        invertedIndexColumns, new ArrayList<>(), noDictionaryColumns, varLengthDictionaryColumns, nullHandlingEnabled);
-  }
-
-  // Used in RealtimeSegmentConverterTest
-  public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, String outputPath, Schema schema,
-      String tableName, TableConfig tableConfig, String segmentName, String sortedColumn) {
-    this(realtimeSegment, outputPath, schema, tableName, tableConfig, segmentName, sortedColumn, new ArrayList<>(),
-        new ArrayList<>(), new ArrayList<>(), null/*StarTreeIndexSpec*/, false/*nullHandlingEnabled*/);
   }
 
   public void build(@Nullable SegmentVersion segmentVersion, ServerMetrics serverMetrics)
@@ -153,7 +139,7 @@ public class RealtimeSegmentConverter {
    * Returns a new schema containing only physical columns
    */
   @VisibleForTesting
-  public Schema getUpdatedSchema(Schema original) {
+  public static Schema getUpdatedSchema(Schema original) {
     Schema newSchema = new Schema();
     for (String col : original.getPhysicalColumnNames()) {
       newSchema.addField(original.getFieldSpecFor(col));

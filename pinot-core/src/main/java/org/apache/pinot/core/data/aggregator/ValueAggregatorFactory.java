@@ -18,13 +18,14 @@
  */
 package org.apache.pinot.core.data.aggregator;
 
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
  * The {@code ValueAggregatorFactory} class is the factory for all value aggregators.
  */
+@SuppressWarnings("rawtypes")
 public class ValueAggregatorFactory {
   private ValueAggregatorFactory() {
   }
@@ -49,6 +50,8 @@ public class ValueAggregatorFactory {
         return new AvgValueAggregator();
       case MINMAXRANGE:
         return new MinMaxRangeValueAggregator();
+      case DISTINCTCOUNTBITMAP:
+        return new DistinctCountBitmapValueAggregator();
       case DISTINCTCOUNTHLL:
       case DISTINCTCOUNTRAWHLL:
         return new DistinctCountHLLValueAggregator();
@@ -81,6 +84,8 @@ public class ValueAggregatorFactory {
         return AvgValueAggregator.AGGREGATED_VALUE_TYPE;
       case MINMAXRANGE:
         return MinMaxRangeValueAggregator.AGGREGATED_VALUE_TYPE;
+      case DISTINCTCOUNTBITMAP:
+        return DistinctCountBitmapValueAggregator.AGGREGATED_VALUE_TYPE;
       case DISTINCTCOUNTHLL:
       case DISTINCTCOUNTRAWHLL:
         return DistinctCountHLLValueAggregator.AGGREGATED_VALUE_TYPE;

@@ -39,6 +39,7 @@ public class SegmentPrunerProvider {
     PRUNER_MAP.put("columnvaluesegmentpruner", ColumnValueSegmentPruner.class);
     PRUNER_MAP.put("dataschemasegmentpruner", DataSchemaSegmentPruner.class);
     PRUNER_MAP.put("validsegmentpruner", ValidSegmentPruner.class);
+    PRUNER_MAP.put("selectionquerysegmentpruner", SelectionQuerySegmentPruner.class);
   }
 
   public static SegmentPruner getSegmentPruner(String prunerClassName, PinotConfiguration segmentPrunerConfig) {

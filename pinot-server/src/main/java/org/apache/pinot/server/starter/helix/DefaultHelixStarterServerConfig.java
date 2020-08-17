@@ -30,10 +30,10 @@ public class DefaultHelixStarterServerConfig {
 
   public static ServerConf getDefaultHelixServerConfig(PinotConfiguration externalConfigs) {
     PinotConfiguration defaultConfigs = loadDefaultServerConf();
-    
-    for (String key: externalConfigs.getKeys()) {
+
+    for (String key : externalConfigs.getKeys()) {
       defaultConfigs.setProperty(key, externalConfigs.getRawProperty(key));
-      
+
       LOGGER.info("External config key: {}, value: {}", key, externalConfigs.getProperty(key));
     }
     return new ServerConf(defaultConfigs);
@@ -41,7 +41,7 @@ public class DefaultHelixStarterServerConfig {
 
   public static PinotConfiguration loadDefaultServerConf() {
     PinotConfiguration serverConf = new PinotConfiguration();
-    
+
     serverConf.addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR,
         CommonConstants.Server.DEFAULT_INSTANCE_DATA_DIR);
     serverConf.addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR,
@@ -58,7 +58,7 @@ public class DefaultHelixStarterServerConfig {
     serverConf.addProperty(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_CLASS,
         CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_CLASS);
     serverConf.addProperty(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_PRUNER_CLASS,
-        "ValidSegmentPruner,DataSchemaSegmentPruner,ColumnValueSegmentPruner");
+        "ValidSegmentPruner,DataSchemaSegmentPruner,ColumnValueSegmentPruner,SelectionQuerySegmentPruner");
 
     // request handler factory parameters
     serverConf.addProperty(CommonConstants.Server.CONFIG_OF_REQUEST_HANDLER_FACTORY_CLASS,

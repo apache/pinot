@@ -38,7 +38,6 @@ import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.SimpleIndexedTable;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.util.trace.TraceRunnable;
@@ -91,7 +90,8 @@ public class BenchmarkIndexedTable {
 
     _queryContext = QueryContextConverterUtils
         .getQueryContextFromPQL("SELECT sum(m1), max(m2) FROM testTable GROUP BY d1, d2 ORDER BY sum(m1) TOP 500");
-    _aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(_queryContext);
+    _aggregationFunctions = _queryContext.getAggregationFunctions();
+    assert _aggregationFunctions != null;
     _dataSchema = new DataSchema(new String[]{"d1", "d2", "sum(m1)", "max(m2)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
 

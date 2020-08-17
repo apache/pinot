@@ -103,7 +103,7 @@ public class BenchmarkOfflineIndexReader {
     FileUtils.deleteQuietly(TEMP_DIR);
 
     File avroDir = new File(TEMP_DIR, "avro");
-    TarGzCompressionUtils.unTar(new File(TestUtils.getFileFromResourceUrl(RESOURCE_URL)), avroDir);
+    TarGzCompressionUtils.untar(new File(TestUtils.getFileFromResourceUrl(RESOURCE_URL)), avroDir);
     File avroFile = new File(avroDir, AVRO_FILE_NAME);
 
     File dataDir = new File(TEMP_DIR, "index");

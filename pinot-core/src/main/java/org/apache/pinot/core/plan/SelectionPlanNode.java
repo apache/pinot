@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.core.plan;
 
+import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.common.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -27,6 +29,7 @@ import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.core.operator.query.SelectionOrderByOperator;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 
@@ -44,7 +47,35 @@ public class SelectionPlanNode implements PlanNode {
     _indexSegment = indexSegment;
     _queryContext = queryContext;
     _expressions = SelectionOperatorUtils.extractExpressions(queryContext, indexSegment);
-    _transformPlanNode = new TransformPlanNode(_indexSegment, queryContext, _expressions);
+    int limit = queryContext.getLimit();
+    if (limit > 0) {
+      List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
+      if (orderByExpressions == null) {
+        // Selection only
+        _transformPlanNode = new TransformPlanNode(_indexSegment, queryContext, _expressions,
+            Math.min(limit, DocIdSetPlanNode.MAX_DOC_PER_CALL));
+      } else {
+        // Selection order-by
+        if (orderByExpressions.size() == _expressions.size()) {
+          // All output expressions are ordered
+          _transformPlanNode =
+              new TransformPlanNode(_indexSegment, queryContext, _expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL);
+        } else {
+          // Not all output expressions are ordered, only fetch the order-by expressions and docId to avoid the
+          // unnecessary data fetch
+          List<ExpressionContext> expressionsToTransform = new ArrayList<>(orderByExpressions.size() + 1);
+          for (OrderByExpressionContext orderByExpression : orderByExpressions) {
+            expressionsToTransform.add(orderByExpression.getExpression());
+          }
+          expressionsToTransform.add(ExpressionContext.forIdentifier(BuiltInVirtualColumn.DOCID));
+          _transformPlanNode = new TransformPlanNode(_indexSegment, queryContext, expressionsToTransform,
+              DocIdSetPlanNode.MAX_DOC_PER_CALL);
+        }
+      }
+    } else {
+      // Empty selection (LIMIT 0)
+      _transformPlanNode = new TransformPlanNode(_indexSegment, queryContext, _expressions, 0);
+    }
   }
 
   @Override

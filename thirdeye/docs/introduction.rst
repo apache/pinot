@@ -23,5 +23,7 @@ Introduction
 .. toctree::
     :maxdepth: 1
 
-    intro
+    about
     quick_start
+    getting_started
+    application

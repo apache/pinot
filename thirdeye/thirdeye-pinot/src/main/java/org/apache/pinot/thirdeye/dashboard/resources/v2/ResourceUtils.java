@@ -369,4 +369,21 @@ public class ResourceUtils {
 
     throw new IllegalStateException(String.format("Could not classify feedback status of anomaly id %d", anomaly.getId()));
   }
+
+  /**
+   * For a list of objects, return the paginated results
+   * @param list the list of objects
+   * @param offset the start pos
+   * @param limit the maximum number of objects returned
+   * @param <T> the type for the objects
+   * @return the sublist for the paginated result
+   */
+  public static <T> List<T> paginateResults(List<T> list, int offset, int limit) {
+    if (offset >= list.size()) {
+      // requested page is out of bound
+      return Collections.emptyList();
+    }
+    return list.subList(offset, Math.min(offset + limit, list.size()));
+  }
+
 }

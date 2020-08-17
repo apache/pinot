@@ -42,6 +42,12 @@ public class RowBasedBlockValueFetcher {
     return row;
   }
 
+  public void getRow(int docId, Object[] buffer, int startIndex) {
+    for (ValueFetcher valueFetcher : _valueFetchers) {
+      buffer[startIndex++] = valueFetcher.getValue(docId);
+    }
+  }
+
   private ValueFetcher createFetcher(BlockValSet blockValSet) {
     DataType valueType = blockValSet.getValueType();
     if (blockValSet.isSingleValue()) {

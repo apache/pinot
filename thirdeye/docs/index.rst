@@ -29,3 +29,5 @@ ThirdEye
    datasources
    caches
    alert_setup
+   thirdeye_architecture
+   thirdeye_ui_mocks

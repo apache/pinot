@@ -41,11 +41,6 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
   }
 
   @Override
-  public void accept(AggregationFunctionVisitorBase visitor) {
-    visitor.visit(this);
-  }
-
-  @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     HyperLogLog hyperLogLog = getDefaultHyperLogLog(aggregationResultHolder);

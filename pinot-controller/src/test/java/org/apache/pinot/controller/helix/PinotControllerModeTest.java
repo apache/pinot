@@ -23,8 +23,12 @@ import java.util.Set;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.manager.zk.ZkClient;
+import org.apache.helix.model.ClusterConstraints;
+import org.apache.helix.model.ConstraintItem;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.model.Message;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
@@ -57,7 +61,7 @@ public class PinotControllerModeTest extends ControllerTest {
     startController(properties);
     TestUtils.waitForCondition(aVoid -> _helixManager.isConnected(), TIMEOUT_IN_MS,
         "Failed to start the Helix-only controller");
-
+    checkHelixConstraints(_helixAdmin);
     stopController();
   }
 
@@ -68,6 +72,9 @@ public class PinotControllerModeTest extends ControllerTest {
     properties.put(ControllerConf.CONTROLLER_MODE, ControllerConf.ControllerMode.DUAL);
     
     startController(properties);
+
+    // check the throttling constraint
+    checkHelixConstraints(_helixAdmin);
 
     // Disable delay rebalance feature
     IdealState idealState = _helixResourceManager.getTableIdealState(Helix.LEAD_CONTROLLER_RESOURCE_NAME);
@@ -237,7 +244,6 @@ public class PinotControllerModeTest extends ControllerTest {
         "Failed to start the second Pinot-only controller");
     // There should still be only one MASTER instance for each partition
     checkInstanceState(helixAdmin);
-
     // Stop the second Pinot-only controller, and there should still be only one MASTER instance for each partition
     secondPinotOnlyController.stop();
     checkInstanceState(helixAdmin);
@@ -252,6 +258,16 @@ public class PinotControllerModeTest extends ControllerTest {
 
     // Stop the Helix-only controller
     helixOnlyController.stop();
+  }
+
+  private void checkHelixConstraints(HelixAdmin helixAdmin) {
+    ClusterConstraints constraints =
+        helixAdmin.getConstraints(getHelixClusterName(), ClusterConstraints.ConstraintType.MESSAGE_CONSTRAINT);
+    ConstraintItem item = constraints.getConstraintItem("MaxStateTransitionsPerInstance");
+    Assert.assertEquals(item.getAttributeValue(ClusterConstraints.ConstraintAttribute.INSTANCE), ".*");
+    Assert.assertEquals(item.getAttributeValue(ClusterConstraints.ConstraintAttribute.MESSAGE_TYPE),
+        Message.MessageType.STATE_TRANSITION.name());
+    Assert.assertEquals(item.getConstraintValue(), CommonConstants.Helix.DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS);
   }
 
   private void checkInstanceState(HelixAdmin helixAdmin) {

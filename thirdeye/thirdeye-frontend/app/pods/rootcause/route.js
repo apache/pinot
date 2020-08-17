@@ -167,16 +167,33 @@ export default Route.extend(AuthenticatedRouteMixin, {
     let { contextUrnsInit, selectedUrnsInit, anomalyUrnsInit, anomalyRangeInit, analysisRangeInit, compareModeInit, granularityInit } = params;
     const isDevEnv = config.environment === 'development';
 
-    let metricUrn, metricEntity, session, anomalyUrn, anomalyEntity, anomalySessions;
+    let metricUrn, metricEntity, session, anomalyUrn, anomalyTemplateEntity, anomalySessions, metricTemplate;
 
     if (metricId) {
       metricUrn = `thirdeye:metric:${metricId}`;
       metricEntity = fetch(`/rootcause/raw?framework=identity&urns=${metricUrn}`).then(checkStatus).then(res => res[0]).catch(() => {});
+      metricTemplate = fetch(`/rootcause/template/search?metricId=${metricId}`).then(checkStatus).then(res => (res) ? res[0] : null).catch(() => {});
     }
 
     if (anomalyId) {
       anomalyUrn = `thirdeye:event:anomaly:${anomalyId}`;
-      anomalyEntity = fetch(`/rootcause/raw?framework=identity&urns=${anomalyUrn}`).then(checkStatus).then(res => res[0]).catch(() => {});
+      anomalyTemplateEntity = fetch(`/rootcause/raw?framework=identity&urns=${anomalyUrn}`)
+        .then(checkStatus)
+        .then(res => {
+          const anomalyMetricId = res[0].attributes.metricId[0];
+          const entityFromResponse = res[0];
+          // retrieve metric template for the corresponding metric
+          return fetch(`/rootcause/template/search?metricId=${anomalyMetricId}`)
+            .then(checkStatus)
+            .then(res1 => (res1) ? res1[0] : null)
+            .then(res => {
+              metricTemplate = res;
+              return {
+                template: res,
+                entity: entityFromResponse
+              };
+            }).catch(() => {});
+        }).catch(() => {});
       anomalySessions = fetch(`/session/query?anomalyId=${anomalyId}`).then(checkStatus).catch(() => {});
     }
 
@@ -218,13 +235,14 @@ export default Route.extend(AuthenticatedRouteMixin, {
       session,
       anomalyId,
       anomalyUrn,
-      anomalyEntity,
+      anomalyTemplateEntity,
       anomalySessions,
       contextUrnsPredefined,
       selectedUrnsPredefined,
       anomalyUrnsPredefined,
       anomalyRange,
       analysisRange,
+      metricTemplate,
       granularity: granularityInit,
       compareMode: compareModeInit
     });
@@ -261,11 +279,11 @@ export default Route.extend(AuthenticatedRouteMixin, {
     // default params
     assignDefaults(model, defaultParams);
 
+    const {anomalySessions} = model;
     // load latest saved session for anomaly
-    const { anomalySessions } = model;
     if (!_.isEmpty(anomalySessions)) {
-      const mostRecent = _.last(_.sortBy(anomalySessions, 'updated'));
 
+      const mostRecent = _.last(_.sortBy(anomalySessions, 'updated'));
       model.anomalyId = null;
       model.anomalyUrn = null;
       model.anomalyContext = null;
@@ -294,11 +312,18 @@ export default Route.extend(AuthenticatedRouteMixin, {
       session,
       anomalyId,
       anomalyUrn,
-      anomalyEntity,
+      anomalyTemplateEntity,
       contextUrnsPredefined,
       selectedUrnsPredefined,
       anomalyUrnsPredefined
     } = model;
+
+    /* 
+      To ensure that the call to search for metric template happens after getting metric id of an anomaly, 
+      we put anomalyEntity and metricTemplate under anomalyTemplateEntity
+    */
+    const metricTemplate = (model.metricTemplate) ? model.metricTemplate : (anomalyTemplateEntity || {}).template;
+    const anomalyEntity = (anomalyTemplateEntity || {}).entity;
 
     // default blank context
     let context = {
@@ -322,6 +347,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
     let sessionUserCustomized = false;
     let setupMode = ROOTCAUSE_SETUP_MODE_CONTEXT;
     let routeErrors = new Set();
+    let baseMetricUrn = null;
 
     // metric-initialized context
     if (metricId && metricUrn) {
@@ -353,6 +379,8 @@ export default Route.extend(AuthenticatedRouteMixin, {
         setupMode = ROOTCAUSE_SETUP_MODE_SELECTED;
       }
     }
+
+
 
     // anomaly-initialized context
     if (anomalyId && anomalyUrn) {
@@ -386,7 +414,6 @@ export default Route.extend(AuthenticatedRouteMixin, {
           compareMode: 'WoW',
           anomalyUrns: new Set([anomalyUrn, anomalyMetricUrn].concat(anomalyFunctionUrns))
         };
-
         selectedUrns = new Set([anomalyUrn, anomalyMetricUrn]);
         const metricName = anomalyEntity.attributes.metric[0];
         sessionName = this._makeTitleHeader(metricName, anomalyRange, anomalyEntity);
@@ -396,12 +423,24 @@ export default Route.extend(AuthenticatedRouteMixin, {
         routeErrors.add(`Could not find anomalyId ${anomalyId}`);
       }
     }
-
+    // rca template context  
+    if(metricTemplate) {
+      const dimAnalysisModule = metricTemplate.modules[0];
+      sessionTableSettings = {
+        oneSideError: dimAnalysisModule.configuration.oneSideError,
+        orderType: (dimAnalysisModule.configuration.manualOrder == true) ? 'manual' : 'auto',
+        summarySize: dimAnalysisModule.configuration.summarySize,
+        depth: dimAnalysisModule.configuration.dimensionDepth,
+        dimensions: dimAnalysisModule.configuration.includedDimension,
+        excludedDimensions: (dimAnalysisModule.configuration.excludedDimension) ? dimAnalysisModule.configuration.excludedDimension : []
+      };
+      sessionUserCustomized = true;
+    }
     // session-initialized context
     if (sessionId) {
       if (!_.isEmpty(session)) {
         const { name, text, updatedBy, updated, owner, permissions,
-        isUserCustomizingRequest, customTableSettings } = model.session;
+          isUserCustomizingRequest, customTableSettings } = model.session;
         context = {
           urns: new Set(session.contextUrns),
           anomalyRange: [session.anomalyRangeStart, session.anomalyRangeEnd],

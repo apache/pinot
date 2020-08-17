@@ -4,6 +4,7 @@ tmp
 dependency-reduced-pom.xml
 .project
 .classpath
+venv/
 .settings/
 test-output/
 *.iml

@@ -69,6 +69,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec> {
   private transient String _stringDefaultNullValue;
 
   // Transform function to generate this column, can be based on other columns
+  @Deprecated // Set this in TableConfig -> IngestionConfig -> TransformConfigs
   protected String _transformFunction;
 
   protected String _virtualColumnProvider;
@@ -236,13 +237,18 @@ public abstract class FieldSpec implements Comparable<FieldSpec> {
 
   /**
    * Transform function if defined else null.
-   * @return
+   * Deprecated. Use TableConfig -> IngestionConfig -> TransformConfigs
    */
+  @Deprecated
   public String getTransformFunction() {
     return _transformFunction;
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
+  /**
+   * Deprecated. Use TableConfig -> IngestionConfig -> TransformConfigs
+   */
+  @Deprecated
   public void setTransformFunction(@Nullable String transformFunction) {
     _transformFunction = transformFunction;
   }

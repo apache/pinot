@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.common;
 
+import javax.annotation.Nullable;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -36,6 +38,12 @@ public interface BlockValSet {
    * Returns {@code true} if the value set is for a single-value column, {@code false} otherwise.
    */
   boolean isSingleValue();
+
+  /**
+   * Returns the dictionary for the column, or {@code null} if the column is not dictionary-encoded.
+   */
+  @Nullable
+  Dictionary getDictionary();
 
   /**
    * SINGLE-VALUED COLUMN APIs

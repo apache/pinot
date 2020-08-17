@@ -19,6 +19,8 @@
 package org.apache.pinot.core.segment.index.readers;
 
 import java.io.Closeable;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
@@ -32,6 +34,11 @@ public interface Dictionary extends Closeable {
    * NOTE: Immutable dictionary is always sorted; mutable dictionary is always unsorted.
    */
   boolean isSorted();
+
+  /**
+   * Returns the data type of the values in the dictionary.
+   */
+  DataType getValueType();
 
   int length();
 

@@ -41,7 +41,6 @@ import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.anomaly.AnomalyType;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import org.apache.pinot.thirdeye.anomaly.alert.util.DataReportHelper;
 import org.apache.pinot.thirdeye.anomaly.events.EventFilter;
 import org.apache.pinot.thirdeye.anomaly.events.EventType;
 import org.apache.pinot.thirdeye.anomaly.events.HolidayEventProvider;
@@ -217,7 +216,6 @@ public abstract class BaseNotificationContent implements NotificationContent {
     templateData.put("startTime", getDateString(startTime));
     templateData.put("endTime", getDateString(endTime));
     templateData.put("timeZone", getTimezoneString(dateTimeZone));
-    templateData.put("dateFormat", new DataReportHelper.DateFormatMethod(timeZone));
     templateData.put("notifiedCount", precisionRecallEvaluator.getTotalAlerts());
     templateData.put("feedbackCount", precisionRecallEvaluator.getTotalResponses());
     templateData.put("trueAlertCount", precisionRecallEvaluator.getTrueAnomalies());
@@ -525,11 +523,12 @@ public abstract class BaseNotificationContent implements NotificationContent {
     String entityName;
     String anomalyType;
     String properties;
+    String metricUrn;
 
     public AnomalyReportEntity(String anomalyId, String anomalyURL, String baselineVal, String currentVal, String lift,
         boolean positiveLift, Double swi, List<String> dimensions, String duration, String feedback, String function,
         String funcDescription, String metric, String startTime, String endTime, String timezone, String issueType,
-        String anomalyType, String properties) {
+        String anomalyType, String properties, String metricUrn) {
       this.anomalyId = anomalyId;
       this.anomalyURL = anomalyURL;
       this.baselineVal = baselineVal;
@@ -556,6 +555,7 @@ public abstract class BaseNotificationContent implements NotificationContent {
       this.issueType = issueType;
       this.anomalyType = anomalyType;
       this.properties = properties;
+      this.metricUrn = metricUrn;
     }
 
     public void setSeasonalValues(COMPARE_MODE compareMode, double seasonalValue, double current) {
@@ -871,6 +871,14 @@ public abstract class BaseNotificationContent implements NotificationContent {
 
     public void setWo4wLift(String wo4wLift) {
       this.wo4wLift = wo4wLift;
+    }
+
+    public String getMetricUrn() {
+      return metricUrn;
+    }
+
+    public void setMetricUrn(String metricUrn) {
+      this.metricUrn = metricUrn;
     }
   }
 }

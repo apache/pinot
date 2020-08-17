@@ -45,6 +45,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
@@ -801,7 +802,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     // Test case 2: segment location with peer format: peer://segment1, verify that an empty string is stored in zk.
     committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
-    String peerSegmentLocation = "peer:///segment1";
+    String peerSegmentLocation = CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME + "/segment1";
     committingSegmentDescriptor = new CommittingSegmentDescriptor(committingSegment,
         new LongMsgOffset(PARTITION_OFFSET.getOffset() + NUM_DOCS).toString(), 0L, peerSegmentLocation);
     committingSegmentDescriptor.setSegmentMetadata(mockSegmentMetadata());

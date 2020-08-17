@@ -18,11 +18,9 @@
  */
 package org.apache.pinot.minion.executor;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.Collections;
 import java.util.Map;
-import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
@@ -44,9 +42,7 @@ public class PurgeTaskExecutor extends BaseSingleSegmentConversionExecutor {
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
 
-    TableConfig tableConfig =
-        ZKMetadataProvider.getTableConfig(MINION_CONTEXT.getHelixPropertyStore(), tableNameWithType);
-    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
+    TableConfig tableConfig = getTableConfig(tableNameWithType);
     SegmentPurger.RecordPurgerFactory recordPurgerFactory = MINION_CONTEXT.getRecordPurgerFactory();
     SegmentPurger.RecordPurger recordPurger =
         recordPurgerFactory != null ? recordPurgerFactory.getRecordPurger(rawTableName) : null;

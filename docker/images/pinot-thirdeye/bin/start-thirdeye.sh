@@ -39,11 +39,11 @@ fi
 
 echo "Running thirdeye backend config: ${CONFIG_DIR}"
 [ -f "${CONFIG_DIR}/data-sources/data-sources-config-backend.yml" ] && cp "${CONFIG_DIR}/data-sources/data-sources-config-backend.yml" "${CONFIG_DIR}/data-sources/data-sources-config.yml"
-java -cp "./bin/thirdeye-pinot.jar" org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyApplication "${CONFIG_DIR}" &
+java -Dlog4j.configurationFile=log4j2.xml -cp "./bin/thirdeye-pinot.jar" org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyApplication "${CONFIG_DIR}" &
 sleep 10
 
 echo "Running thirdeye frontend config: ${CONFIG_DIR}"
 [ -f "${CONFIG_DIR}/data-sources/data-sources-config-frontend.yml" ] && cp "${CONFIG_DIR}/data-sources/data-sources-config-frontend.yml" "${CONFIG_DIR}/data-sources/data-sources-config.yml"
-java -cp "./bin/thirdeye-pinot.jar" org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardApplication "${CONFIG_DIR}" &
+java -Dlog4j.configurationFile=log4j2.xml -cp "./bin/thirdeye-pinot.jar" org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardApplication "${CONFIG_DIR}" &
 
 wait

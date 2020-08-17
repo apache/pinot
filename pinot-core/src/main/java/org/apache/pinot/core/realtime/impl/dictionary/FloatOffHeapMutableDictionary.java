@@ -170,6 +170,11 @@ public class FloatOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
   }
 
   @Override
+  public DataType getValueType() {
+    return DataType.FLOAT;
+  }
+
+  @Override
   public int indexOf(String stringValue) {
     return getDictId(Float.valueOf(stringValue), null);
   }

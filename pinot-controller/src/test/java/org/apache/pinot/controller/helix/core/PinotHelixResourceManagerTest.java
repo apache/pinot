@@ -19,7 +19,9 @@
 package org.apache.pinot.controller.helix.core;
 
 import com.google.common.collect.BiMap;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -41,6 +43,9 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.lineage.LineageEntryState;
+import org.apache.pinot.common.lineage.SegmentLineage;
+import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
@@ -49,6 +54,7 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
@@ -80,6 +86,11 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
   private static final String TABLE_NAME = "testTable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME);
+
+  private static final String SEGMENTS_REPLACE_TEST_TABLE_NAME = "segmentsReplaceTestTable";
+  private static final String OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME =
+      TableNameBuilder.OFFLINE.tableNameWithType(SEGMENTS_REPLACE_TEST_TABLE_NAME);
+
   private static final int CONNECTION_TIMEOUT_IN_MILLISECOND = 10_000;
   private static final int MAX_TIMEOUT_IN_MILLISECOND = 5_000;
   private static final int MAXIMUM_NUMBER_OF_CONTROLLER_INSTANCES = 10;
@@ -91,7 +102,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     startZk();
     Map<String, Object> properties = getDefaultControllerConfiguration();
     properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
-    
+
     startController(properties);
     addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_INSTANCES, false);
     addFakeServerInstancesToAutoJoinHelixCluster(NUM_INSTANCES, false, BASE_SERVER_ADMIN_PORT);
@@ -201,10 +212,8 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
         .setBrokerTenant(BROKER_TENANT_NAME).setServerTenant(SERVER_TENANT_NAME).build();
     _helixResourceManager.addTable(tableConfig);
 
-    // Check that the BrokerResource ideal state has 3 Brokers assigned to the table
     IdealState idealState = _helixResourceManager.getHelixAdmin()
         .getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
-    Assert.assertEquals(idealState.getInstanceStateMap(OFFLINE_TABLE_NAME).size(), 3);
 
     // Untag all Brokers assigned to broker tenant
     untagBrokers();
@@ -500,6 +509,134 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
         Assert.assertTrue((maxCount - count == 0 || maxCount - count == 1), "Instance assignment isn't distributed");
       }
     }
+  }
+
+  @Test
+  public void testSegmentReplacement()
+      throws IOException {
+    // Create broker tenant on 1 Brokers
+    Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 1, 0, 0);
+    PinotResourceManagerResponse response = _helixResourceManager.createBrokerTenant(brokerTenant);
+    Assert.assertTrue(response.isSuccessful());
+
+    // Create the table
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME)
+            .setNumReplicas(2).setBrokerTenant(BROKER_TENANT_NAME).setServerTenant(SERVER_TENANT_NAME).build();
+
+    _helixResourceManager.addTable(tableConfig);
+
+    for (int i = 0; i < 5; i++) {
+      _helixResourceManager.addNewSegment(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME,
+          SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, "s" + i),
+          "downloadUrl");
+    }
+    List<String> segmentsForTable = _helixResourceManager.getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
+    Assert.assertEquals(segmentsForTable.size(), 5);
+
+    List<String> segmentsFrom = new ArrayList<>();
+    List<String> segmentsTo = Arrays.asList("s5", "s6");
+
+    String lineageEntryId =
+        _helixResourceManager.startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo);
+    SegmentLineage segmentLineage =
+        SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
+    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 1);
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId).getSegmentsFrom(), new ArrayList<>());
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId).getSegmentsTo(), segmentsTo);
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId).getState(), LineageEntryState.IN_PROGRESS);
+
+    // Check invalid segmentsTo
+    segmentsFrom = Arrays.asList("s1", "s2");
+    segmentsTo = Arrays.asList("s3", "s4");
+    try {
+      _helixResourceManager.startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo);
+    } catch (Exception e) {
+      // expected
+    }
+    segmentsFrom = Arrays.asList("s1", "s2");
+    segmentsTo = Arrays.asList("s2");
+    try {
+      _helixResourceManager.startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo);
+    } catch (Exception e) {
+      // expected
+    }
+
+    // Check invalid segmentsFrom
+    segmentsFrom = Arrays.asList("s1", "s6");
+    segmentsTo = Arrays.asList("merged1", "merged2");
+    try {
+      _helixResourceManager.startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo);
+    } catch (Exception e) {
+      // expected
+    }
+
+    segmentsFrom = Arrays.asList("s1", "s2");
+    String lineageEntryId2 =
+        _helixResourceManager.startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo);
+    segmentLineage =
+        SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
+    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 2);
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId2).getSegmentsFrom(), segmentsFrom);
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId2).getSegmentsTo(), segmentsTo);
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId2).getState(), LineageEntryState.IN_PROGRESS);
+
+    try {
+      _helixResourceManager.startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo);
+    } catch (Exception e) {
+      // expected
+    }
+
+    // Invalid table
+    try {
+      _helixResourceManager.endReplaceSegments(OFFLINE_TABLE_NAME, lineageEntryId);
+    } catch (Exception e) {
+      // expected
+    }
+
+    // Invalid lineage entry id
+    try {
+      _helixResourceManager.endReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, "aaa");
+    } catch (Exception e) {
+      // expected
+    }
+
+    // Merged segment not available in the table
+    try {
+      _helixResourceManager.endReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, lineageEntryId);
+    } catch (Exception e) {
+      // expected
+    }
+
+    // Try after adding merged segments to the table
+    _helixResourceManager.addNewSegment(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME,
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, "s5"), "downloadUrl");
+    _helixResourceManager.addNewSegment(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME,
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, "s6"), "downloadUrl");
+
+    _helixResourceManager.endReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, lineageEntryId);
+    segmentLineage =
+        SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
+    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 2);
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId).getSegmentsFrom(), new ArrayList<>());
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId).getSegmentsTo(), Arrays.asList("s5", "s6"));
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId).getState(), LineageEntryState.COMPLETED);
+
+    _helixResourceManager.addNewSegment(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME,
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, "merged1"),
+        "downloadUrl");
+    _helixResourceManager.addNewSegment(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME,
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, "merged2"),
+        "downloadUrl");
+
+    _helixResourceManager.endReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, lineageEntryId2);
+    segmentLineage =
+        SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
+    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 2);
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId2).getSegmentsFrom(), Arrays.asList("s1", "s2"));
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId2).getSegmentsTo(),
+        Arrays.asList("merged1", "merged2"));
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId2).getState(), LineageEntryState.COMPLETED);
   }
 
   private void untagBrokers() {

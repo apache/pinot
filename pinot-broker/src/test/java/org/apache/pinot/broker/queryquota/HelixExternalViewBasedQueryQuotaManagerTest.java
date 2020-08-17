@@ -18,15 +18,22 @@
  */
 package org.apache.pinot.broker.queryquota;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.commons.lang.StringUtils;
+import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.InstanceType;
 import org.apache.helix.ZNRecord;
+import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.manager.zk.ZKHelixManager;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.manager.zk.ZkClient;
+import org.apache.helix.manager.zk.client.HelixZkClient;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -65,7 +72,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     _helixManager = initHelixManager(helixClusterName);
     _testPropertyStore = _helixManager.getHelixPropertyStore();
 
-    _queryQuotaManager = new HelixExternalViewBasedQueryQuotaManager(Mockito.mock(BrokerMetrics.class));
+    _queryQuotaManager = new HelixExternalViewBasedQueryQuotaManager(Mockito.mock(BrokerMetrics.class), BROKER_INSTANCE_ID);
     _queryQuotaManager.init(_helixManager);
   }
 
@@ -94,6 +101,25 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
 
     void closeZkClient() {
       _zkclient.close();
+    }
+
+    @Override
+    public HelixAdmin getClusterManagmentTool() {
+      return new FakeZKHelixAdmin(_zkclient);
+    }
+  }
+
+  public class FakeZKHelixAdmin extends ZKHelixAdmin {
+    private Map<String, String> _instanceConfigMap;
+
+    public FakeZKHelixAdmin(HelixZkClient zkClient) {
+      super(zkClient);
+      _instanceConfigMap = new HashMap<>();
+    }
+
+    @Override
+    public Map<String, String> getConfig(HelixConfigScope scope, List<String> keys) {
+      return _instanceConfigMap;
     }
   }
 
@@ -256,7 +282,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     runQueries(70, 10L);
 
     ZKMetadataProvider.removeResourceConfigFromPropertyStore(_testPropertyStore, REALTIME_TABLE_NAME);
-    _queryQuotaManager.processQueryQuotaChange(brokerResource);
+    _queryQuotaManager.processQueryRateLimitingExternalViewChange(brokerResource);
     Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
   }
 

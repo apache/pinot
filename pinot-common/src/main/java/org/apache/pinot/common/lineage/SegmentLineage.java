@@ -24,7 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.ZNRecord;
 
 
@@ -60,14 +60,25 @@ public class SegmentLineage {
   }
 
   /**
-   * Add lineage entry to the segment lineage metadata
+   * Add lineage entry to the segment lineage metadata with the given lineage entry id
+   * @param lineageEntryId the id for the lineage entry
    * @param lineageEntry a lineage entry
-   * @return the id for the input lineage entry for the access
    */
-  public String addLineageEntry(LineageEntry lineageEntry) {
-    String lineageId = generateLineageId();
-    _lineageEntries.put(lineageId, lineageEntry);
-    return lineageId;
+  public void addLineageEntry(String lineageEntryId, LineageEntry lineageEntry) {
+    Preconditions.checkArgument(!_lineageEntries.containsKey(lineageEntryId),
+        String.format("Lineage entry id ('%s') already exists. Please try with the new lineage id", lineageEntryId));
+    _lineageEntries.put(lineageEntryId, lineageEntry);
+  }
+
+  /**
+   * Update lineage entry to the segment lineage metadata with the given lineage entry id
+   * @param lineageEntryId the id for the lineage entry to be updated
+   * @param lineageEntry a lineage entry to be updated
+   */
+  public void updateLineageEntry(String lineageEntryId, LineageEntry lineageEntry) {
+    Preconditions.checkArgument(_lineageEntries.containsKey(lineageEntryId),
+        String.format("Lineage entry id ('%s') does not exists. Please try with the valid lineage id", lineageEntryId));
+    _lineageEntries.put(lineageEntryId, lineageEntry);
   }
 
   /**
@@ -108,8 +119,8 @@ public class SegmentLineage {
       String lineageId = listField.getKey();
       List<String> value = listField.getValue();
       Preconditions.checkState(value.size() == 4);
-      List<String> segmentsFrom = Arrays.asList(value.get(0).split(COMMA_SEPARATOR));
-      List<String> segmentsTo = Arrays.asList(value.get(1).split(COMMA_SEPARATOR));
+      List<String> segmentsFrom = Arrays.asList(StringUtils.split(value.get(0), COMMA_SEPARATOR));
+      List<String> segmentsTo = Arrays.asList(StringUtils.split(value.get(1), COMMA_SEPARATOR));
       LineageEntryState state = LineageEntryState.valueOf(value.get(2));
       long timestamp = Long.parseLong(value.get(3));
       lineageEntries.put(lineageId, new LineageEntry(segmentsFrom, segmentsTo, state, timestamp));
@@ -125,17 +136,13 @@ public class SegmentLineage {
     ZNRecord znRecord = new ZNRecord(_tableNameWithType);
     for (Map.Entry<String, LineageEntry> entry : _lineageEntries.entrySet()) {
       LineageEntry lineageEntry = entry.getValue();
-      String segmentsFrom = String.join(",", lineageEntry.getSegmentsFrom());
-      String segmentsTo = String.join(",", lineageEntry.getSegmentsTo());
+      String segmentsFrom = String.join(COMMA_SEPARATOR, lineageEntry.getSegmentsFrom());
+      String segmentsTo = String.join(COMMA_SEPARATOR, lineageEntry.getSegmentsTo());
       String state = lineageEntry.getState().toString();
       String timestamp = Long.toString(lineageEntry.getTimestamp());
       List<String> listEntry = Arrays.asList(segmentsFrom, segmentsTo, state, timestamp);
       znRecord.setListField(entry.getKey(), listEntry);
     }
     return znRecord;
-  }
-
-  private String generateLineageId() {
-    return UUID.randomUUID().toString();
   }
 }

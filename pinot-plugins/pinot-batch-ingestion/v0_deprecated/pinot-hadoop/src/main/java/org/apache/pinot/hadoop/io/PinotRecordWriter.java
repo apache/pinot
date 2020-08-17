@@ -113,7 +113,7 @@ public class PinotRecordWriter<T> extends RecordWriter<NullWritable, T> {
 
     File segmentTarFile = new File(_segmentTarDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
     LOGGER.info("Tarring segment: {} from directory: {} to: {}", segmentName, indexDir, segmentTarFile);
-    TarGzCompressionUtils.createTarGzOfDirectory(indexDir.getPath(), segmentTarFile.getPath());
+    TarGzCompressionUtils.createTarGzFile(indexDir, segmentTarFile);
 
     Path hdfsSegmentTarPath = new Path(_outputDir, segmentTarFile.getName());
     LOGGER.info("Copying segment tar file from local: {} to HDFS: {}", segmentTarFile, hdfsSegmentTarPath);

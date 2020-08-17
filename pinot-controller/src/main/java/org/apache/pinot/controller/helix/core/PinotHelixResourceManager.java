@@ -25,13 +25,14 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
-import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -39,6 +40,8 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.AccessOption;
@@ -54,9 +57,11 @@ import org.apache.helix.PropertyKey.Builder;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.CurrentState;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.LiveInstance;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
@@ -64,6 +69,12 @@ import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
+import org.apache.pinot.common.lineage.LineageEntry;
+import org.apache.pinot.common.lineage.LineageEntryState;
+import org.apache.pinot.common.lineage.SegmentLineage;
+import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
+import org.apache.pinot.common.lineage.SegmentLineageUtils;
+import org.apache.pinot.common.messages.RoutingTableRebuildMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
@@ -75,6 +86,7 @@ import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.BrokerResourceStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Server;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
@@ -120,6 +132,10 @@ public class PinotHelixResourceManager {
   private static final long CACHE_ENTRY_EXPIRE_TIME_HOURS = 6L;
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
   public static final String APPEND = "APPEND";
+
+  // TODO: make this configurable
+  public static final long EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS = 10 * 60_000L; // 10 minutes
+  public static final long EXTERNAL_VIEW_CHECK_INTERVAL_MS = 1_000L; // 1 second
 
   private final Map<String, Map<String, Long>> _segmentCrcMap = new HashMap<>();
   private final Map<String, Map<String, Integer>> _lastKnownSegmentMetadataVersionMap = new HashMap<>();
@@ -194,10 +210,17 @@ public class PinotHelixResourceManager {
 
     // Add instance group tag for controller
     addInstanceGroupTagIfNeeded();
-
     _segmentDeletionManager = new SegmentDeletionManager(_dataDir, _helixAdmin, _helixClusterName, _propertyStore);
     ZKMetadataProvider.setClusterTenantIsolationEnabled(_propertyStore, _isSingleTenantCluster);
-    _tableCache = new TableCache(_propertyStore);
+
+    // Initialize TableCache
+    HelixConfigScope helixConfigScope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(_helixClusterName).build();
+    Map<String, String> configs = _helixAdmin.getConfig(helixConfigScope,
+        Arrays.asList(Helix.ENABLE_CASE_INSENSITIVE_KEY, Helix.DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY));
+    boolean caseInsensitive = Boolean.parseBoolean(configs.get(Helix.ENABLE_CASE_INSENSITIVE_KEY)) || Boolean
+        .parseBoolean(configs.get(Helix.DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY));
+    _tableCache = new TableCache(_propertyStore, caseInsensitive);
   }
 
   /**
@@ -369,7 +392,7 @@ public class PinotHelixResourceManager {
       return PinotResourceManagerResponse.failure("Instance " + instanceIdToUpdate + " does not exists");
     } else {
       InstanceConfig newConfig = InstanceUtils.toHelixInstanceConfig(newInstance);
-      if(!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceIdToUpdate), newConfig)) {
+      if (!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceIdToUpdate), newConfig)) {
         return PinotResourceManagerResponse.failure("Unable to update instance: " + instanceIdToUpdate);
       }
       return PinotResourceManagerResponse.SUCCESS;
@@ -460,28 +483,23 @@ public class PinotHelixResourceManager {
    * @return tableName actually defined in Pinot (matches case) and exists ,else, return the input value
    */
   public String getActualTableName(String tableName) {
-    return _tableCache.getActualTableName(tableName);
+    if (_tableCache.isCaseInsensitive()) {
+      String actualTableName = _tableCache.getActualTableName(tableName);
+      return actualTableName != null ? actualTableName : tableName;
+    } else {
+      return tableName;
+    }
   }
 
   /**
-   *  Given a column name in any case, returns the column name as defined in Schema
-   *  If table has no schema, it just returns the input value
-   * @param tableName
-   * @param columnName
-   * @return
-   */
-  public String getActualColumnName(String tableName, String columnName) {
-    return _tableCache.getActualColumnName(tableName, columnName);
-  }
-
-  /**
-   * Given a table name in any case, returns crypter class name defined in table config
-   * @param tableName table name in any case
+   * Returns the crypter class name defined in the table config for the given table.
+   *
+   * @param tableNameWithType Table name with type suffix
    * @return crypter class name
    */
-  public String getCrypterClassNameFromTableConfig(String tableName) {
-    TableConfig tableConfig = _tableCache.getTableConfig(tableName);
-    Preconditions.checkNotNull(tableConfig, "Table config is not available for table '%s'", tableName);
+  public String getCrypterClassNameFromTableConfig(String tableNameWithType) {
+    TableConfig tableConfig = _tableCache.getTableConfig(tableNameWithType);
+    Preconditions.checkNotNull(tableConfig, "Table config is not available for table '%s'", tableNameWithType);
     return tableConfig.getValidationConfig().getCrypterClassName();
   }
 
@@ -1173,6 +1191,30 @@ public class PinotHelixResourceManager {
     }
   }
 
+  public ZNRecord readZKData(String path) {
+    return _helixDataAccessor.getBaseDataAccessor().get(path, null, -1);
+  }
+
+  public List<String> getZKChildren(String path) {
+    return _helixDataAccessor.getBaseDataAccessor().getChildNames(path, -1);
+  }
+
+  public Map<String, Stat> getZKChildrenStats(String path) {
+    List<String> childNames = _helixDataAccessor.getBaseDataAccessor().getChildNames(path, -1);
+    List<String> childPaths =
+        childNames.stream().map(name -> (path + "/" + name).replaceAll("//", "/")).collect(Collectors.toList());
+    Stat[] stats = _helixDataAccessor.getBaseDataAccessor().getStats(childPaths, -1);
+    Map<String, Stat> statsMap = new LinkedHashMap<>(childNames.size());
+    for (int i = 0; i < childNames.size(); i++) {
+      statsMap.put(childNames.get(i), stats[i]);
+    }
+    return statsMap;
+  }
+
+  public Stat getZKStat(String path) {
+    return _helixDataAccessor.getBaseDataAccessor().getStat(path, -1);
+  }
+
   public static class InvalidTableConfigException extends RuntimeException {
     public InvalidTableConfigException(String message) {
       super(message);
@@ -1722,6 +1764,39 @@ public class PinotHelixResourceManager {
     }
   }
 
+  private void sendRoutingTableRebuildMessage(String tableNameWithType) {
+    RoutingTableRebuildMessage routingTableRebuildMessage = new RoutingTableRebuildMessage(tableNameWithType);
+
+    // Send table config refresh message to brokers
+    Criteria recipientCriteria = new Criteria();
+    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+    recipientCriteria.setInstanceName("%");
+    recipientCriteria.setResource(Helix.BROKER_RESOURCE_INSTANCE);
+    recipientCriteria.setSessionSpecific(true);
+    recipientCriteria.setPartition(tableNameWithType);
+    // Send message with no callback and infinite timeout on the recipient
+    int numMessagesSent =
+        _helixZkManager.getMessagingService().send(recipientCriteria, routingTableRebuildMessage, null, -1);
+    if (numMessagesSent > 0) {
+      // TODO: Would be nice if we can get the name of the instances to which messages were sent
+      LOGGER.info("Sent {} routing table rebuild messages to brokers for table: {}", numMessagesSent, tableNameWithType);
+    } else {
+      LOGGER.warn("No routing table rebuild message sent to brokers for table: {}", tableNameWithType);
+    }
+  }
+
+  /**
+   * Update the instance config given the broker instance id
+   */
+  public void toggleQueryQuotaStateForBroker(String brokerInstanceName, String state) {
+    Map<String, String> propToUpdate = new HashMap<>();
+    propToUpdate.put(Helix.QUERY_RATE_LIMIT_DISABLED, Boolean.toString("DISABLE".equals(state)));
+    HelixConfigScope scope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.PARTICIPANT, _helixClusterName)
+            .forParticipant(brokerInstanceName).build();
+    _helixAdmin.setConfig(scope, propToUpdate);
+  }
+
   /**
    * Returns a map from server instance to list of segments it serves for the given table.
    */
@@ -2162,6 +2237,206 @@ public class PinotHelixResourceManager {
     }
 
     return tableNamesWithType;
+  }
+
+  /**
+   * Computes the start segment replace phase
+   *
+   * 1. Generate a segment lineage entry id
+   * 2. Compute validation on the user inputs
+   * 3. Add the new lineage entry to the segment lineage metadata in the property store
+   *
+   * Update is done with retry logic along with read-modify-write block for achieving atomic update of the lineage
+   * metadata.
+   *
+   * @param tableNameWithType Table name with type
+   * @param segmentsFrom a list of segments to be merged
+   * @param segmentsTo a list of merged segments
+   * @return Segment lineage entry id
+   *
+   * @throws InvalidConfigException
+   */
+  public String startReplaceSegments(String tableNameWithType, List<String> segmentsFrom, List<String> segmentsTo) {
+    // Create a segment lineage entry id
+    String segmentLineageEntryId = SegmentLineageUtils.generateLineageEntryId();
+
+    // Check that all the segments from 'segmentsFrom' exist in the table
+    Set<String> segmentsForTable = new HashSet<>(getSegmentsFor(tableNameWithType));
+    Preconditions.checkArgument(segmentsForTable.containsAll(segmentsFrom), String.format(
+        "Not all segments from 'segmentsFrom' are available in the table. (tableName = '%s', segmentsFrom = '%s', "
+            + "segmentsTo = '%s', segmentsFromTable = '%s')", tableNameWithType, segmentsFrom, segmentsTo,
+        segmentsForTable));
+
+    // Check that all the segments from 'segmentTo' does not exist in the table.
+    Preconditions.checkArgument(Collections.disjoint(segmentsForTable, segmentsTo), String.format(
+        "Any segments from 'segmentsTo' should not be available in the table at this point. (tableName = '%s', "
+            + "segmentsFrom = '%s', segmentsTo = '%s', segmentsFromTable = '%s')", tableNameWithType, segmentsFrom,
+        segmentsTo, segmentsForTable));
+
+    try {
+      DEFAULT_RETRY_POLICY.attempt(() -> {
+        // Fetch the segment lineage metadata
+        ZNRecord segmentLineageZNRecord =
+            SegmentLineageAccessHelper.getSegmentLineageZNRecord(_propertyStore, tableNameWithType);
+        SegmentLineage segmentLineage;
+        int expectedVersion = -1;
+        if (segmentLineageZNRecord == null) {
+          segmentLineage = new SegmentLineage(tableNameWithType);
+        } else {
+          segmentLineage = SegmentLineage.fromZNRecord(segmentLineageZNRecord);
+          expectedVersion = segmentLineageZNRecord.getVersion();
+        }
+
+        // Check that the segment lineage entry id doesn't exists in the segment lineage
+        Preconditions.checkArgument(segmentLineage.getLineageEntry(segmentLineageEntryId) == null,
+            String.format("SegmentLineageEntryId (%s) already exists in the segment lineage.", segmentLineageEntryId));
+
+        for (String entryId : segmentLineage.getLineageEntryIds()) {
+          LineageEntry lineageEntry = segmentLineage.getLineageEntry(entryId);
+
+          // Check that any segment from 'segmentsFrom' does not appear twice.
+          Preconditions.checkArgument(Collections.disjoint(lineageEntry.getSegmentsFrom(), segmentsFrom), String.format(
+              "It is not allowed to merge segments that are already merged. (tableName = %s, segmentsFrom from "
+                  + "existing lineage entry = %s, requested segmentsFrom = %s)", tableNameWithType,
+              lineageEntry.getSegmentsFrom(), segmentsFrom));
+
+          // Check that merged segments name cannot be the same.
+          Preconditions.checkArgument(Collections.disjoint(lineageEntry.getSegmentsTo(), segmentsTo), String.format(
+              "It is not allowed to have the same segment name for merged segments. (tableName = %s, segmentsTo from "
+                  + "existing lineage entry = %s, requested segmentsTo = %s)", tableNameWithType,
+              lineageEntry.getSegmentsTo(), segmentsTo));
+        }
+
+        // Update lineage entry
+        segmentLineage.addLineageEntry(segmentLineageEntryId,
+            new LineageEntry(segmentsFrom, segmentsTo, LineageEntryState.IN_PROGRESS, System.currentTimeMillis()));
+
+        // Write back to the lineage entry
+        return SegmentLineageAccessHelper.writeSegmentLineage(_propertyStore, segmentLineage, expectedVersion);
+      });
+    } catch (Exception e) {
+      String errorMsg = String
+          .format("Failed while updating the segment lineage. (tableName = %s, segmentsFrom = %s, segmentsTo = %s)",
+              tableNameWithType, segmentsFrom, segmentsTo);
+      LOGGER.error(errorMsg, e);
+      throw new RuntimeException(errorMsg, e);
+    }
+
+    // Only successful attempt can reach here
+    LOGGER.info("startReplaceSegments is successfully processed. (tableNameWithType = {}, segmentsFrom = {}, "
+            + "segmentsTo = {}, segmentLineageEntryId = {})", tableNameWithType, segmentsFrom, segmentsTo,
+        segmentLineageEntryId);
+    return segmentLineageEntryId;
+  }
+
+  /**
+   * Computes the end segment replace phase
+   *
+   * 1. Compute validation
+   * 2. Update the lineage entry state to "COMPLETED" and write metadata to the property store
+   *
+   * Update is done with retry logic along with read-modify-write block for achieving atomic update of the lineage
+   * metadata.
+   *
+   * @param tableNameWithType
+   * @param segmentLineageEntryId
+   */
+  public void endReplaceSegments(String tableNameWithType, String segmentLineageEntryId) {
+    try {
+      DEFAULT_RETRY_POLICY.attempt(() -> {
+        // Fetch the segment lineage metadata
+        ZNRecord segmentLineageZNRecord =
+            SegmentLineageAccessHelper.getSegmentLineageZNRecord(_propertyStore, tableNameWithType);
+        SegmentLineage segmentLineage;
+        int expectedVersion = -1;
+        Preconditions.checkArgument(segmentLineageZNRecord != null, String
+            .format("Segment lineage does not exist. (tableNameWithType = '%s', segmentLineageEntryId = '%s')",
+                tableNameWithType, segmentLineageEntryId));
+        segmentLineage = SegmentLineage.fromZNRecord(segmentLineageZNRecord);
+        expectedVersion = segmentLineageZNRecord.getVersion();
+
+        // Look up the lineage entry based on the segment lineage entry id
+        LineageEntry lineageEntry = segmentLineage.getLineageEntry(segmentLineageEntryId);
+        Preconditions.checkArgument(lineageEntry != null, String
+            .format("Invalid segment lineage entry id (tableName='%s', segmentLineageEntryId='%s')", tableNameWithType,
+                segmentLineageEntryId));
+
+        // NO-OPS if the entry is already completed
+        if (lineageEntry.getState() == LineageEntryState.COMPLETED) {
+          LOGGER.warn(
+              "Lineage entry state is already COMPLETED. Nothing to update. (tableNameWithType={}, segmentLineageEntryId={})",
+              tableNameWithType, segmentLineageEntryId);
+          return true;
+        }
+
+        // Check that all the segments from 'segmentsTo' exist in the table
+        Set<String> segmentsForTable = new HashSet<>(getSegmentsFor(tableNameWithType));
+        Preconditions.checkArgument(segmentsForTable.containsAll(lineageEntry.getSegmentsTo()), String.format(
+            "Not all segments from 'segmentsTo' are available in the table. (tableName = '%s', segmentsTo = '%s', "
+                + "segmentsFromTable = '%s')", tableNameWithType, lineageEntry.getSegmentsTo(), segmentsForTable));
+
+        // Check that all the segments from 'segmentsTo' become ONLINE in the external view
+        waitForSegmentsBecomeOnline(tableNameWithType, new HashSet<>(lineageEntry.getSegmentsTo()));
+
+        // Update lineage entry
+        LineageEntry newLineageEntry =
+            new LineageEntry(lineageEntry.getSegmentsFrom(), lineageEntry.getSegmentsTo(), LineageEntryState.COMPLETED,
+                System.currentTimeMillis());
+        segmentLineage.updateLineageEntry(segmentLineageEntryId, newLineageEntry);
+
+        // Write back to the lineage entry
+        if (SegmentLineageAccessHelper.writeSegmentLineage(_propertyStore, segmentLineage, expectedVersion)) {
+          // If the segment lineage metadata is successfully updated, we need to trigger brokers to rebuild the
+          // routing table because it is possible that there has been no EV change but the routing result may be
+          // different after updating the lineage entry.
+          sendRoutingTableRebuildMessage(tableNameWithType);
+          return true;
+        } else {
+          return false;
+        }
+      });
+    } catch (Exception e) {
+      String errorMsg = String
+          .format("Failed to update the segment lineage. (tableName = %s, segmentLineageEntryId = %s)",
+              tableNameWithType, segmentLineageEntryId);
+      LOGGER.error(errorMsg, e);
+      throw new RuntimeException(errorMsg, e);
+    }
+
+    // Only successful attempt can reach here
+    LOGGER.info("endReplaceSegments is successfully processed. (tableNameWithType = {}, segmentLineageEntryId = {})",
+        tableNameWithType, segmentLineageEntryId);
+  }
+
+  private void waitForSegmentsBecomeOnline(String tableNameWithType, Set<String> segmentsToCheck)
+      throws InterruptedException, TimeoutException {
+    long endTimeMs = System.currentTimeMillis() + EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS;
+    do {
+      Set<String> onlineSegments = getOnlineSegmentsFromExternalView(tableNameWithType);
+      if (onlineSegments.containsAll(segmentsToCheck)) {
+        return;
+      }
+      Thread.sleep(EXTERNAL_VIEW_CHECK_INTERVAL_MS);
+    } while (System.currentTimeMillis() < endTimeMs);
+    throw new TimeoutException(String.format(
+        "Time out while waiting segments become ONLINE. (tableNameWithType = %s, segmentsToCheck = %s)",
+        tableNameWithType, segmentsToCheck));
+  }
+
+  private Set<String> getOnlineSegmentsFromExternalView(String tableNameWithType) {
+    ExternalView externalView = getTableExternalView(tableNameWithType);
+    Preconditions
+        .checkState(externalView != null, String.format("External view is null for table (%s)", tableNameWithType));
+    Map<String, Map<String, String>> segmentAssignment = externalView.getRecord().getMapFields();
+    Set<String> onlineSegments = new HashSet<>(HashUtil.getHashMapCapacity(segmentAssignment.size()));
+    for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
+      Map<String, String> instanceStateMap = entry.getValue();
+      if (instanceStateMap.containsValue(SegmentStateModel.ONLINE) || instanceStateMap
+          .containsValue(SegmentStateModel.CONSUMING)) {
+        onlineSegments.add(entry.getKey());
+      }
+    }
+    return onlineSegments;
   }
 
   /*

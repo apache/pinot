@@ -44,6 +44,7 @@ import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMessageDecoder;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.LongMsgOffsetFactory;
 import org.apache.pinot.spi.stream.PermanentConsumerException;
@@ -653,20 +654,21 @@ public class LLRealtimeSegmentDataManagerTest {
     final long leaseTime = 50000L;
 
     // The first time we invoke build, it should go ahead and build the segment.
-    String segTarFileName = segmentDataManager.invokeBuildForCommit(leaseTime).getSegmentTarFilePath();
+    File segmentTarFile = segmentDataManager.invokeBuildForCommit(leaseTime).getSegmentTarFile();
+    Assert.assertNotNull(segmentTarFile);
     Assert.assertTrue(segmentDataManager._buildSegmentCalled);
-    Assert.assertFalse(segmentDataManager.invokeCommit(segTarFileName));
-    Assert.assertTrue(new File(segTarFileName).exists());
+    Assert.assertFalse(segmentDataManager.invokeCommit());
+    Assert.assertTrue(segmentTarFile.exists());
 
     segmentDataManager._buildSegmentCalled = false;
 
     // This time around it should not build the segment.
-    String segTarFileName1 = segmentDataManager.invokeBuildForCommit(leaseTime).getSegmentTarFilePath();
+    File segmentTarFile1 = segmentDataManager.invokeBuildForCommit(leaseTime).getSegmentTarFile();
     Assert.assertFalse(segmentDataManager._buildSegmentCalled);
-    Assert.assertEquals(segTarFileName1, segTarFileName);
-    Assert.assertTrue(new File(segTarFileName).exists());
-    Assert.assertTrue(segmentDataManager.invokeCommit(segTarFileName1));
-    Assert.assertFalse(new File(segTarFileName).exists());
+    Assert.assertEquals(segmentTarFile1, segmentTarFile);
+    Assert.assertTrue(segmentTarFile.exists());
+    Assert.assertTrue(segmentDataManager.invokeCommit());
+    Assert.assertFalse(segmentTarFile.exists());
     segmentDataManager.destroy();
   }
 
@@ -688,10 +690,11 @@ public class LLRealtimeSegmentDataManagerTest {
     segmentDataManager.setCurrentOffset(finalOffset);
 
     // We have set up commit to fail, so we should carry over the segment file.
-    String segTarFileName = segmentDataManager.invokeBuildForCommit(leaseTime).getSegmentTarFilePath();
+    File segmentTarFile = segmentDataManager.invokeBuildForCommit(leaseTime).getSegmentTarFile();
+    Assert.assertNotNull(segmentTarFile);
     Assert.assertTrue(segmentDataManager._buildSegmentCalled);
-    Assert.assertFalse(segmentDataManager.invokeCommit(segTarFileName));
-    Assert.assertTrue(new File(segTarFileName).exists());
+    Assert.assertFalse(segmentDataManager.invokeCommit());
+    Assert.assertTrue(segmentTarFile.exists());
 
     // Now let the segment go ONLINE from CONSUMING, and ensure that the file is removed.
     LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
@@ -699,7 +702,7 @@ public class LLRealtimeSegmentDataManagerTest {
     segmentDataManager._stopWaitTimeMs = 0;
     segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.HOLDING);
     segmentDataManager.goOnlineFromConsuming(metadata);
-    Assert.assertFalse(new File(segTarFileName).exists());
+    Assert.assertFalse(segmentTarFile.exists());
     segmentDataManager.destroy();
   }
 
@@ -780,6 +783,7 @@ public class LLRealtimeSegmentDataManagerTest {
       when(dataManagerConfig.getSegmentFormatVersion()).thenReturn(null);
       when(dataManagerConfig.isEnableSplitCommit()).thenReturn(false);
       when(dataManagerConfig.isRealtimeOffHeapAllocation()).thenReturn(false);
+      when(dataManagerConfig.getConfig()).thenReturn(new PinotConfiguration());
       return dataManagerConfig;
     }
 
@@ -821,7 +825,7 @@ public class LLRealtimeSegmentDataManagerTest {
       return getSegmentBuildDescriptor();
     }
 
-    public boolean invokeCommit(String segTarFileName) {
+    public boolean invokeCommit() {
       SegmentCompletionProtocol.Response response = mock(SegmentCompletionProtocol.Response.class);
       when(response.isSplitCommit()).thenReturn(false);
       return super.commitSegment(response.getControllerVipUrl(), false);
@@ -894,16 +898,15 @@ public class LLRealtimeSegmentDataManagerTest {
         return null;
       }
       if (!forCommit) {
-        return new SegmentBuildDescriptor(null, null, getCurrentOffset(), _segmentDir, 0, 0, -1);
+        return new SegmentBuildDescriptor(null, null, getCurrentOffset(), 0, 0, -1);
       }
-      final String segTarFileName = _segmentDir + "/" + "segmentFile";
-      File segmentTgzFile = new File(segTarFileName);
+      File segmentTarFile = new File(_segmentDir, "segmentFile");
       try {
-        segmentTgzFile.createNewFile();
+        segmentTarFile.createNewFile();
       } catch (IOException e) {
-        Assert.fail("Could not create file " + segmentTgzFile);
+        Assert.fail("Could not create file " + segmentTarFile);
       }
-      return new SegmentBuildDescriptor(segTarFileName, null, getCurrentOffset(), null, 0, 0, -1);
+      return new SegmentBuildDescriptor(segmentTarFile, null, getCurrentOffset(), 0, 0, -1);
     }
 
     @Override
@@ -979,9 +982,9 @@ public class LLRealtimeSegmentDataManagerTest {
       try {
         Field field = LLRealtimeSegmentDataManager.class.getDeclaredField(fieldName);
         field.setAccessible(true);
-        StreamPartitionMsgOffset offset = (StreamPartitionMsgOffset)field.get(this);
+        StreamPartitionMsgOffset offset = (StreamPartitionMsgOffset) field.get(this);
 //        if (offset == null) {
-          field.set(this, new LongMsgOffset(value));
+        field.set(this, new LongMsgOffset(value));
 //        } else {
 //          offset.setOffset(value);
 //        }
@@ -990,9 +993,9 @@ public class LLRealtimeSegmentDataManagerTest {
       } catch (IllegalAccessException e) {
         Assert.fail();
       }
-  }
+    }
 
-  private void setInt(int value, String fieldName) {
+    private void setInt(int value, String fieldName) {
       try {
         Field field = LLRealtimeSegmentDataManager.class.getDeclaredField(fieldName);
         field.setAccessible(true);

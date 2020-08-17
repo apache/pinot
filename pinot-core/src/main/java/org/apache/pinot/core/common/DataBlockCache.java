@@ -23,9 +23,9 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
+import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.EqualityUtils;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 
 
 /**
@@ -68,6 +68,15 @@ public class DataBlockCache {
     _columnDictIdLoaded.clear();
     _columnValueLoaded.clear();
     _columnNumValuesLoaded.clear();
+  }
+
+  /**
+   * Returns the number of documents within the current block.
+   *
+   * @return Number of documents within the current block
+   */
+  public int getNumDocs() {
+    return _length;
   }
 
   /**

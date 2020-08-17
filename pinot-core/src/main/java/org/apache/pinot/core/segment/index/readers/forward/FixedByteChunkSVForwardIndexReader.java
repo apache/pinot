@@ -19,6 +19,7 @@
 package org.apache.pinot.core.segment.index.readers.forward;
 
 import java.nio.ByteBuffer;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.io.writer.impl.FixedByteChunkSVForwardIndexWriter;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -30,11 +31,14 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * <p>For data layout, please refer to the documentation for {@link FixedByteChunkSVForwardIndexWriter}
  */
 public final class FixedByteChunkSVForwardIndexReader extends BaseChunkSVForwardIndexReader {
+  private final int _chunkSize;
 
   public FixedByteChunkSVForwardIndexReader(PinotDataBuffer dataBuffer, DataType valueType) {
     super(dataBuffer, valueType);
+    _chunkSize = _numDocsPerChunk * _lengthOfLongestEntry;
   }
 
+  @Nullable
   @Override
   public ChunkReaderContext createContext() {
     if (_isCompressed) {

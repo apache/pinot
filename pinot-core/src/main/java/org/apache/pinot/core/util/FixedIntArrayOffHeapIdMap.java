@@ -24,6 +24,7 @@ import java.util.Arrays;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.io.readerwriter.impl.FixedByteSingleValueMultiColumnReaderWriter;
 import org.apache.pinot.core.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
@@ -125,6 +126,11 @@ public class FixedIntArrayOffHeapIdMap extends BaseOffHeapMutableDictionary impl
 
   @Override
   public Object getSortedValues() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public DataType getValueType() {
     throw new UnsupportedOperationException();
   }
 

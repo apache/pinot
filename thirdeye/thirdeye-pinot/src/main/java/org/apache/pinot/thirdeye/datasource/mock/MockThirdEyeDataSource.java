@@ -22,34 +22,21 @@ package org.apache.pinot.thirdeye.datasource.mock;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
-import java.io.File;
-import java.util.Scanner;
+import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.math3.distribution.NormalDistribution;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.StringSeries;
 import org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils;
 import org.apache.pinot.thirdeye.datasource.MetadataSourceConfig;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeDataSource;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest;
-import org.apache.pinot.thirdeye.datasource.csv.CSVThirdEyeDataSource;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeResponse;
+import org.apache.pinot.thirdeye.datasource.csv.CSVThirdEyeDataSource;
 import org.apache.pinot.thirdeye.datasource.sql.SqlDataset;
 import org.apache.pinot.thirdeye.datasource.sql.SqlUtils;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
-import org.apache.commons.collections4.MapUtils;
-import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.math3.distribution.NormalDistribution;
 import org.apache.tomcat.jdbc.pool.DataSource;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -60,7 +47,13 @@ import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
+import javax.annotation.Nullable;
+import java.io.File;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
+
+import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.COL_TIME;
+import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.COL_VALUE;
 import static org.apache.pinot.thirdeye.datasource.sql.SqlResponseCacheLoader.*;
 
 
@@ -85,6 +78,8 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
   final Map<String, DataFrame> datasetData;
   final Map<Long, String> metricNameMap;
 
+  final String name;
+
   final CSVThirdEyeDataSource delegate;
 
   /**
@@ -94,6 +89,8 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
    * @throws Exception if properties cannot be parsed
    */
   public MockThirdEyeDataSource(Map<String, Object> properties) throws Exception {
+    this.name = MapUtils.getString(properties, "name", MockThirdEyeDataSource.class.getSimpleName());
+
     // datasets
     this.datasets = new HashMap<>();
     Map<String, Object> config = ConfigUtils.getMap(properties.get(DATASETS));
@@ -292,7 +289,7 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
 
   @Override
   public String getName() {
-    return MockThirdEyeDataSource.class.getSimpleName();
+    return this.name;
   }
 
   @Override

@@ -49,6 +49,9 @@ public class TaskRunnerFactory {
       case MONITOR:
         taskRunner = new MonitorTaskRunner();
         break;
+      case DETECTION_ONLINE:
+        taskRunner = new DetectionPipelineTaskRunner();
+        break;
       default:
     }
     return taskRunner;

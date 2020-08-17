@@ -73,7 +73,7 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
     if (localPluginsTarFile.exists()) {
       File pluginsDirFile = new File(PINOT_PLUGINS_DIR);
       try {
-        TarGzCompressionUtils.unTar(localPluginsTarFile, pluginsDirFile);
+        TarGzCompressionUtils.untar(localPluginsTarFile, pluginsDirFile);
       } catch (Exception e) {
         LOGGER.error("Failed to untar local Pinot plugins tarball file [{}]", localPluginsTarFile, e);
         throw new RuntimeException(e);
@@ -164,7 +164,7 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
       String segmentTarFileName = segmentName + Constants.TAR_GZ_FILE_EXT;
       File localSegmentTarFile = new File(localOutputTempDir, segmentTarFileName);
       LOGGER.info("Tarring segment from: {} to: {}", localSegmentDir, localSegmentTarFile);
-      TarGzCompressionUtils.createTarGzOfDirectory(localSegmentDir.getPath(), localSegmentTarFile.getPath());
+      TarGzCompressionUtils.createTarGzFile(localSegmentDir, localSegmentTarFile);
       long uncompressedSegmentSize = FileUtils.sizeOf(localSegmentDir);
       long compressedSegmentSize = FileUtils.sizeOf(localSegmentTarFile);
       LOGGER.info("Size for segment: {}, uncompressed: {}, compressed: {}", segmentName,

@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.core.segment.index.readers;
 
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BytesUtils;
 
 
 public class StringDictionary extends BaseImmutableDictionary {
@@ -31,6 +32,11 @@ public class StringDictionary extends BaseImmutableDictionary {
   @Override
   public int insertionIndexOf(String stringValue) {
     return binarySearch(stringValue);
+  }
+
+  @Override
+  public DataType getValueType() {
+    return DataType.STRING;
   }
 
   @Override

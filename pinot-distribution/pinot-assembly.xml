@@ -83,6 +83,10 @@
       <source>${pinot.root}/pinot-plugins/pinot-file-system/pinot-hdfs/target/pinot-hdfs-${project.version}-shaded.jar</source>
       <destName>plugins/pinot-file-system/pinot-hdfs/pinot-hdfs-${project.version}-shaded.jar</destName>
     </file>
+    <file>
+      <source>${pinot.root}/pinot-plugins/pinot-file-system/pinot-s3/target/pinot-s3-${project.version}-shaded.jar</source>
+      <destName>plugins/pinot-file-system/pinot-s3/pinot-s3-${project.version}-shaded.jar</destName>
+    </file>
     <!-- End Include Pinot File System Plugins-->
     <!-- Start Include Pinot Input Format Plugins-->
     <file>
@@ -113,6 +117,10 @@
       <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-thrift/target/pinot-thrift-${project.version}-shaded.jar</source>
       <destName>plugins/pinot-input-format/pinot-thrift/pinot-thrift-${project.version}-shaded.jar</destName>
     </file>
+    <file>
+      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-protobuf/target/pinot-protobuf-${project.version}-shaded.jar</source>
+      <destName>plugins/pinot-input-format/pinot-protobuf/pinot-protobuf-${project.version}-shaded.jar</destName>
+    </file>
     <!-- End Include Pinot Input Format Plugins-->
     <!-- End Include Pinot Plugins-->
   </files>
@@ -122,11 +130,6 @@
       <useDefaultExcludes>false</useDefaultExcludes>
       <directory>${pinot.root}/licenses-binary</directory>
       <outputDirectory>licenses</outputDirectory>
-    </fileSet>
-    <fileSet>
-      <useDefaultExcludes>false</useDefaultExcludes>
-      <directory>${pinot.root}/pinot-controller/src/main/resources/webapp</directory>
-      <outputDirectory>query_console</outputDirectory>
     </fileSet>
     <fileSet>
       <useDefaultExcludes>false</useDefaultExcludes>

@@ -22,8 +22,11 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import org.apache.pinot.thirdeye.common.restclient.MockThirdEyeRcaRestClient;
+import org.apache.pinot.thirdeye.common.restclient.ThirdEyeRcaRestClient;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
@@ -38,6 +41,8 @@ import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
 import org.apache.pinot.thirdeye.detection.alert.filter.SubscriptionUtils;
 import org.apache.pinot.thirdeye.notification.commons.JiraEntity;
 import org.apache.pinot.thirdeye.notification.commons.ThirdEyeJiraClient;
+import org.apache.pinot.thirdeye.notification.content.BaseNotificationContent;
+import org.apache.pinot.thirdeye.notification.content.templates.MetricAnomaliesContent;
 import org.apache.pinot.thirdeye.notification.formatter.channels.TestJiraContentFormatter;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeMethod;
@@ -140,7 +145,18 @@ public class DetectionJiraAlerterTest {
     doNothing().when(jiraClient).updateIssue(any(Issue.class), any(JiraEntity.class));
     doNothing().when(jiraClient).addComment(any(Issue.class), anyString());
 
-    DetectionJiraAlerter jiraAlerter = new DetectionJiraAlerter(this.alertConfigDTO, this.thirdEyeConfig, notificationResults, jiraClient);
+    Map<String, Object> expectedResponse = new HashMap<>();
+    expectedResponse.put("cubeResults", new HashMap<>());
+    ThirdEyeRcaRestClient rcaClient = MockThirdEyeRcaRestClient.setupMockClient(expectedResponse);
+    MetricAnomaliesContent metricAnomaliesContent = new MetricAnomaliesContent(rcaClient);
+
+    DetectionJiraAlerter jiraAlerter = new DetectionJiraAlerter(this.alertConfigDTO, this.thirdEyeConfig,
+        notificationResults, jiraClient) {
+      @Override
+      protected BaseNotificationContent getNotificationContent(Properties emailClientConfigs) {
+        return metricAnomaliesContent;
+      }
+    };
 
     // Executes successfully without errors
     jiraAlerter.run();

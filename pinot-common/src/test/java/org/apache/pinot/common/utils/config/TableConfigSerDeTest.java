@@ -19,12 +19,14 @@
 package org.apache.pinot.common.utils.config;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.spi.config.table.CompletionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -38,6 +40,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
+import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceConstraintConfig;
@@ -45,6 +48,7 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
@@ -249,12 +253,16 @@ public class TableConfigSerDeTest {
     {
       // with SegmentsValidationAndRetentionConfig
       TableConfig tableConfig = tableConfigBuilder.setPeerSegmentDownloadScheme(CommonConstants.HTTP_PROTOCOL).build();
-      checkSegmentsValidationAndRetentionConfig(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class));
-      checkSegmentsValidationAndRetentionConfig(TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)));
+      checkSegmentsValidationAndRetentionConfig(
+          JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class));
+      checkSegmentsValidationAndRetentionConfig(
+          TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)));
     }
     {
       // With ingestion config
-      IngestionConfig ingestionConfig = new IngestionConfig(new FilterConfig("filterFunc(foo)"));
+      List<TransformConfig> transformConfigs =
+          Lists.newArrayList(new TransformConfig("bar", "func(moo)"), new TransformConfig("zoo", "myfunc()"));
+      IngestionConfig ingestionConfig = new IngestionConfig(new FilterConfig("filterFunc(foo)"), transformConfigs);
       TableConfig tableConfig = tableConfigBuilder.setIngestionConfig(ingestionConfig).build();
 
       checkIngestionConfig(tableConfig);
@@ -267,6 +275,26 @@ public class TableConfigSerDeTest {
       tableConfigToCompare = TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig));
       assertEquals(tableConfigToCompare, tableConfig);
       checkIngestionConfig(tableConfigToCompare);
+    }
+    {
+      // With tier config
+      List<TierConfig> tierConfigList = Lists.newArrayList(
+          new TierConfig("tierA", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d", TierFactory.PINOT_SERVER_STORAGE_TYPE,
+              "tierA_tag_OFFLINE"),
+          new TierConfig("tierB", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", TierFactory.PINOT_SERVER_STORAGE_TYPE,
+              "tierB_tag_OFFLINE"));
+      TableConfig tableConfig = tableConfigBuilder.setTierConfigList(tierConfigList).build();
+
+      checkTierConfigList(tableConfig);
+
+      // Serialize then de-serialize
+      TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class);
+      assertEquals(tableConfigToCompare, tableConfig);
+      checkTierConfigList(tableConfigToCompare);
+
+      tableConfigToCompare = TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig));
+      assertEquals(tableConfigToCompare, tableConfig);
+      checkTierConfigList(tableConfigToCompare);
     }
   }
 
@@ -364,7 +392,31 @@ public class TableConfigSerDeTest {
   private void checkIngestionConfig(TableConfig tableConfig) {
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     assertNotNull(ingestionConfig);
+    assertNotNull(ingestionConfig.getFilterConfig());
     assertEquals(ingestionConfig.getFilterConfig().getFilterFunction(), "filterFunc(foo)");
+    List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
+    assertNotNull(transformConfigs);
+    assertEquals(transformConfigs.size(), 2);
+    assertEquals(transformConfigs.get(0).getColumnName(), "bar");
+    assertEquals(transformConfigs.get(0).getTransformFunction(), "func(moo)");
+    assertEquals(transformConfigs.get(1).getColumnName(), "zoo");
+    assertEquals(transformConfigs.get(1).getTransformFunction(), "myfunc()");
+  }
+
+  private void checkTierConfigList(TableConfig tableConfig) {
+    List<TierConfig> tierConfigsList = tableConfig.getTierConfigsList();
+    assertNotNull(tierConfigsList);
+    assertEquals(tierConfigsList.size(), 2);
+    assertEquals(tierConfigsList.get(0).getName(), "tierA");
+    assertEquals(tierConfigsList.get(0).getSegmentSelectorType(), TierFactory.TIME_SEGMENT_SELECTOR_TYPE);
+    assertEquals(tierConfigsList.get(0).getSegmentAge(), "10d");
+    assertEquals(tierConfigsList.get(0).getStorageType(), TierFactory.PINOT_SERVER_STORAGE_TYPE);
+    assertEquals(tierConfigsList.get(0).getServerTag(), "tierA_tag_OFFLINE");
+    assertEquals(tierConfigsList.get(1).getName(), "tierB");
+    assertEquals(tierConfigsList.get(1).getSegmentSelectorType(), TierFactory.TIME_SEGMENT_SELECTOR_TYPE);
+    assertEquals(tierConfigsList.get(1).getSegmentAge(), "30d");
+    assertEquals(tierConfigsList.get(1).getStorageType(), TierFactory.PINOT_SERVER_STORAGE_TYPE);
+    assertEquals(tierConfigsList.get(1).getServerTag(), "tierB_tag_OFFLINE");
   }
 
   private void checkInstanceAssignmentConfig(TableConfig tableConfig) {

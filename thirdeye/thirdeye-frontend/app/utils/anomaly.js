@@ -79,6 +79,10 @@ export const anomalyResponseObjNew = [
   }
 ];
 
+export const anomalyTypeMapping = {
+  "DEVIATION": "Metric Deviation", "TREND_CHANGE": "Trend Change", "DATA_SLA": "SLA Violation"
+}
+
 /**
  * Mapping for anomalyResponseObj 'status' to 'name' for easy lookup
  */
@@ -94,7 +98,6 @@ export let anomalyResponseMapNew = {};
 anomalyResponseObjNew.forEach((obj) => {
   anomalyResponseMapNew[obj.value] = obj.name;
 });
-
 
 /**
  * Update feedback status on any anomaly
@@ -243,6 +246,50 @@ export function pluralizeTime(time, unit) {
   return time ? time + ' ' + unitStr : '';
 }
 
+export function searchAnomaly(offset, limit, startTime, endTime, anomalyIds) {
+  return searchAnomalyWithFilters(offset, limit, startTime, endTime, [], [], [], [], [], anomalyIds)
+}
+
+export function searchAnomalyWithFilters(offset, limit, startTime, endTime, feedbackStatuses, subscriptionGroups,
+  detectionNames, metrics, datasets, anomalyIds) {
+  let url = `/anomaly-search?offset=${offset}&limit=${limit}`;
+  if (startTime) {
+    url = url.concat(`&startTime=${startTime}`);
+  }
+  if (endTime) {
+    url = url.concat(`&endTime=${endTime}`);
+  }
+  feedbackStatuses = feedbackStatuses || [];
+  for (const feedbackStatus of feedbackStatuses) {
+    const feedback = anomalyResponseObj.find(feedback => feedback.name === feedbackStatus)
+    if (feedback) {
+      url = url.concat(`&feedbackStatus=${feedback.value}`);
+    }
+  }
+  subscriptionGroups = subscriptionGroups || [];
+  for (const subscriptionGroup of subscriptionGroups) {
+    url = url.concat(`&subscriptionGroup=${subscriptionGroup}`);
+  }
+  detectionNames = detectionNames || [];
+  for (const detectionName of detectionNames) {
+    url = url.concat(`&detectionName=${detectionName}`);
+  }
+  metrics = metrics || [];
+  for (const metric of metrics) {
+    url = url.concat(`&metric=${metric}`);
+  }
+  datasets = datasets || [];
+  for (const dataset of datasets) {
+    url = url.concat(`&dataset=${dataset}`);
+  }
+  anomalyIds = anomalyIds || [];
+  for (const anomalyId of anomalyIds) {
+    url = url.concat(`&anomalyId=${anomalyId}`);
+  }
+  return fetch(url).then(checkStatus);
+}
+
+
 export default {
   anomalyResponseObj,
   anomalyResponseMap,
@@ -255,5 +302,8 @@ export default {
   putAlertActiveStatus,
   getYamlPreviewAnomalies,
   getAnomaliesByAlertId,
-  getBounds
+  getBounds,
+  searchAnomaly,
+  searchAnomalyWithFilters,
+  anomalyTypeMapping
 };

@@ -26,6 +26,8 @@ import org.apache.pinot.common.Utils;
  */
 public enum ControllerMeter implements AbstractMetrics.Meter {
   HELIX_ZOOKEEPER_RECONNECTS("reconnects", true),
+  HEALTHCHECK_OK_CALLS("healthcheck", true),
+  HEALTHCHECK_BAD_CALLS("healthcheck", true),
   CONTROLLER_INSTANCE_POST_ERROR("InstancePostError", true),
   CONTROLLER_INSTANCE_DELETE_ERROR("InstanceDeleteError", true),
   CONTROLLER_SEGMENT_UPLOAD_ERROR("SegmentUploadError", true),

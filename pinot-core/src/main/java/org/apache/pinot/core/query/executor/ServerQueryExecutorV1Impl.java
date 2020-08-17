@@ -18,14 +18,12 @@
  */
 package org.apache.pinot.core.query.executor;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
-
 import javax.annotation.concurrent.ThreadSafe;
-
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -55,8 +53,6 @@ import org.apache.pinot.core.util.trace.TraceContext;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.base.Preconditions;
 
 
 @ThreadSafe
@@ -192,8 +188,13 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     DataTable dataTable = null;
     try {
+      // Compute total docs for the table before pruning the segments
+      long numTotalDocs = 0;
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        numTotalDocs += segmentDataManager.getSegment().getSegmentMetadata().getTotalDocs();
+      }
       TimerContext.Timer segmentPruneTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.SEGMENT_PRUNING);
-      long numTotalDocs = pruneSegments(tableDataManager, segmentDataManagers, queryRequest);
+      segmentDataManagers = _segmentPrunerService.prune(tableDataManager, segmentDataManagers, queryRequest);
       segmentPruneTimer.stopAndRecord();
       int numSegmentsMatchedAfterPruning = segmentDataManagers.size();
       LOGGER.debug("Matched {} segments after pruning", numSegmentsMatchedAfterPruning);
@@ -262,32 +263,5 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     LOGGER.debug("Query processing time for request Id - {}: {}", requestId, queryProcessingTime);
     LOGGER.debug("InstanceResponse for request Id - {}: {}", requestId, dataTable);
     return dataTable;
-  }
-
-  /**
-   * Helper method to prune segments.
-   *
-   * @param tableDataManager Table data manager
-   * @param segmentDataManagers List of segments to prune
-   * @param serverQueryRequest Server query request
-   * @return Total number of docs across all segments (including the ones that were pruned).
-   */
-  private long pruneSegments(TableDataManager tableDataManager, List<SegmentDataManager> segmentDataManagers,
-      ServerQueryRequest serverQueryRequest) {
-    long numTotalDocs = 0;
-
-    Iterator<SegmentDataManager> iterator = segmentDataManagers.iterator();
-    while (iterator.hasNext()) {
-      SegmentDataManager segmentDataManager = iterator.next();
-      IndexSegment indexSegment = segmentDataManager.getSegment();
-      // We need to compute the total raw docs for the table before any pruning.
-      numTotalDocs += indexSegment.getSegmentMetadata().getTotalDocs();
-      if (_segmentPrunerService.prune(indexSegment, serverQueryRequest)) {
-        iterator.remove();
-        tableDataManager.releaseSegment(segmentDataManager);
-      }
-    }
-
-    return numTotalDocs;
   }
 }

@@ -20,6 +20,7 @@
 package org.apache.pinot.thirdeye.dashboard.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.inject.Inject;
 import org.apache.pinot.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
 import org.apache.pinot.thirdeye.api.Constants;
@@ -66,6 +67,7 @@ public class AnomalyResource {
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
+  @Inject
   public AnomalyResource(AlertFilterFactory alertFilterFactory) {
     this.anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.alertFilterFactory = alertFilterFactory;
@@ -154,11 +156,15 @@ public class AnomalyResource {
    *                        eg. payload
    *                        <p/>
    *                        { "feedbackType": "NOT_ANOMALY", "comment": "this is not an anomaly" }
+   * @param propagate       : a flag whether it should propagate the same feedback value to the parent of this anomaly
+   *                        and all its siblings if they exist
    */
   @POST
   @Path(value = "anomaly-merged-result/feedback/{anomaly_merged_result_id}")
   @ApiOperation("update anomaly merged result feedback")
-  public void updateAnomalyMergedResultFeedback(@PathParam("anomaly_merged_result_id") long anomalyResultId,
+  public void updateAnomalyMergedResultFeedback(
+      @PathParam("anomaly_merged_result_id") long anomalyResultId,
+      @QueryParam("propagate") @DefaultValue("true") boolean propagate,
       String payload) {
     try {
       MergedAnomalyResultDTO result = anomalyMergedResultDAO.findById(anomalyResultId);
@@ -166,18 +172,33 @@ public class AnomalyResource {
         throw new IllegalArgumentException("AnomalyResult not found with id " + anomalyResultId);
       }
       AnomalyFeedbackDTO feedbackRequest = OBJECT_MAPPER.readValue(payload, AnomalyFeedbackDTO.class);
-      AnomalyFeedback feedback = result.getFeedback();
-      if (feedback == null) {
-        feedback = new AnomalyFeedbackDTO();
-        result.setFeedback(feedback);
+      if (propagate && result.isChild()) {
+        // propagate the feedback to its parent and siblings
+        MergedAnomalyResultDTO parent = anomalyMergedResultDAO.findParent(result);
+        if (parent != null) {
+          updateAnomalyFeedback(parent, feedbackRequest);
+        } else {
+          LOG.warn("Cannot find parent for anomaly : {}, thus only updating the feedback of it", result.getId());
+          updateAnomalyFeedback(result, feedbackRequest);
+        }
+      } else {
+        updateAnomalyFeedback(result, feedbackRequest);
       }
-      feedback.setComment(feedbackRequest.getComment());
-      if (feedbackRequest.getFeedbackType() != null){
-        feedback.setFeedbackType(feedbackRequest.getFeedbackType());
-      }
-      anomalyMergedResultDAO.updateAnomalyFeedback(result);
     } catch (IOException e) {
       throw new IllegalArgumentException("Invalid payload " + payload, e);
     }
+  }
+
+  private void updateAnomalyFeedback(MergedAnomalyResultDTO anomaly, AnomalyFeedbackDTO newFeedback) {
+    AnomalyFeedback feedback = anomaly.getFeedback();
+    if (feedback == null) {
+      feedback = new AnomalyFeedbackDTO();
+      anomaly.setFeedback(feedback);
+    }
+    feedback.setComment(newFeedback.getComment());
+    if (newFeedback.getFeedbackType() != null) {
+      feedback.setFeedbackType(newFeedback.getFeedbackType());
+    }
+    anomalyMergedResultDAO.updateAnomalyFeedback(anomaly);
   }
 }

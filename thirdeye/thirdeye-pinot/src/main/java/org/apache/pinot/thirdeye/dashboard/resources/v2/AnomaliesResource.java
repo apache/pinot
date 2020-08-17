@@ -24,6 +24,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
+import com.google.inject.Inject;
+import com.google.inject.Singleton;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -111,8 +113,8 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
-@Path(value = "/anomalies")
 @Produces(MediaType.APPLICATION_JSON)
+@Singleton
 public class AnomaliesResource {
   private static final String COL_CURRENT = "current";
   private static final String COL_BASELINE = "baseline";
@@ -149,6 +151,7 @@ public class AnomaliesResource {
   private final DetectionPipelineLoader loader;
   private final DataProvider provider;
 
+  @Inject
   public AnomaliesResource(AnomalyFunctionFactory anomalyFunctionFactory) {
     this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
     this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();

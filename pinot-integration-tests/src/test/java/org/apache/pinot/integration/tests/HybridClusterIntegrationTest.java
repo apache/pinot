@@ -20,7 +20,7 @@ package org.apache.pinot.integration.tests;
 
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.util.ArrayList;
+import java.net.URLEncoder;
 import java.util.List;
 import java.util.Map;
 
@@ -51,14 +51,6 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   private static final int NUM_OFFLINE_SEGMENTS = 8;
   private static final int NUM_REALTIME_SEGMENTS = 6;
 
-  protected int getNumOfflineSegments() {
-    return NUM_OFFLINE_SEGMENTS;
-  }
-
-  protected int getNumRealtimeSegments() {
-    return NUM_REALTIME_SEGMENTS;
-  }
-
   @Override
   protected String getBrokerTenant() {
     return TENANT_NAME;
@@ -83,8 +75,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     startHybridCluster();
 
     List<File> avroFiles = getAllAvroFiles();
-    List<File> offlineAvroFiles = getOfflineAvroFiles(avroFiles);
-    List<File> realtimeAvroFiles = getRealtimeAvroFiles(avroFiles);
+    List<File> offlineAvroFiles = getOfflineAvroFiles(avroFiles, NUM_OFFLINE_SEGMENTS);
+    List<File> realtimeAvroFiles = getRealtimeAvroFiles(avroFiles, NUM_REALTIME_SEGMENTS);
 
     // Create and upload the schema and table config
     Schema schema = createSchema();
@@ -129,39 +121,6 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     // Create tenants
     createBrokerTenant(TENANT_NAME, 1);
     createServerTenant(TENANT_NAME, 1, 1);
-  }
-
-  protected List<File> getAllAvroFiles()
-      throws Exception {
-    // Unpack the Avro files
-    int numSegments = unpackAvroData(_tempDir).size();
-
-    // Avro files has to be ordered as time series data
-    List<File> avroFiles = new ArrayList<>(numSegments);
-    for (int i = 1; i <= numSegments; i++) {
-      avroFiles.add(new File(_tempDir, "On_Time_On_Time_Performance_2014_" + i + ".avro"));
-    }
-
-    return avroFiles;
-  }
-
-  protected List<File> getOfflineAvroFiles(List<File> avroFiles) {
-    int numOfflineSegments = getNumOfflineSegments();
-    List<File> offlineAvroFiles = new ArrayList<>(numOfflineSegments);
-    for (int i = 0; i < numOfflineSegments; i++) {
-      offlineAvroFiles.add(avroFiles.get(i));
-    }
-    return offlineAvroFiles;
-  }
-
-  protected List<File> getRealtimeAvroFiles(List<File> avroFiles) {
-    int numSegments = avroFiles.size();
-    int numRealtimeSegments = getNumRealtimeSegments();
-    List<File> realtimeAvroFiles = new ArrayList<>(numRealtimeSegments);
-    for (int i = numSegments - numRealtimeSegments; i < numSegments; i++) {
-      realtimeAvroFiles.add(avroFiles.get(i));
-    }
-    return realtimeAvroFiles;
   }
 
   @Test
@@ -223,6 +182,19 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     Assert.assertNotNull(getDebugInfo("debug/routingTable/" + tableName));
     Assert.assertNotNull(getDebugInfo("debug/routingTable/" + TableNameBuilder.OFFLINE.tableNameWithType(tableName)));
     Assert.assertNotNull(getDebugInfo("debug/routingTable/" + TableNameBuilder.REALTIME.tableNameWithType(tableName)));
+  }
+
+  @Test
+  public void testBrokerDebugRoutingTableSQL()
+          throws Exception {
+    String tableName = getTableName();
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    String encodedSQL;
+    encodedSQL = URLEncoder.encode("select * from " + realtimeTableName, "UTF-8");
+    Assert.assertNotNull(getDebugInfo("debug/routingTable/sql?query=" + encodedSQL));
+    encodedSQL = URLEncoder.encode("select * from " + offlineTableName, "UTF-8");
+    Assert.assertNotNull(getDebugInfo("debug/routingTable/sql?query=" + encodedSQL));
   }
 
   @Test

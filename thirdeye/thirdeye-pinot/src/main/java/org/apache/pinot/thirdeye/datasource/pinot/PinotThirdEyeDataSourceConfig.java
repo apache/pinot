@@ -23,17 +23,17 @@ import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
+import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.auto.onboard.AutoOnboardPinotMetadataSource;
-import org.apache.pinot.thirdeye.datasource.DataSourceConfig;
 import org.apache.pinot.thirdeye.datasource.MetadataSourceConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import org.apache.commons.collections4.MapUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * An immutable configurations for setting up {@link PinotThirdEyeDataSource}'s connection to Pinot.
@@ -51,6 +51,7 @@ public class PinotThirdEyeDataSourceConfig {
   private String clusterName;
   private String brokerUrl;
   private String tag;
+  private String name;
 
   public String getZookeeperUrl() {
     return zookeeperUrl;
@@ -82,6 +83,14 @@ public class PinotThirdEyeDataSourceConfig {
 
   private void setTag(String tag) {
     this.tag = tag;
+  }
+
+  public String getName() {
+    return name;
+  }
+
+  public void setName(String name) {
+    this.name = name;
   }
 
   public String getBrokerUrl() {
@@ -128,14 +137,14 @@ public class PinotThirdEyeDataSourceConfig {
   @Override
   public int hashCode() {
     return Objects.hash(getZookeeperUrl(), getControllerHost(), getControllerPort(), getControllerConnectionScheme(),
-        getClusterName(), getBrokerUrl(), getTag());
+        getClusterName(), getBrokerUrl(), getTag(), getName());
   }
 
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this).add("zookeeperUrl", zookeeperUrl).add("controllerHost", controllerHost)
         .add("controllerPort", controllerPort).add("controllerConnectionScheme", controllerConnectionScheme)
-        .add("clusterName", clusterName).add("brokerUrl", brokerUrl).add("tag", tag).toString();
+        .add("clusterName", clusterName).add("brokerUrl", brokerUrl).add("tag", tag).add("name", name).toString();
   }
 
   public static Builder builder() {
@@ -150,6 +159,7 @@ public class PinotThirdEyeDataSourceConfig {
     private String clusterName;
     private String brokerUrl;
     private String tag;
+    private String name;
 
     public Builder setZookeeperUrl(String zookeeperUrl) {
       this.zookeeperUrl = zookeeperUrl;
@@ -181,6 +191,11 @@ public class PinotThirdEyeDataSourceConfig {
       return this;
     }
 
+    public Builder setName(String name) {
+      this.name = name;
+      return this;
+    }
+
     public Builder setControllerConnectionScheme(String controllerConnectionScheme) {
       this.controllerConnectionScheme = controllerConnectionScheme;
       return this;
@@ -204,6 +219,7 @@ public class PinotThirdEyeDataSourceConfig {
       config.setBrokerUrl(brokerUrl);
       config.setTag(tag);
       config.setControllerConnectionScheme(controllerConnectionScheme);
+      config.setName(name);
       return config;
     }
   }
@@ -234,12 +250,10 @@ public class PinotThirdEyeDataSourceConfig {
    *                                  controller host and port, cluster name, and the URL to zoo keeper.
    */
   static PinotThirdEyeDataSourceConfig createFromProperties(Map<String, Object> properties) {
+    String dataSourceName = MapUtils.getString(properties, PinotThirdeyeDataSourceProperties.NAME.getValue(), PinotThirdEyeDataSource.class.getSimpleName());
+
     ImmutableMap<String, Object> processedProperties = processPropertyMap(properties);
-    if (processedProperties == null) {
-      throw new IllegalArgumentException(
-          "Invalid properties for data source: " + PinotThirdEyeDataSource.DATA_SOURCE_NAME + ", properties="
-              + properties);
-    }
+    Preconditions.checkNotNull(processedProperties, "Invalid properties for data source: %s, properties=%s", dataSourceName, properties);
 
     String controllerHost = MapUtils.getString(processedProperties, PinotThirdeyeDataSourceProperties.CONTROLLER_HOST.getValue());
     int controllerPort = MapUtils.getInteger(processedProperties, PinotThirdeyeDataSourceProperties.CONTROLLER_PORT.getValue());
@@ -247,9 +261,10 @@ public class PinotThirdEyeDataSourceConfig {
     String zookeeperUrl = MapUtils.getString(processedProperties, PinotThirdeyeDataSourceProperties.ZOOKEEPER_URL.getValue());
     String clusterName = MapUtils.getString(processedProperties, PinotThirdeyeDataSourceProperties.CLUSTER_NAME.getValue());
 
-    // brokerUrl and tag are optional
+    // brokerUrl, tag, and name are optional
     String brokerUrl = MapUtils.getString(processedProperties, PinotThirdeyeDataSourceProperties.BROKER_URL.getValue());
     String tag = MapUtils.getString(processedProperties, PinotThirdeyeDataSourceProperties.TAG.getValue());
+    String name = MapUtils.getString(processedProperties, PinotThirdeyeDataSourceProperties.NAME.getValue());
 
     Builder builder =
         PinotThirdEyeDataSourceConfig.builder().setControllerHost(controllerHost).setControllerPort(controllerPort)
@@ -259,6 +274,9 @@ public class PinotThirdEyeDataSourceConfig {
     }
     if (StringUtils.isNotBlank(tag)) {
       builder.setTag(tag);
+    }
+    if (StringUtils.isNotBlank(name)) {
+      builder.setName(name);
     }
     if (StringUtils.isNotBlank(controllerConnectionScheme)) {
       builder.setControllerConnectionScheme(controllerConnectionScheme);

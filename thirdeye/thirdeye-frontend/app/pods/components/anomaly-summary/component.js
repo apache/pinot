@@ -16,7 +16,8 @@ import { getFormattedDuration,
   verifyAnomalyFeedback,
   anomalyResponseObj,
   anomalyResponseObjNew,
-  updateAnomalyFeedback
+  updateAnomalyFeedback,
+  anomalyTypeMapping
 } from 'thirdeye-frontend/utils/anomaly';
 import RSVP from "rsvp";
 import fetch from 'fetch';
@@ -211,7 +212,8 @@ export default Component.extend({
           shownChangeRate: humanizeFloat(change),
           anomalyFeedback: a.feedback ? a.feedback.feedbackType : "NONE",
           showResponseSaved: (labelResponse.anomalyId === a.id) ? labelResponse.showResponseSaved : false,
-          showResponseFailed: (labelResponse.anomalyId === a.id) ? labelResponse.showResponseFailed: false
+          showResponseFailed: (labelResponse.anomalyId === a.id) ? labelResponse.showResponseFailed: false,
+          type: anomalyTypeMapping[a.type]
         };
       }
       return tableAnomaly;
@@ -230,34 +232,29 @@ export default Component.extend({
   ),
 
   _fetchAnomalyData() {
-    const anomalyId = get(this, 'anomalyId');
-    const anomalyUrl = `/dashboard/anomalies/view/${anomalyId}`;
+    const anomalyData = get(this, 'anomalyData');
+    const anomalyId = anomalyData.id;
 
+    set(this, 'anomalyId', anomalyId);
     set(this, 'isLoading', true);
 
-    fetch(anomalyUrl)
-      .then(checkStatus)
-      .then(res => {
-        set(this, 'anomalyData', res);
-        const predictedUrl = `/detection/predicted-baseline/${anomalyId}?start=${res.startTime}&end=${res.endTime}&padding=true`;
-        const timeseriesHash = {
-          predicted: fetch(predictedUrl).then(res => checkStatus(res, 'get', true))
-        };
-        return RSVP.hash(timeseriesHash);
-      })
-      .then((res) => {
-        if (!(this.get('isDestroyed') || this.get('isDestroying'))) {
-          set(this, 'current', res.predicted);
-          set(this, 'predicted', res.predicted);
-          set(this, 'isLoading', false);
-        }
-      })
+    const predictedUrl = `/detection/predicted-baseline/${anomalyId}?start=${anomalyData.startTime}&end=${anomalyData.endTime}&padding=true`;
+    const timeseriesHash = {
+      predicted: fetch(predictedUrl).then(res => checkStatus(res, 'get', true))
+    };
+    RSVP.hash(timeseriesHash).then((res) => {
+      if (!(this.get('isDestroyed') || this.get('isDestroying'))) {
+        set(this, 'current', res.predicted);
+        set(this, 'predicted', res.predicted);
+        set(this, 'isLoading', false);
+      }
+    })
       .catch(() => {
         if (!(this.get('isDestroyed') || this.get('isDestroying'))) {
           set(this, 'isLoading', false);
         }
       });
-  },
+    },
 
   _formatAnomaly(anomaly) {
     return `${moment(anomaly.startTime).format(TABLE_DATE_FORMAT)}`;

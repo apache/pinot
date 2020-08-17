@@ -20,6 +20,7 @@
 package org.apache.pinot.thirdeye.dashboard.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.inject.Singleton;
 import org.apache.pinot.thirdeye.datalayer.bao.EntityToEntityMappingManager;
 import org.apache.pinot.thirdeye.datalayer.dto.EntityToEntityMappingDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
@@ -44,8 +45,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Path(value = "/entityMapping")
 @Produces(MediaType.APPLICATION_JSON)
+@Singleton
 public class EntityMappingResource {
 
   private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
