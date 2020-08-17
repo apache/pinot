@@ -113,7 +113,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
   }
 
   @Override
-  protected boolean getNullHandlingEnabledConfig() {
+  protected boolean getNullHandlingEnabled() {
     return true;
   }
 
