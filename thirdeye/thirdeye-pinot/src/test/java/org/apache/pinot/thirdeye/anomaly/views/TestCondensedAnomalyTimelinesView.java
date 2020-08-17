@@ -82,7 +82,17 @@ public class TestCondensedAnomalyTimelinesView {
     Assert.assertTrue(condensedView.toJsonString().length() > CondensedAnomalyTimelinesView.DEFAULT_MAX_LENGTH);
     CondensedAnomalyTimelinesView compressedView = condensedView.compress();
     Assert.assertTrue(compressedView.toJsonString().length() < CondensedAnomalyTimelinesView.DEFAULT_MAX_LENGTH);
-    Assert.assertEquals(testNum, compressedView.timeStamps.size());
+    Assert.assertEquals(compressedView.timeStamps.size(), testNum);
+
+    DateTime date = new DateTime(2018, 1, 1, 0, 0, 0);
+    long minBucketMillis = CondensedAnomalyTimelinesView.DEFAULT_MIN_BUCKET_UNIT;
+    for (int i = 0; i < compressedView.getTimeStamps().size(); i++) {
+      Assert.assertEquals(compressedView.getTimeStamps().get(i).longValue(),
+          (date.getMillis() - condensedView.timestampOffset)/minBucketMillis);
+      Assert.assertEquals(compressedView.getCurrentValues().get(i), i + 0.0d);
+      Assert.assertEquals(compressedView.getBaselineValues().get(i), i + 0.33);
+      date = date.plusMinutes(5);
+    }
   }
 
   /** Compression Test case 2:  The anomaly view is still too large after rounding up, and needed to be further compressed */
@@ -100,8 +110,8 @@ public class TestCondensedAnomalyTimelinesView {
     for (int i = 0; i < compressedView.getTimeStamps().size(); i++) {
       Assert.assertEquals(compressedView.getTimeStamps().get(i).longValue(),
           (date.getMillis() - condensedView.timestampOffset)/minBucketMillis);
-      Assert.assertEquals(compressedView.getCurrentValues().get(i), i * 2 + 0.5, 0.000001);
-      Assert.assertEquals(compressedView.getBaselineValues().get(i), i * 2 + 0.833, 0.000001);
+      Assert.assertEquals(compressedView.getCurrentValues().get(i), i * 2 + 0.5);
+      Assert.assertEquals(compressedView.getBaselineValues().get(i), i * 2 + 0.83);
       date = date.plusMinutes(10);
     }
 
@@ -111,9 +121,41 @@ public class TestCondensedAnomalyTimelinesView {
       TimeBucket timeBucket = decompressedView.getTimeBuckets().get(i);
       Assert.assertEquals(timeBucket.getCurrentStart(), date.getMillis());
       Assert.assertEquals(timeBucket.getCurrentEnd(), date.plusMinutes(10).getMillis());
-      Assert.assertEquals(decompressedView.getCurrentValues().get(i), i * 2 + 0.5, 0.000001);
-      Assert.assertEquals(decompressedView.getBaselineValues().get(i), i * 2 + 0.833, 0.000001);
+      Assert.assertEquals(decompressedView.getCurrentValues().get(i), i * 2 + 0.5);
+      Assert.assertEquals(decompressedView.getBaselineValues().get(i), i * 2 + 0.83);
       date = date.plusMinutes(10);
+    }
+  }
+
+  /** Compression Test case 3:  compressed 2 times */
+  @Test
+  public void testCompressTwice() throws Exception {
+    int testNum = 1200;
+    long minBucketMillis = CondensedAnomalyTimelinesView.DEFAULT_MIN_BUCKET_UNIT;
+    CondensedAnomalyTimelinesView condensedView = CondensedAnomalyTimelinesView.fromAnomalyTimelinesView(getTestData(testNum));
+    Assert.assertTrue(condensedView.toJsonString().length() > CondensedAnomalyTimelinesView.DEFAULT_MAX_LENGTH);
+    CondensedAnomalyTimelinesView compressedView = condensedView.compress();
+    Assert.assertTrue(compressedView.toJsonString().length() < CondensedAnomalyTimelinesView.DEFAULT_MAX_LENGTH);
+    Assert.assertEquals(300, compressedView.timeStamps.size());
+    Assert.assertEquals(compressedView.bucketMillis.longValue(), 20);
+    DateTime date = new DateTime(2018, 1, 1, 0, 0, 0);
+    for (int i = 0; i < compressedView.getTimeStamps().size(); i++) {
+      Assert.assertEquals(compressedView.getTimeStamps().get(i).longValue(),
+          (date.getMillis() - condensedView.timestampOffset)/minBucketMillis);
+      Assert.assertEquals(compressedView.getCurrentValues().get(i), i * 4 + 1.5);
+      Assert.assertEquals(compressedView.getBaselineValues().get(i), i * 4 + 1.83);
+      date = date.plusMinutes(20);
+    }
+
+    AnomalyTimelinesView decompressedView = compressedView.toAnomalyTimelinesView();
+    date = new DateTime(2018, 1, 1, 0, 0, 0);
+    for (int i = 0; i < decompressedView.getBaselineValues().size(); i++) {
+      TimeBucket timeBucket = decompressedView.getTimeBuckets().get(i);
+      Assert.assertEquals(timeBucket.getCurrentStart(), date.getMillis());
+      Assert.assertEquals(timeBucket.getCurrentEnd(), date.plusMinutes(20).getMillis());
+      Assert.assertEquals(decompressedView.getCurrentValues().get(i), i * 4 + 1.5);
+      Assert.assertEquals(decompressedView.getBaselineValues().get(i), i * 4 + 1.83);
+      date = date.plusMinutes(20);
     }
   }
 }

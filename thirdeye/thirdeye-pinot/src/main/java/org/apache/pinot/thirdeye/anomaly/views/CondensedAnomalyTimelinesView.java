@@ -29,6 +29,8 @@ import java.util.List;
 import java.util.Map;
 import org.joda.time.Minutes;
 
+import static org.apache.pinot.thirdeye.util.ThirdEyeUtils.*;
+
 
 /**
  * We face a problem that if we store the timelines view using AnomalyTimelinesView. The DB has overflow exception when
@@ -183,26 +185,18 @@ public class CondensedAnomalyTimelinesView {
    * @return a compressed CondensedAnomalyTimelinesView
    */
   public CondensedAnomalyTimelinesView compress() {
-    if (timeStamps.size() == 0) {
-      return this;
-    }
-    try {
-      if (this.toJsonString().length() > DEFAULT_MAX_LENGTH) {
-        // First try rounding up
-        roundUp();
-      }
-    } catch (JsonProcessingException e) {
-      throw new IllegalStateException("Unable to parse view to json string", e);
-    }
     return compress(DEFAULT_MAX_LENGTH);
   }
 
+  /**
+   * Round up timelines view to save space in storage.
+   * */
   private void roundUp() {
     List<Double> roundedObservedValues = new ArrayList<>();
     List<Double> roundedExpectedValues = new ArrayList<>();
     for (int i = 0; i < timeStamps.size(); i++) {
-      Double roundedObservedValue = Math.round(currentValues.get(i) * (Math.pow(10, DEFAULT_DECIMAL_DIGITS))) / (Math.pow(10, DEFAULT_DECIMAL_DIGITS));
-      Double roundedExpectedValue = Math.round(baselineValues.get(i) * (Math.pow(10, DEFAULT_DECIMAL_DIGITS))) / (Math.pow(10, DEFAULT_DECIMAL_DIGITS));
+      Double roundedObservedValue = getRoundedDouble(currentValues.get(i));
+      Double roundedExpectedValue = getRoundedDouble(baselineValues.get(i));
       roundedObservedValues.add(roundedObservedValue);
       roundedExpectedValues.add(roundedExpectedValue);
     }
@@ -223,11 +217,16 @@ public class CondensedAnomalyTimelinesView {
     try {
       if (this.toJsonString().length() < maxLength) {
         return this;
+      } else {
+        // First try rounding up
+        roundUp();
+        if (this.toJsonString().length() < maxLength) {
+          return this;
+        }
       }
     } catch (JsonProcessingException e) {
       throw new IllegalStateException("Unable to parse view to json string", e);
     }
-
     List<Long> aggregatedTimestamps = new ArrayList<>();
     List<Double> aggregatedObservedValues = new ArrayList<>();
     List<Double> aggregatedExpectedValues = new ArrayList<>();
@@ -251,8 +250,8 @@ public class CondensedAnomalyTimelinesView {
         }
       }
       aggregatedTimestamps.add(timestamp * DEFAULT_MIN_BUCKET_UNIT + timestampOffset);
-      aggregatedObservedValues.add(observedValue/((double)count));
-      aggregatedExpectedValues.add(expectedValue/((double)count));
+      aggregatedObservedValues.add(getRoundedDouble(observedValue/((double)count)));
+      aggregatedExpectedValues.add(getRoundedDouble(expectedValue/((double)count)));
     }
 
 
