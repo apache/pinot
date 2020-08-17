@@ -279,7 +279,10 @@ public class ZKMetadataProvider {
     }
     // Try to fetch offline schema if realtime schema does not exist
     if (schema == null && (tableType == null || tableType == TableType.OFFLINE)) {
-      schema = getSchema(propertyStore, TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+      TableConfig offlineTableConfig = getOfflineTableConfig(propertyStore, tableName);
+      if (offlineTableConfig != null) {
+        schema = getSchema(propertyStore, offlineTableConfig.getValidationConfig().getSchemaName());
+      }
     }
     if (schema != null) {
       LOGGER.warn("Schema name does not match raw table name, schema name: {}, raw table name: {}",
