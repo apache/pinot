@@ -428,7 +428,7 @@ create table if not exists rootcause_template_index (
     application VARCHAR(128),
     owner varchar(32) not null,
     metric_id bigint(20) not null,
-    create_time timestamp default 0,
+    create_time timestamp,
     update_time timestamp default current_timestamp,
     version int(10)
 ) ENGINE=InnoDB;
