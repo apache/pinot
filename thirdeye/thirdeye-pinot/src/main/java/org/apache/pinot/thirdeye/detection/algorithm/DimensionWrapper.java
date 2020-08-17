@@ -88,6 +88,7 @@ public class DimensionWrapper extends DetectionPipeline {
 
   // Stop running if the first several dimension combinations all failed.
   private static final int EARLY_STOP_THRESHOLD = 10;
+  private static final double EARLY_STOP_THRESHOLD_PERCENTAGE = 0.1;
 
   // by default, don't pre-fetch data into the cache
   private static final long DEFAULT_CACHING_PERIOD_LOOKBACK = -1;
@@ -390,7 +391,9 @@ public class DimensionWrapper extends DetectionPipeline {
   private void checkEarlyStop(long totalNestedMetrics, long successNestedMetrics, int i, List<Exception> exceptions)
       throws DetectionPipelineException {
     // if the first certain number of dimensions all failed, throw an exception
-    if (i == EARLY_STOP_THRESHOLD && successNestedMetrics == 0) {
+    // the threshold is set to the 10 percent of the number of dimensions and at least 10.
+    long earlyStopThreshold = Math.max(EARLY_STOP_THRESHOLD, (int)(totalNestedMetrics * EARLY_STOP_THRESHOLD_PERCENTAGE));
+    if (i == earlyStopThreshold && successNestedMetrics == 0) {
       throw new DetectionPipelineException(String.format(
           "Detection failed for first %d out of %d metric dimensions for monitoring window %d to %d, stop processing.",
           i, totalNestedMetrics, this.getStartTime(), this.getEndTime()), Iterables.getLast(exceptions));
