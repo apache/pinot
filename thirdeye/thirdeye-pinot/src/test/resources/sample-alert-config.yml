@@ -4,7 +4,7 @@
 subscriptionGroupName: test_subscription_group
 
 # Every alert in ThirdEye is attached to an application. Please specify the registered application name here. You may request for a new application by dropping an email to ask_thirdeye
-application: thirdeye-internal
+application: thirdeye
 
 # List of detection names that you want to subscribe. Copy-paste the detection name from the above anomaly detection config here.
 subscribedDetections:

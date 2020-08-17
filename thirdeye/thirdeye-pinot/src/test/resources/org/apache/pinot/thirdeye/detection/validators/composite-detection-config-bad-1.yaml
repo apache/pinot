@@ -1,11 +1,11 @@
 detectionName: testPipeline
 description: My test pipeline
-type: COMPOSITE_ALERT
 cron: "0 0 14 * * ? *"
+type: COMPOSITE_ALERT
 alerts:
   - type: METRIC_ALERT
     name: metric alert on test_metric
-    metric: test_metric
+    metricTypo: test_metric
     dataset: test_dataset
     filters:
       D1:

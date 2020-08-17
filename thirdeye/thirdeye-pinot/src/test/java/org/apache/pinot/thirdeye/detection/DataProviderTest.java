@@ -94,8 +94,6 @@ public class DataProviderTest {
   private List<Long> datasetIds;
   private List<Long> detectionIds;
 
-  private static final MetricDataset METRIC = new MetricDataset("metric", "collection1");
-
   @BeforeMethod
   public void beforeMethod() throws Exception {
     this.testBase = DAOTestBase.getInstance();

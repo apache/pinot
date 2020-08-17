@@ -32,7 +32,6 @@ import org.apache.pinot.thirdeye.datalayer.dto.EvaluationDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.apache.pinot.thirdeye.detection.spi.model.EvaluationSlice;
 import org.apache.pinot.thirdeye.detection.spi.model.EventSlice;
@@ -209,12 +208,12 @@ public class MockDataProvider implements DataProvider {
 
   @Override
   public MetricConfigDTO fetchMetric(String metricName, String datasetName) {
-      for (MetricConfigDTO metric : this.metrics) {
-        if (metricName.equals(metric.getName()) && datasetName.equals(metric.getDataset())) {
-          return metric;
-        }
+    for (MetricConfigDTO metric : this.metrics) {
+      if (metricName.equals(metric.getName()) && datasetName.equals(metric.getDataset())) {
+        return metric;
       }
-      return null;
+    }
+    return null;
   }
 
   @Override

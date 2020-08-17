@@ -1,0 +1,82 @@
+# detection name is a required field of type string
+detectionName: dummy detection name
+# description is an optional field of type string
+description: dummy description
+
+# type is an optional field but takes only those values defined in the enum
+type: METRIC_ALERT
+
+# metric_name is a required field of type string
+metric: dummy metric name
+# dataset_name is a required field of type string
+dataset: dummy dataset name
+
+# filters is an optional field
+filters:
+  # filter keys (dimension names) can be any string
+  dummy dimension name:
+    # filter values must be an array of string
+    - "123"
+    - dummy dimension value
+  ._$%^:
+    - ._$%^
+
+# dimensionExploration is an optional field
+dimensionExploration:
+  # dimensions is a required field under dimensionExploration and is an array of strings (dimension names)
+  dimensions:
+    - ._$%^
+    - D2
+  # data filters like minContribution are optional fields and must be a number
+  minContribution: 0.05
+
+# rules is a required field and is an array
+rules:
+  - detection:
+      - type: THRESHOLD
+        name: maxThreshold_1
+        params:
+          max: 100
+    filter:
+      - type: THRESHOLD_RULE_FILTER
+        name: thresholdFilter_1
+        params:
+          min: 50
+      - type: THRESHOLD_RULE_FILTER
+        name: thresholdFilter_2
+        params:
+          min: 50
+
+  - detection:
+      - type: THRESHOLD
+        name: maxThreshold_3
+        params:
+          max: 100
+    quality:
+      - type: DATA_SLA
+        name: slaRule1
+        params:
+          sla: 2_DAYS
+
+  - detection:
+      - type: THRESHOLD
+        name: maxThreshold_2
+        params:
+          max: 100
+    filter:
+      - type: THRESHOLD_RULE_FILTER
+        name: thresholdFilter_3
+        params:
+          min: 50
+
+# merger is an optional field
+merger:
+  maxGap: 0
+  maxDuration: 100000000
+
+# grouper is an optional field
+grouper:
+  - type: MOCK_GROUPER
+    name: test_grouper
+    params:
+      mockParam: 0.3

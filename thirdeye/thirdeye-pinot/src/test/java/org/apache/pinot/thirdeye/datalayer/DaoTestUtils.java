@@ -33,7 +33,6 @@ import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import org.apache.pinot.thirdeye.anomaly.utils.EmailUtils;
 import org.apache.pinot.thirdeye.common.metric.MetricType;
 import org.apache.pinot.thirdeye.constant.MetricAggFunction;
-import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.AlertSnapshotDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
@@ -55,6 +54,7 @@ import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
 import org.apache.pinot.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
+import org.apache.pinot.thirdeye.detection.validators.ConfigValidationException;
 import org.apache.pinot.thirdeye.detection.validators.DetectionConfigValidator;
 import org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTranslator;
 import org.apache.pinot.thirdeye.detection.yaml.translator.SubscriptionConfigTranslator;
@@ -74,8 +74,8 @@ import static org.apache.pinot.thirdeye.detection.alert.StatefulDetectionAlertFi
 
 public class DaoTestUtils {
 
-  public static DetectionConfigDTO getTestDetectionConfig(DataProvider provider, String detectionConfigFile) throws
-                                                                                                             IOException {
+  public static DetectionConfigDTO getTestDetectionConfig(DataProvider provider, String detectionConfigFile)
+      throws IOException, ConfigValidationException {
     String yamlConfig = IOUtils.toString(DaoTestUtils.class.getResourceAsStream(detectionConfigFile));
 
     // Translate
@@ -88,18 +88,18 @@ public class DaoTestUtils {
     detectionConfig.setCron("0/10 * * * * ?");
 
     DetectionConfigValidator validator = new DetectionConfigValidator(provider);
-    validator.validateConfig(detectionConfig);
+    validator.semanticValidation(detectionConfig);
 
     detectionConfig.setLastTimestamp(DateTime.now().minusDays(2).getMillis());
     return detectionConfig;
   }
 
-  public static DetectionAlertConfigDTO getTestDetectionAlertConfig(DetectionConfigManager detectionConfigManager, String alertConfigFile) throws IOException {
+  public static DetectionAlertConfigDTO getTestDetectionAlertConfig(String alertConfigFile)
+      throws IOException, ConfigValidationException {
 
     String yamlConfig = IOUtils.toString(DaoTestUtils.class.getResourceAsStream(alertConfigFile));
 
-    DetectionAlertConfigDTO alertConfig = new SubscriptionConfigTranslator(
-        detectionConfigManager, yamlConfig).translate();
+    DetectionAlertConfigDTO alertConfig = new SubscriptionConfigTranslator(yamlConfig).translate();
     alertConfig.setCronExpression("0/10 * * * * ?");
     return alertConfig;
   }

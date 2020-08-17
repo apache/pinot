@@ -18,8 +18,8 @@
               "className": "org.apache.pinot.thirdeye.detection.wrapper.BaselineFillingMergeWrapper",
               "nested": [{
                 "bucketPeriod": "P1D",
-                "subEntityName" : "metric_alert_on_test_metric",
-                "className": "org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper"
+                "className": "org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper",
+                "subEntityName" : "metric_alert_on_test_metric"
               }],
               "detector": "$maxThreshold_1:THRESHOLD"
             }]
@@ -30,8 +30,8 @@
             "className": "org.apache.pinot.thirdeye.detection.wrapper.BaselineFillingMergeWrapper",
             "nested": [{
               "bucketPeriod": "P1D",
-              "subEntityName" : "metric_alert_on_test_metric",
-              "className": "org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper"
+              "className": "org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper",
+              "subEntityName" : "metric_alert_on_test_metric"
             }],
             "detector": "$maxThreshold_2:THRESHOLD"
           }],
@@ -47,14 +47,14 @@
           "nestedMetricUrns": ["thirdeye:metric:1"],
           "className": "org.apache.pinot.thirdeye.detection.algorithm.DimensionWrapper",
           "nested": [{
-            "baselineValueProvider": "$maxThreshold_1:THRESHOLD",
+            "baselineValueProvider": "$maxThreshold_3:THRESHOLD",
             "className": "org.apache.pinot.thirdeye.detection.wrapper.BaselineFillingMergeWrapper",
             "nested": [{
               "bucketPeriod": "P1D",
-              "subEntityName" : "metric_alert_on_test_metric",
-              "className": "org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper"
+              "className": "org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper",
+              "subEntityName" : "metric_alert_on_test_metric"
             }],
-            "detector": "$maxThreshold_1:THRESHOLD"
+            "detector": "$maxThreshold_3:THRESHOLD"
           }]
         }]
       },
@@ -64,14 +64,14 @@
             "nestedMetricUrns": ["thirdeye:metric:1"],
             "className": "org.apache.pinot.thirdeye.detection.algorithm.DimensionWrapper",
             "nested": [{
-              "baselineValueProvider": "$maxThreshold_1:THRESHOLD",
+              "baselineValueProvider": "$maxThreshold_4:THRESHOLD",
               "className": "org.apache.pinot.thirdeye.detection.wrapper.BaselineFillingMergeWrapper",
               "nested": [{
                 "bucketPeriod": "P1D",
-                "subEntityName" : "another_metric_alert_on_test_metric",
-                "className": "org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper"
+                "className": "org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper",
+                "subEntityName" : "another_metric_alert_on_test_metric"
               }],
-              "detector": "$maxThreshold_1:THRESHOLD"
+              "detector": "$maxThreshold_4:THRESHOLD"
             }]
           }]
         }]

@@ -1,0 +1,61 @@
+description: dummy description
+type: METRIC_ALERT
+
+metric: test_metric
+dataset: test_dataset
+
+filters:
+  D1:
+    - '123'
+    - blah
+  D2:
+    - ._$%^
+
+dimensionExploration:
+  dimensions:
+    - D1
+    - D2
+  minContribution: a
+
+rules:
+  - filter:
+      - type: THRESHOLD_RULE_FILTER
+        name: thresholdFilter_1
+        params:
+          min: 50
+      - type: THRESHOLD_RULE_FILTER
+        name: thresholdFilter_2
+        params:
+          min: 50
+
+  - detection:
+      - type: THRESHOLD
+        name: maxThreshold_3
+        params:
+          max: 100
+    quality:
+      - type: DATA_SLA
+        name: slaRule1
+        params:
+          sla: 2_DAYS
+
+  - detection:
+      - type: THRESHOLD
+        name: maxThreshold_2
+        params:
+          max: 100
+    filter:
+      - type: THRESHOLD_RULE_FILTER
+        name: thresholdFilter_3
+        params:
+          min: 50
+
+merger:
+  maxGap: 0
+  maxDuration: 1000
+
+grouper:
+  - type: MOCK_GROUPER
+    name: test_grouper
+    params:
+      mockParam: 0.3

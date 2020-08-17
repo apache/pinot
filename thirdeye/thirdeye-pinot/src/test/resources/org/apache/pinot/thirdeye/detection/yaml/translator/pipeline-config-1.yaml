@@ -2,7 +2,7 @@ detectionName: testPipeline
 description: My test pipeline
 metric: test_metric
 dataset: test_dataset
-pipelineType: Composite
+type: METRIC_ALERT
 filters:
   D1:
   - v1
@@ -30,8 +30,7 @@ rules:
     params:
       min: 50
 
-- name: rule2
-  detection:
+- detection:
   - type: THRESHOLD
     name: maxThreshold_2
     params:

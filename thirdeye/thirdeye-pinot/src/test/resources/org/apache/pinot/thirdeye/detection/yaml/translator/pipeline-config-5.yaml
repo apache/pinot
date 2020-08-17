@@ -48,7 +48,7 @@ alerts:
         rules:
           - detection:
               - type: THRESHOLD
-                name: maxThreshold_1
+                name: maxThreshold_3
                 params:
                   max: 100
       - type: METRIC_ALERT
@@ -58,6 +58,6 @@ alerts:
         rules:
           - detection:
               - type: THRESHOLD
-                name: maxThreshold_1
+                name: maxThreshold_4
                 params:
                   max: 100

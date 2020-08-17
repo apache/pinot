@@ -35,6 +35,7 @@ import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.EvaluationManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
@@ -50,6 +51,7 @@ import org.apache.pinot.thirdeye.detection.DetectionPipelineTaskInfo;
 import org.apache.pinot.thirdeye.detection.MockDataProvider;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
 import org.apache.pinot.thirdeye.detection.dataquality.components.DataSlaQualityChecker;
+import org.apache.pinot.thirdeye.detection.validators.ConfigValidationException;
 import org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTranslator;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -66,6 +68,7 @@ public class DataQualityTaskRunnerTest {
   private TaskContext context;
   private DAOTestBase testDAOProvider;
   private DetectionConfigManager detectionDAO;
+  private DetectionAlertConfigManager subscriptionDAO;
   private DatasetConfigManager datasetDAO;
   private MergedAnomalyResultManager anomalyDAO;
   private EvaluationManager evaluationDAO;
@@ -82,9 +85,10 @@ public class DataQualityTaskRunnerTest {
       .withMillisOfDay(0).getMillis();
 
   @BeforeMethod
-  public void beforeMethod() throws IOException {
+  public void beforeMethod() throws Exception {
     this.testDAOProvider = DAOTestBase.getInstance();
     this.detectionDAO = DAORegistry.getInstance().getDetectionConfigManager();
+    this.subscriptionDAO = DAORegistry.getInstance().getDetectionAlertConfigManager();
     this.datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
     this.anomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
     this.evaluationDAO = DAORegistry.getInstance().getEvaluationManager();
@@ -130,7 +134,7 @@ public class DataQualityTaskRunnerTest {
   /**
    * Load and update the detection config from filePath into detectionId
    */
-  private DetectionConfigDTO translateSlaConfig(long detectionId, String filePath) throws IOException {
+  private DetectionConfigDTO translateSlaConfig(long detectionId, String filePath) throws Exception {
     String yamlConfig = IOUtils.toString(this.getClass().getResourceAsStream(filePath), StandardCharsets.UTF_8);
     DetectionConfigTranslator translator = new DetectionConfigTranslator(yamlConfig, this.provider);
     DetectionConfigDTO detectionConfigDTO = translator.translate();

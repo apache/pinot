@@ -85,6 +85,7 @@
     <calendar-api.version>v3-rev300-1.23.0</calendar-api.version>
     <json.version>20170516</json.version>
     <log4j2.version>2.12.0</log4j2.version>
+    <json-schema-validator.version>2.2.14</json-schema-validator.version>
   </properties>
   
   <licenses>

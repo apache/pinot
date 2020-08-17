@@ -54,6 +54,7 @@ import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
 import org.apache.pinot.thirdeye.detection.*;
 import org.apache.pinot.thirdeye.detection.cache.builder.AnomaliesCacheBuilder;
 import org.apache.pinot.thirdeye.detection.cache.builder.TimeSeriesCacheBuilder;
+import org.apache.pinot.thirdeye.detection.validators.ConfigValidationException;
 import org.apache.pinot.thirdeye.detection.validators.DetectionConfigValidator;
 import org.apache.pinot.thirdeye.detection.yaml.DetectionConfigTuner;
 import org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTranslator;
@@ -367,7 +368,8 @@ public class AnomalyDetectionResource {
   }
 
   DetectionConfigDTO generateDetectionConfig(JsonNode payloadNode, String suffix,
-      DatasetConfigDTO datasetConfigDTO, MetricConfigDTO metricConfigDTO, long start, long end) {
+      DatasetConfigDTO datasetConfigDTO, MetricConfigDTO metricConfigDTO, long start, long end)
+      throws ConfigValidationException {
     DetectionConfigDTO detectionConfigDTO;
     Map<String, Object> detectionYaml;
     ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
@@ -395,7 +397,7 @@ public class AnomalyDetectionResource {
     detectionConfigDTO = detectionTuner.tune(start, end);
 
     // Validate the detection config
-    detectionValidator.validateConfig(detectionConfigDTO);
+    detectionValidator.semanticValidation(detectionConfigDTO);
 
     // Online detection will not save detect config into DB
 

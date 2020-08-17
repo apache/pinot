@@ -35,7 +35,7 @@ alerts:
         min: 100
   - detection:
     - type: THRESHOLD
-      name: maxThreshold_3
+      name: maxThreshold_2
       params:
         max: 100
     quality:
@@ -45,7 +45,7 @@ alerts:
         sla: 2_DAYS
   - detection:
     - type: THRESHOLD
-      name: maxThreshold_2
+      name: maxThreshold_3
       params:
         max: 100
 
@@ -59,7 +59,7 @@ alerts:
     rules:
     - detection:
       - type: THRESHOLD
-        name: maxThreshold_1
+        name: maxThreshold_4
         params:
           max: 100
       quality:
@@ -74,7 +74,7 @@ alerts:
     rules:
     - detection:
       - type: THRESHOLD
-        name: maxThreshold_1
+        name: maxThreshold_5
         params:
           max: 100
       quality:

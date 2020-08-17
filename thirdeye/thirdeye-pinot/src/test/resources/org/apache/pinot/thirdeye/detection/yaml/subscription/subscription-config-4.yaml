@@ -5,13 +5,7 @@ active: true
 subscribedDetections:
   - test_detection_1
 
-type: DIMENSIONAL_ALERTER_PIPELINE
-dimensionRecipients:
- "android":
-  - "android-thirdeye@thirdeye.com"
- "ios":
-  - "ios-thirdeye@thirdeye.com"
-dimension: app_name
+type: DEFAULT_ALERTER_PIPELINE
 
 alertSchemes:
 - type: EMAIL

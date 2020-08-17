@@ -1,0 +1,214 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "title": "Detection Config Schema",
+
+  "type": "object",
+  "description": "YAML representation of metric or composite detection config",
+
+  "required": [ "detectionName" ],
+
+  "properties": {
+    "detectionName": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "description": "detection pipeline type",
+      "enum": [
+        "METRIC_ALERT",
+        "COMPOSITE_ALERT"
+      ]
+    },
+    "metric": {
+      "type": "string"
+    },
+    "dataset": {
+      "type": "string"
+    },
+    "active": {
+      "type": "boolean"
+    },
+    "cron": {
+      "type": "string"
+    },
+    "filters": {
+      "$ref": "#/definitions/filters"
+    },
+    "dimensionExploration": {
+      "$ref": "#/definitions/dimensionExploration"
+    },
+    "rules": {
+      "$ref": "#/definitions/rules"
+    },
+    "alerts": {
+      "$ref": "#/definitions/alerts"
+    },
+    "merger": {
+      "$ref": "#/definitions/merger"
+    },
+    "grouper": {
+      "$ref": "#/definitions/grouper"
+    }
+  },
+
+  "definitions": {
+    "alerts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/subEntity"
+      }
+    },
+
+    "subEntity": {
+      "type": "object",
+      "description": "a sub-entity detection config",
+      "required": [ "name", "type" ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "description": "detection pipeline type",
+          "enum": [
+            "COMPOSITE_ALERT",
+            "METRIC_ALERT"
+          ]
+        },
+        "alerts": {
+          "$ref": "#/definitions/alerts"
+        },
+        "metric": {
+          "type": "string"
+        },
+        "dataset": {
+          "type": "string"
+        },
+        "filters": {
+          "$ref": "#/definitions/filters"
+        },
+        "dimensionExploration": {
+          "$ref": "#/definitions/dimensionExploration"
+        },
+        "rules": {
+          "$ref": "#/definitions/rules"
+        },
+        "merger": {
+          "$ref": "#/definitions/merger"
+        },
+        "grouper": {
+          "$ref": "#/definitions/grouper"
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "dimensionExploration": {
+      "type": "object",
+      "description": "exploration combination of dimension values",
+      "properties": {
+        "dimensions": {
+          "type": "array",
+          "description": "dimension column names",
+          "items": {
+            "type": "string"
+          }
+        },
+        "dimensionFilterMetric": {
+          "type": "string"
+        }
+      },
+      "patternProperties": {
+        "k|minValue|minContribution|minValueHourly|maxValueHourly|minValueDaily|maxValueDaily": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "filters": {
+      "type": "object",
+      "description": "dimension filters",
+      "patternProperties": {
+        ".*": {
+          "type": "array",
+          "description": "dimension filter values",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+
+    "eachComponent": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [ "type", "name" ],
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "params": {
+            "type": "object"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+
+    "rules": {
+      "type": "array",
+      "description": "define one or more anomaly detection rules",
+      "items": {
+        "type": "object",
+        "required": [ "detection" ],
+        "properties": {
+          "detection": {
+            "$ref": "#/definitions/eachComponent"
+          },
+          "filter": {
+            "$ref": "#/definitions/eachComponent"
+          },
+          "quality": {
+            "$ref": "#/definitions/eachComponent"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+
+    "merger": {
+      "type": "object",
+      "description": "merge settings for anomalies",
+      "properties": {
+        "maxGap": {
+          "type": "number",
+          "description": "merge anomalies if gap btw them is less than this value; 0 means do not merge",
+          "minimum": 0
+        },
+        "maxDuration": {
+          "type": "number",
+          "description": "maximum allowed duration of a merged anomaly",
+          "minimum": 900000
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "grouper": {
+      "$ref": "#/definitions/eachComponent"
+    }
+  },
+
+  "additionalProperties": false
+}
