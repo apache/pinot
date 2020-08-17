@@ -32,8 +32,8 @@ do
     exit 1
     ;;
   esac
-  PROFILES_ARG=${PROFILES_ARG%,}
 done
+PROFILES_ARG=${PROFILES_ARG%,}
 fi
 
 
