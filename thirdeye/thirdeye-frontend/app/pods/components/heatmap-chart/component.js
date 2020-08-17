@@ -46,7 +46,7 @@ export default Component.extend({
       role,
       dimName,
       dimValue
-    } = subdimension;
+    } = (subdimension.data || {});
 
     if (!onInclude) { return; }
 
@@ -66,8 +66,8 @@ export default Component.extend({
       role,
       dimName,
       dimValue
-    } = subdimension;
-
+    } = (subdimension.data || {});
+    
     if (!onExclude) { return; }
 
     onExclude(role, dimName, dimValue);
@@ -130,7 +130,7 @@ export default Component.extend({
       const nodes = treeMap({name: '0', children: children})
         // specify children of treemap
         .children
-        // only nodes which don't have children 
+        // only nodes which don't have children
         .filter((node) => !node.children);
       this._createCell(div, nodes, tooltipId);
     });
