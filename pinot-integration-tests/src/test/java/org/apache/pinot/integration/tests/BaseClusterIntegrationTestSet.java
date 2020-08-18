@@ -241,6 +241,16 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     query =
         "SELECT DaysSinceEpoch, MAX(ArrDelay) * 2 - MAX(AirTime) - 3 FROM mytable GROUP BY DaysSinceEpoch ORDER BY MAX(ArrDelay) - MIN(AirTime) DESC";
     testSqlQuery(query, Collections.singletonList(query));
+
+    // Having
+    query = "SELECT COUNT(*) AS Count, DaysSinceEpoch FROM mytable GROUP BY DaysSinceEpoch HAVING Count > 350";
+    testSqlQuery(query, Collections.singletonList(query));
+    query =
+        "SELECT MAX(ArrDelay) - MAX(AirTime) AS Diff, DaysSinceEpoch FROM mytable GROUP BY DaysSinceEpoch HAVING Diff * 2 > 1000 ORDER BY Diff ASC";
+    testSqlQuery(query, Collections.singletonList(query));
+    query =
+        "SELECT DaysSinceEpoch, MAX(ArrDelay) - MAX(AirTime) AS Diff FROM mytable GROUP BY DaysSinceEpoch HAVING (Diff >= 300 AND Diff < 500) OR Diff < -500 ORDER BY Diff DESC";
+    testSqlQuery(query, Collections.singletonList(query));
   }
 
   /**

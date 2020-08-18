@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.function.BiFunction;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.broker.AggregationResult;
@@ -36,14 +35,15 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.HashUtil;
-import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.core.data.table.SimpleIndexedTable;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GroupByUtils;
@@ -167,15 +167,6 @@ public class GroupByDataTableReducer implements DataTableReducer {
     DataSchema prePostAggregationDataSchema = getPrePostAggregationDataSchema(dataSchema);
     int limit = _queryContext.getLimit();
     List<Object[]> rows = new ArrayList<>(limit);
-    for (int i = 0; i < limit && sortedIterator.hasNext(); i++) {
-      Object[] row = sortedIterator.next().getValues();
-      for (int j = 0; j < _numAggregationFunctions; j++) {
-        int valueIndex = j + _numGroupByExpressions;
-        row[valueIndex] =
-            AggregationFunctionUtils.getSerializableValue(_aggregationFunctions[j].extractFinalResult(row[valueIndex]));
-      }
-      rows.add(row);
-    }
 
     if (_sqlQuery) {
       // SQL query with SQL group-by mode and response format
@@ -183,14 +174,47 @@ public class GroupByDataTableReducer implements DataTableReducer {
       PostAggregationHandler postAggregationHandler =
           new PostAggregationHandler(_queryContext, prePostAggregationDataSchema);
       DataSchema resultTableSchema = postAggregationHandler.getResultDataSchema();
+      FilterContext havingFilter = _queryContext.getHavingFilter();
+      if (havingFilter != null) {
+        HavingFilterHandler havingFilterHandler = new HavingFilterHandler(havingFilter, postAggregationHandler);
+        while (rows.size() < limit && sortedIterator.hasNext()) {
+          Object[] row = sortedIterator.next().getValues();
+          extractFinalAggregationResults(row);
+          if (havingFilterHandler.isMatch(row)) {
+            rows.add(row);
+          }
+        }
+      } else {
+        for (int i = 0; i < limit && sortedIterator.hasNext(); i++) {
+          Object[] row = sortedIterator.next().getValues();
+          extractFinalAggregationResults(row);
+          rows.add(row);
+        }
+      }
       rows.replaceAll(postAggregationHandler::getResult);
       brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, rows));
     } else {
       // PQL query with SQL group-by mode and response format
       // NOTE: For PQL query, keep the order of columns as is (group-by expressions followed by aggregations), no need
-      //       to perform post-aggregation.
+      //       to perform post-aggregation or filtering.
 
+      for (int i = 0; i < limit && sortedIterator.hasNext(); i++) {
+        Object[] row = sortedIterator.next().getValues();
+        extractFinalAggregationResults(row);
+        rows.add(row);
+      }
       brokerResponseNative.setResultTable(new ResultTable(prePostAggregationDataSchema, rows));
+    }
+  }
+
+  /**
+   * Helper method to extract the final aggregation results for the given row (in-place).
+   */
+  private void extractFinalAggregationResults(Object[] row) {
+    for (int i = 0; i < _numAggregationFunctions; i++) {
+      int valueIndex = i + _numGroupByExpressions;
+      row[valueIndex] =
+          AggregationFunctionUtils.getSerializableValue(_aggregationFunctions[i].extractFinalResult(row[valueIndex]));
     }
   }
 
@@ -208,50 +232,42 @@ public class GroupByDataTableReducer implements DataTableReducer {
   }
 
   private IndexedTable getIndexedTable(DataSchema dataSchema, Collection<DataTable> dataTables) {
-    int indexedTableCapacity = GroupByUtils.getTableCapacity(_queryContext);
-    IndexedTable indexedTable = new ConcurrentIndexedTable(dataSchema, _queryContext, indexedTableCapacity);
-
+    int capacity = GroupByUtils.getTableCapacity(_queryContext);
+    IndexedTable indexedTable = new SimpleIndexedTable(dataSchema, _queryContext, capacity);
+    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
     for (DataTable dataTable : dataTables) {
-      BiFunction[] functions = new BiFunction[_numColumns];
-      for (int i = 0; i < _numColumns; i++) {
-        ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
-        BiFunction<Integer, Integer, Object> function;
-        switch (columnDataType) {
-          case INT:
-            function = dataTable::getInt;
-            break;
-          case LONG:
-            function = dataTable::getLong;
-            break;
-          case FLOAT:
-            function = dataTable::getFloat;
-            break;
-          case DOUBLE:
-            function = dataTable::getDouble;
-            break;
-          case STRING:
-            function = dataTable::getString;
-            break;
-          case BYTES:
-            function = dataTable::getBytes;
-            break;
-          case OBJECT:
-            function = dataTable::getObject;
-            break;
-          // Add other aggregation intermediate result / group-by column type supports here
-          default:
-            throw new IllegalStateException();
+      int numRows = dataTable.getNumberOfRows();
+      for (int rowId = 0; rowId < numRows; rowId++) {
+        Object[] values = new Object[_numColumns];
+        for (int colId = 0; colId < _numColumns; colId++) {
+          switch (columnDataTypes[colId]) {
+            case INT:
+              values[colId] = dataTable.getInt(rowId, colId);
+              break;
+            case LONG:
+              values[colId] = dataTable.getLong(rowId, colId);
+              break;
+            case FLOAT:
+              values[colId] = dataTable.getFloat(rowId, colId);
+              break;
+            case DOUBLE:
+              values[colId] = dataTable.getDouble(rowId, colId);
+              break;
+            case STRING:
+              values[colId] = dataTable.getString(rowId, colId);
+              break;
+            case BYTES:
+              values[colId] = dataTable.getBytes(rowId, colId);
+              break;
+            case OBJECT:
+              values[colId] = dataTable.getObject(rowId, colId);
+              break;
+            // Add other aggregation intermediate result / group-by column type supports here
+            default:
+              throw new IllegalStateException();
+          }
         }
-        functions[i] = function;
-      }
-
-      for (int row = 0; row < dataTable.getNumberOfRows(); row++) {
-        Object[] columns = new Object[_numColumns];
-        for (int col = 0; col < _numColumns; col++) {
-          columns[col] = functions[col].apply(row, col);
-        }
-        Record record = new Record(columns);
-        indexedTable.upsert(record);
+        indexedTable.upsert(new Record(values));
       }
     }
     indexedTable.finish(true);
