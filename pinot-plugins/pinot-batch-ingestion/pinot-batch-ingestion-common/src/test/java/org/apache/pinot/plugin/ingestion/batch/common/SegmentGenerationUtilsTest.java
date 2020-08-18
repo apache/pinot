@@ -23,7 +23,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 import java.net.URI;
 
-public class TestSegmentGenerationUtils {
+public class SegmentGenerationUtilsTest {
 
   @Test
   public void testExtractFileNameFromURI() {
