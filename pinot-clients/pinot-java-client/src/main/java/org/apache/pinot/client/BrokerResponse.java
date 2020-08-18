@@ -24,7 +24,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 /**
  * Reimplementation of BrokerResponse from pinot-common, so that pinot-api does not depend on pinot-common.
  */
-class BrokerResponse {
+public class BrokerResponse {
   private JsonNode _aggregationResults;
   private JsonNode _selectionResults;
   private JsonNode _resultTable;
@@ -189,7 +189,7 @@ class BrokerResponse {
     }
   }
 
-  ResponseStats getResponseStats() {
+  public ResponseStats getResponseStats() {
     return _responseStats;
   }
 
