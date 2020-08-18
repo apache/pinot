@@ -28,12 +28,10 @@ import java.util.Random;
 import java.util.Set;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.pinot.common.response.broker.GroupByResult;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.DistinctCountAggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.SumAggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -45,9 +43,8 @@ public class AggregationGroupByTrimmingServiceTest {
   private static final Random RANDOM = new Random(RANDOM_SEED);
   private static final String ERROR_MESSAGE = "Random seed: " + RANDOM_SEED;
 
-  private static final AggregationFunction[] AGGREGATION_FUNCTIONS =
-      {new SumAggregationFunction(ExpressionContext.forIdentifier("sumColumn")), new DistinctCountAggregationFunction(
-          ExpressionContext.forIdentifier("distinctColumn"))};
+  private static final QueryContext QUERY_CONTEXTS = QueryContextConverterUtils
+      .getQueryContextFromPQL("SELECT SUM(m1), DISTINCTCOUNT(m2) FROM testTable GROUP BY d1, d2, d3 TOP 100");
   private static final int NUM_GROUP_KEYS = 3;
   private static final int GROUP_BY_TOP_N = 100;
   private static final int NUM_GROUPS = 50000;
@@ -64,7 +61,7 @@ public class AggregationGroupByTrimmingServiceTest {
       List<String> group = new ArrayList<>(NUM_GROUP_KEYS);
       for (int i = 0; i < NUM_GROUP_KEYS; i++) {
         // Randomly generate group key without GROUP_KEY_DELIMITER
-        group.add(RandomStringUtils.random(RANDOM.nextInt(10)).replace(GroupKeyGenerator.DELIMITER, ""));
+        group.add(RandomStringUtils.random(RANDOM.nextInt(10)).replace(GroupKeyGenerator.DELIMITER, ' '));
       }
       groupSet.add(buildGroupString(group));
     }
@@ -77,7 +74,7 @@ public class AggregationGroupByTrimmingServiceTest {
     }
     _groups.set(NUM_GROUPS - 1, emptyGroupBuilder.toString());
 
-    _trimmingService = new AggregationGroupByTrimmingService(AGGREGATION_FUNCTIONS, GROUP_BY_TOP_N);
+    _trimmingService = new AggregationGroupByTrimmingService(QUERY_CONTEXTS);
   }
 
   @Test

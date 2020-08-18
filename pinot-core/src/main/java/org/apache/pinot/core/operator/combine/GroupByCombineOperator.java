@@ -201,7 +201,7 @@ public class GroupByCombineOperator extends BaseOperator<IntermediateResultsBloc
 
       // Trim the results map.
       AggregationGroupByTrimmingService aggregationGroupByTrimmingService =
-          new AggregationGroupByTrimmingService(aggregationFunctions, _queryContext.getLimit());
+          new AggregationGroupByTrimmingService(_queryContext);
       List<Map<String, Object>> trimmedResults =
           aggregationGroupByTrimmingService.trimIntermediateResultsMap(resultsMap);
       IntermediateResultsBlock mergedBlock = new IntermediateResultsBlock(aggregationFunctions, trimmedResults, true);
