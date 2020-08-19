@@ -25,6 +25,7 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -397,6 +398,28 @@ public class PinotHelixResourceManager {
       }
       return PinotResourceManagerResponse.SUCCESS;
     }
+  }
+
+  /**
+   * Updates the tags of the specified instance ID
+   */
+  public synchronized PinotResourceManagerResponse updateInstanceTags(String instanceIdToUpdate, String tags) {
+    InstanceConfig instanceConfig = getHelixInstanceConfig(instanceIdToUpdate);
+    if (instanceConfig == null) {
+      return PinotResourceManagerResponse.failure("Instance " + instanceIdToUpdate + " does not exists");
+    }
+    String[] newTags = tags.split(",");
+    List<String> existingTags = Lists.newArrayList(instanceConfig.getTags());
+    for (String tag : existingTags) {
+      instanceConfig.removeTag(tag);
+    }
+    for (String tag : newTags) {
+      instanceConfig.addTag(tag);
+    }
+    if (!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceIdToUpdate), instanceConfig)) {
+      return PinotResourceManagerResponse.failure("Unable to update instance: " + instanceIdToUpdate);
+    }
+    return PinotResourceManagerResponse.SUCCESS;
   }
 
   /**

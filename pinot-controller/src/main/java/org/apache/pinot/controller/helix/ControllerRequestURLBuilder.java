@@ -53,6 +53,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "instances", instanceName);
   }
 
+  public String forInstanceUpdateTags(String instanceName, String tagsList) {
+    return StringUtil.join("/", _baseUrl, "instances", instanceName, "updateTags?tags=" + tagsList);
+  }
+
   public String forInstanceList() {
     return StringUtil.join("/", _baseUrl, "instances");
   }
