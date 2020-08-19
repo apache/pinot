@@ -73,30 +73,12 @@ public class PreparedStatement {
   }
 
   /**
-   * Executes this prepared statement and returns the BrokerResponse.
-   *
-   * @return The BrokerResponse received.
-   */
-  public BrokerResponse executeRequest() {
-    return _connection.executeRequest(new Request(_queryFormat, fillStatementWithParameters()));
-  }
-
-  /**
    * Executes this prepared statement asynchronously.
    *
    * @return The query results
    */
   public Future<ResultSetGroup> executeAsync() {
     return _connection.executeAsync(new Request(_queryFormat, fillStatementWithParameters()));
-  }
-
-  /**
-   * Executes this prepared statement asynchronously.
-   *
-   * @return The query results
-   */
-  public Future<BrokerResponse> executeRequestAsync() {
-    return _connection.executeRequestAsync(new Request(_queryFormat, fillStatementWithParameters()));
   }
 
   /**

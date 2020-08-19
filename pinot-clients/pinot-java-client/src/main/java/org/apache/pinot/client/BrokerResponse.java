@@ -24,12 +24,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 /**
  * Reimplementation of BrokerResponse from pinot-common, so that pinot-api does not depend on pinot-common.
  */
-public class BrokerResponse {
+class BrokerResponse {
   private JsonNode _aggregationResults;
   private JsonNode _selectionResults;
   private JsonNode _resultTable;
   private JsonNode _exceptions;
-  private BrokerResponseStats _brokerResponseStats;
+  private ResponseStats _responseStats;
 
   private BrokerResponse() {
   }
@@ -39,7 +39,7 @@ public class BrokerResponse {
     _exceptions = brokerResponse.get("exceptions");
     _selectionResults = brokerResponse.get("selectionResults");
     _resultTable = brokerResponse.get("resultTable");
-    _brokerResponseStats = BrokerResponseStats.fromJson(brokerResponse);
+    _responseStats = ResponseStats.fromJson(brokerResponse);
   }
 
   boolean hasExceptions() {
@@ -70,8 +70,8 @@ public class BrokerResponse {
     }
   }
 
-  public BrokerResponseStats getResponseStats() {
-    return _brokerResponseStats;
+  ResponseStats getResponseStats() {
+    return _responseStats;
   }
 
   static BrokerResponse fromJson(JsonNode json) {

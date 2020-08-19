@@ -24,7 +24,7 @@ import com.fasterxml.jackson.databind.JsonNode;
  * Simple POJO to hold the broker response stats received from the Pinot broker. Client
  * application can use the stats for debugging Pinot slow queries.
  */
-public class BrokerResponseStats {
+class ResponseStats {
   private final int _numServersQueried;
   private final int _numServersResponded;
   private final long _numDocsScanned;
@@ -39,7 +39,7 @@ public class BrokerResponseStats {
   private final boolean _numGroupsLimitReached;
   private final long _timeUsedMs;
 
-  private BrokerResponseStats(JsonNode brokerResponse) {
+  ResponseStats(JsonNode brokerResponse) {
     _numServersQueried = brokerResponse.has("numServersQueried") ?
         brokerResponse.get("numServersQueried").asInt() : -1;
     _numServersResponded = brokerResponse.has("numServersResponded") ?
@@ -68,8 +68,8 @@ public class BrokerResponseStats {
         brokerResponse.get("timeUsedMs").asLong() : -1L;
   }
 
-  static BrokerResponseStats fromJson(JsonNode json) {
-    return new BrokerResponseStats(json);
+  static ResponseStats fromJson(JsonNode json) {
+    return new ResponseStats(json);
   }
 
   public int getNumServersQueried() {
