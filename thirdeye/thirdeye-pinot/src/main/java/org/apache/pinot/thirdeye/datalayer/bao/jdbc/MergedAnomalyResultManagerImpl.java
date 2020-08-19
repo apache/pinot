@@ -190,6 +190,11 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
     }
   }
 
+  @Override
+  public List<MergedAnomalyResultDTO> findByIds(List<Long> ids) {
+    return this.findByIdList(ids);
+  }
+
   public List<MergedAnomalyResultDTO> findByIdList(List<Long> idList) {
     List<MergedAnomalyResultBean> mergedAnomalyResultBeanList =
         genericPojoDao.get(idList, MergedAnomalyResultBean.class);
