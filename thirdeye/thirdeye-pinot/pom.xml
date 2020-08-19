@@ -400,12 +400,6 @@
       <dependency>
         <groupId>com.simba.googlebigquery</groupId>
         <artifactId>jdbc42</artifactId>
-        <exclusions>
-          <exclusion>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-          </exclusion>
-        </exclusions>
       </dependency>
     </dependencies>
   </profile>

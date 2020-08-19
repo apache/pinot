@@ -20,7 +20,6 @@
 package org.apache.pinot.thirdeye.dashboard.resources.v2;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.api.client.repackaged.com.google.common.base.Strings;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import java.util.ArrayList;
@@ -114,12 +113,12 @@ public class RootCauseTemplateResource {
     Map<String, Object> dimAnalysisModule = new HashMap<>();
     dimAnalysisModule.put(RCA_MODULE_NAME, DIM_ANALYSIS_MODULE_NAME_PREFIX + metricConfigDTO.getAlias());
     DimensionAnalysisModuleConfig dimAnalysisModuleConfig = new DimensionAnalysisModuleConfig();
-    if (!Strings.isNullOrEmpty(dimensionStr)) {
+    if (dimensionStr != null  && !dimensionStr.isEmpty()) {
       dimAnalysisModuleConfig.setIncludedDimension(Arrays.asList(dimensionStr.split(",")));
     } else {
       dimAnalysisModuleConfig.setIncludedDimension(Collections.emptyList());
     }
-    if (!Strings.isNullOrEmpty(excludeDimStr)) {
+    if (excludeDimStr != null  && !excludeDimStr.isEmpty()) {
       dimAnalysisModuleConfig.setIncludedDimension(Arrays.asList(excludeDimStr.split(",")));
     } else {
       dimAnalysisModuleConfig.setExcludedDimension(Collections.emptyList());
