@@ -26,6 +26,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.List;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
@@ -45,6 +46,32 @@ public class SegmentPushUtils implements Serializable {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPushUtils.class);
 
   private static final FileUploadDownloadClient FILE_UPLOAD_DOWNLOAD_CLIENT = new FileUploadDownloadClient();
+
+  public static URI generateSegmentTarURI(URI dirURI, URI fileURI, String prefix, String suffix) {
+    if (StringUtils.isEmpty(prefix) && StringUtils.isEmpty(suffix)) {
+      // In case the FS doesn't provide scheme or host, will fill it up from dirURI.
+      String scheme = fileURI.getScheme();
+      if (StringUtils.isEmpty(fileURI.getScheme())) {
+        scheme = dirURI.getScheme();
+      }
+      String host = fileURI.getHost();
+      if (StringUtils.isEmpty(fileURI.getHost())) {
+        host = dirURI.getHost();
+      }
+      int port = fileURI.getPort();
+      if (port < 0) {
+        port = dirURI.getPort();
+      }
+      try {
+        return new URI(scheme, fileURI.getUserInfo(), host, port, fileURI.getPath(), fileURI.getQuery(),
+            fileURI.getFragment());
+      } catch (URISyntaxException e) {
+        LOGGER.warn("Unable to generate push uri based from dir URI: {} and file URI: {}, directly return file URI.", dirURI, fileURI);
+        return fileURI;
+      }
+    }
+    return URI.create(String.format("%s%s%s", prefix, fileURI.getRawPath(), suffix));
+  }
 
   public static void pushSegments(SegmentGenerationJobSpec spec, PinotFS fileSystem, List<String> tarFilePaths)
       throws RetriableOperationException, AttemptsExceededException {
