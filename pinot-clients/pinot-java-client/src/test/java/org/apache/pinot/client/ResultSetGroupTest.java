@@ -55,34 +55,11 @@ public class ResultSetGroupTest {
     Assert.assertEquals(resultSet.getColumnCount(), 79);
     Assert.assertEquals(resultSet.getColumnName(0), "ActualElapsedTime");
     Assert.assertEquals(resultSet.getColumnName(1), "AirTime");
-  }
-
-  @Test
-  public void testDeserializeSelectionBrokerResponse() {
-    // Deserialize selection result
-    BrokerResponse brokerResponse = getBrokerResponse("selection.json");
-    ResultSetGroup resultSetGroup = ResultSetGroup.fromBrokerResponse(brokerResponse);
-    ResultSet resultSet = resultSetGroup.getResultSet(0);
-
-    // Check length
-    Assert.assertEquals(resultSetGroup.getResultSetCount(), 1, "Expected one result set for selection query");
-    Assert.assertEquals(resultSet.getRowCount(), 24, "Mismatched selection query length");
-
-    // Check that values match and are in the same order
-    Assert.assertEquals(resultSet.getInt(0, 0), 84);
-    Assert.assertEquals(resultSet.getLong(1, 0), 202L);
-    Assert.assertEquals(resultSet.getString(2, 0), "95");
-    Assert.assertEquals(resultSet.getInt(0, 78), 2014);
-
-    // Check the columns
-    Assert.assertEquals(resultSet.getColumnCount(), 79);
-    Assert.assertEquals(resultSet.getColumnName(0), "ActualElapsedTime");
-    Assert.assertEquals(resultSet.getColumnName(1), "AirTime");
 
     // Verify the response stats.
-    Assert.assertEquals(115545, brokerResponse.getResponseStats().getTotalDocs());
-    Assert.assertEquals(82, brokerResponse.getResponseStats().getTimeUsedMs());
-    Assert.assertEquals(24, brokerResponse.getResponseStats().getNumDocsScanned());
+    Assert.assertEquals(115545, resultSetGroup.getResultSetStats().getTotalDocs());
+    Assert.assertEquals(82, resultSetGroup.getResultSetStats().getTimeUsedMs());
+    Assert.assertEquals(24, resultSetGroup.getResultSetStats().getNumDocsScanned());
   }
 
   @Test
@@ -147,12 +124,6 @@ public class ResultSetGroupTest {
     return connection.execute("dummy");
   }
 
-  private BrokerResponse getBrokerResponse(String resourceName) {
-    _dummyJsonTransport._resource = resourceName;
-    Connection connection = ConnectionFactory.fromHostList("dummy");
-    return connection.executeRequest(new Request("sql", "dummy"));
-  }
-
   @BeforeClass
   public void overridePinotClientTransport() {
     _previousTransportFactory = ConnectionFactory._transportFactory;
@@ -164,7 +135,7 @@ public class ResultSetGroupTest {
     ConnectionFactory._transportFactory = _previousTransportFactory;
   }
 
-  class DummyJsonTransport implements PinotClientTransport {
+  static class DummyJsonTransport implements PinotClientTransport {
     public String _resource;
 
     @Override

@@ -29,7 +29,7 @@ class BrokerResponse {
   private JsonNode _selectionResults;
   private JsonNode _resultTable;
   private JsonNode _exceptions;
-  private ResponseStats _responseStats;
+  private ResultSetStats _resultSetStats;
 
   private BrokerResponse() {
   }
@@ -39,7 +39,7 @@ class BrokerResponse {
     _exceptions = brokerResponse.get("exceptions");
     _selectionResults = brokerResponse.get("selectionResults");
     _resultTable = brokerResponse.get("resultTable");
-    _responseStats = ResponseStats.fromJson(brokerResponse);
+    _resultSetStats = ResultSetStats.fromJson(brokerResponse);
   }
 
   boolean hasExceptions() {
@@ -70,8 +70,8 @@ class BrokerResponse {
     }
   }
 
-  ResponseStats getResponseStats() {
-    return _responseStats;
+  ResultSetStats getResultSetStats() {
+    return _resultSetStats;
   }
 
   static BrokerResponse fromJson(JsonNode json) {

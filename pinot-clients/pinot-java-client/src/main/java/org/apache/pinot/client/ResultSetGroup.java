@@ -28,7 +28,7 @@ import java.util.List;
  */
 public class ResultSetGroup {
   private final List<ResultSet> _resultSets;
-  private final ResponseStats _responseStats;
+  private final ResultSetStats _resultSetStats;
 
   ResultSetGroup(BrokerResponse brokerResponse) {
     _resultSets = new ArrayList<>();
@@ -54,7 +54,7 @@ public class ResultSetGroup {
       }
     }
 
-    _responseStats = brokerResponse.getResponseStats();
+    _resultSetStats = brokerResponse.getResultSetStats();
   }
 
   /**
@@ -77,8 +77,8 @@ public class ResultSetGroup {
     return _resultSets.get(index);
   }
 
-  public ResponseStats getResponseStats() {
-    return _responseStats;
+  public ResultSetStats getResultSetStats() {
+    return _resultSetStats;
   }
 
   @Override
@@ -88,7 +88,7 @@ public class ResultSetGroup {
       sb.append(resultSet);
       sb.append("\n");
     }
-    sb.append(_responseStats.toString());
+    sb.append(_resultSetStats.toString());
     return sb.toString();
   }
 }
