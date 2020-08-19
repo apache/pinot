@@ -28,7 +28,9 @@ import org.apache.pinot.core.query.request.context.ExpressionContext;
  * <p>Pinot uses RANGE to represent '>', '>=', '<', '<=', BETWEEN so that intersection of multiple ranges can be merged.
  */
 public class RangePredicate implements Predicate {
-  public static final String DELIMITER = "\t\t";
+  public static final char DELIMITER = '\0';
+  // TODO: Remove the legacy delimiter after releasing 0.5.0
+  public static final String LEGACY_DELIMITER = "\t\t";
   public static final char LOWER_INCLUSIVE = '[';
   public static final char LOWER_EXCLUSIVE = '(';
   public static final char UPPER_INCLUSIVE = ']';
@@ -46,7 +48,7 @@ public class RangePredicate implements Predicate {
    * <ul>
    *   <li>Lower inclusive '[' or exclusive '('</li>
    *   <li>Lower bound ('*' for unbounded)</li>
-   *   <li>Delimiter ("\t\t")</li>
+   *   <li>Delimiter ('\0')</li>
    *   <li>Upper bound ('*' for unbounded)</li>
    *   <li>Upper inclusive ']' or exclusive ')'</li>
    * </ul>
@@ -54,6 +56,9 @@ public class RangePredicate implements Predicate {
   public RangePredicate(ExpressionContext lhs, String range) {
     _lhs = lhs;
     String[] split = StringUtils.split(range, DELIMITER);
+    if (split.length != 2) {
+      split = StringUtils.split(range, LEGACY_DELIMITER);
+    }
     String lower = split[0];
     String upper = split[1];
     _lowerInclusive = lower.charAt(0) == LOWER_INCLUSIVE;
