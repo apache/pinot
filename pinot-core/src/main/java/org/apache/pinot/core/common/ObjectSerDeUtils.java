@@ -23,9 +23,20 @@ import com.google.common.primitives.Longs;
 import com.tdunning.math.stats.MergingDigest;
 import com.tdunning.math.stats.TDigest;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.doubles.DoubleIterator;
+import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
+import it.unimi.dsi.fastutil.doubles.DoubleSet;
+import it.unimi.dsi.fastutil.floats.FloatIterator;
+import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
+import it.unimi.dsi.fastutil.floats.FloatSet;
 import it.unimi.dsi.fastutil.ints.IntIterator;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
+import it.unimi.dsi.fastutil.longs.LongIterator;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSet;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -33,6 +44,7 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.Sketch;
 import org.apache.pinot.common.utils.StringUtil;
@@ -41,6 +53,8 @@ import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
 import org.apache.pinot.core.query.aggregation.function.customobject.DistinctTable;
 import org.apache.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
 import org.apache.pinot.core.query.aggregation.function.customobject.QuantileDigest;
+import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.StringUtils;
 import org.locationtech.jts.geom.Geometry;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -48,6 +62,7 @@ import org.roaringbitmap.RoaringBitmap;
 /**
  * The {@code ObjectSerDeUtils} class provides the utility methods to serialize/de-serialize objects.
  */
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class ObjectSerDeUtils {
   private ObjectSerDeUtils() {
   }
@@ -68,7 +83,12 @@ public class ObjectSerDeUtils {
     DistinctTable(11),
     DataSketch(12),
     Geometry(13),
-    RoaringBitmap(14);
+    RoaringBitmap(14),
+    LongSet(15),
+    FloatSet(16),
+    DoubleSet(17),
+    StringSet(18),
+    BytesSet(19);
 
     private final int _value;
 
@@ -111,6 +131,19 @@ public class ObjectSerDeUtils {
         return ObjectType.Geometry;
       } else if (value instanceof RoaringBitmap) {
         return ObjectType.RoaringBitmap;
+      } else if (value instanceof LongSet) {
+        return ObjectType.LongSet;
+      } else if (value instanceof FloatSet) {
+        return ObjectType.FloatSet;
+      } else if (value instanceof DoubleSet) {
+        return ObjectType.DoubleSet;
+      } else if (value instanceof ObjectSet) {
+        ObjectSet objectSet = (ObjectSet) value;
+        if (objectSet.isEmpty() || objectSet.iterator().next() instanceof String) {
+          return ObjectType.StringSet;
+        } else {
+          return ObjectType.BytesSet;
+        }
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());
       }
@@ -390,14 +423,14 @@ public class ObjectSerDeUtils {
     }
 
     @Override
-    public Map<Object, Object> deserialize(byte[] bytes) {
+    public HashMap<Object, Object> deserialize(byte[] bytes) {
       return deserialize(ByteBuffer.wrap(bytes));
     }
 
     @Override
-    public Map<Object, Object> deserialize(ByteBuffer byteBuffer) {
+    public HashMap<Object, Object> deserialize(ByteBuffer byteBuffer) {
       int size = byteBuffer.getInt();
-      Map<Object, Object> map = new HashMap<>(size);
+      HashMap<Object, Object> map = new HashMap<>(size);
       if (size == 0) {
         return map;
       }
@@ -437,18 +470,191 @@ public class ObjectSerDeUtils {
     }
 
     @Override
-    public IntSet deserialize(byte[] bytes) {
+    public IntOpenHashSet deserialize(byte[] bytes) {
       return deserialize(ByteBuffer.wrap(bytes));
     }
 
     @Override
-    public IntSet deserialize(ByteBuffer byteBuffer) {
+    public IntOpenHashSet deserialize(ByteBuffer byteBuffer) {
       int size = byteBuffer.getInt();
-      IntSet intSet = new IntOpenHashSet(size);
+      IntOpenHashSet intSet = new IntOpenHashSet(size);
       for (int i = 0; i < size; i++) {
         intSet.add(byteBuffer.getInt());
       }
       return intSet;
+    }
+  };
+
+  public static final ObjectSerDe<LongSet> LONG_SET_SER_DE = new ObjectSerDe<LongSet>() {
+
+    @Override
+    public byte[] serialize(LongSet longSet) {
+      int size = longSet.size();
+      byte[] bytes = new byte[Integer.BYTES + size * Long.BYTES];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      LongIterator iterator = longSet.iterator();
+      while (iterator.hasNext()) {
+        byteBuffer.putLong(iterator.nextLong());
+      }
+      return bytes;
+    }
+
+    @Override
+    public LongOpenHashSet deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public LongOpenHashSet deserialize(ByteBuffer byteBuffer) {
+      int size = byteBuffer.getInt();
+      LongOpenHashSet longSet = new LongOpenHashSet(size);
+      for (int i = 0; i < size; i++) {
+        longSet.add(byteBuffer.getLong());
+      }
+      return longSet;
+    }
+  };
+
+  public static final ObjectSerDe<FloatSet> FLOAT_SET_SER_DE = new ObjectSerDe<FloatSet>() {
+
+    @Override
+    public byte[] serialize(FloatSet floatSet) {
+      int size = floatSet.size();
+      byte[] bytes = new byte[Integer.BYTES + size * Float.BYTES];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      FloatIterator iterator = floatSet.iterator();
+      while (iterator.hasNext()) {
+        byteBuffer.putFloat(iterator.nextFloat());
+      }
+      return bytes;
+    }
+
+    @Override
+    public FloatOpenHashSet deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public FloatOpenHashSet deserialize(ByteBuffer byteBuffer) {
+      int size = byteBuffer.getInt();
+      FloatOpenHashSet floatSet = new FloatOpenHashSet(size);
+      for (int i = 0; i < size; i++) {
+        floatSet.add(byteBuffer.getFloat());
+      }
+      return floatSet;
+    }
+  };
+
+  public static final ObjectSerDe<DoubleSet> DOUBLE_SET_SER_DE = new ObjectSerDe<DoubleSet>() {
+
+    @Override
+    public byte[] serialize(DoubleSet doubleSet) {
+      int size = doubleSet.size();
+      byte[] bytes = new byte[Integer.BYTES + size * Double.BYTES];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      DoubleIterator iterator = doubleSet.iterator();
+      while (iterator.hasNext()) {
+        byteBuffer.putDouble(iterator.nextDouble());
+      }
+      return bytes;
+    }
+
+    @Override
+    public DoubleOpenHashSet deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public DoubleOpenHashSet deserialize(ByteBuffer byteBuffer) {
+      int size = byteBuffer.getInt();
+      DoubleOpenHashSet doubleSet = new DoubleOpenHashSet(size);
+      for (int i = 0; i < size; i++) {
+        doubleSet.add(byteBuffer.getDouble());
+      }
+      return doubleSet;
+    }
+  };
+
+  public static final ObjectSerDe<Set<String>> STRING_SET_SER_DE = new ObjectSerDe<Set<String>>() {
+
+    @Override
+    public byte[] serialize(Set<String> stringSet) {
+      int size = stringSet.size();
+      // NOTE: No need to close the ByteArrayOutputStream.
+      ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+      DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
+      try {
+        dataOutputStream.writeInt(size);
+        for (String value : stringSet) {
+          byte[] bytes = StringUtils.encodeUtf8(value);
+          dataOutputStream.writeInt(bytes.length);
+          dataOutputStream.write(bytes);
+        }
+      } catch (IOException e) {
+        throw new RuntimeException("Caught exception while serializing Set<String>", e);
+      }
+      return byteArrayOutputStream.toByteArray();
+    }
+
+    @Override
+    public ObjectOpenHashSet<String> deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public ObjectOpenHashSet<String> deserialize(ByteBuffer byteBuffer) {
+      int size = byteBuffer.getInt();
+      ObjectOpenHashSet<String> stringSet = new ObjectOpenHashSet<>(size);
+      for (int i = 0; i < size; i++) {
+        int length = byteBuffer.getInt();
+        byte[] bytes = new byte[length];
+        byteBuffer.get(bytes);
+        stringSet.add(StringUtils.decodeUtf8(bytes));
+      }
+      return stringSet;
+    }
+  };
+
+  public static final ObjectSerDe<Set<ByteArray>> BYTES_SET_SER_DE = new ObjectSerDe<Set<ByteArray>>() {
+
+    @Override
+    public byte[] serialize(Set<ByteArray> bytesSet) {
+      int size = bytesSet.size();
+      // NOTE: No need to close the ByteArrayOutputStream.
+      ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+      DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
+      try {
+        dataOutputStream.writeInt(size);
+        for (ByteArray value : bytesSet) {
+          byte[] bytes = value.getBytes();
+          dataOutputStream.writeInt(bytes.length);
+          dataOutputStream.write(bytes);
+        }
+      } catch (IOException e) {
+        throw new RuntimeException("Caught exception while serializing Set<ByteArray>", e);
+      }
+      return byteArrayOutputStream.toByteArray();
+    }
+
+    @Override
+    public ObjectOpenHashSet<ByteArray> deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public ObjectOpenHashSet<ByteArray> deserialize(ByteBuffer byteBuffer) {
+      int size = byteBuffer.getInt();
+      ObjectOpenHashSet<ByteArray> bytesSet = new ObjectOpenHashSet<>(size);
+      for (int i = 0; i < size; i++) {
+        int length = byteBuffer.getInt();
+        byte[] bytes = new byte[length];
+        byteBuffer.get(bytes);
+        bytesSet.add(new ByteArray(bytes));
+      }
+      return bytesSet;
     }
   };
 
@@ -553,7 +759,12 @@ public class ObjectSerDeUtils {
       DISTINCT_TABLE_SER_DE,
       DATA_SKETCH_SER_DE,
       GEOMETRY_SER_DE,
-      ROARING_BITMAP_SER_DE
+      ROARING_BITMAP_SER_DE,
+      LONG_SET_SER_DE,
+      FLOAT_SET_SER_DE,
+      DOUBLE_SET_SER_DE,
+      STRING_SET_SER_DE,
+      BYTES_SET_SER_DE
   };
   //@formatter:on
 
@@ -565,7 +776,6 @@ public class ObjectSerDeUtils {
     return serialize(value, objectType._value);
   }
 
-  @SuppressWarnings("unchecked")
   public static byte[] serialize(Object value, int objectTypeValue) {
     return SER_DES[objectTypeValue].serialize(value);
   }
@@ -574,7 +784,6 @@ public class ObjectSerDeUtils {
     return deserialize(bytes, objectType._value);
   }
 
-  @SuppressWarnings("unchecked")
   public static <T> T deserialize(byte[] bytes, int objectTypeValue) {
     return (T) SER_DES[objectTypeValue].deserialize(bytes);
   }
@@ -583,7 +792,6 @@ public class ObjectSerDeUtils {
     return deserialize(byteBuffer, objectType._value);
   }
 
-  @SuppressWarnings("unchecked")
   public static <T> T deserialize(ByteBuffer byteBuffer, int objectTypeValue) {
     return (T) SER_DES[objectTypeValue].deserialize(byteBuffer);
   }

@@ -91,7 +91,6 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
       new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
 
   private Set<Integer> _values;
-  private int[] _expectedResults;
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
 
@@ -119,33 +118,56 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
     List<GenericRow> records = new ArrayList<>(NUM_RECORDS);
     int hashMapCapacity = HashUtil.getHashMapCapacity(MAX_VALUE);
     _values = new HashSet<>(hashMapCapacity);
-    Set<Integer> longResultSet = new HashSet<>(hashMapCapacity);
-    Set<Integer> floatResultSet = new HashSet<>(hashMapCapacity);
-    Set<Integer> doubleResultSet = new HashSet<>(hashMapCapacity);
-    Set<Integer> stringResultSet = new HashSet<>(hashMapCapacity);
-    Set<Integer> bytesResultSet = new HashSet<>(hashMapCapacity);
-    for (int i = 0; i < NUM_RECORDS; i++) {
+    for (int i = 0; i < NUM_RECORDS - 2; i++) {
       int value = RANDOM.nextInt(MAX_VALUE);
+      _values.add(value);
       GenericRow record = new GenericRow();
       record.putValue(INT_COLUMN, value);
-      _values.add(Integer.hashCode(value));
       record.putValue(LONG_COLUMN, (long) value);
-      longResultSet.add(Long.hashCode(value));
       record.putValue(FLOAT_COLUMN, (float) value);
-      floatResultSet.add(Float.hashCode(value));
       record.putValue(DOUBLE_COLUMN, (double) value);
-      doubleResultSet.add(Double.hashCode(value));
       String stringValue = Integer.toString(value);
       record.putValue(STRING_COLUMN, stringValue);
-      stringResultSet.add(stringValue.hashCode());
       // NOTE: Create fixed-length bytes so that dictionary can be generated
       byte[] bytesValue = StringUtil.encodeUtf8(StringUtils.leftPad(stringValue, 3, '0'));
       record.putValue(BYTES_COLUMN, bytesValue);
-      bytesResultSet.add(Arrays.hashCode(bytesValue));
       records.add(record);
     }
-    _expectedResults =
-        new int[]{_values.size(), longResultSet.size(), floatResultSet.size(), doubleResultSet.size(), stringResultSet.size(), bytesResultSet.size()};
+
+    // Intentionally put 2 extra records with hash collision values (except for INT_COLUMN and FLOAT_COLUMN which are
+    // impossible for hash collision)
+    long long1 = 0xFFFFFFFFL;
+    long long2 = 0xF00000000FFFFFFFL;
+    assertEquals(Long.hashCode(long1), Long.hashCode(long2));
+    double double1 = Double.longBitsToDouble(long1);
+    double double2 = Double.longBitsToDouble(long2);
+    assertEquals(Double.hashCode(double1), Double.hashCode(double2));
+    String string1 = new String(new char[]{32});
+    String string2 = new String(new char[]{1, 1});
+    assertEquals(string1.hashCode(), string2.hashCode());
+    byte[] bytes1 = {0, 1, 1};
+    byte[] bytes2 = {0, 0, 32};
+    assertEquals(Arrays.hashCode(bytes1), Arrays.hashCode(bytes2));
+
+    _values.add(MAX_VALUE);
+    GenericRow record1 = new GenericRow();
+    record1.putValue(INT_COLUMN, MAX_VALUE);
+    record1.putValue(LONG_COLUMN, long1);
+    record1.putValue(FLOAT_COLUMN, (float) MAX_VALUE);
+    record1.putValue(DOUBLE_COLUMN, double1);
+    record1.putValue(STRING_COLUMN, string1);
+    record1.putValue(BYTES_COLUMN, bytes1);
+    records.add(record1);
+
+    _values.add(MAX_VALUE + 1);
+    GenericRow record2 = new GenericRow();
+    record2.putValue(INT_COLUMN, MAX_VALUE + 1);
+    record2.putValue(LONG_COLUMN, 0xF00000000FFFFFFFL);
+    record2.putValue(FLOAT_COLUMN, (float) (MAX_VALUE + 1));
+    record2.putValue(DOUBLE_COLUMN, double2);
+    record2.putValue(STRING_COLUMN, string2);
+    record2.putValue(BYTES_COLUMN, bytes2);
+    records.add(record2);
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
@@ -186,13 +208,13 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
     assertNotNull(aggregationResultWithFilter);
     assertEquals(aggregationResult, aggregationResultWithFilter);
     for (int i = 0; i < 6; i++) {
-      assertEquals(((Set<Integer>) aggregationResult.get(i)).size(), _expectedResults[i]);
+      assertEquals(((Set) aggregationResult.get(i)).size(), _values.size());
     }
 
     // Inter segments
     String[] expectedResults = new String[6];
     for (int i = 0; i < 6; i++) {
-      expectedResults[i] = Integer.toString(_expectedResults[i]);
+      expectedResults[i] = Integer.toString(_values.size());
     }
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
     QueriesTestUtils
