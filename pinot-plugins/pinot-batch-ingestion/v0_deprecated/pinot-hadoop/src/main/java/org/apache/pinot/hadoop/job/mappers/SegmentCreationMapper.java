@@ -42,6 +42,7 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.name.NormalizedDateSegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SegmentNameGenerator;
@@ -58,6 +59,7 @@ import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.SchemaValidator;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
@@ -98,6 +100,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
   private int _dataTypeMismatch;
   private int _singleValueMultiValueFieldMismatch;
   private int _multiValueStructureMismatch;
+  private int _missingPinotColumn;
 
   /**
    * Generate a relative output directory path when `useRelativePath` flag is on.
@@ -257,7 +260,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     addAdditionalSegmentGeneratorConfigs(segmentGeneratorConfig, hdfsInputFile, sequenceId);
 
     _logger.info("Start creating segment with sequence id: {}", sequenceId);
-    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
 
     // Start a thread that reports progress every minute during segment generation to prevent job getting killed
     Thread progressReporterThread = new Thread(getProgressReporter(context));
@@ -265,7 +268,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     progressReporterThread.start();
     try {
       driver.init(segmentGeneratorConfig);
-      validateSchema(segmentGeneratorConfig, driver.getRecordReader());
+      validateSchema(driver.getSchemaValidator());
       driver.build();
     } catch (Exception e) {
       _logger.error("Caught exception while creating segment with HDFS input file: {}, sequence id: {}", hdfsInputFile,
@@ -368,62 +371,21 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
       int sequenceId) {
   }
 
-  public void validateSchema(SegmentGeneratorConfig segmentGeneratorConfig, RecordReader recordReader) {
-    if (recordReader instanceof AvroRecordReader) {
-      validateSchema(segmentGeneratorConfig.getInputFilePath(), FileFormat.AVRO);
-    } else if (recordReader instanceof ORCRecordReader) {
-      validateSchema(segmentGeneratorConfig.getInputFilePath(), FileFormat.ORC);
+  private void validateSchema(SchemaValidator schemaValidator) {
+    if (schemaValidator == null) {
+      return;
     }
-  }
-
-  private void validateSchema(String inputPath, FileFormat fileFormat) {
-    if (fileFormat == FileFormat.AVRO) {
-      org.apache.avro.Schema avroSchema = extractAvroSchemaFromFile(inputPath);
-      for (String columnName : _schema.getPhysicalColumnNames()) {
-        FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
-        org.apache.avro.Schema.Type avroColumnType = avroSchema.getField(columnName).schema().getType();
-        if (!fieldSpec.getDataType().name().equalsIgnoreCase(avroColumnType.toString())) {
-          _dataTypeMismatch++;
-        }
-
-        if (fieldSpec.isSingleValueField()) {
-          if (avroColumnType.ordinal() < org.apache.avro.Schema.Type.STRING.ordinal()) {
-            // the column is a complex structure
-            _singleValueMultiValueFieldMismatch++;
-          }
-        } else {
-          if (avroColumnType.ordinal() >= org.apache.avro.Schema.Type.STRING.ordinal()) {
-            // the column is a complex structure
-            _singleValueMultiValueFieldMismatch++;
-          }
-          if (avroColumnType != org.apache.avro.Schema.Type.ARRAY) {
-            // multi-value column should use array structure for now.
-            _multiValueStructureMismatch++;
-          }
-        }
-      }
+    if (schemaValidator.isDataTypeMismatch()) {
+      _dataTypeMismatch++;
     }
-    // TODO: add validation for other formats like ORC
-  }
-
-  private org.apache.avro.Schema extractAvroSchemaFromFile(String inputPath) {
-    try {
-      DataFileStream<GenericRecord> dataStreamReader = getAvroReader(inputPath);
-      org.apache.avro.Schema avroSchema = dataStreamReader.getSchema();
-      dataStreamReader.close();
-      return avroSchema;
-    } catch (IOException e) {
-      throw new RuntimeException("IOException when extracting avro schema from input path: " + inputPath, e);
+    if (schemaValidator.isSingleValueMultiValueFieldMismatch()) {
+      _singleValueMultiValueFieldMismatch++;
     }
-  }
-
-  private DataFileStream<GenericRecord> getAvroReader(String inputPath)
-      throws IOException {
-    try {
-      InputStream inputStream = new FileInputStream(inputPath);
-      return new DataFileStream<>(inputStream, new GenericDatumReader<>());
-    } catch (FileNotFoundException e) {
-      throw new RuntimeException("File " + inputPath + " not found", e);
+    if (schemaValidator.isMultiValueStructureMismatch()) {
+      _multiValueStructureMismatch++;
+    }
+    if (schemaValidator.isMissingPinotColumn()) {
+      _missingPinotColumn++;
     }
   }
 
@@ -432,7 +394,9 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     context.getCounter(SegmentCreationJob.SchemaMisMatchCounter.DATA_TYPE_MISMATCH).increment(_dataTypeMismatch);
     context.getCounter(SegmentCreationJob.SchemaMisMatchCounter.SINGLE_VALUE_MULTI_VALUE_FIELD_MISMATCH)
         .increment(_singleValueMultiValueFieldMismatch);
-    context.getCounter(SegmentCreationJob.SchemaMisMatchCounter.MULTI_VALUE_FIELD_STRUCTURE_MISMATCH).increment(_multiValueStructureMismatch);
+    context.getCounter(SegmentCreationJob.SchemaMisMatchCounter.MULTI_VALUE_FIELD_STRUCTURE_MISMATCH)
+        .increment(_multiValueStructureMismatch);
+    context.getCounter(SegmentCreationJob.SchemaMisMatchCounter.MISSING_PINOT_COLUMN).increment(_missingPinotColumn);
     _logger.info("Deleting local temporary directory: {}", _localStagingDir);
     FileUtils.deleteQuietly(_localStagingDir);
   }

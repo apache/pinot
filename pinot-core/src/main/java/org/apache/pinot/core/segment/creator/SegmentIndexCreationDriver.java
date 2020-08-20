@@ -20,6 +20,7 @@ package org.apache.pinot.core.segment.creator;
 
 import java.io.File;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.spi.data.SchemaValidator;
 
 
 /**
@@ -61,4 +62,6 @@ public interface SegmentIndexCreationDriver {
    * Returns the path of the output directory
    */
   File getOutputDirectory();
+
+  SchemaValidator getSchemaValidator();
 }

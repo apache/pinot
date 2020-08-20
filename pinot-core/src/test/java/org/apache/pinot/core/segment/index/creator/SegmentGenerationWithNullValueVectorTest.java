@@ -63,6 +63,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.SchemaValidator;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -226,6 +227,9 @@ public class SegmentGenerationWithNullValueVectorTest {
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(config, recordReader);
     driver.build();
+    SchemaValidator schemaValidator = driver.getSchemaValidator();
+    // Schema validator should be null since the record reader is a generic row record reader
+    Assert.assertNull(schemaValidator);
   }
 
   @Test
