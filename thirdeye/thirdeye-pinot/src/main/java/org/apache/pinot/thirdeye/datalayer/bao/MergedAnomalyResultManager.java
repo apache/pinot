@@ -31,8 +31,6 @@ public interface MergedAnomalyResultManager extends AbstractManager<MergedAnomal
 
   MergedAnomalyResultDTO findById(Long id);
 
-  List<MergedAnomalyResultDTO> findByIdList(List<Long> idList);
-
   List<MergedAnomalyResultDTO> findOverlappingByFunctionId(long functionId, long conflictWindowStart,
       long conflictWindowEnd);
 
