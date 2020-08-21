@@ -26,13 +26,13 @@ public class RecommenderConstants {
   public static class InvertedSortedIndexJointRule {
     public static final double DEFAULT_PERCENT_SELECT_FOR_FUNCTION = 0.5d;
     public static final double DEFAULT_PERCENT_SELECT_FOR_TEXT_MATCH = 0.5d;
-    public static final double DEAFULT_PERCENT_SELECT_FOR_RANGE = 0.5d;
-    public static final double DEAFULT_PERCENT_SELECT_FOR_REGEX = 0.5d;
+    public static final double DEFAULT_PERCENT_SELECT_FOR_RANGE = 0.5d;
+    public static final double DEFAULT_PERCENT_SELECT_FOR_REGEX = 0.5d;
     public static final double DEFAULT_PERCENT_SELECT_FOR_ISNULL = 0.5d;
     public static final double DEFAULT_THRESHOLD_MIN_AND_PREDICATE_INCREMENTAL_VOTE = 0.6d;
     public static final double DEFAULT_THRESHOLD_RATIO_MIN_AND_PREDICATE_TOP_CANDIDATES = 0.8d;
     public static final double DEFAULT_THRESHOLD_RATIO_MIN_GAIN_DIFF_BETWEEN_ITERATION = 0.05d;
-    public static final int DEFAULT_MAX_NUM_ITERATION_WITHOUT_GAIN = 3;
+    public static final int DEFAULT_MAX_NUM_ITERATION_WITHOUT_GAIN = 2;
     public static final double DEFAULT_THRESHOLD_RATIO_MIN_NESI_FOR_TOP_CANDIDATES = 0.7d;
   }
 
@@ -47,7 +47,7 @@ public class RecommenderConstants {
   }
 
   public static class PartitionRule {
-    public static final int DEFAULT_NUM_PARTITIONS = 0;
+    public static final int DEFAULT_NUM_PARTITIONS = 1;
 
     public static final long DEFAULT_THRESHOLD_MAX_LATENCY_SLA_PARTITION = 1000;
     public static final long DEFAULT_THRESHOLD_MIN_QPS_PARTITION = 200;
@@ -93,6 +93,10 @@ public class RecommenderConstants {
   public static final double EPSILON = 0.0001d; // used for double value comparison, margin of error
   public static final int DEFAULT_NUM_KAFKA_PARTITIONS = 0;
   public static final int DEFAULT_SEGMENT_FLUSH_TIME = 86400;
+  public static final long DEFAULT_QPS = 5;
+  public static final long DEFAULT_NUM_MESSAGES_PER_SEC_IN_KAFKA_TOPIC = 250;
+  public static final long DEFAULT_NUM_RECORDS_PER_PUSH = 10000;
+  public static final long DEFAULT_LATENCY_SLA = 500;
 
   public static final int NO_SUCH_COL = -1; // No such colname in colName to ID mapping
 

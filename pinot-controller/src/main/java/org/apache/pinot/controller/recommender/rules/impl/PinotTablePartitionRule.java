@@ -106,30 +106,37 @@ public class PinotTablePartitionRule extends AbstractRule {
     LOGGER.info("*Recommending number of partitions ");
     int numKafkaPartitions = _output.getPartitionConfig().getNumKafkaPartitions();
     long offLineDataSizePerPush = _input.getNumRecordsPerPush() * _input.getSizePerRecord();
-    int optimalOfflinePartitions = (int)Math.ceil((double) offLineDataSizePerPush / _params.OPTIMAL_SIZE_PER_SEGMENT);
-    if (_input.getTableType().equalsIgnoreCase(REALTIME) || _input.getTableType()
-        .equalsIgnoreCase(HYBRID)) {
+    int optimalOfflinePartitions = (int) Math.ceil((double) offLineDataSizePerPush / _params.OPTIMAL_SIZE_PER_SEGMENT);
+    if (_input.getTableType().equalsIgnoreCase(REALTIME) || _input.getTableType().equalsIgnoreCase(HYBRID)) {
       //real time num of partitions should be the same value as the number of kafka partitions
-      _output.getPartitionConfig().setNumPartitionsRealtime(numKafkaPartitions);
+      if (!_input.getOverWrittenConfigs().getPartitionConfig().isNumPartitionsRealtimeOverwritten()) {
+        _output.getPartitionConfig().setNumPartitionsRealtime(numKafkaPartitions);
+      }
     }
     if (_input.getTableType().equalsIgnoreCase(OFFLINE)) {
       //Offline partition num is dependent on the amount of data coming in on a given day.
       //Using a very high value of numPartitions for small dataset size will result in too many small sized segments.
       //We define have a desirable segment size OPTIMAL_SIZE_PER_SEGMENT
       //Divide the size of data coming in on a given day by OPTIMAL_SIZE_PER_SEGMENT we get the number of partitions.
-      _output.getPartitionConfig()
-          .setNumPartitionsOffline((int) (optimalOfflinePartitions));
+      if (!_input.getOverWrittenConfigs().getPartitionConfig().isNumPartitionsOfflineOverwritten()) {
+        _output.getPartitionConfig().setNumPartitionsOffline((int) (optimalOfflinePartitions));
+      }
     }
     if (_input.getTableType().equalsIgnoreCase(HYBRID)) {
-      _output.getPartitionConfig().setNumPartitionsOffline(
-          Math.min(optimalOfflinePartitions, numKafkaPartitions));
+      if (!_input.getOverWrittenConfigs().getPartitionConfig().isNumPartitionsOfflineOverwritten()) {
+        _output.getPartitionConfig().setNumPartitionsOffline(Math.min(optimalOfflinePartitions, numKafkaPartitions));
+      }
+    }
+
+    if (_input.getOverWrittenConfigs().getPartitionConfig().isPartitionDimensionOverwritten()){
+      return;
     }
 
     LOGGER.info("*Recommending column to partition");
 
     double[] weights = new double[_input.getNumDims()];
     _input.getParsedQueries().forEach(query -> {
-      Double weight =_input.getQueryWeight(query);
+      Double weight = _input.getQueryWeight(query);
       FixedLenBitset fixedLenBitset = parseQuery(_input.getQueryContext(query));
       LOGGER.debug("fixedLenBitset:{}", fixedLenBitset);
       if (fixedLenBitset != null) {
@@ -155,11 +162,9 @@ public class PinotTablePartitionRule extends AbstractRule {
     Optional<Pair<String, Double>> max = columnNameWeightPairRank.stream()
         .filter(columnNameWeightPair -> columnNameWeightPair.getRight() > topCandidatesThreshold)
         // filter out the dims with frequency < threshold (THRESHOLD_RATIO_DIMENSION_TO_PARTITION_TOP_CANDIDATES * max frequency)
-        .max(
-            Comparator.comparing(columnNameWeightPair -> _input.getCardinality(columnNameWeightPair.getLeft())));
+        .max(Comparator.comparing(columnNameWeightPair -> _input.getCardinality(columnNameWeightPair.getLeft())));
     // get the dimension with highest cardinality
-    max.ifPresent(
-        stringDoublePair -> _output.getPartitionConfig().setPartitionDimension(stringDoublePair.getLeft()));
+    max.ifPresent(stringDoublePair -> _output.getPartitionConfig().setPartitionDimension(stringDoublePair.getLeft()));
   }
 
   /**
@@ -208,7 +213,7 @@ public class PinotTablePartitionRule extends AbstractRule {
       } else if (!_input.isDim(colName)) {
         LOGGER.error("Error: Column {} should not appear in filter, ignoring this", colName);
         return null;
-      } else if(!_input.isSingleValueColumn(colName)){ // only SV column can be used as partitioning column
+      } else if (!_input.isSingleValueColumn(colName)) { // only SV column can be used as partitioning column
         LOGGER.trace("Skipping the MV column {}", colName);
       } else if (predicateType == Predicate.Type.IN) {
         int numValuesSelected;
@@ -216,7 +221,9 @@ public class PinotTablePartitionRule extends AbstractRule {
         InPredicate inPredicate = ((InPredicate) predicate);
         boolean isFirst = false;
         List<String> values = inPredicate.getValues();
-        if (values.get(FIRST).equals(IN_PREDICATE_ESTIMATE_LEN_FLAG) || (isFirst =
+        if (values.size() == 1) {
+          numValuesSelected = 1;
+        } else if (values.get(FIRST).equals(IN_PREDICATE_ESTIMATE_LEN_FLAG) || (isFirst =
             values.get(SECOND).equals(IN_PREDICATE_ESTIMATE_LEN_FLAG))) {
           numValuesSelected = Integer.parseInt(values.get(isFirst ? FIRST : SECOND));
         } else {
