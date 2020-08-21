@@ -56,10 +56,10 @@ public class ResultSetGroupTest {
     Assert.assertEquals(resultSet.getColumnName(0), "ActualElapsedTime");
     Assert.assertEquals(resultSet.getColumnName(1), "AirTime");
 
-    // Verify the response stats.
-    Assert.assertEquals(115545, resultSetGroup.getResultSetStats().getTotalDocs());
-    Assert.assertEquals(82, resultSetGroup.getResultSetStats().getTimeUsedMs());
-    Assert.assertEquals(24, resultSetGroup.getResultSetStats().getNumDocsScanned());
+    // Verify the execution stats.
+    Assert.assertEquals(115545, resultSetGroup.getExecutionStats().getTotalDocs());
+    Assert.assertEquals(82, resultSetGroup.getExecutionStats().getTimeUsedMs());
+    Assert.assertEquals(24, resultSetGroup.getExecutionStats().getNumDocsScanned());
   }
 
   @Test
