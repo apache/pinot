@@ -29,6 +29,7 @@ class BrokerResponse {
   private JsonNode _selectionResults;
   private JsonNode _resultTable;
   private JsonNode _exceptions;
+  private ExecutionStats _executionStats;
 
   private BrokerResponse() {
   }
@@ -38,6 +39,7 @@ class BrokerResponse {
     _exceptions = brokerResponse.get("exceptions");
     _selectionResults = brokerResponse.get("selectionResults");
     _resultTable = brokerResponse.get("resultTable");
+    _executionStats = ExecutionStats.fromJson(brokerResponse);
   }
 
   boolean hasExceptions() {
@@ -66,6 +68,10 @@ class BrokerResponse {
     } else {
       return _aggregationResults.size();
     }
+  }
+
+  ExecutionStats getExecutionStats() {
+    return _executionStats;
   }
 
   static BrokerResponse fromJson(JsonNode json) {
