@@ -234,7 +234,6 @@ public class CondensedAnomalyTimelinesView {
     long lastTimestampEnd = this.timeStamps.get(this.timeStamps.size() - 1) + this.bucketMillis;
 
     for (int i = 0; i < timeStamps.size(); i++) {
-      int count = 1;
       long timestamp = this.timeStamps.get(i);
       double observedValue = this.currentValues.get(i);
       double expectedValue = this.baselineValues.get(i);
@@ -243,15 +242,12 @@ public class CondensedAnomalyTimelinesView {
        */
       if ((lastTimestampEnd - timestamp) >= maxBucketMills) {
         while (i + 1 < this.timeStamps.size() && (this.timeStamps.get(i + 1) - timestamp) < maxBucketMills) {
-          observedValue += this.currentValues.get(i + 1);
-          expectedValue += this.baselineValues.get(i + 1);
           i++;
-          count++;
         }
       }
       aggregatedTimestamps.add(timestamp * DEFAULT_MIN_BUCKET_UNIT + timestampOffset);
-      aggregatedObservedValues.add(getRoundedDouble(observedValue/((double)count)));
-      aggregatedExpectedValues.add(getRoundedDouble(expectedValue/((double)count)));
+      aggregatedObservedValues.add(getRoundedDouble(observedValue));
+      aggregatedExpectedValues.add(getRoundedDouble(expectedValue));
     }
 
 

@@ -110,8 +110,8 @@ public class TestCondensedAnomalyTimelinesView {
     for (int i = 0; i < compressedView.getTimeStamps().size(); i++) {
       Assert.assertEquals(compressedView.getTimeStamps().get(i).longValue(),
           (date.getMillis() - condensedView.timestampOffset)/minBucketMillis);
-      Assert.assertEquals(compressedView.getCurrentValues().get(i), i * 2 + 0.5);
-      Assert.assertEquals(compressedView.getBaselineValues().get(i), i * 2 + 0.83);
+      Assert.assertEquals(compressedView.getCurrentValues().get(i), i * 2 + 0d);
+      Assert.assertEquals(compressedView.getBaselineValues().get(i), i * 2 + 0.33);
       date = date.plusMinutes(10);
     }
 
@@ -121,8 +121,8 @@ public class TestCondensedAnomalyTimelinesView {
       TimeBucket timeBucket = decompressedView.getTimeBuckets().get(i);
       Assert.assertEquals(timeBucket.getCurrentStart(), date.getMillis());
       Assert.assertEquals(timeBucket.getCurrentEnd(), date.plusMinutes(10).getMillis());
-      Assert.assertEquals(decompressedView.getCurrentValues().get(i), i * 2 + 0.5);
-      Assert.assertEquals(decompressedView.getBaselineValues().get(i), i * 2 + 0.83);
+      Assert.assertEquals(decompressedView.getCurrentValues().get(i), i * 2 + 0d);
+      Assert.assertEquals(decompressedView.getBaselineValues().get(i), i * 2 + 0.33);
       date = date.plusMinutes(10);
     }
   }
@@ -142,8 +142,8 @@ public class TestCondensedAnomalyTimelinesView {
     for (int i = 0; i < compressedView.getTimeStamps().size(); i++) {
       Assert.assertEquals(compressedView.getTimeStamps().get(i).longValue(),
           (date.getMillis() - condensedView.timestampOffset)/minBucketMillis);
-      Assert.assertEquals(compressedView.getCurrentValues().get(i), i * 4 + 1.5);
-      Assert.assertEquals(compressedView.getBaselineValues().get(i), i * 4 + 1.83);
+      Assert.assertEquals(compressedView.getCurrentValues().get(i), i * 4 + 0d);
+      Assert.assertEquals(compressedView.getBaselineValues().get(i), i * 4 + 0.33);
       date = date.plusMinutes(20);
     }
 
@@ -153,8 +153,8 @@ public class TestCondensedAnomalyTimelinesView {
       TimeBucket timeBucket = decompressedView.getTimeBuckets().get(i);
       Assert.assertEquals(timeBucket.getCurrentStart(), date.getMillis());
       Assert.assertEquals(timeBucket.getCurrentEnd(), date.plusMinutes(20).getMillis());
-      Assert.assertEquals(decompressedView.getCurrentValues().get(i), i * 4 + 1.5);
-      Assert.assertEquals(decompressedView.getBaselineValues().get(i), i * 4 + 1.83);
+      Assert.assertEquals(decompressedView.getCurrentValues().get(i), i * 4 + 0d);
+      Assert.assertEquals(decompressedView.getBaselineValues().get(i), i * 4 + 0.33);
       date = date.plusMinutes(20);
     }
   }
