@@ -19,6 +19,8 @@
 package org.apache.pinot.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Simple POJO to hold query execution statistics for a request. These stats come in every
@@ -28,6 +30,21 @@ import com.fasterxml.jackson.databind.JsonNode;
  * and that will only be released when the object is GC'ed.</p>
  */
 class ExecutionStats {
+
+  private static final String NUM_SERVERS_QUERIED = "numServersQueried";
+  private static final String NUM_SERVERS_RESPONDED = "numServersResponded";
+  private static final String NUM_DOCS_SCANNED = "numDocsScanned";
+  private static final String NUM_ENTRIES_SCANNED_IN_FILTER = "numEntriesScannedInFilter";
+  private static final String NUM_ENTRIES_SCANNED_POST_FILTER = "numEntriesScannedPostFilter";
+  private static final String NUM_SEGMENTS_QUERIED = "numSegmentsQueried";
+  private static final String NUM_SEGMENTS_PROCESSED = "numSegmentsProcessed";
+  private static final String NUM_SEGMENTS_MATCHED = "numSegmentsMatched";
+  private static final String NUM_CONSUMING_SEGMENTS_QUERIED = "numConsumingSegmentsQueried";
+  private static final String MIN_CONSUMING_FRESHNESS_TIME_MS = "minConsumingFreshnessTimeMs";
+  private static final String TOTAL_DOCS = "totalDocs";
+  private static final String NUM_GROUPS_LIMIT_REACHED = "numGroupsLimitReached";
+  private static final String TIME_USED_MS = "timeUsedMs";
+
   private final JsonNode brokerResponse;
 
   ExecutionStats(JsonNode brokerResponse) {
@@ -40,85 +57,86 @@ class ExecutionStats {
 
   public int getNumServersQueried() {
     // Lazily load the field from the JsonNode to avoid reading the stats when not needed.
-    return brokerResponse.has("numServersQueried") ?
-        brokerResponse.get("numServersQueried").asInt() : -1;
+    return brokerResponse.has(NUM_SERVERS_QUERIED) ?
+        brokerResponse.get(NUM_SERVERS_QUERIED).asInt() : -1;
   }
 
   public int getNumServersResponded() {
-    return brokerResponse.has("numServersResponded") ?
-        brokerResponse.get("numServersResponded").asInt() : -1;
+    return brokerResponse.has(NUM_SERVERS_RESPONDED) ?
+        brokerResponse.get(NUM_SERVERS_RESPONDED).asInt() : -1;
   }
 
   public long getNumDocsScanned() {
-    return brokerResponse.has("numDocsScanned") ?
-        brokerResponse.get("numDocsScanned").asLong() : -1L;
+    return brokerResponse.has(NUM_DOCS_SCANNED) ?
+        brokerResponse.get(NUM_DOCS_SCANNED).asLong() : -1L;
   }
 
   public long getNumEntriesScannedInFilter() {
-    return brokerResponse.has("numEntriesScannedInFilter") ?
-        brokerResponse.get("numEntriesScannedInFilter").asLong() : -1L;
+    return brokerResponse.has(NUM_ENTRIES_SCANNED_IN_FILTER) ?
+        brokerResponse.get(NUM_ENTRIES_SCANNED_IN_FILTER).asLong() : -1L;
   }
 
   public long getNumEntriesScannedPostFilter() {
-    return brokerResponse.has("numEntriesScannedPostFilter") ?
-        brokerResponse.get("numEntriesScannedPostFilter").asLong() : -1L;
+    return brokerResponse.has(NUM_ENTRIES_SCANNED_POST_FILTER) ?
+        brokerResponse.get(NUM_ENTRIES_SCANNED_POST_FILTER).asLong() : -1L;
   }
 
   public long getNumSegmentsQueried() {
-    return brokerResponse.has("numSegmentsQueried") ?
-        brokerResponse.get("numSegmentsQueried").asLong() : -1L;
+    return brokerResponse.has(NUM_SEGMENTS_QUERIED) ?
+        brokerResponse.get(NUM_SEGMENTS_QUERIED).asLong() : -1L;
   }
 
   public long getNumSegmentsProcessed() {
-    return brokerResponse.has("numSegmentsProcessed") ?
-        brokerResponse.get("numSegmentsProcessed").asLong() : -1L;
+    return brokerResponse.has(NUM_SEGMENTS_PROCESSED) ?
+        brokerResponse.get(NUM_SEGMENTS_PROCESSED).asLong() : -1L;
   }
 
   public long getNumSegmentsMatched() {
-    return brokerResponse.has("numSegmentsMatched") ?
-        brokerResponse.get("numSegmentsMatched").asLong() : -1L;
+    return brokerResponse.has(NUM_SEGMENTS_MATCHED) ?
+        brokerResponse.get(NUM_SEGMENTS_MATCHED).asLong() : -1L;
   }
 
   public long getNumConsumingSegmentsQueried() {
-    return brokerResponse.has("numConsumingSegmentsQueried") ?
-        brokerResponse.get("numConsumingSegmentsQueried").asLong() : -1L;
+    return brokerResponse.has(NUM_CONSUMING_SEGMENTS_QUERIED) ?
+        brokerResponse.get(NUM_CONSUMING_SEGMENTS_QUERIED).asLong() : -1L;
   }
 
   public long getMinConsumingFreshnessTimeMs() {
-    return brokerResponse.has("minConsumingFreshnessTimeMs") ?
-        brokerResponse.get("minConsumingFreshnessTimeMs").asLong() : -1L;
+    return brokerResponse.has(MIN_CONSUMING_FRESHNESS_TIME_MS) ?
+        brokerResponse.get(MIN_CONSUMING_FRESHNESS_TIME_MS).asLong() : -1L;
   }
 
   public long getTotalDocs() {
-    return brokerResponse.has("totalDocs") ?
-        brokerResponse.get("totalDocs").asLong() : -1L;
+    return brokerResponse.has(TOTAL_DOCS) ?
+        brokerResponse.get(TOTAL_DOCS).asLong() : -1L;
   }
 
   public boolean isNumGroupsLimitReached() {
-    return brokerResponse.has("numGroupsLimitReached")
-        && brokerResponse.get("numGroupsLimitReached").asBoolean();
+    return brokerResponse.has(NUM_GROUPS_LIMIT_REACHED)
+        && brokerResponse.get(NUM_GROUPS_LIMIT_REACHED).asBoolean();
   }
 
   public long getTimeUsedMs() {
-    return brokerResponse.has("timeUsedMs") ?
-        brokerResponse.get("timeUsedMs").asLong() : -1L;
+    return brokerResponse.has(TIME_USED_MS) ?
+        brokerResponse.get(TIME_USED_MS).asLong() : -1L;
   }
 
   @Override
   public String toString() {
-    return "{numServersQueried: " + getNumServersQueried() +
-        ", numServersResponded: " + getNumServersResponded() +
-        ", numDocsScanned: " + getNumDocsScanned() +
-        ", numEntriesScannedInFilter: " + getNumEntriesScannedInFilter() +
-        ", numEntriesScannedPostFilter: " + getNumEntriesScannedPostFilter() +
-        ", numSegmentsQueried: " + getNumSegmentsQueried() +
-        ", numSegmentsProcessed: " + getNumSegmentsProcessed() +
-        ", numSegmentsMatched: " + getNumSegmentsMatched() +
-        ", numConsumingSegmentsQueried: " + getNumConsumingSegmentsQueried() +
-        ", minConsumingFreshnessTimeMs: " + getMinConsumingFreshnessTimeMs() +
-        "ms, totalDocs: " + getTotalDocs() +
-        ", numGroupsLimitReached: " + isNumGroupsLimitReached() +
-        ", timeUsedMs: " + getTimeUsedMs() +
-        "ms}";
+    Map<String, Object> map = new HashMap<>();
+    map.put(NUM_SERVERS_QUERIED, getNumServersQueried());
+    map.put(NUM_SERVERS_RESPONDED, getNumServersResponded());
+    map.put(NUM_DOCS_SCANNED, getNumDocsScanned());
+    map.put(NUM_ENTRIES_SCANNED_IN_FILTER, getNumEntriesScannedInFilter());
+    map.put(NUM_ENTRIES_SCANNED_POST_FILTER, getNumEntriesScannedPostFilter());
+    map.put(NUM_SEGMENTS_QUERIED, getNumSegmentsQueried());
+    map.put(NUM_SEGMENTS_PROCESSED, getNumSegmentsProcessed());
+    map.put(NUM_SEGMENTS_MATCHED, getNumSegmentsMatched());
+    map.put(NUM_CONSUMING_SEGMENTS_QUERIED, getNumConsumingSegmentsQueried());
+    map.put(MIN_CONSUMING_FRESHNESS_TIME_MS, getMinConsumingFreshnessTimeMs() + "ms");
+    map.put(TOTAL_DOCS, getTotalDocs());
+    map.put(NUM_GROUPS_LIMIT_REACHED, isNumGroupsLimitReached());
+    map.put(TIME_USED_MS, getTimeUsedMs() + "ms");
+    return map.toString();
   }
 }
