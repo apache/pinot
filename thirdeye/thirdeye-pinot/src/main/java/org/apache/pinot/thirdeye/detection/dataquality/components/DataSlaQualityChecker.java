@@ -77,7 +77,6 @@ public class DataSlaQualityChecker implements AnomalyDetector<DataSlaQualityChec
 
   private String sla;
   private InputDataFetcher dataFetcher;
-  private final String DEFAULT_DATA_SLA = "3_DAYS";
 
   @Override
   public DetectionResult runDetection(Interval window, String metricUrn) {
@@ -108,10 +107,11 @@ public class DataSlaQualityChecker implements AnomalyDetector<DataSlaQualityChec
 
     try {
       long datasetLastRefreshTime = fetchLatestDatasetRefreshTime(data, me, window);
-      MetricSlice slice = MetricSlice.from(me.getId(), datasetLastRefreshTime + 1, expectedDatasetRefreshTime);
+      long datasetLastRefreshTimeRoundUp = alignToUpperBoundary(datasetLastRefreshTime, datasetConfig);
+      MetricSlice slice = MetricSlice.from(me.getId(), datasetLastRefreshTimeRoundUp, expectedDatasetRefreshTime);
 
-      if (isSLAViolated(datasetLastRefreshTime, expectedDatasetRefreshTime)) {
-        anomalies.add(createDataSLAAnomaly(slice, datasetConfig));
+      if (isSLAViolated(datasetLastRefreshTimeRoundUp, expectedDatasetRefreshTime)) {
+        anomalies.add(createDataSLAAnomaly(slice, datasetConfig, datasetLastRefreshTime, datasetLastRefreshTimeRoundUp));
       }
     } catch (Exception e) {
       LOG.error(String.format("Failed to run sla check on metric URN %s", me.getUrn()), e);
@@ -148,6 +148,7 @@ public class DataSlaQualityChecker implements AnomalyDetector<DataSlaQualityChec
       DataFrame dataFrame = this.dataFetcher.fetchData(new InputDataSpec()
           .withTimeseriesSlices(Collections.singletonList(metricSlice))).getTimeseries().get(metricSlice);
       if (dataFrame != null && !dataFrame.isEmpty()) {
+        // Fetches the latest timestamp from the source. This value is already in epoch (UTC).
         return dataFrame.getDoubles("timestamp").max().longValue();
       }
     }
@@ -177,38 +178,45 @@ public class DataSlaQualityChecker implements AnomalyDetector<DataSlaQualityChec
    * fetch the user configured SLA, otherwise default 3_DAYS.
    */
   private boolean isSLAViolated(long actualRefreshTime, long expectedRefreshTime) {
-    String sla = StringUtils.isNotEmpty(this.sla) ? this.sla : DEFAULT_DATA_SLA;
-    long delay = TimeGranularity.fromString(sla).toPeriod().toStandardDuration().getMillis();
-
+    long delay = TimeGranularity.fromString(this.sla).toPeriod().toStandardDuration().getMillis();
     return (expectedRefreshTime - actualRefreshTime) > delay;
   }
 
   /**
-   * Align and round off start time to the upper boundary of the granularity
+   * Align and round off timestamp to the upper boundary of the granularity
+   *
+   * Examples:
+   * a. 20th Aug 05:00 pm will be rounded up to 21th Aug 12:00 am
+   * b. 20th Aug 12:00 am will be rounded up to 21th Aug 12:00 am
    */
   private static long alignToUpperBoundary(long timestamp, DatasetConfigDTO datasetConfig) {
     Period granularityPeriod = datasetConfig.bucketTimeGranularity().toPeriod();
     DateTimeZone timezone = DateTimeZone.forID(datasetConfig.getTimezone());
-    DateTime startTime = new DateTime(timestamp - 1, timezone).plus(granularityPeriod);
-    return (startTime.getMillis() / granularityPeriod.toStandardDuration().getMillis()) * granularityPeriod.toStandardDuration().getMillis();
+    DateTime startTime = new DateTime(timestamp, timezone).plus(granularityPeriod);
+    return (startTime.getMillis() / granularityPeriod.toStandardDuration().getMillis())
+        * granularityPeriod.toStandardDuration().getMillis();
   }
 
   /**
    * Creates a DATA_SLA anomaly from ceiling(start) to ceiling(end) for the detection id.
    * If existing DATA_SLA anomalies are present, then it will be merged accordingly.
+   *
+   * @param datasetLastRefreshTime the timestamp corresponding to the last record in the data (UTC)
+   * @param datasetLastRefreshTimeRoundUp the timestamp rounded off to the upper granular bucket. See
+   * @{link #alignToUpperBoundary}
    */
-  private MergedAnomalyResultDTO createDataSLAAnomaly(MetricSlice slice, DatasetConfigDTO datasetConfig) {
-    MergedAnomalyResultDTO anomaly = DetectionUtils.makeAnomaly(
-        alignToUpperBoundary(slice.getStart(), datasetConfig),
-        alignToUpperBoundary(slice.getEnd(), datasetConfig));
+  private MergedAnomalyResultDTO createDataSLAAnomaly(MetricSlice slice, DatasetConfigDTO datasetConfig,
+      long datasetLastRefreshTime, long datasetLastRefreshTimeRoundUp) {
+    MergedAnomalyResultDTO anomaly = DetectionUtils.makeAnomaly(slice.getStart(), slice.getEnd());
     anomaly.setCollection(datasetConfig.getName());
     anomaly.setType(AnomalyType.DATA_SLA);
     anomaly.setAnomalyResultSource(AnomalyResultSource.DATA_QUALITY_DETECTION);
 
     // Store the metadata in the anomaly
     Map<String, String> properties = new HashMap<>();
-    properties.put("datasetLastRefreshTime", String.valueOf(slice.getStart() - 1));
-    properties.put("sla", sla);
+    properties.put("datasetLastRefreshTime", String.valueOf(datasetLastRefreshTime));
+    properties.put("datasetLastRefreshTimeRoundUp", String.valueOf(datasetLastRefreshTimeRoundUp));
+    properties.put("sla", this.sla);
     anomaly.setProperties(properties);
 
     return anomaly;
