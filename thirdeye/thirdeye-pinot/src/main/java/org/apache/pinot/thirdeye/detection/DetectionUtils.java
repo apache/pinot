@@ -106,12 +106,12 @@ public class DetectionUtils {
    * @param slice metric slice
    * @param df time series with COL_TIME and at least one boolean value series
    * @param seriesName name of the value series
-   * @param endTime end time of this detection window
    * @param monitoringGranularityPeriod the monitoring granularity period
    * @param dataset dataset config for the metric
    * @return list of anomalies
    */
-  public static List<MergedAnomalyResultDTO> makeAnomalies(MetricSlice slice, DataFrame df, String seriesName, long endTime, Period monitoringGranularityPeriod, DatasetConfigDTO dataset) {
+  public static List<MergedAnomalyResultDTO> makeAnomalies(MetricSlice slice, DataFrame df, String seriesName,
+      Period monitoringGranularityPeriod, DatasetConfigDTO dataset) {
     if (df.isEmpty()) {
       return Collections.emptyList();
     }

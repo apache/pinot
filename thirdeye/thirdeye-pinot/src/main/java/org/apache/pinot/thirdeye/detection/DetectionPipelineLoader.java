@@ -32,7 +32,7 @@ public class DetectionPipelineLoader {
       Constructor<?> constructor = Class.forName(className).getConstructor(DataProvider.class, DetectionConfigDTO.class, long.class, long.class);
       return (DetectionPipeline) constructor.newInstance(provider, config, start, end);
     } catch (Exception e) {
-      throw new IllegalArgumentException("Failed to initialize the detection pipeline.", e.getCause());
+      throw new IllegalArgumentException("Failed to initialize the detection pipeline.", e);
     }
   }
 }

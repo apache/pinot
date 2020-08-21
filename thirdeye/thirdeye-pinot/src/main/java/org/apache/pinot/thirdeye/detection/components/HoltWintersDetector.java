@@ -217,7 +217,7 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
 
     // Anomalies
     List<MergedAnomalyResultDTO> anomalyResults =
-        DetectionUtils.makeAnomalies(sliceData, df, COL_ANOMALY, window.getEndMillis(),
+        DetectionUtils.makeAnomalies(sliceData, df, COL_ANOMALY,
             DetectionUtils.getMonitoringGranularityPeriod(this.monitoringGranularity, datasetConfig), datasetConfig);
     dfBase = dfBase.joinRight(df.retainSeries(COL_TIME, COL_CURR), COL_TIME);
     return DetectionResult.from(anomalyResults, TimeSeries.fromDataFrame(dfBase));

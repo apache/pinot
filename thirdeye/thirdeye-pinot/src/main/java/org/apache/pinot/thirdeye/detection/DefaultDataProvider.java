@@ -215,7 +215,7 @@ public class DefaultDataProvider implements DataProvider {
   }
 
   @Override
-  public DetectionPipeline loadPipeline(DetectionConfigDTO config, long start, long end) throws Exception {
+  public DetectionPipeline loadPipeline(DetectionConfigDTO config, long start, long end) {
     return this.loader.from(this, config, start, end);
   }
 

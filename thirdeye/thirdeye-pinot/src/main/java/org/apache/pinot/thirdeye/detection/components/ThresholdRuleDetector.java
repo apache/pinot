@@ -88,7 +88,7 @@ public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetec
     }
     df.mapInPlace(BooleanSeries.HAS_TRUE, COL_ANOMALY, COL_TOO_HIGH, COL_TOO_LOW);
     DatasetConfigDTO datasetConfig = data.getDatasetForMetricId().get(me.getId());
-    List<MergedAnomalyResultDTO> anomalies = DetectionUtils.makeAnomalies(slice, df, COL_ANOMALY, endTime,
+    List<MergedAnomalyResultDTO> anomalies = DetectionUtils.makeAnomalies(slice, df, COL_ANOMALY,
         DetectionUtils.getMonitoringGranularityPeriod(monitoringGranularity, datasetConfig), datasetConfig);
     DataFrame baselineWithBoundaries = constructBaselineAndBoundaries(df);
 

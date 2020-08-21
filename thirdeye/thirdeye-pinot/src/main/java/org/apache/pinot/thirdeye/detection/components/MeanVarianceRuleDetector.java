@@ -170,7 +170,6 @@ public class MeanVarianceRuleDetector implements AnomalyDetector<MeanVarianceRul
 
     // Anomalies
     List<MergedAnomalyResultDTO> anomalyResults = DetectionUtils.makeAnomalies(slice, df, COL_ANOMALY,
-        window.getEndMillis(),
         DetectionUtils.getMonitoringGranularityPeriod(timeGranularity.toAggregationGranularityString(),
             datasetConfig), datasetConfig);
     dfBase = dfBase.joinRight(df.retainSeries(COL_TIME, COL_CURR), COL_TIME);
