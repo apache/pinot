@@ -18,8 +18,14 @@
  */
 package org.apache.pinot.core.segment.store;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.HashSet;
 import org.apache.commons.configuration.ConfigurationException;
@@ -163,6 +169,58 @@ public class SingleFileIndexDirectoryTest {
       sfd.newBuffer("col1", ColumnIndexType.DICTIONARY, 1024);
       Assert.assertFalse(sfd.isIndexRemovalSupported());
       sfd.removeIndex("col1", ColumnIndexType.DICTIONARY);
+    }
+  }
+
+  @Test
+  public void testDropIndex() throws Exception {
+    Assert.assertEquals(TEMP_DIR.list().length, 0);
+    SingleFileIndexDirectory columnDirectory = new SingleFileIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap);
+    columnDirectory.newBuffer("col1", ColumnIndexType.DICTIONARY, 1024*1024);
+    columnDirectory.newBuffer("col2", ColumnIndexType.DICTIONARY, 1024*1024);
+    columnDirectory.newBuffer("col3", ColumnIndexType.DICTIONARY, 1024*1024);
+    columnDirectory.newBuffer("col1", ColumnIndexType.FORWARD_INDEX, 256*1024*1024);
+    columnDirectory.newBuffer("col2", ColumnIndexType.FORWARD_INDEX, 256*1024*1024);
+    columnDirectory.newBuffer("col3", ColumnIndexType.FORWARD_INDEX, 256*1024*1024);
+    PinotDataBuffer dataBuffer = columnDirectory.newBuffer("col1", ColumnIndexType.INVERTED_INDEX, 64*1024*1024);
+    for (long i = 0; i < 8_000_000; i++) {
+      dataBuffer.putLong(i * Long.BYTES, i);
+    }
+    dataBuffer = columnDirectory.newBuffer("col2", ColumnIndexType.INVERTED_INDEX, 64*1024*1024);
+    for (long i = 0; i < 8_000_000; i++) {
+      dataBuffer.putLong(i * Long.BYTES, 8_000_000 + i);
+    }
+    dataBuffer = columnDirectory.newBuffer("col3", ColumnIndexType.INVERTED_INDEX, 64*1024*1024);
+    for (long i = 0; i < 8_000_000; i++) {
+      dataBuffer.putLong(i * Long.BYTES, 16_000_000 + i);
+    }
+    columnDirectory.close();
+    long length = (3*1024*1024) + (3*256*1024*1024) + (3 *64*1024*1024) + (SingleFileIndexDirectory.MAGIC_MARKER_SIZE_BYTES * 9);
+    Assert.assertEquals(columnDirectory.getIndexFile().length(), length);
+    when(segmentMetadata.getAllColumns()).thenReturn(new HashSet<String>(Arrays.asList("col1", "col2", "col3")));
+    try (SingleFileIndexDirectory directoryReader = new SingleFileIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap)) {
+      directoryReader.removeIndex("col1", ColumnIndexType.INVERTED_INDEX);
+      long removedIndexSize = 64*1024*1024 + SingleFileIndexDirectory.MAGIC_MARKER_SIZE_BYTES;
+      Assert.assertEquals(directoryReader.getIndexFile().length(), length - removedIndexSize);
+      File mapFile = new File(TEMP_DIR, SingleFileIndexDirectory.INDEX_MAP_FILE);
+      int lines = 0;
+      String line;
+      try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(mapFile)))) {
+        while ((line = reader.readLine()) != null) {
+          Assert.assertFalse(line.startsWith("col1.inverted_index.startOffset"));
+          Assert.assertFalse(line.startsWith("col1.inverted_index.size"));
+          lines++;
+        }
+      }
+      dataBuffer = directoryReader.getBuffer("col2", ColumnIndexType.INVERTED_INDEX);
+      for (long i = 0; i < 8_000_000; i++) {
+        dataBuffer.putLong(i * Long.BYTES, 8_000_000 + i);
+      }
+      dataBuffer = directoryReader.getBuffer("col3", ColumnIndexType.INVERTED_INDEX);
+      for (long i = 0; i < 8_000_000; i++) {
+        dataBuffer.putLong(i * Long.BYTES, 16_000_000 + i);
+      }
+      Assert.assertEquals(lines, 16);
     }
   }
 }

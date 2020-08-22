@@ -18,13 +18,16 @@
  */
 package org.apache.pinot.core.segment.store;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.RandomAccessFile;
 import java.nio.ByteOrder;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -35,6 +38,7 @@ import java.util.TreeMap;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreator;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
@@ -64,9 +68,10 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   private static Logger LOGGER = LoggerFactory.getLogger(SingleFileIndexDirectory.class);
 
   private static final String DEFAULT_INDEX_FILE_NAME = "columns.psf";
-  private static final String INDEX_MAP_FILE = "index_map";
+  static final String INDEX_MAP_FILE = "index_map";
+  private static final String INDEX_MAP_FILE_TMP = "index_map_tmp";
   private static final long MAGIC_MARKER = 0xdeadbeefdeafbeadL;
-  private static final int MAGIC_MARKER_SIZE_BYTES = 8;
+  static final int MAGIC_MARKER_SIZE_BYTES = 8;
   private static final String MAP_KEY_SEPARATOR = ".";
   private static final String MAP_KEY_NAME_START_OFFSET = "startOffset";
   private static final String MAP_KEY_NAME_SIZE = "size";
@@ -339,9 +344,92 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
 
   @Override
   public void removeIndex(String columnName, ColumnIndexType indexType) {
-    throw new UnsupportedOperationException(
-        "Index removal is not supported for single file index format. Requested colum: " + columnName + " indexType: "
-            + indexType);
+    if (indexType != ColumnIndexType.INVERTED_INDEX) {
+      throw new UnsupportedOperationException("Currently only inverted index removal is supported");
+    }
+    IndexKey indexKey = new IndexKey(columnName, indexType);
+    if (!columnEntries.containsKey(indexKey)) {
+      throw new IllegalStateException("Attempting to drop inverted index for non-existent column");
+    }
+    IndexEntry indexEntry = columnEntries.get(indexKey);
+    long indexStartOffset = indexEntry.startOffset;
+    SortedMap<Long, IndexEntry> indexStartMap = new TreeMap<>();
+    for (Map.Entry<IndexKey, IndexEntry> columnEntry : columnEntries.entrySet()) {
+      long startOffset = columnEntry.getValue().startOffset;
+      if (startOffset > indexStartOffset) {
+        indexStartMap.put(startOffset, columnEntry.getValue());
+      }
+    }
+    long runningSize = 0;
+    List<Long> offsetAccum = new ArrayList<>();
+    try {
+      long copyToOffset = indexStartOffset;
+      for (Map.Entry<Long, IndexEntry> offsetEntry : indexStartMap.entrySet()) {
+        IndexEntry entry = offsetEntry.getValue();
+        runningSize += entry.size;
+        if (runningSize >= MAX_ALLOCATION_SIZE) {
+          copyAndRemap(indexStartMap, offsetAccum, offsetEntry.getKey(), copyToOffset);
+          copyToOffset += runningSize - entry.size;
+          runningSize = entry.size;
+          offsetAccum.clear();
+        }
+        offsetAccum.add(offsetEntry.getKey());
+      }
+      if (offsetAccum.size() > 0) {
+        copyAndRemap(indexStartMap, offsetAccum, offsetAccum.get(0) + runningSize, copyToOffset);
+        copyToOffset += runningSize;
+      }
+      columnEntries.remove(indexKey);
+      RandomAccessFile randomFile = new RandomAccessFile(indexFile, "rw");
+      randomFile.setLength(copyToOffset);
+      updateIndexMap();
+    } catch (Exception e) {
+      // throw exception
+    }
+  }
+
+  private void copyAndRemap(SortedMap<Long, IndexEntry> startOffsets, List<Long> offsetAccum,
+      long endOffset, long copyToOffset)
+      throws IOException {
+    long fromFilePos = offsetAccum.get(0);
+    long size = endOffset - fromFilePos;
+    String context = allocationContext(indexFile,
+        "single_file_index.rw." + "." + fromFilePos + "." + size);
+    PinotDataBuffer srcBuffer = PinotDataBuffer.mapFile(indexFile, false, fromFilePos, size, ByteOrder.BIG_ENDIAN, context);
+    PinotDataBuffer dstBuffer = PinotDataBuffer.mapFile(indexFile, false, copyToOffset, size, ByteOrder.BIG_ENDIAN, context);
+    dstBuffer.copyTo(0, srcBuffer, 0, srcBuffer.size());
+    allocBuffers.add(dstBuffer);
+    int prevSlicePoint = 0;
+    for (Long fileOffset : offsetAccum) {
+      IndexEntry entry = startOffsets.get(fileOffset);
+      int endSlicePoint = prevSlicePoint + (int) entry.size;
+      validateMagicMarker(dstBuffer, prevSlicePoint);
+      PinotDataBuffer viewBuffer = dstBuffer.view(prevSlicePoint + MAGIC_MARKER_SIZE_BYTES, endSlicePoint);
+      entry.buffer = viewBuffer;
+      entry.startOffset = copyToOffset;
+      prevSlicePoint = endSlicePoint;
+      copyToOffset += entry.size;
+    }
+  }
+
+  private void updateIndexMap() throws Exception {
+    File mapFile = new File(segmentDirectory, INDEX_MAP_FILE_TMP);
+    mapFile.createNewFile();
+    try (PrintWriter writer = new PrintWriter(new BufferedWriter(new FileWriter(mapFile, true)))) {
+      for (IndexEntry entry : columnEntries.values()) {
+        String startKey = getKey(entry.key.name, entry.key.type.getIndexName(), true);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(startKey).append(" = ").append(entry.startOffset);
+        writer.println(sb.toString());
+
+        String endKey = getKey(entry.key.name, entry.key.type.getIndexName(), false);
+        sb = new StringBuilder();
+        sb.append(endKey).append(" = ").append(entry.size);
+        writer.println(sb.toString());
+      }
+    }
+    mapFile.renameTo(new File(segmentDirectory, INDEX_MAP_FILE));
   }
 
   @Override
@@ -352,5 +440,10 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   @Override
   public String toString() {
     return segmentDirectory.toString() + "/" + indexFile.toString();
+  }
+
+  @VisibleForTesting
+  File getIndexFile() {
+    return indexFile;
   }
 }
