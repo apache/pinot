@@ -16,29 +16,38 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.function;
+package org.apache.pinot.core.segment.processing.collector;
 
-import java.util.List;
-import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.Schema;
 
 
 /**
- * Interface for evaluators of transform function expressions of schema field specs
+ * Factory for constructing a Collector from CollectorConfig
  */
-public interface FunctionEvaluator {
+public final class CollectorFactory {
+
+  private CollectorFactory() {
+
+  }
+
+  public enum CollectorType {
+    ROLLUP, CONCAT
+  }
 
   /**
-   * Get the arguments of the function
+   * Construct a Collector from the given CollectorConfig and schema
    */
-  List<String> getArguments();
+  public static Collector getCollector(CollectorConfig collectorConfig, Schema pinotSchema) {
+    Collector collector = null;
+    switch (collectorConfig.getCollectorType()) {
 
-  /**
-   * Evaluate the function on the generic row and return the result
-   */
-  Object evaluate(GenericRow genericRow);
-
-  /**
-   * Evaluate the function on the given arguments
-   */
-  Object evaluate(Object[] arguments);
+      case ROLLUP:
+        collector = new RollupCollector(collectorConfig, pinotSchema);
+        break;
+      case CONCAT:
+        collector = new ConcatCollector();
+        break;
+    }
+    return collector;
+  }
 }

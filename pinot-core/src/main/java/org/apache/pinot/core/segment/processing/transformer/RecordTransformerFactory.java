@@ -16,28 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.minion.rollup.aggregate;
+package org.apache.pinot.core.segment.processing.transformer;
 
 /**
- * Factory class to create instances of value aggregator from the given name.
+ * Factory for RecordTransformer
  */
-public class ValueAggregatorFactory {
-  public enum ValueAggregatorType {
-    SUM, MAX
+public final class RecordTransformerFactory {
+  private RecordTransformerFactory() {
+
   }
 
-  private ValueAggregatorFactory() {
-  }
-
-  public static ValueAggregator getValueAggregator(String name) {
-    ValueAggregatorType aggregatorType = ValueAggregatorType.valueOf(name.toUpperCase());
-    switch (aggregatorType) {
-      case SUM:
-        return new SumValueAggregator();
-      case MAX:
-        return new MaxValueAggregator();
-      default:
-        throw new IllegalStateException("Unsupported value aggregator type : " + name);
+  /**
+   * Construct a RecordTransformer from the config
+   */
+  public static RecordTransformer getRecordTransformer(RecordTransformerConfig recordTransformerConfig) {
+    if (recordTransformerConfig.getTransformFunctionMap() != null) {
+      return new TransformFunctionRecordTransformer(recordTransformerConfig.getTransformFunctionMap());
     }
+    return new NoOpRecordTransformer();
   }
 }

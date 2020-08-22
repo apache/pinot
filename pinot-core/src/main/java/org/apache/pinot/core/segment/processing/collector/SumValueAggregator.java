@@ -16,33 +16,35 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.minion.rollup.aggregate;
+package org.apache.pinot.core.segment.processing.collector;
 
 import org.apache.pinot.spi.data.MetricFieldSpec;
 
 
 /**
- * Max value aggregator
+ * Sum value aggregator
  */
-public class MaxValueAggregator implements ValueAggregator {
+public class SumValueAggregator implements ValueAggregator {
+
   @Override
   public Object aggregate(Object value1, Object value2, MetricFieldSpec metricFieldSpec) {
     Object result;
     switch (metricFieldSpec.getDataType()) {
       case INT:
-        result = Math.max(((Number) value1).intValue(), ((Number) value2).intValue());
+        result = ((Number) value1).intValue() + ((Number) value2).intValue();
         break;
       case LONG:
-        result = Math.max(((Number) value1).longValue(), ((Number) value2).longValue());
+        result = ((Number) value1).longValue() + ((Number) value2).longValue();
         break;
       case FLOAT:
-        result = Math.max(((Number) value1).floatValue(), ((Number) value2).floatValue());
+        result = ((Number) value1).floatValue() + ((Number) value2).floatValue();
         break;
       case DOUBLE:
-        result = Math.max(((Number) value1).doubleValue(), ((Number) value2).doubleValue());
+        result = ((Number) value1).doubleValue() + ((Number) value2).doubleValue();
         break;
       default:
-        throw new IllegalArgumentException("Unsupported metric type : " + metricFieldSpec.getDataType());
+        throw new IllegalArgumentException(
+            "Unsupported metric type for SUM aggregator : " + metricFieldSpec.getDataType());
     }
     return result;
   }

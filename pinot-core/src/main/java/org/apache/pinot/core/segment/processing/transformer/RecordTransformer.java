@@ -16,29 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.function;
+package org.apache.pinot.core.segment.processing.transformer;
 
-import java.util.List;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
- * Interface for evaluators of transform function expressions of schema field specs
+ * Interface for record transformer
  */
-public interface FunctionEvaluator {
+public interface RecordTransformer {
 
   /**
-   * Get the arguments of the function
+   * Transform the given row to another row
+   *
+   * @param row an original row
+   * @return a transformed row
    */
-  List<String> getArguments();
-
-  /**
-   * Evaluate the function on the generic row and return the result
-   */
-  Object evaluate(GenericRow genericRow);
-
-  /**
-   * Evaluate the function on the given arguments
-   */
-  Object evaluate(Object[] arguments);
+  GenericRow transformRecord(GenericRow row);
 }

@@ -16,29 +16,37 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.function;
+package org.apache.pinot.core.segment.processing.collector;
 
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
- * Interface for evaluators of transform function expressions of schema field specs
+ * A Collector implementation for simply collecting all incoming rows without any additional processing
  */
-public interface FunctionEvaluator {
+public class ConcatCollector implements Collector {
+  private final List<GenericRow> _collection = new ArrayList<>();
 
-  /**
-   * Get the arguments of the function
-   */
-  List<String> getArguments();
+  @Override
+  public void collect(GenericRow genericRow) {
+    _collection.add(genericRow);
+  }
 
-  /**
-   * Evaluate the function on the generic row and return the result
-   */
-  Object evaluate(GenericRow genericRow);
+  @Override
+  public Iterator<GenericRow> iterator() {
+    return _collection.iterator();
+  }
 
-  /**
-   * Evaluate the function on the given arguments
-   */
-  Object evaluate(Object[] arguments);
+  @Override
+  public int size() {
+    return _collection.size();
+  }
+
+  @Override
+  public void reset() {
+    _collection.clear();
+  }
 }

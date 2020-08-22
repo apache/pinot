@@ -16,29 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.function;
+package org.apache.pinot.core.segment.processing.partitioner;
 
-import java.util.List;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
- * Interface for evaluators of transform function expressions of schema field specs
+ * Partitioner implementation which always returns constant partition value "0"
  */
-public interface FunctionEvaluator {
-
-  /**
-   * Get the arguments of the function
-   */
-  List<String> getArguments();
-
-  /**
-   * Evaluate the function on the generic row and return the result
-   */
-  Object evaluate(GenericRow genericRow);
-
-  /**
-   * Evaluate the function on the given arguments
-   */
-  Object evaluate(Object[] arguments);
+public class NoOpPartitioner implements Partitioner {
+  @Override
+  public String getPartition(GenericRow genericRow) {
+    return "0";
+  }
 }

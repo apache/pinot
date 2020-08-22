@@ -16,22 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.minion.rollup.aggregate;
+package org.apache.pinot.core.segment.processing.transformer;
 
-import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
- * Interface for value aggregator
+ * Record transformer which does no transformation
  */
-public interface ValueAggregator {
-
-  /**
-   * Given two values and its metric fieldspec, return the aggregated value
-   * @param value1 first metric column value
-   * @param value2 second metric column value
-   * @param metricFieldSpec metric field spec
-   * @return aggregated value given two column values
-   */
-  Object aggregate(Object value1, Object value2, MetricFieldSpec metricFieldSpec);
+public class NoOpRecordTransformer implements RecordTransformer {
+  @Override
+  public GenericRow transformRecord(GenericRow row) {
+    return row;
+  }
 }

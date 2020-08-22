@@ -16,29 +16,35 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.function;
+package org.apache.pinot.core.segment.processing.collector;
 
-import java.util.List;
+import java.util.Iterator;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
- * Interface for evaluators of transform function expressions of schema field specs
+ * Collects and stores GenericRows
  */
-public interface FunctionEvaluator {
+public interface Collector {
 
   /**
-   * Get the arguments of the function
+   * Collects the given GenericRow and stores it
+   * @param genericRow the generic row to add to the collection
    */
-  List<String> getArguments();
+  void collect(GenericRow genericRow);
 
   /**
-   * Evaluate the function on the generic row and return the result
+   * Provides an iterator for the GenericRows in the collection
    */
-  Object evaluate(GenericRow genericRow);
+  Iterator<GenericRow> iterator();
 
   /**
-   * Evaluate the function on the given arguments
+   * The size of the collection
    */
-  Object evaluate(Object[] arguments);
+  int size();
+
+  /**
+   * Resets the collection of this collector by deleting all existing GenericRows
+   */
+  void reset();
 }

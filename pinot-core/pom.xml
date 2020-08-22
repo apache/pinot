@@ -167,6 +167,11 @@
       <groupId>org.locationtech.jts</groupId>
       <artifactId>jts-core</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-avro-base</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <!-- test -->
     <dependency>
       <groupId>org.apache.pinot</groupId>

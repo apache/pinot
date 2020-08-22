@@ -16,29 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.function;
-
-import java.util.List;
-import org.apache.pinot.spi.data.readers.GenericRow;
-
+package org.apache.pinot.core.segment.processing.partitioner;
 
 /**
- * Interface for evaluators of transform function expressions of schema field specs
+ * Filter for partitions
  */
-public interface FunctionEvaluator {
+public interface PartitionFilter {
 
   /**
-   * Get the arguments of the function
+   * Returns true if given partition should be filtered out
    */
-  List<String> getArguments();
-
-  /**
-   * Evaluate the function on the generic row and return the result
-   */
-  Object evaluate(GenericRow genericRow);
-
-  /**
-   * Evaluate the function on the given arguments
-   */
-  Object evaluate(Object[] arguments);
+  boolean filter(String partition);
 }

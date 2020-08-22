@@ -16,33 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.minion.rollup.aggregate;
+package org.apache.pinot.core.segment.processing.collector;
 
 import org.apache.pinot.spi.data.MetricFieldSpec;
 
 
 /**
- * Sum value aggregator
+ * Interface for value aggregator
  */
-public class SumValueAggregator implements ValueAggregator {
+public interface ValueAggregator {
 
-  @Override
-  public Object aggregate(Object value1, Object value2, MetricFieldSpec metricFieldSpec) {
-    Object result;
-    switch (metricFieldSpec.getDataType()) {
-      case LONG:
-        result = ((Number) value1).longValue() + ((Number) value2).longValue();
-        break;
-      case FLOAT:
-        result = ((Number) value1).floatValue() + ((Number) value2).floatValue();
-        break;
-      case DOUBLE:
-        result = ((Number) value1).doubleValue() + ((Number) value2).doubleValue();
-        break;
-      default:
-        throw new IllegalArgumentException(
-            "Unsupported metric type for SUM aggregator : " + metricFieldSpec.getDataType());
-    }
-    return result;
-  }
+  /**
+   * Given two values and its metric fieldspec, return the aggregated value
+   * @param value1 first metric column value
+   * @param value2 second metric column value
+   * @param metricFieldSpec metric field spec
+   * @return aggregated value given two column values
+   */
+  Object aggregate(Object value1, Object value2, MetricFieldSpec metricFieldSpec);
 }

@@ -16,29 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.function;
+package org.apache.pinot.core.segment.processing.partitioner;
 
-import java.util.List;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
- * Interface for evaluators of transform function expressions of schema field specs
+ * Partitioner which creates a partition value between [0-numPartitions)
  */
-public interface FunctionEvaluator {
+public class RowHashPartitioner implements Partitioner {
+  private final int _numPartitions;
 
-  /**
-   * Get the arguments of the function
-   */
-  List<String> getArguments();
+  public RowHashPartitioner(int numPartitions) {
+    _numPartitions = numPartitions;
+  }
 
-  /**
-   * Evaluate the function on the generic row and return the result
-   */
-  Object evaluate(GenericRow genericRow);
-
-  /**
-   * Evaluate the function on the given arguments
-   */
-  Object evaluate(Object[] arguments);
+  @Override
+  public String getPartition(GenericRow genericRow) {
+    return String.valueOf(Math.abs(genericRow.hashCode()) % _numPartitions);
+  }
 }

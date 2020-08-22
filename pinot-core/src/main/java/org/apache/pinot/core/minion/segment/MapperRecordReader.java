@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.data.readers.MultiplePinotSegmentRecordReader;
+import org.apache.pinot.core.segment.processing.transformer.RecordTransformer;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;

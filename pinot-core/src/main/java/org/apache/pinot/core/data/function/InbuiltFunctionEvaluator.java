@@ -104,9 +104,16 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     return _rootNode.execute(row);
   }
 
+  @Override
+  public Object evaluate(Object[] arguments) {
+    return _rootNode.execute(arguments);
+  }
+
   private interface ExecutableNode {
 
     Object execute(GenericRow row);
+
+    Object execute(Object[] arguments);
   }
 
   private static class FunctionExecutionNode implements ExecutableNode {
@@ -129,6 +136,12 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
       _functionInvoker.convertTypes(_arguments);
       return _functionInvoker.invoke(_arguments);
     }
+
+    @Override
+    public Object execute(Object[] arguments) {
+      _functionInvoker.convertTypes(arguments);
+      return _functionInvoker.invoke(arguments);
+    }
   }
 
   private static class ConstantExecutionNode implements ExecutableNode {
@@ -142,6 +155,9 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     public String execute(GenericRow row) {
       return _value;
     }
+
+    @Override
+    public String execute(Object[] arguments) { return _value; }
   }
 
   private static class ColumnExecutionNode implements ExecutableNode {
@@ -154,6 +170,11 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     @Override
     public Object execute(GenericRow row) {
       return row.getValue(_column);
+    }
+
+    @Override
+    public Object execute(Object[] arguments) {
+      throw new UnsupportedOperationException("Operation not supported for ColumnExecutionNode");
     }
   }
 }
