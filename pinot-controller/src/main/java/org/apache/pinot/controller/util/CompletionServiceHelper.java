@@ -83,16 +83,21 @@ public class CompletionServiceHelper {
 
     int numServersResponded = completionServiceResponse._httpResponses.size();
     if (numServersResponded != serverURLs.size()) {
-      LOGGER.warn("Finish reading information for table: {} with {}/{} server responses", tableNameWithType,
-          numServersResponded, serverURLs);
+      LOGGER.warn("Finished reading information for table: {} with {}/{} server responses", tableNameWithType,
+          numServersResponded, serverURLs.size());
     } else {
-      LOGGER.info("Finish reading information for table: {}", tableNameWithType);
+      LOGGER.info("Finished reading information for table: {}", tableNameWithType);
     }
     return completionServiceResponse;
   }
 
+  /**
+   * Helper class to maintain the completion service response to be sent back to the caller.
+   */
   static public class CompletionServiceResponse {
+    // Map of the server instance to the response from that server
     public Map<String, String> _httpResponses;
+    // Number of failures encountered when requesting
     public int _failedResponseCount;
 
     public CompletionServiceResponse() {

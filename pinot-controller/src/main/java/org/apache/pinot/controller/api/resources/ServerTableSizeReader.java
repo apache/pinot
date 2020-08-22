@@ -76,11 +76,11 @@ public class ServerTableSizeReader {
         serverToSegmentSizeInfoListMap.put(streamResponse.getKey(), tableSizeInfo.segments);
       } catch (IOException e) {
         failedParses++;
-        LOGGER.error("Unable to parse server response due to an error: ", e);
+        LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
       }
     }
     if (failedParses != 0) {
-      LOGGER.warn("Failed to parse {} segment size info responses from server.", failedParses);
+      LOGGER.warn("Failed to parse {} / {} segment size info responses from servers.", failedParses, serverUrls.size());
     }
     return serverToSegmentSizeInfoListMap;
   }

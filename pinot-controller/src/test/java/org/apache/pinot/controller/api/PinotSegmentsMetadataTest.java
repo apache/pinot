@@ -37,7 +37,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
-import org.apache.pinot.common.restlet.resources.SegmentStatus;
+import org.apache.pinot.common.restlet.resources.SegmentLoadStatus;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -126,7 +126,7 @@ public class PinotSegmentsMetadataTest {
   }
 
   private HttpHandler createReloadStatusHandler(final int status,
-                                                final SegmentStatus reloadStatus,
+                                                final SegmentLoadStatus reloadStatus,
                                                 final int sleepTimeMs) {
     return httpExchange -> {
       if (sleepTimeMs > 0) {
@@ -238,7 +238,7 @@ public class PinotSegmentsMetadataTest {
     InetSocketAddress socket = new InetSocketAddress(0);
     String segmentMetadata;
     HttpServer httpServer;
-    List<SegmentStatus> segmentsReloadStatus = new ArrayList<>();
+    List<SegmentLoadStatus> segmentsReloadStatus = new ArrayList<>();
 
     public SegmentsServerMock(String segment) {
       this.segment = segment;
@@ -249,7 +249,7 @@ public class PinotSegmentsMetadataTest {
       ObjectNode objectNode = jsonNode.deepCopy();
       objectNode.put("segmentName", segment);
       segmentMetadata = JsonUtils.objectToString(objectNode);
-      SegmentStatus status = new SegmentStatus();
+      SegmentLoadStatus status = new SegmentLoadStatus();
       status._segmentName = segment;
       status._segmentReloadTimeUTC = "2020-07-18'T'20:20:20:200";
       segmentsReloadStatus.add(status);

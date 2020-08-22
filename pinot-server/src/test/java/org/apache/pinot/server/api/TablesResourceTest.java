@@ -27,7 +27,7 @@ import java.util.Date;
 import java.util.List;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.restlet.resources.SegmentStatus;
+import org.apache.pinot.common.restlet.resources.SegmentLoadStatus;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -273,11 +273,11 @@ public class TablesResourceTest extends BaseResourceTest {
         "/tables/" + TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME) + "/" + defaultSegment
             .getSegmentName() + "/loadStatus";
     SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) defaultSegment.getSegmentMetadata();
-    SegmentStatus segmentStatus =
-        JsonUtils.stringToObject(_webTarget.path(segmentMetadataPath).request().get(String.class), SegmentStatus.class);
-    Assert.assertEquals(segmentStatus._segmentName, segmentMetadata.getName());
+    SegmentLoadStatus segmentLoadStatus =
+        JsonUtils.stringToObject(_webTarget.path(segmentMetadataPath).request().get(String.class), SegmentLoadStatus.class);
+    Assert.assertEquals(segmentLoadStatus._segmentName, segmentMetadata.getName());
     final DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss:SSS' UTC'");
     String refreshTimeReadable = segmentMetadata.getRefreshTime() != Long.MIN_VALUE ? dateFormat.format(new Date(segmentMetadata.getRefreshTime())) : "";
-    Assert.assertEquals(segmentStatus._segmentReloadTimeUTC, refreshTimeReadable);
+    Assert.assertEquals(segmentLoadStatus._segmentReloadTimeUTC, refreshTimeReadable);
   }
 }

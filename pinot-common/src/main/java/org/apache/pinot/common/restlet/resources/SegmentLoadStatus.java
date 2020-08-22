@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.common.restlet.resources;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 /**
  * Holds segment last reload time status along with any errors for a segment with unsuccessful call to get reload times.
  *
@@ -26,7 +28,8 @@ package org.apache.pinot.common.restlet.resources;
  *
  * TODO: refactor this class to be handled better. Make sure to have an extensible design that helps add more
  */
-public class SegmentStatus {
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class SegmentLoadStatus {
   // Name of the segment itself
   public String _segmentName;
   // The last segment reload time in ISO date format (yyyy-MM-dd HH:mm:ss:SSS UTC)
@@ -36,10 +39,10 @@ public class SegmentStatus {
   // TODO: add message description to show why call to fetch reload status has errors
   public String _segmentReloadStatusMessage;
 
-  public SegmentStatus() {
+  public SegmentLoadStatus() {
   }
 
-  public SegmentStatus(String segmentName, String segmentReloadTimeUTC, String segmentReloadStatusMessage) {
+  public SegmentLoadStatus(String segmentName, String segmentReloadTimeUTC, String segmentReloadStatusMessage) {
     _segmentName = segmentName;
     _segmentReloadTimeUTC = segmentReloadTimeUTC;
     _segmentReloadStatusMessage = segmentReloadStatusMessage;

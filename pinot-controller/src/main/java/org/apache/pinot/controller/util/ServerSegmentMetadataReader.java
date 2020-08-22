@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import org.apache.commons.httpclient.HttpConnectionManager;
-import org.apache.pinot.common.restlet.resources.SegmentStatus;
+import org.apache.pinot.common.restlet.resources.SegmentLoadStatus;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,11 +81,11 @@ public class ServerSegmentMetadataReader {
         segmentsMetadata.add(JsonUtils.objectToString(segmentMetadata));
       } catch (IOException e) {
         failedParses++;
-        LOGGER.error("Unable to parse server response due to an error: ", e);
+        LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
       }
     }
     if (failedParses != 0) {
-      LOGGER.warn("Failed to parse {} segment metadata responses from server.", failedParses);
+      LOGGER.error("Unable to parse server {} / {} response due to an error: ", failedParses, serverURLs.size());
     }
 
     LOGGER.debug("Retrieved segment metadata from servers.");
@@ -125,39 +125,39 @@ public class ServerSegmentMetadataReader {
     CompletionServiceHelper completionServiceHelper = new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
         completionServiceHelper.doMultiGetRequest(serverURLs, tableNameWithType, timeoutMs);
-    List<SegmentStatus> segmentsStatus = new ArrayList<>();
+    List<SegmentLoadStatus> segmentsStatus = new ArrayList<>();
     int failedParses = 0;
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
-        SegmentStatus segmentStatus = JsonUtils.stringToObject(streamResponse.getValue(), SegmentStatus.class);
-        segmentsStatus.add(segmentStatus);
+        SegmentLoadStatus segmentLoadStatus = JsonUtils.stringToObject(streamResponse.getValue(), SegmentLoadStatus.class);
+        segmentsStatus.add(segmentLoadStatus);
       } catch (IOException e) {
         failedParses++;
-        LOGGER.error("Unable to parse server response due to an error: ", e);
+        LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
       }
     }
     if (failedParses != 0) {
-      LOGGER.warn("Failed to parse {} segment load status responses from server.", failedParses);
+      LOGGER.warn("Failed to parse {} / {} segment load status responses from server.", failedParses, serverURLs.size());
     }
 
     TableReloadStatus tableReloadStatus = new TableReloadStatus();
     tableReloadStatus._tableName = tableNameWithType;
-    tableReloadStatus._segmentStatus = segmentsStatus;
+    tableReloadStatus._segmentLoadStatuses = segmentsStatus;
     tableReloadStatus._numSegmentsFailed = serviceResponse._failedResponseCount;
     return tableReloadStatus;
   }
 
   /**
-   * Structure to hold the reload statsus for all segments of a given table.
+   * Structure to hold the load status for all segments of a given table.
    */
   @JsonIgnoreProperties(ignoreUnknown = true)
   public static class TableReloadStatus {
     String _tableName;
-    List<SegmentStatus> _segmentStatus;
+    List<SegmentLoadStatus> _segmentLoadStatuses;
     int _numSegmentsFailed;
 
-    public List<SegmentStatus> getSegmentStatus() {
-      return _segmentStatus;
+    public List<SegmentLoadStatus> getSegmentStatus() {
+      return _segmentLoadStatuses;
     }
   }
 }

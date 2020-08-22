@@ -47,7 +47,7 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
-import org.apache.pinot.common.restlet.resources.SegmentStatus;
+import org.apache.pinot.common.restlet.resources.SegmentLoadStatus;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -259,8 +259,8 @@ public class TablesResource {
 
     try {
       LOGGER.info("Get segment reload status for: {}", segmentName);
-      SegmentStatus segmentStatus = SegmentMetadataFetcher.getSegmentReloadStatus(segmentDataManager);
-      return ResourceUtils.convertToJsonString(segmentStatus);
+      SegmentLoadStatus segmentLoadStatus = SegmentMetadataFetcher.getSegmentReloadStatus(segmentDataManager);
+      return ResourceUtils.convertToJsonString(segmentLoadStatus);
     } catch (Exception e) {
       LOGGER.error("Failed to convert table {} segment {} to json", tableName, segmentName);
       throw new WebApplicationException("Failed to convert segment metadata to json",
