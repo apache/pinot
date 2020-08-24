@@ -47,24 +47,6 @@ The docker image is tagged as `[Docker Tag]`.
 ./docker-build.sh thirdeye:latest master https://github.com/apache/incubator-pinot.git
 ```
 
-##Distributed setup
-
-Once the thirdeye container is built, the frontend and backend images can be generated using a simple docker build
-in their respective directories. These images are built using the `thirdeye` image as the base image.
-
-```SHELL
-# The frontend image launches the Dashboard Server
-cd frontend
-docker build --no-cache -t spyne/thirdeye-frontend -f Dockerfile .
-cd ..
-
-# The backend image launches the Anomaly Server
-cd backend
-docker build --no-cache -t spyne/thirdeye-frontend -f Dockerfile .
-cd ..
-```
-
-
 ## How to publish a docker image
 
 Script `docker-push.sh` publishes a given docker image to your docker registry.
