@@ -18,6 +18,17 @@
 # under the License.
 #
 
+# Script Usage
+# ---------------------------------------------
+# ./start-thirdeye.sh ${CONFIG_DIR} ${MODE}
+#
+# - CONFIG_DIR: path to the thirdeye configuration director
+# - MODE: Choices: {frontend, backend, * }
+#       frontend: Start the frontend server only
+#       backend: Start the backend server only
+#       For any other value, defaults to starting all services with an h2 db.
+#
+
 if [[ "$#" -gt 0 ]]
 then
   CONFIG_DIR="./config/$1"
@@ -25,25 +36,46 @@ else
   CONFIG_DIR="./config/default"
 fi
 
-echo "Starting H2 database server"
-java -cp "./bin/thirdeye-pinot.jar" org.h2.tools.Server -tcp -baseDir "${CONFIG_DIR}/.." &
-sleep 1
 
-echo "Creating ThirdEye database schema"
-java -cp "./bin/thirdeye-pinot.jar" org.h2.tools.RunScript -user "sa" -password "sa" -url "jdbc:h2:tcp:localhost/h2db" -script "zip:./bin/thirdeye-pinot.jar!/schema/create-schema.sql"
+function start_server {
+  class_ref=$1
+  config_dir=$2
+  java -Dlog4j.configurationFile=log4j2.xml -cp "./bin/thirdeye-pinot.jar" ${class_ref} "${config_dir}"
+}
 
-if [ -f "${CONFIG_DIR}/bootstrap.sql" ]; then
-  echo "Running database bootstrap script ${CONFIG_DIR}/bootstrap.sql"
-  java -cp "./bin/thirdeye-pinot.jar" org.h2.tools.RunScript -user "sa" -password "sa" -url "jdbc:h2:tcp:localhost/h2db" -script "${CONFIG_DIR}/bootstrap.sql"
-fi
+function start_frontend {
+  echo "Running Thirdeye frontend config: ${CONFIG_DIR}"
+  start_server org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardApplication "${CONFIG_DIR}"
+}
 
-echo "Running thirdeye backend config: ${CONFIG_DIR}"
-[ -f "${CONFIG_DIR}/data-sources/data-sources-config-backend.yml" ] && cp "${CONFIG_DIR}/data-sources/data-sources-config-backend.yml" "${CONFIG_DIR}/data-sources/data-sources-config.yml"
-java -Dlog4j.configurationFile=log4j2.xml -cp "./bin/thirdeye-pinot.jar" org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyApplication "${CONFIG_DIR}" &
-sleep 10
+function start_backend {
+  echo "Running Thirdeye backend config: ${CONFIG_DIR}"
+  start_server  org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyApplication "${CONFIG_DIR}"
+}
 
-echo "Running thirdeye frontend config: ${CONFIG_DIR}"
-[ -f "${CONFIG_DIR}/data-sources/data-sources-config-frontend.yml" ] && cp "${CONFIG_DIR}/data-sources/data-sources-config-frontend.yml" "${CONFIG_DIR}/data-sources/data-sources-config.yml"
-java -Dlog4j.configurationFile=log4j2.xml -cp "./bin/thirdeye-pinot.jar" org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardApplication "${CONFIG_DIR}" &
+function start_all {
+  echo "Starting H2 database server"
+  java -cp "./bin/thirdeye-pinot.jar" org.h2.tools.Server -tcp -baseDir "${CONFIG_DIR}/.." &
+  sleep 1
 
-wait
+  echo "Creating ThirdEye database schema"
+  java -cp "./bin/thirdeye-pinot.jar" org.h2.tools.RunScript -user "sa" -password "sa" -url "jdbc:h2:tcp:localhost/h2db" -script "zip:./bin/thirdeye-pinot.jar!/schema/create-schema.sql"
+
+  if [ -f "${CONFIG_DIR}/bootstrap.sql" ]; then
+    echo "Running database bootstrap script ${CONFIG_DIR}/bootstrap.sql"
+    java -cp "./bin/thirdeye-pinot.jar" org.h2.tools.RunScript -user "sa" -password "sa" -url "jdbc:h2:tcp:localhost/h2db" -script "${CONFIG_DIR}/bootstrap.sql"
+  fi
+
+  start_backend &
+  sleep 10
+
+  start_frontend &
+  wait
+}
+
+MODE=$2
+case ${MODE} in
+    "frontend" )  start_frontend ;;
+    "backend" )   start_backend ;;
+    * )           start_all ;;
+esac
