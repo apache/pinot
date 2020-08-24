@@ -281,6 +281,16 @@ public class MonitorTaskRunner implements TaskRunner {
     } catch (Exception e) {
       LOG.error("Exception when deleting old evaluations.", e);
     }
+
+    // Delete expired online detection data
+    try {
+      int deletedOnlineDetectionDatas = DAO_REGISTRY.getOnlineDetectionDataManager()
+          .deleteRecordsOlderThanDays(monitorTaskInfo.getDefaultRetentionDays());
+      LOG.info("Deleted {} online detection data that are older than {} days.",
+          deletedOnlineDetectionDatas, monitorTaskInfo.getDefaultRetentionDays());
+    } catch (Exception e) {
+      LOG.error("Exception when deleting old online detection data.", e);
+    }
   }
 
   private Map<Long, JobDTO> findScheduledJobsWithinDays(int days) {

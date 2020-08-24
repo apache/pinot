@@ -128,7 +128,7 @@
     "select f from tableName where a in (1,2,3) and b in ('#VALUES',4) and c in ('#VALUES',5) and t between 1 and 1000": 2
   },
   "qps": 250,
-  "numMessagesPerSecInKafKaTopic":1000,
+  "numMessagesPerSecInKafkaTopic":1000,
   "numRecordsPerPush":1000000000,
   "tableType": "HYBRID",
   "latencySLA": 500

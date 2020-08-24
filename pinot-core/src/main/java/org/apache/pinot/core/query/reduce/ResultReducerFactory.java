@@ -46,11 +46,11 @@ public final class ResultReducerFactory {
           // Distinct query
           return new DistinctDataTableReducer(queryContext, (DistinctAggregationFunction) aggregationFunctions[0]);
         } else {
-          return new AggregationDataTableReducer(queryContext, aggregationFunctions);
+          return new AggregationDataTableReducer(queryContext);
         }
       } else {
         // Aggregation group-by query
-        return new GroupByDataTableReducer(queryContext, aggregationFunctions);
+        return new GroupByDataTableReducer(queryContext);
       }
     }
   }

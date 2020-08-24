@@ -54,7 +54,7 @@ public class PartitionRuleParams {
     return THRESHOLD_MAX_IN_LENGTH;
   }
 
-  @JsonSetter(value = "THRESHOLD_RATIO_MAX_IN_LENGTH", nulls = Nulls.SKIP)
+  @JsonSetter(value = "THRESHOLD_MAX_IN_LENGTH", nulls = Nulls.SKIP)
   public void setTHRESHOLD_MAX_IN_LENGTH(Integer THRESHOLD_MAX_IN_LENGTH) {
     this.THRESHOLD_MAX_IN_LENGTH = THRESHOLD_MAX_IN_LENGTH;
   }

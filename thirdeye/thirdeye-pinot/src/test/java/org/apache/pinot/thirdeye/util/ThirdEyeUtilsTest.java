@@ -114,6 +114,15 @@ public class ThirdEyeUtilsTest {
     };
   }*/
 
+
+  @Test
+  public void testGetRoundedDouble() {
+    double value = 123.456789;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedDouble(value), 123.46);
+    value = 0.056789;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedDouble(value), 0.057);
+  }
+
   @Test
   public void testGetRoundedValue() throws Exception {
     double value = 123;

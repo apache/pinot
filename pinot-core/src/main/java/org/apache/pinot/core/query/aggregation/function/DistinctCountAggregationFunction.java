@@ -18,9 +18,13 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
+import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import java.util.Arrays;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -31,11 +35,13 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
-public class DistinctCountAggregationFunction extends BaseSingleInputAggregationFunction<IntOpenHashSet, Integer> {
+@SuppressWarnings({"rawtypes", "unchecked"})
+public class DistinctCountAggregationFunction extends BaseSingleInputAggregationFunction<Set, Integer> {
 
   public DistinctCountAggregationFunction(ExpressionContext expression) {
     super(expression);
@@ -69,44 +75,51 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
       return;
     }
 
-    // For non-dictionary-encoded expression, store hash code of the values into the value set
-    IntOpenHashSet valueSet = getValueSet(aggregationResultHolder);
+    // For non-dictionary-encoded expression, store values into the value set
     DataType valueType = blockValSet.getValueType();
+    Set valueSet = getValueSet(aggregationResultHolder, valueType);
     switch (valueType) {
       case INT:
+        IntOpenHashSet intSet = (IntOpenHashSet) valueSet;
         int[] intValues = blockValSet.getIntValuesSV();
         for (int i = 0; i < length; i++) {
-          valueSet.add(intValues[i]);
+          intSet.add(intValues[i]);
         }
         break;
       case LONG:
+        LongOpenHashSet longSet = (LongOpenHashSet) valueSet;
         long[] longValues = blockValSet.getLongValuesSV();
         for (int i = 0; i < length; i++) {
-          valueSet.add(Long.hashCode(longValues[i]));
+          longSet.add(longValues[i]);
         }
         break;
       case FLOAT:
+        FloatOpenHashSet floatSet = (FloatOpenHashSet) valueSet;
         float[] floatValues = blockValSet.getFloatValuesSV();
         for (int i = 0; i < length; i++) {
-          valueSet.add(Float.hashCode(floatValues[i]));
+          floatSet.add(floatValues[i]);
         }
         break;
       case DOUBLE:
+        DoubleOpenHashSet doubleSet = (DoubleOpenHashSet) valueSet;
         double[] doubleValues = blockValSet.getDoubleValuesSV();
         for (int i = 0; i < length; i++) {
-          valueSet.add(Double.hashCode(doubleValues[i]));
+          doubleSet.add(doubleValues[i]);
         }
         break;
       case STRING:
+        ObjectOpenHashSet<String> stringSet = (ObjectOpenHashSet<String>) valueSet;
         String[] stringValues = blockValSet.getStringValuesSV();
+        //noinspection ManualArrayToCollectionCopy
         for (int i = 0; i < length; i++) {
-          valueSet.add(stringValues[i].hashCode());
+          stringSet.add(stringValues[i]);
         }
         break;
       case BYTES:
+        ObjectOpenHashSet<ByteArray> bytesSet = (ObjectOpenHashSet<ByteArray>) valueSet;
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
         for (int i = 0; i < length; i++) {
-          valueSet.add(Arrays.hashCode(bytesValues[i]));
+          bytesSet.add(new ByteArray(bytesValues[i]));
         }
         break;
       default:
@@ -129,43 +142,46 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
       return;
     }
 
-    // For non-dictionary-encoded expression, store hash code of the values into the value set
+    // For non-dictionary-encoded expression, store values into the value set
     DataType valueType = blockValSet.getValueType();
     switch (valueType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
         for (int i = 0; i < length; i++) {
-          getValueSet(groupByResultHolder, groupKeyArray[i]).add(intValues[i]);
+          ((IntOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.INT)).add(intValues[i]);
         }
         break;
       case LONG:
         long[] longValues = blockValSet.getLongValuesSV();
         for (int i = 0; i < length; i++) {
-          getValueSet(groupByResultHolder, groupKeyArray[i]).add(Long.hashCode(longValues[i]));
+          ((LongOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.LONG)).add(longValues[i]);
         }
         break;
       case FLOAT:
         float[] floatValues = blockValSet.getFloatValuesSV();
         for (int i = 0; i < length; i++) {
-          getValueSet(groupByResultHolder, groupKeyArray[i]).add(Float.hashCode(floatValues[i]));
+          ((FloatOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.FLOAT)).add(floatValues[i]);
         }
         break;
       case DOUBLE:
         double[] doubleValues = blockValSet.getDoubleValuesSV();
         for (int i = 0; i < length; i++) {
-          getValueSet(groupByResultHolder, groupKeyArray[i]).add(Double.hashCode(doubleValues[i]));
+          ((DoubleOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.DOUBLE))
+              .add(doubleValues[i]);
         }
         break;
       case STRING:
         String[] stringValues = blockValSet.getStringValuesSV();
         for (int i = 0; i < length; i++) {
-          getValueSet(groupByResultHolder, groupKeyArray[i]).add(stringValues[i].hashCode());
+          ((ObjectOpenHashSet<String>) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.STRING))
+              .add(stringValues[i]);
         }
         break;
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
         for (int i = 0; i < length; i++) {
-          getValueSet(groupByResultHolder, groupKeyArray[i]).add(Arrays.hashCode(bytesValues[i]));
+          ((ObjectOpenHashSet<ByteArray>) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.BYTES))
+              .add(new ByteArray(bytesValues[i]));
         }
         break;
       default:
@@ -188,7 +204,7 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
       return;
     }
 
-    // For non-dictionary-encoded expression, store hash code of the values into the value set
+    // For non-dictionary-encoded expression, store values into the value set
     DataType valueType = blockValSet.getValueType();
     switch (valueType) {
       case INT:
@@ -200,31 +216,31 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
       case LONG:
         long[] longValues = blockValSet.getLongValuesSV();
         for (int i = 0; i < length; i++) {
-          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], Long.hashCode(longValues[i]));
+          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], longValues[i]);
         }
         break;
       case FLOAT:
         float[] floatValues = blockValSet.getFloatValuesSV();
         for (int i = 0; i < length; i++) {
-          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], Float.hashCode(floatValues[i]));
+          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], floatValues[i]);
         }
         break;
       case DOUBLE:
         double[] doubleValues = blockValSet.getDoubleValuesSV();
         for (int i = 0; i < length; i++) {
-          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], Double.hashCode(doubleValues[i]));
+          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], doubleValues[i]);
         }
         break;
       case STRING:
         String[] stringValues = blockValSet.getStringValuesSV();
         for (int i = 0; i < length; i++) {
-          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], stringValues[i].hashCode());
+          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], stringValues[i]);
         }
         break;
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
         for (int i = 0; i < length; i++) {
-          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], Arrays.hashCode(bytesValues[i]));
+          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], new ByteArray(bytesValues[i]));
         }
         break;
       default:
@@ -233,41 +249,88 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
   }
 
   @Override
-  public IntOpenHashSet extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
+  public Set extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     Object result = aggregationResultHolder.getResult();
     if (result == null) {
+      // Use empty IntOpenHashSet as a place holder for empty result
       return new IntOpenHashSet();
     }
 
     if (result instanceof DictIdsWrapper) {
-      // For dictionary-encoded expression, convert dictionary ids to hash code of the values
+      // For dictionary-encoded expression, convert dictionary ids to values
       return convertToValueSet((DictIdsWrapper) result);
     } else {
       // For non-dictionary-encoded expression, directly return the value set
-      return (IntOpenHashSet) result;
+      return (Set) result;
     }
   }
 
   @Override
-  public IntOpenHashSet extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
+  public Set extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     Object result = groupByResultHolder.getResult(groupKey);
     if (result == null) {
+      // NOTE: Return an empty IntOpenHashSet for empty result.
       return new IntOpenHashSet();
     }
 
     if (result instanceof DictIdsWrapper) {
-      // For dictionary-encoded expression, convert dictionary ids to hash code of the values
+      // For dictionary-encoded expression, convert dictionary ids to values
       return convertToValueSet((DictIdsWrapper) result);
     } else {
       // For non-dictionary-encoded expression, directly return the value set
-      return (IntOpenHashSet) result;
+      return (Set) result;
     }
   }
 
   @Override
-  public IntOpenHashSet merge(IntOpenHashSet intermediateResult1, IntOpenHashSet intermediateResult2) {
-    intermediateResult1.addAll(intermediateResult2);
-    return intermediateResult1;
+  public Set merge(Set intermediateResult1, Set intermediateResult2) {
+    if (intermediateResult1.isEmpty()) {
+      return intermediateResult2;
+    }
+    if (intermediateResult2.isEmpty()) {
+      return intermediateResult1;
+    }
+    if (intermediateResult1.getClass() == intermediateResult2.getClass()) {
+      // Both results are of the same type, directly merge
+      intermediateResult1.addAll(intermediateResult2);
+      return intermediateResult1;
+    } else {
+      // TODO: Remove this part after releasing 0.5.0
+      // The results are not of the same type. This can happen when servers are getting upgraded, and some servers are
+      // still running the old code and store hash codes in the set. For backward-compatibility, we convert the values
+      // into hash codes and insert them into the hash code set.
+      IntOpenHashSet hashCodeSet;
+      Set valueSet;
+      if (intermediateResult1 instanceof IntOpenHashSet) {
+        hashCodeSet = (IntOpenHashSet) intermediateResult1;
+        valueSet = intermediateResult2;
+      } else {
+        hashCodeSet = (IntOpenHashSet) intermediateResult2;
+        valueSet = intermediateResult1;
+      }
+      if (valueSet instanceof LongOpenHashSet) {
+        LongOpenHashSet longSet = (LongOpenHashSet) valueSet;
+        for (long value : longSet) {
+          hashCodeSet.add(Long.hashCode(value));
+        }
+      } else if (valueSet instanceof FloatOpenHashSet) {
+        FloatOpenHashSet floatSet = (FloatOpenHashSet) valueSet;
+        for (float value : floatSet) {
+          hashCodeSet.add(Float.hashCode(value));
+        }
+      } else if (valueSet instanceof DoubleOpenHashSet) {
+        DoubleOpenHashSet doubleSet = (DoubleOpenHashSet) valueSet;
+        for (double value : doubleSet) {
+          hashCodeSet.add(Double.hashCode(value));
+        }
+      } else {
+        // STRING and BYTES
+        for (Object value : valueSet) {
+          hashCodeSet.add(value.hashCode());
+        }
+      }
+      return hashCodeSet;
+    }
   }
 
   @Override
@@ -286,7 +349,7 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
   }
 
   @Override
-  public Integer extractFinalResult(IntOpenHashSet intermediateResult) {
+  public Integer extractFinalResult(Set intermediateResult) {
     return intermediateResult.size();
   }
 
@@ -306,13 +369,34 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
   /**
    * Returns the value set from the result holder or creates a new one if it does not exist.
    */
-  protected static IntOpenHashSet getValueSet(AggregationResultHolder aggregationResultHolder) {
-    IntOpenHashSet valueSet = aggregationResultHolder.getResult();
+  protected static Set getValueSet(AggregationResultHolder aggregationResultHolder, DataType valueType) {
+    Set valueSet = aggregationResultHolder.getResult();
     if (valueSet == null) {
-      valueSet = new IntOpenHashSet();
+      valueSet = getValueSet(valueType);
       aggregationResultHolder.setValue(valueSet);
     }
     return valueSet;
+  }
+
+  /**
+   * Helper method to create a value set for the given value type.
+   */
+  private static Set getValueSet(DataType valueType) {
+    switch (valueType) {
+      case INT:
+        return new IntOpenHashSet();
+      case LONG:
+        return new LongOpenHashSet();
+      case FLOAT:
+        return new FloatOpenHashSet();
+      case DOUBLE:
+        return new DoubleOpenHashSet();
+      case STRING:
+      case BYTES:
+        return new ObjectOpenHashSet();
+      default:
+        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT aggregation function: " + valueType);
+    }
   }
 
   /**
@@ -331,10 +415,10 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
   /**
    * Returns the value set for the given group key or creates a new one if it does not exist.
    */
-  protected static IntOpenHashSet getValueSet(GroupByResultHolder groupByResultHolder, int groupKey) {
-    IntOpenHashSet valueSet = groupByResultHolder.getResult(groupKey);
+  protected static Set getValueSet(GroupByResultHolder groupByResultHolder, int groupKey, DataType valueType) {
+    Set valueSet = groupByResultHolder.getResult(groupKey);
     if (valueSet == null) {
-      valueSet = new IntOpenHashSet();
+      valueSet = getValueSet(valueType);
       groupByResultHolder.setValueForKey(groupKey, valueSet);
     }
     return valueSet;
@@ -351,59 +435,108 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
   }
 
   /**
-   * Helper method to set value for the given group keys into the result holder.
+   * Helper method to set INT value for the given group keys into the result holder.
    */
   private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, int value) {
     for (int groupKey : groupKeys) {
-      getValueSet(groupByResultHolder, groupKey).add(value);
+      ((IntOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.INT)).add(value);
     }
   }
 
   /**
-   * Helper method to read dictionary and convert dictionary ids to hash code of the values for dictionary-encoded
-   * expression.
+   * Helper method to set LONG value for the given group keys into the result holder.
    */
-  private static IntOpenHashSet convertToValueSet(DictIdsWrapper dictIdsWrapper) {
+  private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, long value) {
+    for (int groupKey : groupKeys) {
+      ((LongOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.LONG)).add(value);
+    }
+  }
+
+  /**
+   * Helper method to set FLOAT value for the given group keys into the result holder.
+   */
+  private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, float value) {
+    for (int groupKey : groupKeys) {
+      ((FloatOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.FLOAT)).add(value);
+    }
+  }
+
+  /**
+   * Helper method to set DOUBLE value for the given group keys into the result holder.
+   */
+  private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, double value) {
+    for (int groupKey : groupKeys) {
+      ((DoubleOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.DOUBLE)).add(value);
+    }
+  }
+
+  /**
+   * Helper method to set STRING value for the given group keys into the result holder.
+   */
+  private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, String value) {
+    for (int groupKey : groupKeys) {
+      ((ObjectOpenHashSet<String>) getValueSet(groupByResultHolder, groupKey, DataType.STRING)).add(value);
+    }
+  }
+
+  /**
+   * Helper method to set BYTES value for the given group keys into the result holder.
+   */
+  private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, ByteArray value) {
+    for (int groupKey : groupKeys) {
+      ((ObjectOpenHashSet<ByteArray>) getValueSet(groupByResultHolder, groupKey, DataType.BYTES)).add(value);
+    }
+  }
+
+  /**
+   * Helper method to read dictionary and convert dictionary ids to values for dictionary-encoded expression.
+   */
+  private static Set convertToValueSet(DictIdsWrapper dictIdsWrapper) {
     Dictionary dictionary = dictIdsWrapper._dictionary;
     RoaringBitmap dictIdBitmap = dictIdsWrapper._dictIdBitmap;
-    IntOpenHashSet valueSet = new IntOpenHashSet(dictIdBitmap.getCardinality());
+    int numValues = dictIdBitmap.getCardinality();
     PeekableIntIterator iterator = dictIdBitmap.getIntIterator();
     DataType valueType = dictionary.getValueType();
     switch (valueType) {
       case INT:
+        IntOpenHashSet intSet = new IntOpenHashSet(numValues);
         while (iterator.hasNext()) {
-          valueSet.add(dictionary.getIntValue(iterator.next()));
+          intSet.add(dictionary.getIntValue(iterator.next()));
         }
-        break;
+        return intSet;
       case LONG:
+        LongOpenHashSet longSet = new LongOpenHashSet(numValues);
         while (iterator.hasNext()) {
-          valueSet.add(Long.hashCode(dictionary.getLongValue(iterator.next())));
+          longSet.add(dictionary.getLongValue(iterator.next()));
         }
-        break;
+        return longSet;
       case FLOAT:
+        FloatOpenHashSet floatSet = new FloatOpenHashSet(numValues);
         while (iterator.hasNext()) {
-          valueSet.add(Float.hashCode(dictionary.getFloatValue(iterator.next())));
+          floatSet.add(dictionary.getFloatValue(iterator.next()));
         }
-        break;
+        return floatSet;
       case DOUBLE:
+        DoubleOpenHashSet doubleSet = new DoubleOpenHashSet(numValues);
         while (iterator.hasNext()) {
-          valueSet.add(Double.hashCode(dictionary.getDoubleValue(iterator.next())));
+          doubleSet.add(dictionary.getDoubleValue(iterator.next()));
         }
-        break;
+        return doubleSet;
       case STRING:
+        ObjectOpenHashSet<String> stringSet = new ObjectOpenHashSet<>(numValues);
         while (iterator.hasNext()) {
-          valueSet.add(dictionary.getStringValue(iterator.next()).hashCode());
+          stringSet.add(dictionary.getStringValue(iterator.next()));
         }
-        break;
+        return stringSet;
       case BYTES:
+        ObjectOpenHashSet<ByteArray> bytesSet = new ObjectOpenHashSet<>(numValues);
         while (iterator.hasNext()) {
-          valueSet.add(Arrays.hashCode(dictionary.getBytesValue(iterator.next())));
+          bytesSet.add(new ByteArray(dictionary.getBytesValue(iterator.next())));
         }
-        break;
+        return bytesSet;
       default:
         throw new IllegalStateException("Illegal data type for DISTINCT_COUNT aggregation function: " + valueType);
     }
-    return valueSet;
   }
 
   private static final class DictIdsWrapper {

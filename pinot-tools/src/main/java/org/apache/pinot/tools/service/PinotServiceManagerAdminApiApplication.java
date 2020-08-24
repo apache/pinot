@@ -77,7 +77,7 @@ public class PinotServiceManagerAdminApiApplication extends ResourceConfig {
     _httpServer.getServerConfiguration().addHttpHandler(httpHandler, "/api/", "/help/");
 
     URL swaggerDistLocation = PinotServiceManagerAdminApiApplication.class.getClassLoader()
-        .getResource("META-INF/resources/webjars/swagger-ui/2.2.10-1/");
+        .getResource("META-INF/resources/webjars/swagger-ui/3.18.2/");
     CLStaticHttpHandler swaggerDist = new CLStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
     _httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
   }

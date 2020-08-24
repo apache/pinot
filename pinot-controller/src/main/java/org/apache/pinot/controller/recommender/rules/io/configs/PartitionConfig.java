@@ -34,6 +34,10 @@ public class PartitionConfig {
   int _numPartitionsOffline;
   int _numPartitionsRealtime;
 
+  boolean _isNumPartitionsOfflineOverwritten = false;
+  boolean _isNumPartitionsRealtimeOverwritten = false;
+  boolean _isPartitionDimensionOverwritten = false;
+
   public PartitionConfig() {
     this._partitionDimension = "";
     this._numKafkaPartitions = DEFAULT_NUM_KAFKA_PARTITIONS;
@@ -48,6 +52,7 @@ public class PartitionConfig {
   @JsonSetter(nulls = Nulls.SKIP)
   public void setNumPartitionsRealtime(int numPartitionsRealtime) {
     _numPartitionsRealtime = numPartitionsRealtime;
+    _isNumPartitionsRealtimeOverwritten = true;
   }
 
   public String getPartitionDimension() {
@@ -57,6 +62,7 @@ public class PartitionConfig {
   @JsonSetter(nulls = Nulls.SKIP)
   public void setPartitionDimension(String partitionDimension) {
     this._partitionDimension = partitionDimension;
+    this._isPartitionDimensionOverwritten = true;
   }
 
   public int getNumPartitionsOffline() {
@@ -66,6 +72,7 @@ public class PartitionConfig {
   @JsonSetter(nulls = Nulls.SKIP)
   public void setNumPartitionsOffline(int numPartitionsOffline) {
     this._numPartitionsOffline = numPartitionsOffline;
+    this._isNumPartitionsOfflineOverwritten = true;
   }
 
   public int getNumKafkaPartitions() {
@@ -74,5 +81,17 @@ public class PartitionConfig {
 
   public void setNumKafkaPartitions(int numKafkaPartitions) {
     this._numKafkaPartitions = numKafkaPartitions;
+  }
+
+  public boolean isNumPartitionsOfflineOverwritten() {
+    return _isNumPartitionsOfflineOverwritten;
+  }
+
+  public boolean isNumPartitionsRealtimeOverwritten() {
+    return _isNumPartitionsRealtimeOverwritten;
+  }
+
+  public boolean isPartitionDimensionOverwritten() {
+    return _isPartitionDimensionOverwritten;
   }
 }

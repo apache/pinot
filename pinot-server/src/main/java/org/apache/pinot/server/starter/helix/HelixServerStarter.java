@@ -363,6 +363,7 @@ public class HelixServerStarter implements ServiceStartable {
 
     LOGGER.info("Initializing server instance and registering state model factory");
     Utils.logVersions();
+    ControllerLeaderLocator.create(_helixManager);
     ServerSegmentCompletionProtocolHandler
         .init(_serverConf.subset(SegmentCompletionProtocol.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
     ServerConf serverInstanceConfig = DefaultHelixStarterServerConfig.getDefaultHelixServerConfig(_serverConf);
@@ -413,8 +414,6 @@ public class HelixServerStarter implements ServiceStartable {
 
     // Register the service status handler
     registerServiceStatusHandler();
-
-    ControllerLeaderLocator.create(_helixManager);
 
     if (_serverConf
         .getProperty(CONFIG_OF_STARTUP_ENABLE_SERVICE_STATUS_CHECK, DEFAULT_STARTUP_ENABLE_SERVICE_STATUS_CHECK)) {

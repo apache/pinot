@@ -441,6 +441,25 @@ public abstract class ThirdEyeUtils {
 
   /**
    * Get rounded double value, according to the value of the double.
+   * Max rounding will be up to 4 decimals
+   * For values >= 0.1, use 2 decimals (eg. 123, 2.5, 1.26, 0.5, 0.162)
+   * For values < 0.1, use 3 decimals (eg. 0.08, 0.071, 0.0123)
+   * @param value any double value
+   * @return the rounded double value
+   */
+  public static Double getRoundedDouble(Double value) {
+    if (Double.isNaN(value) || Double.isInfinite(value)) {
+      return Double.NaN;
+    }
+    if (value >= 0.1) {
+      return Math.round(value * (Math.pow(10, 2))) / (Math.pow(10, 2));
+    } else {
+      return Math.round(value * (Math.pow(10, 3))) / (Math.pow(10, 3));
+    }
+  }
+
+  /**
+   * Get rounded double value, according to the value of the double.
    * Max rounding will be upto 4 decimals
    * For values gte 0.1, use ##.## (eg. 123, 2.5, 1.26, 0.5, 0.162)
    * For values lt 0.1 and gte 0.01, use ##.### (eg. 0.08, 0.071, 0.0123)

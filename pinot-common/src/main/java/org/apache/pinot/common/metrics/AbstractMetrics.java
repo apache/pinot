@@ -376,6 +376,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   public void initializeGlobalMeters() {
     M[] meters = getMeters();
+    LOGGER.info("Initializing global {} meters", meters.length);
 
     for (M meter : meters) {
       if (meter.isGlobal()) {
@@ -384,6 +385,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     }
 
     G[] gauges = getGauges();
+    LOGGER.info("Initializing global {} gauges", gauges.length);
     for (G gauge : gauges) {
       if (gauge.isGlobal()) {
         setValueOfGlobalGauge(gauge, 0);

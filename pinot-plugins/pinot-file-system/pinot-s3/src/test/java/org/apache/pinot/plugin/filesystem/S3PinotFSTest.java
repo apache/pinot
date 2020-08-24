@@ -287,7 +287,7 @@ public class S3PinotFSTest {
 
     Assert.assertEquals(headObjectResponse.contentLength(), (Long) fileToCopy.length());
 
-    File fileToDownload = new File("copyFile_download.txt");
+    File fileToDownload = new File("copyFile_download.txt").getAbsoluteFile();
     _s3PinotFS.copyToLocalFile(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, fileName)), fileToDownload);
     Assert.assertEquals(fileToCopy.length(), fileToDownload.length());
 

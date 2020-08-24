@@ -39,13 +39,13 @@ public final class GroupByUtils {
   /**
    * (For SQL semantic) Returns the capacity of the table required by the given query.
    * <ul>
-   *   <li>For group-by & order-by queries, returns {@code max(limit * 5, 5000)} to ensure the result accuracy</li>
-   *   <li>For group-by without order-by queries, returns the limit</li>
+   *   <li>For GROUP-BY with ORDER-BY or HAVING, returns {@code max(limit * 5, 5000)} to ensure the result accuracy</li>
+   *   <li>For GROUP-BY without ORDER-BY or HAVING, returns the limit</li>
    * </ul>
    */
   public static int getTableCapacity(QueryContext queryContext) {
     int limit = queryContext.getLimit();
-    if (queryContext.getOrderByExpressions() != null) {
+    if (queryContext.getOrderByExpressions() != null || queryContext.getHavingFilter() != null) {
       return Math.max(limit * 5, NUM_RESULTS_LOWER_LIMIT);
     } else {
       return limit;

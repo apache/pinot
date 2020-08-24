@@ -221,6 +221,9 @@ public class QueryContextConverterUtils {
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new RangePredicate(getExpression(operands.get(0)), true, getStringValue(operands.get(1)), true,
                 getStringValue(operands.get(2))));
+      case RANGE:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new RangePredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
       case REGEXP_LIKE:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new RegexpLikePredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
