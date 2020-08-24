@@ -18,7 +18,7 @@
 #
 
 
-FROM apachepinot/thirdeye-base:latest
+FROM apachepinot/thirdeye:latest
 
 EXPOSE 1426 1427
 COPY bin ${TE_HOME}/bin
