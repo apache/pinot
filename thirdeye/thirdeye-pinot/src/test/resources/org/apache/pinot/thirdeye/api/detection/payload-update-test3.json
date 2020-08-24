@@ -1,0 +1,3 @@
+{"dataset-configuration": "timeColumn: time_update",
+  "metric-configuration": "metricColumn: metric_update",
+  "data":{"columns":["time_update","metric_update"],"rows":[["20200325","68"],["20200428","67"],["20200422","63"],["20200423","56"],["20200424","44"]]}}
