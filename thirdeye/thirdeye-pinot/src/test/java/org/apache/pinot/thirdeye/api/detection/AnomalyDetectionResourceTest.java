@@ -132,9 +132,6 @@ public class AnomalyDetectionResourceTest {
     String payload = IOUtils.toString(this.getClass().getResourceAsStream("payload-good-custom.json"));
     JsonNode node = this.objectMapper.readTree(payload);
     DatasetConfigDTO datasetConfigDTO = this.anomalyDetectionResource
-        .generateDatasetConfig(this.objectMapper.readTree(payload), this.suffix);
-    MetricConfigDTO metricConfigDTO = this.anomalyDetectionResource
-        .generateMetricConfig(this.objectMapper.readTree(payload), this.suffix);
         .generateDatasetConfig(node, suffix);
     MetricConfigDTO metricConfigDTO = this.anomalyDetectionResource
         .generateMetricConfig(node, suffix);
