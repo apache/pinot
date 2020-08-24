@@ -69,7 +69,9 @@
            </td>
            <td class="te-anomaly-table__cell">
             <ul class="te-anomaly-table__list">
-              <li>{{anomaly.shownCurrent}} / {{anomaly.shownBaseline}}</li>
+              <li>{{anomaly.shownCurrent}} / {{anomaly.shownBaseline}}
+                {{partial 'partials/si-tooltip'}}
+              </li>
               <li class="te-anomaly-table__value-label te-anomaly-table__value-label--{{calculate-direction anomaly.shownChangeRate}}">
                 {{#if (not anomaly.isNullChangeRate)}}
                   ({{anomaly.shownChangeRate}}%)
