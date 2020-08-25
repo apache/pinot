@@ -865,9 +865,9 @@ export default Component.extend({
       };
       if (selectedRule.type === FORECAST_STRING) {
         const futureRanges = {
-          'Next 48 Hours': [moment().add(48, 'hour').startOf('hour'), moment().startOf('hour')],
-          'Next Week': [moment().add(1, 'week').startOf('day'), moment().startOf('day')],
-          'Next 30 Days': [moment().add(1, 'month').startOf('day'), moment().startOf('day')]
+          'Next 48 Hours': [moment().startOf('hour'), moment().add(48, 'hour').startOf('hour')],
+          'Next Week': [moment().startOf('day'), moment().add(1, 'week').startOf('day')],
+          'Next 30 Days': [moment().startOf('day'), moment().add(1, 'month').startOf('day')]
         };
         Object.assign(predefinedRanges, futureRanges);
       }
