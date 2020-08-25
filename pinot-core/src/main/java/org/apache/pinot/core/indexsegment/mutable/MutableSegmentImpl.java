@@ -639,7 +639,8 @@ public class MutableSegmentImpl implements MutableSegment {
       if (fieldSpec == null) {
         // If the column was added during ingestion, we will construct the column provider based on its fieldSpec to provide values
         fieldSpec = _newlyAddedColumnsFieldMap.get(column);
-        Preconditions.checkNotNull(fieldSpec, "FieldSpec for " + column + " should not be null");
+        Preconditions.checkNotNull(fieldSpec,
+            "FieldSpec for " + column + " should not be null. " + "Potentially invalid column name specified.");
       }
       // TODO: Refactor virtual column provider to directly generate data source
       VirtualColumnContext virtualColumnContext = new VirtualColumnContext(fieldSpec, _numDocsIndexed);
