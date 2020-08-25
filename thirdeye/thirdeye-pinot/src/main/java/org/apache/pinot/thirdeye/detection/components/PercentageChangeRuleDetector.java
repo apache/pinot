@@ -138,7 +138,7 @@ public class PercentageChangeRuleDetector implements AnomalyDetector<PercentageC
       df.mapInPlace(BooleanSeries.ALL_TRUE, COL_ANOMALY, COL_PATTERN, COL_CHANGE_VIOLATION);
     }
 
-    List<MergedAnomalyResultDTO> anomalies = DetectionUtils.makeAnomalies(slice, df, COL_ANOMALY, window.getEndMillis(),
+    List<MergedAnomalyResultDTO> anomalies = DetectionUtils.makeAnomalies(slice, df, COL_ANOMALY,
         DetectionUtils.getMonitoringGranularityPeriod(monitoringGranularity, datasetConfig), datasetConfig);
     DataFrame baselineWithBoundaries = constructPercentageChangeBoundaries(df);
     return DetectionResult.from(anomalies, TimeSeries.fromDataFrame(baselineWithBoundaries));
