@@ -302,4 +302,30 @@ public class ChildKeepingMergeWrapperTest {
     Assert.assertEquals(anomalyResults.get(0).getAvgCurrentVal(), 998.0);
 
   }
+
+  @Test
+  public void testMergerDifferentPattern() throws Exception {
+    this.config.getProperties().put(PROP_MAX_GAP, 200);
+    this.config.getProperties().put(PROP_MAX_DURATION, 1250);
+
+    this.outputs.add(new MockPipelineOutput(Arrays.asList(
+        makeAnomalyWithProps(2800, 3800, Collections.singletonMap("pattern", "UP")),
+        makeAnomalyWithProps(3500, 3600, Collections.singletonMap("pattern", "DOWN"))
+    ), 3700));
+
+    Map<String, Object> nestedProperties = new HashMap<>();
+    nestedProperties.put(PROP_CLASS_NAME, "none");
+    nestedProperties.put(PROP_METRIC_URN, "thirdeye:metric:3");
+
+    this.nestedProperties.add(nestedProperties);
+
+    this.wrapper = new ChildKeepingMergeWrapper(this.provider, this.config, 1000, 4000);
+    DetectionPipelineResult output = this.wrapper.run();
+
+    Assert.assertEquals(output.getAnomalies().size(), 5);
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomalyWithProps(2800, 3800, Collections.singletonMap("pattern", "UP"))));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomalyWithProps(3500, 3600, Collections.singletonMap("pattern", "UP"))));
+
+
+  }
 }
