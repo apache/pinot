@@ -118,7 +118,7 @@ public class SummaryResource {
 
       Dimensions dimensions;
       if (StringUtils.isBlank(groupByDimensions) || JAVASCRIPT_NULL_STRING.equals(groupByDimensions)) {
-        DatasetConfigDTO datasetConfigDTO = datasetConfigDAO.findByDataset(dataset);
+        DatasetConfigDTO datasetConfigDTO = datasetConfigDAO.findByDataset(datasetName);
         List<String> dimensionNames = new ArrayList<>();
         if (datasetConfigDTO != null) {
           dimensionNames = datasetConfigDTO.getDimensions();
