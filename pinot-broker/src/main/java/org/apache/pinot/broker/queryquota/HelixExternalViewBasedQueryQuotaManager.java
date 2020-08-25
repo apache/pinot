@@ -55,7 +55,8 @@ import org.slf4j.LoggerFactory;
  */
 public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHandler, QueryQuotaManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixExternalViewBasedQueryQuotaManager.class);
-  private static final int TIME_RANGE_IN_SECOND = 1;
+  private static final int ONE_SECOND_TIME_RANGE_IN_SECOND = 1;
+  private static final int ONE_MINUTE_TIME_RANGE_IN_SECOND = 60;
 
   private final BrokerMetrics _brokerMetrics;
   private final String _instanceId;
@@ -196,8 +197,8 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
 
     double perBrokerRate = overallRate / onlineCount;
     QueryQuotaEntity queryQuotaEntity =
-        new QueryQuotaEntity(RateLimiter.create(perBrokerRate), new HitCounter(TIME_RANGE_IN_SECOND), onlineCount,
-            overallRate, stat.getVersion());
+        new QueryQuotaEntity(RateLimiter.create(perBrokerRate), new HitCounter(ONE_SECOND_TIME_RANGE_IN_SECOND),
+            new HitCounter(ONE_MINUTE_TIME_RANGE_IN_SECOND, 60), onlineCount, overallRate, stat.getVersion());
     _rateLimiterMap.put(tableNameWithType, queryQuotaEntity);
     LOGGER.info(
         "Rate limiter for table: {} has been initialized. Overall rate: {}. Per-broker rate: {}. Number of online broker instances: {}. Table config stat version: {}",
@@ -255,18 +256,22 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
    */
   private boolean tryAcquireToken(String tableNameWithType, QueryQuotaEntity queryQuotaEntity) {
     // Use hit counter to count the number of hits.
-    queryQuotaEntity.getHitCounter().hit();
+    queryQuotaEntity.getHitCounterInSecond().hit();
+    queryQuotaEntity.getHitCounterInMinute().hit();
 
     RateLimiter rateLimiter = queryQuotaEntity.getRateLimiter();
     double perBrokerRate = rateLimiter.getRate();
 
     // Emit the qps capacity utilization rate.
-    int numHits = queryQuotaEntity.getHitCounter().getHitCount();
+    int numHits = queryQuotaEntity.getHitCounterInSecond().getHitCount();
     if (_brokerMetrics != null) {
       int percentageOfCapacityUtilization = (int) (numHits * 100 / perBrokerRate);
       LOGGER.debug("The percentage of rate limit capacity utilization is {}", percentageOfCapacityUtilization);
       _brokerMetrics.setValueOfTableGauge(tableNameWithType, BrokerGauge.QUERY_QUOTA_CAPACITY_UTILIZATION_RATE,
           percentageOfCapacityUtilization);
+
+      _brokerMetrics.addCallbackTableGaugeIfNeeded(tableNameWithType, BrokerGauge.MAX_QPS_IN_ONE_MINUTE,
+          () -> (long) queryQuotaEntity.getHitCounterInMinute().getMaxCountPerBucket());
     }
 
     if (!rateLimiter.tryAcquire()) {
