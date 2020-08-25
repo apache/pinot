@@ -324,7 +324,7 @@ public class ChildKeepingMergeWrapperTest {
 
     Assert.assertEquals(output.getAnomalies().size(), 5);
     Assert.assertTrue(output.getAnomalies().contains(makeAnomalyWithProps(2800, 3800, Collections.singletonMap("pattern", "UP"))));
-    Assert.assertTrue(output.getAnomalies().contains(makeAnomalyWithProps(3500, 3600, Collections.singletonMap("pattern", "UP"))));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomalyWithProps(3500, 3600, Collections.singletonMap("pattern", "DOWN"))));
 
 
   }
