@@ -184,6 +184,8 @@ public class AnomalyDetectionResource {
 
     // TODO: refactor code to resolve request configurations in one place (e.g. default/customized config names)
 
+    // TODO: refactor code to resolve request configurations in one place (e.g. default/customized config names)
+
     try {
       Preconditions.checkNotNull(start, "Detection start time is not provided");
       Preconditions.checkNotNull(end, "Detection end time is not provided");
