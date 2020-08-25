@@ -26,6 +26,7 @@
 # - MODE: Choices: {frontend, backend, * }
 #       frontend: Start the frontend server only
 #       backend: Start the backend server only
+#       database: Start the H@ db service. Also initializes the db with the required tables
 #       For any other value, defaults to starting all services with an h2 db.
 #
 
@@ -53,7 +54,8 @@ function start_backend {
   start_server  org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyApplication "${CONFIG_DIR}"
 }
 
-function start_all {
+
+function start_db {
   echo "Starting H2 database server"
   java -cp "./bin/thirdeye-pinot.jar" org.h2.tools.Server -tcp -baseDir "${CONFIG_DIR}/.." &
   sleep 1
@@ -65,6 +67,10 @@ function start_all {
     echo "Running database bootstrap script ${CONFIG_DIR}/bootstrap.sql"
     java -cp "./bin/thirdeye-pinot.jar" org.h2.tools.RunScript -user "sa" -password "sa" -url "jdbc:h2:tcp:localhost/h2db" -script "${CONFIG_DIR}/bootstrap.sql"
   fi
+}
+
+function start_all {
+  start_db
 
   start_backend &
   sleep 10
@@ -76,6 +82,7 @@ function start_all {
 MODE=$2
 case ${MODE} in
     "frontend" )  start_frontend ;;
-    "backend" )   start_backend ;;
+    "backend"  )  start_backend ;;
+    "database" )  start_db;;
     * )           start_all ;;
 esac
