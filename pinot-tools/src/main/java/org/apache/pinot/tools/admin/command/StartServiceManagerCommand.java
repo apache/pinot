@@ -192,7 +192,20 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
   }
 
   private void startPinotService(Map<String, Object> properties) {
-    startPinotService(ServiceRole.valueOf(properties.get(PINOT_SERVICE_ROLE).toString()), properties);
+    ServiceRole role = ServiceRole.valueOf(properties.get(PINOT_SERVICE_ROLE).toString());
+    switch (role) {
+      // Broker and Server can be started in parallel always
+      case BROKER:
+      case SERVER:
+        new Thread("Starting " + role) {
+          @Override public void run() {
+            startPinotService(role, properties);
+          }
+        }.start();
+        break;
+      default:
+        startPinotService(role, properties);
+    }
   }
 
   public boolean startPinotService(ServiceRole role, Map<String, Object> properties) {
