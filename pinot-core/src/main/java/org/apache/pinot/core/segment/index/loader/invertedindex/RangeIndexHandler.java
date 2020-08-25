@@ -206,7 +206,7 @@ public class RangeIndexHandler {
         return new FixedBitMVForwardIndexReader(buffer, numRows, columnMetadata.getTotalNumberOfEntries(),
                 numBitsPerValue);
       } else {
-        throw new RuntimeException("Range indexing is not supported for multi value non-dictionary columns");
+        throw new RuntimeException("Raw index on multi-value column is not supported");
       }
     }
   }

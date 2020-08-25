@@ -66,7 +66,7 @@ import static org.apache.pinot.core.segment.creator.impl.V1Constants.Indexes.BIT
  *   </li>
  * </ul>
  */
-public final class RangeIndexCreator implements RawValueBasedInvertedIndexCreator {
+public final class RangeIndexCreator implements RawValueBasedInvertedIndexCreator,DictionaryBasedInvertedIndexCreator {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RangeIndexCreator.class);
 
@@ -176,6 +176,7 @@ public final class RangeIndexCreator implements RawValueBasedInvertedIndexCreato
     for (int i = 0; i < length; i++) {
       addValueToBuffer(values[i]);
       nextDoc();
+      _nextValueId = _nextValueId + 1;
     }
     nextDoc();
   }
@@ -223,6 +224,11 @@ public final class RangeIndexCreator implements RawValueBasedInvertedIndexCreato
       nextDoc();
     }
     nextDoc();
+  }
+
+  @Override
+  public void addDoc(Object document, int docIdCounter) {
+    throw new IllegalStateException("Range index creator does not support Object type currently");
   }
 
   /**
