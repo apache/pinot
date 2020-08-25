@@ -167,63 +167,70 @@ public final class RangeIndexCreator implements RawValueBasedInvertedIndexCreato
 
   @Override
   public void add(int value) {
-    addValueToBuffer(value);
-    nextDoc();
+    _numberValueBuffer.put(_nextDocId, value);
+    _docIdBuffer.put(_nextDocId, _nextDocId);
+    _nextDocId = _nextDocId + 1;
   }
 
   @Override
   public void add(int[] values, int length) {
     for (int i = 0; i < length; i++) {
-      addValueToBuffer(values[i]);
-      nextDoc();
+      _numberValueBuffer.put(_nextValueId, values[i]);
+      _docIdBuffer.put(_nextValueId, _nextDocId);
       _nextValueId = _nextValueId + 1;
     }
-    nextDoc();
+    _nextDocId = _nextDocId + 1;
   }
 
   @Override
   public void add(long value) {
-    addValueToBuffer(value);
-    nextDoc();
+    _numberValueBuffer.put(_nextDocId, value);
+    _docIdBuffer.put(_nextDocId, _nextDocId);
+    _nextDocId = _nextDocId + 1;
   }
 
   @Override
   public void add(long[] values, int length) {
     for (int i = 0; i < length; i++) {
-      addValueToBuffer(values[i]);
-      nextDoc();
+      _numberValueBuffer.put(_nextValueId, values[i]);
+      _docIdBuffer.put(_nextValueId, _nextDocId);
+      _nextValueId = _nextValueId + 1;
     }
-    nextDoc();
+    _nextDocId = _nextDocId + 1;
   }
 
   @Override
   public void add(float value) {
-    addValueToBuffer(value);
-    nextDoc();
+    _numberValueBuffer.put(_nextDocId, value);
+    _docIdBuffer.put(_nextDocId, _nextDocId);
+    _nextDocId = _nextDocId + 1;
   }
 
   @Override
   public void add(float[] values, int length) {
     for (int i = 0; i < length; i++) {
-      addValueToBuffer(values[i]);
-      nextDoc();
+      _numberValueBuffer.put(_nextValueId, values[i]);
+      _docIdBuffer.put(_nextValueId, _nextDocId);
+      _nextValueId = _nextValueId + 1;
     }
-    nextDoc();
+    _nextDocId = _nextDocId + 1;
   }
 
   @Override
   public void add(double value) {
-    addValueToBuffer(value);
-    nextDoc();
+    _numberValueBuffer.put(_nextDocId, value);
+    _docIdBuffer.put(_nextDocId, _nextDocId);
+    _nextDocId = _nextDocId + 1;
   }
 
   @Override
   public void add(double[] values, int length) {
     for (int i = 0; i < length; i++) {
-      addValueToBuffer(values[i]);
-      nextDoc();
+      _numberValueBuffer.put(_nextValueId, values[i]);
+      _docIdBuffer.put(_nextValueId, _nextDocId);
+      _nextValueId = _nextValueId + 1;
     }
-    nextDoc();
+    _nextDocId = _nextDocId + 1;
   }
 
   @Override
@@ -443,14 +450,6 @@ public final class RangeIndexCreator implements RawValueBasedInvertedIndexCreato
     }
   }
 
-  private void nextDoc() {
-    _nextDocId = _nextDocId + 1;
-  }
-
-  private void addValueToBuffer(Number value) {
-    _numberValueBuffer.put(_nextDocId, value);
-    _docIdBuffer.put(_nextDocId, _nextDocId);
-  }
 
   void dump() {
     StringBuilder docIdAsString = new StringBuilder("DocIdBuffer  [ ");

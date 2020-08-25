@@ -42,7 +42,7 @@ import java.io.IOException;
  *
  * <p>To create an inverted index:
  * <ul>
- *   <li>
+ *   <li>R
  *     Construct an instance of <code>InvertedIndexCreator</code>
  *   </li>
  *   <li>
