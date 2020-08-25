@@ -262,7 +262,7 @@ public class RangePredicateEvaluatorFactory {
     }
   }
 
-  private static final class IntRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+  public static final class IntRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final int _lowerBound;
     final int _upperBound;
     final boolean _lowerInclusive;
@@ -278,6 +278,14 @@ public class RangePredicateEvaluatorFactory {
       _upperBound = upperUnbounded ? Integer.MAX_VALUE : Integer.parseInt(upperBound);
       _lowerInclusive = lowerUnbounded || rangePredicate.isLowerInclusive();
       _upperInclusive = upperUnbounded || rangePredicate.isUpperInclusive();
+    }
+
+    public int geLowerBound() {
+      return _lowerBound;
+    }
+
+    public int getUpperBound() {
+      return _upperBound;
     }
 
     @Override
@@ -307,7 +315,7 @@ public class RangePredicateEvaluatorFactory {
     }
   }
 
-  private static final class LongRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+  public static final class LongRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final long _lowerBound;
     final long _upperBound;
     final boolean _lowerInclusive;
@@ -323,6 +331,14 @@ public class RangePredicateEvaluatorFactory {
       _upperBound = upperUnbounded ? Long.MAX_VALUE : Long.parseLong(upperBound);
       _lowerInclusive = lowerUnbounded || rangePredicate.isLowerInclusive();
       _upperInclusive = upperUnbounded || rangePredicate.isUpperInclusive();
+    }
+
+    public long geLowerBound() {
+      return _lowerBound;
+    }
+
+    public long getUpperBound() {
+      return _upperBound;
     }
 
     @Override
@@ -352,7 +368,7 @@ public class RangePredicateEvaluatorFactory {
     }
   }
 
-  private static final class FloatRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+  public static final class FloatRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final float _lowerBound;
     final float _upperBound;
     final boolean _lowerInclusive;
@@ -368,6 +384,14 @@ public class RangePredicateEvaluatorFactory {
       _upperBound = upperUnbounded ? Float.POSITIVE_INFINITY : Float.parseFloat(upperBound);
       _lowerInclusive = lowerUnbounded || rangePredicate.isLowerInclusive();
       _upperInclusive = upperUnbounded || rangePredicate.isUpperInclusive();
+    }
+
+    public float geLowerBound() {
+      return _lowerBound;
+    }
+
+    public float getUpperBound() {
+      return _upperBound;
     }
 
     @Override
@@ -397,7 +421,7 @@ public class RangePredicateEvaluatorFactory {
     }
   }
 
-  private static final class DoubleRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+  public static final class DoubleRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final double _lowerBound;
     final double _upperBound;
     final boolean _lowerInclusive;
@@ -413,6 +437,14 @@ public class RangePredicateEvaluatorFactory {
       _upperBound = upperUnbounded ? Double.POSITIVE_INFINITY : Double.parseDouble(upperBound);
       _lowerInclusive = lowerUnbounded || rangePredicate.isLowerInclusive();
       _upperInclusive = upperUnbounded || rangePredicate.isUpperInclusive();
+    }
+
+    public double geLowerBound() {
+      return _lowerBound;
+    }
+
+    public double getUpperBound() {
+      return _upperBound;
     }
 
     @Override
@@ -442,7 +474,7 @@ public class RangePredicateEvaluatorFactory {
     }
   }
 
-  private static final class StringRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+  public static final class StringRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final String _lowerBound;
     final String _upperBound;
     final boolean _lowerInclusive;
@@ -488,7 +520,7 @@ public class RangePredicateEvaluatorFactory {
     }
   }
 
-  private static final class BytesRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+  public static final class BytesRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final byte[] _lowerBound;
     final byte[] _upperBound;
     final boolean _lowerInclusive;
