@@ -157,7 +157,7 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
       throws Exception {
     try {
       LOGGER.info("Executing command: " + toString());
-      startPinotService("ServiceManager", this::startServiceManager);
+      startPinotService("SERVICE_MANAGER", this::startServiceManager);
 
       if (_bootstrapConfigPaths != null) {
         for (String configPath : _bootstrapConfigPaths) {
