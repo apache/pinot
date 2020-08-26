@@ -53,6 +53,8 @@ import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
 import org.apache.pinot.core.query.aggregation.function.customobject.DistinctTable;
 import org.apache.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
 import org.apache.pinot.core.query.aggregation.function.customobject.QuantileDigest;
+import org.apache.pinot.core.query.utils.idset.IdSet;
+import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.StringUtils;
 import org.locationtech.jts.geom.Geometry;
@@ -88,7 +90,8 @@ public class ObjectSerDeUtils {
     FloatSet(16),
     DoubleSet(17),
     StringSet(18),
-    BytesSet(19);
+    BytesSet(19),
+    IdSet(20);
 
     private final int _value;
 
@@ -144,6 +147,8 @@ public class ObjectSerDeUtils {
         } else {
           return ObjectType.BytesSet;
         }
+      } else if (value instanceof IdSet) {
+        return ObjectType.IdSet;
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());
       }
@@ -742,6 +747,35 @@ public class ObjectSerDeUtils {
     }
   };
 
+  public static final ObjectSerDe<IdSet> ID_SET_SER_DE = new ObjectSerDe<IdSet>() {
+    @Override
+    public byte[] serialize(IdSet idSet) {
+      try {
+        return idSet.toBytes();
+      } catch (IOException e) {
+        throw new RuntimeException("Caught exception while serializing IdSet", e);
+      }
+    }
+
+    @Override
+    public IdSet deserialize(byte[] bytes) {
+      try {
+        return IdSets.fromBytes(bytes);
+      } catch (IOException e) {
+        throw new RuntimeException("Caught exception while deserializing IdSet", e);
+      }
+    }
+
+    @Override
+    public IdSet deserialize(ByteBuffer byteBuffer) {
+      try {
+        return IdSets.fromByteBuffer(byteBuffer);
+      } catch (IOException e) {
+        throw new RuntimeException("Caught exception while deserializing IdSet", e);
+      }
+    }
+  };
+
   // NOTE: DO NOT change the order, it has to be the same order as the ObjectType
   //@formatter:off
   private static final ObjectSerDe[] SER_DES = {
@@ -764,7 +798,8 @@ public class ObjectSerDeUtils {
       FLOAT_SET_SER_DE,
       DOUBLE_SET_SER_DE,
       STRING_SET_SER_DE,
-      BYTES_SET_SER_DE
+      BYTES_SET_SER_DE,
+      ID_SET_SER_DE
   };
   //@formatter:on
 
