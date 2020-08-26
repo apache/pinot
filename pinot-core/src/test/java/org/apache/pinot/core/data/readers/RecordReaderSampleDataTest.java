@@ -51,9 +51,6 @@ public class RecordReaderSampleDataTest {
   private static final File JSON_SAMPLE_DATA_FILE = new File(Preconditions
       .checkNotNull(RecordReaderSampleDataTest.class.getClassLoader().getResource("data/test_sample_data.json"))
       .getFile());
-  private static final File JSON_INVALID_SAMPLE_DATA_FILE = new File(Preconditions
-          .checkNotNull(RecordReaderSampleDataTest.class.getClassLoader().getResource("data/test_invalid_data.json"))
-          .getFile());
   private final Schema SCHEMA = new Schema.SchemaBuilder().addSingleValueDimension("column1", FieldSpec.DataType.LONG)
       .addSingleValueDimension("column2", FieldSpec.DataType.INT)
       .addSingleValueDimension("column3", FieldSpec.DataType.STRING)
@@ -144,21 +141,6 @@ public class RecordReaderSampleDataTest {
         }
       }
       assertEquals(numRecords, 10001);
-    }
-  }
-
-  @Test(
-     expectedExceptions = RuntimeException.class,
-     expectedExceptionsMessageRegExp = "^.*test_invalid_data.json.*$"
-  )
-  public void testReadingInvalidJsonFile()
-      throws Exception {
-    try(RecordReader jsonRecordReader = RecordReaderFactory
-       .getRecordReader(FileFormat.JSON, JSON_INVALID_SAMPLE_DATA_FILE, SCHEMA.getColumnNames(), null)) {
-      // first record without a problem
-      jsonRecordReader.next();
-      // problematic record
-      jsonRecordReader.next();
     }
   }
 

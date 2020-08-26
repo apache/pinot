@@ -252,7 +252,8 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
             if (j < _retry) {
               LOGGER.warn("Caught exception while creating/verifying segment, will retry", e);
             } else {
-              throw e;
+              final String exceptionMessage = String.format("%s. File: %s", e.getMessage(), dataFiles.get(sequenceId));
+              throw new Exception(exceptionMessage, e);
             }
           }
         }

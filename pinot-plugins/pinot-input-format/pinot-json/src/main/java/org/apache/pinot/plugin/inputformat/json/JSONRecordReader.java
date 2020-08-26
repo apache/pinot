@@ -77,14 +77,9 @@ public class JSONRecordReader implements RecordReader {
 
   @Override
   public GenericRow next(GenericRow reuse) {
-    try {
-      Map<String, Object> record = _iterator.next();
-      _recordExtractor.extract(record, reuse);
-      return reuse;
-    } catch (RuntimeException e) {
-      final String exceptionMessage = String.format("%s. File: %s", e.getMessage(), _dataFile.getName());
-      throw new RuntimeException(exceptionMessage);
-    }
+    Map<String, Object> record = _iterator.next();
+    _recordExtractor.extract(record, reuse);
+    return reuse;
   }
 
   @Override
