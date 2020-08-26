@@ -21,11 +21,11 @@ package org.apache.pinot.tools.segment.converter;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
-import java.util.ArrayList;
-import java.util.List;
+import java.io.IOException;
 import org.apache.commons.lang.StringUtils;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /**
@@ -53,31 +53,36 @@ public class PinotSegmentToCsvConverter implements PinotSegmentConverter {
     try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader(new File(_segmentDir));
         BufferedWriter recordWriter = new BufferedWriter(new FileWriter(_outputFile))) {
       GenericRow row = new GenericRow();
-
+      row = recordReader.next(row);
+      String[] fields = row.getFieldToValueMap().keySet().toArray(new String[0]);
       if (_withHeader) {
-        row = recordReader.next(row);
-        recordWriter.write(StringUtils.join(row.getFieldNames(), _delimiter));
+        recordWriter.write(StringUtils.join(fields, _delimiter));
         recordWriter.newLine();
-        recordReader.rewind();
       }
-
+      writeRow(recordWriter, row, fields);
       while (recordReader.hasNext()) {
         row = recordReader.next(row);
-        String[] fields = row.getFieldNames();
-        List<String> record = new ArrayList<>(fields.length);
-
-        for (String field : fields) {
-          Object value = row.getValue(field);
-          if (value instanceof Object[]) {
-            record.add(StringUtils.join((Object[]) value, _listDelimiter));
-          } else {
-            record.add(value.toString());
-          }
-        }
-
-        recordWriter.write(StringUtils.join(record, _delimiter));
-        recordWriter.newLine();
+        writeRow(recordWriter, row, fields);
       }
     }
+  }
+
+  private void writeRow(BufferedWriter recordWriter, GenericRow row, String[] fields)
+      throws IOException {
+    int numFields = fields.length;
+    String[] values = new String[numFields];
+    for (int i = 0; i < numFields; i++) {
+      String field = fields[i];
+      Object value = row.getValue(field);
+      if (value instanceof Object[]) {
+        values[i] = StringUtils.join((Object[]) value, _listDelimiter);
+      } else if (value instanceof byte[]) {
+        values[i] = BytesUtils.toHexString((byte[]) value);
+      } else {
+        values[i] = value.toString();
+      }
+    }
+    recordWriter.write(StringUtils.join(values, _delimiter));
+    recordWriter.newLine();
   }
 }
