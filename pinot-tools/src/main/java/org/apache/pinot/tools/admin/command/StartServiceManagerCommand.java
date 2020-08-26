@@ -19,15 +19,20 @@
 package org.apache.pinot.tools.admin.command;
 
 import static org.apache.pinot.common.utils.CommonConstants.Helix.PINOT_SERVICE_ROLE;
+import static org.apache.pinot.spi.services.ServiceRole.CONTROLLER;
 
 import java.io.File;
 import java.net.SocketException;
 import java.net.UnknownHostException;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
+import com.google.common.collect.LinkedListMultimap;
+import com.google.common.collect.Multimap;
+import org.apache.helix.HelixManager;
+import org.apache.helix.HelixManagerFactory;
+import org.apache.helix.InstanceType;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.services.ServiceRole;
@@ -46,8 +51,10 @@ import org.slf4j.LoggerFactory;
  */
 public class StartServiceManagerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartServiceManagerCommand.class);
-  private final List<Map<String, Object>> _bootstrapConfigurations = new ArrayList<>();
-  private final String[] BOOTSTRAP_SERVICES = new String[]{"CONTROLLER", "BROKER", "SERVER"};
+  private static final long startTick = System.nanoTime();
+  private static final String[] BOOTSTRAP_SERVICES = new String[]{"CONTROLLER", "BROKER", "SERVER"};
+  // multiple instances allowed per role for testing many minions
+  private final Multimap<ServiceRole, Map<String, Object>> _bootstrapConfigurations = LinkedListMultimap.create();
 
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help;
@@ -152,19 +159,24 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
       LOGGER.info("Executing command: " + toString());
       _pinotServiceManager = new PinotServiceManager(_zkAddress, _clusterName, _port);
       _pinotServiceManager.start();
+
       if (_bootstrapConfigPaths != null) {
         for (String configPath : _bootstrapConfigPaths) {
-          _bootstrapConfigurations.add(readConfigFromFile(configPath));
+          Map<String, Object> config = readConfigFromFile(configPath);
+          ServiceRole role = ServiceRole.valueOf(config.get(PINOT_SERVICE_ROLE).toString());
+          _bootstrapConfigurations.put(role, config);
         }
       } else if (_bootstrapServices != null) {
         for (String service : _bootstrapServices) {
-          ServiceRole serviceRole = ServiceRole.valueOf(service.toUpperCase());
-          addBootstrapService(serviceRole, getDefaultConfig(serviceRole));
+          ServiceRole role = ServiceRole.valueOf(service.toUpperCase());
+          Map<String, Object> config = getDefaultConfig(role);
+          config.put(PINOT_SERVICE_ROLE, role.toString());
+          _bootstrapConfigurations.put(role, config);
         }
       }
-      for (Map<String, Object> properties : _bootstrapConfigurations) {
-        startPinotService(properties);
-      }
+
+      startBootstrapServices();
+
       String pidFile = ".pinotAdminService-" + System.currentTimeMillis() + ".pid";
       savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
       return true;
@@ -191,39 +203,66 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
     }
   }
 
-  private void startPinotService(Map<String, Object> properties) {
-    ServiceRole role = ServiceRole.valueOf(properties.get(PINOT_SERVICE_ROLE).toString());
-    switch (role) {
-      // Broker and Server can be started in parallel always
-      case BROKER:
-      case SERVER:
-        new Thread("Starting " + role) {
-          @Override public void run() {
-            startPinotService(role, properties);
-          }
-        }.start();
-        break;
-      default:
-        startPinotService(role, properties);
+  public StartServiceManagerCommand addBootstrapService(ServiceRole role, Map<String, Object> config) {
+    config.put(PINOT_SERVICE_ROLE, role.toString());
+
+    _bootstrapConfigurations.put(role, config);
+
+    return this;
+  }
+
+  /**
+   * Starts a controller synchronously unless the cluster already exists. Other services start in parallel.
+   */
+  private void startBootstrapServices() {
+    boolean clusterExists = clusterExists(_pinotServiceManager.getInstanceId());
+
+    if (!clusterExists) {
+      // start controller(s) synchronously so that other services don't fail
+      for (Map<String, Object> config : _bootstrapConfigurations.get(CONTROLLER)) {
+        startPinotService(CONTROLLER, config);
+      }
+    }
+
+    for (Map.Entry<ServiceRole, Map<String, Object>> roleToConfig : _bootstrapConfigurations.entries()) {
+      ServiceRole role = roleToConfig.getKey();
+      if (!clusterExists && role == CONTROLLER) continue; // already started
+
+      Map<String, Object> config = roleToConfig.getValue();
+      new Thread("Starting " + role) {
+        @Override public void run() {
+          startPinotService(role, config);
+        }
+      }.start();
     }
   }
 
-  public boolean startPinotService(ServiceRole role, Map<String, Object> properties) {
+  private boolean clusterExists(String instanceId) {
+    HelixManager spectatorHelixManager =
+        HelixManagerFactory.getZKHelixManager(_clusterName, instanceId, InstanceType.SPECTATOR, _zkAddress);
     try {
+      spectatorHelixManager.connect();
+      spectatorHelixManager.disconnect();
+      return true;
+    } catch (Exception ignored) {
+      return false;
+    }
+  }
+
+  private boolean startPinotService(ServiceRole role, Map<String, Object> properties) {
+    try {
+      LOGGER.info("Starting a Pinot [{}] at {}s since launch", role, startOffsetSeconds());
       String instanceId = _pinotServiceManager.startRole(role, properties);
-      LOGGER.info("Started Pinot [{}] Instance [{}].", role, instanceId);
+      LOGGER.info("Started Pinot [{}] instance [{}] at {}s since launch", role, instanceId, startOffsetSeconds());
     } catch (Exception e) {
-      LOGGER.error(String.format("Failed to start a [ %s ] Service", role), e);
+      LOGGER.error(String.format("Failed to start a Pinot [%s] at %s since launch", role, startOffsetSeconds()), e);
       return false;
     }
     return true;
   }
 
-  public StartServiceManagerCommand addBootstrapService(ServiceRole role, Map<String, Object> properties) {
-    properties.put(PINOT_SERVICE_ROLE, role.toString());
-    
-    _bootstrapConfigurations.add(properties);
-    
-    return this;
+  /** Creates millis precision unit of seconds. ex 1.002 */
+  private static float startOffsetSeconds() {
+    return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTick) / 1000f;
   }
 }
