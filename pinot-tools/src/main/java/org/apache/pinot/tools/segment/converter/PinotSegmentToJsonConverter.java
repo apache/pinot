@@ -22,9 +22,11 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
-import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.data.readers.GenericRow;
+import java.util.Map;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
@@ -48,8 +50,14 @@ public class PinotSegmentToJsonConverter implements PinotSegmentConverter {
       while (recordReader.hasNext()) {
         row = recordReader.next(row);
         ObjectNode record = JsonUtils.newObjectNode();
-        for (String column : row.getFieldNames()) {
-          record.set(column, JsonUtils.objectToJsonNode(row.getValue(column)));
+        for (Map.Entry<String, Object> entry : row.getFieldToValueMap().entrySet()) {
+          String field = entry.getKey();
+          Object value = entry.getValue();
+          if (value instanceof byte[]) {
+            record.put(field, BytesUtils.toHexString((byte[]) value));
+          } else {
+            record.set(field, JsonUtils.objectToJsonNode(value));
+          }
         }
         recordWriter.write(record.toString());
         recordWriter.newLine();
