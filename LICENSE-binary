@@ -432,12 +432,23 @@ org.threeten:threetenbp:1.3.3
 pinot-controller/src/main/resources/*/js/lib/jquery.dataTables.min.js
 
 
+Common Development and Distribution License (CDDL) 1.0
+------------------------------------------------------
+(see licenses-binary/LICENSE-cddl-1.0.txt)
+
+javax.activation:activation:1.1.1
+javax.servlet:javax.servlet-api:3.0.1
+
+
 Common Development and Distribution License (CDDL) 1.1
 ------------------------------------------------------
 (see licenses-binary/LICENSE-cddl-1.1.txt)
 
+com.sun.xml.bind:jaxb-core:2.3.0
+com.sun.xml.bind:jaxb-impl:2.3.0
 javax.annotation:javax.annotation-api:1.3.2
 javax.ws.rs:javax.ws.rs-api:2.0.1
+javax.xml.bind:jaxb-api:2.3.0
 org.glassfish.hk2:osgi-resource-locator:1.0.1
 org.glassfish.tyrus.bundles:tyrus-standalone-client:1.5
 
