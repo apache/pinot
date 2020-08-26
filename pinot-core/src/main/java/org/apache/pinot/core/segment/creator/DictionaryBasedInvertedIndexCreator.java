@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.segment.creator;
 
-import java.io.Closeable;
 import java.io.IOException;
 
 
