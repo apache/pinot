@@ -73,7 +73,7 @@
     "maxThreshold_1:THRESHOLD": {
       "max": 100,
       "className": "org.apache.pinot.thirdeye.detection.components.ThresholdRuleDetector",
-      "metricUrn": "thirdeye:metric:1"
+      "metricUrn": "thirdeye:metric:1:D1%3Dv1:D1%3Dv2:D2%3Dv3"
     },
     "maxThreshold_2:THRESHOLD": {
       "max": 100,
@@ -84,6 +84,16 @@
       "max": 100,
       "className": "org.apache.pinot.thirdeye.detection.components.ThresholdRuleDetector",
       "metricUrn": "thirdeye:metric:1:D1%3Dv1:D1%3Dv2:D2%3Dv3"
+    },
+    "maxThreshold_4:THRESHOLD": {
+      "max": 100,
+      "className": "org.apache.pinot.thirdeye.detection.components.ThresholdRuleDetector",
+      "metricUrn": "thirdeye:metric:1"
+    },
+    "maxThreshold_5:THRESHOLD": {
+      "max": 100,
+      "className": "org.apache.pinot.thirdeye.detection.components.ThresholdRuleDetector",
+      "metricUrn": "thirdeye:metric:1"
     },
     "thresholdFilter_1:THRESHOLD_RULE_FILTER": {
       "min": 50,

@@ -27,7 +27,7 @@
     ]
   },
   "active":true,
-  "yaml":"detectionName: test_function\ndescription: Please update description - If this alert fires then it means so-and-so and check so-and-so for irregularities\nmetric: test_metric\nactive: true\ndataset: test_collection\npipelineType: Composite\nfilters:\n  score_challenge_type:\n  - Captcha Challenge\nrules:\n- detection:\n  - name: detection_rule1\n    type: THRESHOLD\n    params:\n      min: '0.70'\n",
+  "yaml":"detectionName: test_function\ndescription: Please update description - If this alert fires then it means so-and-so and check so-and-so for irregularities\nmetric: test_metric\nactive: true\ndataset: test_collection\ntype: COMPOSITE_ALERT\nfilters:\n  score_challenge_type:\n  - Captcha Challenge\nrules:\n- detection:\n  - name: detection_rule1\n    type: THRESHOLD\n    params:\n      min: '0.70'\n",
   "componentSpecs":{
     "detection_rule1:THRESHOLD":{
       "min":"0.70",

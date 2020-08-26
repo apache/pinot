@@ -2,13 +2,7 @@ subscriptionGroupName: "Subscription Group Name"
 cron: "0 0/5 * 1/1 * ? *"
 active: true
 
-type: DIMENSIONAL_ALERTER_PIPELINE
-dimensionRecipients:
- "android":
-  - "android-thirdeye@thirdeye.com"
- "ios":
-  - "ios-thirdeye@thirdeye.com"
-dimension: app_name
+type: DEFAULT_ALERTER_PIPELINE
 
 subscribedDetections:
 - test_detection_1
@@ -36,3 +30,5 @@ alertSuppressors:
 
 referenceLinks:
  "Oncall Runbook": "test_url"
+
+

@@ -19,6 +19,7 @@ package org.apache.pinot.thirdeye.integration;
 import java.util.List;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import org.apache.pinot.thirdeye.datalayer.DaoTestUtils;
+import org.apache.pinot.thirdeye.datalayer.bao.ApplicationManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.EvaluationManager;
@@ -26,6 +27,7 @@ import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
+import org.apache.pinot.thirdeye.datalayer.dto.ApplicationDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
@@ -76,6 +78,7 @@ public class NotificationTaskSchedulerTest {
   private MergedAnomalyResultManager anomalyDAO;
   private TaskManager taskDAO;
   private EvaluationManager evaluationDAO;
+  private ApplicationManager appDAO;
   private DetectionPipelineLoader detectionPipelineLoader;
   private long detectionId;
 
@@ -109,6 +112,7 @@ public class NotificationTaskSchedulerTest {
     taskDAO = daoRegistry.getTaskDAO();
     anomalyDAO = daoRegistry.getMergedAnomalyResultDAO();
     evaluationDAO = daoRegistry.getEvaluationManager();
+    appDAO = daoRegistry.getApplicationDAO();
     detectionPipelineLoader = new DetectionPipelineLoader();
   }
 
@@ -126,6 +130,11 @@ public class NotificationTaskSchedulerTest {
     datasetDAO.save(getTestDatasetConfig(collection));
     metricDAO.save(getTestMetricConfig(collection, metric, null));
 
+    ApplicationDTO app = new ApplicationDTO();
+    app.setApplication("thirdeye");
+    app.setRecipients("test@test");
+    this.appDAO.save(app);
+
     TimeSeriesLoader timeseriesLoader =
         new DefaultTimeSeriesLoader(daoRegistry.getMetricConfigDAO(), datasetDAO, null, null);
     AggregationLoader aggregationLoader =
@@ -138,8 +147,7 @@ public class NotificationTaskSchedulerTest {
 
     detectionId = daoRegistry.getDetectionConfigManager().save(DaoTestUtils.getTestDetectionConfig(provider, detectionConfigFile));
     // create test alert configuration
-    daoRegistry.getDetectionAlertConfigManager()
-        .save(DaoTestUtils.getTestDetectionAlertConfig(daoRegistry.getDetectionConfigManager(), alertConfigFile));
+    daoRegistry.getDetectionAlertConfigManager().save(DaoTestUtils.getTestDetectionAlertConfig(alertConfigFile));
   }
 
   @Test

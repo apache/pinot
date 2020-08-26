@@ -51,7 +51,7 @@ import org.testng.annotations.Test;
 import org.yaml.snakeyaml.Yaml;
 
 
-public class DetectionConfigValidatorTest {
+public class SubscriptionConfigValidatorTest {
 
   private Yaml yaml;
   private Map<String, Object> yamlConfig1;

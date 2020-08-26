@@ -1,0 +1,110 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "title": "Subscription Config Schema",
+
+  "type": "object",
+  "description": "YAML representation of a subscription group config",
+  "required": [ "subscriptionGroupName", "subscribedDetections", "application", "alertSchemes" ],
+
+  "properties": {
+    "subscriptionGroupName": {
+      "type": "string"
+    },
+    "application": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string"
+    },
+    "cron": {
+      "type": "string"
+    },
+    "dimension": {
+      "type": "string"
+    },
+    "dimensionRecipients": {
+      "$ref": "#/definitions/dimensionRecipients"
+    },
+    "subscribedDetections": {
+      "$ref": "#/definitions/subscribedDetections"
+    },
+    "alertSchemes": {
+      "$ref": "#/definitions/alertSchemes"
+    },
+    "referenceLinks": {
+      "$ref": "#/definitions/referenceLinks"
+    }
+  },
+
+  "definitions": {
+    "dimensionRecipients": {
+      "type": "array",
+      "description": "list of dimensional recipients",
+      "items": {
+        "type": "object",
+        "required": [ "dimensions", "notify" ],
+        "properties": {
+          "dimensions": {
+            "$ref": "#/definitions/dimensionFilters"
+          },
+          "notify": {
+            "$ref": "#/definitions/notificationFilters"
+          },
+          "referenceLinks": {
+            "$ref": "#/definitions/referenceLinks"
+          }
+        }
+      }
+    },
+    "subscribedDetections": {
+      "type": "array",
+      "description": "list of dimensional recipients",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "alertSchemes": {
+      "type": "array",
+      "description": "list of alerting schemes",
+      "items": {
+        "type": "object",
+        "required": [ "type" ],
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "params": {
+            "type": "object"
+          }
+        }
+      },
+      "minItems": 1
+    },
+    "referenceLinks": {
+      "type": "object"
+    },
+    "dimensionFilters": {
+      "type": "object",
+      "description": "dimension filters",
+      "patternProperties": {
+        ".*": {
+          "type": "array",
+          "description": "dimension filter values",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "notificationFilters": {
+      "type": "object",
+      "description": "notification filters",
+      "patternProperties": {
+        ".*Scheme": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

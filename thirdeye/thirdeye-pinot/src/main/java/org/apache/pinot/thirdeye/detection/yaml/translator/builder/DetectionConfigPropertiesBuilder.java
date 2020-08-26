@@ -89,9 +89,9 @@ public abstract class DetectionConfigPropertiesBuilder {
     this.dataProvider = dataProvider;
   }
 
-  public abstract Map<String, Object> buildMetricAlertProperties(Map<String, Object> yamlConfigMap) throws IllegalArgumentException;
+  public abstract Map<String, Object> buildMetricAlertProperties(Map<String, Object> yamlConfigMap);
 
-  public abstract Map<String, Object> buildCompositeAlertProperties(Map<String, Object> yamlConfigMap) throws IllegalArgumentException;
+  public abstract Map<String, Object> buildCompositeAlertProperties(Map<String, Object> yamlConfigMap);
 
   Map<String, Object> buildDimensionWrapperProperties(Map<String, Object> yamlConfigMap,
       Map<String, Collection<String>> dimensionFilters, String metricUrn, String datasetName) {

@@ -30,7 +30,7 @@ public class YamlDetectionAlertConfigTranslatorTest {
   private DetectionConfigManager detectionConfigManager;
 
   @Test
-  public void testTranslateAlert() {
+  public void testTranslateAlert() throws Exception {
     DetectionAlertRegistry.getInstance().registerAlertScheme("EMAIL", "EmailClass");
     DetectionAlertRegistry.getInstance().registerAlertSuppressor("TIME_WINDOW", "TimeWindowClass");
 
@@ -70,11 +70,10 @@ public class YamlDetectionAlertConfigTranslatorTest {
     alertYamlConfigs.put(PROP_RECIPIENTS, recipients);
 
     SubscriptionConfigValidator validateMocker = mock(SubscriptionConfigValidator.class);
-    doNothing().when(validateMocker).validateYaml(alertYamlConfigs);
+    doNothing().when(validateMocker).staticValidation(new Yaml().dump(alertYamlConfigs));
 
     String yamlConfig = new Yaml().dump(alertYamlConfigs);
-    DetectionAlertConfigDTO alertConfig = new SubscriptionConfigTranslator(
-        this.detectionConfigManager, yamlConfig, validateMocker).translate();
+    DetectionAlertConfigDTO alertConfig = new SubscriptionConfigTranslator(yamlConfig, validateMocker).translate();
 
     Assert.assertTrue(alertConfig.isActive());
     Assert.assertEquals(alertConfig.getName(), "test_group_name");

@@ -1,3 +1,22 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 package org.apache.pinot.thirdeye.detection.yaml;
 
 import java.util.HashMap;
@@ -20,6 +39,7 @@ import java.io.IOException;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
 import org.apache.pinot.thirdeye.detection.components.ThresholdRuleDetector;
+import org.apache.pinot.thirdeye.detection.validators.ConfigValidationException;
 import org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTranslator;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
@@ -34,6 +54,9 @@ public class YamlResourceTest {
   private ThirdEyePrincipal user;
   private static long alertId1;
   private static long alertId2;
+
+  private static final String MISSING_FIELD_PREFIX_TEMPLATE = "Validation errors: \n"
+      + "- object has missing required properties ([%s])";
 
   @BeforeMethod
   public void beforeClass() {
@@ -90,7 +113,7 @@ public class YamlResourceTest {
     config.put("subscription", subscriptionPayload);
     try {
       this.yamlResource.validateCreateAlertYaml(config);
-    } catch (IllegalArgumentException e) {
+    } catch (ConfigValidationException e) {
       Assert.assertEquals(e.getMessage(), "You have not subscribed to the alert. Please configure the"
           + " detectionName under the subscribedDetections field in your subscription group.");
       return;
@@ -177,9 +200,9 @@ public class YamlResourceTest {
     try {
       this.yamlResource.createSubscriptionConfig(blankYaml);
       Assert.fail("Exception not thrown on empty yaml");
-    } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "A subscription group should subscribe to at least one alert."
-          + " If you wish to unsubscribe, set active to false in the subscription config.");
+    } catch (ConfigValidationException e) {
+      Assert.assertEquals(e.getMessage(), String.format(MISSING_FIELD_PREFIX_TEMPLATE,
+          "\"alertSchemes\",\"application\",\"subscribedDetections\",\"subscriptionGroupName\""));
     }
 
     String inValidYaml = "application:test:application";
@@ -196,7 +219,8 @@ public class YamlResourceTest {
       this.yamlResource.createSubscriptionConfig(noSubscriptGroupYaml);
       Assert.fail("Exception not thrown on empty yaml");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "Subscription group name field cannot be left empty.");
+      Assert.assertEquals(e.getMessage(), String.format(MISSING_FIELD_PREFIX_TEMPLATE,
+          "\"alertSchemes\",\"subscriptionGroupName\""));
     }
 
     String appFieldMissingYaml = IOUtils.toString(this.getClass().getResourceAsStream("subscription/subscription-config-1.yaml"));
@@ -204,7 +228,8 @@ public class YamlResourceTest {
       this.yamlResource.createSubscriptionConfig(appFieldMissingYaml);
       Assert.fail("Exception not thrown on empty yaml");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "Application field cannot be left empty");
+      Assert.assertEquals(e.getMessage(), String.format(MISSING_FIELD_PREFIX_TEMPLATE,
+          "\"application\""));
     }
 
     String appMissingYaml = IOUtils.toString(this.getClass().getResourceAsStream("subscription/subscription-config-6.yaml"));
@@ -213,8 +238,7 @@ public class YamlResourceTest {
       Assert.fail("Exception not thrown on empty yaml");
     } catch (Exception e) {
       Assert.assertEquals(e.getMessage(), "Application name doesn't exist in our registry."
-          + " Please use an existing application name. You may search for registered applications from the ThirdEye"
-          + " dashboard or reach out to ask_thirdeye if you wish to setup a new application.");
+          + " Please use an existing application name or reach out to the ThirdEye team to setup a new one.");
     }
 
     DetectionAlertConfigDTO oldAlertDTO = new DetectionAlertConfigDTO();
@@ -231,7 +255,7 @@ public class YamlResourceTest {
       this.yamlResource.createSubscriptionConfig(groupExists);
       Assert.fail("Exception not thrown on empty yaml");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "Subscription group name is already taken. Please use a different name.");
+      Assert.assertEquals(e.getMessage(), "subscriptionGroupName is already taken. Please use a different one.");
     }
 
     String validYaml = IOUtils.toString(this.getClass().getResourceAsStream("subscription/subscription-config-4.yaml"));
@@ -274,8 +298,8 @@ public class YamlResourceTest {
       this.yamlResource.updateSubscriptionGroup(user, oldId, blankYaml);
       Assert.fail("Exception not thrown on empty yaml");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "A subscription group should subscribe to at least one alert."
-          + " If you wish to unsubscribe, set active to false in the subscription config.");
+      Assert.assertEquals(e.getMessage(), String.format(MISSING_FIELD_PREFIX_TEMPLATE,
+          "\"alertSchemes\",\"application\",\"subscribedDetections\",\"subscriptionGroupName\""));
     }
 
     String inValidYaml = "application:test:application";
@@ -292,7 +316,8 @@ public class YamlResourceTest {
       this.yamlResource.updateSubscriptionGroup(user, oldId, noSubscriptGroupYaml);
       Assert.fail("Exception not thrown on empty yaml");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "Subscription group name field cannot be left empty.");
+      Assert.assertEquals(e.getMessage(), String.format(MISSING_FIELD_PREFIX_TEMPLATE,
+          "\"alertSchemes\",\"subscriptionGroupName\""));
     }
 
     String appFieldMissingYaml = IOUtils.toString(this.getClass().getResourceAsStream("subscription/subscription-config-1.yaml"));
@@ -300,7 +325,8 @@ public class YamlResourceTest {
       this.yamlResource.updateSubscriptionGroup(user, oldId, appFieldMissingYaml);
       Assert.fail("Exception not thrown on empty yaml");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "Application field cannot be left empty");
+      Assert.assertEquals(e.getMessage(), String.format(MISSING_FIELD_PREFIX_TEMPLATE,
+          "\"application\""));
     }
 
     String validYaml2 = IOUtils.toString(this.getClass().getResourceAsStream("subscription/subscription-config-5.yaml"));
