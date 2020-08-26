@@ -34,9 +34,6 @@ import java.util.concurrent.TimeUnit;
 
 import com.google.common.collect.LinkedListMultimap;
 import com.google.common.collect.Multimap;
-import org.apache.helix.HelixManager;
-import org.apache.helix.HelixManagerFactory;
-import org.apache.helix.InstanceType;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.services.ServiceRole;
@@ -177,9 +174,7 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
         }
       }
 
-      if (!_bootstrapConfigurations.isEmpty()) {
-        startBootstrapServices();
-      }
+      startBootstrapServices();
 
       String pidFile = ".pinotAdminService-" + System.currentTimeMillis() + ".pid";
       savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
@@ -225,11 +220,12 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
    * Starts a controller synchronously unless the cluster already exists. Other services start in parallel.
    */
   private void startBootstrapServices() {
-    boolean clusterExists = clusterExists(_pinotServiceManager.getInstanceId());
-    if (!clusterExists) { // start controller(s) synchronously so that other services don't fail
-      for (Map<String, Object> config : _bootstrapConfigurations.removeAll(CONTROLLER)) {
-        startPinotService(new SimpleImmutableEntry<>(CONTROLLER, config));
-      }
+    // Start controller(s) synchronously so that other services don't fail
+    //
+    // Note: Technically, we don't need to do this if the cluster already exists, but checking the
+    // cluster takes time and clutters logs with errors when it doesn't exist.
+    for (Map<String, Object> config : _bootstrapConfigurations.removeAll(CONTROLLER)) {
+      startPinotService(new SimpleImmutableEntry<>(CONTROLLER, config));
     }
 
     if (_bootstrapConfigurations.isEmpty()) return;
@@ -250,18 +246,6 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new RuntimeException(e);
-    }
-  }
-
-  private boolean clusterExists(String instanceId) {
-    try {
-      HelixManager spectatorHelixManager =
-          HelixManagerFactory.getZKHelixManager(_clusterName, instanceId, InstanceType.SPECTATOR, _zkAddress);
-      spectatorHelixManager.connect();
-      spectatorHelixManager.disconnect();
-      return true;
-    } catch (Exception ignored) {
-      return false;
     }
   }
 
