@@ -26,6 +26,7 @@ import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.collect.LinkedListMultimap;
@@ -157,8 +158,7 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
       throws Exception {
     try {
       LOGGER.info("Executing command: " + toString());
-      _pinotServiceManager = new PinotServiceManager(_zkAddress, _clusterName, _port);
-      _pinotServiceManager.start();
+      startPinotService("ServiceManager", this::startServiceManager);
 
       if (_bootstrapConfigPaths != null) {
         for (String configPath : _bootstrapConfigPaths) {
@@ -185,6 +185,12 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
       System.exit(-1);
       return false;
     }
+  }
+
+  private String startServiceManager() {
+    _pinotServiceManager = new PinotServiceManager(_zkAddress, _clusterName, _port);
+    _pinotServiceManager.start();
+    return _pinotServiceManager.getInstanceId();
   }
 
   private Map<String, Object> getDefaultConfig(ServiceRole serviceRole)
@@ -220,7 +226,7 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
     if (!clusterExists) {
       // start controller(s) synchronously so that other services don't fail
       for (Map<String, Object> config : _bootstrapConfigurations.get(CONTROLLER)) {
-        startPinotService(CONTROLLER, config);
+        startPinotService(CONTROLLER, () -> _pinotServiceManager.startRole(CONTROLLER, config));
       }
     }
 
@@ -231,7 +237,7 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
       Map<String, Object> config = roleToConfig.getValue();
       new Thread("Starting " + role) {
         @Override public void run() {
-          startPinotService(role, config);
+          startPinotService(role, () -> _pinotServiceManager.startRole(role, config));
         }
       }.start();
     }
@@ -249,10 +255,10 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
     }
   }
 
-  private boolean startPinotService(ServiceRole role, Map<String, Object> properties) {
+  private boolean startPinotService(Object role, Callable<String> serviceStarter) {
     try {
       LOGGER.info("Starting a Pinot [{}] at {}s since launch", role, startOffsetSeconds());
-      String instanceId = _pinotServiceManager.startRole(role, properties);
+      String instanceId = serviceStarter.call();
       LOGGER.info("Started Pinot [{}] instance [{}] at {}s since launch", role, instanceId, startOffsetSeconds());
     } catch (Exception e) {
       LOGGER.error(String.format("Failed to start a Pinot [%s] at %s since launch", role, startOffsetSeconds()), e);
