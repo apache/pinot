@@ -199,8 +199,12 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
       }
 
       List<String> pathAndIdxList = new ArrayList<>();
-      String isLocalDirectorySequenceId = _spec.getSegmentNameGeneratorSpec().getConfigs().get(LOCAL_DIRECTORY_SEQUENCE_ID);
-      if (Boolean.parseBoolean(isLocalDirectorySequenceId)) {
+      String localDirectorySequenceIdString = _spec.getSegmentNameGeneratorSpec().getConfigs().get(LOCAL_DIRECTORY_SEQUENCE_ID);
+      boolean localDirectorySequenceId = false;
+      if (localDirectorySequenceIdString != null) {
+        localDirectorySequenceId = Boolean.parseBoolean(localDirectorySequenceIdString);
+      }
+      if (localDirectorySequenceId) {
         Map<String, List<String>> localDirIndex = new HashMap<>();
         for (String filteredFile : filteredFiles) {
           Path filteredParentPath = Paths.get(filteredFile).getParent();
