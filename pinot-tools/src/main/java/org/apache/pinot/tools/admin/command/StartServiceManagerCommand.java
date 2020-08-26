@@ -254,9 +254,9 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
   }
 
   private boolean clusterExists(String instanceId) {
-    HelixManager spectatorHelixManager =
-        HelixManagerFactory.getZKHelixManager(_clusterName, instanceId, InstanceType.SPECTATOR, _zkAddress);
     try {
+      HelixManager spectatorHelixManager =
+          HelixManagerFactory.getZKHelixManager(_clusterName, instanceId, InstanceType.SPECTATOR, _zkAddress);
       spectatorHelixManager.connect();
       spectatorHelixManager.disconnect();
       return true;
