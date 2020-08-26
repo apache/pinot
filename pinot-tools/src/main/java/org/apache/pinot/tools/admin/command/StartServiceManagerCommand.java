@@ -24,9 +24,12 @@ import static org.apache.pinot.spi.services.ServiceRole.CONTROLLER;
 import java.io.File;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.collect.LinkedListMultimap;
@@ -44,7 +47,6 @@ import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.spi.StringArrayOptionHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 /**
  * Class to implement StartPinotService command.
@@ -175,7 +177,9 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
         }
       }
 
-      startBootstrapServices();
+      if (!_bootstrapConfigurations.isEmpty()) {
+        startBootstrapServices();
+      }
 
       String pidFile = ".pinotAdminService-" + System.currentTimeMillis() + ".pid";
       savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
@@ -222,24 +226,30 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
    */
   private void startBootstrapServices() {
     boolean clusterExists = clusterExists(_pinotServiceManager.getInstanceId());
-
-    if (!clusterExists) {
-      // start controller(s) synchronously so that other services don't fail
-      for (Map<String, Object> config : _bootstrapConfigurations.get(CONTROLLER)) {
-        startPinotService(CONTROLLER, () -> _pinotServiceManager.startRole(CONTROLLER, config));
+    if (!clusterExists) { // start controller(s) synchronously so that other services don't fail
+      for (Map<String, Object> config : _bootstrapConfigurations.removeAll(CONTROLLER)) {
+        startPinotService(new SimpleImmutableEntry<>(CONTROLLER, config));
       }
     }
 
-    for (Map.Entry<ServiceRole, Map<String, Object>> roleToConfig : _bootstrapConfigurations.entries()) {
-      ServiceRole role = roleToConfig.getKey();
-      if (!clusterExists && role == CONTROLLER) continue; // already started
+    if (_bootstrapConfigurations.isEmpty()) return;
 
-      Map<String, Object> config = roleToConfig.getValue();
-      new Thread("Starting " + role) {
-        @Override public void run() {
-          startPinotService(role, () -> _pinotServiceManager.startRole(role, config));
-        }
-      }.start();
+    // Otherwise, launch the remaining services in parallel
+    ExecutorService executorService = Executors.newFixedThreadPool(_bootstrapConfigurations.size());
+    for (Map.Entry<ServiceRole, Map<String, Object>> roleToConfig : _bootstrapConfigurations.entries()) {
+      executorService.submit(() -> startPinotService(roleToConfig));
+    }
+
+    // Block until service startup completes
+    executorService.shutdown();
+    try {
+      if (!executorService.awaitTermination(1, TimeUnit.MINUTES)) {
+        throw new RuntimeException(
+            "Took longer than a minute to start: " + _bootstrapConfigurations.keySet());
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
     }
   }
 
@@ -253,6 +263,12 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
     } catch (Exception ignored) {
       return false;
     }
+  }
+
+  private void startPinotService(Map.Entry<ServiceRole, Map<String, Object>> roleToConfig) {
+    ServiceRole role = roleToConfig.getKey();
+    Map<String, Object> config = roleToConfig.getValue();
+    startPinotService(role, () -> _pinotServiceManager.startRole(role, config));
   }
 
   private boolean startPinotService(Object role, Callable<String> serviceStarter) {
