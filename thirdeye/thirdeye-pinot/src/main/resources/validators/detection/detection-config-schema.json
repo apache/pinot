@@ -182,7 +182,8 @@
           "cachingPeriodLookback": {
             "type": "string"
           }
-        }
+        },
+        "additionalProperties": false
       }
     },
 
