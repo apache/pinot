@@ -23,6 +23,8 @@
 # Pinot in the 2 given directories and then upgrades in the following order:
 # Controller -> Broker -> Server
 
+declare -a components=("controller" "broker" "server" "zookeeper")
+
 # get usage of the script 
 function usage() {
   command=$1
@@ -45,6 +47,7 @@ function cleanup() {
   fi
 }
 
+# cleanp the temporary directory when the bash script exits 
 trap cleanup EXIT
 
 if [ $# -lt 2 ] || [ $# -gt 3 ] ; then
@@ -85,12 +88,18 @@ function checkoutAndBuild() {
   popd || exit 1
 }
 
+# Given a component and directory, start that version of the specific component 
 function startService() {
   if [ $# -ne 2 ]; then 
     usage startService
   fi
   serviceName=$1
   dirName=$2
+  if [[ ! " ${components[*]} " =~ $serviceName ]]; then
+    printf "Not a valid component. Needs to be one of: %s \n" "${components[*]}"
+    exit 1
+  fi
+  # Upon start, save the pid of the process for a component into a file in /tmp/{component}.pid, which is then used to stop it
   pushd "$dirName"/pinot-tools/target/pinot-tools-pkg/bin  || exit 1
   if [ "$serviceName" = "zookeeper" ]; then
     sh -c 'echo $$ > /tmp/zookeeper.pid; exec ./pinot-admin.sh StartZookeeper' &
@@ -104,24 +113,25 @@ function startService() {
   popd || exit 1
 }
 
+# Given a component, check if it known to be running and stop that specific component
 function stopService() {
   if [ $# -ne 1 ]; then 
     usage stopService
   fi
   serviceName=$1
-  if [ "$serviceName" = "zookeeper" ]; then
-    zookeeperPid=$(</tmp/zookeeper.pid)
-    kill -9 "$zookeeperPid"
-  elif [ "$serviceName" = "controller" ]; then 
-    controllerPid=$(</tmp/controller.pid)
-    kill -9 "$controllerPid" 
-  elif [ "$serviceName" = "broker" ]; then
-    brokerPid=$(</tmp/broker.pid)
-    kill -9 "$brokerPid"
-  elif [ "$serviceName" = "server" ]; then
-    serverPid=$(</tmp/server.pid)
-    kill -9 "$serverPid"
-  fi 
+  if [[ ! " ${components[*]} " =~ $serviceName ]]; then
+    printf "Not a valid component. Needs to be one of: %s \n" "${components[*]}"
+    exit 1
+  fi
+  if [ -f /tmp/"${serviceName}".pid ]; then 
+    servicePid=$(</tmp/"${serviceName}".pid)
+    rm /tmp/"${serviceName}".pid
+    if [ -n "$servicePid" ]; then
+      kill -9 "$servicePid"
+    fi
+  else
+    echo "Can't stop component ${serviceName} since can't component ${serviceName} is not known to have been started."
+  fi
 }
 
 # Starts a Pinot cluster given a specific target directory
@@ -181,10 +191,10 @@ checkoutAndBuild "$olderCommit" "$oldTargetDir"
 echo "Building the second target ..."
 checkoutAndBuild "$newerCommit" "$newTargetDir"
 
-# check that the default ports are available
+# check that the default ports are open
 if [ "$(lsof -t -i:8097 -s TCP:LISTEN)" ] || [ "$(lsof -t -i:8098 -sTCP:LISTEN)" ] || [ "$(lsof -t -i:8099 -sTCP:LISTEN)" ] || 
      [ "$(lsof -t -i:9000 -sTCP:LISTEN)" ] || [ "$(lsof -t -i:2181 -sTCP:LISTEN)" ]; then
-  echo "Cannot start the components since the default ports are not available. Check any existing process that may be using the default ports."
+  echo "Cannot start the components since the default ports are not open. Check any existing process that may be using the default ports."
   exit 1
 fi
 
