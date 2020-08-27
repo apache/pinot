@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.ingestion.batch.spark;
 
+import static org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner.LOCAL_DIRECTORY_SEQUENCE_ID;
 import static org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUtils.PINOT_PLUGINS_DIR;
 import static org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUtils.PINOT_PLUGINS_TAR_GZ;
 import static org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUtils.getFileName;
@@ -29,11 +30,14 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.net.URI;
 import java.nio.file.FileSystems;
+import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.apache.commons.io.FileUtils;
@@ -200,8 +204,31 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
       }
 
       List<String> pathAndIdxList = new ArrayList<>();
-      for (int i = 0; i < filteredFiles.size(); i++) {
-        pathAndIdxList.add(String.format("%s %d", filteredFiles.get(i), i));
+      String localDirectorySequenceIdString = _spec.getSegmentNameGeneratorSpec().getConfigs().get(LOCAL_DIRECTORY_SEQUENCE_ID);
+      boolean localDirectorySequenceId = false;
+      if (localDirectorySequenceIdString != null) {
+        localDirectorySequenceId = Boolean.parseBoolean(localDirectorySequenceIdString);
+      }
+      if (localDirectorySequenceId) {
+        Map<String, List<String>> localDirIndex = new HashMap<>();
+        for (String filteredFile : filteredFiles) {
+          Path filteredParentPath = Paths.get(filteredFile).getParent();
+          if (!localDirIndex.containsKey(filteredParentPath.toString())) {
+            localDirIndex.put(filteredParentPath.toString(), new ArrayList<>());
+          }
+          localDirIndex.get(filteredParentPath.toString()).add(filteredFile);
+        }
+        for (String parentPath: localDirIndex.keySet()){
+          List<String> siblingFiles = localDirIndex.get(parentPath);
+          Collections.sort(siblingFiles);
+          for (int i = 0; i < siblingFiles.size(); i++) {
+            pathAndIdxList.add(String.format("%s %d", siblingFiles.get(i), i));
+          }
+        }
+      } else {
+        for (int i = 0; i < filteredFiles.size(); i++) {
+          pathAndIdxList.add(String.format("%s %d", filteredFiles.get(i), i));
+        }
       }
       JavaRDD<String> pathRDD = sparkContext.parallelize(pathAndIdxList, pathAndIdxList.size());
 
