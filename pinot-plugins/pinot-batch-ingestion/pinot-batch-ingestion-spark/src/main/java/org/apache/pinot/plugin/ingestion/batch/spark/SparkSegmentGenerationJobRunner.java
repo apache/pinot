@@ -33,7 +33,12 @@ import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -215,6 +220,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
         }
         for (String parentPath: localDirIndex.keySet()){
           List<String> siblingFiles = localDirIndex.get(parentPath);
+          Collections.sort(siblingFiles);
           for (int i = 0; i < siblingFiles.size(); i++) {
             pathAndIdxList.add(String.format("%s %d", siblingFiles.get(i), i));
           }
