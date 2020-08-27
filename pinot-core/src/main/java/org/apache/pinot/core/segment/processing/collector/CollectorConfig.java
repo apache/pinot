@@ -18,14 +18,16 @@
  */
 package org.apache.pinot.core.segment.processing.collector;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.data.Schema;
 
 
 /**
  * Config for Collector
  */
+@JsonDeserialize(builder = CollectorConfig.Builder.class)
 public class CollectorConfig {
   private static final CollectorFactory.CollectorType DEFAULT_COLLECTOR_TYPE = CollectorFactory.CollectorType.CONCAT;
 
@@ -56,6 +58,7 @@ public class CollectorConfig {
   /**
    * Builder for CollectorConfig
    */
+  @JsonPOJOBuilder(withPrefix = "set")
   public static class Builder {
     private CollectorFactory.CollectorType collectorType = DEFAULT_COLLECTOR_TYPE;
     private Map<String, ValueAggregatorFactory.ValueAggregatorType> aggregatorTypeMap;

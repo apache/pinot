@@ -71,7 +71,7 @@ public class SegmentMapper {
     _avroSchema = SegmentProcessorUtils.convertPinotSchemaToAvroSchema(mapperConfig.getPinotSchema());
     _recordTransformer = RecordTransformerFactory.getRecordTransformer(mapperConfig.getRecordTransformerConfig());
     _partitioner = PartitionerFactory.getPartitioner(mapperConfig.getPartitioningConfig());
-    _partitionFilter = PartitionerFactory.getPartitionSelector(mapperConfig.getPartitioningConfig());
+    _partitionFilter = PartitionerFactory.getPartitionFilter(mapperConfig.getPartitioningConfig());
     LOGGER.info(
         "Initialized mapper with id: {}, input segment: {}, output dir: {}, recordTransformer: {}, partitioner: {}, partitionFilter: {}",
         _mapperId, _inputSegment, _mapperOutputDir, _recordTransformer.getClass(), _partitioner.getClass(),
@@ -122,7 +122,7 @@ public class SegmentMapper {
           Files.createDirectory(Paths.get(partDir.getAbsolutePath()));
         }
         DataFileWriter<GenericData.Record> recordWriter = new DataFileWriter<>(new GenericDatumWriter<>(_avroSchema));
-        recordWriter.create(_avroSchema, new File(partDir, "mapper_" + _mapperId + ".avro"));
+        recordWriter.create(_avroSchema, new File(partDir, createMapperOutputFileName(_mapperId)));
         _partitionToDataFileWriterMap.put(partition, recordWriter);
       }
 
@@ -140,5 +140,9 @@ public class SegmentMapper {
     for (DataFileWriter<GenericData.Record> recordDataFileWriter : _partitionToDataFileWriterMap.values()) {
       recordDataFileWriter.close();
     }
+  }
+
+  public static String createMapperOutputFileName(String mapperId) {
+    return "mapper_" + mapperId + ".avro";
   }
 }

@@ -86,8 +86,9 @@ public class SegmentProcessorFramework {
         "Input path: %s,  must be a directory with Pinot segments", _inputSegmentsDir.getAbsolutePath());
 
     _outputSegmentsDir = outputSegmentsDir;
-    Preconditions.checkState(_outputSegmentsDir.exists() && _outputSegmentsDir.isDirectory(),
-        "Must provide valid output directory: %s", _outputSegmentsDir.getAbsolutePath());
+    Preconditions.checkState(
+        _outputSegmentsDir.exists() && _outputSegmentsDir.isDirectory() && (_outputSegmentsDir.list().length == 0),
+        "Must provide existing empty output directory: %s", _outputSegmentsDir.getAbsolutePath());
 
     _segmentProcessorConfig = segmentProcessorConfig;
     _pinotSchema = segmentProcessorConfig.getSchema();

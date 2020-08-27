@@ -50,18 +50,18 @@ public final class PartitionerFactory {
         partitioner = new RowHashPartitioner(config.getNumPartitions());
         break;
       case COLUMN_VALUE:
-        Preconditions.checkNotNull(config.getColumnName(), "Must provide columnName for COLUMN_VALUE partitioner");
+        Preconditions.checkState(config.getColumnName() != null, "Must provide columnName for COLUMN_VALUE partitioner");
         partitioner = new ColumnValuePartitioner(config.getColumnName());
         break;
       case TRANSFORM_FUNCTION:
-        Preconditions.checkNotNull(config.getTransformFunction(),
+        Preconditions.checkState(config.getTransformFunction() != null,
             "Must provide transformFunction for TRANSFORM_FUNCTION partitioner");
         partitioner = new TransformFunctionPartitioner(config.getTransformFunction());
         break;
       case TABLE_PARTITION_CONFIG:
         Preconditions
-            .checkNotNull(config.getColumnName(), "Must provide columnName for TABLE_PARTITION_CONFIG Partitioner");
-        Preconditions.checkNotNull(config.getColumnPartitionConfig(),
+            .checkState(config.getColumnName() != null, "Must provide columnName for TABLE_PARTITION_CONFIG Partitioner");
+        Preconditions.checkState(config.getColumnPartitionConfig() != null,
             "Must provide columnPartitionConfig for TABLE_PARTITION_CONFIG Partitioner");
         partitioner = new TableConfigPartitioner(config.getColumnName(), config.getColumnPartitionConfig());
         break;
@@ -72,7 +72,7 @@ public final class PartitionerFactory {
   /**
    * Construct a PartitionFilter using PartitioningConfig
    */
-  public static PartitionFilter getPartitionSelector(PartitioningConfig config) {
+  public static PartitionFilter getPartitionFilter(PartitioningConfig config) {
     String filterFunction = config.getFilterFunction();
     if (filterFunction != null) {
       return new FunctionEvaluatorPartitionFilter(filterFunction);

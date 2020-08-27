@@ -32,6 +32,7 @@ public final class CollectorFactory {
 
   public enum CollectorType {
     ROLLUP, CONCAT
+    // TODO: add support for DEDUP
   }
 
   /**

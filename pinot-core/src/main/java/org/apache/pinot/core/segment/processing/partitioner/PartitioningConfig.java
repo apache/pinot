@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.core.segment.processing.partitioner;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 
 
 /**
  * Config for Partitioner
  */
+@JsonDeserialize(builder = PartitioningConfig.Builder.class)
 public class PartitioningConfig {
 
   private static final PartitionerFactory.PartitionerType DEFAULT_PARTITIONER_TYPE =
@@ -91,6 +94,7 @@ public class PartitioningConfig {
   /**
    * Builder for a PartitioningConfig
    */
+  @JsonPOJOBuilder(withPrefix = "set")
   public static class Builder {
     private PartitionerFactory.PartitionerType partitionerType = DEFAULT_PARTITIONER_TYPE;
     private int numPartitions;

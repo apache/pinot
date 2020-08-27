@@ -30,8 +30,8 @@ public final class RecordTransformerFactory {
    * Construct a RecordTransformer from the config
    */
   public static RecordTransformer getRecordTransformer(RecordTransformerConfig recordTransformerConfig) {
-    if (recordTransformerConfig.getTransformFunctionMap() != null) {
-      return new TransformFunctionRecordTransformer(recordTransformerConfig.getTransformFunctionMap());
+    if (recordTransformerConfig.getTransformFunctionsMap() != null) {
+      return new TransformFunctionRecordTransformer(recordTransformerConfig.getTransformFunctionsMap());
     }
     return new NoOpRecordTransformer();
   }

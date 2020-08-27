@@ -18,12 +18,17 @@
  */
 package org.apache.pinot.core.segment.processing.framework;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
+
+
 /**
  * Config for the final segment generation phase of the SegmentProcessorFramework
  */
+@JsonDeserialize(builder = SegmentConfig.Builder.class)
 public class SegmentConfig {
 
-  private static final int DEFAULT_MAX_NUM_RECORDS_PER_PART = 1_000_000;
+  private static final int DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT = 1_000_000;
   private final int _maxNumRecordsPerSegment;
 
   private SegmentConfig(int maxNumRecordsPerSegment) {
@@ -37,8 +42,12 @@ public class SegmentConfig {
     return _maxNumRecordsPerSegment;
   }
 
+  /**
+   * Builder for SegmentConfig
+   */
+  @JsonPOJOBuilder(withPrefix = "set")
   public static class Builder {
-    private int maxNumRecordsPerSegment = DEFAULT_MAX_NUM_RECORDS_PER_PART;
+    private int maxNumRecordsPerSegment = DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT;
 
     public Builder setMaxNumRecordsPerSegment(int maxNumRecordsPerSegment) {
       this.maxNumRecordsPerSegment = maxNumRecordsPerSegment;

@@ -47,6 +47,7 @@ import org.slf4j.LoggerFactory;
 public class SegmentReducer {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentReducer.class);
+  private static final int MAX_RECORDS_TO_COLLECT = 5_000_000;
 
   private final File _reducerInputDir;
   private final File _reducerOutputDir;
@@ -55,7 +56,7 @@ public class SegmentReducer {
   private final Schema _pinotSchema;
   private final org.apache.avro.Schema _avroSchema;
   private final Collector _collector;
-  private final int _maxRecordsPerPart;
+  private final int _numRecordsPerPart;
 
   public SegmentReducer(File reducerInputDir, SegmentReducerConfig reducerConfig, File reducerOutputDir) {
     _reducerInputDir = reducerInputDir;
@@ -65,9 +66,9 @@ public class SegmentReducer {
     _pinotSchema = reducerConfig.getPinotSchema();
     _avroSchema = SegmentProcessorUtils.convertPinotSchemaToAvroSchema(_pinotSchema);
     _collector = CollectorFactory.getCollector(reducerConfig.getCollectorConfig(), _pinotSchema);
-    _maxRecordsPerPart = reducerConfig.getMaxRecordsPerPart();
-    LOGGER.info("Initialized reducer with id: {}, input dir: {}, output dir: {}, collector: {}, maxRecordsPerPart: {}",
-        _reducerId, _reducerInputDir, _reducerOutputDir, _collector.getClass(), _maxRecordsPerPart);
+    _numRecordsPerPart = reducerConfig.getNumRecordsPerPart();
+    LOGGER.info("Initialized reducer with id: {}, input dir: {}, output dir: {}, collector: {}, numRecordsPerPart: {}",
+        _reducerId, _reducerInputDir, _reducerOutputDir, _collector.getClass(), _numRecordsPerPart);
   }
 
   /**
@@ -93,10 +94,10 @@ public class SegmentReducer {
         // Aggregations
         _collector.collect(next);
 
-        // Split
-        if (_collector.size() == _maxRecordsPerPart) {
-          flushRecords(_collector, part);
-          part++;
+        // Exceeded max records allowed to collect. Flush
+        if (_collector.size() == MAX_RECORDS_TO_COLLECT) {
+          int numFiles = flushRecords(_collector, part);
+          part += numFiles;
           _collector.reset();
         }
       }
@@ -108,20 +109,38 @@ public class SegmentReducer {
   }
 
   /**
-   * Flushes all records from the collector into a part file in the reducer output directory
+   * Flushes all records from the collector into a part files in the reducer output directory
    */
-  private void flushRecords(Collector collector, int part)
+  private int flushRecords(Collector collector, int partNumber)
       throws IOException {
     GenericData.Record reusableRecord = new GenericData.Record(_avroSchema);
-    DataFileWriter<GenericData.Record> recordWriter = new DataFileWriter<>(new GenericDatumWriter<>(_avroSchema));
-    recordWriter.create(_avroSchema, new File(_reducerOutputDir, "reducer_" + _reducerId + "_" + part + ".avro"));
-
     Iterator<GenericRow> collectionIt = collector.iterator();
+
+    DataFileWriter<GenericData.Record> recordWriter = new DataFileWriter<>(new GenericDatumWriter<>(_avroSchema));
+    recordWriter.create(_avroSchema, new File(_reducerOutputDir, createReducerOutputFileName(_reducerId, partNumber++)));
+
+    int numRecords = 0;
     while (collectionIt.hasNext()) {
       SegmentProcessorUtils.convertGenericRowToAvroRecord(collectionIt.next(), reusableRecord);
       recordWriter.append(reusableRecord);
+      numRecords++;
+      if (numRecords == _numRecordsPerPart) {
+        recordWriter.close();
+        numRecords = 0;
+        if (collectionIt.hasNext()) {
+          recordWriter = new DataFileWriter<>(new GenericDatumWriter<>(_avroSchema));
+          recordWriter.create(_avroSchema, new File(_reducerOutputDir, createReducerOutputFileName(_reducerId, partNumber++)));
+        }
+      }
     }
-    recordWriter.close();
+    if (numRecords > 0) {
+      recordWriter.close();
+    }
+    return partNumber;
+  }
+
+  public static String createReducerOutputFileName(String reducerId, int part) {
+    return "reducer_" + reducerId + "_" + part + ".avro";
   }
 
   /**

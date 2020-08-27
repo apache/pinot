@@ -29,14 +29,14 @@ public class SegmentReducerConfig {
 
   private final String _reducerId;
   private final Schema _pinotSchema;
-  private final int _maxRecordsPerPart;
+  private final int _numRecordsPerPart;
   private final CollectorConfig _collectorConfig;
 
   public SegmentReducerConfig(String reducerId, Schema pinotSchema, CollectorConfig collectorConfig,
-      int maxRecordsPerPart) {
+      int numRecordsPerPart) {
     _reducerId = reducerId;
     _pinotSchema = pinotSchema;
-    _maxRecordsPerPart = maxRecordsPerPart;
+    _numRecordsPerPart = numRecordsPerPart;
     _collectorConfig = collectorConfig;
   }
 
@@ -55,10 +55,10 @@ public class SegmentReducerConfig {
   }
 
   /**
-   * The maximum number of records that a reducer should put in a single part file
+   * The number of records that a reducer should put in a single part file. This will directly control number of records per segment
    */
-  public int getMaxRecordsPerPart() {
-    return _maxRecordsPerPart;
+  public int getNumRecordsPerPart() {
+    return _numRecordsPerPart;
   }
 
   /**
