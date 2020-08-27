@@ -123,8 +123,6 @@ public class SqlQueryBuilder {
       if (columnInfo.field != null
           && !AUTO_UPDATE_COLUMN_SET.contains(columnInfo.columnNameInDB.toLowerCase())) {
         Object val = columnInfo.field.get(entity);
-        LOG.debug("Setting value: {} for:{} sqlType:{}", val, columnInfo.columnNameInDB,
-            columnInfo.sqlType);
         if (val != null) {
           if (columnInfo.sqlType == Types.CLOB) {
             Clob clob = conn.createClob();
@@ -244,7 +242,6 @@ public class SqlQueryBuilder {
       String dbFieldName = paramEntry.getKey();
       ColumnInfo info = columnInfoMap.get(dbFieldName);
       prepareStatement.setObject(parameterIndex++, paramEntry.getValue(), info.sqlType);
-      LOG.debug("Setting value:{} for {}", paramEntry.getValue(), dbFieldName);
 
     }
     return prepareStatement;
