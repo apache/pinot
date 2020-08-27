@@ -96,6 +96,8 @@ public class ChildKeepingMergeWrapper extends BaselineFillingMergeWrapper {
       String patternKey = "";
       if (anomaly.getProperties().containsKey(PROP_PATTERN_KEY)) {
         patternKey = anomaly.getProperties().get(PROP_PATTERN_KEY);
+      } else if (!Double.isNaN(anomaly.getAvgBaselineVal()) && !Double.isNaN(anomaly.getAvgCurrentVal())) {
+        patternKey = (anomaly.getAvgCurrentVal() > anomaly.getAvgBaselineVal()) ? "UP" : "DOWN";
       }
       MergeWrapper.AnomalyKey key =
           new MergeWrapper.AnomalyKey(anomaly.getMetric(), anomaly.getCollection(), anomaly.getDimensions(),
