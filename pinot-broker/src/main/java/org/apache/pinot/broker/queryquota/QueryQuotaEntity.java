@@ -25,12 +25,12 @@ public class QueryQuotaEntity {
 
   private RateLimiter _rateLimiter;
   private HitCounter _hitCounterInSecond;
-  private HitCounter _hitCounterInMinute;
+  private StatefulHitCounter _hitCounterInMinute;
   private int _numOnlineBrokers;
   private double _overallRate;
   private int _tableConfigStatVersion;
 
-  public QueryQuotaEntity(RateLimiter rateLimiter, HitCounter hitCounterInSecond, HitCounter hitCounterInMinute,
+  public QueryQuotaEntity(RateLimiter rateLimiter, HitCounter hitCounterInSecond, StatefulHitCounter hitCounterInMinute,
       int numOnlineBrokers, double overallRate, int tableConfigStatVersion) {
     _rateLimiter = rateLimiter;
     _hitCounterInSecond = hitCounterInSecond;
@@ -48,7 +48,7 @@ public class QueryQuotaEntity {
     return _hitCounterInSecond;
   }
 
-  public HitCounter getHitCounterInMinute() {
+  public StatefulHitCounter getHitCounterInMinute() {
     return _hitCounterInMinute;
   }
 

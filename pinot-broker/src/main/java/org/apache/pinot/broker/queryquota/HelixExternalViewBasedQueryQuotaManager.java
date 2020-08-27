@@ -57,6 +57,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixExternalViewBasedQueryQuotaManager.class);
   private static final int ONE_SECOND_TIME_RANGE_IN_SECOND = 1;
   private static final int ONE_MINUTE_TIME_RANGE_IN_SECOND = 60;
+  private static final int TWO_MINUTE_TIME_RANGE_IN_SECOND = 120;
 
   private final BrokerMetrics _brokerMetrics;
   private final String _instanceId;
@@ -198,7 +199,8 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     double perBrokerRate = overallRate / onlineCount;
     QueryQuotaEntity queryQuotaEntity =
         new QueryQuotaEntity(RateLimiter.create(perBrokerRate), new HitCounter(ONE_SECOND_TIME_RANGE_IN_SECOND),
-            new HitCounter(ONE_MINUTE_TIME_RANGE_IN_SECOND, 60), onlineCount, overallRate, stat.getVersion());
+            new StatefulHitCounter(TWO_MINUTE_TIME_RANGE_IN_SECOND, 120, ONE_MINUTE_TIME_RANGE_IN_SECOND),
+            onlineCount, overallRate, stat.getVersion());
     _rateLimiterMap.put(tableNameWithType, queryQuotaEntity);
     LOGGER.info(
         "Rate limiter for table: {} has been initialized. Overall rate: {}. Per-broker rate: {}. Number of online broker instances: {}. Table config stat version: {}",

@@ -31,10 +31,10 @@ import java.util.concurrent.atomic.AtomicLongArray;
  */
 public class HitCounter {
   private static int DEFAULT_BUCKET_COUNT = 100;
-  private final int _timeBucketWidthMs;
-  private final int _bucketCount;
-  private final AtomicLongArray _bucketStartTime;
-  private final AtomicIntegerArray _bucketHitCount;
+  final int _timeBucketWidthMs;
+  final int _bucketCount;
+  final AtomicLongArray _bucketStartTime;
+  final AtomicIntegerArray _bucketHitCount;
 
   public HitCounter(int timeRangeInSeconds) {
     this(timeRangeInSeconds, DEFAULT_BUCKET_COUNT);
@@ -89,24 +89,5 @@ public class HitCounter {
       }
     }
     return count;
-  }
-
-  /**
-   * Get the maximum count among the buckets
-   */
-  public int getMaxCountPerBucket() {
-    return getMaxCountPerBucket(System.currentTimeMillis());
-  }
-
-  @VisibleForTesting
-  int getMaxCountPerBucket(long timestamp) {
-    long numTimeUnits = timestamp / _timeBucketWidthMs;
-    int maxCount = 0;
-    for (int i = 0; i < _bucketCount; i++) {
-      if (numTimeUnits - _bucketStartTime.get(i) < _bucketCount) {
-        maxCount = Math.max(_bucketHitCount.get(i), maxCount);
-      }
-    }
-    return maxCount;
   }
 }

@@ -114,39 +114,4 @@ public class HitCounterTest {
       System.out.println(duration);
     }
   }
-
-  @Test
-  public void testGetMaxCountPerBucket() {
-    int timeInSec = 60;
-    int bucketCount = 60;
-    HitCounter hitCounter = new HitCounter(timeInSec, bucketCount);
-    long currentTimestamp = System.currentTimeMillis();
-    for (int i = 0; i < timeInSec; i++) {
-      for (int j = 0; j < 5; j++) {
-        hitCounter.hit(currentTimestamp + i * 1000);
-      }
-    }
-    long latestTimeStamp = currentTimestamp + (timeInSec - 1) * 1000;
-    Assert.assertNotNull(hitCounter);
-    Assert.assertEquals(5, hitCounter.getMaxCountPerBucket(latestTimeStamp));
-
-    // Increase hit count by 1
-    Random random = new Random();
-    hitCounter.hit(currentTimestamp + random.nextInt(60) * 1000);
-    Assert.assertEquals(6, hitCounter.getMaxCountPerBucket(latestTimeStamp));
-
-
-    hitCounter = new HitCounter(timeInSec, bucketCount);
-    // Set the iteration larger than the time range
-    int newIteration = timeInSec + 10;
-    for (int i = 0; i < newIteration; i++) {
-      for (int j = 0; j < 5; j++) {
-        hitCounter.hit(currentTimestamp + i * 1000);
-      }
-    }
-    latestTimeStamp = currentTimestamp + (newIteration - 1) * 1000;
-    // The max count is still the same
-    Assert.assertNotNull(hitCounter);
-    Assert.assertEquals(5, hitCounter.getMaxCountPerBucket(latestTimeStamp));
-  }
 }
