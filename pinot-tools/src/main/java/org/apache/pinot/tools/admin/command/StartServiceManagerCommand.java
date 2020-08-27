@@ -19,21 +19,20 @@
 package org.apache.pinot.tools.admin.command;
 
 import static org.apache.pinot.common.utils.CommonConstants.Helix.PINOT_SERVICE_ROLE;
-import static org.apache.pinot.spi.services.ServiceRole.CONTROLLER;
 
 import java.io.File;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.AbstractMap.SimpleImmutableEntry;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.google.common.collect.LinkedListMultimap;
-import com.google.common.collect.Multimap;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.services.ServiceRole;
@@ -45,16 +44,22 @@ import org.kohsuke.args4j.spi.StringArrayOptionHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
- * Class to implement StartPinotService command.
+ * Starts services in the following order, and returns false on any startup failure:
  *
+ * <p><ol>
+ * <li>{@link PinotServiceManager}</li>
+ * <li>Bootstrap services in role {@link ServiceRole#CONTROLLER}</li>
+ * <li>All remaining bootstrap services in parallel</li>
+ * </ol>
  */
 public class StartServiceManagerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartServiceManagerCommand.class);
   private static final long startTick = System.nanoTime();
   private static final String[] BOOTSTRAP_SERVICES = new String[]{"CONTROLLER", "BROKER", "SERVER"};
   // multiple instances allowed per role for testing many minions
-  private final Multimap<ServiceRole, Map<String, Object>> _bootstrapConfigurations = LinkedListMultimap.create();
+  private final List<Entry<ServiceRole, Map<String, Object>>> _bootstrapConfigurations = new ArrayList<>();
 
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help;
@@ -157,24 +162,27 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
       throws Exception {
     try {
       LOGGER.info("Executing command: " + toString());
-      startPinotService("SERVICE_MANAGER", this::startServiceManager);
+      if (!startPinotService("SERVICE_MANAGER", this::startServiceManager)) {
+        return false;
+      }
 
       if (_bootstrapConfigPaths != null) {
         for (String configPath : _bootstrapConfigPaths) {
           Map<String, Object> config = readConfigFromFile(configPath);
           ServiceRole role = ServiceRole.valueOf(config.get(PINOT_SERVICE_ROLE).toString());
-          _bootstrapConfigurations.put(role, config);
+          addBootstrapService(role, config);
         }
       } else if (_bootstrapServices != null) {
         for (String service : _bootstrapServices) {
           ServiceRole role = ServiceRole.valueOf(service.toUpperCase());
           Map<String, Object> config = getDefaultConfig(role);
-          config.put(PINOT_SERVICE_ROLE, role.toString());
-          _bootstrapConfigurations.put(role, config);
+          addBootstrapService(role, config);
         }
       }
 
-      startBootstrapServices();
+      if (!startBootstrapServices()) {
+        return false;
+      }
 
       String pidFile = ".pinotAdminService-" + System.currentTimeMillis() + ".pid";
       savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
@@ -208,54 +216,71 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
     }
   }
 
-  public StartServiceManagerCommand addBootstrapService(ServiceRole role, Map<String, Object> config) {
-    config.put(PINOT_SERVICE_ROLE, role.toString());
-
-    _bootstrapConfigurations.put(role, config);
-
-    return this;
-  }
-
   /**
    * Starts a controller synchronously unless the cluster already exists. Other services start in parallel.
    */
-  private void startBootstrapServices() {
+  private boolean startBootstrapServices() {
+    if (_bootstrapConfigurations.isEmpty()) return true;
+
+    List<Entry<ServiceRole, Map<String, Object>>> parallelConfigs = new ArrayList<>();
+
     // Start controller(s) synchronously so that other services don't fail
     //
     // Note: Technically, we don't need to do this if the cluster already exists, but checking the
     // cluster takes time and clutters logs with errors when it doesn't exist.
-    for (Map<String, Object> config : _bootstrapConfigurations.removeAll(CONTROLLER)) {
-      startPinotService(new SimpleImmutableEntry<>(CONTROLLER, config));
+    for (Entry<ServiceRole, Map<String, Object>> roleToConfig : _bootstrapConfigurations) {
+      if (roleToConfig.getKey() == ServiceRole.CONTROLLER) {
+        if (!startPinotService(ServiceRole.CONTROLLER,
+            () -> _pinotServiceManager.startRole(ServiceRole.CONTROLLER, roleToConfig.getValue()))) {
+          return false;
+        }
+      } else {
+        parallelConfigs.add(roleToConfig);
+      }
     }
 
-    if (_bootstrapConfigurations.isEmpty()) return;
+    return startBootstrapServicesInParallel(_pinotServiceManager, parallelConfigs);
+  }
 
-    // Otherwise, launch the remaining services in parallel
-    ExecutorService executorService = Executors.newFixedThreadPool(_bootstrapConfigurations.size());
-    for (Map.Entry<ServiceRole, Map<String, Object>> roleToConfig : _bootstrapConfigurations.entries()) {
-      executorService.submit(() -> startPinotService(roleToConfig));
+  static boolean startBootstrapServicesInParallel(
+      PinotServiceManager pinotServiceManager,
+      List<Entry<ServiceRole, Map<String, Object>>> parallelConfigs
+  ) {
+    if (parallelConfigs.isEmpty()) return true;
+
+    // True is when everything succeeded
+    AtomicBoolean failed = new AtomicBoolean(false);
+
+    List<Thread> threads = new ArrayList<>();
+    for (Entry<ServiceRole, Map<String, Object>> roleToConfig : parallelConfigs) {
+      ServiceRole role = roleToConfig.getKey();
+      Map<String, Object> config = roleToConfig.getValue();
+      Thread thread = new Thread("Start a Pinot [" + role + "]") {
+        @Override public void run() {
+          if (!startPinotService(role, () -> pinotServiceManager.startRole(role, config))) {
+            failed.set(true);
+          }
+        }
+      };
+      threads.add(thread);
+      // Unhandled exceptions are likely logged, so we don't need to re-log here
+      thread.setUncaughtExceptionHandler((t, e) -> failed.set(true));
+      thread.start();
     }
 
     // Block until service startup completes
-    executorService.shutdown();
-    try {
-      if (!executorService.awaitTermination(1, TimeUnit.MINUTES)) {
-        throw new RuntimeException(
-            "Took longer than a minute to start: " + _bootstrapConfigurations.keySet());
+    for (Thread thread : threads) {
+      try {
+        thread.join();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new RuntimeException(e);
       }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new RuntimeException(e);
     }
+    return !failed.get();
   }
 
-  private void startPinotService(Map.Entry<ServiceRole, Map<String, Object>> roleToConfig) {
-    ServiceRole role = roleToConfig.getKey();
-    Map<String, Object> config = roleToConfig.getValue();
-    startPinotService(role, () -> _pinotServiceManager.startRole(role, config));
-  }
-
-  private boolean startPinotService(Object role, Callable<String> serviceStarter) {
+  private static boolean startPinotService(Object role, Callable<String> serviceStarter) {
     try {
       LOGGER.info("Starting a Pinot [{}] at {}s since launch", role, startOffsetSeconds());
       String instanceId = serviceStarter.call();
@@ -270,5 +295,12 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
   /** Creates millis precision unit of seconds. ex 1.002 */
   private static float startOffsetSeconds() {
     return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTick) / 1000f;
+  }
+
+  public StartServiceManagerCommand addBootstrapService(ServiceRole role, Map<String, Object> config) {
+    if (role == null) throw new NullPointerException("role == null");
+    config.put(PINOT_SERVICE_ROLE, role.toString()); // Ensure config has role key
+    _bootstrapConfigurations.add(new SimpleImmutableEntry<>(role, config));
+    return this;
   }
 }
