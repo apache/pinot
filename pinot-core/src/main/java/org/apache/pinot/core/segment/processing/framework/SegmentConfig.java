@@ -20,6 +20,7 @@ package org.apache.pinot.core.segment.processing.framework;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
+import com.google.common.base.Preconditions;
 
 
 /**
@@ -55,6 +56,7 @@ public class SegmentConfig {
     }
 
     public SegmentConfig build() {
+      Preconditions.checkState(maxNumRecordsPerSegment > 0, "Max num records per segment must be > 0");
       return new SegmentConfig(maxNumRecordsPerSegment);
     }
   }

@@ -27,7 +27,6 @@ import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.pinot.core.segment.processing.collector.Collector;
 import org.apache.pinot.core.segment.processing.collector.CollectorFactory;
 import org.apache.pinot.core.segment.processing.utils.SegmentProcessorUtils;
-import org.apache.pinot.plugin.inputformat.avro.AvroRecordReader;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
@@ -59,11 +58,12 @@ public class SegmentReducer {
   private final Collector _collector;
   private final int _numRecordsPerPart;
 
-  public SegmentReducer(File reducerInputDir, SegmentReducerConfig reducerConfig, File reducerOutputDir) {
+  public SegmentReducer(String reducerId, File reducerInputDir, SegmentReducerConfig reducerConfig,
+      File reducerOutputDir) {
     _reducerInputDir = reducerInputDir;
     _reducerOutputDir = reducerOutputDir;
 
-    _reducerId = reducerConfig.getReducerId();
+    _reducerId = reducerId;
     _pinotSchema = reducerConfig.getPinotSchema();
     _avroSchema = SegmentProcessorUtils.convertPinotSchemaToAvroSchema(_pinotSchema);
     _collector = CollectorFactory.getCollector(reducerConfig.getCollectorConfig(), _pinotSchema);

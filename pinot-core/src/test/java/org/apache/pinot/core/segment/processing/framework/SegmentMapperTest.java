@@ -104,13 +104,14 @@ public class SegmentMapperTest {
   }
 
   @Test(dataProvider = "segmentMapperConfigProvider")
-  public void segmentMapperTest(SegmentMapperConfig segmentMapperConfig, Map<String, List<Object[]>> partitionToRecords)
+  public void segmentMapperTest(String mapperId, SegmentMapperConfig segmentMapperConfig,
+      Map<String, List<Object[]>> partitionToRecords)
       throws Exception {
 
     File mapperOutputDir = new File(_baseDir, "mapper_output");
     FileUtils.deleteQuietly(mapperOutputDir);
     assertTrue(mapperOutputDir.mkdirs());
-    SegmentMapper segmentMapper = new SegmentMapper(_inputSegment, segmentMapperConfig, mapperOutputDir);
+    SegmentMapper segmentMapper = new SegmentMapper(mapperId, _inputSegment, segmentMapperConfig, mapperOutputDir);
     segmentMapper.map();
     segmentMapper.cleanup();
 
@@ -124,7 +125,7 @@ public class SegmentMapperTest {
       // each partition directory has as many files as mapper
       File[] avroFiles = partitionDir.listFiles();
       assertEquals(avroFiles.length, 1);
-      assertEquals(avroFiles[0].getName(), SegmentMapper.createMapperOutputFileName(segmentMapperConfig.getMapperId()));
+      assertEquals(avroFiles[0].getName(), SegmentMapper.createMapperOutputFileName(mapperId));
 
       RecordReader avroRecordReader = new AvroRecordReader();
       avroRecordReader.init(avroFiles[0], _pinotSchema.getColumnNames(), null);
@@ -156,106 +157,98 @@ public class SegmentMapperTest {
     List<Object[]> inputs = new ArrayList<>();
 
     // default configs
-    SegmentMapperConfig config1 =
-        new SegmentMapperConfig(mapperId, _pinotSchema, new RecordTransformerConfig.Builder().build(),
-            new PartitioningConfig.Builder().build());
+    SegmentMapperConfig config1 = new SegmentMapperConfig(_pinotSchema, new RecordTransformerConfig.Builder().build(),
+        new PartitioningConfig.Builder().build());
     Map<String, List<Object[]>> expectedRecords1 = new HashMap<>();
     expectedRecords1.put("0", outputData);
-    inputs.add(new Object[]{config1, expectedRecords1});
+    inputs.add(new Object[]{mapperId, config1, expectedRecords1});
 
     // partition by timeValue
-    SegmentMapperConfig config2 =
-        new SegmentMapperConfig(mapperId, _pinotSchema, new RecordTransformerConfig.Builder().build(),
-            new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.COLUMN_VALUE)
-                .setColumnName("timeValue").build());
+    SegmentMapperConfig config2 = new SegmentMapperConfig(_pinotSchema, new RecordTransformerConfig.Builder().build(),
+        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.COLUMN_VALUE)
+            .setColumnName("timeValue").build());
     Map<String, List<Object[]>> expectedRecords2 =
         outputData.stream().collect(Collectors.groupingBy(r -> String.valueOf(r[2]), Collectors.toList()));
-    inputs.add(new Object[]{config2, expectedRecords2});
+    inputs.add(new Object[]{mapperId, config2, expectedRecords2});
 
     // partition by campaign
-    SegmentMapperConfig config3 =
-        new SegmentMapperConfig(mapperId, _pinotSchema, new RecordTransformerConfig.Builder().build(),
-            new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.COLUMN_VALUE)
-                .setColumnName("campaign").build());
+    SegmentMapperConfig config3 = new SegmentMapperConfig(_pinotSchema, new RecordTransformerConfig.Builder().build(),
+        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.COLUMN_VALUE)
+            .setColumnName("campaign").build());
     Map<String, List<Object[]>> expectedRecords3 =
         outputData.stream().collect(Collectors.groupingBy(r -> String.valueOf(r[0]), Collectors.toList()));
-    inputs.add(new Object[]{config3, expectedRecords3});
+    inputs.add(new Object[]{mapperId, config3, expectedRecords3});
 
     // transform function partition
-    SegmentMapperConfig config4 =
-        new SegmentMapperConfig(mapperId, _pinotSchema, new RecordTransformerConfig.Builder().build(),
-            new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION)
-                .setTransformFunction("toEpochDays(timeValue)").build());
+    SegmentMapperConfig config4 = new SegmentMapperConfig(_pinotSchema, new RecordTransformerConfig.Builder().build(),
+        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION)
+            .setTransformFunction("toEpochDays(timeValue)").build());
     Map<String, List<Object[]>> expectedRecords4 = outputData.stream()
         .collect(Collectors.groupingBy(r -> String.valueOf(((long) r[2]) / 86400000), Collectors.toList()));
-    inputs.add(new Object[]{config4, expectedRecords4});
+    inputs.add(new Object[]{mapperId, config4, expectedRecords4});
 
     // filter function which filters out nothing
-    SegmentMapperConfig config5 =
-        new SegmentMapperConfig(mapperId, _pinotSchema, new RecordTransformerConfig.Builder().build(),
-            new PartitioningConfig.Builder().setFilterFunction("Groovy({Integer.valueOf(arg0) > 0}, arg0)").build());
+    SegmentMapperConfig config5 = new SegmentMapperConfig(_pinotSchema, new RecordTransformerConfig.Builder().build(),
+        new PartitioningConfig.Builder().setFilterFunction("Groovy({Integer.valueOf(arg0) > 0}, arg0)").build());
     Map<String, List<Object[]>> expectedRecords5 = new HashMap<>();
     expectedRecords5.put("0", outputData);
-    inputs.add(new Object[]{config5, expectedRecords5});
+    inputs.add(new Object[]{mapperId, config5, expectedRecords5});
 
     // filter function which filters out everything
-    SegmentMapperConfig config6 =
-        new SegmentMapperConfig(mapperId, _pinotSchema, new RecordTransformerConfig.Builder().build(),
-            new PartitioningConfig.Builder().setFilterFunction("Groovy({Integer.valueOf(arg0) == 0}, arg0)").build());
+    SegmentMapperConfig config6 = new SegmentMapperConfig(_pinotSchema, new RecordTransformerConfig.Builder().build(),
+        new PartitioningConfig.Builder().setFilterFunction("Groovy({Integer.valueOf(arg0) == 0}, arg0)").build());
     Map<String, List<Object[]>> expectedRecords6 = new HashMap<>();
-    inputs.add(new Object[]{config6, expectedRecords6});
+    inputs.add(new Object[]{mapperId, config6, expectedRecords6});
 
     // filter function which filters out certain times
-    SegmentMapperConfig config7 =
-        new SegmentMapperConfig(mapperId, _pinotSchema, new RecordTransformerConfig.Builder().build(),
-            new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.COLUMN_VALUE)
-                .setColumnName("timeValue").setFilterFunction(
-                "Groovy({Long.valueOf(arg0) < 1597795200000 || Long.valueOf(arg0) >= 1597881600000}, arg0)").build());
+    SegmentMapperConfig config7 = new SegmentMapperConfig(_pinotSchema, new RecordTransformerConfig.Builder().build(),
+        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.COLUMN_VALUE)
+            .setColumnName("timeValue").setFilterFunction(
+            "Groovy({Long.valueOf(arg0) < 1597795200000 || Long.valueOf(arg0) >= 1597881600000}, arg0)").build());
     Map<String, List<Object[]>> expectedRecords7 =
         outputData.stream().filter(r -> ((long) r[2]) >= 1597795200000L && ((long) r[2]) < 1597881600000L)
             .collect(Collectors.groupingBy(r -> String.valueOf(r[2]), Collectors.toList()));
-    inputs.add(new Object[]{config7, expectedRecords7});
+    inputs.add(new Object[]{mapperId, config7, expectedRecords7});
 
     // transform function + filter function which keeps only 1 day
-    SegmentMapperConfig config8 =
-        new SegmentMapperConfig(mapperId, _pinotSchema, new RecordTransformerConfig.Builder().build(),
-            new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION)
-                .setTransformFunction("toEpochDays(timeValue)")
-                .setFilterFunction("Groovy({Integer.valueOf(arg0) != 18493}, arg0)").build());
+    SegmentMapperConfig config8 = new SegmentMapperConfig(_pinotSchema, new RecordTransformerConfig.Builder().build(),
+        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION)
+            .setTransformFunction("toEpochDays(timeValue)")
+            .setFilterFunction("Groovy({Integer.valueOf(arg0) != 18493}, arg0)").build());
     Map<String, List<Object[]>> expectedRecords8 = outputData.stream().filter(r -> (((long) r[2]) / 86400000) == 18493)
         .collect(Collectors.groupingBy(r -> "18493", Collectors.toList()));
-    inputs.add(new Object[]{config8, expectedRecords8});
+    inputs.add(new Object[]{mapperId, config8, expectedRecords8});
 
     // record transformation - round timeValue to nearest day
     Map<String, String> transformFunctionMap = new HashMap<>();
     transformFunctionMap.put("timeValue", "round(timeValue, 86400000)");
-    SegmentMapperConfig config9 = new SegmentMapperConfig(mapperId, _pinotSchema,
+    SegmentMapperConfig config9 = new SegmentMapperConfig(_pinotSchema,
         new RecordTransformerConfig.Builder().setTransformFunctionsMap(transformFunctionMap).build(),
         new PartitioningConfig.Builder().build());
     List<Object[]> transformedData = new ArrayList<>();
     outputData.forEach(r -> transformedData.add(new Object[]{r[0], r[1], (((long) r[2]) / 86400000) * 86400000}));
     Map<String, List<Object[]>> expectedRecords9 = new HashMap<>();
     expectedRecords9.put("0", transformedData);
-    inputs.add(new Object[]{config9, expectedRecords9});
+    inputs.add(new Object[]{mapperId, config9, expectedRecords9});
 
     // record transformation - round timeValue to nearest day, partition on timeValue
-    SegmentMapperConfig config10 = new SegmentMapperConfig(mapperId, _pinotSchema,
+    SegmentMapperConfig config10 = new SegmentMapperConfig(_pinotSchema,
         new RecordTransformerConfig.Builder().setTransformFunctionsMap(transformFunctionMap).build(),
         new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.COLUMN_VALUE)
             .setColumnName("timeValue").build());
     Map<String, List<Object[]>> expectedRecords10 =
         transformedData.stream().collect(Collectors.groupingBy(r -> String.valueOf(r[2]), Collectors.toList()));
-    inputs.add(new Object[]{config10, expectedRecords10});
+    inputs.add(new Object[]{mapperId, config10, expectedRecords10});
 
     // record transformation - round timeValue to nearest day, partition on timeValue, filter out timeValues
-    SegmentMapperConfig config11 = new SegmentMapperConfig(mapperId, _pinotSchema,
+    SegmentMapperConfig config11 = new SegmentMapperConfig(_pinotSchema,
         new RecordTransformerConfig.Builder().setTransformFunctionsMap(transformFunctionMap).build(),
         new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.COLUMN_VALUE)
             .setColumnName("timeValue").setFilterFunction("Groovy({arg0 != \"1597795200000\"}, arg0)").build());
     Map<String, List<Object[]>> expectedRecords11 =
         transformedData.stream().filter(r -> ((long) r[2]) == 1597795200000L)
             .collect(Collectors.groupingBy(r -> "1597795200000", Collectors.toList()));
-    inputs.add(new Object[]{config11, expectedRecords11});
+    inputs.add(new Object[]{mapperId, config11, expectedRecords11});
 
     return inputs.toArray(new Object[0][]);
   }

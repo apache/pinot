@@ -112,6 +112,10 @@ public class RollupCollector implements Collector {
     _collection.clear();
   }
 
+  /**
+   * A record representation for the keys of the record
+   * Note that the dimensions can have multi-value columns, and hence the equals and hashCode need deep array operations
+   */
   private static class Record {
     private final Object[] _values;
 

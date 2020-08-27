@@ -63,11 +63,11 @@ public class SegmentMapper {
   private final PartitionFilter _partitionFilter;
   private final Map<String, DataFileWriter<GenericData.Record>> _partitionToDataFileWriterMap = new HashMap<>();
 
-  public SegmentMapper(File inputSegment, SegmentMapperConfig mapperConfig, File mapperOutputDir) {
+  public SegmentMapper(String mapperId, File inputSegment, SegmentMapperConfig mapperConfig, File mapperOutputDir) {
     _inputSegment = inputSegment;
     _mapperOutputDir = mapperOutputDir;
 
-    _mapperId = mapperConfig.getMapperId();
+    _mapperId = mapperId;
     _avroSchema = SegmentProcessorUtils.convertPinotSchemaToAvroSchema(mapperConfig.getPinotSchema());
     _recordTransformer = RecordTransformerFactory.getRecordTransformer(mapperConfig.getRecordTransformerConfig());
     _partitioner = PartitionerFactory.getPartitioner(mapperConfig.getPartitioningConfig());

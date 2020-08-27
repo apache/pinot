@@ -20,24 +20,14 @@ package org.apache.pinot.core.segment.processing.framework;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
-import java.io.IOException;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.core.segment.processing.collector.CollectorConfig;
-import org.apache.pinot.core.segment.processing.collector.CollectorFactory;
-import org.apache.pinot.core.segment.processing.collector.ValueAggregatorFactory;
-import org.apache.pinot.core.segment.processing.partitioner.PartitionerFactory;
-import org.apache.pinot.core.segment.processing.partitioner.PartitioningConfig;
-import org.apache.pinot.core.segment.processing.transformer.RecordTransformerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,8 +73,7 @@ public class SegmentProcessorFramework {
 
     _inputSegmentsDir = inputSegmentsDir;
     Preconditions.checkState(_inputSegmentsDir.exists() && _inputSegmentsDir.isDirectory(),
-        "Input path: %s,  must be a directory with Pinot segments", _inputSegmentsDir.getAbsolutePath());
-
+        "Input path: %s must be a directory with Pinot segments", _inputSegmentsDir.getAbsolutePath());
     _outputSegmentsDir = outputSegmentsDir;
     Preconditions.checkState(
         _outputSegmentsDir.exists() && _outputSegmentsDir.isDirectory() && (_outputSegmentsDir.list().length == 0),
@@ -96,21 +85,19 @@ public class SegmentProcessorFramework {
 
     _baseDir = new File(FileUtils.getTempDirectory(), "segment_processor_" + System.currentTimeMillis());
     FileUtils.deleteQuietly(_baseDir);
-    if (!_baseDir.mkdirs()) {
-      throw new RuntimeException("Failed to create directory " + _baseDir + " for SegmentProcessor");
-    }
+    Preconditions.checkState(_baseDir.mkdirs(), "Failed to create base directory: %s for SegmentProcessor", _baseDir);
     _mapperInputDir = new File(_baseDir, "mapper_input");
-    if (!_mapperInputDir.mkdirs()) {
-      throw new RuntimeException("Failed to create directory " + _mapperInputDir + " for SegmentProcessor");
-    }
+    Preconditions
+        .checkState(_mapperInputDir.mkdirs(), "Failed to create mapper input directory: %s for SegmentProcessor",
+            _mapperInputDir);
     _mapperOutputDir = new File(_baseDir, "mapper_output");
-    if (!_mapperOutputDir.mkdirs()) {
-      throw new RuntimeException("Failed to create directory " + _mapperOutputDir + " for SegmentProcessor");
-    }
+    Preconditions
+        .checkState(_mapperOutputDir.mkdirs(), "Failed to create mapper output directory: %s for SegmentProcessor",
+            _mapperOutputDir);
     _reducerOutputDir = new File(_baseDir, "reducer_output");
-    if (!_reducerOutputDir.mkdirs()) {
-      throw new RuntimeException("Failed to create directory " + _reducerOutputDir + " for SegmentProcessor");
-    }
+    Preconditions
+        .checkState(_reducerOutputDir.mkdirs(), "Failed to create reducer output directory: %s for SegmentProcessor",
+            _reducerOutputDir);
   }
 
   /**
@@ -143,9 +130,10 @@ public class SegmentProcessorFramework {
       }
 
       // Set mapperId as the name of the segment
-      SegmentMapperConfig mapperConfig = new SegmentMapperConfig(mapperInput.getName(), _pinotSchema,
-          _segmentProcessorConfig.getRecordTransformerConfig(), _segmentProcessorConfig.getPartitioningConfig());
-      SegmentMapper mapper = new SegmentMapper(mapperInput, mapperConfig, _mapperOutputDir);
+      SegmentMapperConfig mapperConfig =
+          new SegmentMapperConfig(_pinotSchema, _segmentProcessorConfig.getRecordTransformerConfig(),
+              _segmentProcessorConfig.getPartitioningConfig());
+      SegmentMapper mapper = new SegmentMapper(mapperInput.getName(), mapperInput, mapperConfig, _mapperOutputDir);
       mapper.map();
       mapper.cleanup();
     }
@@ -164,9 +152,9 @@ public class SegmentProcessorFramework {
 
       // Set partition as reducerId
       SegmentReducerConfig reducerConfig =
-          new SegmentReducerConfig(partDir.getName(), _pinotSchema, _segmentProcessorConfig.getCollectorConfig(),
+          new SegmentReducerConfig(_pinotSchema, _segmentProcessorConfig.getCollectorConfig(),
               _segmentProcessorConfig.getSegmentConfig().getMaxNumRecordsPerSegment());
-      SegmentReducer reducer = new SegmentReducer(partDir, reducerConfig, _reducerOutputDir);
+      SegmentReducer reducer = new SegmentReducer(partDir.getName(), partDir, reducerConfig, _reducerOutputDir);
       reducer.reduce();
       reducer.cleanup();
     }
@@ -202,49 +190,5 @@ public class SegmentProcessorFramework {
    */
   public void cleanup() {
     FileUtils.deleteQuietly(_baseDir);
-  }
-
-  public static void main(String[] args)
-      throws IOException {
-    TableConfig tableConfig = JsonUtils
-        .fileToObject(new File("/Users/npawar/quick_start_configs/segment_processing_framework/offline.json"),
-            TableConfig.class);
-    Schema schema =
-        Schema.fromFile(new File("/Users/npawar/quick_start_configs/segment_processing_framework/schema.json"));
-    File inputSegments = new File("/Users/npawar/quick_start_configs/segment_processing_framework/segments");
-    File outputSegments = new File("/Users/npawar/quick_start_configs/segment_processing_framework/output");
-    FileUtils.deleteQuietly(outputSegments);
-    outputSegments.mkdirs();
-
-    Map<String, String> transformFunctionsMap = new HashMap<>();
-    transformFunctionsMap.put("timeValue", "round(timeValue, 86400000)");
-    RecordTransformerConfig transformerConfig =
-        new RecordTransformerConfig.Builder().setTransformFunctionsMap(transformFunctionsMap).build();
-    PartitioningConfig partitioningConfig =
-        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.COLUMN_VALUE)
-            .setColumnName("timeValue").setFilterFunction("Groovy({arg0 != \"1597795200000\"}, arg0)").build();
-    SegmentConfig segmentConfig = new SegmentConfig.Builder().setMaxNumRecordsPerSegment(4).build();
-    Map<String, ValueAggregatorFactory.ValueAggregatorType> valueAggregatorsMap = new HashMap<>();
-    valueAggregatorsMap.put("clicks", ValueAggregatorFactory.ValueAggregatorType.MAX);
-    CollectorConfig collectorConfig =
-        new CollectorConfig.Builder().setCollectorType(CollectorFactory.CollectorType.ROLLUP)
-            .setAggregatorTypeMap(valueAggregatorsMap).build();
-    SegmentProcessorConfig segmentProcessorConfig =
-        new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema)
-            .setRecordTransformerConfig(transformerConfig).setPartitioningConfig(partitioningConfig)
-            .setCollectorConfig(collectorConfig).setSegmentConfig(segmentConfig).build();
-    System.out.println(segmentProcessorConfig);
-
-    SegmentProcessorFramework framework = null;
-    try {
-      framework = new SegmentProcessorFramework(inputSegments, segmentProcessorConfig, outputSegments);
-      framework.processSegments();
-    } catch (Exception e) {
-      e.printStackTrace();
-    } finally {
-      if (framework != null) {
-        framework.cleanup();
-      }
-    }
   }
 }

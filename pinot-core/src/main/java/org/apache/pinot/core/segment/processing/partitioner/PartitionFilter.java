@@ -19,7 +19,7 @@
 package org.apache.pinot.core.segment.processing.partitioner;
 
 /**
- * Filter for partitions
+ * Used for filtering partitions in the mapper
  */
 public interface PartitionFilter {
 

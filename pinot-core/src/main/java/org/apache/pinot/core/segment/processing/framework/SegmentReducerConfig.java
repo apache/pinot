@@ -27,24 +27,15 @@ import org.apache.pinot.spi.data.Schema;
  */
 public class SegmentReducerConfig {
 
-  private final String _reducerId;
   private final Schema _pinotSchema;
   private final int _numRecordsPerPart;
   private final CollectorConfig _collectorConfig;
 
-  public SegmentReducerConfig(String reducerId, Schema pinotSchema, CollectorConfig collectorConfig,
+  public SegmentReducerConfig(Schema pinotSchema, CollectorConfig collectorConfig,
       int numRecordsPerPart) {
-    _reducerId = reducerId;
     _pinotSchema = pinotSchema;
     _numRecordsPerPart = numRecordsPerPart;
     _collectorConfig = collectorConfig;
-  }
-
-  /**
-   * Reducer id. Each reducer should have a unique id for a run of the Segment Processor Framework
-   */
-  public String getReducerId() {
-    return _reducerId;
   }
 
   /**

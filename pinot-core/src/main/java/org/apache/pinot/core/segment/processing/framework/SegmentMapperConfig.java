@@ -28,24 +28,15 @@ import org.apache.pinot.spi.data.Schema;
  */
 public class SegmentMapperConfig {
 
-  private final String _mapperId;
   private final Schema _pinotSchema;
   private final RecordTransformerConfig _recordTransformerConfig;
   private final PartitioningConfig _partitioningConfig;
 
-  public SegmentMapperConfig(String mapperId, Schema pinotSchema, RecordTransformerConfig recordTransformerConfig,
+  public SegmentMapperConfig(Schema pinotSchema, RecordTransformerConfig recordTransformerConfig,
       PartitioningConfig partitioningConfig) {
-    _mapperId = mapperId;
     _pinotSchema = pinotSchema;
     _recordTransformerConfig = recordTransformerConfig;
     _partitioningConfig = partitioningConfig;
-  }
-
-  /**
-   * Mapper id. Each mapper should have a unique id in one run of the Segment Processor
-   */
-  public String getMapperId() {
-    return _mapperId;
   }
 
   /**

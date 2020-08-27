@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.processing.framework;
 
+import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;

@@ -111,8 +111,14 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
 
   private interface ExecutableNode {
 
+    /**
+     * Execute the function by extracting arguments from the row
+     */
     Object execute(GenericRow row);
 
+    /**
+     * Execute the function on provided arguments
+     */
     Object execute(Object[] arguments);
   }
 
