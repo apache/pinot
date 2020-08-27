@@ -22,6 +22,10 @@ alerts:
       - detection:
           - type: THRESHOLD
             name: maxThreshold_1
+            windowUnit: DAYS
+            bucketPeriod: P7D
+            windowSize: 7
+            timeZone: America/Los_Angeles
             params:
               max: 100
         filter:

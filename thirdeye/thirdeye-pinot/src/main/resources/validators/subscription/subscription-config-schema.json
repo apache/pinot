@@ -16,6 +16,9 @@
     "type": {
       "type": "string"
     },
+    "active": {
+      "type": "boolean"
+    },
     "cron": {
       "type": "string"
     },

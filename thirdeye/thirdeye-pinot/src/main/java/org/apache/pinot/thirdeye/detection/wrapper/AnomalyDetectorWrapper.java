@@ -69,8 +69,9 @@ import static org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfi
  */
 public class AnomalyDetectorWrapper extends DetectionPipeline {
   private static final String PROP_METRIC_URN = "metricUrn";
+  private static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
 
-  // moving window detection properties
+  // moving window detection properties (configurable in yaml)
   private static final String PROP_MOVING_WINDOW_DETECTION = "isMovingWindowDetection";
   private static final String PROP_WINDOW_DELAY = "windowDelay";
   private static final String PROP_WINDOW_DELAY_UNIT = "windowDelayUnit";
@@ -78,10 +79,10 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   private static final String PROP_WINDOW_UNIT = "windowUnit";
   private static final String PROP_FREQUENCY = "frequency";
   private static final String PROP_DETECTOR = "detector";
-  private static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
   private static final String PROP_TIMEZONE = "timezone";
   private static final String PROP_BUCKET_PERIOD = "bucketPeriod";
   private static final String PROP_CACHE_PERIOD_LOOKBACK = "cachingPeriodLookback";
+
   // fail detection job if it failed successively for the first 5 windows
   private static final long EARLY_TERMINATE_WINDOW = 5;
   // expression to consolidate the time series

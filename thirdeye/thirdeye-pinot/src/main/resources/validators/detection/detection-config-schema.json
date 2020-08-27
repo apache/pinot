@@ -146,7 +146,47 @@
       }
     },
 
-    "eachComponent": {
+    "anomalyDetectorComponent": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [ "type", "name" ],
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "params": {
+            "type": "object"
+          },
+          "windowDelay": {
+            "type": "number"
+          },
+          "windowDelayUnit": {
+            "type": "string"
+          },
+          "windowSize": {
+            "type": "number"
+          },
+          "windowUnit": {
+            "type": "string"
+          },
+          "bucketPeriod": {
+            "type": "string"
+          },
+          "timeZone": {
+            "type": "string"
+          },
+          "cachingPeriodLookback": {
+            "type": "string"
+          }
+        }
+      }
+    },
+
+    "genericComponent": {
       "type": "array",
       "items": {
         "type": "object",
@@ -174,13 +214,13 @@
         "required": [ "detection" ],
         "properties": {
           "detection": {
-            "$ref": "#/definitions/eachComponent"
+            "$ref": "#/definitions/anomalyDetectorComponent"
           },
           "filter": {
-            "$ref": "#/definitions/eachComponent"
+            "$ref": "#/definitions/genericComponent"
           },
           "quality": {
-            "$ref": "#/definitions/eachComponent"
+            "$ref": "#/definitions/genericComponent"
           }
         },
         "additionalProperties": false
@@ -206,7 +246,7 @@
     },
 
     "grouper": {
-      "$ref": "#/definitions/eachComponent"
+      "$ref": "#/definitions/genericComponent"
     }
   },
 
