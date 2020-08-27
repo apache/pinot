@@ -93,8 +93,8 @@ public class DAOTestBase {
     Connection conn = ds.getConnection();
     // create schema
     URL createSchemaUrl = getClass().getResource("/schema/create-schema.sql");
-    ScriptRunner scriptRunner = new ScriptRunner(conn, false, false);
-    scriptRunner.setDelimiter(";", true);
+    ScriptRunner scriptRunner = new ScriptRunner(conn, true);
+    scriptRunner.setDelimiter(";");
     scriptRunner.setLogWriter(new PrintWriter(new NullWriter()));
     scriptRunner.runScript(new FileReader(createSchemaUrl.getFile()));
   }
@@ -103,7 +103,7 @@ public class DAOTestBase {
     System.out.println("Cleaning database: start");
     try (Connection conn = ds.getConnection()) {
       URL deleteSchemaUrl = getClass().getResource("/schema/drop-tables.sql");
-      ScriptRunner scriptRunner = new ScriptRunner(conn, false, false);
+      ScriptRunner scriptRunner = new ScriptRunner(conn, false);
       scriptRunner.setLogWriter(new PrintWriter(new NullWriter()));
       scriptRunner.runScript(new FileReader(deleteSchemaUrl.getFile()));
     }
