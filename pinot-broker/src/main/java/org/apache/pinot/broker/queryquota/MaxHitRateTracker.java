@@ -28,15 +28,22 @@ import com.google.common.annotations.VisibleForTesting;
  * If the current timestamp has exceeded the current time range of all the buckets, this hit counter will use
  * the current timestamp minus the default time queried time range to calculate the start time index.
  */
-public class StatefulHitCounter extends HitCounter {
-  private long _maxTimeRangeMs;
-  private long _defaultQueriedTimeRangeMs;
-  private long _lastAccessTimestamp;
+public class MaxHitRateTracker extends HitCounter {
+  private static int ONE_SECOND_BUCKET_WIDTH_MS = 1000;
+  private static int MAX_TIME_RANGE_FACTOR = 2;
 
-  public StatefulHitCounter(int timeRangeInSeconds, int bucketCount, int defaultQueriedTimeRangeInSeconds) {
-    super(timeRangeInSeconds, bucketCount);
-    _maxTimeRangeMs = timeRangeInSeconds * 1000L;
-    _defaultQueriedTimeRangeMs = defaultQueriedTimeRangeInSeconds * 1000L;
+  private final long _maxTimeRangeMs;
+  private final long _defaultTimeRangeMs;
+  private volatile long _lastAccessTimestamp;
+
+  public MaxHitRateTracker(int timeRangeInSeconds) {
+    this(timeRangeInSeconds, timeRangeInSeconds * MAX_TIME_RANGE_FACTOR);
+  }
+
+  private MaxHitRateTracker(int defaultTimeRangeInSeconds, int maxTimeRangeInSeconds) {
+    super(maxTimeRangeInSeconds, (int) (maxTimeRangeInSeconds * 1000L / ONE_SECOND_BUCKET_WIDTH_MS));
+    _defaultTimeRangeMs = defaultTimeRangeInSeconds * 1000L;
+    _maxTimeRangeMs = maxTimeRangeInSeconds * 1000L;
   }
 
   /**
@@ -47,19 +54,20 @@ public class StatefulHitCounter extends HitCounter {
   }
 
   @VisibleForTesting
-  int getMaxCountPerBucket(long timestamp) {
-    // If the hit counter didn't get queried for more than _maxTimeRangeMs
-    if (timestamp - _lastAccessTimestamp > _maxTimeRangeMs) {
-      _lastAccessTimestamp = timestamp - _defaultQueriedTimeRangeMs;
+  int getMaxCountPerBucket(long now) {
+    // Update the last access timestamp if the hit counter didn't get queried for more than _maxTimeRangeMs.
+    long then = _lastAccessTimestamp;
+    if (now - then > _maxTimeRangeMs) {
+      then = now - _defaultTimeRangeMs;
     }
-    long startTimeUnits = _lastAccessTimestamp / _timeBucketWidthMs;
+    long startTimeUnits = then / _timeBucketWidthMs;
     int startIndex = (int) (startTimeUnits % _bucketCount);
 
-    long numTimeUnits = timestamp / _timeBucketWidthMs;
+    long numTimeUnits = now / _timeBucketWidthMs;
     int endIndex = (int) (numTimeUnits % _bucketCount);
 
     int maxCount = 0;
-    // Since the start index was accessed last time, there is no need to query its bucket this time.
+    // Skipping the end index here as its bucket hasn't fully gathered all the hits yet.
     for (int i = startIndex; i != endIndex; i = (++i % _bucketCount)) {
       if (numTimeUnits - _bucketStartTime.get(i) < _bucketCount) {
         maxCount = Math.max(_bucketHitCount.get(i), maxCount);
@@ -67,7 +75,7 @@ public class StatefulHitCounter extends HitCounter {
     }
 
     // Update the last access timestamp
-    _lastAccessTimestamp = timestamp;
+    _lastAccessTimestamp = now;
     return maxCount;
   }
 }

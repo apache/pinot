@@ -22,13 +22,12 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-public class StatefulHitCounterTest {
+public class MaxHitRateTrackerTest {
 
   @Test
-  public void testStatefulHitCounter() {
+  public void testMaxHitRateTracker() {
     int timeInSec = 60;
-    int bucketCount = 60;
-    StatefulHitCounter hitCounter = new StatefulHitCounter(timeInSec * 2, bucketCount * 2, timeInSec);
+    MaxHitRateTracker hitCounter = new MaxHitRateTracker(timeInSec);
     long currentTimestamp = System.currentTimeMillis();
     for (int i = 0; i < timeInSec; i++) {
       for (int j = 0; j < 5; j++) {
