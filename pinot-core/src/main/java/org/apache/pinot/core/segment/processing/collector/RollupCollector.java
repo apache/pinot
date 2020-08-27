@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.core.segment.processing.collector;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -110,5 +110,25 @@ public class RollupCollector implements Collector {
   @Override
   public void reset() {
     _collection.clear();
+  }
+
+  private static class Record {
+    private final Object[] _values;
+
+    public Record(Object[] values) {
+      _values = values;
+    }
+
+    // NOTE: Not check class for performance concern
+    @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
+    @Override
+    public boolean equals(Object o) {
+      return Arrays.deepEquals(_values, ((Record) o)._values);
+    }
+
+    @Override
+    public int hashCode() {
+      return Arrays.deepHashCode(_values);
+    }
   }
 }

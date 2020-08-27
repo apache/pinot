@@ -31,6 +31,7 @@ import org.apache.pinot.plugin.inputformat.avro.AvroRecordReader;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -81,12 +82,9 @@ public class SegmentReducer {
     int part = 0;
     for (File inputFile : _reducerInputDir.listFiles()) {
 
-      // FIXME: create via plugins before submitting PR
-      RecordReader avroRecordReader = new AvroRecordReader();
-      avroRecordReader.init(inputFile, _pinotSchema.getColumnNames(), null);
-//      RecordReader avroRecordReader = RecordReaderFactory
-//          .getRecordReaderByClass("org.apache.pinot.plugin.inputformat.avro.AvroRecordReader", inputFile,
-//              _pinotSchema.getColumnNames(), null);
+      RecordReader avroRecordReader = RecordReaderFactory
+          .getRecordReaderByClass("org.apache.pinot.plugin.inputformat.avro.AvroRecordReader", inputFile,
+              _pinotSchema.getColumnNames(), null);
 
       while (avroRecordReader.hasNext()) {
         GenericRow next = avroRecordReader.next();
@@ -117,7 +115,8 @@ public class SegmentReducer {
     Iterator<GenericRow> collectionIt = collector.iterator();
 
     DataFileWriter<GenericData.Record> recordWriter = new DataFileWriter<>(new GenericDatumWriter<>(_avroSchema));
-    recordWriter.create(_avroSchema, new File(_reducerOutputDir, createReducerOutputFileName(_reducerId, partNumber++)));
+    recordWriter
+        .create(_avroSchema, new File(_reducerOutputDir, createReducerOutputFileName(_reducerId, partNumber++)));
 
     int numRecords = 0;
     while (collectionIt.hasNext()) {
@@ -129,7 +128,8 @@ public class SegmentReducer {
         numRecords = 0;
         if (collectionIt.hasNext()) {
           recordWriter = new DataFileWriter<>(new GenericDatumWriter<>(_avroSchema));
-          recordWriter.create(_avroSchema, new File(_reducerOutputDir, createReducerOutputFileName(_reducerId, partNumber++)));
+          recordWriter
+              .create(_avroSchema, new File(_reducerOutputDir, createReducerOutputFileName(_reducerId, partNumber++)));
         }
       }
     }

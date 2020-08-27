@@ -168,7 +168,6 @@ public class PartitionerTest {
             .setTransformFunction("toEpochDays(timestamp)").build();
     Partitioner partitioner = PartitionerFactory.getPartitioner(partitioningConfig);
     assertEquals(partitioner.getClass(), TransformFunctionPartitioner.class);
-
     GenericRow row = new GenericRow();
     row.putValue("timestamp", 1587410614000L);
     assertEquals(partitioner.getPartition(row), "18372");
@@ -180,5 +179,13 @@ public class PartitionerTest {
     row.putValue("a", 10);
     row.putValue("b", 20);
     assertEquals(partitioner.getPartition(row), "30");
+
+    // mv column
+    partitioningConfig =
+        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION)
+            .setTransformFunction("Groovy({dMv[1]},dMv)").build();
+    partitioner = PartitionerFactory.getPartitioner(partitioningConfig);
+    row.putValue("dMv", new Object[]{1, 2, 3});
+    assertEquals(partitioner.getPartition(row), "2");
   }
 }

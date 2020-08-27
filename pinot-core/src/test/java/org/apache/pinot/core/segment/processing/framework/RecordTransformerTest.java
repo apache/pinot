@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.segment.processing.framework;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.core.segment.processing.transformer.NoOpRecordTransformer;
@@ -67,16 +69,18 @@ public class RecordTransformerTest {
     Map<String, String> transformFunctionMap = new HashMap<>();
     transformFunctionMap.put("foo", "toEpochDays(foo)");
     transformFunctionMap.put("bar", "Groovy({bar + \"_\" + zoo}, bar, zoo)");
+    transformFunctionMap.put("dMv", "Groovy({dMv.findAll { it > 1}}, dMv)");
     RecordTransformerConfig config = new RecordTransformerConfig.Builder().setTransformFunctionsMap(transformFunctionMap).build();
     RecordTransformer recordTransformer = RecordTransformerFactory.getRecordTransformer(config);
     GenericRow row = new GenericRow();
     row.putValue("foo", 1587410614000L);
     row.putValue("bar", "dimValue1");
     row.putValue("zoo", "dimValue2");
+    row.putValue("dMv", new Object[]{1, 2, 3});
     GenericRow transformRecord = recordTransformer.transformRecord(row);
     assertEquals(transformRecord.getValue("foo"), 18372L);
     assertEquals(transformRecord.getValue("bar"), "dimValue1_dimValue2");
     assertEquals(transformRecord.getValue("zoo"), "dimValue2");
-
+    assertTrue(Arrays.equals(((ArrayList<Object>) transformRecord.getValue("dMv")).toArray(), new Object[]{2, 3}));
   }
 }

@@ -19,6 +19,7 @@
 package org.apache.pinot.core.segment.processing.framework;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -150,6 +151,34 @@ public class CollectorTest {
     }
     collector.reset();
     assertEquals(collector.size(), 0);
+  }
+
+  @Test
+  public void testRollupCollectorWithMVDimensions() {
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName("testSchema").addMultiValueDimension("dMv", FieldSpec.DataType.STRING)
+            .addMetric("m1", FieldSpec.DataType.INT).build();
+    CollectorConfig collectorConfig =
+        new CollectorConfig.Builder().setCollectorType(CollectorFactory.CollectorType.ROLLUP).build();
+    Collector collector = CollectorFactory.getCollector(collectorConfig, schema);
+
+    GenericRow r1 = new GenericRow();
+    r1.putValue("dMv", new Object[]{"a", "b"});
+    r1.putValue("m1", 100);
+    GenericRow r2 = new GenericRow();
+    r2.putValue("dMv", new Object[]{"b", "a"});
+    r2.putValue("m1", 100);
+    GenericRow r3 = new GenericRow();
+    r3.putValue("dMv", new Object[]{"a", "b"});
+    r3.putValue("m1", 100);
+    GenericRow r4 = new GenericRow();
+    r4.putValue("dMv", new Object[]{"a"});
+    r4.putValue("m1", 100);
+    collector.collect(r1);
+    collector.collect(r2);
+    collector.collect(r3);
+    collector.collect(r4);
+    assertEquals(collector.size(), 3);
   }
 
   @Test
