@@ -1666,6 +1666,9 @@
             <!-- Third eye (not part of the distribution) -->
             <exclude>thirdeye/**</exclude>
             <exclude>docker/images/pinot-thirdeye/**</exclude>
+
+            <!-- Github template files -->
+            <exclude>.github/*.md</exclude>
           </excludes>
         </configuration>
       </plugin>
