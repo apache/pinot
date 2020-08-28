@@ -42,54 +42,44 @@
       <td style="border-bottom: 1px solid rgba(0,0,0,0.15); padding: 12px 24px; align:left">
           <p style="font-size:20px; line-height:24px; color:#1D1D1D; font-weight: 500; margin:0; padding:0;">Root Cause Analysis</p>
 
-            <a href="http://localhost:8080/dashboard/app/#/rootcause?anomalyId= style="text-decoration: none; color:#0073B1; font-size:12px; font-weight:bold;">(more)</a>
+            <a href="http://localhost:8080/dashboard/app/#/rootcause?anomalyId=" style="text-decoration: none; color:#0073B1; font-size:12px; font-weight:bold;">Top Anomalous Dimensions</a>
             <table border="0" align="center" style="table-layout: fixed; width:100%; padding:0; margin:0; border-collapse: collapse; text-align:left;">
-              <tr style="border-bottom: 1px solid #C7D1D8; padding: 16px;">
-                <div>
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Top Anomalous Dimensions</th>
-                      </tr>
-                      <tr>
-                        <th style="text-align:left; padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">country_code</th>
-                        <th style="text-align:left; padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">industry</th>
-                        <th style="text-align:left; padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">device</th>
-                      <th style="text-align:left; padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">Baseline</th>
-                      <th style="text-align:left; padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">Current</th>
-                      <th style="text-align:left; padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">% Change</th>
-                      </tr>
-                    </thead>
-
-                    <tbody>
-                        <tr>
-                            <td style="color: rgba(0,0,0,0.9); font-size:12px; line-height:20px;">(ALL)-</td>
-                            <td style="color: rgba(0,0,0,0.9); font-size:12px; line-height:20px;"></td>
-                            <td style="color: rgba(0,0,0,0.9); font-size:12px; line-height:20px;"></td>
-                          <td style="color: rgba(0,0,0,0.9); font-size:12px; line-height:20px; text-align:center;">189,072</td>
-                          <td style="color: rgba(0,0,0,0.9); font-size:12px; line-height:20px; text-align:center;">188,105</td>
-                          <td style="color:#ee1620; font-size:12px; line-height:20px; text-align:center;">-0.5114%</td>
-                        </tr>
-                        <tr>
-                            <td style="color: rgba(0,0,0,0.9); font-size:12px; line-height:20px;">india</td>
-                            <td style="color: rgba(0,0,0,0.9); font-size:12px; line-height:20px;">information technology and services</td>
-                            <td style="color: rgba(0,0,0,0.9); font-size:12px; line-height:20px;">Android</td>
-                          <td style="color: rgba(0,0,0,0.9); font-size:12px; line-height:20px; text-align:center;">3,907</td>
-                          <td style="color: rgba(0,0,0,0.9); font-size:12px; line-height:20px; text-align:center;">15,598</td>
-                          <td style="color:#3A8C18; font-size:12px; line-height:20px; text-align:center;">299.2321%</td>
-                        </tr>
-                        <tr>
-                            <td style="color: rgba(0,0,0,0.9); font-size:12px; line-height:20px;">australia</td>
-                            <td style="color: rgba(0,0,0,0.9); font-size:12px; line-height:20px;">computer and network security</td>
-                            <td style="color: rgba(0,0,0,0.9); font-size:12px; line-height:20px;">Android</td>
-                          <td style="color: rgba(0,0,0,0.9); font-size:12px; line-height:20px; text-align:center;">1</td>
-                          <td style="color: rgba(0,0,0,0.9); font-size:12px; line-height:20px; text-align:center;">752</td>
-                          <td style="color:#3A8C18; font-size:12px; line-height:20px; text-align:center;">75100.0000%</td>
-                        </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </tr>
+              <thead>
+                <tr style="text-align:center; background-color: #F6F8FA; border-top: 2px solid #C7D1D8; border-bottom: 2px solid #C7D1D8;">
+                    <th style="text-align:left; padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">country_code</th>
+                    <th style="text-align:left; padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">industry</th>
+                    <th style="text-align:left; padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">device</th>
+                  <th style="padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">Baseline</th>
+                  <th style="padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">Current</th>
+                  <th style="padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">% Change</th>
+                </tr>
+              </thead>
+              <tbody>
+                  <tr style="border-bottom: 1px solid #C7D1D8;">
+                          <td style="color: rgba(0,0,0,0.9); font-size:12px; line-height:20px; text-align:left;">Other</td>
+                        <td style="color: rgba(0,0,0,0.9); font-size:12px; line-height:20px; text-align:left;">-</td>
+                        <td style="color: rgba(0,0,0,0.9); font-size:12px; line-height:20px; text-align:left;">-</td>
+                    <td style="color: rgba(0,0,0,0.9); font-size:12px; line-height:20px; text-align:center;">189,072</td>
+                    <td style="color: rgba(0,0,0,0.9); font-size:12px; line-height:20px; text-align:center;">188,105</td>
+                    <td style="color:#ee1620; font-size:12px; line-height:20px; text-align:center;">-0.5114%</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid #C7D1D8;">
+                          <td style="word-break: break-all; color: rgba(0,0,0,0.9); font-size:12px; line-height:20px; text-align:left;">india</td>
+                          <td style="word-break: break-all; color: rgba(0,0,0,0.9); font-size:12px; line-height:20px; text-align:left;">information technology and services</td>
+                          <td style="word-break: break-all; color: rgba(0,0,0,0.9); font-size:12px; line-height:20px; text-align:left;">Android</td>
+                    <td style="color: rgba(0,0,0,0.9); font-size:12px; line-height:20px; text-align:center;">3,907</td>
+                    <td style="color: rgba(0,0,0,0.9); font-size:12px; line-height:20px; text-align:center;">15,598</td>
+                    <td style="color:#3A8C18; font-size:12px; line-height:20px; text-align:center;">299.2321%</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid #C7D1D8;">
+                          <td style="word-break: break-all; color: rgba(0,0,0,0.9); font-size:12px; line-height:20px; text-align:left;">australia</td>
+                          <td style="word-break: break-all; color: rgba(0,0,0,0.9); font-size:12px; line-height:20px; text-align:left;">computer and network security</td>
+                          <td style="word-break: break-all; color: rgba(0,0,0,0.9); font-size:12px; line-height:20px; text-align:left;">Android</td>
+                    <td style="color: rgba(0,0,0,0.9); font-size:12px; line-height:20px; text-align:center;">1</td>
+                    <td style="color: rgba(0,0,0,0.9); font-size:12px; line-height:20px; text-align:center;">752</td>
+                    <td style="color:#3A8C18; font-size:12px; line-height:20px; text-align:center;">75100.0000%</td>
+                  </tr>
+              </tbody>
             </table>
 
       </td>

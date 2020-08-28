@@ -32,8 +32,6 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
 
   private boolean alert = false;
   private boolean autoload = false;
-  private boolean classifier = false;
-  private boolean dataCompleteness = false;
   private boolean holidayEventsLoader = false;
   private boolean mockEventsLoader = false;
   private boolean monitor = false;
@@ -47,7 +45,6 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   private boolean dataAvailabilityTaskScheduler = false;
 
   private long id;
-  private String dashboardHost;
   private HolidayEventsLoaderConfiguration holidayEventsLoaderConfiguration = new HolidayEventsLoaderConfiguration();
   private MockEventsLoaderConfiguration mockEventsLoaderConfiguration = new MockEventsLoaderConfiguration();
   private MonitorConfiguration monitorConfiguration = new MonitorConfiguration();
@@ -56,8 +53,6 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   private ThirdEyeRestClientConfiguration teRestConfig = new ThirdEyeRestClientConfiguration();
   private DataAvailabilitySchedulingConfiguration
       dataAvailabilitySchedulingConfiguration = new DataAvailabilitySchedulingConfiguration();
-  private String failureFromAddress;
-  private String failureToAddress;
   private List<String> holidayCountriesWhitelist;
 
   public ThirdEyeRestClientConfiguration getThirdEyeRestClientConfiguration() {
@@ -114,14 +109,6 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
 
   public void setHolidayEventsLoader(boolean holidayEventsLoader) {
     this.holidayEventsLoader = holidayEventsLoader;
-  }
-
-  public String getDashboardHost() {
-    return dashboardHost;
-  }
-
-  public void setDashboardHost(String dashboardHost) {
-    this.dashboardHost = dashboardHost;
   }
 
   public long getId() {
@@ -220,44 +207,12 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
     this.autoload = autoload;
   }
 
-  public boolean isDataCompleteness() {
-    return dataCompleteness;
-  }
-
-  public void setDataCompleteness(boolean dataCompleteness) {
-    this.dataCompleteness = dataCompleteness;
-  }
-
-  public boolean isClassifier() {
-    return classifier;
-  }
-
-  public void setClassifier(boolean classifier) {
-    this.classifier = classifier;
-  }
-
   public boolean isPinotProxy() {
     return pinotProxy;
   }
 
   public void setPinotProxy(boolean pinotProxy) {
     this.pinotProxy = pinotProxy;
-  }
-
-  public String getFailureFromAddress() {
-    return failureFromAddress;
-  }
-
-  public void setFailureFromAddress(String failureFromAddress) {
-    this.failureFromAddress = failureFromAddress;
-  }
-
-  public String getFailureToAddress() {
-    return failureToAddress;
-  }
-
-  public void setFailureToAddress(String failureToAddress) {
-    this.failureToAddress = failureToAddress;
   }
 
   public List<String> getHolidayCountriesWhitelist() {
