@@ -23,19 +23,11 @@
 # Pinot in the 2 given directories and then upgrades in the following order:
 # Controller -> Broker -> Server
 
-declare -a components=("controller" "broker" "server" "zookeeper")
-
 # get usage of the script 
 function usage() {
   command=$1
   if [[ "$command" =~ compCheck.sh$ ]] ; then
     echo "Usage: $command olderCommit newerCommit [workingDir]"
-  elif [[ "$command" =~ checkoutAndBuild$ ]]; then
-    echo "Usage: $command commitHash dirName"
-  elif [[ "$command" =~ startService$ ]]; then
-    echo "Usage: $command serviceName dirName"
-  elif [[ "$command" =~ stopService$ ]]; then
-    echo "Usage: $command serviceName"
   fi
   exit 1
 }
@@ -46,6 +38,73 @@ function cleanup() {
     rm -rf "$tmpDir"
   fi
 }
+
+# This function builds Pinot given a specific commit hash and target directory
+function checkoutAndBuild() {
+  commitHash=$1
+  targetDir=$2
+  
+  pushd "$targetDir" || exit 1
+  git init
+  git remote add origin https://github.com/apache/incubator-pinot
+  git fetch --depth 1 origin "$commitHash"
+  git checkout FETCH_HEAD
+  mvn install package -DskipTests -Pbin-dist
+  popd || exit 1
+}
+
+# Given a component and directory, start that version of the specific component 
+function startService() {
+  serviceName=$1
+  dirName=$2
+  # Upon start, save the pid of the process for a component into a file in /tmp/{component}.pid, which is then used to stop it
+  pushd "$dirName"/pinot-tools/target/pinot-tools-pkg/bin  || exit 1
+  if [ "$serviceName" = "zookeeper" ]; then
+    sh -c 'echo $$ > $0/zookeeper.pid; exec ./pinot-admin.sh StartZookeeper' "${dirName}" &
+  elif [ "$serviceName" = "controller" ]; then 
+    sh -c 'echo $$ > $0/controller.pid; exec ./pinot-admin.sh StartController' "${dirName}" &
+  elif [ "$serviceName" = "broker" ]; then
+    sh -c 'echo $$ > $0/broker.pid; exec ./pinot-admin.sh StartBroker' "${dirName}" &
+  elif [ "$serviceName" = "server" ]; then
+    sh -c 'echo $$ > $0/server.pid; exec ./pinot-admin.sh StartServer' "${dirName}" &
+  fi 
+  popd || exit 1
+}
+
+# Given a component, check if it known to be running and stop that specific component
+function stopService() {
+  serviceName=$1
+  dirName=$2
+  if [ -f "${dirName}/${serviceName}".pid ]; then 
+    servicePid=$(<"${dirName}/${serviceName}".pid)
+    rm "${dirName}/${serviceName}".pid
+    if [ -n "$servicePid" ]; then
+      kill -9 "$servicePid"
+    fi
+  else
+    echo "Pid file ${dirName}/${serviceName}.pid  not found. Failed to stop component ${serviceName}"
+  fi
+}
+
+# Starts a Pinot cluster given a specific target directory
+function startServices() {
+  dirName=$1
+  startService zookeeper "$dirName"
+  startService controller "$dirName"
+  startService broker "$dirName"
+  startService server "$dirName"
+  echo "Cluster started."
+}
+
+# Stops the currently running Pinot cluster
+function stopServices() {
+  dirName=$1
+  stopService controller "$dirName"
+  stopService broker "$dirName"
+  stopService server "$dirName"
+  stopService zookeeper "$dirName"
+  echo "Cluster stopped."
+} 
 
 # cleanp the temporary directory when the bash script exits 
 trap cleanup EXIT
@@ -70,112 +129,6 @@ else
   workingDir=$tmpDir
 fi
 
-
-# This function builds Pinot given a specific commit hash and target directory
-function checkoutAndBuild() {
-  if [ $# -ne 2 ]; then 
-    usage checkoutAndBuild
-  fi
-  commitHash=$1
-  targetDir=$2
-  
-  pushd "$targetDir" || exit 1
-  git init
-  git remote add origin https://github.com/apache/incubator-pinot
-  git fetch --depth 1 origin "$commitHash"
-  git checkout FETCH_HEAD
-  mvn install package -DskipTests -Pbin-dist
-  popd || exit 1
-}
-
-# Given a component and directory, start that version of the specific component 
-function startService() {
-  if [ $# -ne 2 ]; then 
-    usage startService
-  fi
-  serviceName=$1
-  dirName=$2
-  if [[ ! " ${components[*]} " =~ $serviceName ]]; then
-    printf "Not a valid component. Needs to be one of: %s \n" "${components[*]}"
-    exit 1
-  fi
-  # Upon start, save the pid of the process for a component into a file in /tmp/{component}.pid, which is then used to stop it
-  pushd "$dirName"/pinot-tools/target/pinot-tools-pkg/bin  || exit 1
-  if [ "$serviceName" = "zookeeper" ]; then
-    sh -c 'echo $$ > /tmp/zookeeper.pid; exec ./pinot-admin.sh StartZookeeper' &
-  elif [ "$serviceName" = "controller" ]; then 
-    sh -c 'echo $$ > /tmp/controller.pid; exec ./pinot-admin.sh StartController' &  
-  elif [ "$serviceName" = "broker" ]; then
-    sh -c 'echo $$ > /tmp/broker.pid; exec ./pinot-admin.sh StartBroker' &
-  elif [ "$serviceName" = "server" ]; then
-    sh -c 'echo $$ > /tmp/server.pid; exec ./pinot-admin.sh StartServer' &
-  fi 
-  popd || exit 1
-}
-
-# Given a component, check if it known to be running and stop that specific component
-function stopService() {
-  if [ $# -ne 1 ]; then 
-    usage stopService
-  fi
-  serviceName=$1
-  if [[ ! " ${components[*]} " =~ $serviceName ]]; then
-    printf "Not a valid component. Needs to be one of: %s \n" "${components[*]}"
-    exit 1
-  fi
-  if [ -f /tmp/"${serviceName}".pid ]; then 
-    servicePid=$(</tmp/"${serviceName}".pid)
-    rm /tmp/"${serviceName}".pid
-    if [ -n "$servicePid" ]; then
-      kill -9 "$servicePid"
-    fi
-  else
-    echo "Can't stop component ${serviceName} since can't component ${serviceName} is not known to have been started."
-  fi
-}
-
-# Starts a Pinot cluster given a specific target directory
-function startServices() {
-  dirName=$1
-  startService zookeeper "$dirName"
-  startService controller "$dirName"
-  startService broker "$dirName"
-  startService server "$dirName"
-  echo "Cluster started."
-}
-
-# Stops the currently running Pinot cluster
-function stopServices() {
-  stopService controller
-  stopService broker
-  stopService server
-  stopService zookeeper
-  echo "Cluster stopped."
-} 
-
-# upgrades the cluster by upgrading components one by one (Controller -> Broker -> Server) 
-function switchComponents() {
-  dirName=$1
-  stopService controller
-  startService controller "$dirName"
-  stopService broker
-  startService broker "$dirName"
-  stopService server
-  startService server "$dirName"
-}
-
-# Do rolling upgrade from olderCommit to newerCommit
-function upgradeAndTest() {
-  switchComponents "$newTargetDir"
-  echo "Rolling upgrade complete."
-}
-
-# Do rolling upgrade from newerCommit to olderCommit
-function downgradeAndTest() {
-  switchComponents "$oldTargetDir"
-  echo "Rolling downgrade complete."
-}
-
 # create subdirectories for given commits
 oldTargetDir="$workingDir"/oldTargetDir
 newTargetDir="$workingDir"/newTargetDir
@@ -186,9 +139,9 @@ if ! mkdir -p "$oldTargetDir" "$newTargetDir"; then
 fi
 
 # Building targets
-echo "Building the first target ... "
+echo "Building the old version ... "
 checkoutAndBuild "$olderCommit" "$oldTargetDir"
-echo "Building the second target ..."
+echo "Building the new version ..."
 checkoutAndBuild "$newerCommit" "$newTargetDir"
 
 # check that the default ports are open
@@ -201,10 +154,20 @@ fi
 # Setup initial cluster with olderCommit and do rolling upgrade
 startServices "$oldTargetDir"
 sleep 20
-upgradeAndTest
+stopService controller "$oldTargetDir"
+startService controller "$newTargetDir"
+stopService broker "$oldTargetDir"
+startService broker "$newTargetDir"
+stopService server "$oldTargetDir"
+startService server "$newTargetDir"
 sleep 20
-downgradeAndTest
+stopService controller "$newTargetDir"
+startService controller "$oldTargetDir"
+stopService broker "$newTargetDir"
+startService broker "$oldTargetDir"
+stopService server "$newTargetDir"
+startService server "$oldTargetDir"
 sleep 20
-stopServices
+stopServices "$oldTargetDir"
 
 exit 0
