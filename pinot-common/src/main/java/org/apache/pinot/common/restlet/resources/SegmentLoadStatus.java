@@ -34,7 +34,7 @@ public class SegmentLoadStatus {
   public String _segmentName;
   // The last segment reload time in ISO date format (yyyy-MM-dd HH:mm:ss:SSS UTC)
   // If the segment reload failed for a segment, then the value will be the previous segment reload was successful
-  public String _segmentReloadTimeUTC;
+  public long _segmentReloadTimeUTC;
   // If a segment load failed, then a status message is to be set - currently not done
   // TODO: add message description to show why call to fetch reload status has errors
   public String _segmentReloadStatusMessage;
@@ -42,7 +42,7 @@ public class SegmentLoadStatus {
   public SegmentLoadStatus() {
   }
 
-  public SegmentLoadStatus(String segmentName, String segmentReloadTimeUTC, String segmentReloadStatusMessage) {
+  public SegmentLoadStatus(String segmentName, long segmentReloadTimeUTC, String segmentReloadStatusMessage) {
     _segmentName = segmentName;
     _segmentReloadTimeUTC = segmentReloadTimeUTC;
     _segmentReloadStatusMessage = segmentReloadStatusMessage;

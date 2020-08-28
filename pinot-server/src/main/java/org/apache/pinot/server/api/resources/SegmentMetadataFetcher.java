@@ -21,9 +21,6 @@ package org.apache.pinot.server.api.resources;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -81,10 +78,8 @@ public class SegmentMetadataFetcher {
    */
   public static SegmentLoadStatus getSegmentReloadStatus(SegmentDataManager segmentDataManager) {
     SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) segmentDataManager.getSegment().getSegmentMetadata();
-    final DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss:SSS' UTC'");
     long refreshTime = segmentMetadata.getRefreshTime();
-    String refreshTimeReadable = refreshTime != Long.MIN_VALUE ? dateFormat.format(new Date(refreshTime)) : "";
-    return new SegmentLoadStatus(segmentDataManager.getSegmentName(), refreshTimeReadable, "");
+    return new SegmentLoadStatus(segmentDataManager.getSegmentName(), refreshTime, "");
   }
 
   /**

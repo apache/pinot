@@ -21,9 +21,6 @@ package org.apache.pinot.server.api;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.List;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
@@ -37,15 +34,11 @@ import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
 public class TablesResourceTest extends BaseResourceTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TablesResourceTest.class);
-
   @Test
   public void getTables()
       throws Exception {
@@ -276,8 +269,6 @@ public class TablesResourceTest extends BaseResourceTest {
     SegmentLoadStatus segmentLoadStatus =
         JsonUtils.stringToObject(_webTarget.path(segmentMetadataPath).request().get(String.class), SegmentLoadStatus.class);
     Assert.assertEquals(segmentLoadStatus._segmentName, segmentMetadata.getName());
-    final DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss:SSS' UTC'");
-    String refreshTimeReadable = segmentMetadata.getRefreshTime() != Long.MIN_VALUE ? dateFormat.format(new Date(segmentMetadata.getRefreshTime())) : "";
-    Assert.assertEquals(segmentLoadStatus._segmentReloadTimeUTC, refreshTimeReadable);
+    Assert.assertEquals(Long.MIN_VALUE, segmentLoadStatus._segmentReloadTimeUTC);
   }
 }
