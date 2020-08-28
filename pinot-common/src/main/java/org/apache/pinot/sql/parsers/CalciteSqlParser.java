@@ -767,6 +767,7 @@ public class CalciteSqlParser {
           functionName = AggregationFunctionType.COUNT.name();
         }
         break;
+      case OTHER:
       case OTHER_FUNCTION:
         functionName = functionNode.getOperator().getName().toUpperCase();
         break;
