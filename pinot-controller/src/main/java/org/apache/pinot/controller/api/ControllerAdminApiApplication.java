@@ -156,7 +156,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     httpServer.getServerConfiguration().addHttpHandler(apiStaticHttpHandler, "/api/");
     httpServer.getServerConfiguration().addHttpHandler(apiStaticHttpHandler, "/help/");
 
-    URL swaggerDistLocation = loader.getResource("META-INF/resources/webjars/swagger-ui/3.18.2/");
+    URL swaggerDistLocation = loader.getResource("META-INF/resources/webjars/swagger-ui/2.2.10-1/");
     CLStaticHttpHandler swaggerDist = new CLStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
     httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
   }
