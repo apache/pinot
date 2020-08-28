@@ -383,7 +383,6 @@ public class GenericPojoDao {
     genericJsonEntity.setId(pojo.getId());
     genericJsonEntity.setVersion(pojo.getVersion());
     PojoInfo pojoInfo = pojoInfoMap.get(pojo.getClass());
-    dumpTable(connection, pojoInfo.indexEntityClass);
     Set<String> fieldsToUpdate = Sets.newHashSet("jsonVal", "updateTime", "version");
     int affectedRows;
     try (PreparedStatement baseTableInsertStmt =
@@ -606,7 +605,6 @@ public class GenericPojoDao {
         @Override
         public List<E> handle(Connection connection) throws Exception {
           PojoInfo pojoInfo = pojoInfoMap.get(pojoClass);
-          dumpTable(connection, pojoInfo.indexEntityClass);
           List<? extends AbstractIndexEntity> indexEntities;
           try (PreparedStatement findMatchingIdsStatement = sqlQueryBuilder.createStatementFromSQL(
               connection, parameterizedSQL, parameterMap, pojoInfo.indexEntityClass)) {
@@ -726,7 +724,6 @@ public class GenericPojoDao {
               idsToReturn.add(entity.getBaseId());
             }
           }
-          dumpTable(connection, pojoInfo.indexEntityClass);
           return idsToReturn;
         }
       }, Collections.<Long>emptyList());
@@ -736,6 +733,15 @@ public class GenericPojoDao {
     }
   }
 
+  /**
+   * Dump all entities of type entityClass to logger
+   * This utility is useful to dump the entire table. However, it gets executed in code regularly in debug mode.
+   *
+   * @param connection SQL connection
+   * @param entityClass The entity class.
+   * @throws Exception exceptions encountered during row fetches
+   */
+  @SuppressWarnings("unused")
   private void dumpTable(Connection connection, Class<? extends AbstractEntity> entityClass)
       throws Exception {
     long tStart = System.nanoTime();

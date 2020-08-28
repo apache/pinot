@@ -103,8 +103,8 @@ public abstract class DaoProviderUtil {
       try {
         LOG.info("Creating database schema for default URL '{}'", DEFAULT_DATABASE_PATH);
         Connection conn = dataSource.getConnection();
-        ScriptRunner scriptRunner = new ScriptRunner(conn, false, false);
-        scriptRunner.setDelimiter(";", true);
+        final ScriptRunner scriptRunner = new ScriptRunner(conn, false);
+        scriptRunner.setDelimiter(";");
 
         InputStream createSchema = DaoProviderUtil.class.getResourceAsStream("/schema/create-schema.sql");
         scriptRunner.runScript(new InputStreamReader(createSchema));

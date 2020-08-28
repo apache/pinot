@@ -32,28 +32,24 @@ import java.sql.SQLException;
 public class ScriptRunner {
 
   private static final String DEFAULT_DELIMITER = ";";
-  private Connection connection;
-  private boolean stopOnError;
-  private boolean autoCommit;
+
+  private final Connection connection;
+  private final boolean autoCommit;
+
   private PrintWriter logWriter = new PrintWriter(System.out);
   private PrintWriter errorLogWriter = new PrintWriter(System.err);
   private String delimiter = DEFAULT_DELIMITER;
-  private boolean fullLineDelimiter = false;
-  private static final String DELIMITER_LINE_REGEX = "(?i)DELIMITER.+";
-  private static final String DELIMITER_LINE_SPLIT_REGEX = "(?i)DELIMITER";
 
   /**
    * Default constructor
    */
-  public ScriptRunner(Connection connection, boolean autoCommit, boolean stopOnError) {
+  public ScriptRunner(Connection connection, boolean autoCommit) {
     this.connection = connection;
     this.autoCommit = autoCommit;
-    this.stopOnError = stopOnError;
   }
 
-  public void setDelimiter(String delimiter, boolean fullLineDelimiter) {
+  public void setDelimiter(String delimiter) {
     this.delimiter = delimiter;
-    this.fullLineDelimiter = fullLineDelimiter;
   }
 
   /**
@@ -90,9 +86,7 @@ public class ScriptRunner {
       } finally {
         connection.setAutoCommit(originalAutoCommit);
       }
-    } catch (IOException e) {
-      throw e;
-    } catch (SQLException e) {
+    } catch (IOException | SQLException e) {
       throw e;
     } catch (Exception e) {
       throw new RuntimeException("Error running script.  Cause: " + e, e);
@@ -111,7 +105,7 @@ public class ScriptRunner {
   private void runScript(Connection conn, Reader reader) throws IOException, SQLException {
     StringBuffer command = null;
     try {
-      LineNumberReader lineReader = new LineNumberReader(reader);
+      final LineNumberReader lineReader = new LineNumberReader(reader);
       String line = null;
       while ((line = lineReader.readLine()) != null) {
         if (command == null) {
@@ -122,8 +116,10 @@ public class ScriptRunner {
         }
         command.append(line).append(" ");
         if (line.endsWith(";")) {
-          conn.prepareStatement(command.toString()).executeUpdate();
-          this.logWriter.println(command);
+          final String sql = sanitize(command.toString());
+
+          conn.prepareStatement(sql).executeUpdate();
+          this.logWriter.println(sql);
           command = null;
         }
       }
@@ -131,10 +127,10 @@ public class ScriptRunner {
         conn.commit();
       }
     } catch (SQLException e) {
+      // TODO spyne Ignores errors and keeps progressing. Could be dangerous.
       e.fillInStackTrace();
       printlnError("Error executing: " + command);
       printlnError(e);
-//      throw e;
     } catch (IOException e) {
       e.fillInStackTrace();
       printlnError("Error executing: " + command);
@@ -144,6 +140,26 @@ public class ScriptRunner {
       conn.rollback();
       flush();
     }
+  }
+
+  /**
+   * TODO spyne fix mega hack. TE unit tests fail when parsing ENGINE=InnoDB in create schema
+   *
+   * The create-schema script is used to create schema in the testing env which uses H2. However,
+   * H2 db doesn't have an InnoDB engine and raises error.
+   * Fix: When connecting to H2, remove InnoDB engine config from SQL
+   *
+   *
+   * @param sql SQL statement to be executed.
+   * @return sanitized sql statement
+   * @throws SQLException if it fails to get metadata
+   */
+  private String sanitize(final String sql) throws SQLException {
+    final String url = connection.getMetaData().getURL();
+    if (url != null && url.startsWith("jdbc:h2:")) {
+      return sql.replaceAll("ENGINE[ ]*=[ ]*InnoDB", "");
+    }
+    return sql;
   }
 
   private String getDelimiter() {
