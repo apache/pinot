@@ -44,9 +44,9 @@ public class TestCreateSegmentCommand {
   )
   public void testReadingInvalidJsonFile()
       throws Exception {
-    final String fileDirectoryPath = JSON_INVALID_SAMPLE_DATA_FILE.getParent();
-    final TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
-    final Schema fakeSchema = new Schema.SchemaBuilder().build();
+    String fileDirectoryPath = JSON_INVALID_SAMPLE_DATA_FILE.getParent();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema fakeSchema = new Schema.SchemaBuilder().build();
 
     // this writes temporary files into pinot-tools/target/test-classes/test_data
     Files.write(Paths.get(fileDirectoryPath + "/tmpTableConfig.json"), tableConfig.toJsonString().getBytes());
