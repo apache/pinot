@@ -78,7 +78,7 @@ public class ServerSegmentMetadataReader {
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
         JsonNode segmentMetadata = JsonUtils.stringToJsonNode(streamResponse.getValue());
-        segmentsMetadata.add(JsonUtils.objectToString(segmentMetadata));
+        segmentsMetadata.add(JsonUtils.objectToPrettyString(segmentMetadata));
       } catch (IOException e) {
         failedParses++;
         LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);

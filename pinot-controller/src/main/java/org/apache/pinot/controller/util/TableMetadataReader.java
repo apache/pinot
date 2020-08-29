@@ -92,5 +92,4 @@ public class TableMetadataReader {
     }
     return response;
   }
-
 }
