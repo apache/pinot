@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.filter.predicate;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.core.query.request.context.predicate.EqPredicate;
+import org.apache.pinot.core.query.request.context.predicate.InIdSetPredicate;
 import org.apache.pinot.core.query.request.context.predicate.InPredicate;
 import org.apache.pinot.core.query.request.context.predicate.NotEqPredicate;
 import org.apache.pinot.core.query.request.context.predicate.NotInPredicate;
@@ -56,6 +57,9 @@ public class PredicateEvaluatorProvider {
           case REGEXP_LIKE:
             return RegexpLikePredicateEvaluatorFactory
                 .newDictionaryBasedEvaluator((RegexpLikePredicate) predicate, dictionary);
+          case IN_ID_SET:
+            return InIdSetPredicateEvaluatorFactory
+                .newDictionaryBasedEvaluator((InIdSetPredicate) predicate, dictionary);
           default:
             throw new UnsupportedOperationException("Unsupported predicate type: " + predicate.getType());
         }
@@ -75,6 +79,8 @@ public class PredicateEvaluatorProvider {
           case REGEXP_LIKE:
             return RegexpLikePredicateEvaluatorFactory
                 .newRawValueBasedEvaluator((RegexpLikePredicate) predicate, dataType);
+          case IN_ID_SET:
+            return InIdSetPredicateEvaluatorFactory.newRawValueBasedEvaluator((InIdSetPredicate) predicate, dataType);
           default:
             throw new UnsupportedOperationException("Unsupported predicate type: " + predicate.getType());
         }

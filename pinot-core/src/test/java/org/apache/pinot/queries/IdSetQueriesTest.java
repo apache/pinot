@@ -42,6 +42,7 @@ import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.utils.idset.BloomFilterIdSet;
 import org.apache.pinot.core.query.utils.idset.EmptyIdSet;
+import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.core.query.utils.idset.Roaring64NavigableMapIdSet;
 import org.apache.pinot.core.query.utils.idset.RoaringBitmapIdSet;
@@ -390,6 +391,35 @@ public class IdSetQueriesTest extends BaseQueriesTest {
       // Should be much smaller than the default BloomFilterIdSet (4.35MB)
       assertEquals(intIdSet.getSerializedSizeInBytes(), 928);
     }
+  }
+
+  @Test
+  public void testInIdSet()
+      throws IOException {
+    // Create an IdSet with the values from the first half records
+    IdSet idSet = IdSets.create(DataType.INT);
+    for (int i = 0; i < NUM_RECORDS / 2; i++) {
+      idSet.add(_values[i]);
+    }
+
+    // Calculate the expected number of matching records
+    int expectedNumMatchingRecords = 0;
+    for (int value : _values) {
+      if (idSet.contains(value)) {
+        expectedNumMatchingRecords++;
+      }
+    }
+
+    String query = "SELECT COUNT(*) FROM testTable where intColumn IN ('__IDSET__', '" + idSet.toBase64String() + "')";
+    AggregationOperator aggregationOperator = getOperatorForPqlQuery(query);
+    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    QueriesTestUtils
+        .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), expectedNumMatchingRecords,
+            NUM_RECORDS, 0, NUM_RECORDS);
+    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+    assertNotNull(aggregationResult);
+    assertEquals(aggregationResult.size(), 1);
+    assertEquals((long) aggregationResult.get(0), expectedNumMatchingRecords);
   }
 
   @AfterClass

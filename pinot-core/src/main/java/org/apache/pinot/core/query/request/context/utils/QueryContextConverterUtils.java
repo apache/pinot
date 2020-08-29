@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.request.context.utils;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -34,6 +35,7 @@ import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.FunctionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.predicate.EqPredicate;
+import org.apache.pinot.core.query.request.context.predicate.InIdSetPredicate;
 import org.apache.pinot.core.query.request.context.predicate.InPredicate;
 import org.apache.pinot.core.query.request.context.predicate.IsNotNullPredicate;
 import org.apache.pinot.core.query.request.context.predicate.IsNullPredicate;
@@ -42,6 +44,8 @@ import org.apache.pinot.core.query.request.context.predicate.NotInPredicate;
 import org.apache.pinot.core.query.request.context.predicate.RangePredicate;
 import org.apache.pinot.core.query.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.core.query.request.context.predicate.TextMatchPredicate;
+import org.apache.pinot.core.query.utils.idset.IdSet;
+import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.pql.parsers.pql2.ast.AstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
@@ -188,6 +192,10 @@ public class QueryContextConverterUtils {
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new NotEqPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
       case IN:
+        if (numOperands == 3 && getStringValue(operands.get(1)).equalsIgnoreCase(InIdSetPredicate.ID_SET_INDICATOR)) {
+          return new FilterContext(FilterContext.Type.PREDICATE, null,
+              new InIdSetPredicate(getExpression(operands.get(0)), getIdSet(getStringValue(operands.get(2)))));
+        }
         List<String> values = new ArrayList<>(numOperands - 1);
         for (int i = 1; i < numOperands; i++) {
           values.add(getStringValue(operands.get(i)));
@@ -249,6 +257,14 @@ public class QueryContextConverterUtils {
     return thriftExpression.getLiteral().getFieldValue().toString();
   }
 
+  private static IdSet getIdSet(String serializedIdSet) {
+    try {
+      return IdSets.fromBase64String(serializedIdSet);
+    } catch (IOException e) {
+      throw new BadQueryRequestException("Caught exception while deserializing IdSet", e);
+    }
+  }
+
   /**
    * Converts the given {@link FilterQueryTree} into a {@link FilterContext}.
    */
@@ -276,8 +292,13 @@ public class QueryContextConverterUtils {
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new NotEqPredicate(getExpression(node.getColumn()), node.getValue().get(0)));
       case IN:
+        List<String> values = node.getValue();
+        if (values.size() == 2 && values.get(0).equalsIgnoreCase(InIdSetPredicate.ID_SET_INDICATOR)) {
+          return new FilterContext(FilterContext.Type.PREDICATE, null,
+              new InIdSetPredicate(getExpression(node.getColumn()), getIdSet(values.get(1))));
+        }
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new InPredicate(getExpression(node.getColumn()), node.getValue()));
+            new InPredicate(getExpression(node.getColumn()), values));
       case NOT_IN:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new NotInPredicate(getExpression(node.getColumn()), node.getValue()));

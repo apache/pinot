@@ -33,6 +33,8 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.core.query.utils.idset.IdSet;
+import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -251,6 +253,18 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     query =
         "SELECT DaysSinceEpoch, MAX(ArrDelay) - MAX(AirTime) AS Diff FROM mytable GROUP BY DaysSinceEpoch HAVING (Diff >= 300 AND Diff < 500) OR Diff < -500 ORDER BY Diff DESC";
     testSqlQuery(query, Collections.singletonList(query));
+
+    // IN_ID_SET
+    IdSet idSet = IdSets.create(FieldSpec.DataType.LONG);
+    idSet.add(19690L);
+    idSet.add(20355L);
+    idSet.add(21171L);
+    // Also include a non-existing id
+    idSet.add(0L);
+    String inIdSetQuery =
+        "SELECT COUNT(*) FROM mytable WHERE AirlineID IN ('__IDSET__', '" + idSet.toBase64String() + "')";
+    String inQuery = "SELECT COUNT(*) FROM mytable WHERE AirlineID IN (19690, 20355, 21171, 0)";
+    testSqlQuery(inIdSetQuery, Collections.singletonList(inQuery));
   }
 
   /**

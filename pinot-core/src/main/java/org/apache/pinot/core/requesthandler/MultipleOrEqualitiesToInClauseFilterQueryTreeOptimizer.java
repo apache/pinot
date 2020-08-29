@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
+import org.apache.pinot.core.query.request.context.predicate.InIdSetPredicate;
 
 
 /**
@@ -86,7 +87,12 @@ public class MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizer extends Filt
         // for IN , dedup the values and rewrite it as IN/EQ based on
         // whether the number of predicate values is more than 1 or 1
         List<String> values = filterQueryTree.getValue();
-        if (values.size() > 1) {
+        int numValues = values.size();
+        if (numValues == 2 && values.get(0).equalsIgnoreCase(InIdSetPredicate.ID_SET_INDICATOR)) {
+          // Skip optimizing IN_ID_SET predicate
+          return filterQueryTree;
+        }
+        if (numValues > 1) {
           // if more than 1 value, dedup them
           // rewrite as IN if more than 1 value after deduping
           // rewrite as EQ if 1 value after deduping
@@ -162,7 +168,6 @@ public class MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizer extends Filt
    *
    * a = 1 OR b = 2 OR c > 20 -- two equality and one other operator
    * nothing needs to be rewritten
-
    * a IN (1) OR b IN (2) OR c > 20 -- two IN operators and one other operators
    * both IN operators can be rewritten to EQUALITY and other operator need not
    * be rewritten
@@ -192,7 +197,8 @@ public class MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizer extends Filt
 
     // Collect all equality/in operators and non-equality operators
     // these are the immediate children of root OR operator
-    boolean rewriteINEQChildrenOfORRootOperator = collectChildOperatorsOfRootOROperator(filterQueryTree, columnToInEqPredicateValues, nonEqInOperators);
+    boolean rewriteINEQChildrenOfORRootOperator =
+        collectChildOperatorsOfRootOROperator(filterQueryTree, columnToInEqPredicateValues, nonEqInOperators);
 
     if (columnToInEqPredicateValues.size() == 1 && nonEqInOperators.isEmpty()) {
       // We can eliminate the OR root node if there is exactly one unique column with one or more
@@ -278,23 +284,28 @@ public class MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizer extends Filt
       FilterOperator operator = childQueryTree.getOperator();
       if (operator == FilterOperator.EQUALITY || operator == FilterOperator.IN) {
         // the immediate child of root OR operator is EQUALITY or IN
-        List<String> childValues = childQueryTree.getValue();
+        List<String> values = childQueryTree.getValue();
+        int numValues = values.size();
+        if (numValues == 2 && values.get(0).equalsIgnoreCase(InIdSetPredicate.ID_SET_INDICATOR)) {
+          // Skip optimizing IN_ID_SET predicate
+          nonEqInOperators.add(childQueryTree);
+          continue;
+        }
         String column = childQueryTree.getColumn();
         Set<String> predicateValues = columnToInEqPredicateValues.get(column);
         if (predicateValues == null) {
           // we didn't see this column before
-          predicateValues = new HashSet<>(childValues);
+          predicateValues = new HashSet<>(values);
           // if after adding to the set, the number of predicate values become different (less),
           // it implies that values got deduplicated and so we need to rewrite this predicate later
           // similarly, if this is a single value IN predicate, we need to rewrite it later to equality
-          int numChildren = childValues.size();
-          if (operator == FilterOperator.IN && (numChildren == 1 || numChildren != predicateValues.size())) {
+          if (operator == FilterOperator.IN && (numValues == 1 || numValues != predicateValues.size())) {
             rewriteINEQChildrenOfORRootOperator = true;
           }
           columnToInEqPredicateValues.put(column, predicateValues);
         } else {
           // if we had earlier seen this column, we need to rewrite the predicate
-          predicateValues.addAll(childValues);
+          predicateValues.addAll(values);
           rewriteINEQChildrenOfORRootOperator = true;
         }
       } else {
@@ -314,7 +325,8 @@ public class MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizer extends Filt
   private FilterQueryTree rebuildFilterPredicate(Map<String, Set<String>> columnToInEqPredicateValues) {
     ArrayList<FilterQueryTree> newChildren = new ArrayList<>();
     for (Map.Entry<String, Set<String>> columnAndPredicate : columnToInEqPredicateValues.entrySet()) {
-      newChildren.add(buildFilterQueryTreeForColumnAndPredicateInfo(columnAndPredicate.getKey(), columnAndPredicate.getValue()));
+      newChildren.add(
+          buildFilterQueryTreeForColumnAndPredicateInfo(columnAndPredicate.getKey(), columnAndPredicate.getValue()));
     }
     return new FilterQueryTree(null, null, FilterOperator.OR, newChildren);
   }

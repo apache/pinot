@@ -71,6 +71,9 @@ public class PredicateTest {
     // IsNotNullPredicate
     assertEquals(testSerDe("foo\tIS not\tNulL"), "foo IS NOT NULL");
 
+    // InIdSetPredicate
+    assertEquals(testSerDe("foo In (\t'__iDsEt__',\t'ATowAAAAAAAA')"), "foo IN ('__IDSET__','ATowAAAAAAAA')");
+
     // Non-standard RangePredicate (merged ranges)
     RangePredicate rangePredicate =
         new RangePredicate(ExpressionContext.forIdentifier("foo"), true, "123", false, "456");
