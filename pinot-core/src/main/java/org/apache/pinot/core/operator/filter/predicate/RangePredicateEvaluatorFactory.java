@@ -474,7 +474,7 @@ public class RangePredicateEvaluatorFactory {
     }
   }
 
-  public static final class StringRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+  private static final class StringRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final String _lowerBound;
     final String _upperBound;
     final boolean _lowerInclusive;
@@ -520,7 +520,7 @@ public class RangePredicateEvaluatorFactory {
     }
   }
 
-  public static final class BytesRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+  private static final class BytesRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final byte[] _lowerBound;
     final byte[] _upperBound;
     final boolean _lowerInclusive;

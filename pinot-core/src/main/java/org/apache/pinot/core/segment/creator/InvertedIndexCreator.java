@@ -19,11 +19,17 @@
 package org.apache.pinot.core.segment.creator;
 
 import java.io.Closeable;
+import java.io.IOException;
 
 
 /**
- * Marker interface for all inverted index creators
+ * Marker interface for all inverted index creators.
  */
 public interface InvertedIndexCreator extends Closeable {
 
+  /**
+   * Seals the index and flushes it to disk.
+   */
+  void seal()
+      throws IOException;
 }

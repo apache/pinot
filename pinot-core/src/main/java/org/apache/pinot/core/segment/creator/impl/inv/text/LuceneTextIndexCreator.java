@@ -21,7 +21,6 @@ package org.apache.pinot.core.segment.creator.impl.inv.text;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
-
 import org.apache.lucene.analysis.CharArraySet;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
@@ -53,14 +52,10 @@ public class LuceneTextIndexCreator implements DictionaryBasedInvertedIndexCreat
   private final Directory _indexDirectory;
   private final IndexWriter _indexWriter;
 
-  public static final CharArraySet ENGLISH_STOP_WORDS_SET =
-      new CharArraySet(Arrays.asList(
-          "a", "an", "and", "are", "as", "at", "be", "but", "by",
-          "for", "if", "in", "into", "is", "it",
-          "no", "not", "of", "on", "or", "such",
-          "that", "the", "their", "then", "than", "there", "these",
-          "they", "this", "to", "was", "will", "with", "those"
-      ), true);
+  public static final CharArraySet ENGLISH_STOP_WORDS_SET = new CharArraySet(Arrays
+      .asList("a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in", "into", "is", "it", "no",
+          "not", "of", "on", "or", "such", "that", "the", "their", "then", "than", "there", "these", "they", "this",
+          "to", "was", "will", "with", "those"), true);
 
   /**
    * Called by {@link org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator}
@@ -99,7 +94,8 @@ public class LuceneTextIndexCreator implements DictionaryBasedInvertedIndexCreat
       indexWriterConfig.setCommitOnClose(commit);
       _indexWriter = new IndexWriter(_indexDirectory, indexWriterConfig);
     } catch (Exception e) {
-      LOGGER.error("Failed to instantiate Lucene text index creator for column {}, exception {}", column, e.getMessage());
+      LOGGER
+          .error("Failed to instantiate Lucene text index creator for column {}, exception {}", column, e.getMessage());
       throw new RuntimeException(e);
     }
   }
@@ -117,7 +113,8 @@ public class LuceneTextIndexCreator implements DictionaryBasedInvertedIndexCreat
     try {
       _indexWriter.addDocument(docToIndex);
     } catch (Exception e) {
-      LOGGER.error("Failure while adding a new document to index for column {}, exception {}", _textColumn, e.getMessage());
+      LOGGER.error("Failure while adding a new document to index for column {}, exception {}", _textColumn,
+          e.getMessage());
       throw new RuntimeException(e);
     }
   }
@@ -148,7 +145,8 @@ public class LuceneTextIndexCreator implements DictionaryBasedInvertedIndexCreat
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     try {
       // based on the commit flag set in IndexWriterConfig, this will decide to commit or not
       _indexWriter.close();

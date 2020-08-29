@@ -123,69 +123,97 @@ public class RangeIndexHandler {
   private void handleDictionaryBasedColumn(ColumnMetadata columnMetadata)
       throws IOException {
     int numDocs = columnMetadata.getTotalDocs();
-    try (RangeIndexCreator creator = new RangeIndexCreator(_indexDir, columnMetadata.getFieldSpec(),
-        FieldSpec.DataType.INT, -1, -1, numDocs, columnMetadata.getTotalNumberOfEntries())) {
-      try (ForwardIndexReader forwardIndexReader = getForwardIndexReader(columnMetadata, _segmentWriter);
-          ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
-        if (columnMetadata.isSingleValue()) {
-          // Single-value column.
-          for (int i = 0; i < numDocs; i++) {
-            creator.add(forwardIndexReader.getDictId(i, readerContext));
-          }
-        } else {
-          // Multi-value column.
-          int[] dictIds = new int[columnMetadata.getMaxNumberOfMultiValues()];
-          for (int i = 0; i < numDocs; i++) {
-            int length = forwardIndexReader.getDictIdMV(i, dictIds, readerContext);
-            creator.add(dictIds, length);
-          }
+    try (ForwardIndexReader forwardIndexReader = getForwardIndexReader(columnMetadata, _segmentWriter);
+        ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
+        RangeIndexCreator rangeIndexCreator = new RangeIndexCreator(_indexDir, columnMetadata.getFieldSpec(),
+            FieldSpec.DataType.INT, -1, -1, numDocs, columnMetadata.getTotalNumberOfEntries())) {
+      if (columnMetadata.isSingleValue()) {
+        // Single-value column
+        for (int i = 0; i < numDocs; i++) {
+          rangeIndexCreator.add(forwardIndexReader.getDictId(i, readerContext));
         }
-        creator.seal();
+      } else {
+        // Multi-value column
+        int[] dictIds = new int[columnMetadata.getMaxNumberOfMultiValues()];
+        for (int i = 0; i < numDocs; i++) {
+          int length = forwardIndexReader.getDictIdMV(i, dictIds, readerContext);
+          rangeIndexCreator.add(dictIds, length);
+        }
       }
+      rangeIndexCreator.seal();
     }
   }
 
   private void handleNonDictionaryBasedColumn(ColumnMetadata columnMetadata)
-          throws IOException {
+      throws IOException {
     int numDocs = columnMetadata.getTotalDocs();
-    try (RangeIndexCreator creator = new RangeIndexCreator(_indexDir, columnMetadata.getFieldSpec(),
+    try (ForwardIndexReader forwardIndexReader = getForwardIndexReader(columnMetadata, _segmentWriter);
+        ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
+        RangeIndexCreator rangeIndexCreator = new RangeIndexCreator(_indexDir, columnMetadata.getFieldSpec(),
             columnMetadata.getDataType(), -1, -1, numDocs, columnMetadata.getTotalNumberOfEntries())) {
-      try (ForwardIndexReader forwardIndexReader = getForwardIndexReader(columnMetadata, _segmentWriter);
-           ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
-        if (columnMetadata.isSingleValue()) {
-          // Single-value column.
-          switch (columnMetadata.getDataType()) {
-            case INT: {
-              for (int i = 0; i < numDocs; i++) {
-                creator.add(forwardIndexReader.getInt(i, readerContext));
-              }
-              break;
+      if (columnMetadata.isSingleValue()) {
+        // Single-value column.
+        switch (columnMetadata.getDataType()) {
+          case INT:
+            for (int i = 0; i < numDocs; i++) {
+              rangeIndexCreator.add(forwardIndexReader.getInt(i, readerContext));
             }
-            case LONG: {
-              for (int i = 0; i < numDocs; i++) {
-                creator.add(forwardIndexReader.getLong(i, readerContext));
-              }
-              break;
+            break;
+          case LONG:
+            for (int i = 0; i < numDocs; i++) {
+              rangeIndexCreator.add(forwardIndexReader.getLong(i, readerContext));
             }
-            case FLOAT: {
-              for (int i = 0; i < numDocs; i++) {
-                creator.add(forwardIndexReader.getFloat(i, readerContext));
-              }
-              break;
+            break;
+          case FLOAT:
+            for (int i = 0; i < numDocs; i++) {
+              rangeIndexCreator.add(forwardIndexReader.getFloat(i, readerContext));
             }
-            case DOUBLE: {
-              for (int i = 0; i < numDocs; i++) {
-                creator.add(forwardIndexReader.getDouble(i, readerContext));
-              }
-              break;
+            break;
+          case DOUBLE:
+            for (int i = 0; i < numDocs; i++) {
+              rangeIndexCreator.add(forwardIndexReader.getDouble(i, readerContext));
             }
-            default: {
-              throw new RuntimeException("Range indexing is not supported");
-            }
-          }
+            break;
+          default:
+            throw new IllegalStateException("Unsupported data type: " + columnMetadata.getDataType());
         }
-        creator.seal();
+      } else {
+        // Multi-value column
+        int maxNumValuesPerMVEntry = columnMetadata.getMaxNumberOfMultiValues();
+        switch (columnMetadata.getDataType()) {
+          case INT:
+            int[] intValues = new int[maxNumValuesPerMVEntry];
+            for (int i = 0; i < numDocs; i++) {
+              int length = forwardIndexReader.getIntMV(i, intValues, readerContext);
+              rangeIndexCreator.add(intValues, length);
+            }
+            break;
+          case LONG:
+            long[] longValues = new long[maxNumValuesPerMVEntry];
+            for (int i = 0; i < numDocs; i++) {
+              int length = forwardIndexReader.getLongMV(i, longValues, readerContext);
+              rangeIndexCreator.add(longValues, length);
+            }
+            break;
+          case FLOAT:
+            float[] floatValues = new float[maxNumValuesPerMVEntry];
+            for (int i = 0; i < numDocs; i++) {
+              int length = forwardIndexReader.getFloatMV(i, floatValues, readerContext);
+              rangeIndexCreator.add(floatValues, length);
+            }
+            break;
+          case DOUBLE:
+            double[] doubleValues = new double[maxNumValuesPerMVEntry];
+            for (int i = 0; i < numDocs; i++) {
+              int length = forwardIndexReader.getDoubleMV(i, doubleValues, readerContext);
+              rangeIndexCreator.add(doubleValues, length);
+            }
+            break;
+          default:
+            throw new IllegalStateException("Unsupported data type: " + columnMetadata.getDataType());
+        }
       }
+      rangeIndexCreator.seal();
     }
   }
 
@@ -204,11 +232,10 @@ public class RangeIndexHandler {
     } else {
       if (columnMetadata.hasDictionary()) {
         return new FixedBitMVForwardIndexReader(buffer, numRows, columnMetadata.getTotalNumberOfEntries(),
-                numBitsPerValue);
+            numBitsPerValue);
       } else {
-        throw new RuntimeException("Raw index on multi-value column is not supported");
+        throw new IllegalStateException("Raw index on multi-value column is not supported");
       }
     }
   }
-
 }

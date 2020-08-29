@@ -38,8 +38,8 @@ import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.io.util.PinotDataBitSet;
 import org.apache.pinot.core.io.writer.impl.BaseChunkSVForwardIndexWriter;
 import org.apache.pinot.core.segment.creator.ColumnIndexCreationInfo;
-import org.apache.pinot.core.segment.creator.ForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.DictionaryBasedInvertedIndexCreator;
+import org.apache.pinot.core.segment.creator.ForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.SegmentCreator;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationInfo;
 import org.apache.pinot.core.segment.creator.TextIndexType;
@@ -82,7 +82,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private Map<String, ColumnIndexCreationInfo> indexCreationInfoMap;
   private Map<String, SegmentDictionaryCreator> _dictionaryCreatorMap = new HashMap<>();
   private Map<String, ForwardIndexCreator> _forwardIndexCreatorMap = new HashMap<>();
-  private Map<String, DictionaryBasedInvertedIndexCreator> _dictionaryBasedInvertedIndexCreatorMap = new HashMap<>();
+  private Map<String, DictionaryBasedInvertedIndexCreator> _invertedIndexCreatorMap = new HashMap<>();
   private Map<String, DictionaryBasedInvertedIndexCreator> _textIndexCreatorMap = new HashMap<>();
   private Map<String, NullValueVectorCreator> _nullValueVectorCreatorMap = new HashMap<>();
   private String segmentName;
@@ -173,10 +173,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         // Initialize inverted index creator; skip creating inverted index if sorted
         if (invertedIndexColumns.contains(columnName) && !indexCreationInfo.isSorted()) {
           if (segmentCreationSpec.isOnHeap()) {
-            _dictionaryBasedInvertedIndexCreatorMap
+            _invertedIndexCreatorMap
                 .put(columnName, new OnHeapBitmapInvertedIndexCreator(_indexDir, columnName, cardinality));
           } else {
-            _dictionaryBasedInvertedIndexCreatorMap.put(columnName,
+            _invertedIndexCreatorMap.put(columnName,
                 new OffHeapBitmapInvertedIndexCreator(_indexDir, fieldSpec, cardinality, totalDocs,
                     indexCreationInfo.getTotalNumberOfEntries()));
           }
@@ -324,11 +324,11 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           int dictId = dictionaryCreator.indexOfSV(columnValueToIndex);
           // store the docID -> dictID mapping in forward index
           forwardIndexCreator.putDictId(dictId);
-          DictionaryBasedInvertedIndexCreator dictionaryBasedInvertedIndexCreator = _dictionaryBasedInvertedIndexCreatorMap.get(columnName);
-          if (dictionaryBasedInvertedIndexCreator != null) {
+          DictionaryBasedInvertedIndexCreator invertedIndexCreator = _invertedIndexCreatorMap.get(columnName);
+          if (invertedIndexCreator != null) {
             // if inverted index enabled during segment creation,
             // then store dictID -> docID mapping in inverted index
-            dictionaryBasedInvertedIndexCreator.add(dictId);
+            invertedIndexCreator.add(dictId);
           }
         } else {
           // non-dictionary encoded SV column
@@ -358,17 +358,17 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         }
         // text-index enabled SV column
         if (_textIndexColumns.contains(columnName)) {
-          DictionaryBasedInvertedIndexCreator textInvertedIndexCreator = _textIndexCreatorMap.get(columnName);
+          DictionaryBasedInvertedIndexCreator textIndexCreator = _textIndexCreatorMap.get(columnName);
           // add the column value to lucene index
-          textInvertedIndexCreator.addDoc(columnValueToIndex, docIdCounter);
+          textIndexCreator.addDoc(columnValueToIndex, docIdCounter);
         }
       } else {
         // MV column (always dictionary encoded)
         int[] dictIds = dictionaryCreator.indexOfMV(columnValueToIndex);
         forwardIndexCreator.putDictIdMV(dictIds);
-        DictionaryBasedInvertedIndexCreator dictionaryBasedInvertedIndexCreator = _dictionaryBasedInvertedIndexCreatorMap.get(columnName);
-        if (dictionaryBasedInvertedIndexCreator != null) {
-          dictionaryBasedInvertedIndexCreator.add(dictIds, dictIds.length);
+        DictionaryBasedInvertedIndexCreator invertedIndexCreator = _invertedIndexCreatorMap.get(columnName);
+        if (invertedIndexCreator != null) {
+          invertedIndexCreator.add(dictIds, dictIds.length);
         }
       }
 
@@ -390,8 +390,11 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   @Override
   public void seal()
       throws ConfigurationException, IOException {
-    for (DictionaryBasedInvertedIndexCreator dictionaryBasedInvertedIndexCreator : _dictionaryBasedInvertedIndexCreatorMap.values()) {
-      dictionaryBasedInvertedIndexCreator.seal();
+    for (DictionaryBasedInvertedIndexCreator invertedIndexCreator : _invertedIndexCreatorMap.values()) {
+      invertedIndexCreator.seal();
+    }
+    for (DictionaryBasedInvertedIndexCreator textIndexCreator : _textIndexCreatorMap.values()) {
+      textIndexCreator.seal();
     }
     for (NullValueVectorCreator nullValueVectorCreator : _nullValueVectorCreatorMap.values()) {
       nullValueVectorCreator.seal();
@@ -616,7 +619,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   public void close()
       throws IOException {
     FileUtils.close(Iterables
-        .concat(_dictionaryCreatorMap.values(), _forwardIndexCreatorMap.values(), _dictionaryBasedInvertedIndexCreatorMap.values(),
-            _nullValueVectorCreatorMap.values(), _textIndexCreatorMap.values()));
+        .concat(_dictionaryCreatorMap.values(), _forwardIndexCreatorMap.values(), _invertedIndexCreatorMap.values(),
+            _textIndexCreatorMap.values(), _nullValueVectorCreatorMap.values()));
   }
 }

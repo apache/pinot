@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.core.segment.creator;
 
-import java.io.IOException;
-
-
 /**
  * Support for RoaringBitmap inverted index:
  * <pre>
@@ -58,27 +55,17 @@ import java.io.IOException;
 public interface DictionaryBasedInvertedIndexCreator extends InvertedIndexCreator {
 
   /**
-   * For single-valued column, adds the dictionary Id for the next document.
+   * For single-value column, adds the dictionary id for the next document.
    */
   void add(int dictId);
 
   /**
-   * For multi-valued column, adds the dictionary Ids for the next document.
+   * For multi-value column, adds the dictionary ids for the next document.
    */
   void add(int[] dictIds, int length);
 
   /**
-   * Seals the index and flushes it to disk.
-   */
-  void seal()
-      throws IOException;
-
-  /**
-   * Add a row (represented by an object) with a given docId
-   * @param document document/object to add
-   * @param docId object's docId
-   *
-   * Currently this is
+   * For text column, adds the document of the given document id.
    */
   void addDoc(Object document, int docId);
 }
