@@ -21,14 +21,8 @@ package org.apache.pinot.core.segment.creator.impl.inv.text;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.List;
-import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.CharArraySet;
-import org.apache.lucene.analysis.core.LowerCaseFilterFactory;
-import org.apache.lucene.analysis.core.StopFilterFactory;
-import org.apache.lucene.analysis.custom.CustomAnalyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
-import org.apache.lucene.analysis.standard.StandardTokenizerFactory;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.StoredField;
@@ -37,7 +31,7 @@ import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
-import org.apache.pinot.core.segment.creator.InvertedIndexCreator;
+import org.apache.pinot.core.segment.creator.DictionaryBasedInvertedIndexCreator;
 import org.slf4j.LoggerFactory;
 
 
@@ -46,7 +40,7 @@ import org.slf4j.LoggerFactory;
  * Used for both offline from {@link org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator}
  * and realtime from {@link org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneTextIndexReader}
  */
-public class LuceneTextIndexCreator implements InvertedIndexCreator {
+public class LuceneTextIndexCreator implements DictionaryBasedInvertedIndexCreator {
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(LuceneTextIndexCreator.class);
   // TODO: make buffer size configurable choosing a default value based on the heap usage results in design doc
   private static final int LUCENE_INDEX_MAX_BUFFER_SIZE_MB = 500;
@@ -58,14 +52,10 @@ public class LuceneTextIndexCreator implements InvertedIndexCreator {
   private final Directory _indexDirectory;
   private final IndexWriter _indexWriter;
 
-  public static final CharArraySet ENGLISH_STOP_WORDS_SET =
-      new CharArraySet(Arrays.asList(
-          "a", "an", "and", "are", "as", "at", "be", "but", "by",
-          "for", "if", "in", "into", "is", "it",
-          "no", "not", "of", "on", "or", "such",
-          "that", "the", "their", "then", "than", "there", "these",
-          "they", "this", "to", "was", "will", "with", "those"
-      ), true);
+  public static final CharArraySet ENGLISH_STOP_WORDS_SET = new CharArraySet(Arrays
+      .asList("a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in", "into", "is", "it", "no",
+          "not", "of", "on", "or", "such", "that", "the", "their", "then", "than", "there", "these", "they", "this",
+          "to", "was", "will", "with", "those"), true);
 
   /**
    * Called by {@link org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator}
@@ -80,8 +70,8 @@ public class LuceneTextIndexCreator implements InvertedIndexCreator {
    *               Once {@link org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator}
    *               finishes indexing all documents/rows for the segment, we need to commit and close
    *               the Lucene index which will internally persist the index on disk, do the necessary
-   *               resource cleanup etc. We commit during {@link InvertedIndexCreator#seal()}
-   *               and close during {@link InvertedIndexCreator#close()}.
+   *               resource cleanup etc. We commit during {@link DictionaryBasedInvertedIndexCreator#seal()}
+   *               and close during {@link DictionaryBasedInvertedIndexCreator#close()}.
    *               This lucene index writer is used by both offline and realtime (both during
    *               indexing in-memory MutableSegment and later during conversion to offline).
    *               Since realtime segment conversion is again going to go through the offline
@@ -104,7 +94,8 @@ public class LuceneTextIndexCreator implements InvertedIndexCreator {
       indexWriterConfig.setCommitOnClose(commit);
       _indexWriter = new IndexWriter(_indexDirectory, indexWriterConfig);
     } catch (Exception e) {
-      LOGGER.error("Failed to instantiate Lucene text index creator for column {}, exception {}", column, e.getMessage());
+      LOGGER
+          .error("Failed to instantiate Lucene text index creator for column {}, exception {}", column, e.getMessage());
       throw new RuntimeException(e);
     }
   }
@@ -122,7 +113,8 @@ public class LuceneTextIndexCreator implements InvertedIndexCreator {
     try {
       _indexWriter.addDocument(docToIndex);
     } catch (Exception e) {
-      LOGGER.error("Failure while adding a new document to index for column {}, exception {}", _textColumn, e.getMessage());
+      LOGGER.error("Failure while adding a new document to index for column {}, exception {}", _textColumn,
+          e.getMessage());
       throw new RuntimeException(e);
     }
   }
@@ -153,7 +145,8 @@ public class LuceneTextIndexCreator implements InvertedIndexCreator {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     try {
       // based on the commit flag set in IndexWriterConfig, this will decide to commit or not
       _indexWriter.close();

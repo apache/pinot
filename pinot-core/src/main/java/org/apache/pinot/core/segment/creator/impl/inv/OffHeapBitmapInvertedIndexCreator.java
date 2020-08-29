@@ -26,15 +26,15 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.core.segment.creator.InvertedIndexCreator;
+import org.apache.pinot.core.segment.creator.DictionaryBasedInvertedIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /**
- * Implementation of {@link InvertedIndexCreator} that uses off-heap memory.
+ * Implementation of {@link DictionaryBasedInvertedIndexCreator} that uses off-heap memory.
  * <p>We use 2 passes to create the inverted index.
  * <ul>
  *   <li>
@@ -52,7 +52,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  * </ul>
  * <p>Based on the number of values we need to store, we use direct memory or MMap file to allocate the buffer.
  */
-public final class OffHeapBitmapInvertedIndexCreator implements InvertedIndexCreator {
+public final class OffHeapBitmapInvertedIndexCreator implements DictionaryBasedInvertedIndexCreator {
   // Use MMapBuffer if the value buffer size is larger than 2G
   private static final int NUM_VALUES_THRESHOLD_FOR_MMAP_BUFFER = 500_000_000;
 

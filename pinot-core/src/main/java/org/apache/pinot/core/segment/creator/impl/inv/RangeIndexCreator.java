@@ -33,7 +33,8 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.query.utils.Pair;
-import org.apache.pinot.core.segment.creator.InvertedIndexCreator;
+import org.apache.pinot.core.segment.creator.DictionaryBasedInvertedIndexCreator;
+import org.apache.pinot.core.segment.creator.RawValueBasedInvertedIndexCreator;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -45,28 +46,22 @@ import static org.apache.pinot.core.segment.creator.impl.V1Constants.Indexes.BIT
 
 
 /**
- * Implementation of {@link InvertedIndexCreator} that uses off-heap memory.
+ * Range index creator that uses off-heap memory.
  * <p>We use 2 passes to create the range index.
  * <ul>
- *
  *   <li>
- *     A
+ *     In the first pass (adding values phase), when add() method is called, store the raw values into the value buffer
+ *     (for multi-valued column we flatten the values). We also store the corresponding docId in docIdBuffer which will
+ *     be sorted in the next phase based on the value in valueBuffer.
  *   </li>
  *   <li>
- *     In the first pass (adding values phase), when add() method is called, store the raw values into the
- *     value buffer (for multi-valued column we flatten the values).
- *     We also store the corresponding docId in docIdBuffer which will be sorted in the next phase based on the value in valueBuffer.
- *
- *   </li>
- *   <li>
- *     In the second pass (processing values phase), when seal() method is called, we sort the docIdBuffer based on the value in valueBuffer.
- *     We then iterate over the sorted docIdBuffer and create ranges such that each range comprises of _numDocsPerRange.
- *     While
+ *     In the second pass (processing values phase), when seal() method is called, we sort the docIdBuffer based on the
+ *     value in valueBuffer. We then iterate over the sorted docIdBuffer and create ranges such that each range
+ *     comprises of _numDocsPerRange.
  *   </li>
  * </ul>
  */
-public final class RangeIndexCreator implements InvertedIndexCreator {
-
+public final class RangeIndexCreator implements DictionaryBasedInvertedIndexCreator, RawValueBasedInvertedIndexCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(RangeIndexCreator.class);
 
   //This will dump the content of temp buffers and ranges
@@ -165,21 +160,71 @@ public final class RangeIndexCreator implements InvertedIndexCreator {
   }
 
   @Override
-  public void add(int dictId) {
-    _numberValueBuffer.put(_nextDocId, dictId);
+  public void add(int value) {
+    _numberValueBuffer.put(_nextDocId, value);
     _docIdBuffer.put(_nextDocId, _nextDocId);
-    _nextDocId = _nextDocId + 1;
+    _nextDocId++;
   }
 
   @Override
-  public void add(int[] dictIds, int length) {
+  public void add(int[] values, int length) {
     for (int i = 0; i < length; i++) {
-      int dictId = dictIds[i];
-      _numberValueBuffer.put(_nextValueId, dictId);
+      _numberValueBuffer.put(_nextValueId, values[i]);
       _docIdBuffer.put(_nextValueId, _nextDocId);
-      _nextValueId = _nextValueId + 1;
+      _nextValueId++;
     }
-    _nextDocId = _nextDocId + 1;
+    _nextDocId++;
+  }
+
+  @Override
+  public void add(long value) {
+    _numberValueBuffer.put(_nextDocId, value);
+    _docIdBuffer.put(_nextDocId, _nextDocId);
+    _nextDocId++;
+  }
+
+  @Override
+  public void add(long[] values, int length) {
+    for (int i = 0; i < length; i++) {
+      _numberValueBuffer.put(_nextValueId, values[i]);
+      _docIdBuffer.put(_nextValueId, _nextDocId);
+      _nextValueId++;
+    }
+    _nextDocId++;
+  }
+
+  @Override
+  public void add(float value) {
+    _numberValueBuffer.put(_nextDocId, value);
+    _docIdBuffer.put(_nextDocId, _nextDocId);
+    _nextDocId++;
+  }
+
+  @Override
+  public void add(float[] values, int length) {
+    for (int i = 0; i < length; i++) {
+      _numberValueBuffer.put(_nextValueId, values[i]);
+      _docIdBuffer.put(_nextValueId, _nextDocId);
+      _nextValueId++;
+    }
+    _nextDocId++;
+  }
+
+  @Override
+  public void add(double value) {
+    _numberValueBuffer.put(_nextDocId, value);
+    _docIdBuffer.put(_nextDocId, _nextDocId);
+    _nextDocId++;
+  }
+
+  @Override
+  public void add(double[] values, int length) {
+    for (int i = 0; i < length; i++) {
+      _numberValueBuffer.put(_nextValueId, values[i]);
+      _docIdBuffer.put(_nextValueId, _nextDocId);
+      _nextValueId++;
+    }
+    _nextDocId++;
   }
 
   @Override
@@ -431,7 +476,7 @@ public final class RangeIndexCreator implements InvertedIndexCreator {
     }
   }
 
-  interface NumberValueBuffer {
+  private interface NumberValueBuffer {
 
     void put(int position, Number value);
 
@@ -440,23 +485,21 @@ public final class RangeIndexCreator implements InvertedIndexCreator {
     int compare(Number val1, Number val2);
   }
 
-  class IntValueBuffer implements NumberValueBuffer {
+  private static class IntValueBuffer implements NumberValueBuffer {
+    private final PinotDataBuffer _dataBuffer;
 
-    private PinotDataBuffer _buffer;
-
-    IntValueBuffer(PinotDataBuffer buffer) {
-
-      _buffer = buffer;
+    IntValueBuffer(PinotDataBuffer dataBuffer) {
+      _dataBuffer = dataBuffer;
     }
 
     @Override
     public void put(int position, Number value) {
-      _buffer.putInt(position << 2, value.intValue());
+      _dataBuffer.putInt(position << 2, value.intValue());
     }
 
     @Override
     public Number get(int position) {
-      return _buffer.getInt(position << 2);
+      return _dataBuffer.getInt(position << 2);
     }
 
     @Override
@@ -465,23 +508,21 @@ public final class RangeIndexCreator implements InvertedIndexCreator {
     }
   }
 
-  class LongValueBuffer implements NumberValueBuffer {
+  private static class LongValueBuffer implements NumberValueBuffer {
+    private final PinotDataBuffer _dataBuffer;
 
-    private PinotDataBuffer _buffer;
-
-    LongValueBuffer(PinotDataBuffer buffer) {
-
-      _buffer = buffer;
+    LongValueBuffer(PinotDataBuffer dataBuffer) {
+      _dataBuffer = dataBuffer;
     }
 
     @Override
     public void put(int position, Number value) {
-      _buffer.putInt(position << 3, value.intValue());
+      _dataBuffer.putLong(position << 3, value.longValue());
     }
 
     @Override
     public Number get(int position) {
-      return _buffer.getInt(position << 3);
+      return _dataBuffer.getLong(position << 3);
     }
 
     @Override
@@ -490,53 +531,49 @@ public final class RangeIndexCreator implements InvertedIndexCreator {
     }
   }
 
-  class FloatValueBuffer implements NumberValueBuffer {
+  private static class FloatValueBuffer implements NumberValueBuffer {
+    private final PinotDataBuffer _dataBuffer;
 
-    private PinotDataBuffer _buffer;
-
-    FloatValueBuffer(PinotDataBuffer buffer) {
-
-      _buffer = buffer;
+    FloatValueBuffer(PinotDataBuffer dataBuffer) {
+      _dataBuffer = dataBuffer;
     }
 
     @Override
     public void put(int position, Number value) {
-      _buffer.putInt(position << 2, value.intValue());
+      _dataBuffer.putFloat(position << 2, value.intValue());
     }
 
     @Override
     public Number get(int position) {
-      return _buffer.getInt(position << 2);
+      return _dataBuffer.getFloat(position << 2);
     }
 
     @Override
     public int compare(Number val1, Number val2) {
-      return Long.compare(val1.longValue(), val2.longValue());
+      return Float.compare(val1.floatValue(), val2.floatValue());
     }
   }
 
-  class DoubleValueBuffer implements NumberValueBuffer {
+  private static class DoubleValueBuffer implements NumberValueBuffer {
+    private final PinotDataBuffer _dataBuffer;
 
-    private PinotDataBuffer _buffer;
-
-    DoubleValueBuffer(PinotDataBuffer buffer) {
-
-      _buffer = buffer;
+    DoubleValueBuffer(PinotDataBuffer dataBuffer) {
+      _dataBuffer = dataBuffer;
     }
 
     @Override
     public void put(int position, Number value) {
-      _buffer.putInt(position << 3, value.intValue());
+      _dataBuffer.putDouble(position << 3, value.doubleValue());
     }
 
     @Override
     public Number get(int position) {
-      return _buffer.getInt(position << 3);
+      return _dataBuffer.getDouble(position << 3);
     }
 
     @Override
     public int compare(Number val1, Number val2) {
-      return Long.compare(val1.longValue(), val2.longValue());
+      return Double.compare(val1.doubleValue(), val2.doubleValue());
     }
   }
 }

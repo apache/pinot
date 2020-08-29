@@ -38,8 +38,8 @@ import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.io.util.PinotDataBitSet;
 import org.apache.pinot.core.io.writer.impl.BaseChunkSVForwardIndexWriter;
 import org.apache.pinot.core.segment.creator.ColumnIndexCreationInfo;
+import org.apache.pinot.core.segment.creator.DictionaryBasedInvertedIndexCreator;
 import org.apache.pinot.core.segment.creator.ForwardIndexCreator;
-import org.apache.pinot.core.segment.creator.InvertedIndexCreator;
 import org.apache.pinot.core.segment.creator.SegmentCreator;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationInfo;
 import org.apache.pinot.core.segment.creator.TextIndexType;
@@ -82,8 +82,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private Map<String, ColumnIndexCreationInfo> indexCreationInfoMap;
   private Map<String, SegmentDictionaryCreator> _dictionaryCreatorMap = new HashMap<>();
   private Map<String, ForwardIndexCreator> _forwardIndexCreatorMap = new HashMap<>();
-  private Map<String, InvertedIndexCreator> _invertedIndexCreatorMap = new HashMap<>();
-  private Map<String, InvertedIndexCreator> _textIndexCreatorMap = new HashMap<>();
+  private Map<String, DictionaryBasedInvertedIndexCreator> _invertedIndexCreatorMap = new HashMap<>();
+  private Map<String, DictionaryBasedInvertedIndexCreator> _textIndexCreatorMap = new HashMap<>();
   private Map<String, NullValueVectorCreator> _nullValueVectorCreatorMap = new HashMap<>();
   private String segmentName;
   private Schema schema;
@@ -324,7 +324,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           int dictId = dictionaryCreator.indexOfSV(columnValueToIndex);
           // store the docID -> dictID mapping in forward index
           forwardIndexCreator.putDictId(dictId);
-          InvertedIndexCreator invertedIndexCreator = _invertedIndexCreatorMap.get(columnName);
+          DictionaryBasedInvertedIndexCreator invertedIndexCreator = _invertedIndexCreatorMap.get(columnName);
           if (invertedIndexCreator != null) {
             // if inverted index enabled during segment creation,
             // then store dictID -> docID mapping in inverted index
@@ -358,15 +358,15 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         }
         // text-index enabled SV column
         if (_textIndexColumns.contains(columnName)) {
-          InvertedIndexCreator textInvertedIndexCreator = _textIndexCreatorMap.get(columnName);
+          DictionaryBasedInvertedIndexCreator textIndexCreator = _textIndexCreatorMap.get(columnName);
           // add the column value to lucene index
-          textInvertedIndexCreator.addDoc(columnValueToIndex, docIdCounter);
+          textIndexCreator.addDoc(columnValueToIndex, docIdCounter);
         }
       } else {
         // MV column (always dictionary encoded)
         int[] dictIds = dictionaryCreator.indexOfMV(columnValueToIndex);
         forwardIndexCreator.putDictIdMV(dictIds);
-        InvertedIndexCreator invertedIndexCreator = _invertedIndexCreatorMap.get(columnName);
+        DictionaryBasedInvertedIndexCreator invertedIndexCreator = _invertedIndexCreatorMap.get(columnName);
         if (invertedIndexCreator != null) {
           invertedIndexCreator.add(dictIds, dictIds.length);
         }
@@ -390,8 +390,11 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   @Override
   public void seal()
       throws ConfigurationException, IOException {
-    for (InvertedIndexCreator invertedIndexCreator : _invertedIndexCreatorMap.values()) {
+    for (DictionaryBasedInvertedIndexCreator invertedIndexCreator : _invertedIndexCreatorMap.values()) {
       invertedIndexCreator.seal();
+    }
+    for (DictionaryBasedInvertedIndexCreator textIndexCreator : _textIndexCreatorMap.values()) {
+      textIndexCreator.seal();
     }
     for (NullValueVectorCreator nullValueVectorCreator : _nullValueVectorCreatorMap.values()) {
       nullValueVectorCreator.seal();
@@ -617,6 +620,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       throws IOException {
     FileUtils.close(Iterables
         .concat(_dictionaryCreatorMap.values(), _forwardIndexCreatorMap.values(), _invertedIndexCreatorMap.values(),
-            _nullValueVectorCreatorMap.values(), _textIndexCreatorMap.values()));
+            _textIndexCreatorMap.values(), _nullValueVectorCreatorMap.values()));
   }
 }

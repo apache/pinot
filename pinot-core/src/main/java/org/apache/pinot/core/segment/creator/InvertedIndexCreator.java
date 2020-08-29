@@ -23,63 +23,13 @@ import java.io.IOException;
 
 
 /**
- * Support for RoaringBitmap inverted index:
- * <pre>
- * Layout for RoaringBitmap inverted index:
- * |-------------------------------------------------------------------------|
- * |                    Start offset of 1st bitmap                           |
- * |    End offset of 1st bitmap (exclusive) / Start offset of 2nd bitmap    |
- * |                                   ...                                   |
- * | End offset of 2nd last bitmap (exclusive) / Start offset of last bitmap |
- * |                  End offset of last bitmap (exclusive)                  |
- * |-------------------------------------------------------------------------|
- * |                           Data for 1st bitmap                           |
- * |                           Data for 2nd bitmap                           |
- * |                                   ...                                   |
- * |                           Data for last bitmap                          |
- * |-------------------------------------------------------------------------|
- * </pre>
- *
- * <p>To create an inverted index:
- * <ul>
- *   <li>
- *     Construct an instance of <code>InvertedIndexCreator</code>
- *   </li>
- *   <li>
- *     Call add() for each docId in sequence starting with 0 to add dictId (dictIds for multi-valued column) into the
- *     creator
- *   </li>
- *   <li>
- *     Call seal() after all dictIds have been added
- *   </li>
- * </ul>
- *
- * Support for Lucene based inverted index for text
+ * Marker interface for all inverted index creators.
  */
 public interface InvertedIndexCreator extends Closeable {
-
-  /**
-   * For single-valued column, adds the dictionary Id for the next document.
-   */
-  void add(int dictId);
-
-  /**
-   * For multi-valued column, adds the dictionary Ids for the next document.
-   */
-  void add(int[] dictIds, int length);
 
   /**
    * Seals the index and flushes it to disk.
    */
   void seal()
       throws IOException;
-
-  /**
-   * Add a row (represented by an object) with a given docId
-   * @param document document/object to add
-   * @param docId object's docId
-   *
-   * Currently this is
-   */
-  void addDoc(Object document, int docId);
 }
