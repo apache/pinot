@@ -19,7 +19,6 @@
 package org.apache.pinot.client;
 
 import java.sql.SQLException;
-import java.sql.Types;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.client.base.AbstractBaseResultSetMetadata;
@@ -31,8 +30,9 @@ public class PinotResultMetadata extends AbstractBaseResultSetMetadata {
   private Map<Integer, String> _columns = new HashMap<>();
   private Map<Integer, String> _columnDataTypes = new HashMap<>();
 
-  public PinotResultMetadata(int totalColumns, Map<String, Integer> columnsNameToIndex) {
+  public PinotResultMetadata(int totalColumns, Map<String, Integer> columnsNameToIndex, Map<Integer, String> columnDataTypes) {
     _totalColumns = totalColumns;
+    _columnDataTypes = columnDataTypes;
     for (Map.Entry<String, Integer> entry : columnsNameToIndex.entrySet()) {
       _columns.put(entry.getValue(), entry.getKey());
     }
