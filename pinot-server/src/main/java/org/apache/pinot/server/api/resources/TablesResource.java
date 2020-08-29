@@ -243,7 +243,7 @@ public class TablesResource {
   }
 
   @GET
-  @Path("tables/{tableName}/{segmentName}/loadStatus")
+  @Path("tables/{tableName}/segments/{segmentName}/loadStatus")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Metadata from server segment metadata.properties", notes = "Metadata from server that hosts the segment provided.")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"), @ApiResponse(code = 404, message = "Table not found")})

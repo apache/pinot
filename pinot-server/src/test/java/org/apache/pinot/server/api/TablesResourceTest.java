@@ -263,7 +263,7 @@ public class TablesResourceTest extends BaseResourceTest {
   public void testOfflineTableSegmentsReloadStatus() throws Exception {
     IndexSegment defaultSegment = _offlineIndexSegments.get(0);
     String segmentMetadataPath =
-        "/tables/" + TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME) + "/" + defaultSegment
+        "/tables/" + TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME) + "/segments/" + defaultSegment
             .getSegmentName() + "/loadStatus";
     SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) defaultSegment.getSegmentMetadata();
     SegmentLoadStatus segmentLoadStatus =
