@@ -20,7 +20,7 @@ package org.apache.pinot.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.InputStream;
-import java.text.SimpleDateFormat;
+import java.sql.ResultSetMetaData;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.concurrent.Future;
@@ -37,8 +37,7 @@ import org.testng.annotations.Test;
  *
  */
 public class PinotResultSetTest {
-  public static final String TEST_RESULT_SET_RESOURCE = "selection.json";
-  public static final String DATE_FORMAT = "yyyy-mm-dd";
+  public static final String TEST_RESULT_SET_RESOURCE = "result_table.json";
   private DummyJsonTransport _dummyJsonTransport = new DummyJsonTransport();
   private PinotClientTransportFactory _previousTransportFactory = null;
 
@@ -52,9 +51,10 @@ public class PinotResultSetTest {
     int currentRow = 0;
     while (pinotResultSet.next()) {
       Assert.assertEquals(pinotResultSet.getInt(1), resultSet.getInt(currentRow, 0));
-      Assert.assertEquals(pinotResultSet.getLong(1), resultSet.getLong(currentRow, 0));
-      Assert.assertEquals(pinotResultSet.getString(1), resultSet.getString(currentRow, 0));
-      Assert.assertEquals(pinotResultSet.getDouble(79), resultSet.getDouble(currentRow, 78));
+      Assert.assertEquals(pinotResultSet.getLong(2), resultSet.getLong(currentRow, 1));
+      Assert.assertEquals(pinotResultSet.getFloat(3), resultSet.getFloat(currentRow, 2));
+      Assert.assertEquals(pinotResultSet.getDouble(4), resultSet.getDouble(currentRow, 3));
+      Assert.assertEquals(pinotResultSet.getString(5), resultSet.getString(currentRow, 4));
       currentRow++;
     }
   }
@@ -67,23 +67,23 @@ public class PinotResultSetTest {
     PinotResultSet pinotResultSet = new PinotResultSet(resultSet);
 
     int currentRow = 0;
-    int targetRow = 10;
+    int targetRow = 7;
     while (pinotResultSet.next() && currentRow < targetRow) {
       currentRow++;
     }
 
-    Assert.assertEquals(pinotResultSet.getInt(10), resultSet.getInt(targetRow, 9));
+    Assert.assertEquals(pinotResultSet.getInt(1), resultSet.getInt(targetRow, 0));
 
     pinotResultSet.first();
     Assert.assertTrue(pinotResultSet.isFirst());
-    Assert.assertEquals(pinotResultSet.getInt(10), resultSet.getInt(0, 9));
+    Assert.assertEquals(pinotResultSet.getInt(1), resultSet.getInt(0, 0));
 
     pinotResultSet.last();
     Assert.assertTrue(pinotResultSet.isLast());
-    Assert.assertEquals(pinotResultSet.getInt(10), resultSet.getInt(resultSet.getRowCount() - 1, 9));
+    Assert.assertEquals(pinotResultSet.getInt(1), resultSet.getInt(resultSet.getRowCount() - 1, 0));
 
     pinotResultSet.previous();
-    Assert.assertEquals(pinotResultSet.getInt(10), resultSet.getInt(resultSet.getRowCount() - 2, 9));
+    Assert.assertEquals(pinotResultSet.getInt(1), resultSet.getInt(resultSet.getRowCount() - 2, 0));
 
     pinotResultSet.first();
     pinotResultSet.previous();
@@ -94,14 +94,14 @@ public class PinotResultSetTest {
     Assert.assertTrue(pinotResultSet.isAfterLast());
 
     pinotResultSet.first();
-    pinotResultSet.absolute(18);
-    Assert.assertEquals(pinotResultSet.getInt(10), resultSet.getInt(18, 9));
+    pinotResultSet.absolute(7);
+    Assert.assertEquals(pinotResultSet.getInt(1), resultSet.getInt(7, 0));
 
     pinotResultSet.relative(-5);
-    Assert.assertEquals(pinotResultSet.getInt(10), resultSet.getInt(13, 9));
+    Assert.assertEquals(pinotResultSet.getInt(1), resultSet.getInt(2, 0));
 
     pinotResultSet.relative(1);
-    Assert.assertEquals(pinotResultSet.getInt(10), resultSet.getInt(14, 9));
+    Assert.assertEquals(pinotResultSet.getInt(1), resultSet.getInt(3, 0));
   }
 
   @Test
@@ -114,9 +114,9 @@ public class PinotResultSetTest {
     int currentRow = 0;
 
     while (pinotResultSet.next()) {
-      Assert.assertEquals(IOUtils.toString(pinotResultSet.getAsciiStream(30)), resultSet.getString(currentRow, 29));
-      Assert.assertEquals(IOUtils.toString(pinotResultSet.getUnicodeStream(30)), resultSet.getString(currentRow, 29));
-      Assert.assertEquals(IOUtils.toString(pinotResultSet.getCharacterStream(30)), resultSet.getString(currentRow, 29));
+      Assert.assertEquals(IOUtils.toString(pinotResultSet.getAsciiStream(5)), resultSet.getString(currentRow, 4));
+      Assert.assertEquals(IOUtils.toString(pinotResultSet.getUnicodeStream(5)), resultSet.getString(currentRow, 4));
+      Assert.assertEquals(IOUtils.toString(pinotResultSet.getCharacterStream(5)), resultSet.getString(currentRow, 4));
       currentRow++;
     }
   }
@@ -130,9 +130,9 @@ public class PinotResultSetTest {
 
     int currentRow = 0;
     while (pinotResultSet.next()) {
-      Date date = DateTimeUtils.getDateFromString(resultSet.getString(currentRow, 51), Calendar.getInstance());
+      Date date = DateTimeUtils.getDateFromString(resultSet.getString(currentRow, 5), Calendar.getInstance());
       long expectedTimeMillis = date.getTime();
-      Assert.assertEquals(pinotResultSet.getDate(52).getTime(), expectedTimeMillis);
+      Assert.assertEquals(pinotResultSet.getDate(6).getTime(), expectedTimeMillis);
       currentRow++;
     }
   }
@@ -146,6 +146,18 @@ public class PinotResultSetTest {
 
     for (int i = 0; i < resultSet.getColumnCount(); i++) {
       Assert.assertEquals(pinotResultSet.findColumn(resultSet.getColumnName(i)), i + 1);
+    }
+  }
+
+  @Test
+  public void testGetResultMetadata() throws Exception {
+    ResultSetGroup resultSetGroup = getResultSet(TEST_RESULT_SET_RESOURCE);
+    ResultSet resultSet = resultSetGroup.getResultSet(0);
+    PinotResultSet pinotResultSet = new PinotResultSet(resultSet);
+    ResultSetMetaData pinotResultSetMetadata = pinotResultSet.getMetaData();
+
+    for (int i = 0; i < resultSet.getColumnCount(); i++) {
+      Assert.assertEquals(pinotResultSetMetadata.getColumnTypeName(i+1), resultSet.getColumnDataType(i));
     }
   }
 
