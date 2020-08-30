@@ -1191,6 +1191,10 @@ public class PinotHelixResourceManager {
     }
   }
 
+  public boolean setZKData(String path, ZNRecord record, int expectedVersion, int accessOption) {
+    return _helixDataAccessor.getBaseDataAccessor().set(path, record, expectedVersion, accessOption);
+  }
+
   public ZNRecord readZKData(String path) {
     return _helixDataAccessor.getBaseDataAccessor().get(path, null, -1);
   }
