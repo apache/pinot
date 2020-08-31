@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.controller.helix;
 
+import com.google.common.base.Joiner;
+import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.utils.StringUtil;
@@ -53,8 +55,8 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "instances", instanceName);
   }
 
-  public String forInstanceUpdateTags(String instanceName, String tagsList) {
-    return StringUtil.join("/", _baseUrl, "instances", instanceName, "updateTags?tags=" + tagsList);
+  public String forInstanceUpdateTags(String instanceName, List<String> tags) {
+    return StringUtil.join("/", _baseUrl, "instances", instanceName, "updateTags?tags=" + Joiner.on(",").join(tags));
   }
 
   public String forInstanceList() {
