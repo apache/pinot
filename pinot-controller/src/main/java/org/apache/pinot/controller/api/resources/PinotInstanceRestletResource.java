@@ -207,15 +207,16 @@ public class PinotInstanceRestletResource {
   public SuccessResponse updateInstanceTags(
       @ApiParam(value = "Instance name", required = true, example = "Server_a.b.com_20000 | Broker_my.broker.com_30000") @PathParam("instanceName") String instanceName,
       @ApiParam(value = "Comma separated tags list", required = true) @QueryParam("tags") String tags) {
-    LOGGER.info("Instance update request received for instance: {}", instanceName);
+    LOGGER.info("Instance update request received for instance: {} and tags: {}", instanceName, tags);
     if (tags == null) {
       throw new ControllerApplicationException(LOGGER, "Must provide tags to update", Response.Status.BAD_REQUEST);
     }
     PinotResourceManagerResponse response = pinotHelixResourceManager.updateInstanceTags(instanceName, tags);
     if (!response.isSuccessful()) {
       throw new ControllerApplicationException(LOGGER,
-          "Failure to update instance tags. Reason: " + response.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
+          "Failure to update instance: " + instanceName + " with tags: " + tags + ". Reason: " + response.getMessage(),
+          Response.Status.INTERNAL_SERVER_ERROR);
     }
-    return new SuccessResponse("Instance successfully updated");
+    return new SuccessResponse("Successfully updated tags for instance: " + instanceName + " tags: " + tags);
   }
 }

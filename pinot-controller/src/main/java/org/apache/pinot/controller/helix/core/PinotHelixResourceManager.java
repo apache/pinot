@@ -45,6 +45,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
@@ -408,16 +409,11 @@ public class PinotHelixResourceManager {
     if (instanceConfig == null) {
       return PinotResourceManagerResponse.failure("Instance " + instanceIdToUpdate + " does not exists");
     }
-    String[] newTags = tags.split(",");
-    List<String> existingTags = Lists.newArrayList(instanceConfig.getTags());
-    for (String tag : existingTags) {
-      instanceConfig.removeTag(tag);
-    }
-    for (String tag : newTags) {
-      instanceConfig.addTag(tag);
-    }
+    List<String> tagList = Arrays.asList(StringUtils.split(tags, ','));
+    instanceConfig.getRecord().setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), tagList);
     if (!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceIdToUpdate), instanceConfig)) {
-      return PinotResourceManagerResponse.failure("Unable to update instance: " + instanceIdToUpdate);
+      return PinotResourceManagerResponse
+          .failure("Unable to update instance: " + instanceIdToUpdate + " to tags: " + tags);
     }
     return PinotResourceManagerResponse.SUCCESS;
   }
