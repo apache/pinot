@@ -56,7 +56,7 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
   public synchronized void updateFlushThreshold(PartitionLevelStreamConfig streamConfig,
       LLCRealtimeSegmentZKMetadata newSegmentZKMetadata, CommittingSegmentDescriptor committingSegmentDescriptor,
       @Nullable LLCRealtimeSegmentZKMetadata committingSegmentZKMetadata, int maxNumPartitionsPerInstance) {
-    final long desiredSegmentSizeBytes = streamConfig.getFlushSegmentDesiredSizeBytes();
+    final long desiredSegmentSizeBytes = streamConfig.getFlushThresholdSegmentSizeBytes();
     final long timeThresholdMillis = streamConfig.getFlushThresholdTimeMillis();
     final int autotuneInitialRows = streamConfig.getFlushAutotuneInitialRows();
     final long optimalSegmentSizeBytesMin = desiredSegmentSizeBytes / 2;

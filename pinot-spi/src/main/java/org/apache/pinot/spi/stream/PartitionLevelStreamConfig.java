@@ -39,7 +39,7 @@ public class PartitionLevelStreamConfig extends StreamConfig {
   @Override
   protected int extractFlushThresholdRows(Map<String, String> streamConfigMap) {
     String flushThresholdRowsKey =
-        StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS + StreamConfigProperties.LLC_SUFFIX;
+        StreamConfigProperties.DEPRECATED_SEGMENT_FLUSH_THRESHOLD_ROWS + StreamConfigProperties.LLC_SUFFIX;
     String flushThresholdRowsStr = streamConfigMap.get(flushThresholdRowsKey);
     if (flushThresholdRowsStr != null) {
       try {
