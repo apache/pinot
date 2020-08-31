@@ -29,6 +29,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import javax.inject.Inject;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -77,6 +78,29 @@ public class ZookeeperResource {
       return new String(_znRecordSerializer.serialize(znRecord), StandardCharsets.UTF_8);
     }
     return null;
+  }
+
+  @DELETE
+  @Path("/zk/delete")
+  @Produces(MediaType.TEXT_PLAIN)
+  @ApiOperation(value = "Get content of the znode")
+  @ApiResponses(value = { //
+      @ApiResponse(code = 200, message = "Success"), //
+      @ApiResponse(code = 404, message = "ZK Path not found"), //
+      @ApiResponse(code = 204, message = "No Content"), //
+      @ApiResponse(code = 500, message = "Internal server error")})
+  public SuccessResponse delete(
+      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path") @DefaultValue("") String path) {
+
+    path = validateAndNormalizeZKPath(path);
+
+    boolean success = pinotHelixResourceManager.deleteZKPath(path);
+    if(success) {
+      return new SuccessResponse("Successfully deleted path: " + path);
+    } else {
+      throw new ControllerApplicationException(LOGGER, "Failed to delete path: " + path,
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
   }
 
   @PUT
