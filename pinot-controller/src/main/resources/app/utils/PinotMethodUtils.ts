@@ -92,7 +92,7 @@ const getInstanceData = (instances, liveInstanceArr) => {
 
   return Promise.all(promiseArr).then((result) => {
     return {
-      columns: ['Insance Name', 'Enabled', 'Hostname', 'Port', 'Status'],
+      columns: ['Instance Name', 'Enabled', 'Hostname', 'Port', 'Status'],
       records: [
         ...result.map(({ data }) => [
           data.instanceName,
@@ -533,6 +533,15 @@ const getNodeData = (path) => {
     const currentNodeData = results[0].data || {};
     const currentNodeListStat = results[1].data;
     const currentNodeMetadata = results[2].data;
+
+    if(currentNodeMetadata['ctime'] || currentNodeMetadata['mtime']){
+      currentNodeMetadata['ctime'] = moment(+currentNodeMetadata['ctime']).format(
+        'MMMM Do YYYY, h:mm:ss'
+      );
+      currentNodeMetadata['mtime'] = moment(+currentNodeMetadata['mtime']).format(
+        'MMMM Do YYYY, h:mm:ss'
+      );
+    }
     return { currentNodeData, currentNodeMetadata, currentNodeListStat };
   });
 };

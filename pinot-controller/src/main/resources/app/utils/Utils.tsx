@@ -1,3 +1,4 @@
+/* eslint-disable no-nested-ternary */
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -49,7 +50,7 @@ const tableFormat = (data) => {
   const results = [];
   rows.forEach((singleRow) => {
     const obj = {};
-    singleRow.forEach((val: any, index: number)=>{
+    singleRow.forEach((val: any, index: number) => {
       obj[header[index]] = val;
     });
     results.push(obj);
@@ -64,14 +65,14 @@ const getSegmentStatus = (idealStateObj, externalViewObj) => {
   const externalSegmentKeys = Object.keys(externalViewObj);
   const externalSegmentCount = externalSegmentKeys.length;
 
-  if(idealSegmentCount !== externalSegmentCount){
+  if (idealSegmentCount !== externalSegmentCount) {
     return 'Bad';
   }
 
   let segmentStatus = 'Good';
   idealSegmentKeys.map((segmentKey) => {
-    if(segmentStatus === 'Good'){
-      if( !_.isEqual( idealStateObj[segmentKey], externalViewObj[segmentKey] ) ){
+    if (segmentStatus === 'Good') {
+      if (!_.isEqual(idealStateObj[segmentKey], externalViewObj[segmentKey])) {
         segmentStatus = 'Bad';
       }
     }
@@ -90,9 +91,161 @@ const findNestedObj = (entireObj, keyToFind, valToFind) => {
   return foundObj;
 };
 
+const generateCodeMirrorOptions = (array, type, modeType?) => {
+  const arr = [];
+  // eslint-disable-next-line no-shadow
+  const nestedFields = (arrayList, type, level, oldObj?) => {
+    _.map(arrayList, (a) => {
+      const obj = {
+        text: a.displayName || a.name || a,
+        displayText: a.displayName || a.name || a,
+        filterText: oldObj
+          ? `${oldObj.filterText}.${a.displayName || a.name || a}`
+          : a.displayName || a.name || a,
+        argsType: '',
+        description: '',
+        render: (el, cm, data) => {},
+        className:
+          type === 'FUNCTION'
+            ? 'codemirror-func'
+            : type === 'SQL'
+              ? 'codemirror-sql'
+              : type === 'BINARY-OPERATORS'
+                ? 'codemirror-Operators'
+                : type === 'TABLE'
+                  ? 'codemirror-table'
+                  : 'codemirror-column'
+      };
+      obj[type === 'FUNCTION' ? 'returnType' : 'type'] =
+        type === 'FUNCTION'
+          ? a.returnType
+          : type === 'SQL'
+            ? 'SQL'
+            : type === 'BINARY-OPERATORS'
+              ? 'Binary Operators'
+              : a.type;
+      if (type === 'FUNCTION') {
+        obj.argsType = a.argTypes.toString();
+        obj.description = a.description
+          ? `Description: ${a.description}`
+          : undefined;
+      }
+      obj.render = (el, cm, data) => {
+        codeMirrorOptionsTemplate(el, data);
+      };
+
+      if (oldObj === undefined) {
+        arr.push(obj);
+      } else {
+        const index = _.findIndex(
+          arr,
+          (n) => n.filterText === oldObj.filterText
+        );
+        if (index !== -1) {
+          const name = obj.displayText;
+          if (modeType === 'sql') {
+            obj.displayText = `${oldObj.displayText}.${name}`;
+            obj.text = `${oldObj.text}.${name}`;
+          } else {
+            obj.displayText = name;
+            obj.text = name;
+          }
+          obj.filterText = `${oldObj.text}.${name}`;
+          if (arr[index].fields) {
+            arr[index].fields.push(obj);
+          } else {
+            arr[index].fields = [];
+            arr[index].fields.push(obj);
+          }
+        } else {
+          const indexPath = getNestedObjPathFromList(arr, oldObj);
+          if (indexPath && indexPath.length) {
+            pushNestedObjectInArray(indexPath, obj, arr, modeType);
+          }
+        }
+      }
+      if (a.fields) {
+        nestedFields(a.fields, type, level + 1, obj);
+      }
+    });
+    return arr;
+  };
+  return nestedFields(array, type, 0);
+};
+
+const pushNestedObjectInArray = (pathArr, obj, targetList, modeType) => {
+  const rollOverFields = (target) => {
+    _.map(target, (list) => {
+      if (pathArr === list.filterText) {
+        if (modeType === 'sql') {
+          obj.displayText = `${pathArr}.${obj.displayText}`;
+          obj.text = `${pathArr}.${obj.text}`;
+        } else {
+          obj.displayText = obj.displayText;
+          obj.text = obj.text;
+        }
+        obj.filterText = `${pathArr}.${obj.text}`;
+        if (list.fields) {
+          list.fields.push(obj);
+        } else {
+          list.fields = [];
+          list.fields.push(obj);
+        }
+      } else if (list.fields) {
+        rollOverFields(list.fields);
+      }
+    });
+  };
+  rollOverFields(targetList);
+};
+
+const getNestedObjPathFromList = (list, obj) => {
+  const str = [];
+  const recursiveFunc = (arr, level) => {
+    _.map(arr, (a) => {
+      if (a.fields) {
+        str.push(a.filterText);
+        recursiveFunc(a.fields, level + 1);
+      } else if (obj.filterText === a.filterText) {
+        str.push(a.filterText);
+      }
+    });
+    return _.findLast(str);
+  };
+  return recursiveFunc(list, 0);
+};
+
+const codeMirrorOptionsTemplate = (el, data) => {
+  const text = document.createElement('div');
+  const fNameSpan = document.createElement('span');
+  fNameSpan.setAttribute('class', 'funcText');
+  fNameSpan.innerHTML = data.displayText;
+
+  // data.argsType is only for UDF Function
+  if (data.argsType && data.argsType.length) {
+    const paramSpan = document.createElement('span');
+    paramSpan.innerHTML = `(${data.argsType})`;
+    fNameSpan.appendChild(paramSpan);
+  }
+  text.appendChild(fNameSpan);
+  el.appendChild(text);
+
+  // data.returnType is for UDF Function ||  data.type is for Fields
+  if (data.returnType || data.type) {
+    const returnTypetxt = document.createElement('div');
+    returnTypetxt.setAttribute('class', 'fieldText');
+    const content = data.returnType
+      ? `Return Type: ${data.returnType}`
+      : `Type: ${data.type}`;
+    returnTypetxt.innerHTML = content;
+    el.appendChild(returnTypetxt);
+  }
+};
+
 export default {
   sortArray,
   tableFormat,
   getSegmentStatus,
-  findNestedObj
+  findNestedObj,
+  generateCodeMirrorOptions
 };
