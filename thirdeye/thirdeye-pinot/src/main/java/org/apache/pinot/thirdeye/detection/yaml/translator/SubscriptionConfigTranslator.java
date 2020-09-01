@@ -69,10 +69,11 @@ public class SubscriptionConfigTranslator extends ConfigTranslator<DetectionAler
 
   private static final String PROP_DIMENSION = "dimension";
   private static final String PROP_DIMENSION_RECIPIENTS = "dimensionRecipients";
+  private static final String PROP_SEVERITY_RECIPIENTS = "severityRecipients";
 
   private static final DetectionAlertRegistry DETECTION_ALERT_REGISTRY = DetectionAlertRegistry.getInstance();
   private static final Set<String> PROPERTY_KEYS = new HashSet<>(
-      Arrays.asList(PROP_RECIPIENTS, PROP_DIMENSION, PROP_DIMENSION_RECIPIENTS));
+      Arrays.asList(PROP_RECIPIENTS, PROP_DIMENSION, PROP_DIMENSION_RECIPIENTS, PROP_SEVERITY_RECIPIENTS));
 
   private final DetectionConfigManager detectionConfigDAO = DAORegistry.getInstance().getDetectionConfigManager();
 

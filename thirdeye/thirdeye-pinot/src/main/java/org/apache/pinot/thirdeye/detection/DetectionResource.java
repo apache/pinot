@@ -123,6 +123,7 @@ public class DetectionResource {
   private final DetectionAlertConfigFormatter subscriptionConfigFormatter;
   private final AggregationLoader aggregationLoader;
   private final DetectionConfigurationResource detectionConfigurationResource;
+  private final AnomalySubscriptionGroupNotificationManager anomalySubscriptionGroupNotificationManager;
 
   @Inject
   public DetectionResource(
@@ -137,6 +138,7 @@ public class DetectionResource {
     this.detectionAlertConfigDAO = DAORegistry.getInstance().getDetectionAlertConfigManager();
     this.evaluationDAO = DAORegistry.getInstance().getEvaluationManager();
     this.taskDAO = DAORegistry.getInstance().getTaskDAO();
+    this.anomalySubscriptionGroupNotificationManager = DAORegistry.getInstance().getAnomalySubscriptionGroupNotificationManager();
 
     TimeSeriesLoader timeseriesLoader =
         new DefaultTimeSeriesLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(), ThirdEyeCacheRegistry.getInstance().getTimeSeriesCache());
@@ -573,14 +575,18 @@ public class DetectionResource {
     return Response.ok(health).build();
   }
 
-  @GET
-  @Path(value = "/alert")
-  public Response alert() {
-    AnomalySubscriptionGroupNotificationManager anomalySubscriptionGroupNotificationManager = DAORegistry.getInstance().getAnomalySubscriptionGroupNotificationManager();
-    AnomalySubscriptionGroupNotificationDTO anomalySubscriptionGroupNotificationDTO = new AnomalySubscriptionGroupNotificationDTO();
-    anomalySubscriptionGroupNotificationDTO.setAnomalyId(1L);
-    anomalySubscriptionGroupNotificationDTO.setDetectionConfigId(2L);
-    anomalySubscriptionGroupNotificationManager.save(anomalySubscriptionGroupNotificationDTO);
+  @POST
+  @Path(value = "/re-notify")
+  @ApiOperation("Resend the notification for the anomalies to the subscribed notification groups, if the subscription group supports re-notify")
+  public Response alert(@QueryParam("id") List<Long> anomalyIds) {
+    List<MergedAnomalyResultDTO> anomalies = this.anomalyDAO.findByIds(anomalyIds);
+    for (MergedAnomalyResultDTO anomaly : anomalies) {
+      AnomalySubscriptionGroupNotificationDTO anomalySubscriptionGroupNotificationDTO =
+          new AnomalySubscriptionGroupNotificationDTO();
+      anomalySubscriptionGroupNotificationDTO.setAnomalyId(anomaly.getId());
+      anomalySubscriptionGroupNotificationDTO.setDetectionConfigId(anomaly.getDetectionConfigId());
+      anomalySubscriptionGroupNotificationManager.save(anomalySubscriptionGroupNotificationDTO);
+    }
     return Response.ok().build();
   }
 }
