@@ -20,6 +20,7 @@ package org.apache.pinot.core.segment.processing.framework;
 
 import com.google.common.base.Preconditions;
 import org.apache.pinot.core.segment.processing.collector.CollectorConfig;
+import org.apache.pinot.core.segment.processing.filter.RecordFilterConfig;
 import org.apache.pinot.core.segment.processing.partitioner.PartitioningConfig;
 import org.apache.pinot.core.segment.processing.transformer.RecordTransformerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -34,16 +35,18 @@ public class SegmentProcessorConfig {
   private final TableConfig _tableConfig;
   private final Schema _schema;
   private final RecordTransformerConfig _recordTransformerConfig;
+  private final RecordFilterConfig _recordFilterConfig;
   private final PartitioningConfig _partitioningConfig;
   private final CollectorConfig _collectorConfig;
   private final SegmentConfig _segmentConfig;
 
   private SegmentProcessorConfig(TableConfig tableConfig, Schema schema,
-      RecordTransformerConfig recordTransformerConfig, PartitioningConfig partitioningConfig,
-      CollectorConfig collectorConfig, SegmentConfig segmentConfig) {
+      RecordTransformerConfig recordTransformerConfig, RecordFilterConfig recordFilterConfig,
+      PartitioningConfig partitioningConfig, CollectorConfig collectorConfig, SegmentConfig segmentConfig) {
     _tableConfig = tableConfig;
     _schema = schema;
     _recordTransformerConfig = recordTransformerConfig;
+    _recordFilterConfig = recordFilterConfig;
     _partitioningConfig = partitioningConfig;
     _collectorConfig = collectorConfig;
     _segmentConfig = segmentConfig;
@@ -68,6 +71,13 @@ public class SegmentProcessorConfig {
    */
   public RecordTransformerConfig getRecordTransformerConfig() {
     return _recordTransformerConfig;
+  }
+
+  /**
+   * The RecordFilterConfig to filter records
+   */
+  public RecordFilterConfig getRecordFilterConfig() {
+    return _recordFilterConfig;
   }
 
   /**
@@ -98,6 +108,7 @@ public class SegmentProcessorConfig {
     private TableConfig tableConfig;
     private Schema schema;
     private RecordTransformerConfig recordTransformerConfig;
+    private RecordFilterConfig recordFilterConfig;
     private PartitioningConfig partitioningConfig;
     private CollectorConfig collectorConfig;
     private SegmentConfig _segmentConfig;
@@ -114,6 +125,11 @@ public class SegmentProcessorConfig {
 
     public Builder setRecordTransformerConfig(RecordTransformerConfig recordTransformerConfig) {
       this.recordTransformerConfig = recordTransformerConfig;
+      return this;
+    }
+
+    public Builder setRecordFilterConfig(RecordFilterConfig recordFilterConfig) {
+      this.recordFilterConfig = recordFilterConfig;
       return this;
     }
 
@@ -138,6 +154,9 @@ public class SegmentProcessorConfig {
       if (recordTransformerConfig == null) {
         recordTransformerConfig = new RecordTransformerConfig.Builder().build();
       }
+      if (recordFilterConfig == null) {
+        recordFilterConfig = new RecordFilterConfig.Builder().build();
+      }
       if (partitioningConfig == null) {
         partitioningConfig = new PartitioningConfig.Builder().build();
       }
@@ -147,15 +166,16 @@ public class SegmentProcessorConfig {
       if (_segmentConfig == null) {
         _segmentConfig = new SegmentConfig.Builder().build();
       }
-      return new SegmentProcessorConfig(tableConfig, schema, recordTransformerConfig, partitioningConfig,
-          collectorConfig, _segmentConfig);
+      return new SegmentProcessorConfig(tableConfig, schema, recordTransformerConfig, recordFilterConfig,
+          partitioningConfig, collectorConfig, _segmentConfig);
     }
   }
 
   @Override
   public String toString() {
-    return "SegmentProcessorConfig{" + "\n_tableConfig=" + _tableConfig + ", \n_schema=" + _schema.toSingleLineJsonString()
-        + ", \n_recordTransformerConfig=" + _recordTransformerConfig + ", \n_partitioningConfig=" + _partitioningConfig
-        + ", \n_collectorConfig=" + _collectorConfig + ", \n_segmentsConfig=" + _segmentConfig + "\n}";
+    return "SegmentProcessorConfig{" + "\n_tableConfig=" + _tableConfig + ", \n_schema=" + _schema
+        .toSingleLineJsonString() + ", \n_recordFilterConfig=" + _recordFilterConfig + ", \n_recordTransformerConfig="
+        + _recordTransformerConfig + ", \n_partitioningConfig=" + _partitioningConfig + ", \n_collectorConfig="
+        + _collectorConfig + ", \n_segmentsConfig=" + _segmentConfig + "\n}";
   }
 }

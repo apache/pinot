@@ -132,7 +132,7 @@ public class SegmentProcessorFramework {
       // Set mapperId as the name of the segment
       SegmentMapperConfig mapperConfig =
           new SegmentMapperConfig(_pinotSchema, _segmentProcessorConfig.getRecordTransformerConfig(),
-              _segmentProcessorConfig.getPartitioningConfig());
+              _segmentProcessorConfig.getRecordFilterConfig(), _segmentProcessorConfig.getPartitioningConfig());
       SegmentMapper mapper = new SegmentMapper(mapperInput.getName(), mapperInput, mapperConfig, _mapperOutputDir);
       mapper.map();
       mapper.cleanup();

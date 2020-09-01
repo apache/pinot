@@ -69,9 +69,4 @@ public class TimeSpecFunctionEvaluator implements FunctionEvaluator {
     }
     return _outgoingTimeConverter.fromMillisSinceEpoch(_incomingTimeConverter.toMillisSinceEpoch(incomingTimeValue));
   }
-
-  @Override
-  public Object evaluate(Object[] arguments) {
-    throw new UnsupportedOperationException("Operation not supported for TimeSpecFunctionEvaluator");
-  }
 }

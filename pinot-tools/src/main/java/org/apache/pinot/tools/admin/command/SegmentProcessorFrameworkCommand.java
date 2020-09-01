@@ -91,13 +91,13 @@ public class SegmentProcessorFrameworkCommand extends AbstractBaseAdminCommand i
     Schema schema = Schema.fromFile(new File(segmentProcessorFrameworkSpec.getSchemaFile()));
     TableConfig tableConfig =
         JsonUtils.fileToObject(new File(segmentProcessorFrameworkSpec.getTableConfigFile()), TableConfig.class);
-    SegmentProcessorConfig.Builder configBuilder =
-        new SegmentProcessorConfig.Builder().setSchema(schema).setTableConfig(tableConfig);
-    configBuilder.setRecordTransformerConfig(segmentProcessorFrameworkSpec.getRecordTransformerConfig());
-    configBuilder.setPartitioningConfig(segmentProcessorFrameworkSpec.getPartitioningConfig());
-    configBuilder.setCollectorConfig(segmentProcessorFrameworkSpec.getCollectorConfig());
-    configBuilder.setSegmentConfig(segmentProcessorFrameworkSpec.getSegmentConfig());
-    SegmentProcessorConfig segmentProcessorConfig = configBuilder.build();
+    SegmentProcessorConfig segmentProcessorConfig =
+        new SegmentProcessorConfig.Builder().setSchema(schema).setTableConfig(tableConfig)
+            .setRecordTransformerConfig(segmentProcessorFrameworkSpec.getRecordTransformerConfig())
+            .setRecordFilterConfig(segmentProcessorFrameworkSpec.getRecordFilterConfig())
+            .setPartitioningConfig(segmentProcessorFrameworkSpec.getPartitioningConfig())
+            .setCollectorConfig(segmentProcessorFrameworkSpec.getCollectorConfig())
+            .setSegmentConfig(segmentProcessorFrameworkSpec.getSegmentConfig()).build();
 
     SegmentProcessorFramework framework =
         new SegmentProcessorFramework(inputSegmentsDir, segmentProcessorConfig, outputSegmentsDir);

@@ -68,15 +68,4 @@ public final class PartitionerFactory {
     }
     return partitioner;
   }
-
-  /**
-   * Construct a PartitionFilter using PartitioningConfig
-   */
-  public static PartitionFilter getPartitionFilter(PartitioningConfig config) {
-    String filterFunction = config.getFilterFunction();
-    if (filterFunction != null) {
-      return new FunctionEvaluatorPartitionFilter(filterFunction);
-    }
-    return new NoOpPartitionFilter();
-  }
 }

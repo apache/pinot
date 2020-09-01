@@ -16,15 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.processing.partitioner;
+package org.apache.pinot.core.segment.processing.filter;
+
+import org.apache.pinot.spi.data.readers.GenericRow;
+
 
 /**
- * Used for filtering partitions in the mapper
+ * Record filter which doesn't filter out any records
  */
-public interface PartitionFilter {
+public class NoOpRecordFilter implements RecordFilter {
 
-  /**
-   * Returns true if given partition should be filtered out
-   */
-  boolean filter(String partition);
+  @Override
+  public boolean filter(GenericRow row) {
+    return false;
+  }
 }

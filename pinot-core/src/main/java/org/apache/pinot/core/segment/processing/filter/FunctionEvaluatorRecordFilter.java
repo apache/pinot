@@ -16,14 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.processing.partitioner;
+package org.apache.pinot.core.segment.processing.filter;
+
+import org.apache.pinot.core.data.function.FunctionEvaluator;
+import org.apache.pinot.core.data.function.FunctionEvaluatorFactory;
+import org.apache.pinot.spi.data.readers.GenericRow;
+
 
 /**
- * Partition filter which doesn't filter out any partitions
+ * RecordFilter which evaluates the filter function to decide whether record should be skipped or not
  */
-public class NoOpPartitionFilter implements PartitionFilter {
+public class FunctionEvaluatorRecordFilter implements RecordFilter {
+
+  private final FunctionEvaluator _filterFunctionEvaluator;
+
+  public FunctionEvaluatorRecordFilter(String filterFunction) {
+    _filterFunctionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(filterFunction);
+  }
+
   @Override
-  public boolean filter(String partition) {
+  public boolean filter(GenericRow row) {
+    if (_filterFunctionEvaluator != null) {
+      Object filter = _filterFunctionEvaluator.evaluate(row);
+      return Boolean.TRUE.equals(filter);
+    }
     return false;
   }
 }

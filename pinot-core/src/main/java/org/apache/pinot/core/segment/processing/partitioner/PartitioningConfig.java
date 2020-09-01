@@ -37,16 +37,14 @@ public class PartitioningConfig {
   private final String _columnName;
   private final String _transformFunction;
   private final ColumnPartitionConfig _columnPartitionConfig;
-  private final String _filterFunction;
 
   private PartitioningConfig(PartitionerFactory.PartitionerType partitionerType, int numPartitions, String columnName,
-      String transformFunction, ColumnPartitionConfig columnPartitionConfig, String filterFunction) {
+      String transformFunction, ColumnPartitionConfig columnPartitionConfig) {
     _partitionerType = partitionerType;
     _numPartitions = numPartitions;
     _columnName = columnName;
     _transformFunction = transformFunction;
     _columnPartitionConfig = columnPartitionConfig;
-    _filterFunction = filterFunction;
   }
 
   /**
@@ -85,13 +83,6 @@ public class PartitioningConfig {
   }
 
   /**
-   * Filter function to use for filtering out partitions
-   */
-  public String getFilterFunction() {
-    return _filterFunction;
-  }
-
-  /**
    * Builder for a PartitioningConfig
    */
   @JsonPOJOBuilder(withPrefix = "set")
@@ -101,7 +92,6 @@ public class PartitioningConfig {
     private String columnName;
     private String transformFunction;
     private ColumnPartitionConfig columnPartitionConfig;
-    private String filterFunction;
 
     public Builder setPartitionerType(PartitionerFactory.PartitionerType partitionerType) {
       this.partitionerType = partitionerType;
@@ -128,14 +118,9 @@ public class PartitioningConfig {
       return this;
     }
 
-    public Builder setFilterFunction(String filterFunction) {
-      this.filterFunction = filterFunction;
-      return this;
-    }
-
     public PartitioningConfig build() {
-      return new PartitioningConfig(partitionerType, numPartitions, columnName, transformFunction, columnPartitionConfig,
-          filterFunction);
+      return new PartitioningConfig(partitionerType, numPartitions, columnName, transformFunction,
+          columnPartitionConfig);
     }
   }
 
@@ -143,6 +128,6 @@ public class PartitioningConfig {
   public String toString() {
     return "PartitioningConfig{" + "_partitionerType=" + _partitionerType + ", _numPartitions=" + _numPartitions
         + ", _columnName='" + _columnName + '\'' + ", _transformFunction='" + _transformFunction + '\''
-        + ", _columnPartitionConfig=" + _columnPartitionConfig + ", _filterFunction='" + _filterFunction + '\'' + '}';
+        + ", _columnPartitionConfig=" + _columnPartitionConfig + '\'' + '}';
   }
 }

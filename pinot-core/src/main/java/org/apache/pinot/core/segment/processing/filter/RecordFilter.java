@@ -16,29 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.processing.partitioner;
+package org.apache.pinot.core.segment.processing.filter;
 
-import org.apache.pinot.core.data.function.FunctionEvaluator;
-import org.apache.pinot.core.data.function.FunctionEvaluatorFactory;
+import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
- * PartitionFilter which evaluates the filter function to decide
+ * Used for filtering records in the mapper
  */
-public class FunctionEvaluatorPartitionFilter implements PartitionFilter {
+public interface RecordFilter {
 
-  private final FunctionEvaluator _filterFunctionEvaluator;
-
-  public FunctionEvaluatorPartitionFilter(String filterFunction) {
-    _filterFunctionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(filterFunction);
-  }
-
-  @Override
-  public boolean filter(String partition) {
-    if (_filterFunctionEvaluator != null) {
-      Object filter = _filterFunctionEvaluator.evaluate(new Object[]{partition});
-      return Boolean.TRUE.equals(filter);
-    }
-    return false;
-  }
+  /**
+   * Returns true if given record should be filtered out
+   */
+  boolean filter(GenericRow row);
 }

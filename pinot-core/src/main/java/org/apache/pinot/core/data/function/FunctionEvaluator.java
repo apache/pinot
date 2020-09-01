@@ -36,9 +36,4 @@ public interface FunctionEvaluator {
    * Evaluate the function on the generic row and return the result
    */
   Object evaluate(GenericRow genericRow);
-
-  /**
-   * Evaluate the function on the given arguments
-   */
-  Object evaluate(Object[] arguments);
 }

@@ -23,15 +23,14 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
-import org.apache.pinot.core.segment.processing.partitioner.PartitionFilter;
+import org.apache.pinot.core.segment.processing.filter.RecordFilter;
+import org.apache.pinot.core.segment.processing.filter.RecordFilterFactory;
 import org.apache.pinot.core.segment.processing.partitioner.Partitioner;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerFactory;
 import org.apache.pinot.core.segment.processing.transformer.RecordTransformer;
@@ -59,8 +58,8 @@ public class SegmentMapper {
   private final String _mapperId;
   private final Schema _avroSchema;
   private final RecordTransformer _recordTransformer;
+  private final RecordFilter _recordFilter;
   private final Partitioner _partitioner;
-  private final PartitionFilter _partitionFilter;
   private final Map<String, DataFileWriter<GenericData.Record>> _partitionToDataFileWriterMap = new HashMap<>();
 
   public SegmentMapper(String mapperId, File inputSegment, SegmentMapperConfig mapperConfig, File mapperOutputDir) {
@@ -70,12 +69,12 @@ public class SegmentMapper {
     _mapperId = mapperId;
     _avroSchema = SegmentProcessorUtils.convertPinotSchemaToAvroSchema(mapperConfig.getPinotSchema());
     _recordTransformer = RecordTransformerFactory.getRecordTransformer(mapperConfig.getRecordTransformerConfig());
+    _recordFilter = RecordFilterFactory.getRecordFilter(mapperConfig.getRecordFilterConfig());
     _partitioner = PartitionerFactory.getPartitioner(mapperConfig.getPartitioningConfig());
-    _partitionFilter = PartitionerFactory.getPartitionFilter(mapperConfig.getPartitioningConfig());
     LOGGER.info(
-        "Initialized mapper with id: {}, input segment: {}, output dir: {}, recordTransformer: {}, partitioner: {}, partitionFilter: {}",
-        _mapperId, _inputSegment, _mapperOutputDir, _recordTransformer.getClass(), _partitioner.getClass(),
-        _partitionFilter.getClass());
+        "Initialized mapper with id: {}, input segment: {}, output dir: {}, recordTransformer: {}, recordFilter: {}, partitioner: {}",
+        _mapperId, _inputSegment, _mapperOutputDir, _recordTransformer.getClass(), _recordFilter.getClass(),
+        _partitioner.getClass());
   }
 
   /**
@@ -89,31 +88,19 @@ public class SegmentMapper {
     GenericRow reusableRow = new GenericRow();
     GenericData.Record reusableRecord = new GenericData.Record(_avroSchema);
 
-    Set<String> selectedPartitions = new HashSet<>();
-    Set<String> rejectedPartitions = new HashSet<>();
-
     while (segmentRecordReader.hasNext()) {
       reusableRow = segmentRecordReader.next(reusableRow);
 
       // Record transformation
       reusableRow = _recordTransformer.transformRecord(reusableRow);
 
-      // Partitioning
-      String partition = _partitioner.getPartition(reusableRow);
-
-      // Partition filtering
-      if (rejectedPartitions.contains(partition)) {
+      // Record filtering
+      if (_recordFilter.filter(reusableRow)) {
         continue;
       }
-      if (!selectedPartitions.contains(partition)) {
-        boolean filter = _partitionFilter.filter(partition);
-        if (filter) {
-          rejectedPartitions.add(partition);
-          continue;
-        } else {
-          selectedPartitions.add(partition);
-        }
-      }
+
+      // Partitioning
+      String partition = _partitioner.getPartition(reusableRow);
 
       // Create writer for the partition, if not exists
       if (!_partitionToDataFileWriterMap.containsKey(partition)) {
