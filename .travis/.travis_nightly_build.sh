@@ -21,7 +21,7 @@
 if [ -n "${DEPLOY_BUILD_OPTS}" ]; then
   echo "Deploying to bintray"
 
-  BUILD_VERSION=$(grep -E "<revision>(.*)</revision>" pom.xml | cut -d'>' -f2 | cut -d'<' -f1)
+  BUILD_VERSION=$(grep -E "<version>(.*)-SNAPSHOT</version>" pom.xml | cut -d'>' -f2 | cut -d'<' -f1 | cut -d'-' -f1)
   echo "Current build version: $BUILD_VERSION${DEV_VERSION}"
   mvn versions:set -DnewVersion="$BUILD_VERSION${DEV_VERSION}" -q -B
   mvn versions:commit -q -B
