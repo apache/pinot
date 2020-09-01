@@ -126,6 +126,10 @@ public class YamlResource {
 
   private static final String PROP_DETECTION = "detection";
   private static final String PROP_SUBSCRIPTION = "subscription";
+  private static final String PROP_ALERT = PROP_DETECTION + "/" + PROP_SUBSCRIPTION;
+
+  protected static final String PROP_DETECTION_ID = "detectionConfigId";
+  protected static final String PROP_SUBSCRIPTION_ID = "subscriptionConfigId";
 
   private static final String PROP_SUBS_GROUP_NAME = "subscriptionGroupName";
   private static final String PROP_DETECTION_NAME = "detectionName";
@@ -231,7 +235,11 @@ public class YamlResource {
   /*
    * Create a yaml onboarding task. It runs 1 month replay and re-tune the pipeline.
    */
-  private void createYamlOnboardingTask(DetectionConfigDTO detectionConfig, long tuningWindowStart, long tuningWindowEnd) {
+  private void createYamlOnboardingTask(long detectionConfigId, long tuningWindowStart, long tuningWindowEnd) {
+    DetectionConfigDTO detectionConfig = this.detectionConfigDAO.findById(detectionConfigId);
+    Preconditions.checkNotNull(detectionConfig,
+        String.format("Cannot find detection %d to run onboarding job", detectionConfigId));
+
     YamlOnboardingTaskInfo info = new YamlOnboardingTaskInfo();
     info.setConfigId(detectionConfig.getId());
     if (tuningWindowStart == 0L && tuningWindowEnd == 0L) {
@@ -316,40 +324,25 @@ public class YamlResource {
       @ApiParam("tuning window start time for tunable components") @QueryParam("startTime") long tuningStartTime,
       @ApiParam("tuning window end time for tunable components") @QueryParam("endTime") long tuningEndTime) {
     Map<String, String> responseMessage = new HashMap<>();
+    Long detectionConfigId = null;
+    Long subscriptionConfigId = null;
+    boolean isAlertCreationSuccess = false;
 
-    // validate the payload
     Map<String, String> yamls;
     try {
+      // validate the payload
       validatePayload(payload);
       yamls = OBJECT_MAPPER.readValue(payload, Map.class);
       validateCreateAlertYaml(yamls);
-    } catch (ConfigValidationException e) {
-      return processValidationErrorResponse(PROP_DETECTION, YamlOperations.CREATING.name(), payload, e);
-    } catch (Exception e) {
-      return processServerErrorResponse(PROP_DETECTION, YamlOperations.CREATING.name(), payload, e);
-    }
 
-    // Parse and save the detection config
-    long detectionConfigId;
-    try {
-      validatePayload(payload);
-      yamls = OBJECT_MAPPER.readValue(payload, Map.class);
+      // Parse and save the detection config
       String detectionYaml = yamls.get(PROP_DETECTION);
       ConfigValidationUtils.checkArgument(StringUtils.isNotBlank(detectionYaml), String.format(MISSING_YAML_MSG, "Detection"));
-
       detectionConfigId = createDetectionConfig(detectionYaml, tuningStartTime, tuningEndTime);
-    } catch (ConfigValidationException e) {
-      return processValidationErrorResponse(PROP_DETECTION, YamlOperations.CREATING.name(), payload, e);
-    } catch (Exception e) {
-      return processServerErrorResponse(PROP_DETECTION, YamlOperations.CREATING.name(), payload, e);
-    }
 
-    // Parse and save the subscription config
-    long subscriptionConfigId;
-    try {
+      // Parse and save the subscription config
       String subscriptionYaml = yamls.get(PROP_SUBSCRIPTION);
       ConfigValidationUtils.checkArgument(StringUtils.isNotBlank(subscriptionYaml), String.format(MISSING_YAML_MSG, "Subscription group"));
-
       // Check if existing or new subscription group
       Map<String, Object> subscriptionYamlConfig = ConfigUtils.getMap(this.yaml.load(subscriptionYaml));
       String groupName = MapUtils.getString(subscriptionYamlConfig, PROP_SUBS_GROUP_NAME);
@@ -360,26 +353,49 @@ public class YamlResource {
       } else {
         subscriptionConfigId = createSubscriptionConfig(subscriptionYaml);
       }
+
+      // Both the detection and subscription configs are created/updated successfully
+      isAlertCreationSuccess = true;
+
+      // Submit onboarding job to populate some anomalies
+      createYamlOnboardingTask(detectionConfigId, tuningStartTime, tuningEndTime);
     } catch (ConfigValidationException e) {
-      return processValidationErrorResponse(PROP_SUBSCRIPTION, YamlOperations.CREATING.name() + "/" + YamlOperations.UPDATING.name(), payload, e);
+      return processValidationErrorResponse(PROP_ALERT, YamlOperations.CREATING.name(), payload, e);
     } catch (NotAuthorizedException e) {
-      return processBadAuthorizationResponse(PROP_SUBSCRIPTION, YamlOperations.UPDATING.name(), payload, e);
+      return processBadAuthorizationResponse(PROP_ALERT, YamlOperations.UPDATING.name(), payload, e);
     } catch (Exception e) {
-      return processServerErrorResponse(PROP_DETECTION, YamlOperations.CREATING.name() + "/" + YamlOperations.UPDATING.name(), payload, e);
+      return processServerErrorResponse(PROP_ALERT, YamlOperations.CREATING.name() + "/" + YamlOperations.UPDATING.name(), payload, e);
     } finally {
-      // Roll back the detection change.
-      LOG.warn("Failed to create the subscription group. Rolling back detection " + detectionConfigId);
-      this.detectionConfigDAO.deleteById(detectionConfigId);
+      if (!isAlertCreationSuccess) {
+        rollbackAlert(detectionConfigId, subscriptionConfigId);
+      }
     }
 
-    LOG.info("Alert created successfully with detection ID " + detectionConfigId + " and subscription ID "
-        + subscriptionConfigId);
     responseMessage.put("message", "Alert was created successfully.");
     responseMessage.put("more-info", "Record saved with detection id " + detectionConfigId
         + " and subscription id " + subscriptionConfigId);
-    responseMessage.put("detectionConfigId", String.valueOf(detectionConfigId));
-    responseMessage.put("subscriptionConfigId", String.valueOf(subscriptionConfigId));
+    responseMessage.put(PROP_DETECTION_ID, String.valueOf(detectionConfigId));
+    responseMessage.put(PROP_SUBSCRIPTION_ID, String.valueOf(subscriptionConfigId));
     return Response.ok().entity(responseMessage).build();
+  }
+
+  private void rollbackDetection(Long detectionConfigId) {
+    if (detectionConfigId != null) {
+      LOG.warn(String.format("Rolling back detection %d", detectionConfigId));
+      this.detectionConfigDAO.deleteById(detectionConfigId);
+    }
+  }
+
+  private void rollbackSubscription(Long subscriptionConfigId) {
+    if (subscriptionConfigId != null) {
+      LOG.warn(String.format("Rolling back subscription %d", subscriptionConfigId));
+      this.subscriptionConfigDAO.deleteById(subscriptionConfigId);
+    }
+  }
+
+  private void rollbackAlert(Long detectionConfigId, Long subscriptionConfigId) {
+    rollbackDetection(detectionConfigId);
+    rollbackSubscription(subscriptionConfigId);
   }
 
   /**
@@ -424,10 +440,7 @@ public class YamlResource {
     Long id = this.detectionConfigDAO.save(detectionConfig);
     Preconditions.checkNotNull(id, "Error while saving the detection pipeline");
 
-    // create an yaml onboarding task to run replay and tuning
-    createYamlOnboardingTask(detectionConfig, tuningStartTime, tuningEndTime);
-
-    return detectionConfig.getId();
+    return id;
   }
 
   /**
@@ -473,16 +486,13 @@ public class YamlResource {
     Preconditions.checkNotNull(existingDetectionConfig, "Cannot find detection pipeline " + detectionID);
 
     authorizeUser(user, detectionID, PROP_DETECTION);
-    DetectionConfigDTO newDetectionConfig;
     try {
-      newDetectionConfig = buildDetectionConfigFromYaml(startTime, endTime, payload, existingDetectionConfig);
-      if (!newDetectionConfig.getName().equals(existingDetectionConfig.getName())) {
+      DetectionConfigDTO updatedDetectionConfig = buildDetectionConfigFromYaml(startTime, endTime, payload, existingDetectionConfig);
+      if (!updatedDetectionConfig.getName().equals(existingDetectionConfig.getName())) {
         // detection name has been renamed; ensure there are no duplicates.
-        validateDuplicateDetection(newDetectionConfig.getName());
+        validateDuplicateDetection(updatedDetectionConfig.getName());
       }
-
-      Long id = this.detectionConfigDAO.save(newDetectionConfig);
-      Preconditions.checkNotNull(id, "Error while saving the detection pipeline");
+      this.detectionConfigDAO.update(updatedDetectionConfig);
     } finally {
       // If it is to disable the pipeline then no need to do validation and parsing.
       // It is possible that the metric or dataset was deleted so the validation will fail.
@@ -490,7 +500,7 @@ public class YamlResource {
       if (!MapUtils.getBooleanValue(detectionConfigMap, PROP_ACTIVE, true)) {
         existingDetectionConfig.setActive(false);
         existingDetectionConfig.setYaml(payload);
-        this.detectionConfigDAO.save(existingDetectionConfig);
+        this.detectionConfigDAO.update(existingDetectionConfig);
       }
     }
   }
@@ -568,7 +578,7 @@ public class YamlResource {
     LOG.info("Detection with id " + id + " updated");
     responseMessage.put("message", "Alert was updated successfully.");
     responseMessage.put("more-info", "Record updated id " + id);
-    responseMessage.put("detectionConfigId", String.valueOf(id));
+    responseMessage.put(PROP_DETECTION_ID, String.valueOf(id));
     return Response.ok().entity(responseMessage).build();
   }
 
@@ -599,6 +609,9 @@ public class YamlResource {
       updateDetectionConfig(user, detectionId, payload);
     } else {
       detectionId = createDetectionConfig(payload);
+
+      // Submit onboarding job to populate some anomalies
+      createYamlOnboardingTask(detectionId, 0, 0);
     }
 
     return detectionId;
@@ -622,6 +635,7 @@ public class YamlResource {
     long detectionConfigId;
     try {
       validatePayload(payload);
+
       detectionConfigId = createOrUpdateDetectionConfig(user, payload);
     } catch (ConfigValidationException e) {
       return processValidationErrorResponse(PROP_DETECTION, YamlOperations.CREATING.name() + "/" + YamlOperations.UPDATING.name(), payload, e);
