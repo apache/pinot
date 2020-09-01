@@ -32,9 +32,9 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 public class SegmentLoadStatus {
   // Name of the segment itself
   public String _segmentName;
-  // The last segment reload time in ISO date format (yyyy-MM-dd HH:mm:ss:SSS UTC)
+  // The last segment reload time as a long timestamp
   // If the segment reload failed for a segment, then the value will be the previous segment reload was successful
-  public long _segmentReloadTimeUTC;
+  public long _segmentReloadTimeMillis;
   // If a segment load failed, then a status message is to be set - currently not done
   // TODO: add message description to show why call to fetch reload status has errors
   public String _segmentReloadStatusMessage;
@@ -42,15 +42,15 @@ public class SegmentLoadStatus {
   public SegmentLoadStatus() {
   }
 
-  public SegmentLoadStatus(String segmentName, long segmentReloadTimeUTC, String segmentReloadStatusMessage) {
+  public SegmentLoadStatus(String segmentName, long segmentReloadTimeMillis, String segmentReloadStatusMessage) {
     _segmentName = segmentName;
-    _segmentReloadTimeUTC = segmentReloadTimeUTC;
+    _segmentReloadTimeMillis = segmentReloadTimeMillis;
     _segmentReloadStatusMessage = segmentReloadStatusMessage;
   }
 
   @Override
   public String toString() {
-    return "{ segmentName: " + _segmentName + ", segmentReloadTime: " + _segmentReloadTimeUTC +
+    return "{ segmentName: " + _segmentName + ", segmentReloadTime: " + _segmentReloadTimeMillis +
         ", segmentReloadStatusMessage: " + _segmentReloadStatusMessage + " }";
   }
 }

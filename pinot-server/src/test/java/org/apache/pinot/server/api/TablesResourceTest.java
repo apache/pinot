@@ -269,6 +269,6 @@ public class TablesResourceTest extends BaseResourceTest {
     SegmentLoadStatus segmentLoadStatus =
         JsonUtils.stringToObject(_webTarget.path(segmentMetadataPath).request().get(String.class), SegmentLoadStatus.class);
     Assert.assertEquals(segmentLoadStatus._segmentName, segmentMetadata.getName());
-    Assert.assertEquals(Long.MIN_VALUE, segmentLoadStatus._segmentReloadTimeUTC);
+    Assert.assertEquals(Long.MIN_VALUE, segmentLoadStatus._segmentReloadTimeMillis);
   }
 }

@@ -251,7 +251,7 @@ public class PinotSegmentsMetadataTest {
       segmentMetadata = JsonUtils.objectToString(objectNode);
       SegmentLoadStatus status = new SegmentLoadStatus();
       status._segmentName = segment;
-      status._segmentReloadTimeUTC = 1598645309;
+      status._segmentReloadTimeMillis = 1598645309;
       segmentsReloadStatus.add(status);
     }
 
