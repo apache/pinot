@@ -353,7 +353,7 @@ org.lz4:lz4-java:1.4.1
 org.roaringbitmap:RoaringBitmap:0.8.0
 org.roaringbitmap:shims:0.8.0
 org.scala-lang:scala-library:2.11.11
-org.webjars:swagger-ui:2.2.10-1
+org.webjars:swagger-ui:3.18.2
 org.xerial.java:xerial-core:2.1
 org.xerial.larray:larray:0.2.1
 org.xerial.larray:larray-buffer:0.2.1
