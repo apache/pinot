@@ -610,7 +610,7 @@ public class PinotLLCRealtimeSegmentManager {
     } catch (Exception e) {
       throw new IllegalStateException(String
           .format("Failed to fetch the offset for topic: %s, partition: %s with criteria: %s",
-              streamConfig.getTopicName(), partitionId, offsetCriteria));
+              streamConfig.getTopicName(), partitionId, offsetCriteria), e);
     }
   }
 
