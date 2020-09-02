@@ -30,6 +30,7 @@ frontend:
   replicaCount: 1
   port: 1426
   adminport: 1427
+  serviceType: LoadBalancer
 
   resources: {}
   nodeSelector: {}
@@ -44,6 +45,7 @@ backend:
   replicaCount: 1
   port: 1867
   adminport: 1868
+  serviceType: LoadBalancer
 
   resources: {}
   nodeSelector: {}

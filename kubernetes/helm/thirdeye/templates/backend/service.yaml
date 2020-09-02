@@ -20,19 +20,19 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "thirdeye.frontend.fullname" . }}
+  name: {{ include "thirdeye.backend.fullname" . }}
   labels:
     app: {{ include "thirdeye.name" . }}
     chart: {{ include "thirdeye.chart" . }}
-    component: {{ .Values.frontend.name }}
+    component: {{ .Values.backend.name }}
     release: {{ .Release.Name }}
     heritage: {{ .Release.Service }}
 spec:
-  type: {{ .Values.frontend.serviceType }}
+  type: {{ .Values.backend.serviceType }}
   ports:
     # [pod_name].[service_name].[namespace].svc.cluster.local
-    - port: {{ .Values.frontend.port }}
+    - port: {{ .Values.backend.port }}
   selector:
     app: {{ include "thirdeye.name" . }}
     release: {{ .Release.Name }}
-    component: {{ .Values.frontend.name }}
+    component: {{ .Values.backend.name }}

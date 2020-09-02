@@ -20,7 +20,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: thirdeye-pinot-quickstart-datasource-config
+  name: thirdeye-config
 data:
   persistence.yml: |-
     databaseConfiguration:

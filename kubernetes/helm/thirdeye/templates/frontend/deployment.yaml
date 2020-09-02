@@ -67,23 +67,23 @@ spec:
           - containerPort: {{ .Values.frontend.adminport }}
             protocol: TCP
         volumeMounts:
-          - name: thirdeye-pinot-quickstart-datasource-config
+          - name: thirdeye-config
             mountPath: "/opt/thirdeye/config/pinot-quickstart/data-sources/data-sources-config.yml"
             subPath: "data-sources-config.yml"
             readOnly: true
-          - name: thirdeye-pinot-quickstart-datasource-config
+          - name: thirdeye-config
             mountPath: "/opt/thirdeye/config/pinot-quickstart/data-sources/cache-config.yml"
             subPath: "cache-config.yml"
             readOnly: true
-          - name: thirdeye-pinot-quickstart-datasource-config
+          - name: thirdeye-config
             mountPath: "/opt/thirdeye/config/pinot-quickstart/detector.yml"
             subPath: "detector.yml"
             readOnly: true
-          - name: thirdeye-pinot-quickstart-datasource-config
+          - name: thirdeye-config
             mountPath: "/opt/thirdeye/config/pinot-quickstart/dashboard.yml"
             subPath: "dashboard.yml"
             readOnly: true
-          - name: thirdeye-pinot-quickstart-datasource-config
+          - name: thirdeye-config
             mountPath: "/opt/thirdeye/config/pinot-quickstart/persistence.yml"
             subPath: "persistence.yml"
             readOnly: true
@@ -91,6 +91,6 @@ spec:
 {{ toYaml .Values.frontend.resources | indent 12 }}
       restartPolicy: Always
       volumes:
-        - name: thirdeye-pinot-quickstart-datasource-config
+        - name: thirdeye-config
           configMap:
-            name: thirdeye-pinot-quickstart-datasource-config
+            name: thirdeye-config
