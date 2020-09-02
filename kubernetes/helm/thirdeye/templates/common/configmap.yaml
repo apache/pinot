@@ -89,12 +89,12 @@ data:
       adminConnectors:
         - type: http
           port: 1868
-    alert: false
+    alert: true
     autoload: true
     # autoOnboardConfiguration:
     #   runFrequency: 10s
 
-    classifier: false
+    classifier: true
     holidayEventsLoader: true
     monitor: true
     pinotProxy: false
