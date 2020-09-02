@@ -46,7 +46,7 @@ public final class CollectorFactory {
         collector = new RollupCollector(collectorConfig, pinotSchema);
         break;
       case CONCAT:
-        collector = new ConcatCollector();
+        collector = new ConcatCollector(collectorConfig, pinotSchema);
         break;
     }
     return collector;

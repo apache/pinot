@@ -20,7 +20,7 @@ package org.apache.pinot.core.segment.processing.framework;
 
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -42,7 +42,8 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -74,6 +75,7 @@ public class CollectorTest {
       row.putValue("d", uniqueD.get(RandomUtils.nextInt(uniqueD.size())));
       collector.collect(row);
     }
+    collector.finish();
     assertEquals(collector.size(), 100);
     Iterator<GenericRow> iterator = collector.iterator();
     while (iterator.hasNext()) {
@@ -102,6 +104,7 @@ public class CollectorTest {
       collector.collect(row);
       usedValues.add(value);
     }
+    collector.finish();
     assertEquals(collector.size(), usedValues.size());
     Iterator<GenericRow> iterator = collector.iterator();
     while (iterator.hasNext()) {
@@ -116,7 +119,7 @@ public class CollectorTest {
   public void testRollupCollectorWithDefaultAggregations() {
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName("testSchema").addSingleValueDimension("d", FieldSpec.DataType.STRING)
-            .addMetric("m1", FieldSpec.DataType.INT). addMetric("m2", FieldSpec.DataType.LONG).build();
+            .addMetric("m1", FieldSpec.DataType.INT).addMetric("m2", FieldSpec.DataType.LONG).build();
     CollectorConfig collectorConfig =
         new CollectorConfig.Builder().setCollectorType(CollectorFactory.CollectorType.ROLLUP).build();
     Collector collector = CollectorFactory.getCollector(collectorConfig, schema);
@@ -141,6 +144,7 @@ public class CollectorTest {
       }
       collector.collect(row);
     }
+    collector.finish();
     assertEquals(collector.size(), m1Map.size());
     Iterator<GenericRow> iterator = collector.iterator();
     while (iterator.hasNext()) {
@@ -186,12 +190,13 @@ public class CollectorTest {
   public void testRollupCollectorWithMinMaxAggregations() {
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName("testSchema").addSingleValueDimension("d", FieldSpec.DataType.STRING)
-            .addMetric("m1", FieldSpec.DataType.INT). addMetric("m2", FieldSpec.DataType.LONG).build();
+            .addMetric("m1", FieldSpec.DataType.INT).addMetric("m2", FieldSpec.DataType.LONG).build();
     Map<String, ValueAggregatorFactory.ValueAggregatorType> valueAggregatorMap = new HashMap<>();
     valueAggregatorMap.put("m1", ValueAggregatorFactory.ValueAggregatorType.MAX);
     valueAggregatorMap.put("m2", ValueAggregatorFactory.ValueAggregatorType.MIN);
     CollectorConfig collectorConfig =
-        new CollectorConfig.Builder().setCollectorType(CollectorFactory.CollectorType.ROLLUP).setAggregatorTypeMap(valueAggregatorMap).build();
+        new CollectorConfig.Builder().setCollectorType(CollectorFactory.CollectorType.ROLLUP)
+            .setAggregatorTypeMap(valueAggregatorMap).build();
     Collector collector = CollectorFactory.getCollector(collectorConfig, schema);
 
     Map<String, Integer> m1Map = new HashMap<>();
@@ -214,6 +219,7 @@ public class CollectorTest {
       }
       collector.collect(row);
     }
+    collector.finish();
     assertEquals(collector.size(), m1Map.size());
     Iterator<GenericRow> iterator = collector.iterator();
     while (iterator.hasNext()) {
@@ -222,6 +228,68 @@ public class CollectorTest {
       assertTrue(uniqueD.contains(d));
       assertEquals(next.getValue("m1"), m1Map.get(d));
       assertEquals(next.getValue("m2"), m2Map.get(d));
+    }
+    collector.reset();
+    assertEquals(collector.size(), 0);
+  }
+
+  @Test
+  public void testConcatCollectorWithSort() {
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName("testSchema").addSingleValueDimension("d", FieldSpec.DataType.STRING)
+            .build();
+    CollectorConfig collectorConfig = new CollectorConfig.Builder().setSortOrder(Lists.newArrayList("d")).build();
+    Collector collector = CollectorFactory.getCollector(collectorConfig, schema);
+    assertEquals(collector.getClass(), ConcatCollector.class);
+
+    List<String> dValues = new ArrayList<>();
+    for (int i = 0; i < 100; i++) {
+      GenericRow row = new GenericRow();
+      String dValue = uniqueD.get(RandomUtils.nextInt(uniqueD.size()));
+      row.putValue("d", dValue);
+      dValues.add(dValue);
+      collector.collect(row);
+    }
+    collector.finish();
+    assertEquals(collector.size(), 100);
+    Collections.sort(dValues);
+    Iterator<GenericRow> iterator = collector.iterator();
+    int idx = 0;
+    while (iterator.hasNext()) {
+      GenericRow next = iterator.next();
+      assertEquals(dValues.get(idx++), String.valueOf(next.getValue("d")));
+    }
+    collector.reset();
+    assertEquals(collector.size(), 0);
+  }
+
+  @Test
+  public void testRollupCollectorWithSort() {
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName("testSchema").addSingleValueDimension("d", FieldSpec.DataType.STRING)
+            .addMetric("m1", FieldSpec.DataType.INT).build();
+    CollectorConfig collectorConfig =
+        new CollectorConfig.Builder().setCollectorType(CollectorFactory.CollectorType.ROLLUP)
+            .setSortOrder(Lists.newArrayList("d")).build();
+    Collector collector = CollectorFactory.getCollector(collectorConfig, schema);
+
+    Set<String> dValues = new HashSet<>();
+    for (int i = 0; i < 100; i++) {
+      GenericRow row = new GenericRow();
+      String value = uniqueD.get(RANDOM.nextInt(uniqueD.size()));
+      dValues.add(value);
+      row.putValue("d", value);
+      row.putValue("m1", RandomUtils.nextInt(10));
+      collector.collect(row);
+    }
+    collector.finish();
+    List<String> uniqueDValues = new ArrayList<>(dValues);
+    Collections.sort(uniqueDValues);
+    Iterator<GenericRow> iterator = collector.iterator();
+    int idx = 0;
+    while (iterator.hasNext()) {
+      GenericRow next = iterator.next();
+      assertEquals(uniqueDValues.get(idx++), String.valueOf(next.getValue("d")));
     }
     collector.reset();
     assertEquals(collector.size(), 0);

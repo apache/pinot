@@ -20,6 +20,8 @@ package org.apache.pinot.core.segment.processing.collector;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 
@@ -33,11 +35,13 @@ public class CollectorConfig {
 
   private final CollectorFactory.CollectorType _collectorType;
   private final Map<String, ValueAggregatorFactory.ValueAggregatorType> _aggregatorTypeMap;
+  private final List<String> _sortOrder;
 
   private CollectorConfig(CollectorFactory.CollectorType collectorType,
-      Map<String, ValueAggregatorFactory.ValueAggregatorType> aggregatorTypeMap) {
+      Map<String, ValueAggregatorFactory.ValueAggregatorType> aggregatorTypeMap, List<String> sortOrder) {
     _collectorType = collectorType;
     _aggregatorTypeMap = aggregatorTypeMap;
+    _sortOrder = sortOrder;
   }
 
   /**
@@ -56,12 +60,20 @@ public class CollectorConfig {
   }
 
   /**
+   * The columns on which to sort
+   */
+  public List<String> getSortOrder() {
+    return _sortOrder;
+  }
+
+  /**
    * Builder for CollectorConfig
    */
   @JsonPOJOBuilder(withPrefix = "set")
   public static class Builder {
     private CollectorFactory.CollectorType collectorType = DEFAULT_COLLECTOR_TYPE;
     private Map<String, ValueAggregatorFactory.ValueAggregatorType> aggregatorTypeMap;
+    private List<String> sortOrder = new ArrayList<>();
 
     public Builder setCollectorType(CollectorFactory.CollectorType collectorType) {
       this.collectorType = collectorType;
@@ -73,13 +85,19 @@ public class CollectorConfig {
       return this;
     }
 
+    public Builder setSortOrder(List<String> sortOrder) {
+      this.sortOrder = sortOrder;
+      return this;
+    }
+
     public CollectorConfig build() {
-      return new CollectorConfig(collectorType, aggregatorTypeMap);
+      return new CollectorConfig(collectorType, aggregatorTypeMap, sortOrder);
     }
   }
 
   @Override
   public String toString() {
-    return "CollectorConfig{" + "_collectorType=" + _collectorType + ", _aggregatorTypeMap=" + _aggregatorTypeMap + '}';
+    return "CollectorConfig{" + "_collectorType=" + _collectorType + ", _aggregatorTypeMap=" + _aggregatorTypeMap
+        + ", _sortOrder=" + _sortOrder + '}';
   }
 }

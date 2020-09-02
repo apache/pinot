@@ -21,14 +21,24 @@ package org.apache.pinot.core.segment.processing.collector;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
- * A Collector implementation for simply collecting all incoming rows without any additional processing
+ * A Collector implementation for collecting and concatenating all incoming rows
  */
 public class ConcatCollector implements Collector {
   private final List<GenericRow> _collection = new ArrayList<>();
+  private Iterator<GenericRow> _iterator;
+  private GenericRowSorter _sorter;
+
+  public ConcatCollector(CollectorConfig collectorConfig, Schema schema) {
+    List<String> sortOrder = collectorConfig.getSortOrder();
+    if (sortOrder.size() > 0) {
+      _sorter = new GenericRowSorter(sortOrder, schema);
+    }
+  }
 
   @Override
   public void collect(GenericRow genericRow) {
@@ -37,7 +47,7 @@ public class ConcatCollector implements Collector {
 
   @Override
   public Iterator<GenericRow> iterator() {
-    return _collection.iterator();
+    return _iterator;
   }
 
   @Override
@@ -46,7 +56,16 @@ public class ConcatCollector implements Collector {
   }
 
   @Override
+  public void finish() {
+    if (_sorter != null) {
+      _sorter.sort(_collection);
+    }
+    _iterator = _collection.iterator();
+  }
+
+  @Override
   public void reset() {
+    _iterator = null;
     _collection.clear();
   }
 }

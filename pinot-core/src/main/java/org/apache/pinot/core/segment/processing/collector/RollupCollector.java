@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.core.segment.processing.collector;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -36,6 +38,8 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 public class RollupCollector implements Collector {
 
   private final Map<Record, GenericRow> _collection = new HashMap<>();
+  private Iterator<GenericRow> _iterator;
+  private GenericRowSorter _sorter;
 
   private final int _keySize;
   private final int _valueSize;
@@ -72,6 +76,11 @@ public class RollupCollector implements Collector {
         }
       }
     }
+
+    List<String> sortOrder = collectorConfig.getSortOrder();
+    if (sortOrder.size() > 0) {
+      _sorter = new GenericRowSorter(sortOrder, schema);
+    }
   }
 
   /**
@@ -99,7 +108,7 @@ public class RollupCollector implements Collector {
 
   @Override
   public Iterator<GenericRow> iterator() {
-    return _collection.values().iterator();
+    return _iterator;
   }
 
   @Override
@@ -108,7 +117,19 @@ public class RollupCollector implements Collector {
   }
 
   @Override
+  public void finish() {
+    if (_sorter != null) {
+      List<GenericRow> sortedRows = new ArrayList<>(_collection.values());
+      _sorter.sort(sortedRows);
+      _iterator = sortedRows.iterator();
+    } else {
+      _iterator = _collection.values().iterator();
+    }
+  }
+
+  @Override
   public void reset() {
+    _iterator = null;
     _collection.clear();
   }
 

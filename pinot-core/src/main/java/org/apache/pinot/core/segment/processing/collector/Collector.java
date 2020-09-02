@@ -44,6 +44,11 @@ public interface Collector {
   int size();
 
   /**
+   * Finish any pre-exit processing and seal the collection for reading
+   */
+  void finish();
+
+  /**
    * Resets the collection of this collector by deleting all existing GenericRows
    */
   void reset();

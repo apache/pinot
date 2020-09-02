@@ -94,6 +94,7 @@ public class SegmentReducer {
 
         // Exceeded max records allowed to collect. Flush
         if (_collector.size() == MAX_RECORDS_TO_COLLECT) {
+          _collector.finish();
           int numFiles = flushRecords(_collector, part);
           part += numFiles;
           _collector.reset();
@@ -101,6 +102,7 @@ public class SegmentReducer {
       }
     }
     if (_collector.size() > 0) {
+      _collector.finish();
       flushRecords(_collector, part);
       _collector.reset();
     }
