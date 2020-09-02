@@ -35,16 +35,20 @@ import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * PeerServerSegmentFinder discovers all the servers having the input segment in a ONLINE state through external view of
- * a Pinot table.
+ * PeerServerSegmentFinder discovers all the servers having the input segment in an ONLINE state through external view
+ * of a Pinot table. It performs retries during the discovery to minimize the chance of Helix state propagation delay.
  */
 public class PeerServerSegmentFinder {
   private static final Logger _logger = LoggerFactory.getLogger(PeerServerSegmentFinder.class);
+  private static final int MAX_NUM_ATTEMPTS = 5;
+  private static final int INITIAL_DELAY_MS = 500;
+  private static final double DELAY_SCALE_FACTOR = 2;
 
   /**
    *
@@ -65,13 +69,27 @@ public class PeerServerSegmentFinder {
       _logger.error("ClusterName not found");
       return ListUtils.EMPTY_LIST;
     }
+    final List<URI> onlineServerURIs = new ArrayList<>();
+    try {
+      RetryPolicies.exponentialBackoffRetryPolicy(MAX_NUM_ATTEMPTS, INITIAL_DELAY_MS, DELAY_SCALE_FACTOR).attempt(() -> {
+        getOnlineServersFromExternalView(segmentName, downloadScheme, tableNameWithType, helixAdmin, clusterName,
+            onlineServerURIs);
+        return onlineServerURIs.size() > 0;
+      });
+    } catch (Exception e) {
+      _logger.error("Failure in getting online servers for segment {}", segmentName, e);
+    }
+    return onlineServerURIs;
+  }
+
+  private static void getOnlineServersFromExternalView(String segmentName, String downloadScheme,
+      String tableNameWithType, HelixAdmin helixAdmin, String clusterName, List<URI> onlineServerURIs) {
     ExternalView externalViewForResource =
         HelixHelper.getExternalViewForResource(helixAdmin, clusterName, tableNameWithType);
     if (externalViewForResource == null) {
       _logger.warn("External View not found for table {}", tableNameWithType);
-      return ListUtils.EMPTY_LIST;
+      return;
     }
-    List<URI> onlineServerURIs = new ArrayList<>();
     // Find out the ONLINE servers serving the segment.
     Map<String, String> instanceToStateMap = externalViewForResource.getStateMap(segmentName);
     for (Map.Entry<String, String> instanceState : instanceToStateMap.entrySet()) {
@@ -89,7 +107,6 @@ public class PeerServerSegmentFinder {
         }
       }
     }
-    return onlineServerURIs;
   }
 
   private static int getServerAdminPort(HelixAdmin helixAdmin, String clusterName, String instanceId) {
