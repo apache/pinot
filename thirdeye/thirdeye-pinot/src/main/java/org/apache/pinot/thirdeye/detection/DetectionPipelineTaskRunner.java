@@ -179,21 +179,7 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
       for (MergedAnomalyResultDTO anomaly : result.getAnomalies()) {
         // if an anomaly should be re-notified, update the notification lookup table in the database
         if (anomaly.shouldRenotify()) {
-          List<AnomalySubscriptionGroupNotificationDTO> subscriptionGroupNotificationDTOs =
-              this.anomalySubscriptionGroupNotificationDAO.findByPredicate(Predicate.EQ("anomalyId", anomaly.getId()));
-          AnomalySubscriptionGroupNotificationDTO anomalyNotificationDTO;
-          if (subscriptionGroupNotificationDTOs.isEmpty()) {
-            // create a new record if it is not existed yet.
-            anomalyNotificationDTO = new AnomalySubscriptionGroupNotificationDTO();
-            new AnomalySubscriptionGroupNotificationDTO();
-            anomalyNotificationDTO.setAnomalyId(anomaly.getId());
-            anomalyNotificationDTO.setDetectionConfigId(anomaly.getDetectionConfigId());
-          } else {
-            // update the existing record if the anomaly needs to be re-notified
-            anomalyNotificationDTO = subscriptionGroupNotificationDTOs.get(0);
-            anomalyNotificationDTO.setNotifiedSubscriptionGroupIds(Collections.emptyList());
-          }
-          this.anomalySubscriptionGroupNotificationDAO.save(anomalyNotificationDTO);
+          renotifyAnomaly(anomaly);
         }
       }
 
@@ -205,5 +191,23 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
       ThirdeyeMetricsUtil.detectionTaskExceptionCounter.inc();
       throw e;
     }
+  }
+
+  private void renotifyAnomaly(MergedAnomalyResultDTO anomaly) {
+    List<AnomalySubscriptionGroupNotificationDTO> subscriptionGroupNotificationDTOs =
+        this.anomalySubscriptionGroupNotificationDAO.findByPredicate(Predicate.EQ("anomalyId", anomaly.getId()));
+    AnomalySubscriptionGroupNotificationDTO anomalyNotificationDTO;
+    if (subscriptionGroupNotificationDTOs.isEmpty()) {
+      // create a new record if it is not existed yet.
+      anomalyNotificationDTO = new AnomalySubscriptionGroupNotificationDTO();
+      new AnomalySubscriptionGroupNotificationDTO();
+      anomalyNotificationDTO.setAnomalyId(anomaly.getId());
+      anomalyNotificationDTO.setDetectionConfigId(anomaly.getDetectionConfigId());
+    } else {
+      // update the existing record if the anomaly needs to be re-notified
+      anomalyNotificationDTO = subscriptionGroupNotificationDTOs.get(0);
+      anomalyNotificationDTO.setNotifiedSubscriptionGroupIds(Collections.emptyList());
+    }
+    this.anomalySubscriptionGroupNotificationDAO.save(anomalyNotificationDTO);
   }
 }
