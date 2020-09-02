@@ -33,6 +33,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.config.table.CompletionConfig;
@@ -58,7 +59,7 @@ import static org.testng.Assert.assertEquals;
 /**
  * Integration test that extends RealtimeClusterIntegrationTest but uses low-level Kafka consumer and a fake PinotFS as
  * the deep store for segments. This test enables the peer to peer segment download scheme to test Pinot servers can
- * download segments from peer servers even the deep store is down. This is done by injection of failures in
+ * download segments from peer servers even when the deep store is down. This is done by injection of failures in
  * the fake PinotFS segment upload api (i.e., copyFromLocal) for all segments whose seq number mod 5 is 0.
  *
  * Besides standard tests, it also verifies that
@@ -325,8 +326,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     public void copyFromLocalFile(File srcFile, URI dstUri)
         throws Exception {
       // Inject failures for segments whose seq number mod 5 is 0.
-      String[] parts = srcFile.getName().split("__");
-      if (parts.length > 3 && (Integer.parseInt(parts[2]) % UPLOAD_FAILURE_MOD == 0)) {
+      if (new LLCSegmentName(srcFile.getName()).getSequenceNumber() % UPLOAD_FAILURE_MOD == 0) {
         throw new IllegalArgumentException(srcFile.getAbsolutePath());
       }
       try {
