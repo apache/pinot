@@ -166,4 +166,11 @@ public abstract class SegmentCreationJob extends BaseSegmentJob {
       }
     }
   }
+
+  public enum SchemaMisMatchCounter {
+    DATA_TYPE_MISMATCH,
+    SINGLE_VALUE_MULTI_VALUE_FIELD_MISMATCH,
+    MULTI_VALUE_FIELD_STRUCTURE_MISMATCH,
+    MISSING_PINOT_COLUMN
+  }
 }
