@@ -23,19 +23,20 @@
 # Pinot in the 2 given directories and then upgrades in the following order:
 # Controller -> Broker -> Server
 
+# get a temporary directory in case the workingDir is not provided by user   
+TMP_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')
+
 # get usage of the script 
 function usage() {
   command=$1
-  if [[ "$command" =~ compCheck.sh$ ]] ; then
-    echo "Usage: $command olderCommit newerCommit [workingDir]"
-  fi
+  echo "Usage: $command olderCommit newerCommit [workingDir]"
   exit 1
 }
 
 # cleanup the temporary directory when exiting the script
 function cleanup() {
-  if [ -n "$tmpDir" ] && [ -d "$tmpDir" ]; then
-    rm -rf "$tmpDir"
+  if [ -n "$TMP_DIR" ] && [ -d "$TMP_DIR" ] && [ "$workingDir" = "$TMP_DIR" ] ; then
+    echo "The temporary directory $TMP_DIR needs to be cleaned up."
   fi
 }
 
@@ -124,17 +125,20 @@ if [ -n "$3" ]; then
     exit 1
   fi
 else
-  # use a temp directory in case workingDir is not provided
-  tmpDir=$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')
-  workingDir=$tmpDir
+  # use the temp directory in case workingDir is not provided
+  workingDir=$TMP_DIR
 fi
 
 # create subdirectories for given commits
 oldTargetDir="$workingDir"/oldTargetDir
 newTargetDir="$workingDir"/newTargetDir
 
-if ! mkdir -p "$oldTargetDir" "$newTargetDir"; then
-  echo "Failed to create target directory"
+if ! mkdir -p "$oldTargetDir"; then
+  echo "Failed to create target directory ${oldTargetDir}"
+  exit 1
+fi
+if ! mkdir -p "$newTargetDir"; then
+  echo "Failed to create target directory ${newTargetDir}"
   exit 1
 fi
 
