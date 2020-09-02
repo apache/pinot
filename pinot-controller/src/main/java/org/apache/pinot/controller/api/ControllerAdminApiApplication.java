@@ -24,6 +24,7 @@ import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.net.UnknownHostException;
+import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -152,7 +153,12 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     beanConfig.setResourcePackage(RESOURCE_PACKAGE);
     beanConfig.setScan(true);
     try {
-      beanConfig.setHost(InetAddress.getLocalHost().getHostName());
+      Collection<NetworkListener> listeners = httpServer.getListeners();
+      if (listeners.size() > 0) {
+        // fetch the port from the first listener which uses http
+        int port = listeners.iterator().next().getPort();
+        beanConfig.setHost(InetAddress.getLocalHost().getHostName() + ":" + port);
+      }
     } catch (UnknownHostException e) {
       throw new RuntimeException("Cannot get localhost name");
     }
