@@ -44,4 +44,6 @@ public class InternalConfigConstants {
 
   // Number of segments we want generated.
   public static final String PREPROCESS_NUM_FILES = "preprocess.num.files";
+
+  public static final String FAIL_ON_SCHEMA_MISMATCH = "fail.on.schema.mismatch";
 }

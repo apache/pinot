@@ -41,6 +41,7 @@ import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl
 import org.apache.pinot.core.segment.name.NormalizedDateSegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SimpleSegmentNameGenerator;
+import org.apache.pinot.hadoop.job.InternalConfigConstants;
 import org.apache.pinot.ingestion.common.JobConfigConstants;
 import org.apache.pinot.ingestion.jobs.SegmentCreationJob;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
@@ -48,6 +49,7 @@ import org.apache.pinot.plugin.inputformat.protobuf.ProtoBufRecordReaderConfig;
 import org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReaderConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableCustomConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -72,6 +74,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
   protected Schema _schema;
   protected SegmentNameGenerator _segmentNameGenerator;
   protected boolean _useRelativePath = false;
+  protected boolean _failIfSchemaMismatch = false;
 
   // Optional
   protected TableConfig _tableConfig;
@@ -88,10 +91,10 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
   protected File _localSegmentTarDir;
 
   // Counter for detecting schema mismatch
-  private int _dataTypeMismatch;
-  private int _singleValueMultiValueFieldMismatch;
-  private int _multiValueStructureMismatch;
-  private int _missingPinotColumn;
+  private int _dataTypeMismatch = 0;
+  private int _singleValueMultiValueFieldMismatch = 0;
+  private int _multiValueStructureMismatch = 0;
+  private int _missingPinotColumn = 0;
 
   /**
    * Generate a relative output directory path when `useRelativePath` flag is on.
@@ -131,6 +134,9 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
       _readerConfigFile = new Path(readerConfigFile);
     }
     _recordReaderPath = _jobConf.get(JobConfigConstants.RECORD_READER_PATH);
+    Preconditions.checkNotNull(_tableConfig);
+
+    setFlagForSchemaMismatch();
 
     // Set up segment name generator
     String segmentNameGeneratorType =
@@ -362,6 +368,21 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
       int sequenceId) {
   }
 
+  private void setFlagForSchemaMismatch() {
+    String failJobMsg = "Set to fail the job if schemas mismatch.";
+    String notFailJobMsg = "Set NOT to fail the job if schemas mismatch.";
+    TableCustomConfig tableCustomConfig = _tableConfig.getCustomConfig();
+    if (tableCustomConfig == null) {
+      _logger.info(notFailJobMsg);
+      return;
+    }
+    Map<String, String> customConfigsMap = tableCustomConfig.getCustomConfigs();
+    if (customConfigsMap != null && customConfigsMap.containsKey(InternalConfigConstants.FAIL_ON_SCHEMA_MISMATCH)) {
+      _failIfSchemaMismatch = Boolean.parseBoolean(customConfigsMap.get(InternalConfigConstants.FAIL_ON_SCHEMA_MISMATCH));
+    }
+    _logger.info(_failIfSchemaMismatch ? failJobMsg : notFailJobMsg);
+  }
+
   private void validateSchema(SchemaValidator schemaValidator) {
     if (schemaValidator == null) {
       return;
@@ -382,6 +403,15 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
       _missingPinotColumn++;
       schemaValidator.getMissingPinotColumnResult().getMismatchReason();
     }
+
+    if (isSchemaMismatch() && _failIfSchemaMismatch) {
+      throw new RuntimeException("Schema mismatch detected. Forcing to fail the job. Please checking log message above.");
+    }
+  }
+
+  private boolean isSchemaMismatch() {
+    return _dataTypeMismatch + _singleValueMultiValueFieldMismatch + _multiValueStructureMismatch + _missingPinotColumn
+        != 0;
   }
 
   @Override
