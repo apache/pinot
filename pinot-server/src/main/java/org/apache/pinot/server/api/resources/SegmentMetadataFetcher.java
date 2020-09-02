@@ -64,7 +64,7 @@ public class SegmentMetadataFetcher {
     } else {
       columnSet = new HashSet<>(columns);
     }
-    JsonNode indexes = getIndexesForSegmentColumns(segmentDataManager, columnSet);
+    JsonNode indexes = getIndexesForSegmentColumns(segmentDataManager);
     JsonNode segmentMetadataJson = segmentMetadata.toJson(columnSet);
     ObjectNode segmentMetadataObject = segmentMetadataJson.deepCopy();
     segmentMetadataObject.set("indexes", indexes);
@@ -85,10 +85,9 @@ public class SegmentMetadataFetcher {
   /**
    * Get the JSON object with the segment column's indexing metadata.
    * @param segmentDataManager
-   * @param columnSet
    * @return
    */
-  private static JsonNode getIndexesForSegmentColumns(SegmentDataManager segmentDataManager, Set<String> columnSet) {
+  private static JsonNode getIndexesForSegmentColumns(SegmentDataManager segmentDataManager) {
     ArrayNode columnsIndexMetadata = JsonUtils.newArrayNode();
     if (segmentDataManager instanceof ImmutableSegmentDataManager) {
       ImmutableSegmentDataManager immutableSegmentDataManager = (ImmutableSegmentDataManager) segmentDataManager;
@@ -96,7 +95,7 @@ public class SegmentMetadataFetcher {
       if (immutableSegment instanceof ImmutableSegmentImpl) {
         ImmutableSegmentImpl immutableSegmentImpl = (ImmutableSegmentImpl) immutableSegment;
         Map<String, ColumnIndexContainer> columnIndexContainerMap = immutableSegmentImpl.getIndexContainerMap();
-        columnsIndexMetadata.add(getImmutableSegmentColumnIndexes(columnIndexContainerMap, columnSet));
+        columnsIndexMetadata.add(getImmutableSegmentColumnIndexes(columnIndexContainerMap));
       }
     }
     return columnsIndexMetadata;
@@ -106,16 +105,11 @@ public class SegmentMetadataFetcher {
    * Helper to loop through column index container to create a index map as follows:
    * {<"bloom-filter", "YES">, <"dictionary", "NO">}
    * @param columnIndexContainerMap
-   * @param columnSet
    * @return
    */
-  private static ObjectNode getImmutableSegmentColumnIndexes(Map<String, ColumnIndexContainer> columnIndexContainerMap,
-                                                             Set<String> columnSet) {
+  private static ObjectNode getImmutableSegmentColumnIndexes(Map<String, ColumnIndexContainer> columnIndexContainerMap) {
     ObjectNode columnIndexMap = JsonUtils.newObjectNode();
     for (Map.Entry<String, ColumnIndexContainer> e : columnIndexContainerMap.entrySet()) {
-      if (columnSet != null && !columnSet.contains(e.getKey())) {
-        continue;
-      }
       ColumnIndexContainer columnIndexContainer = e.getValue();
       ObjectNode indexesNode = JsonUtils.newObjectNode();
       if (Objects.isNull(columnIndexContainer.getBloomFilter())) {
