@@ -50,6 +50,7 @@ import org.apache.pinot.thirdeye.detection.DetectionPipelineLoader;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineTaskInfo;
 import org.apache.pinot.thirdeye.detection.MockDataProvider;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
+import org.apache.pinot.thirdeye.detection.components.ThresholdRuleDetector;
 import org.apache.pinot.thirdeye.detection.dataquality.components.DataSlaQualityChecker;
 import org.apache.pinot.thirdeye.detection.validators.ConfigValidationException;
 import org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTranslator;
@@ -95,6 +96,7 @@ public class DataQualityTaskRunnerTest {
     this.loader = new DetectionPipelineLoader();
 
     DetectionRegistry.registerComponent(DataSlaQualityChecker.class.getName(), "DATA_SLA");
+    DetectionRegistry.registerComponent(ThresholdRuleDetector.class.getName(), "THRESHOLD");
 
     metricConfigDTO = new MetricConfigDTO();
     metricConfigDTO.setId(123L);
