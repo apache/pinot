@@ -31,7 +31,11 @@ public final class RecordFilterFactory {
   }
 
   public enum RecordFilterType {
-    NO_OP, FILTER_FUNCTION
+    NO_OP,
+    /**
+     * Evaluates a function expression to decide if the record should be filtered
+     */
+    FILTER_FUNCTION
   }
 
   /**

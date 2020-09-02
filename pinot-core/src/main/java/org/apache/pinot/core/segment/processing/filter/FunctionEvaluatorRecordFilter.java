@@ -24,7 +24,8 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
- * RecordFilter which evaluates the filter function to decide whether record should be skipped or not
+ * RecordFilter which evaluates the filter function to decide whether record should be skipped or not.
+ * The filter function is expected to evaluate to true, if the record should be filtered
  */
 public class FunctionEvaluatorRecordFilter implements RecordFilter {
 

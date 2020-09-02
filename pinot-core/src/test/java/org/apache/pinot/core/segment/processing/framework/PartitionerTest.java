@@ -24,7 +24,7 @@ import org.apache.pinot.core.segment.processing.partitioner.NoOpPartitioner;
 import org.apache.pinot.core.segment.processing.partitioner.Partitioner;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerFactory;
 import org.apache.pinot.core.segment.processing.partitioner.PartitioningConfig;
-import org.apache.pinot.core.segment.processing.partitioner.RowHashPartitioner;
+import org.apache.pinot.core.segment.processing.partitioner.NumPartitionsPartitioner;
 import org.apache.pinot.core.segment.processing.partitioner.TableConfigPartitioner;
 import org.apache.pinot.core.segment.processing.partitioner.TransformFunctionPartitioner;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
@@ -76,29 +76,29 @@ public class PartitionerTest {
   }
 
   @Test
-  public void testRowHashPartitioner() {
+  public void testNumPartitionsPartitioner() {
     PartitioningConfig partitioningConfig =
-        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.ROW_HASH).build();
+        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.NUM_PARTITIONS).build();
     try {
       PartitionerFactory.getPartitioner(partitioningConfig);
-      fail("Should not create ROW_HASH Partitioner without num partitions");
+      fail("Should not create NUM_PARTITIONS Partitioner without num partitions");
     } catch (IllegalStateException e) {
       // expected
     }
     partitioningConfig =
-        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.ROW_HASH)
+        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.NUM_PARTITIONS)
             .setNumPartitions(0).build();
     try {
       PartitionerFactory.getPartitioner(partitioningConfig);
-      fail("Should not create ROW_HASH Partitioner without num partitions <=0");
+      fail("Should not create NUM_PARTITIONS Partitioner without num partitions <=0");
     } catch (IllegalStateException e) {
       // expected
     }
     partitioningConfig =
-        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.ROW_HASH)
+        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.NUM_PARTITIONS)
             .setNumPartitions(3).build();
     Partitioner partitioner = PartitionerFactory.getPartitioner(partitioningConfig);
-    assertEquals(partitioner.getClass(), RowHashPartitioner.class);
+    assertEquals(partitioner.getClass(), NumPartitionsPartitioner.class);
 
     GenericRow row = new GenericRow();
     for (int i = 0; i < 10; i++) {

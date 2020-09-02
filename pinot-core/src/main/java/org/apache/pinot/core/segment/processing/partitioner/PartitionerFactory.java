@@ -31,7 +31,23 @@ public final class PartitionerFactory {
   }
 
   public enum PartitionerType {
-    NO_OP, ROW_HASH, COLUMN_VALUE, TRANSFORM_FUNCTION, TABLE_PARTITION_CONFIG
+    NO_OP,
+    /**
+     * Creates not more than the configured fixed number of partitions
+     */
+    NUM_PARTITIONS,
+    /**
+     * Partitions using a column value
+     */
+    COLUMN_VALUE,
+    /**
+     * Evaluates a function expression to determine partition value
+     */
+    TRANSFORM_FUNCTION,
+    /**
+     * Partitions using {@link org.apache.pinot.spi.config.table.ColumnPartitionConfig} as defined in the table config
+     */
+    TABLE_PARTITION_CONFIG
   }
 
   /**
@@ -44,13 +60,14 @@ public final class PartitionerFactory {
       case NO_OP:
         partitioner = new NoOpPartitioner();
         break;
-      case ROW_HASH:
+      case NUM_PARTITIONS:
         Preconditions
-            .checkState(config.getNumPartitions() > 0, "Must provide numPartitions > 0 for ROW_HASH partitioner");
-        partitioner = new RowHashPartitioner(config.getNumPartitions());
+            .checkState(config.getNumPartitions() > 0, "Must provide numPartitions > 0 for NUM_PARTITIONS partitioner");
+        partitioner = new NumPartitionsPartitioner(config.getNumPartitions());
         break;
       case COLUMN_VALUE:
-        Preconditions.checkState(config.getColumnName() != null, "Must provide columnName for COLUMN_VALUE partitioner");
+        Preconditions
+            .checkState(config.getColumnName() != null, "Must provide columnName for COLUMN_VALUE partitioner");
         partitioner = new ColumnValuePartitioner(config.getColumnName());
         break;
       case TRANSFORM_FUNCTION:
@@ -59,8 +76,8 @@ public final class PartitionerFactory {
         partitioner = new TransformFunctionPartitioner(config.getTransformFunction());
         break;
       case TABLE_PARTITION_CONFIG:
-        Preconditions
-            .checkState(config.getColumnName() != null, "Must provide columnName for TABLE_PARTITION_CONFIG Partitioner");
+        Preconditions.checkState(config.getColumnName() != null,
+            "Must provide columnName for TABLE_PARTITION_CONFIG Partitioner");
         Preconditions.checkState(config.getColumnPartitionConfig() != null,
             "Must provide columnPartitionConfig for TABLE_PARTITION_CONFIG Partitioner");
         partitioner = new TableConfigPartitioner(config.getColumnName(), config.getColumnPartitionConfig());

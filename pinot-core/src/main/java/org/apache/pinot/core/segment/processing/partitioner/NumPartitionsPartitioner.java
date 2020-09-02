@@ -24,10 +24,10 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 /**
  * Partitioner which creates a partition value between [0-numPartitions)
  */
-public class RowHashPartitioner implements Partitioner {
+public class NumPartitionsPartitioner implements Partitioner {
   private final int _numPartitions;
 
-  public RowHashPartitioner(int numPartitions) {
+  public NumPartitionsPartitioner(int numPartitions) {
     _numPartitions = numPartitions;
   }
 

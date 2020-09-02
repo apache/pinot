@@ -39,7 +39,7 @@ public interface Collector {
   Iterator<GenericRow> iterator();
 
   /**
-   * The size of the collection
+   * The number of rows in the collection
    */
   int size();
 

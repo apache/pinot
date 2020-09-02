@@ -31,7 +31,14 @@ public final class CollectorFactory {
   }
 
   public enum CollectorType {
-    ROLLUP, CONCAT
+    /**
+     * Aggregate the metric values based on configured aggregation types on unique dimension + time column values
+     */
+    ROLLUP,
+    /**
+     * Append rows without doing any aggregations
+     */
+    CONCAT
     // TODO: add support for DEDUP
   }
 

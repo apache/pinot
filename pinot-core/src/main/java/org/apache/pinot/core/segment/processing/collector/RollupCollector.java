@@ -49,7 +49,7 @@ public class RollupCollector implements Collector {
   private final MetricFieldSpec[] _metricFieldSpecs;
 
   public RollupCollector(CollectorConfig collectorConfig, Schema schema) {
-    _keySize = schema.getColumnNames().size() - schema.getMetricNames().size();
+    _keySize = schema.getPhysicalColumnNames().size() - schema.getMetricNames().size();
     _valueSize = schema.getMetricNames().size();
     _keyColumns = new String[_keySize];
     _valueColumns = new String[_valueSize];
@@ -134,26 +134,26 @@ public class RollupCollector implements Collector {
   }
 
   /**
-   * A record representation for the keys of the record
+   * A representation for the keys of the generic row
    * Note that the dimensions can have multi-value columns, and hence the equals and hashCode need deep array operations
    */
   private static class Record {
-    private final Object[] _values;
+    private final Object[] _keyParts;
 
-    public Record(Object[] values) {
-      _values = values;
+    public Record(Object[] keyParts) {
+      _keyParts = keyParts;
     }
 
     // NOTE: Not check class for performance concern
     @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
     @Override
     public boolean equals(Object o) {
-      return Arrays.deepEquals(_values, ((Record) o)._values);
+      return Arrays.deepEquals(_keyParts, ((Record) o)._keyParts);
     }
 
     @Override
     public int hashCode() {
-      return Arrays.deepHashCode(_values);
+      return Arrays.deepHashCode(_keyParts);
     }
   }
 }
