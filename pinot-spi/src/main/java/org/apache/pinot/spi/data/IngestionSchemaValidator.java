@@ -22,7 +22,7 @@ package org.apache.pinot.spi.data;
 /**
  * Validator to validate the schema between Pinot schema and input raw data schema
  */
-public interface SchemaValidator {
+public interface IngestionSchemaValidator {
 
   void init(Schema pinotSchema, String inputFilePath);
 

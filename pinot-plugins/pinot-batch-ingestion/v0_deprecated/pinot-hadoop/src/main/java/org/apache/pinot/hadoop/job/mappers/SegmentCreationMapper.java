@@ -53,7 +53,7 @@ import org.apache.pinot.spi.config.table.TableCustomConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.SchemaValidator;
+import org.apache.pinot.spi.data.IngestionSchemaValidator;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.utils.DataSizeUtils;
@@ -265,7 +265,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     progressReporterThread.start();
     try {
       driver.init(segmentGeneratorConfig);
-      validateSchema(driver.getSchemaValidator());
+      validateSchema(driver.getIngestionSchemaValidator());
       driver.build();
     } catch (Exception e) {
       _logger.error("Caught exception while creating segment with HDFS input file: {}, sequence id: {}", hdfsInputFile,
@@ -383,25 +383,25 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     _logger.info(_failIfSchemaMismatch ? failJobMsg : notFailJobMsg);
   }
 
-  private void validateSchema(SchemaValidator schemaValidator) {
-    if (schemaValidator == null) {
+  private void validateSchema(IngestionSchemaValidator ingestionSchemaValidator) {
+    if (ingestionSchemaValidator == null) {
       return;
     }
-    if (schemaValidator.getDataTypeMismatchResult().isMismatchDetected()) {
+    if (ingestionSchemaValidator.getDataTypeMismatchResult().isMismatchDetected()) {
       _dataTypeMismatch++;
-      _logger.warn(schemaValidator.getDataTypeMismatchResult().getMismatchReason());
+      _logger.warn(ingestionSchemaValidator.getDataTypeMismatchResult().getMismatchReason());
     }
-    if (schemaValidator.getSingleValueMultiValueFieldMismatchResult().isMismatchDetected()) {
+    if (ingestionSchemaValidator.getSingleValueMultiValueFieldMismatchResult().isMismatchDetected()) {
       _singleValueMultiValueFieldMismatch++;
-      schemaValidator.getSingleValueMultiValueFieldMismatchResult().getMismatchReason();
+      ingestionSchemaValidator.getSingleValueMultiValueFieldMismatchResult().getMismatchReason();
     }
-    if (schemaValidator.getMultiValueStructureMismatchResult().isMismatchDetected()) {
+    if (ingestionSchemaValidator.getMultiValueStructureMismatchResult().isMismatchDetected()) {
       _multiValueStructureMismatch++;
-      schemaValidator.getMultiValueStructureMismatchResult().getMismatchReason();
+      ingestionSchemaValidator.getMultiValueStructureMismatchResult().getMismatchReason();
     }
-    if (schemaValidator.getMissingPinotColumnResult().isMismatchDetected()) {
+    if (ingestionSchemaValidator.getMissingPinotColumnResult().isMismatchDetected()) {
       _missingPinotColumn++;
-      schemaValidator.getMissingPinotColumnResult().getMismatchReason();
+      ingestionSchemaValidator.getMissingPinotColumnResult().getMismatchReason();
     }
 
     if (isSchemaMismatch() && _failIfSchemaMismatch) {

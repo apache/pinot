@@ -42,15 +42,15 @@ public class SchemaValidatorResult {
     return _mismatchReason.toString();
   }
 
-  private void addMismatchReason(String reason) {
+  private void addMismatchReasonInternal(String reason) {
     if (_mismatchReason.length() > 0) {
       _mismatchReason.append(" ");
     }
     _mismatchReason.append(reason);
   }
 
-  public void incrementMismatchCountWithMismatchReason(String reason) {
+  public void addMismatchReason(String reason) {
     incrementMismatchCount();
-    addMismatchReason(reason);
+    addMismatchReasonInternal(reason);
   }
 }

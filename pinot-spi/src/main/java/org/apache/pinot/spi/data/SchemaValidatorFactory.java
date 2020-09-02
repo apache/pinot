@@ -20,7 +20,6 @@ package org.apache.pinot.spi.data;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.plugin.PluginManager;
 
 
@@ -34,7 +33,7 @@ public class SchemaValidatorFactory {
       "org.apache.pinot.plugin.inputformat.avro.AvroRecordReader";
 
   private static final String DEFAULT_AVRO_SCHEMA_VALIDATOR_CLASS =
-      "org.apache.pinot.plugin.inputformat.avro.AvroSchemaValidator";
+      "org.apache.pinot.plugin.inputformat.avro.AvroIngestionSchemaValidator";
 
   //TODO: support schema validation for more data formats like ORC.
 
@@ -48,14 +47,14 @@ public class SchemaValidatorFactory {
    * @param recordReaderClassName record reader class name
    * @param inputFilePath local input file path
    */
-  public static SchemaValidator getSchemaValidator(Schema pinotSchema, String recordReaderClassName, String inputFilePath)
+  public static IngestionSchemaValidator getSchemaValidator(Schema pinotSchema, String recordReaderClassName, String inputFilePath)
       throws Exception {
     String schemaValidatorClassName = DEFAULT_RECORD_READER_TO_SCHEMA_VALIDATOR_MAP.get(recordReaderClassName);
     if (schemaValidatorClassName == null) {
       return null;
     }
-    SchemaValidator schemaValidator = PluginManager.get().createInstance(schemaValidatorClassName);
-    schemaValidator.init(pinotSchema, inputFilePath);
-    return schemaValidator;
+    IngestionSchemaValidator ingestionSchemaValidator = PluginManager.get().createInstance(schemaValidatorClassName);
+    ingestionSchemaValidator.init(pinotSchema, inputFilePath);
+    return ingestionSchemaValidator;
   }
 }
