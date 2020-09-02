@@ -15,7 +15,6 @@ server:
     type: external
 alert: false
 autoload: false
-classifier: false
 holidayEventsLoader: false
 mockEventsLoader: true
 monitor: false
