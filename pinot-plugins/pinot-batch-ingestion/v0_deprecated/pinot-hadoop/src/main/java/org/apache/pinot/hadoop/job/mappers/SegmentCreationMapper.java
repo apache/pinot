@@ -20,17 +20,11 @@ package org.apache.pinot.hadoop.job.mappers;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.avro.file.DataFileStream;
-import org.apache.avro.generic.GenericDatumReader;
-import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.mapred.AvroRecordReader;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -50,18 +44,15 @@ import org.apache.pinot.core.segment.name.SimpleSegmentNameGenerator;
 import org.apache.pinot.ingestion.common.JobConfigConstants;
 import org.apache.pinot.ingestion.jobs.SegmentCreationJob;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
-import org.apache.pinot.plugin.inputformat.orc.ORCRecordReader;
 import org.apache.pinot.plugin.inputformat.protobuf.ProtoBufRecordReaderConfig;
 import org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReaderConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.SchemaValidator;
 import org.apache.pinot.spi.data.readers.FileFormat;
-import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -375,17 +366,21 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     if (schemaValidator == null) {
       return;
     }
-    if (schemaValidator.isDataTypeMismatch()) {
+    if (schemaValidator.getDataTypeMismatchResult().isMismatchDetected()) {
       _dataTypeMismatch++;
+      _logger.warn(schemaValidator.getDataTypeMismatchResult().getMismatchReason());
     }
-    if (schemaValidator.isSingleValueMultiValueFieldMismatch()) {
+    if (schemaValidator.getSingleValueMultiValueFieldMismatchResult().isMismatchDetected()) {
       _singleValueMultiValueFieldMismatch++;
+      schemaValidator.getSingleValueMultiValueFieldMismatchResult().getMismatchReason();
     }
-    if (schemaValidator.isMultiValueStructureMismatch()) {
+    if (schemaValidator.getMultiValueStructureMismatchResult().isMismatchDetected()) {
       _multiValueStructureMismatch++;
+      schemaValidator.getMultiValueStructureMismatchResult().getMismatchReason();
     }
-    if (schemaValidator.isMissingPinotColumn()) {
+    if (schemaValidator.getMissingPinotColumnResult().isMismatchDetected()) {
       _missingPinotColumn++;
+      schemaValidator.getMissingPinotColumnResult().getMismatchReason();
     }
   }
 

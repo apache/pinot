@@ -18,21 +18,39 @@
  */
 package org.apache.pinot.spi.data;
 
-
 /**
- * Validator to validate the schema between Pinot schema and input raw data schema
+ * The result class to provide the detailed mismatch information.
  */
-public interface SchemaValidator {
+public class SchemaValidatorResult {
+  private long _mismatchCount;
+  private StringBuilder _mismatchReason;
 
-  void init(Schema pinotSchema, String inputFilePath);
+  public SchemaValidatorResult() {
+    _mismatchCount = 0;
+    _mismatchReason = new StringBuilder();
+  }
 
-  String getInputSchemaType();
+  public boolean isMismatchDetected() {
+    return _mismatchCount != 0;
+  }
 
-  SchemaValidatorResult getDataTypeMismatchResult();
+  private void incrementMismatchCount() {
+    _mismatchCount++;
+  }
 
-  SchemaValidatorResult getSingleValueMultiValueFieldMismatchResult();
+  public String getMismatchReason() {
+    return _mismatchReason.toString();
+  }
 
-  SchemaValidatorResult getMultiValueStructureMismatchResult();
+  private void addMismatchReason(String reason) {
+    if (_mismatchReason.length() > 0) {
+      _mismatchReason.append(" ");
+    }
+    _mismatchReason.append(reason);
+  }
 
-  SchemaValidatorResult getMissingPinotColumnResult();
+  public void incrementMismatchCountWithMismatchReason(String reason) {
+    incrementMismatchCount();
+    addMismatchReason(reason);
+  }
 }

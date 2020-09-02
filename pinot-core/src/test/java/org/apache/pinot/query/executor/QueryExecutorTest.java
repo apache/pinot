@@ -93,10 +93,10 @@ public class QueryExecutorTest {
       driver.init(config);
       driver.build();
       SchemaValidator schemaValidator = driver.getSchemaValidator();
-      Assert.assertFalse(schemaValidator.isDataTypeMismatch());
-      Assert.assertFalse(schemaValidator.isSingleValueMultiValueFieldMismatch());
-      Assert.assertFalse(schemaValidator.isMultiValueStructureMismatch());
-      Assert.assertFalse(schemaValidator.isMissingPinotColumn());
+      Assert.assertFalse(schemaValidator.getDataTypeMismatchResult().isMismatchDetected());
+      Assert.assertFalse(schemaValidator.getSingleValueMultiValueFieldMismatchResult().isMismatchDetected());
+      Assert.assertFalse(schemaValidator.getMultiValueStructureMismatchResult().isMismatchDetected());
+      Assert.assertFalse(schemaValidator.getMissingPinotColumnResult().isMismatchDetected());
       _indexSegments.add(ImmutableSegmentLoader.load(new File(INDEX_DIR, driver.getSegmentName()), ReadMode.mmap));
       _segmentNames.add(driver.getSegmentName());
     }

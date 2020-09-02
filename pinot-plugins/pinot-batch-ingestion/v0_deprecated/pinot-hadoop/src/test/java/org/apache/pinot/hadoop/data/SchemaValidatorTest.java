@@ -47,10 +47,10 @@ public class SchemaValidatorTest {
     SchemaValidator schemaValidator =
         SchemaValidatorFactory.getSchemaValidator(pinotSchema, recordReaderClassName, inputFilePath);
     Assert.assertNotNull(schemaValidator);
-    Assert.assertFalse(schemaValidator.isDataTypeMismatch());
-    Assert.assertFalse(schemaValidator.isSingleValueMultiValueFieldMismatch());
-    Assert.assertFalse(schemaValidator.isMultiValueStructureMismatch());
-    Assert.assertFalse(schemaValidator.isMissingPinotColumn());
+    Assert.assertFalse(schemaValidator.getDataTypeMismatchResult().isMismatchDetected());
+    Assert.assertFalse(schemaValidator.getSingleValueMultiValueFieldMismatchResult().isMismatchDetected());
+    Assert.assertFalse(schemaValidator.getMultiValueStructureMismatchResult().isMismatchDetected());
+    Assert.assertFalse(schemaValidator.getMissingPinotColumnResult().isMismatchDetected());
 
     // Adding one extra column
     pinotSchema = new Schema.SchemaBuilder()
@@ -64,10 +64,12 @@ public class SchemaValidatorTest {
     schemaValidator =
         SchemaValidatorFactory.getSchemaValidator(pinotSchema, recordReaderClassName, inputFilePath);
     Assert.assertNotNull(schemaValidator);
-    Assert.assertFalse(schemaValidator.isDataTypeMismatch());
-    Assert.assertFalse(schemaValidator.isSingleValueMultiValueFieldMismatch());
-    Assert.assertFalse(schemaValidator.isMultiValueStructureMismatch());
-    Assert.assertTrue(schemaValidator.isMissingPinotColumn());
+    Assert.assertFalse(schemaValidator.getDataTypeMismatchResult().isMismatchDetected());
+    Assert.assertFalse(schemaValidator.getSingleValueMultiValueFieldMismatchResult().isMismatchDetected());
+    Assert.assertFalse(schemaValidator.getMultiValueStructureMismatchResult().isMismatchDetected());
+    Assert.assertTrue(schemaValidator.getMissingPinotColumnResult().isMismatchDetected());
+    Assert.assertNotNull(schemaValidator.getMissingPinotColumnResult().getMismatchReason());
+    System.out.println(schemaValidator.getMissingPinotColumnResult().getMismatchReason());
 
     // Change the data type of column1 from LONG to STRING
     pinotSchema = new Schema.SchemaBuilder()
@@ -79,10 +81,12 @@ public class SchemaValidatorTest {
     schemaValidator =
         SchemaValidatorFactory.getSchemaValidator(pinotSchema, recordReaderClassName, inputFilePath);
     Assert.assertNotNull(schemaValidator);
-    Assert.assertTrue(schemaValidator.isDataTypeMismatch());
-    Assert.assertFalse(schemaValidator.isSingleValueMultiValueFieldMismatch());
-    Assert.assertFalse(schemaValidator.isMultiValueStructureMismatch());
-    Assert.assertFalse(schemaValidator.isMissingPinotColumn());
+    Assert.assertTrue(schemaValidator.getDataTypeMismatchResult().isMismatchDetected());
+    Assert.assertNotNull(schemaValidator.getDataTypeMismatchResult().getMismatchReason());
+    System.out.println(schemaValidator.getDataTypeMismatchResult().getMismatchReason());
+    Assert.assertFalse(schemaValidator.getSingleValueMultiValueFieldMismatchResult().isMismatchDetected());
+    Assert.assertFalse(schemaValidator.getMultiValueStructureMismatchResult().isMismatchDetected());
+    Assert.assertFalse(schemaValidator.getMissingPinotColumnResult().isMismatchDetected());
 
     // Change column2 from single-value column to multi-value column
     pinotSchema = new Schema.SchemaBuilder()
@@ -94,10 +98,14 @@ public class SchemaValidatorTest {
     schemaValidator =
         SchemaValidatorFactory.getSchemaValidator(pinotSchema, recordReaderClassName, inputFilePath);
     Assert.assertNotNull(schemaValidator);
-    Assert.assertFalse(schemaValidator.isDataTypeMismatch());
-    Assert.assertTrue(schemaValidator.isSingleValueMultiValueFieldMismatch());
-    Assert.assertTrue(schemaValidator.isMultiValueStructureMismatch());
-    Assert.assertFalse(schemaValidator.isMissingPinotColumn());
+    Assert.assertFalse(schemaValidator.getDataTypeMismatchResult().isMismatchDetected());
+    Assert.assertTrue(schemaValidator.getSingleValueMultiValueFieldMismatchResult().isMismatchDetected());
+    Assert.assertNotNull(schemaValidator.getSingleValueMultiValueFieldMismatchResult().getMismatchReason());
+    System.out.println(schemaValidator.getSingleValueMultiValueFieldMismatchResult().getMismatchReason());
+    Assert.assertTrue(schemaValidator.getMultiValueStructureMismatchResult().isMismatchDetected());
+    Assert.assertNotNull(schemaValidator.getMultiValueStructureMismatchResult().getMismatchReason());
+    System.out.println(schemaValidator.getMultiValueStructureMismatchResult().getMismatchReason());
+    Assert.assertFalse(schemaValidator.getMissingPinotColumnResult().isMismatchDetected());
 
   }
 }

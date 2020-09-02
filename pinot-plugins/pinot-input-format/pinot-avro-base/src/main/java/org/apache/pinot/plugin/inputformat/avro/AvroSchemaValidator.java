@@ -19,16 +19,14 @@
 package org.apache.pinot.plugin.inputformat.avro;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStream;
 import org.apache.avro.file.DataFileStream;
-import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.SchemaValidator;
+import org.apache.pinot.spi.data.SchemaValidatorResult;
+
 
 /**
  * Schema validator to validate pinot schema and avro schema
@@ -37,10 +35,10 @@ public class AvroSchemaValidator implements SchemaValidator {
   private org.apache.avro.Schema _avroSchema;
   private Schema _pinotSchema;
 
-  private int _dataTypeMismatch = 0;
-  private int _singleValueMultiValueFieldMismatch = 0;
-  private int _multiValueStructureMismatch = 0;
-  private int _missingPinotColumn = 0;
+  private SchemaValidatorResult _dataTypeMismatch = new SchemaValidatorResult();
+  private SchemaValidatorResult _singleValueMultiValueFieldMismatch = new SchemaValidatorResult();
+  private SchemaValidatorResult _multiValueStructureMismatch = new SchemaValidatorResult();
+  private SchemaValidatorResult _missingPinotColumn = new SchemaValidatorResult();
 
   public AvroSchemaValidator() {
   }
@@ -54,23 +52,28 @@ public class AvroSchemaValidator implements SchemaValidator {
   }
 
   @Override
-  public boolean isDataTypeMismatch() {
-    return _dataTypeMismatch != 0;
+  public String getInputSchemaType() {
+    return "AVRO";
   }
 
   @Override
-  public boolean isSingleValueMultiValueFieldMismatch() {
-    return _singleValueMultiValueFieldMismatch != 0;
+  public SchemaValidatorResult getDataTypeMismatchResult() {
+    return _dataTypeMismatch;
   }
 
   @Override
-  public boolean isMultiValueStructureMismatch() {
-    return _multiValueStructureMismatch != 0;
+  public SchemaValidatorResult getSingleValueMultiValueFieldMismatchResult() {
+    return _singleValueMultiValueFieldMismatch;
   }
 
   @Override
-  public boolean isMissingPinotColumn() {
-    return _missingPinotColumn != 0;
+  public SchemaValidatorResult getMultiValueStructureMismatchResult() {
+    return _multiValueStructureMismatch;
+  }
+
+  @Override
+  public SchemaValidatorResult getMissingPinotColumnResult() {
+    return _missingPinotColumn;
   }
 
   private org.apache.avro.Schema extractAvroSchemaFromFile(String inputPath) {
@@ -89,7 +92,9 @@ public class AvroSchemaValidator implements SchemaValidator {
       FieldSpec fieldSpec = _pinotSchema.getFieldSpecFor(columnName);
       org.apache.avro.Schema.Field avroColumnField = _avroSchema.getField(columnName);
       if (avroColumnField == null) {
-        _missingPinotColumn++;
+        _missingPinotColumn.incrementMismatchCountWithMismatchReason(String
+            .format("The Pinot column: (%s: %s) is missing in the %s schema of input data.", columnName,
+                fieldSpec.getDataType().name(), getInputSchemaType()));
         continue;
       }
       org.apache.avro.Schema avroColumnSchema = avroColumnField.schema();
@@ -111,22 +116,31 @@ public class AvroSchemaValidator implements SchemaValidator {
       }
 
       if (!fieldSpec.getDataType().name().equalsIgnoreCase(avroColumnType.toString())) {
-        _dataTypeMismatch++;
+        _dataTypeMismatch.incrementMismatchCountWithMismatchReason(String
+            .format("The Pinot column: (%s: %s) doesn't match with the column (%s: %s) in input %s schema.", columnName,
+                fieldSpec.getDataType().name(), avroColumnSchema.getName(), avroColumnType.toString(),
+                getInputSchemaType()));
       }
 
       if (fieldSpec.isSingleValueField()) {
         if (avroColumnType.ordinal() < org.apache.avro.Schema.Type.STRING.ordinal()) {
           // the column is a complex structure
-          _singleValueMultiValueFieldMismatch++;
+          _singleValueMultiValueFieldMismatch.incrementMismatchCountWithMismatchReason(String.format(
+              "The Pinot column: %s is 'single-value' column but the column: %s from input %s is 'multi-value' column.",
+              columnName, avroColumnSchema.getName(), getInputSchemaType()));
         }
       } else {
         if (avroColumnType.ordinal() >= org.apache.avro.Schema.Type.STRING.ordinal()) {
           // the column is a complex structure
-          _singleValueMultiValueFieldMismatch++;
+          _singleValueMultiValueFieldMismatch.incrementMismatchCountWithMismatchReason(String.format(
+              "The Pinot column: %s is 'multi-value column' but the column: %s from input %s is 'single-value' column.",
+              columnName, avroColumnSchema.getName(), getInputSchemaType()));
         }
         if (avroColumnType != org.apache.avro.Schema.Type.ARRAY) {
           // multi-value column should use array structure for now.
-          _multiValueStructureMismatch++;
+          _multiValueStructureMismatch.incrementMismatchCountWithMismatchReason(String.format(
+              "The Pinot column: %s is 'multi-value' column but the column: %s from input %s schema is of '%s' type, which should have been of 'array' type.",
+              columnName, avroColumnSchema.getName(), getInputSchemaType(), avroColumnType.getName()));
         }
       }
     }
