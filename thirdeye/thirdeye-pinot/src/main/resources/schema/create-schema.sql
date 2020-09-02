@@ -1,5 +1,5 @@
-create alias if not exists TO_UNIXTIME as $$ long unix_timestamp(java.sql.Timestamp timestamp) { return
-(long) (timestamp.getTime() / 1000L); } $$;
+-- create alias if not exists TO_UNIXTIME as $$ long unix_timestamp(java.sql.Timestamp timestamp) { return
+-- (long) (timestamp.getTime() / 1000L); } $$;
 
 create table if not exists generic_json_entity (
     id bigint(20) primary key auto_increment,

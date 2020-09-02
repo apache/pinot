@@ -1,5 +1,5 @@
 databaseConfiguration:
-  url: jdbc:mysql://127.0.0.1:33306/thirdeye
+  url: jdbc:mysql://127.0.0.1:23306/thirdeye
   user: root
   password: root
   driver: com.mysql.jdbc.Driver
