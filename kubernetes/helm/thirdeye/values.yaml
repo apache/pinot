@@ -17,19 +17,12 @@
 # under the License.
 #
 
-# Default values for Presto image with built-in Pinot Connector.
+# Default values for ThirdEye Deployment
 
 image:
   repository: apachepinot/thirdeye
   tag: latest
   pullPolicy: IfNotPresent
-
-persistence:
-  enabled: true
-  accessMode: ReadWriteOnce
-  size: 4G
-  storageClass: ""
-
 
 frontend:
   enabled: true
@@ -39,13 +32,9 @@ frontend:
   adminport: 1427
 
   resources: {}
-
   nodeSelector: {}
-
   tolerations: []
-
   affinity: {}
-
   podAnnotations: {}
 
 
@@ -56,33 +45,28 @@ backend:
   port: 1867
   adminport: 1868
 
-  node:
-    environment: production
-    dataDir: /home/presto/data
-
   resources: {}
-
   nodeSelector: {}
-
   tolerations: []
-
   affinity: {}
-
   podAnnotations: {}
 
-
-scheduler:
-  name: scheduler
-
-# MySQL:
-# ----------------------------
-# Note:  initializationFiles parameter needs to be injected via command line to
-# complete the DB setup.
+# Persistence layer configuration
 mysql:
   mysqlRootPassword: password
   mysqlUser: uthirdeye
   mysqlPassword: pass
   mysqlDatabase: thirdeye
+
+  # Note:  initializationFiles parameter needs to be injected via command line to
+  # complete the DB setup.
+
+persistence:
+  enabled: true
+  accessMode: ReadWriteOnce
+  size: 4G
+  storageClass: ""
+
 
 traefik:
   enabled: false
