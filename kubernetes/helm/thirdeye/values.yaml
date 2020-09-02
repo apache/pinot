@@ -1,0 +1,89 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+# Default values for Presto image with built-in Pinot Connector.
+
+image:
+  repository: apachepinot/thirdeye
+  tag: latest
+  pullPolicy: IfNotPresent
+
+persistence:
+  enabled: true
+  accessMode: ReadWriteOnce
+  size: 4G
+  storageClass: ""
+
+
+frontend:
+  enabled: true
+  name: frontend
+  replicaCount: 1
+  port: 1426
+  adminport: 1427
+
+  resources: {}
+
+  nodeSelector: {}
+
+  tolerations: []
+
+  affinity: {}
+
+  podAnnotations: {}
+
+
+backend:
+  enabled: true
+  name: backend
+  replicaCount: 1
+  port: 1867
+  adminport: 1868
+
+  node:
+    environment: production
+    dataDir: /home/presto/data
+
+  resources: {}
+
+  nodeSelector: {}
+
+  tolerations: []
+
+  affinity: {}
+
+  podAnnotations: {}
+
+
+scheduler:
+  name: scheduler
+
+# MySQL:
+# ----------------------------
+# Note:  initializationFiles parameter needs to be injected via command line to
+# complete the DB setup.
+mysql:
+  mysqlRootPassword: password
+  mysqlUser: uthirdeye
+  mysqlPassword: pass
+  mysqlDatabase: thirdeye
+
+traefik:
+  enabled: false
+
