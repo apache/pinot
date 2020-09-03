@@ -115,17 +115,3 @@ The name of the thirdeye scheduler (backend with special detector.yml) headless 
 {{- define "thirdeye.scheduler.headless" -}}
 {{- printf "%s-headless" (include "thirdeye.scheduler.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
-
-{{/*
-  Create a default fully qualified traefik name.
-  We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
-*/}}
-{{- define "thirdeye.traefik.fullname" -}}
-{{-   if .Values.traefik.fullnameOverride -}}
-{{-     .Values.traefik.fullnameOverride | trunc -63 | trimSuffix "-" -}}
-{{-   else -}}
-{{-     $name := default "traefik" .Values.traefik.nameOverride -}}
-{{-     printf "%s-%s" .Release.Name $name | trunc -63 | trimSuffix "-" -}}
-{{-    end -}}
-{{- end -}}
-
