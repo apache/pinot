@@ -106,6 +106,9 @@ public class IngestionJobLauncher {
       case SegmentUriPush:
         kickoffIngestionJob(spec, executionFramework.getSegmentUriPushJobRunnerClassName());
         break;
+      case SegmentMetadataPush:
+        kickoffIngestionJob(spec, executionFramework.getSegmentMetadataPushJobRunnerClassName());
+        break;
       case SegmentCreationAndTarPush:
         kickoffIngestionJob(spec, executionFramework.getSegmentGenerationJobRunnerClassName());
         kickoffIngestionJob(spec, executionFramework.getSegmentTarPushJobRunnerClassName());
@@ -113,6 +116,10 @@ public class IngestionJobLauncher {
       case SegmentCreationAndUriPush:
         kickoffIngestionJob(spec, executionFramework.getSegmentGenerationJobRunnerClassName());
         kickoffIngestionJob(spec, executionFramework.getSegmentUriPushJobRunnerClassName());
+        break;
+      case SegmentCreationAndMetadataPush:
+        kickoffIngestionJob(spec, executionFramework.getSegmentGenerationJobRunnerClassName());
+        kickoffIngestionJob(spec, executionFramework.getSegmentMetadataPushJobRunnerClassName());
         break;
       default:
         LOGGER.error("Unsupported job type - {}. Support job types: {}", spec.getJobType(),
@@ -139,6 +146,6 @@ public class IngestionJobLauncher {
   }
 
   enum PinotIngestionJobType {
-    SegmentCreation, SegmentTarPush, SegmentUriPush, SegmentCreationAndTarPush, SegmentCreationAndUriPush,
+    SegmentCreation, SegmentTarPush, SegmentUriPush, SegmentMetadataPush, SegmentCreationAndTarPush, SegmentCreationAndUriPush, SegmentCreationAndMetadataPush,
   }
 }
