@@ -4,7 +4,7 @@ import {
   toMetricUrn,
   toAbsoluteUrn
 } from 'thirdeye-frontend/utils/rca-utils';
-import { checkStatus } from 'thirdeye-frontend/utils/utils';
+import { checkStatus, stripNonFiniteValues } from 'thirdeye-frontend/utils/utils';
 import config from 'thirdeye-frontend/config/environment';
 import _ from 'lodash';
 
@@ -86,7 +86,8 @@ export default Service.extend({
 
   _extractTimeseries(json, urn) {
     const timeseries = {};
-    timeseries[urn] = json;
+    json.value = stripNonFiniteValues((json.value || []));
+    timeseries[urn] =  json;
     return timeseries;
   },
 
