@@ -332,7 +332,8 @@ public class DimensionWrapper extends DetectionPipeline {
       for (Map<String, Object> properties : this.nestedProperties) {
         DetectionPipelineResult intermediate;
         try {
-          intermediate = this.runNested(metric, properties);
+          properties.put(this.nestedMetricUrnKey, metric.getUrn());
+          intermediate = this.runNested(properties, this.startTime, this.endTime);
         } catch (Exception e) {
           LOG.warn("[DetectionConfigID{}] detecting anomalies for window {} to {} failed for metric urn {}.",
               this.config.getId(), this.start, this.end, metric.getUrn(), e);
@@ -445,24 +446,5 @@ public class DimensionWrapper extends DetectionPipeline {
       return df.getDoubles(COL_VALUE).mean().getDouble(0)>= this.minValue;
     }
     return false;
-  }
-
-  protected DetectionPipelineResult runNested(MetricEntity metric, Map<String, Object> template) throws Exception {
-    Preconditions.checkArgument(template.containsKey(PROP_CLASS_NAME), "Nested missing " + PROP_CLASS_NAME);
-
-    Map<String, Object> properties = new HashMap<>(template);
-
-    properties.put(this.nestedMetricUrnKey, metric.getUrn());
-
-    DetectionConfigDTO nestedConfig = new DetectionConfigDTO();
-    nestedConfig.setId(this.config.getId());
-    nestedConfig.setName(this.config.getName());
-    nestedConfig.setDescription(this.config.getDescription());
-    nestedConfig.setProperties(properties);
-    nestedConfig.setComponents(this.config.getComponents());
-
-    DetectionPipeline pipeline = this.provider.loadPipeline(nestedConfig, this.startTime, this.endTime);
-
-    return pipeline.run();
   }
 }

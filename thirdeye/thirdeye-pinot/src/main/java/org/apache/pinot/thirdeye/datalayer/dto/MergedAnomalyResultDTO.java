@@ -44,6 +44,9 @@ public class MergedAnomalyResultDTO extends MergedAnomalyResultBean implements A
 
   private Set<MergedAnomalyResultDTO> children = new HashSet<>();
 
+  // flag to be set when severity changes but not to be persisted
+  private boolean renotify = false;
+
   public MergedAnomalyResultDTO() {
     setCreatedTime(System.currentTimeMillis());
   }
@@ -105,6 +108,14 @@ public class MergedAnomalyResultDTO extends MergedAnomalyResultBean implements A
 
   public void setChildren(Set<MergedAnomalyResultDTO> children) {
     this.children = children;
+  }
+
+  public boolean isRenotify() {
+    return renotify;
+  }
+
+  public void setRenotify(boolean renotify) {
+    this.renotify = renotify;
   }
 
   @Override

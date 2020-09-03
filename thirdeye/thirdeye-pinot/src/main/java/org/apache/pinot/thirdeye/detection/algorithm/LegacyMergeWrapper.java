@@ -143,27 +143,14 @@ public class LegacyMergeWrapper extends DetectionPipeline {
     // generate anomalies
     List<MergedAnomalyResultDTO> generated = new ArrayList<>();
 
-    for (Map<String, Object> propertiesRaw : this.nestedProperties) {
-      Map<String, Object> properties = new HashMap<>(propertiesRaw);
-      DetectionConfigDTO nestedConfig = new DetectionConfigDTO();
-
-      Preconditions.checkArgument(properties.containsKey(PROP_CLASS_NAME), "Nested missing " + PROP_CLASS_NAME);
-
+    for (Map<String, Object> properties : this.nestedProperties) {
       if (!properties.containsKey(PROP_SPEC)) {
         properties.put(PROP_SPEC, this.anomalyFunctionSpecs);
       }
       if (!properties.containsKey(PROP_ANOMALY_FUNCTION_CLASS)) {
         properties.put(PROP_ANOMALY_FUNCTION_CLASS, this.anomalyFunctionClassName);
       }
-      nestedConfig.setId(this.config.getId());
-      nestedConfig.setName(this.config.getName());
-      nestedConfig.setDescription(this.config.getDescription());
-      nestedConfig.setProperties(properties);
-
-      DetectionPipeline pipeline = this.provider.loadPipeline(nestedConfig, this.startTime, this.endTime);
-
-      DetectionPipelineResult intermediate = pipeline.run();
-
+      DetectionPipelineResult intermediate = this.runNested(properties, startTime, endTime);
       generated.addAll(intermediate.getAnomalies());
     }
 

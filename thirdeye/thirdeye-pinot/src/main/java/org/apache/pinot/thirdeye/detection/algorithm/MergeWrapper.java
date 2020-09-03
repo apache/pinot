@@ -123,20 +123,8 @@ public class MergeWrapper extends DetectionPipeline {
     int i = 0;
     Set<Long> lastTimeStamps = new HashSet<>();
     for (Map<String, Object> properties : this.nestedProperties) {
-      DetectionConfigDTO nestedConfig = new DetectionConfigDTO();
-
-      Preconditions.checkArgument(properties.containsKey(PROP_CLASS_NAME), "Nested missing " + PROP_CLASS_NAME);
-
-      nestedConfig.setId(this.config.getId());
-      nestedConfig.setName(this.config.getName());
-      nestedConfig.setDescription(this.config.getDescription());
-      nestedConfig.setProperties(properties);
-      nestedConfig.setComponents(this.config.getComponents());
-      DetectionPipeline pipeline = this.provider.loadPipeline(nestedConfig, this.startTime, this.endTime);
-
-      DetectionPipelineResult intermediate = pipeline.run();
+      DetectionPipelineResult intermediate = this.runNested(properties, this.startTime, this.endTime);
       lastTimeStamps.add(intermediate.getLastTimestamp());
-
       generated.addAll(intermediate.getAnomalies());
       predictionResults.addAll(intermediate.getPredictions());
       evaluations.addAll(intermediate.getEvaluations());
@@ -376,6 +364,7 @@ public class MergeWrapper extends DetectionPipeline {
     to.setWeight(from.getWeight());
     to.setProperties(from.getProperties());
     to.setType(from.getType());
+    to.setSeverity(from.getSeverity());
     return to;
   }
 
