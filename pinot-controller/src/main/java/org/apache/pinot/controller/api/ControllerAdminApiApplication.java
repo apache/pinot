@@ -152,15 +152,12 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     beanConfig.setBasePath("/");
     beanConfig.setResourcePackage(RESOURCE_PACKAGE);
     beanConfig.setScan(true);
-    try {
-      Collection<NetworkListener> listeners = httpServer.getListeners();
-      if (listeners.size() > 0) {
-        // fetch the port from the first listener which uses http
-        int port = listeners.iterator().next().getPort();
-        beanConfig.setHost(InetAddress.getLocalHost().getHostName() + ":" + port);
-      }
-    } catch (UnknownHostException e) {
-      throw new RuntimeException("Cannot get localhost name");
+
+    Collection<NetworkListener> listeners = httpServer.getListeners();
+    if (listeners.size() > 0) {
+      // fetch the port from the first listener which uses http
+      int port = listeners.iterator().next().getPort();
+      beanConfig.setHost("localhost:" + port);
     }
 
     ClassLoader loader = this.getClass().getClassLoader();
