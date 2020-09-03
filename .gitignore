@@ -52,3 +52,6 @@ yarn-error.log*
 #quickstart files
 examples/
 quickstart*
+
+#Local DBs
+*h2db*.*

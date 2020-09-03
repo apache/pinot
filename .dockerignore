@@ -1,2 +1,3 @@
 .git/
 target/
+*h2db.*

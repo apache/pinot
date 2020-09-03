@@ -1,0 +1,5 @@
+databaseConfiguration:
+  url: jdbc:mysql://MYSQL_HOSTNAME:MYSQL_PORT/THIRDEYE_DATABASE
+  user: root
+  password: root
+  driver: com.mysql.jdbc.Driver
