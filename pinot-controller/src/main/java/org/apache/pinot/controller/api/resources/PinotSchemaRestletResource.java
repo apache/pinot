@@ -26,8 +26,10 @@ import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -171,7 +173,8 @@ public class PinotSchemaRestletResource {
   public String validateSchema(FormDataMultiPart multiPart) {
     Schema schema = getSchemaFromMultiPart(multiPart);
     try {
-      SchemaUtils.validate(schema);
+      List<TableConfig> tableConfigs = getTableConfigsForSchema(schema.getSchemaName());
+      SchemaUtils.validate(schema, tableConfigs);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           "Invalid schema: " + schema.getSchemaName() + ". Reason: " + e.getMessage(), Response.Status.BAD_REQUEST, e);
@@ -188,7 +191,8 @@ public class PinotSchemaRestletResource {
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully validated schema"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
   public String validateSchema(Schema schema) {
     try {
-      SchemaUtils.validate(schema);
+      List<TableConfig> tableConfigs = getTableConfigsForSchema(schema.getSchemaName());
+      SchemaUtils.validate(schema, tableConfigs);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           "Invalid schema: " + schema.getSchemaName() + ". Reason: " + e.getMessage(), Response.Status.BAD_REQUEST, e);
@@ -202,25 +206,26 @@ public class PinotSchemaRestletResource {
    * @param override  set to true to override the existing schema with the same name
    */
   private SuccessResponse addSchema(Schema schema, boolean override) {
+    String schemaName = schema.getSchemaName();
     try {
-      SchemaUtils.validate(schema);
+      List<TableConfig> tableConfigs = getTableConfigsForSchema(schemaName);
+      SchemaUtils.validate(schema, tableConfigs);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
-          "Cannot add invalid schema: " + schema.getSchemaName() + ". Reason: " + e.getMessage(),
-          Response.Status.BAD_REQUEST, e);
+          "Cannot add invalid schema: " + schemaName + ". Reason: " + e.getMessage(), Response.Status.BAD_REQUEST, e);
     }
 
     try {
       _pinotHelixResourceManager.addSchema(schema, override);
       // Best effort notification. If controller fails at this point, no notification is given.
-      LOGGER.info("Notifying metadata event for adding new schema {}", schema.getSchemaName());
+      LOGGER.info("Notifying metadata event for adding new schema {}", schemaName);
       _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, SchemaEventType.CREATE);
 
-      return new SuccessResponse(schema.getSchemaName() + " successfully added");
+      return new SuccessResponse(schemaName + " successfully added");
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER,
-          String.format("Failed to add new schema %s.", schema.getSchemaName()), Response.Status.INTERNAL_SERVER_ERROR,
+          String.format("Failed to add new schema %s.", schemaName), Response.Status.INTERNAL_SERVER_ERROR,
           e);
     }
   }
@@ -234,7 +239,8 @@ public class PinotSchemaRestletResource {
    */
   private SuccessResponse updateSchema(String schemaName, Schema schema, boolean reload) {
     try {
-      SchemaUtils.validate(schema);
+      List<TableConfig> tableConfigs = getTableConfigsForSchema(schemaName);
+      SchemaUtils.validate(schema, tableConfigs);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           "Cannot add invalid schema: " + schemaName + ". Reason: " + e.getMessage(),
@@ -317,5 +323,20 @@ public class PinotSchemaRestletResource {
       throw new ControllerApplicationException(LOGGER, String.format("Failed to delete schema %s", schemaName),
           Response.Status.INTERNAL_SERVER_ERROR);
     }
+  }
+
+  private List<TableConfig> getTableConfigsForSchema(@Nullable String schemaName) {
+    List<TableConfig> tableConfigs = new ArrayList<>();
+    if (schemaName != null) {
+      TableConfig offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(schemaName);
+      if (offlineTableConfig != null) {
+        tableConfigs.add(offlineTableConfig);
+      }
+      TableConfig realtimeTableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(schemaName);
+      if (realtimeTableConfig != null) {
+        tableConfigs.add(realtimeTableConfig);
+      }
+    }
+    return tableConfigs;
   }
 }
