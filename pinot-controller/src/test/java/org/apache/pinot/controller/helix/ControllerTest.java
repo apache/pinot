@@ -579,6 +579,14 @@ public abstract class ControllerTest {
     return constructResponse(httpConnection.getInputStream());
   }
 
+  public static String sendPutRequest(String urlString)
+      throws IOException {
+    HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
+    httpConnection.setDoOutput(true);
+    httpConnection.setRequestMethod("PUT");
+    return constructResponse(httpConnection.getInputStream());
+  }
+
   public static String sendDeleteRequest(String urlString)
       throws IOException {
     HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
