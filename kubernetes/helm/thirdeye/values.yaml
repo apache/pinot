@@ -68,8 +68,3 @@ persistence:
   accessMode: ReadWriteOnce
   size: 4G
   storageClass: ""
-
-
-traefik:
-  enabled: false
-
