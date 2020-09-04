@@ -93,7 +93,7 @@ public enum TransformFunctionType {
     String upperCaseFunctionName = functionName.toUpperCase();
     try {
       return TransformFunctionType.valueOf(upperCaseFunctionName);
-    } catch (Exception e) {
+    } catch (IllegalArgumentException e) {
       if (FunctionRegistry.containsFunction(functionName)) {
         return SCALAR;
       }
