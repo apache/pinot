@@ -153,13 +153,6 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     beanConfig.setResourcePackage(RESOURCE_PACKAGE);
     beanConfig.setScan(true);
 
-    Collection<NetworkListener> listeners = httpServer.getListeners();
-    if (listeners.size() > 0) {
-      // fetch the port from the first listener which uses http
-      int port = listeners.iterator().next().getPort();
-      beanConfig.setHost("localhost:" + port);
-    }
-
     ClassLoader loader = this.getClass().getClassLoader();
     CLStaticHttpHandler apiStaticHttpHandler = new CLStaticHttpHandler(loader, "/api/");
     // map both /api and /help to swagger docs. /api because it looks nice. /help for backward compatibility
