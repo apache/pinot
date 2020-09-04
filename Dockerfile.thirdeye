@@ -17,7 +17,7 @@
 # under the License.
 #
 
-FROM razorpay/onggi:maven-java8 AS thirdeye_build_env
+FROM c.rzp.io/razorpay/onggi:maven-java8 AS thirdeye_build_env
 
 LABEL MAINTAINER=observability@razorpay.com
 
