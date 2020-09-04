@@ -24,8 +24,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -85,7 +87,7 @@ public class DataTypeTransformer implements RecordTransformer {
         continue;
       }
       PinotDataType dest = entry.getValue();
-      value = standardize(column, value, dest.isSingleValue());
+      value = standardize(record, column, value, dest.isSingleValue());
       // NOTE: The standardized value could be null for empty Collection/Map/Object[].
       if (value == null) {
         record.putValue(column, null);
@@ -109,6 +111,9 @@ public class DataTypeTransformer implements RecordTransformer {
         }
       }
       if (source != dest) {
+        if (source.getSingleValueType() != dest.getSingleValueType()) {
+          putValueAsSetToKey(record, GenericRow.DATA_TYPE_MISMATCH_KEY, column);
+        }
         value = dest.convert(value, source);
       }
 
@@ -127,28 +132,39 @@ public class DataTypeTransformer implements RecordTransformer {
    */
   @VisibleForTesting
   @Nullable
-  static Object standardize(String column, @Nullable Object value, boolean isSingleValue) {
+  static Object standardize(GenericRow record, String column, @Nullable Object value, boolean isSingleValue) {
+    return standardize(record, column, value, isSingleValue, 1);
+  }
+
+  static Object standardize(GenericRow record, String column, @Nullable Object value, boolean isSingleValue, int level) {
     if (value == null) {
       return null;
     }
+    // If it's single-value column and the value is Collection/Map/Object[], mark the key.
     if (value instanceof Collection) {
-      return standardizeCollection(column, (Collection) value, isSingleValue);
+      return standardizeCollection(record, column, (Collection) value, isSingleValue, level);
     }
     if (value instanceof Map) {
-      return standardizeCollection(column, ((Map) value).values(), isSingleValue);
+      // If it's a map structure, mark the key.
+      putValueAsSetToKey(record, GenericRow.MULTI_VALUE_STRUCTURE_MISMATCH_KEY, column);
+      Collection values = ((Map) value).values();
+      return standardizeCollection(record, column, values, isSingleValue, level);
     }
     if (value instanceof Object[]) {
+      if (isSingleValue && level == 1) {
+        putValueAsSetToKey(record, GenericRow.SINGLE_VALUE_MULTI_VALUE_FIELD_MISMATCH_KEY, column);
+      }
       Object[] values = (Object[]) value;
       int numValues = values.length;
       if (numValues == 0) {
         return null;
       }
       if (numValues == 1) {
-        return standardize(column, values[0], isSingleValue);
+        return standardize(record, column, values[0], isSingleValue, level + 1);
       }
       List<Object> standardizedValues = new ArrayList<>(numValues);
       for (Object singleValue : values) {
-        Object standardizedValue = standardize(column, singleValue, true);
+        Object standardizedValue = standardize(record, column, singleValue, true, level + 1);
         if (standardizedValue != null) {
           standardizedValues.add(standardizedValue);
         }
@@ -164,20 +180,27 @@ public class DataTypeTransformer implements RecordTransformer {
           Arrays.toString(values), column);
       return standardizedValues.toArray();
     }
+    // If it's multi-value column and the level is 1, mark the key.
+    if (!isSingleValue && level == 1) {
+      putValueAsSetToKey(record, GenericRow.SINGLE_VALUE_MULTI_VALUE_FIELD_MISMATCH_KEY, column);
+    }
     return value;
   }
 
-  private static Object standardizeCollection(String column, Collection collection, boolean isSingleValue) {
+  private static Object standardizeCollection(GenericRow record, String column, Collection collection, boolean isSingleValue, int level) {
+    if (isSingleValue && level == 1) {
+      putValueAsSetToKey(record, GenericRow.SINGLE_VALUE_MULTI_VALUE_FIELD_MISMATCH_KEY, column);
+    }
     int numValues = collection.size();
     if (numValues == 0) {
       return null;
     }
     if (numValues == 1) {
-      return standardize(column, collection.iterator().next(), isSingleValue);
+      return standardize(record, column, collection.iterator().next(), isSingleValue, level + 1);
     }
     List<Object> standardizedValues = new ArrayList<>(numValues);
     for (Object singleValue : collection) {
-      Object standardizedValue = standardize(column, singleValue, true);
+      Object standardizedValue = standardize(record, column, singleValue, true, level + 1);
       if (standardizedValue != null) {
         standardizedValues.add(standardizedValue);
       }
@@ -192,5 +215,14 @@ public class DataTypeTransformer implements RecordTransformer {
     Preconditions
         .checkState(!isSingleValue, "Cannot read single-value from Collection: %s for column: %s", collection, column);
     return standardizedValues.toArray();
+  }
+
+  private static void putValueAsSetToKey(GenericRow record, String key, String value) {
+    Set<String> valueSet = (Set) record.getValue(key);
+    if (valueSet == null) {
+      valueSet = new HashSet<>();
+      record.putValue(key, valueSet);
+    }
+    valueSet.add(value);
   }
 }

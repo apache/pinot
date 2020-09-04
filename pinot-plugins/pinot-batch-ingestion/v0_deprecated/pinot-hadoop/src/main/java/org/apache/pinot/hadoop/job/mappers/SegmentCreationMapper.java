@@ -52,8 +52,10 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableCustomConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
+import org.apache.pinot.spi.data.RowBasedSchemaValidationResults;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.IngestionSchemaValidator;
+import org.apache.pinot.spi.data.SchemaValidationResults;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.utils.DataSizeUtils;
@@ -91,10 +93,13 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
   protected File _localSegmentTarDir;
 
   // Counter for detecting schema mismatch
-  private int _dataTypeMismatch = 0;
-  private int _singleValueMultiValueFieldMismatch = 0;
-  private int _multiValueStructureMismatch = 0;
-  private int _missingPinotColumn = 0;
+  private int _fileBasedDataTypeMismatch = 0;
+  private int _fileBasedSingleValueMultiValueFieldMismatch = 0;
+  private int _fileBasedMultiValueStructureMismatch = 0;
+  private int _fileBasedMissingPinotColumn = 0;
+  private int _rowBasedDataTypeMismatch = 0;
+  private int _rowBasedSingleValueMultiValueFieldMismatch = 0;
+  private int _rowBasedMultiValueStructureMismatch = 0;
 
   /**
    * Generate a relative output directory path when `useRelativePath` flag is on.
@@ -387,22 +392,39 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     if (ingestionSchemaValidator == null) {
       return;
     }
-    if (ingestionSchemaValidator.getDataTypeMismatchResult().isMismatchDetected()) {
-      _dataTypeMismatch++;
-      _logger.warn(ingestionSchemaValidator.getDataTypeMismatchResult().getMismatchReason());
+    SchemaValidationResults fileBasedSchemaValidationResults = ingestionSchemaValidator.getFileBasedSchemaValidationResults();
+    if (fileBasedSchemaValidationResults.getDataTypeMismatchResult().isMismatchDetected()) {
+      _fileBasedDataTypeMismatch++;
+      _logger.warn(fileBasedSchemaValidationResults.getDataTypeMismatchResult().getMismatchReason());
     }
-    if (ingestionSchemaValidator.getSingleValueMultiValueFieldMismatchResult().isMismatchDetected()) {
-      _singleValueMultiValueFieldMismatch++;
-      ingestionSchemaValidator.getSingleValueMultiValueFieldMismatchResult().getMismatchReason();
+    if (fileBasedSchemaValidationResults.getSingleValueMultiValueFieldMismatchResult().isMismatchDetected()) {
+      _fileBasedSingleValueMultiValueFieldMismatch++;
+      fileBasedSchemaValidationResults.getSingleValueMultiValueFieldMismatchResult().getMismatchReason();
     }
-    if (ingestionSchemaValidator.getMultiValueStructureMismatchResult().isMismatchDetected()) {
-      _multiValueStructureMismatch++;
-      ingestionSchemaValidator.getMultiValueStructureMismatchResult().getMismatchReason();
+    if (fileBasedSchemaValidationResults.getMultiValueStructureMismatchResult().isMismatchDetected()) {
+      _fileBasedMultiValueStructureMismatch++;
+      fileBasedSchemaValidationResults.getMultiValueStructureMismatchResult().getMismatchReason();
     }
-    if (ingestionSchemaValidator.getMissingPinotColumnResult().isMismatchDetected()) {
-      _missingPinotColumn++;
-      ingestionSchemaValidator.getMissingPinotColumnResult().getMismatchReason();
+    if (fileBasedSchemaValidationResults.getMissingPinotColumnResult().isMismatchDetected()) {
+      _fileBasedMissingPinotColumn++;
+      fileBasedSchemaValidationResults.getMissingPinotColumnResult().getMismatchReason();
     }
+
+    RowBasedSchemaValidationResults rowBasedSchemaValidationResults = ingestionSchemaValidator.getRowBasedSchemaValidationResults();
+    if (rowBasedSchemaValidationResults.getDataTypeMismatchResult().isMismatchDetected()) {
+      _rowBasedDataTypeMismatch++;
+      _logger.warn(rowBasedSchemaValidationResults.getDataTypeMismatchResult().getMismatchReason());
+    }
+    if (rowBasedSchemaValidationResults.getSingleValueMultiValueFieldMismatchResult().isMismatchDetected()) {
+      _rowBasedSingleValueMultiValueFieldMismatch++;
+      _logger.warn(rowBasedSchemaValidationResults.getSingleValueMultiValueFieldMismatchResult().getMismatchReason());
+    }
+    if (rowBasedSchemaValidationResults.getMultiValueStructureMismatchResult().isMismatchDetected()) {
+      _rowBasedMultiValueStructureMismatch++;
+      _logger.warn(rowBasedSchemaValidationResults.getMultiValueStructureMismatchResult().getMismatchReason());
+    }
+
+    //TODO add logic to detect.
 
     if (isSchemaMismatch() && _failIfSchemaMismatch) {
       throw new RuntimeException("Schema mismatch detected. Forcing to fail the job. Please checking log message above.");
@@ -410,20 +432,33 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
   }
 
   private boolean isSchemaMismatch() {
-    return _dataTypeMismatch + _singleValueMultiValueFieldMismatch + _multiValueStructureMismatch + _missingPinotColumn
+    return _fileBasedDataTypeMismatch + _fileBasedSingleValueMultiValueFieldMismatch + _fileBasedMultiValueStructureMismatch
+        + _fileBasedMissingPinotColumn
         != 0;
   }
 
   @Override
   public void cleanup(Context context) {
-    context.getCounter(SegmentCreationJob.SchemaMisMatchCounter.DATA_TYPE_MISMATCH).increment(_dataTypeMismatch);
-    context.getCounter(SegmentCreationJob.SchemaMisMatchCounter.SINGLE_VALUE_MULTI_VALUE_FIELD_MISMATCH)
-        .increment(_singleValueMultiValueFieldMismatch);
-    context.getCounter(SegmentCreationJob.SchemaMisMatchCounter.MULTI_VALUE_FIELD_STRUCTURE_MISMATCH)
-        .increment(_multiValueStructureMismatch);
-    context.getCounter(SegmentCreationJob.SchemaMisMatchCounter.MISSING_PINOT_COLUMN).increment(_missingPinotColumn);
+    incrementCounters(context);
     _logger.info("Deleting local temporary directory: {}", _localStagingDir);
     FileUtils.deleteQuietly(_localStagingDir);
+  }
+
+  private void incrementCounters(Context context) {
+    context.getCounter(SegmentCreationJob.SchemaMisMatchCounter.FILE_BASED_DATA_TYPE_MISMATCH).increment(
+        _fileBasedDataTypeMismatch);
+    context.getCounter(SegmentCreationJob.SchemaMisMatchCounter.FILE_BASED_SINGLE_VALUE_MULTI_VALUE_FIELD_MISMATCH)
+        .increment(_fileBasedSingleValueMultiValueFieldMismatch);
+    context.getCounter(SegmentCreationJob.SchemaMisMatchCounter.FILE_BASED_MULTI_VALUE_FIELD_STRUCTURE_MISMATCH)
+        .increment(_fileBasedMultiValueStructureMismatch);
+    context.getCounter(SegmentCreationJob.SchemaMisMatchCounter.FILE_BASED_MISSING_PINOT_COLUMN).increment(
+        _fileBasedMissingPinotColumn);
+    context.getCounter(SegmentCreationJob.SchemaMisMatchCounter.ROW_BASED_DATA_TYPE_MISMATCH).increment(
+        _rowBasedDataTypeMismatch);
+    context.getCounter(SegmentCreationJob.SchemaMisMatchCounter.ROW_BASED_SINGLE_VALUE_MULTI_VALUE_FIELD_MISMATCH)
+        .increment(_rowBasedSingleValueMultiValueFieldMismatch);
+    context.getCounter(SegmentCreationJob.SchemaMisMatchCounter.ROW_BASED_MULTI_VALUE_FIELD_STRUCTURE_MISMATCH)
+        .increment(_rowBasedMultiValueStructureMismatch);
   }
 
   private static class ProgressReporter implements Runnable {

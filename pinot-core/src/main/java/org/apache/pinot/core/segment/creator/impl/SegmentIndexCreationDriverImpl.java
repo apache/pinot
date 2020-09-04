@@ -187,7 +187,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
     try {
       // Initialize the index creation using the per-column statistics information
-      indexCreator.init(config, segmentIndexCreationInfo, indexCreationInfoMap, dataSchema, tempIndexDir);
+      indexCreator.init(config, segmentIndexCreationInfo, indexCreationInfoMap, dataSchema, tempIndexDir,
+          _ingestionSchemaValidator);
 
       // Build the index
       recordReader.rewind();

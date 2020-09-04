@@ -93,10 +93,17 @@ public class QueryExecutorTest {
       driver.init(config);
       driver.build();
       IngestionSchemaValidator ingestionSchemaValidator = driver.getIngestionSchemaValidator();
-      Assert.assertFalse(ingestionSchemaValidator.getDataTypeMismatchResult().isMismatchDetected());
-      Assert.assertFalse(ingestionSchemaValidator.getSingleValueMultiValueFieldMismatchResult().isMismatchDetected());
-      Assert.assertFalse(ingestionSchemaValidator.getMultiValueStructureMismatchResult().isMismatchDetected());
-      Assert.assertFalse(ingestionSchemaValidator.getMissingPinotColumnResult().isMismatchDetected());
+
+      Assert.assertFalse(ingestionSchemaValidator.getFileBasedSchemaValidationResults().getDataTypeMismatchResult()
+          .isMismatchDetected());
+      Assert.assertFalse(
+          ingestionSchemaValidator.getFileBasedSchemaValidationResults().getSingleValueMultiValueFieldMismatchResult()
+              .isMismatchDetected());
+      Assert.assertFalse(
+          ingestionSchemaValidator.getFileBasedSchemaValidationResults().getMultiValueStructureMismatchResult()
+              .isMismatchDetected());
+      Assert.assertFalse(ingestionSchemaValidator.getFileBasedSchemaValidationResults().getMissingPinotColumnResult()
+          .isMismatchDetected());
       _indexSegments.add(ImmutableSegmentLoader.load(new File(INDEX_DIR, driver.getSegmentName()), ReadMode.mmap));
       _segmentNames.add(driver.getSegmentName());
     }

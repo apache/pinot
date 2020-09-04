@@ -61,6 +61,24 @@ public class GenericRow {
    */
   public static final String SKIP_RECORD_KEY = "$SKIP_RECORD_KEY$";
 
+  /**
+   * This key is used to identify whether there is data type mismatch so that it requires a data type conversion.
+   * E.g. the Pinot column is of int type, whereas the input column is of long type.
+   */
+  public static final String DATA_TYPE_MISMATCH_KEY = "$DATA_TYPE_MISMATCH_KEY$";
+
+  /**
+   * This key is used to identify whether the input value is a map structure for multi-value column.
+   * This is necessary for us to identify whether there is any existing use case that is leveraging this way to fetch values.
+   */
+  public static final String MULTI_VALUE_STRUCTURE_MISMATCH_KEY = "$MULTI_VALUE_STRUCTURE_MISMATCH_KEY$";
+
+  /**
+   * This key is used to identify whether there is a single-value multi-value mismatch. E.g. the Pinot column is single-value,
+   * whereas the input data is a Collection/Map/object[].
+   */
+  public static final String SINGLE_VALUE_MULTI_VALUE_FIELD_MISMATCH_KEY = "$SINGLE_VALUE_MULTI_VALUE_FIELD_MISMATCH_KEY$";
+
   private final Map<String, Object> _fieldToValueMap = new HashMap<>();
   private final Set<String> _nullValueFields = new HashSet<>();
 

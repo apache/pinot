@@ -57,6 +57,8 @@ import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
+import org.apache.pinot.spi.data.IngestionSchemaValidator;
+import org.apache.pinot.spi.data.RowBasedSchemaValidationResults;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.TimeUtils;
@@ -79,6 +81,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   // TODO Refactor class name to match interface name
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentColumnarIndexCreator.class);
   private SegmentGeneratorConfig config;
+  private IngestionSchemaValidator _ingestionSchemaValidator;
   private Map<String, ColumnIndexCreationInfo> indexCreationInfoMap;
   private Map<String, SegmentDictionaryCreator> _dictionaryCreatorMap = new HashMap<>();
   private Map<String, ForwardIndexCreator> _forwardIndexCreatorMap = new HashMap<>();
@@ -96,11 +99,13 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   @Override
   public void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
-      Map<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir)
+      Map<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir,
+      IngestionSchemaValidator ingestionSchemaValidator)
       throws Exception {
     docIdCounter = 0;
     config = segmentCreationSpec;
     this.indexCreationInfoMap = indexCreationInfoMap;
+    _ingestionSchemaValidator = ingestionSchemaValidator;
 
     // Check that the output directory does not exist
     Preconditions.checkState(!outDir.exists(), "Segment output directory: %s already exists", outDir);
@@ -304,6 +309,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   @Override
   public void indexRow(GenericRow row) {
+    validateRowBasedSchemas(row);
     for (Map.Entry<String, ForwardIndexCreator> entry : _forwardIndexCreatorMap.entrySet()) {
       String columnName = entry.getKey();
       ForwardIndexCreator forwardIndexCreator = entry.getValue();
@@ -400,6 +406,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       nullValueVectorCreator.seal();
     }
     writeMetadata();
+    gatherRowBasedSchemaValidationResults();
   }
 
   private void writeMetadata()
@@ -555,6 +562,32 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
     if (isValidPropertyValue(maxValue)) {
       properties.setProperty(getKeyFor(column, MAX_VALUE), maxValue);
+    }
+  }
+
+  private void validateRowBasedSchemas(GenericRow row) {
+    if (_ingestionSchemaValidator == null) {
+      return;
+    }
+    RowBasedSchemaValidationResults rowBasedSchemaValidationResults = _ingestionSchemaValidator.getRowBasedSchemaValidationResults();
+
+    if (row.getValue(GenericRow.MULTI_VALUE_STRUCTURE_MISMATCH_KEY) != null) {
+      Set<String> columns = (Set) row.getValue(GenericRow.MULTI_VALUE_STRUCTURE_MISMATCH_KEY);
+      rowBasedSchemaValidationResults.collectMultiValueStructureMismatchColumns(columns);
+    }
+    if (row.getValue(GenericRow.DATA_TYPE_MISMATCH_KEY) != null) {
+      Set<String> columns = (Set) row.getValue(GenericRow.DATA_TYPE_MISMATCH_KEY);
+      rowBasedSchemaValidationResults.collectDataTypeMismatchColumns(columns);
+    }
+    if (row.getValue(GenericRow.SINGLE_VALUE_MULTI_VALUE_FIELD_MISMATCH_KEY) != null) {
+      Set<String> columns = (Set) row.getValue(GenericRow.SINGLE_VALUE_MULTI_VALUE_FIELD_MISMATCH_KEY);
+      rowBasedSchemaValidationResults.collectSingleValueMultiValueFieldMismatchColumns(columns);
+    }
+  }
+
+  private void gatherRowBasedSchemaValidationResults() {
+    if (_ingestionSchemaValidator != null) {
+      _ingestionSchemaValidator.getRowBasedSchemaValidationResults().gatherRowBasedSchemaValidationResults();
     }
   }
 

@@ -586,22 +586,32 @@ public enum PinotDataType {
 
   public PinotDataType getSingleValueType() {
     switch (this) {
+      case BYTE:
+      case BYTES:
       case BYTE_ARRAY:
         return BYTE;
+      case CHARACTER:
       case CHARACTER_ARRAY:
         return CHARACTER;
+      case SHORT:
       case SHORT_ARRAY:
         return SHORT;
+      case INTEGER:
       case INTEGER_ARRAY:
         return INTEGER;
+      case LONG:
       case LONG_ARRAY:
         return LONG;
+      case FLOAT:
       case FLOAT_ARRAY:
         return FLOAT;
+      case DOUBLE:
       case DOUBLE_ARRAY:
         return DOUBLE;
+      case STRING:
       case STRING_ARRAY:
         return STRING;
+      case OBJECT:
       case OBJECT_ARRAY:
         return OBJECT;
       default:

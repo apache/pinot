@@ -28,11 +28,7 @@ public interface IngestionSchemaValidator {
 
   String getInputSchemaType();
 
-  SchemaValidatorResult getDataTypeMismatchResult();
+  SchemaValidationResults getFileBasedSchemaValidationResults();
 
-  SchemaValidatorResult getSingleValueMultiValueFieldMismatchResult();
-
-  SchemaValidatorResult getMultiValueStructureMismatchResult();
-
-  SchemaValidatorResult getMissingPinotColumnResult();
+  RowBasedSchemaValidationResults getRowBasedSchemaValidationResults();
 }

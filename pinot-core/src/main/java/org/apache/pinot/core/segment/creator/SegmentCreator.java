@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Map;
 import org.apache.commons.configuration.ConfigurationException;
+import org.apache.pinot.spi.data.IngestionSchemaValidator;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -43,7 +44,8 @@ public interface SegmentCreator extends Closeable {
    * @throws Exception
    */
   void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
-      Map<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir)
+      Map<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir,
+      IngestionSchemaValidator ingestionSchemaValidator)
       throws Exception;
 
   /**
