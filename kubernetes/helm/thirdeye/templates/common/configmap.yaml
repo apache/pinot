@@ -95,7 +95,7 @@ data:
     #   runFrequency: 10s
 
     classifier: true
-    holidayEventsLoader: true
+    holidayEventsLoader: {{ not .Values.backend.holidayLoaderKey | ternary "false" "true" }}
     monitor: true
     pinotProxy: false
     scheduler: true
@@ -163,6 +163,7 @@ data:
     mockEventsLoader: true
     mockEventsLoaderConfiguration:
       generators:
+        {{- if not .Values.backend.holidayLoaderKey }}
         - type: HOLIDAY
           arrivalType: exponential
           arrivalMean: 86400000
@@ -171,6 +172,7 @@ data:
           seed: 0
           namePrefixes: [First, Second, Third, Last, Funky, Happy, Sad, Glorious, Jolly, Unity, Pinot's]
           nameSuffixes: [day, day, days, celebration, rememberance, occurrence, moment]
+        {{- end }}
         - type: INFORMED
           arrivalType: exponential
           arrivalMean: 43200000
@@ -250,3 +252,7 @@ data:
             trustStoreFilePath: 'trust/store/path/truststore_file' # e.g. '/etc/riddler/cacerts'
             trustStorePassword: ''
         # add your store of choice here
+
+  {{- if .Values.backend.holidayLoaderKey }}
+  holiday-loader-key.json: {{ .Values.backend.holidayLoaderKey | toPrettyJson }}
+  {{- end }}

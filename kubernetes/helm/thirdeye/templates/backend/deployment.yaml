@@ -87,6 +87,12 @@ spec:
             mountPath: "/opt/thirdeye/config/pinot-quickstart/persistence.yml"
             subPath: "persistence.yml"
             readOnly: true
+          {{- if .Values.backend.holidayLoaderKey }}
+          - name: thirdeye-config
+            mountPath: "/opt/thirdeye/config/pinot-quickstart/holiday-loader-key.json"
+            subPath: "holiday-loader-key.json"
+            readOnly: true
+          {{- end }}
         resources:
 {{ toYaml .Values.frontend.resources | indent 12 }}
       restartPolicy: Always

@@ -71,3 +71,12 @@ Alternatively a YAML file that specifies the values for the parameters can be pr
 ```bash
 ./install.sh --name thirdeye -f values.yaml .
 ```
+
+## Holiday Events
+
+ThirdEye allows you to display events from external Google Calendars. To enable this feature, 
+simply provide a JSON key. Check https://docs.simplecalendar.io/google-api-key/
+
+```bash
+./install.sh  --set-file backend.holidayLoaderKey="/path/to/holiday-loader-key.json"
+```
