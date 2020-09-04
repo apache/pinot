@@ -28,6 +28,10 @@ import DeleteOutlineOutlinedIcon from '@material-ui/icons/DeleteOutlineOutlined'
 import EditOutlinedIcon from '@material-ui/icons/EditOutlined';
 import { Grid, ButtonGroup, Button, Tooltip, Popover, Typography } from '@material-ui/core';
 import MaterialTree from '../MaterialTree';
+import Confirm from '../Confirm';
+import CustomCodemirror from '../CustomCodemirror';
+import PinotMethodUtils from '../../utils/PinotMethodUtils';
+import Utils from '../../utils/Utils';
 
 const drawerWidth = 400;
 
@@ -93,11 +97,26 @@ type Props = {
   handleToggle: any;
   handleSelect: any;
   refreshAction: Function;
+  isLeafNodeSelected: boolean;
+  currentNodeData: Object;
+  currentNodeMetadata: any;
+  showInfoEvent: Function;
+  fetchInnerPath: Function;
 };
 
-const TreeDirectory = ({treeData, showChildEvent, expanded, selected, handleToggle, handleSelect, refreshAction}: Props) => {
+const TreeDirectory = ({
+  treeData, showChildEvent, selectedNode, expanded, selected, handleToggle, fetchInnerPath,
+  handleSelect, refreshAction, isLeafNodeSelected, currentNodeData, currentNodeMetadata, showInfoEvent
+}: Props) => {
   const classes = useStyles();
 
+  let newCodeMirrorData = null;
+  const [confirmDialog, setConfirmDialog] = React.useState(false);
+  const [dialogTitle, setDialogTitle] = React.useState(null);
+  const [dialogContent, setDialogContent] = React.useState(null);
+  const [dialogSuccessCb, setDialogSuccessCb] = React.useState(null);
+  const [dialogYesLabel, setDialogYesLabel] = React.useState(null);
+  const [dialogNoLabel, setDialogNoLabel] = React.useState(null);
   const [anchorEl, setAnchorEl] = React.useState<HTMLButtonElement | null>(null);
 
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -106,6 +125,64 @@ const TreeDirectory = ({treeData, showChildEvent, expanded, selected, handleTogg
 
   const handleClose = () => {
     setAnchorEl(null);
+  };
+
+  const handleEditClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if(!isLeafNodeSelected){
+      return;
+    }
+    setDialogContent("Update this node?");
+    setDialogSuccessCb(() => showUpdateNode);
+    setConfirmDialog(true);
+  };
+
+  const handleDeleteClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if(!isLeafNodeSelected){
+      return;
+    }
+    setDialogContent("Delete this node?");
+    setDialogSuccessCb(() => deleteNode);
+    setConfirmDialog(true);
+  };
+
+  const showUpdateNode = () => {
+    setDialogTitle("Update Node Data");
+    setDialogContent(<CustomCodemirror
+      data={currentNodeData}
+      isEditable={true}
+      returnCodemirrorValue={(val)=>{ newCodeMirrorData = val;}}
+    />)
+    setDialogYesLabel("Update");
+    setDialogNoLabel("Cancel");
+    setDialogSuccessCb(() => updateNode);
+  }
+
+  const updateNode = async () => {
+    const nodeData = {
+      path: selectedNode,
+      data: newCodeMirrorData.trim(),
+      expectedVersion: currentNodeMetadata.version,
+      accessOption: currentNodeMetadata.ephemeralOwner === 0 ? 1 : 10
+    }
+    const data = await PinotMethodUtils.putNodeData(nodeData);
+    showInfoEvent(selectedNode);
+    closeDialog();
+  }
+
+  const deleteNode = async () => {
+    const parentPath = selectedNode.split('/').slice(0, selectedNode.split('/').length-1).join('/');
+    const treeObj = Utils.findNestedObj(treeData, 'fullPath', parentPath);
+    const result = await PinotMethodUtils.deleteNode(selectedNode);
+    fetchInnerPath(treeObj);
+    closeDialog();
+  }
+
+  const closeDialog = () => {
+    setConfirmDialog(false);
+    setDialogContent(null);
+    setDialogTitle(null);
+    setDialogYesLabel(null);
+    setDialogNoLabel(null);
   };
 
   const open = Boolean(anchorEl);
@@ -132,11 +209,11 @@ const TreeDirectory = ({treeData, showChildEvent, expanded, selected, handleTogg
                 <Tooltip title="Add">
                   <Button onClick={handleClick}><NoteAddOutlinedIcon/></Button>
                 </Tooltip>
-                <Tooltip title="Delete">
-                  <Button onClick={handleClick}><DeleteOutlineOutlinedIcon/></Button>
+                <Tooltip title="Delete" open={false}>
+                  <Button onClick={handleDeleteClick} disabled={!isLeafNodeSelected}><DeleteOutlineOutlinedIcon/></Button>
                 </Tooltip>
-                <Tooltip title="Edit">
-                  <Button onClick={handleClick}><EditOutlinedIcon/></Button>
+                <Tooltip title="Edit" open={false}>
+                  <Button onClick={handleEditClick} disabled={!isLeafNodeSelected}><EditOutlinedIcon/></Button>
                 </Tooltip>
               </ButtonGroup>
             </div>
@@ -168,6 +245,15 @@ const TreeDirectory = ({treeData, showChildEvent, expanded, selected, handleTogg
           </Grid>
         </div>
       </Drawer>
+      {confirmDialog && <Confirm
+        openDialog={confirmDialog}
+        dialogTitle={dialogTitle}
+        dialogContent={dialogContent}
+        successCallback={dialogSuccessCb}
+        closeDialog={closeDialog}
+        dialogYesLabel={dialogYesLabel}
+        dialogNoLabel={dialogNoLabel}
+      />}
     </>
   );
 };

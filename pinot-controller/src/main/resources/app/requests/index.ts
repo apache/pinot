@@ -79,3 +79,9 @@ export const zookeeperGetStat = (params: string): Promise<AxiosResponse<ZKConfig
 
 export const zookeeperGetListWithStat = (params: string): Promise<AxiosResponse<ZKConfig>> =>
   baseApi.get(`/zk/lsl?path=${params}`);
+
+export const zookeeperPutData = (params: string): Promise<AxiosResponse<ZKConfig>> =>
+  baseApi.put(`/zk/put?${params}`, null, { headers: { 'Content-Type': 'application/json; charset=UTF-8', 'Accept': 'text/plain, */*; q=0.01' } });
+
+export const zookeeperDeleteNode = (params: string): Promise<AxiosResponse<ZKConfig>> =>
+  baseApi.delete(`/zk/delete?path=${params}`);

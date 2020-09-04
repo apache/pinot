@@ -38,7 +38,9 @@ import {
   zookeeperGetList,
   zookeeperGetData,
   zookeeperGetListWithStat,
-  zookeeperGetStat
+  zookeeperGetStat,
+  zookeeperPutData,
+  zookeeperDeleteNode
 } from '../requests';
 import Utils from './Utils';
 
@@ -546,6 +548,20 @@ const getNodeData = (path) => {
   });
 };
 
+const putNodeData = (data) => {
+  const serializedData = Utils.serialize(data);
+  return zookeeperPutData(serializedData).then((obj)=>{
+    return obj;
+  });
+};
+
+const deleteNode = (path) => {
+  const params = encodeURIComponent(path);
+  return zookeeperDeleteNode(params).then((obj)=>{
+    return obj;
+  });
+};
+
 export default {
   getTenantsData,
   getAllInstances,
@@ -565,5 +581,7 @@ export default {
   getInstanceConfig,
   getTenantsFromInstance,
   getZookeeperData,
-  getNodeData
+  getNodeData,
+  putNodeData,
+  deleteNode
 };
