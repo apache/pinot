@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -164,6 +165,17 @@ public class SegmentMapperTest {
     Map<String, List<Object[]>> expectedRecords1 = new HashMap<>();
     expectedRecords1.put("0", outputData);
     inputs.add(new Object[]{mapperId, config1, expectedRecords1});
+
+    // round robin partitioner
+    SegmentMapperConfig config12 = new SegmentMapperConfig(_pinotSchema, new RecordTransformerConfig.Builder().build(),
+        new RecordFilterConfig.Builder().build(), new PartitioningConfig.Builder().setPartitionerType(
+        PartitionerFactory.PartitionerType.ROUND_ROBIN).setNumPartitions(3).build());
+    Map<String, List<Object[]>> expectedRecords12 = new HashMap<>();
+    IntStream.range(0, 3).forEach(i -> expectedRecords12.put(String.valueOf(i), new ArrayList<>()));
+    for (int i = 0; i < outputData.size(); i++) {
+      expectedRecords12.get(String.valueOf(i%3)).add(outputData.get(i));
+    }
+    inputs.add(new Object[]{mapperId, config12, expectedRecords12});
 
     // partition by timeValue
     SegmentMapperConfig config2 = new SegmentMapperConfig(_pinotSchema, new RecordTransformerConfig.Builder().build(),

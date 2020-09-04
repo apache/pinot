@@ -35,7 +35,7 @@ public final class PartitionerFactory {
     /**
      * Creates not more than the configured fixed number of partitions
      */
-    NUM_PARTITIONS,
+    ROUND_ROBIN,
     /**
      * Partitions using a column value
      */
@@ -60,10 +60,10 @@ public final class PartitionerFactory {
       case NO_OP:
         partitioner = new NoOpPartitioner();
         break;
-      case NUM_PARTITIONS:
+      case ROUND_ROBIN:
         Preconditions
-            .checkState(config.getNumPartitions() > 0, "Must provide numPartitions > 0 for NUM_PARTITIONS partitioner");
-        partitioner = new NumPartitionsPartitioner(config.getNumPartitions());
+            .checkState(config.getNumPartitions() > 0, "Must provide numPartitions > 0 for ROUND_ROBIN partitioner");
+        partitioner = new RoundRobinPartitioner(config.getNumPartitions());
         break;
       case COLUMN_VALUE:
         Preconditions

@@ -47,7 +47,6 @@ import org.slf4j.LoggerFactory;
 public class SegmentReducer {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentReducer.class);
-  private static final int MAX_RECORDS_TO_COLLECT = 5_000_000;
 
   private final File _reducerInputDir;
   private final File _reducerOutputDir;
@@ -92,18 +91,17 @@ public class SegmentReducer {
         // Aggregations
         _collector.collect(next);
 
-        // Exceeded max records allowed to collect. Flush
-        if (_collector.size() == MAX_RECORDS_TO_COLLECT) {
+        // Reached max records per part file. Flush
+        if (_collector.size() == _numRecordsPerPart) {
           _collector.finish();
-          int numFiles = flushRecords(_collector, part);
-          part += numFiles;
+          flushRecords(_collector, createReducerOutputFileName(_reducerId, part++));
           _collector.reset();
         }
       }
     }
     if (_collector.size() > 0) {
       _collector.finish();
-      flushRecords(_collector, part);
+      flushRecords(_collector, createReducerOutputFileName(_reducerId, part));
       _collector.reset();
     }
   }
@@ -111,34 +109,17 @@ public class SegmentReducer {
   /**
    * Flushes all records from the collector into a part files in the reducer output directory
    */
-  private int flushRecords(Collector collector, int partNumber)
+  private void flushRecords(Collector collector, String fileName)
       throws IOException {
     GenericData.Record reusableRecord = new GenericData.Record(_avroSchema);
     Iterator<GenericRow> collectionIt = collector.iterator();
-
     DataFileWriter<GenericData.Record> recordWriter = new DataFileWriter<>(new GenericDatumWriter<>(_avroSchema));
-    recordWriter
-        .create(_avroSchema, new File(_reducerOutputDir, createReducerOutputFileName(_reducerId, partNumber++)));
-
-    int numRecords = 0;
+    recordWriter.create(_avroSchema, new File(_reducerOutputDir, fileName));
     while (collectionIt.hasNext()) {
       SegmentProcessorUtils.convertGenericRowToAvroRecord(collectionIt.next(), reusableRecord);
       recordWriter.append(reusableRecord);
-      numRecords++;
-      if (numRecords == _numRecordsPerPart) {
-        recordWriter.close();
-        numRecords = 0;
-        if (collectionIt.hasNext()) {
-          recordWriter = new DataFileWriter<>(new GenericDatumWriter<>(_avroSchema));
-          recordWriter
-              .create(_avroSchema, new File(_reducerOutputDir, createReducerOutputFileName(_reducerId, partNumber++)));
-        }
-      }
     }
-    if (numRecords > 0) {
-      recordWriter.close();
-    }
-    return partNumber;
+    recordWriter.close();
   }
 
   public static String createReducerOutputFileName(String reducerId, int part) {

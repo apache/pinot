@@ -192,15 +192,15 @@ public class SegmentReducerTest {
             new Object[]{"xyz", 4000, 1597795200000L});
     inputs.add(new Object[]{reducerId, config4, expectedFileNames4, rollupRows4, comparator});
 
-    // ROLLUP MAX, numRecordsPerPart = 2
+    // ROLLUP MAX, numRecordsPerPart = 3
     SegmentReducerConfig config5 = new SegmentReducerConfig(_pinotSchema,
         new CollectorConfig.Builder().setCollectorType(CollectorFactory.CollectorType.ROLLUP)
-            .setAggregatorTypeMap(valueAggregators).build(), 2);
+            .setAggregatorTypeMap(valueAggregators).build(), 3);
     HashSet<String> expectedFileNames5 = Sets.newHashSet(SegmentReducer.createReducerOutputFileName(reducerId, 0),
         SegmentReducer.createReducerOutputFileName(reducerId, 1));
     List<Object> rollupRows5 = Lists
-        .newArrayList(new Object[]{"abc", 4000, 1597795200000L}, new Object[]{"pqr", 1000, 1597795200000L},
-            new Object[]{"xyz", 4000, 1597795200000L});
+        .newArrayList(new Object[]{"abc", 3000, 1597795200000L}, new Object[]{"abc", 4000, 1597795200000L},
+            new Object[]{"pqr", 1000, 1597795200000L}, new Object[]{"xyz", 4000, 1597795200000L});
     inputs.add(new Object[]{reducerId, config5, expectedFileNames5, rollupRows5, comparator});
 
     // CONCAT and sort

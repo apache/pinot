@@ -29,7 +29,7 @@ import com.google.common.base.Preconditions;
 @JsonDeserialize(builder = SegmentConfig.Builder.class)
 public class SegmentConfig {
 
-  private static final int DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT = 1_000_000;
+  private static final int DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT = 5_000_000;
   private final int _maxNumRecordsPerSegment;
 
   private SegmentConfig(int maxNumRecordsPerSegment) {

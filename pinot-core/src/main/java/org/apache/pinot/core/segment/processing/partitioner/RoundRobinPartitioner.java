@@ -22,17 +22,20 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
- * Partitioner which creates a partition value between [0-numPartitions)
+ * Partitioner which creates a partition value between [0-numPartitions) in a round-robin manner
  */
-public class NumPartitionsPartitioner implements Partitioner {
+public class RoundRobinPartitioner implements Partitioner {
   private final int _numPartitions;
+  private transient int _nextPartition = 0;
 
-  public NumPartitionsPartitioner(int numPartitions) {
+  public RoundRobinPartitioner(int numPartitions) {
     _numPartitions = numPartitions;
   }
 
   @Override
   public String getPartition(GenericRow genericRow) {
-    return String.valueOf(Math.abs(genericRow.hashCode()) % _numPartitions);
+    int currentPartition = _nextPartition;
+    _nextPartition = (_nextPartition + 1) % _numPartitions;
+    return String.valueOf(currentPartition);
   }
 }

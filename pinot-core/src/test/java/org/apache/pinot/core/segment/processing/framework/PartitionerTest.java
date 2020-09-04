@@ -24,7 +24,7 @@ import org.apache.pinot.core.segment.processing.partitioner.NoOpPartitioner;
 import org.apache.pinot.core.segment.processing.partitioner.Partitioner;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerFactory;
 import org.apache.pinot.core.segment.processing.partitioner.PartitioningConfig;
-import org.apache.pinot.core.segment.processing.partitioner.NumPartitionsPartitioner;
+import org.apache.pinot.core.segment.processing.partitioner.RoundRobinPartitioner;
 import org.apache.pinot.core.segment.processing.partitioner.TableConfigPartitioner;
 import org.apache.pinot.core.segment.processing.partitioner.TransformFunctionPartitioner;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
@@ -76,35 +76,38 @@ public class PartitionerTest {
   }
 
   @Test
-  public void testNumPartitionsPartitioner() {
+  public void testRoundRobinPartitioner() {
     PartitioningConfig partitioningConfig =
-        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.NUM_PARTITIONS).build();
+        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.ROUND_ROBIN).build();
     try {
       PartitionerFactory.getPartitioner(partitioningConfig);
-      fail("Should not create NUM_PARTITIONS Partitioner without num partitions");
+      fail("Should not create ROUND_ROBIN Partitioner without num partitions");
     } catch (IllegalStateException e) {
       // expected
     }
     partitioningConfig =
-        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.NUM_PARTITIONS)
+        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.ROUND_ROBIN)
             .setNumPartitions(0).build();
     try {
       PartitionerFactory.getPartitioner(partitioningConfig);
-      fail("Should not create NUM_PARTITIONS Partitioner without num partitions <=0");
+      fail("Should not create ROUND_ROBIN Partitioner without num partitions <=0");
     } catch (IllegalStateException e) {
       // expected
     }
+    int numPartitions = 3;
     partitioningConfig =
-        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.NUM_PARTITIONS)
-            .setNumPartitions(3).build();
+        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.ROUND_ROBIN)
+            .setNumPartitions(numPartitions).build();
     Partitioner partitioner = PartitionerFactory.getPartitioner(partitioningConfig);
-    assertEquals(partitioner.getClass(), NumPartitionsPartitioner.class);
+    assertEquals(partitioner.getClass(), RoundRobinPartitioner.class);
 
     GenericRow row = new GenericRow();
+    int expectedPartition = 0;
     for (int i = 0; i < 10; i++) {
       row.putValue("dim", RandomStringUtils.randomAlphabetic(3));
       int partition = Integer.parseInt(partitioner.getPartition(row));
-      assertTrue(partition >= 0 && partition < 3);
+      assertEquals(partition, expectedPartition);
+      expectedPartition = (expectedPartition + 1) % numPartitions;
     }
   }
 
