@@ -68,3 +68,7 @@ persistence:
   accessMode: ReadWriteOnce
   size: 4G
   storageClass: ""
+
+# Optional: Enable for ingress
+traefik:
+  enabled: false
