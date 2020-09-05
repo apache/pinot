@@ -75,15 +75,6 @@ public enum AggregationFunctionType {
     return _name;
   }
 
-  public boolean isOfType(AggregationFunctionType... aggregationFunctionTypes) {
-    for (AggregationFunctionType aggregationFunctionType : aggregationFunctionTypes) {
-      if (this == aggregationFunctionType) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   /**
    * Returns the corresponding aggregation function type for the given function name.
    * <p>NOTE: Underscores in the function name are ignored.
@@ -110,7 +101,7 @@ public enum AggregationFunctionType {
     } else {
       try {
         return AggregationFunctionType.valueOf(upperCaseFunctionName);
-      } catch (Exception e) {
+      } catch (IllegalArgumentException e) {
         throw new IllegalArgumentException("Invalid aggregation function name: " + functionName);
       }
     }
