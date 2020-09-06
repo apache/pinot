@@ -88,6 +88,7 @@ public class SqlUtils {
   private static final String MYSQL = "MySQL";
   private static final String H2 = "H2";
   private static final String VERTICA = "Vertica";
+  private static final String BIGQUERY = "BigQuery";
 
   /**
    * Insert a table to SQL database, currently only used by H2, that can be read by ThirdEye
@@ -588,6 +589,26 @@ public class SqlUtils {
   }
 
   /**
+   * Convert java SimpleDateFormat to BigQuery StandardSQL's format
+   *
+   * @param timeFormat
+   * @return BigQuery Standard SQL time format
+   */
+  private static String timeFormatToBigQueryFormat(String timeFormat) {
+    switch (timeFormat) {
+      case "yyyyMMdd":
+        return "%Y%m%d";
+      case "yyyy-MM-dd hh:mm:ss":
+        return "%Y-%m-%d %H:%M:%S";
+      case "yyyy-MM-dd-HH":
+        return "%Y-%m-%d-%H";
+      default:
+        return "%Y-%m-%d %H:%M:%S";
+    }
+  }
+
+
+  /**
    * Return a SQL clause that cast any timeColumn as unix timestamp
    *
    * @param timeFormat format of time column
@@ -604,6 +625,8 @@ public class SqlUtils {
       return "TO_UNIXTIME(PARSEDATETIME(CAST(" + timeColumn + " AS VARCHAR), '" + timeFormat + "'))";
     } else if (sourceName.equals(VERTICA)) {
       return "EXTRACT(EPOCH FROM to_timestamp(to_char(" + timeColumn + "), '" + timeFormatToVerticaFormat(timeFormat) + "'))";
+    } else if (sourceName.equals(BIGQUERY)) {
+      return "UNIX_SECONDS(TIMESTAMP(PARSE_DATETIME(\"" + timeFormatToBigQueryFormat(timeFormat) + "\", " + timeColumn + ")))";
     }
     return "";
   }

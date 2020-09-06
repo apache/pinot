@@ -87,7 +87,7 @@
     <log4j2.version>2.12.0</log4j2.version>
     <json-schema-validator.version>2.2.14</json-schema-validator.version>
   </properties>
-  
+
   <licenses>
     <license>
       <name>Apache License, Version 2.0</name>
@@ -545,6 +545,54 @@
       </dependency>
     </dependencies>
   </dependencyManagement>
+
+  <profiles>
+    <profile>
+      <id>bigquery</id>
+      <properties>
+        <avro.version>1.9.0</avro.version>
+        <google-auth-library-oauth2-http.version>0.13.0</google-auth-library-oauth2-http.version>
+        <gax.version>1.42.0</gax.version>
+        <google-api-services-bigquery.version>v2-rev426-1.25.0</google-api-services-bigquery.version>
+        <jdbc42.version>1.2.4</jdbc42.version>
+      </properties>
+    <dependencyManagement>
+      <dependencies>
+        <dependency>
+          <groupId>com.google.auth</groupId>
+          <artifactId>google-auth-library-oauth2-http</artifactId>
+          <version>${google-auth-library-oauth2-http.version}</version>
+        </dependency>
+        <dependency>
+          <groupId>com.google.api</groupId>
+          <artifactId>gax</artifactId>
+          <version>${gax.version}</version>
+        </dependency>
+        <dependency>
+          <groupId>com.google.apis</groupId>
+          <artifactId>google-api-services-bigquery</artifactId>
+          <version>${google-api-services-bigquery.version}</version>
+        </dependency>
+        <dependency>
+          <groupId>org.apache.avro</groupId>
+          <artifactId>avro</artifactId>
+          <version>${avro.version}</version>
+        </dependency>
+        <dependency>
+          <groupId>com.simba.googlebigquery</groupId>
+          <artifactId>jdbc42</artifactId>
+          <version>${jdbc42.version}</version>
+          <exclusions>
+            <exclusion>
+              <groupId>com.google.guava</groupId>
+              <artifactId>guava</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+      </dependencies>
+    </dependencyManagement>
+    </profile>
+  </profiles>
 
   <reporting>
     <plugins>
