@@ -17,7 +17,7 @@
 # under the License.
 #
 
-FROM openjdk:8 AS pinot_build_env
+FROM openjdk:11 AS pinot_build_env
 
 LABEL MAINTAINER=dev@pinot.apache.org
 
@@ -59,7 +59,7 @@ RUN git clone ${PINOT_GIT_URL} ${PINOT_BUILD_DIR} && \
     cp -r pinot-distribution/target/apache-pinot-*-bin/apache-pinot-*-bin/* ${PINOT_HOME}/. && \
     chmod +x ${PINOT_HOME}/bin/*.sh
 
-FROM openjdk:8-jdk-slim
+FROM openjdk:11-jdk-slim
 
 LABEL MAINTAINER=dev@pinot.apache.org
 
