@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.client;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import java.net.URI;
 import java.sql.Connection;
@@ -37,6 +38,7 @@ import org.slf4j.LoggerFactory;
 public class PinotDriver implements Driver {
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(PinotDriver.class);
   private final String SCHEME = "pinot";
+  public static final String TENANT = "tenant";
 
   @Override
   public Connection connect(String url, Properties info)
@@ -44,9 +46,10 @@ public class PinotDriver implements Driver {
     try {
       LOGGER.info("Initiating connection to database for url: " + url);
       PinotClientTransport pinotClientTransport = new JsonAsyncHttpPinotClientTransportFactory().buildTransport();
-      List<String> brokerList = DriverUtils.getBrokersFromURL(url);
       String controllerUrl = DriverUtils.getControllerFromURL(url);
-      return new PinotConnection(brokerList, controllerUrl, pinotClientTransport);
+      Preconditions.checkArgument(info.containsKey(TENANT), "Pinot tenant missing in the properties");
+      String tenant = info.getProperty(TENANT);
+      return new PinotConnection(controllerUrl, pinotClientTransport, tenant);
     } catch (Exception e) {
       throw new SQLException(String.format("Failed to connect to url : %s", url), e);
     }
@@ -64,6 +67,11 @@ public class PinotDriver implements Driver {
   public DriverPropertyInfo[] getPropertyInfo(String url, Properties info)
       throws SQLException {
     List<DriverPropertyInfo> propertyInfoList = new ArrayList<>();
+    DriverPropertyInfo tenantPropertyInfo = new DriverPropertyInfo("tenant", null);
+    tenantPropertyInfo.required = true;
+    tenantPropertyInfo.description =
+        "Name of the tenant for which to create the JDBC connection. You can only query the tables belonging to the specified tenant";
+    propertyInfoList.add(tenantPropertyInfo);
     return Iterables.toArray(propertyInfoList, DriverPropertyInfo.class);
   }
 

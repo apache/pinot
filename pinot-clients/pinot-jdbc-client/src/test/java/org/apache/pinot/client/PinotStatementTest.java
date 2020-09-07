@@ -30,13 +30,15 @@ import org.testng.annotations.Test;
 
 public class PinotStatementTest {
   private DummyPinotClientTransport _dummyPinotClientTransport = new DummyPinotClientTransport();
+  private DummyPinotControllerTransport _dummyPinotControllerTransport = new DummyPinotControllerTransport();
+
   private PinotClientTransportFactory _previousTransportFactory = null;
 
   @Test
   public void testExecuteQuery() throws Exception {
-    PinotConnection connection = new PinotConnection(Collections.singletonList("dummy"), _dummyPinotClientTransport);
+    PinotConnection connection = new PinotConnection("dummy", _dummyPinotClientTransport, "dummy" ,_dummyPinotControllerTransport);
     Statement statement = new PinotStatement(connection);
-    ResultSet resultSet = statement.executeQuery("dummy");
+    ResultSet resultSet = statement.executeQuery("select * from dummy");
     Assert.assertNotNull(resultSet);
     Assert.assertEquals(statement.getConnection(), connection);
   }
