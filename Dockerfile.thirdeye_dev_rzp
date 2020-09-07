@@ -59,6 +59,9 @@ ENV TE_HOME=/opt/thirdeye
 
 COPY --from=thirdeye_build_env ${TE_HOME} ${TE_HOME}
 
+RUN apk add bzip2=1.0.6-r7 libjpeg-turbo=1.5.3-r6 libtasn1=4.14-r0 libx11=1.6.12-r0 musl=1.1.20-r5 \
+    && apk add --update
+
 EXPOSE 1426 1427
 WORKDIR ${TE_HOME}
 
