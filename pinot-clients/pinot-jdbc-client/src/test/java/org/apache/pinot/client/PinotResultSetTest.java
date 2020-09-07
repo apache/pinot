@@ -150,14 +150,15 @@ public class PinotResultSetTest {
   }
 
   @Test
-  public void testGetResultMetadata() throws Exception {
+  public void testGetResultMetadata()
+      throws Exception {
     ResultSetGroup resultSetGroup = getResultSet(TEST_RESULT_SET_RESOURCE);
     ResultSet resultSet = resultSetGroup.getResultSet(0);
     PinotResultSet pinotResultSet = new PinotResultSet(resultSet);
     ResultSetMetaData pinotResultSetMetadata = pinotResultSet.getMetaData();
 
     for (int i = 0; i < resultSet.getColumnCount(); i++) {
-      Assert.assertEquals(pinotResultSetMetadata.getColumnTypeName(i+1), resultSet.getColumnDataType(i));
+      Assert.assertEquals(pinotResultSetMetadata.getColumnTypeName(i + 1), resultSet.getColumnDataType(i));
     }
   }
 

@@ -62,7 +62,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
     _closed = false;
     for (int i = 0; i < _totalColumns; i++) {
       _columns.put(_resultSet.getColumnName(i), i + 1);
-      _columnDataTypes.put(i+1, _resultSet.getColumnDataType(i));
+      _columnDataTypes.put(i + 1, _resultSet.getColumnDataType(i));
     }
   }
 
