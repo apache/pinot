@@ -18,25 +18,48 @@
 #
 
 pipeline:
-    build:
-      group: test-thirdeye-build
-      image: plugins/docker
-      registry: c.rzp.io
-      repo: c.rzp.io/razorpay/thirdeye
-      dockerfile: Dockerfile.thirdeye_rzp
-      build_args:
-        - GIT_COMMIT_HASH=${DRONE_COMMIT_SHA}
-        - GIT_TOKEN
-      secrets:
-        - source: harbor_docker_username
-          target: docker_username
-        - source: harbor_docker_password
-          target: docker_password
-        - source: git_token
-          target: GIT_TOKEN
-      tags: ${DRONE_COMMIT_SHA}
-      when:
-        status: [success]
-        event:
-          exclude: [deployment, pull_request, tag]
-          include: [push]
+  build:
+    group: test-thirdeye-build
+    image: plugins/docker
+    registry: c.rzp.io
+    repo: c.rzp.io/razorpay/thirdeye
+    dockerfile: Dockerfile.thirdeye_rzp
+    build_args:
+      - GIT_COMMIT_HASH=${DRONE_COMMIT_SHA}
+      - GIT_TOKEN
+    secrets:
+      - source: harbor_docker_username
+        target: docker_username
+      - source: harbor_docker_password
+        target: docker_password
+      - source: git_token
+        target: GIT_TOKEN
+    tags: ${DRONE_COMMIT_SHA}
+    when:
+      status: [success]
+      event:
+        exclude: [deployment, pull_request, tag]
+        include: [push]
+  build-notify:
+    image: plugins/slack
+    secrets: [slack_webhook]
+    channel: tech_observability
+    username: drone
+    icon_url: https://avatars2.githubusercontent.com/u/2181346?s=200&v=4
+    template: >
+      {{#success build.status}}
+        Build succeeded.
+      {{else}}
+        Build failed.
+      {{/success}}
+        Build No:{{build.number}}
+        Branch: {{build.branch}}
+        Commit: {{build.commit}}
+        Author: {{build.author}}
+        Started at: {{build.started}}
+        Time taken: {{since build.started}}
+        Link: {{build.link}}
+    when:
+      event:
+        exclude: [deployment]
+        include: [push]
