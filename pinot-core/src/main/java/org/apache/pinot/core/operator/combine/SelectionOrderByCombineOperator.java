@@ -69,8 +69,8 @@ public class SelectionOrderByCombineOperator extends BaseCombineOperator {
   private final int _numRowsToKeep;
 
   public SelectionOrderByCombineOperator(List<Operator> operators, QueryContext queryContext,
-      ExecutorService executorService, long timeOutMs) {
-    super(operators, queryContext, executorService, timeOutMs);
+      ExecutorService executorService, long endTimeMs) {
+    super(operators, queryContext, executorService, endTimeMs);
     _numRowsToKeep = queryContext.getLimit() + queryContext.getOffset();
   }
 
@@ -91,9 +91,6 @@ public class SelectionOrderByCombineOperator extends BaseCombineOperator {
   }
 
   private IntermediateResultsBlock minMaxValueBasedCombine() {
-    long startTimeMs = System.currentTimeMillis();
-    long endTimeMs = startTimeMs + _timeOutMs;
-
     List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
     assert orderByExpressions != null;
     int numOrderByExpressions = orderByExpressions.size();
@@ -270,7 +267,7 @@ public class SelectionOrderByCombineOperator extends BaseCombineOperator {
       int numBlocksMerged = 0;
       while (numBlocksMerged + numOperatorsSkipped.get() < numOperators) {
         IntermediateResultsBlock blockToMerge =
-            blockingQueue.poll(endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+            blockingQueue.poll(_endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
         if (blockToMerge == null) {
           // Query times out, skip merging the remaining results blocks
           LOGGER.error("Timed out while polling results block, numBlocksMerged: {} (query: {})", numBlocksMerged,
