@@ -64,7 +64,7 @@ public class CombinePlanNodeTest {
 
   @Test
   public void testSlowPlanNode() {
-    // Warning: this test is slow (take 10 seconds).
+    // Warning: this test is slow (take 60 seconds).
 
     AtomicBoolean notInterrupted = new AtomicBoolean();
 
@@ -72,7 +72,7 @@ public class CombinePlanNodeTest {
     for (int i = 0; i < 20; i++) {
       planNodes.add(() -> {
         try {
-          Thread.sleep(20000);
+          Thread.sleep(70000);
         } catch (InterruptedException e) {
           // Thread should be interrupted
           throw new RuntimeException(e);
