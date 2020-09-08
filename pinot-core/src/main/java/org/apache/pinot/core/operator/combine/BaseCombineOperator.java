@@ -50,20 +50,18 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
   protected final List<Operator> _operators;
   protected final QueryContext _queryContext;
   protected final ExecutorService _executorService;
-  protected final long _timeOutMs;
+  protected final long _endTimeMs;
 
   public BaseCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService,
-      long timeOutMs) {
+      long endTimeMs) {
     _operators = operators;
     _queryContext = queryContext;
     _executorService = executorService;
-    _timeOutMs = timeOutMs;
+    _endTimeMs = endTimeMs;
   }
 
   @Override
   protected IntermediateResultsBlock getNextBlock() {
-    long startTimeMs = System.currentTimeMillis();
-    long endTimeMs = startTimeMs + _timeOutMs;
     int numOperators = _operators.size();
     int numThreads = CombineOperatorUtils.getNumThreadsForQuery(numOperators);
 
@@ -124,7 +122,7 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
       int numBlocksMerged = 0;
       while (numBlocksMerged < numOperators) {
         IntermediateResultsBlock blockToMerge =
-            blockingQueue.poll(endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+            blockingQueue.poll(_endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
         if (blockToMerge == null) {
           // Query times out, skip merging the remaining results blocks
           LOGGER.error("Timed out while polling results block, numBlocksMerged: {} (query: {})", numBlocksMerged,

@@ -97,13 +97,13 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
   @Override
   public Plan makeInstancePlan(List<IndexSegment> indexSegments, QueryContext queryContext,
-      ExecutorService executorService, long timeOutMs) {
+      ExecutorService executorService, long endTimeMs) {
     List<PlanNode> planNodes = new ArrayList<>(indexSegments.size());
     for (IndexSegment indexSegment : indexSegments) {
       planNodes.add(makeSegmentPlanNode(indexSegment, queryContext));
     }
     CombinePlanNode combinePlanNode =
-        new CombinePlanNode(planNodes, queryContext, executorService, timeOutMs, _numGroupsLimit);
+        new CombinePlanNode(planNodes, queryContext, executorService, endTimeMs, _numGroupsLimit);
     return new GlobalPlanImplV0(new InstanceResponsePlanNode(combinePlanNode));
   }
 

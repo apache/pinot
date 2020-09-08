@@ -37,7 +37,7 @@ public interface PlanMaker {
    * Returns an instance level {@link Plan} which contains the logical execution plan for multiple segments.
    */
   Plan makeInstancePlan(List<IndexSegment> indexSegments, QueryContext queryContext, ExecutorService executorService,
-      long timeoutMs);
+      long endTimeMs);
 
   /**
    * Returns a segment level {@link PlanNode} which contains the logical execution plan for one segment.

@@ -51,12 +51,10 @@ public class CombinePlanNode implements PlanNode {
   // Try to schedule 10 plans for each thread, or evenly distribute plans to all MAX_NUM_THREADS_PER_QUERY threads
   private static final int TARGET_NUM_PLANS_PER_THREAD = 10;
 
-  private static final int TIME_OUT_IN_MILLISECONDS_FOR_PARALLEL_RUN = 10_000;
-
   private final List<PlanNode> _planNodes;
   private final QueryContext _queryContext;
   private final ExecutorService _executorService;
-  private final long _timeOutMs;
+  private final long _endTimeMs;
   private final int _numGroupsLimit;
 
   /**
@@ -65,15 +63,15 @@ public class CombinePlanNode implements PlanNode {
    * @param planNodes List of underlying plan nodes
    * @param queryContext Query context
    * @param executorService Executor service
-   * @param timeOutMs Time out in milliseconds for query execution (not for planning phase)
+   * @param endTimeMs End time in milliseconds for the query
    * @param numGroupsLimit Limit of number of groups stored in each segment
    */
   public CombinePlanNode(List<PlanNode> planNodes, QueryContext queryContext, ExecutorService executorService,
-      long timeOutMs, int numGroupsLimit) {
+      long endTimeMs, int numGroupsLimit) {
     _planNodes = planNodes;
     _queryContext = queryContext;
     _executorService = executorService;
-    _timeOutMs = timeOutMs;
+    _endTimeMs = endTimeMs;
     _numGroupsLimit = numGroupsLimit;
   }
 
@@ -90,9 +88,6 @@ public class CombinePlanNode implements PlanNode {
       }
     } else {
       // Large number of plan nodes, run them in parallel
-
-      // Calculate the time out timestamp
-      long endTimeMs = System.currentTimeMillis() + TIME_OUT_IN_MILLISECONDS_FOR_PARALLEL_RUN;
 
       int numThreads = Math.min((numPlanNodes + TARGET_NUM_PLANS_PER_THREAD - 1) / TARGET_NUM_PLANS_PER_THREAD,
           MAX_NUM_THREADS_PER_QUERY);
@@ -136,7 +131,7 @@ public class CombinePlanNode implements PlanNode {
       try {
         for (Future future : futures) {
           List<Operator> ops =
-              (List<Operator>) future.get(endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+              (List<Operator>) future.get(_endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
           operators.addAll(ops);
         }
       } catch (Exception e) {
@@ -163,22 +158,22 @@ public class CombinePlanNode implements PlanNode {
     if (QueryContextUtils.isAggregationQuery(_queryContext)) {
       if (_queryContext.getGroupByExpressions() == null) {
         // Aggregation only
-        return new AggregationOnlyCombineOperator(operators, _queryContext, _executorService, _timeOutMs);
+        return new AggregationOnlyCombineOperator(operators, _queryContext, _executorService, _endTimeMs);
       } else {
         // Aggregation group-by
         QueryOptions queryOptions = new QueryOptions(_queryContext.getQueryOptions());
         if (queryOptions.isGroupByModeSQL()) {
-          return new GroupByOrderByCombineOperator(operators, _queryContext, _executorService, _timeOutMs);
+          return new GroupByOrderByCombineOperator(operators, _queryContext, _executorService, _endTimeMs);
         }
-        return new GroupByCombineOperator(operators, _queryContext, _executorService, _timeOutMs, _numGroupsLimit);
+        return new GroupByCombineOperator(operators, _queryContext, _executorService, _endTimeMs, _numGroupsLimit);
       }
     } else {
       if (_queryContext.getLimit() == 0 || _queryContext.getOrderByExpressions() == null) {
         // Selection only
-        return new SelectionOnlyCombineOperator(operators, _queryContext, _executorService, _timeOutMs);
+        return new SelectionOnlyCombineOperator(operators, _queryContext, _executorService, _endTimeMs);
       } else {
         // Selection order-by
-        return new SelectionOrderByCombineOperator(operators, _queryContext, _executorService, _timeOutMs);
+        return new SelectionOrderByCombineOperator(operators, _queryContext, _executorService, _endTimeMs);
       }
     }
   }
