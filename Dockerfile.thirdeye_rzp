@@ -17,7 +17,8 @@
 # under the License.
 #
 
-FROM c.rzp.io/razorpay/onggi:maven-java8 AS thirdeye_build_env
+#FROM c.rzp.io/razorpay/onggi:maven-java8 AS thirdeye_build_env
+FROM maven:3.6.3-openjdk-14-slim as thirdeye_build_env
 
 LABEL MAINTAINER=observability@razorpay.com
 
@@ -28,8 +29,13 @@ ENV TE_BUILD_DIR=/opt/thirdeye-build
 
 COPY . ${TE_BUILD_DIR}
 
-RUN apk update \
-    && apk add --update vim wget curl git automake bison flex g++ boost-dev libevent-dev openssl-dev libtool make pkgconfig nodejs npm
+## Below for Alpine
+#RUN apk update \
+#    && apk add --update vim wget curl git automake bison flex g++ boost-dev libevent-dev openssl-dev libtool make pkgconfig nodejs npm
+#
+# Below for ubuntu
+RUN apt-get update \
+    && apt-get install -y vim wget curl git automake libboost-all-dev flex g++ libevent-dev libssl-dev libtool make pkg-config nodejs npm
 
 RUN npm install -g phantomjs --unsafe-perm --ignore-scripts
 

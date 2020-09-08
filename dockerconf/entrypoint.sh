@@ -18,14 +18,13 @@
 # under the License.
 #
 
-set -euo pipefail
+#set -euo pipefail
 
 ## Initialize files from environment variables. These should come from the kubernetes secrets configured
 ## CONFIG_DIR is an environment variable, ideally equal to /opt/thirdeye/config/default. Look at the Dockerfile.thirdeye for reference
 
 echo "Setting Config File : $CONFIG_DIR/persistence.yml"
-sed -e "s/MYSQL_HOSTNAME/$(eval echo $MYSQL_HOSTNAME)/" -e "s/MYSQL_PORT/$(eval echo $MYSQL_PORT)/" -e "s/THIRDEYE_DATABASE/$(eval echo $THIRDEYE_DATABASE)/" -e "s/MYSQL_USERNAME/$(eval ec
-ho $MYSQL_USERNAME)/" -e "s/MYSQL_PASSWORD/$(eval echo $MYSQL_PASSWORD)/" $CONFIG_DIR/persistence.yml.tmpl > $CONFIG_DIR/persistence.yml
+sed -e "s/MYSQL_HOSTNAME/$(eval echo $MYSQL_HOSTNAME)/" -e "s/MYSQL_PORT/$(eval echo $MYSQL_PORT)/" -e "s/THIRDEYE_DATABASE/$(eval echo $THIRDEYE_DATABASE)/" -e "s/MYSQL_USERNAME/$(eval echo $MYSQL_USERNAME)/" -e "s/MYSQL_PASSWORD/\"$(eval echo $MYSQL_PASSWORD)\"/" $CONFIG_DIR/persistence.yml.tmpl > $CONFIG_DIR/persistence.yml
 
 echo "Setting Config File : $CONFIG_DIR/data-sources/data-sources-config.yml"
 #sed -e 's/POSTGRES_HOSTNAME/'"$POSTGRES_HOSTNAME"'/' -e 's/POSTGRES_PORT/'"$POSTGRES_PORT"'/' -e 's/POSTGRES_DATABASE/'"$POSTGRES_DATABASE"'/' -e 's/POSTGRESQL_PASSWORD/'"$POSTGRESQL_PASSWORD"'/' $CONFIG_DIR/data-sources/data-sources-config.yml.tmpl > $CONFIG_DIR/data-sources/data-sources-config.yml
