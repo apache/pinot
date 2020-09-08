@@ -30,15 +30,15 @@ public class SeverityThresholdLabelerSpec  extends AbstractSpec{
   @JsonIgnoreProperties(ignoreUnknown = true)
   public static class Threshold {
     public double change = Double.MAX_VALUE;
-    public long durationMilli = Long.MAX_VALUE;
+    public long duration = Long.MAX_VALUE;
 
     public Threshold() {
 
     }
 
-    public Threshold(double change, long durationMilli) {
+    public Threshold(double change, long duration) {
       this.change = change;
-      this.durationMilli = durationMilli;
+      this.duration = duration;
     }
   }
 

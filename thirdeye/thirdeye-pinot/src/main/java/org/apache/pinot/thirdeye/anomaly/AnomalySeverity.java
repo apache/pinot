@@ -28,7 +28,7 @@ public enum AnomalySeverity {
   HIGH ("high"),
   MEDIUM ("medium"),
   LOW ("low"),
-  DEBUG ("debug");
+  DEFAULT ("default");
 
   private String severity;
 

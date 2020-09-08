@@ -364,7 +364,7 @@ public class MergeWrapper extends DetectionPipeline {
     to.setWeight(from.getWeight());
     to.setProperties(from.getProperties());
     to.setType(from.getType());
-    to.setSeverity(from.getSeverity());
+    to.setSeverityLabel(from.getSeverityLabel());
     return to;
   }
 

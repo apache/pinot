@@ -116,17 +116,17 @@ public class ThresholdSeverityLabelerTest {
     DetectionPipelineResult result = this.thresholdSeverityLabeler.run();
     List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
     Assert.assertEquals(anomalies.size(), 4);
-    Assert.assertEquals(anomalies.get(0).getSeverity(), AnomalySeverity.CRITICAL);
-    Assert.assertEquals(anomalies.get(1).getSeverity(), AnomalySeverity.HIGH);
-    Assert.assertEquals(anomalies.get(2).getSeverity(), AnomalySeverity.DEBUG);
-    Assert.assertEquals(anomalies.get(3).getSeverity(), AnomalySeverity.HIGH);
+    Assert.assertEquals(anomalies.get(0).getSeverityLabel(), AnomalySeverity.CRITICAL);
+    Assert.assertEquals(anomalies.get(1).getSeverityLabel(), AnomalySeverity.HIGH);
+    Assert.assertEquals(anomalies.get(2).getSeverityLabel(), AnomalySeverity.DEFAULT);
+    Assert.assertEquals(anomalies.get(3).getSeverityLabel(), AnomalySeverity.HIGH);
   }
 
   @Test
   public void testLabelingSingleThreshold() throws Exception {
     Map<String, Object> severityMap = new HashMap<>();
     Threshold singleThreshold = new Threshold();
-    singleThreshold.durationMilli = 2000L;
+    singleThreshold.duration = 2000L;
     severityMap.put(AnomalySeverity.CRITICAL.toString(), singleThreshold);
     severityMap.put(AnomalySeverity.HIGH.toString(), new Threshold(0.15, 2000));
     this.specs.put("severity", severityMap);
@@ -134,10 +134,10 @@ public class ThresholdSeverityLabelerTest {
     DetectionPipelineResult result = this.thresholdSeverityLabeler.run();
     List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
     Assert.assertEquals(anomalies.size(), 4);
-    Assert.assertEquals(anomalies.get(0).getSeverity(), AnomalySeverity.HIGH);
-    Assert.assertEquals(anomalies.get(1).getSeverity(), AnomalySeverity.HIGH);
-    Assert.assertEquals(anomalies.get(2).getSeverity(), AnomalySeverity.DEBUG);
-    Assert.assertEquals(anomalies.get(3).getSeverity(), AnomalySeverity.CRITICAL);
+    Assert.assertEquals(anomalies.get(0).getSeverityLabel(), AnomalySeverity.HIGH);
+    Assert.assertEquals(anomalies.get(1).getSeverityLabel(), AnomalySeverity.HIGH);
+    Assert.assertEquals(anomalies.get(2).getSeverityLabel(), AnomalySeverity.DEFAULT);
+    Assert.assertEquals(anomalies.get(3).getSeverityLabel(), AnomalySeverity.CRITICAL);
   }
 
   @Test
@@ -148,14 +148,14 @@ public class ThresholdSeverityLabelerTest {
     severityMap.put(AnomalySeverity.MEDIUM.toString(), new Threshold(0.12, 1500));
     this.specs.put("severity", severityMap);
     MergedAnomalyResultDTO anomaly = DetectionTestUtils.makeAnomaly(4000L, 6000L, METRIC_URN, 2400, 3000);
-    anomaly.setSeverity(AnomalySeverity.HIGH);
+    anomaly.setSeverityLabel(AnomalySeverity.HIGH);
     anomaly.setId(125L);
     this.anomalies.set(this.anomalies.size() - 1, anomaly);
     this.thresholdSeverityLabeler = new AnomalyLabelerWrapper(this.testDataProvider, this.config, 1000L, 6000L);
     DetectionPipelineResult result = this.thresholdSeverityLabeler.run();
     List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
     Assert.assertEquals(anomalies.size(), 4);
-    Assert.assertEquals(anomalies.get(3).getSeverity(), AnomalySeverity.CRITICAL);
+    Assert.assertEquals(anomalies.get(3).getSeverityLabel(), AnomalySeverity.CRITICAL);
     Assert.assertTrue(anomalies.get(3).isRenotify());
 
   }
@@ -168,14 +168,14 @@ public class ThresholdSeverityLabelerTest {
     severityMap.put(AnomalySeverity.MEDIUM.toString(), new Threshold(0.10, 1500));
     this.specs.put("severity", severityMap);
     MergedAnomalyResultDTO anomaly = DetectionTestUtils.makeAnomaly(4000L, 6000L, METRIC_URN, 2700, 3000);
-    anomaly.setSeverity(AnomalySeverity.HIGH);
+    anomaly.setSeverityLabel(AnomalySeverity.HIGH);
     anomaly.setId(125L);
     this.anomalies.set(this.anomalies.size() - 1, anomaly);
     this.thresholdSeverityLabeler = new AnomalyLabelerWrapper(this.testDataProvider, this.config, 1000L, 6000L);
     DetectionPipelineResult result = this.thresholdSeverityLabeler.run();
     List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
     Assert.assertEquals(anomalies.size(), 4);
-    Assert.assertEquals(anomalies.get(3).getSeverity(), AnomalySeverity.MEDIUM);
+    Assert.assertEquals(anomalies.get(3).getSeverityLabel(), AnomalySeverity.MEDIUM);
     Assert.assertFalse(anomalies.get(3).isRenotify());
   }
 }

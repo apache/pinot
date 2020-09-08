@@ -61,7 +61,7 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
   private Set<Long> childIds; // ids of the anomalies this anomaly merged from
   private boolean isChild;
   private AnomalyType type;
-  private AnomalySeverity severity;
+  private AnomalySeverity severityLabel;
 
 
   public Set<Long> getChildIds() {
@@ -267,16 +267,16 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
     this.type = type;
   }
 
-  public void setSeverity(AnomalySeverity severity) {
-    this.severity = severity;
+  public void setSeverityLabel(AnomalySeverity severityLabel) {
+    this.severityLabel = severityLabel;
   }
 
-  public AnomalySeverity getSeverity() {
+  public AnomalySeverity getSeverityLabel() {
     // default severity level is debug
-    if (severity == null) {
-      return AnomalySeverity.DEBUG;
+    if (severityLabel == null) {
+      return AnomalySeverity.DEFAULT;
     }
-    return severity;
+    return severityLabel;
   }
 
   @Override

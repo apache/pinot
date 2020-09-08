@@ -38,8 +38,8 @@ import static org.apache.pinot.thirdeye.detection.spec.SeverityThresholdLabelerS
  * Threshold-based severity labeler, which labels anomalies with severity based on deviation from baseline and duration
  * of the anomalies. It tries to label anomalies from highest to lowest if deviation or duration exceeds the threshold
  */
-@Components(title = "ThresholdSeverityLabeler", type = "threshold_severity_labeler",
-    tags = {DetectionTag.LABELER}, description = "An expression based grouper")
+@Components(title = "ThresholdSeverityLabeler", type = "THRESHOLD_SEVERITY_LABELER",
+    tags = {DetectionTag.LABELER}, description = "An threshold-based labeler for anomaly severity")
 public class ThresholdSeverityLabeler implements Labeler<SeverityThresholdLabelerSpec> {
   private final static Logger LOG = LoggerFactory.getLogger(ThresholdSeverityLabeler.class);
   // severity map ordered by priority from top to bottom
@@ -58,14 +58,14 @@ public class ThresholdSeverityLabeler implements Labeler<SeverityThresholdLabele
       double deviation = Math.abs(currVal - baseVal) / baseVal;
       long duration = anomaly.getEndTime() - anomaly.getStartTime();
       for (Map.Entry<AnomalySeverity, Threshold> entry : severityMap.entrySet()) {
-        if (deviation >= entry.getValue().change || duration >= entry.getValue().durationMilli) {
-          if (anomaly.getSeverity() != entry.getKey()) {
+        if (deviation >= entry.getValue().change || duration >= entry.getValue().duration) {
+          if (anomaly.getSeverityLabel() != entry.getKey()) {
             // find the severity from highest to lowest
-            if (anomaly.getId() != null && anomaly.getSeverity().compareTo(entry.getKey()) > 0) {
+            if (anomaly.getId() != null && anomaly.getSeverityLabel().compareTo(entry.getKey()) > 0) {
               // only set renotify if the anomaly exists and its severity gets higher
               anomaly.setRenotify(true);
             }
-            anomaly.setSeverity(entry.getKey());
+            anomaly.setSeverityLabel(entry.getKey());
             break;
           }
         }
