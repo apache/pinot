@@ -26,14 +26,19 @@ import RefreshOutlinedIcon from '@material-ui/icons/RefreshOutlined';
 import NoteAddOutlinedIcon from '@material-ui/icons/NoteAddOutlined';
 import DeleteOutlineOutlinedIcon from '@material-ui/icons/DeleteOutlineOutlined';
 import EditOutlinedIcon from '@material-ui/icons/EditOutlined';
-import { Grid, ButtonGroup, Button, Tooltip, Popover, Typography } from '@material-ui/core';
+import { Grid, ButtonGroup, Button, Tooltip, Popover, Typography, Snackbar } from '@material-ui/core';
 import MaterialTree from '../MaterialTree';
 import Confirm from '../Confirm';
 import CustomCodemirror from '../CustomCodemirror';
 import PinotMethodUtils from '../../utils/PinotMethodUtils';
 import Utils from '../../utils/Utils';
+import MuiAlert from '@material-ui/lab/Alert';
 
 const drawerWidth = 400;
+
+const Alert = (props) => {
+  return <MuiAlert elevation={6} variant="filled" {...props} />;
+}
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -96,7 +101,6 @@ type Props = {
   selected: any;
   handleToggle: any;
   handleSelect: any;
-  refreshAction: Function;
   isLeafNodeSelected: boolean;
   currentNodeData: Object;
   currentNodeMetadata: any;
@@ -106,7 +110,7 @@ type Props = {
 
 const TreeDirectory = ({
   treeData, showChildEvent, selectedNode, expanded, selected, handleToggle, fetchInnerPath,
-  handleSelect, refreshAction, isLeafNodeSelected, currentNodeData, currentNodeMetadata, showInfoEvent
+  handleSelect, isLeafNodeSelected, currentNodeData, currentNodeMetadata, showInfoEvent
 }: Props) => {
   const classes = useStyles();
 
@@ -118,6 +122,8 @@ const TreeDirectory = ({
   const [dialogYesLabel, setDialogYesLabel] = React.useState(null);
   const [dialogNoLabel, setDialogNoLabel] = React.useState(null);
   const [anchorEl, setAnchorEl] = React.useState<HTMLButtonElement | null>(null);
+  const [notificationData, setNotificationData] = React.useState({type: '', message: ''});
+  const [showNotification, setShowNotification] = React.useState(false);
 
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setAnchorEl(event.currentTarget);
@@ -131,8 +137,15 @@ const TreeDirectory = ({
     if(!isLeafNodeSelected){
       return;
     }
-    setDialogContent("Update this node?");
-    setDialogSuccessCb(() => showUpdateNode);
+    setDialogTitle("Update Node Data");
+    setDialogContent(<CustomCodemirror
+      data={currentNodeData}
+      isEditable={true}
+      returnCodemirrorValue={(val)=>{ newCodeMirrorData = val;}}
+    />)
+    setDialogYesLabel("Update");
+    setDialogNoLabel("Cancel");
+    setDialogSuccessCb(() => confirmUpdate);
     setConfirmDialog(true);
   };
 
@@ -145,15 +158,10 @@ const TreeDirectory = ({
     setConfirmDialog(true);
   };
 
-  const showUpdateNode = () => {
-    setDialogTitle("Update Node Data");
-    setDialogContent(<CustomCodemirror
-      data={currentNodeData}
-      isEditable={true}
-      returnCodemirrorValue={(val)=>{ newCodeMirrorData = val;}}
-    />)
-    setDialogYesLabel("Update");
-    setDialogNoLabel("Cancel");
+  const confirmUpdate = () => {
+    setDialogYesLabel("Yes");
+    setDialogNoLabel("No");
+    setDialogContent("Are you sure want to update this node?");
     setDialogSuccessCb(() => updateNode);
   }
 
@@ -164,8 +172,14 @@ const TreeDirectory = ({
       expectedVersion: currentNodeMetadata.version,
       accessOption: currentNodeMetadata.ephemeralOwner === 0 ? 1 : 10
     }
-    const data = await PinotMethodUtils.putNodeData(nodeData);
-    showInfoEvent(selectedNode);
+    const result = await PinotMethodUtils.putNodeData(nodeData);
+    if(result.data.status){
+      setNotificationData({type: 'success', message: result.data.status})
+      showInfoEvent(selectedNode);
+    } else {
+      setNotificationData({type: 'error', message: result.data.error})
+    }
+    setShowNotification(true);
     closeDialog();
   }
 
@@ -173,7 +187,14 @@ const TreeDirectory = ({
     const parentPath = selectedNode.split('/').slice(0, selectedNode.split('/').length-1).join('/');
     const treeObj = Utils.findNestedObj(treeData, 'fullPath', parentPath);
     const result = await PinotMethodUtils.deleteNode(selectedNode);
-    fetchInnerPath(treeObj);
+    if(result.data.status){
+      setNotificationData({type: 'success', message: result.data.status})
+      showInfoEvent(selectedNode);
+      fetchInnerPath(treeObj);
+    } else {
+      setNotificationData({type: 'error', message: result.data.error})
+    }
+    setShowNotification(true);
     closeDialog();
   }
 
@@ -184,6 +205,10 @@ const TreeDirectory = ({
     setDialogYesLabel(null);
     setDialogNoLabel(null);
   };
+
+  const hideNotification = () => {
+    setShowNotification(false);
+  }
 
   const open = Boolean(anchorEl);
   const id = open ? 'simple-popover' : undefined;
@@ -204,7 +229,7 @@ const TreeDirectory = ({
             <div className={classes.buttonGrpDiv}>
               <ButtonGroup color="primary" aria-label="outlined primary button group" className={classes.btnGroup}>
                 <Tooltip title="Refresh">
-                  <Button onClick={(e)=>{refreshAction();}}><RefreshOutlinedIcon/></Button>
+                  <Button onClick={(e)=>{showInfoEvent(selectedNode);}}><RefreshOutlinedIcon/></Button>
                 </Tooltip>
                 <Tooltip title="Add">
                   <Button onClick={handleClick}><NoteAddOutlinedIcon/></Button>
@@ -245,7 +270,7 @@ const TreeDirectory = ({
           </Grid>
         </div>
       </Drawer>
-      {confirmDialog && <Confirm
+      <Confirm
         openDialog={confirmDialog}
         dialogTitle={dialogTitle}
         dialogContent={dialogContent}
@@ -253,7 +278,16 @@ const TreeDirectory = ({
         closeDialog={closeDialog}
         dialogYesLabel={dialogYesLabel}
         dialogNoLabel={dialogNoLabel}
-      />}
+      />
+      <Snackbar
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        open={showNotification}
+        onClose={hideNotification}
+        key="notification"
+        autoHideDuration={3000}
+      >
+        <Alert severity={notificationData.type}>{notificationData.message}</Alert>
+      </Snackbar>
     </>
   );
 };

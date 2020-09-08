@@ -116,4 +116,5 @@ declare module 'Models' {
   export type ZKGetList = Array<string>
 
   export type ZKConfig = Object;
+  export type ZKOperationResponsne = any;
 }

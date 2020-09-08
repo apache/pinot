@@ -45,6 +45,10 @@ const useStyles = makeStyles((theme) => ({
     borderRadius: 4,
     marginBottom: '20px',
   },
+  lastRefreshDiv: {
+    direction: 'rtl',
+    margin: '-15px 0'
+  }
 }));
 
 const ZookeeperPage = () => {
@@ -61,6 +65,7 @@ const ZookeeperPage = () => {
   // states and handlers for toggle and select of tree
   const [expanded, setExpanded] = React.useState<string[]>(["1"]);
   const [selected, setSelected] = React.useState<string[]>(["1"]);
+  const [lastRefresh, setLastRefresh] = React.useState(null);
 
   const handleToggle = (event: React.ChangeEvent<{}>, nodeIds: string[]) => {
     setExpanded(nodeIds);
@@ -83,6 +88,7 @@ const ZookeeperPage = () => {
     const { currentNodeData, currentNodeMetadata } = await PinotMethodUtils.getNodeData(fullPath);
     setCurrentNodeData(currentNodeData);
     setCurrentNodeMetadata(currentNodeMetadata);
+    setLastRefresh(new Date());
   }
 
   // handlers for Tabs
@@ -123,12 +129,27 @@ const ZookeeperPage = () => {
     setCount(counter);
     setExpanded(["1"]);
     setSelected(["1"]);
+    setLastRefresh(new Date());
     setFetching(false);
   };
 
   useEffect(() => {
     fetchData();
   }, []);
+
+  const renderLastRefresh = () => (
+    <div className={classes.lastRefreshDiv}>
+      <p>
+        {`Last Refreshed: ${lastRefresh.toLocaleTimeString("en-US",{
+            hour12: true,
+            hour: 'numeric',
+            minute: '2-digit',
+            second: '2-digit'
+          })}
+        `}
+      </p>
+    </div>
+  )
 
   return fetching ? (
     <AppLoader />
@@ -143,7 +164,6 @@ const ZookeeperPage = () => {
           selected={selected}
           handleToggle={handleToggle}
           handleSelect={handleSelect}
-          refreshAction={fetchData}
           isLeafNodeSelected={leafNode}
           currentNodeData={currentNodeData}
           currentNodeMetadata={currentNodeMetadata}
@@ -171,11 +191,13 @@ const ZookeeperPage = () => {
               index={0}
               dir={theme.direction}
             >
+              {lastRefresh && renderLastRefresh()}
               <div className={classes.codeMirrorDiv}>
                 <CustomCodemirror data={currentNodeData}/>
               </div>
             </TabPanel>
             <TabPanel value={value} index={1} dir={theme.direction}>
+              {lastRefresh && renderLastRefresh()}
               <div className={classes.codeMirrorDiv}>
                 <CustomCodemirror data={currentNodeMetadata}/>
               </div>

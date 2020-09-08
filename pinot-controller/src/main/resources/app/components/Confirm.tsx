@@ -18,7 +18,7 @@
  * under the License.
  */
 
-import React, {  } from 'react';
+import React, { useEffect } from 'react';
 import { Button, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, makeStyles } from '@material-ui/core';
 import { green, red } from '@material-ui/core/colors';
 
@@ -66,6 +66,10 @@ type Props = {
 const Confirm = ({openDialog, dialogTitle, dialogContent, successCallback, closeDialog, dialogYesLabel, dialogNoLabel}: Props) => {
   const classes = useStyles();
   const [open, setOpen] = React.useState(openDialog);
+
+  useEffect(()=>{
+    setOpen(openDialog);
+  }, [openDialog])
 
   const isStringDialog = typeof dialogContent === 'string';
 

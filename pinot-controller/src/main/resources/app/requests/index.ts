@@ -19,7 +19,7 @@
 
 import { AxiosResponse } from 'axios';
 import { TableData, Instances, Instance, Tenants, ClusterConfig, TableName, TableSize,
-  IdealState, QueryTables, TableSchema, SQLResult, ClusterName, ZKGetList, ZKConfig
+  IdealState, QueryTables, TableSchema, SQLResult, ClusterName, ZKGetList, ZKConfig, ZKOperationResponsne
 } from 'Models';
 import { baseApi } from '../utils/axios-config';
 
@@ -80,8 +80,8 @@ export const zookeeperGetStat = (params: string): Promise<AxiosResponse<ZKConfig
 export const zookeeperGetListWithStat = (params: string): Promise<AxiosResponse<ZKConfig>> =>
   baseApi.get(`/zk/lsl?path=${params}`);
 
-export const zookeeperPutData = (params: string): Promise<AxiosResponse<ZKConfig>> =>
+export const zookeeperPutData = (params: string): Promise<AxiosResponse<ZKOperationResponsne>> =>
   baseApi.put(`/zk/put?${params}`, null, { headers: { 'Content-Type': 'application/json; charset=UTF-8', 'Accept': 'text/plain, */*; q=0.01' } });
 
-export const zookeeperDeleteNode = (params: string): Promise<AxiosResponse<ZKConfig>> =>
+export const zookeeperDeleteNode = (params: string): Promise<AxiosResponse<ZKOperationResponsne>> =>
   baseApi.delete(`/zk/delete?path=${params}`);
