@@ -581,11 +581,7 @@ public class DetectionResource {
   public Response alert(@QueryParam("id") List<Long> anomalyIds) {
     List<MergedAnomalyResultDTO> anomalies = this.anomalyDAO.findByIds(anomalyIds);
     for (MergedAnomalyResultDTO anomaly : anomalies) {
-      AnomalySubscriptionGroupNotificationDTO anomalySubscriptionGroupNotificationDTO =
-          new AnomalySubscriptionGroupNotificationDTO();
-      anomalySubscriptionGroupNotificationDTO.setAnomalyId(anomaly.getId());
-      anomalySubscriptionGroupNotificationDTO.setDetectionConfigId(anomaly.getDetectionConfigId());
-      anomalySubscriptionGroupNotificationManager.save(anomalySubscriptionGroupNotificationDTO);
+      DetectionUtils.renotifyAnomaly(anomaly);
     }
     return Response.ok().build();
   }
