@@ -51,7 +51,7 @@ public class CombinePlanNode implements PlanNode {
   // Try to schedule 10 plans for each thread, or evenly distribute plans to all MAX_NUM_THREADS_PER_QUERY threads
   private static final int TARGET_NUM_PLANS_PER_THREAD = 10;
 
-  private static final int TIME_OUT_IN_MILLISECONDS_FOR_PARALLEL_RUN = 10_000;
+  private static final int TIME_OUT_IN_MILLISECONDS_FOR_PARALLEL_RUN = 60_000;
 
   private final List<PlanNode> _planNodes;
   private final QueryContext _queryContext;
