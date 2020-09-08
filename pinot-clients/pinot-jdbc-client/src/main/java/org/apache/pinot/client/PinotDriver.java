@@ -41,7 +41,6 @@ public class PinotDriver implements Driver {
   public static final String TENANT = "tenant";
   public static final String DEFAULT_TENANT = "DefaultTenant";
 
-
   @Override
   public Connection connect(String url, Properties info)
       throws SQLException {
@@ -49,8 +48,7 @@ public class PinotDriver implements Driver {
       LOGGER.info("Initiating connection to database for url: " + url);
       PinotClientTransport pinotClientTransport = new JsonAsyncHttpPinotClientTransportFactory().buildTransport();
       String controllerUrl = DriverUtils.getControllerFromURL(url);
-      Preconditions.checkArgument(info.containsKey(TENANT), "Pinot tenant missing in the properties");
-      String tenant = info.getProperty(TENANT);
+      String tenant = info.getProperty(TENANT, DEFAULT_TENANT);
       return new PinotConnection(controllerUrl, pinotClientTransport, tenant);
     } catch (Exception e) {
       throw new SQLException(String.format("Failed to connect to url : %s", url), e);
