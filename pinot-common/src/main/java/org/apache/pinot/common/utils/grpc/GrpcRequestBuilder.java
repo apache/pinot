@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.transport.grpc;
+package org.apache.pinot.common.utils.grpc;
 
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;

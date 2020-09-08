@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.transport.grpc;
+package org.apache.pinot.common.utils.grpc;
 
 import io.grpc.Channel;
 import io.grpc.ManagedChannelBuilder;

@@ -105,6 +105,7 @@ public class CommonConstants {
       public static final String INSTANCE_ID_KEY = "instanceId";
       public static final String DATA_DIR_KEY = "dataDir";
       public static final String ADMIN_PORT_KEY = "adminPort";
+      public static final String GRPC_PORT_KEY = "grpcPort";
     }
 
     public static final String SET_INSTANCE_ID_TO_HOSTNAME_KEY = "pinot.set.instance.id.to.hostname";

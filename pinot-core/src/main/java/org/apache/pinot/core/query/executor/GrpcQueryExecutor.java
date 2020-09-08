@@ -129,7 +129,8 @@ public class GrpcQueryExecutor extends PinotQueryServerGrpc.PinotQueryServerImpl
     if (schedulerWaitTimer != null) {
       schedulerWaitTimer.stopAndRecord();
     }
-    long querySchedulingTimeMs = System.currentTimeMillis() - timerContext.getQueryArrivalTimeMs();
+    long queryArrivalTimeMs = timerContext.getQueryArrivalTimeMs();
+    long querySchedulingTimeMs = System.currentTimeMillis() - queryArrivalTimeMs;
     TimerContext.Timer queryProcessingTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PROCESSING);
 
     long requestId = queryRequest.getRequestId();
@@ -145,10 +146,9 @@ public class GrpcQueryExecutor extends PinotQueryServerGrpc.PinotQueryServerImpl
         queryTimeoutMs = timeoutFromQueryOptions;
       }
     }
-    long remainingTimeMs = queryTimeoutMs - querySchedulingTimeMs;
 
     // Query scheduler wait time already exceeds query timeout, directly return
-    if (remainingTimeMs <= 0) {
+    if (querySchedulingTimeMs >= queryTimeoutMs) {
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.SCHEDULING_TIMEOUT_EXCEPTIONS, 1);
       String errorMessage = String
           .format("Query scheduling took %dms (longer than query timeout of %dms)", querySchedulingTimeMs,
@@ -251,9 +251,10 @@ public class GrpcQueryExecutor extends PinotQueryServerGrpc.PinotQueryServerImpl
         for (SegmentDataManager segmentDataManager : segmentDataManagers) {
           indexSegments.add(segmentDataManager.getSegment());
         }
+        long endTimeMs = queryArrivalTimeMs + queryTimeoutMs;
         Plan globalQueryPlan = queryRequest.isEnableStreaming() ? _planMaker
-            .makeStreamingInstancePlan(indexSegments, queryContext, _executorService, streamObserver, remainingTimeMs)
-            : _planMaker.makeInstancePlan(indexSegments, queryContext, _executorService, remainingTimeMs);
+            .makeStreamingInstancePlan(indexSegments, queryContext, _executorService, streamObserver, endTimeMs)
+            : _planMaker.makeInstancePlan(indexSegments, queryContext, _executorService, endTimeMs);
         planBuildTimer.stopAndRecord();
 
         TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);
