@@ -43,7 +43,6 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 import static org.apache.pinot.thirdeye.detection.spec.SeverityThresholdLabelerSpec.Threshold;
 
 public class ThresholdSeverityLabelerTest {
@@ -62,10 +61,10 @@ public class ThresholdSeverityLabelerTest {
   @BeforeMethod
   public void beforeMethod(){
     Map<MetricSlice, DataFrame> aggregates = new HashMap<>();
-    aggregates.put(MetricSlice.from(123L, 1000L, 2000L), new DataFrame().addSeries(COL_VALUE, 1200));
-    aggregates.put(MetricSlice.from(123L, 2000L, 3000L), new DataFrame().addSeries(COL_VALUE, 1600));
-    aggregates.put(MetricSlice.from(123L, 3000L, 4000L), new DataFrame().addSeries(COL_VALUE, 4800));
-    aggregates.put(MetricSlice.from(123L, 4000L, 6000L), new DataFrame().addSeries(COL_VALUE, 2500));
+    aggregates.put(MetricSlice.from(123L, 1000L, 2000L), new DataFrame().addSeries(DataFrame.COL_VALUE, 1200));
+    aggregates.put(MetricSlice.from(123L, 2000L, 3000L), new DataFrame().addSeries(DataFrame.COL_VALUE, 1600));
+    aggregates.put(MetricSlice.from(123L, 3000L, 4000L), new DataFrame().addSeries(DataFrame.COL_VALUE, 4800));
+    aggregates.put(MetricSlice.from(123L, 4000L, 6000L), new DataFrame().addSeries(DataFrame.COL_VALUE, 2500));
 
     MetricConfigDTO metricConfigDTO = new MetricConfigDTO();
     metricConfigDTO.setId(123L);
