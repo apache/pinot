@@ -17,13 +17,17 @@
  * under the License.
  */
 
-package org.apache.pinot.thirdeye.detection.annotation;
+package org.apache.pinot.thirdeye.detection.spi.components;
 
-public enum DetectionTag {
-  ALGORITHM_DETECTION,
-  RULE_DETECTION,
-  ALGORITHM_FILTER,
-  RULE_FILTER,
-  GROUPER,
-  LABELER
+import java.util.List;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.detection.spec.AbstractSpec;
+
+
+public interface Labeler <T extends AbstractSpec> extends BaseComponent<T> {
+  /**
+   * add or modify labels of anomalies in place
+   * @param anomalies
+   */
+  void label(List<MergedAnomalyResultDTO> anomalies);
 }

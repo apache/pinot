@@ -17,13 +17,36 @@
  * under the License.
  */
 
-package org.apache.pinot.thirdeye.detection.annotation;
+package org.apache.pinot.thirdeye.detection.spec;
 
-public enum DetectionTag {
-  ALGORITHM_DETECTION,
-  RULE_DETECTION,
-  ALGORITHM_FILTER,
-  RULE_FILTER,
-  GROUPER,
-  LABELER
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import java.util.Map;
+
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class SeverityThresholdLabelerSpec  extends AbstractSpec{
+  private Map<String, Threshold> severity;
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public static class Threshold {
+    public double change = Double.MAX_VALUE;
+    public long duration = Long.MAX_VALUE;
+
+    public Threshold() {
+
+    }
+
+    public Threshold(double change, long duration) {
+      this.change = change;
+      this.duration = duration;
+    }
+  }
+
+  public Map<String, Threshold> getSeverity() {
+    return severity;
+  }
+
+  public void setSeverity(Map<String, Threshold> severity) {
+    this.severity = severity;
+  }
 }

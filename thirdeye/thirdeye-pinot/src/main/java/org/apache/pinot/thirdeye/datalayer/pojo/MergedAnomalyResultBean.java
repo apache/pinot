@@ -20,6 +20,7 @@
 package org.apache.pinot.thirdeye.datalayer.pojo;
 
 import java.io.Serializable;
+import org.apache.pinot.thirdeye.anomaly.AnomalySeverity;
 import org.apache.pinot.thirdeye.anomaly.AnomalyType;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
@@ -60,6 +61,8 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
   private Set<Long> childIds; // ids of the anomalies this anomaly merged from
   private boolean isChild;
   private AnomalyType type;
+  private AnomalySeverity severityLabel;
+
 
   public Set<Long> getChildIds() {
     return childIds;
@@ -262,6 +265,18 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
 
   public void setType(AnomalyType type) {
     this.type = type;
+  }
+
+  public void setSeverityLabel(AnomalySeverity severityLabel) {
+    this.severityLabel = severityLabel;
+  }
+
+  public AnomalySeverity getSeverityLabel() {
+    // default severity level is debug
+    if (severityLabel == null) {
+      return AnomalySeverity.DEFAULT;
+    }
+    return severityLabel;
   }
 
   @Override

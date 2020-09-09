@@ -49,7 +49,6 @@ import static org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfi
  */
 public class GrouperWrapper extends DetectionPipeline {
   private static final String PROP_NESTED = "nested";
-  private static final String PROP_CLASS_NAME = "className";
   private static final String PROP_GROUPER = "grouper";
   public static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
 
@@ -88,20 +87,8 @@ public class GrouperWrapper extends DetectionPipeline {
 
     Set<Long> lastTimeStamps = new HashSet<>();
     for (Map<String, Object> properties : this.nestedProperties) {
-      DetectionConfigDTO nestedConfig = new DetectionConfigDTO();
-
-      Preconditions.checkArgument(properties.containsKey(PROP_CLASS_NAME), "Nested missing " + PROP_CLASS_NAME);
-
-      nestedConfig.setId(this.config.getId());
-      nestedConfig.setName(this.config.getName());
-      nestedConfig.setDescription(this.config.getDescription());
-      nestedConfig.setProperties(properties);
-      nestedConfig.setComponents(this.config.getComponents());
-      DetectionPipeline pipeline = this.provider.loadPipeline(nestedConfig, this.startTime, this.endTime);
-
-      DetectionPipelineResult intermediate = pipeline.run();
+      DetectionPipelineResult intermediate = this.runNested(properties, this.startTime, this.endTime);
       lastTimeStamps.add(intermediate.getLastTimestamp());
-
       predictionResults.addAll(intermediate.getPredictions());
       evaluations.addAll(intermediate.getEvaluations());
       diagnostics.putAll(intermediate.getDiagnostics());

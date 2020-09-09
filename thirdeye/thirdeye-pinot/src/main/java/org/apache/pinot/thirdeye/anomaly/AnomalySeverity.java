@@ -17,13 +17,26 @@
  * under the License.
  */
 
-package org.apache.pinot.thirdeye.detection.annotation;
+package org.apache.pinot.thirdeye.anomaly;
 
-public enum DetectionTag {
-  ALGORITHM_DETECTION,
-  RULE_DETECTION,
-  ALGORITHM_FILTER,
-  RULE_FILTER,
-  GROUPER,
-  LABELER
+/**
+ * The severity of anomaly.
+ */
+public enum AnomalySeverity {
+  // the order of definition follows the severity from highest to lowest
+  CRITICAL ("critical"),
+  HIGH ("high"),
+  MEDIUM ("medium"),
+  LOW ("low"),
+  DEFAULT ("default");
+
+  private String severity;
+
+  AnomalySeverity(String severity) {
+    this.severity = severity;
+  }
+
+  public String getLabel() {
+    return severity;
+  }
 }
