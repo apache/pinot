@@ -85,8 +85,8 @@ public class MetricAnalysisPipeline2 extends Pipeline {
   private static final String PROP_GRANULARITY = "granularity";
   private static final String PROP_GRANULARITY_DEFAULT = "15_MINUTES";
 
-  private static final String COL_TIME = DataFrameUtils.COL_TIME;
-  private static final String COL_VALUE = DataFrameUtils.COL_VALUE;
+  private static final String COL_TIME = DataFrame.COL_TIME;
+  private static final String COL_VALUE = DataFrame.COL_VALUE;
   private static final String COL_CURRENT = "current";
   private static final String COL_BASELINE = "baseline";
 

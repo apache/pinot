@@ -137,7 +137,7 @@ public class MockThirdEyeDataSourceIntegrationTest {
     ThirdEyeResponse response = this.cacheRegistry.getQueryCache().getQueryResult(requestContainer.getRequest());
     DataFrame df = DataFrameUtils.evaluateResponse(response, requestContainer);
 
-    Assert.assertTrue(df.getDouble(DataFrameUtils.COL_VALUE, 0) > 0);
+    Assert.assertTrue(df.getDouble(DataFrame.COL_VALUE, 0) > 0);
   }
 
   @Test
@@ -151,7 +151,7 @@ public class MockThirdEyeDataSourceIntegrationTest {
     Assert.assertEquals(new HashSet<>(df.getStrings("country").toList()), new HashSet<>(Arrays.asList("ca", "mx", "us")));
     Assert.assertEquals(new HashSet<>(df.getStrings("browser").toList()), new HashSet<>(Arrays.asList("chrome", "edge", "safari")));
     for (int i = 0; i < df.size(); i++) {
-      Assert.assertTrue(df.getDouble(DataFrameUtils.COL_VALUE, i) >= 0);
+      Assert.assertTrue(df.getDouble(DataFrame.COL_VALUE, i) >= 0);
     }
   }
 
@@ -163,10 +163,10 @@ public class MockThirdEyeDataSourceIntegrationTest {
     DataFrame df = DataFrameUtils.evaluateResponse(response, requestContainer);
 
     Assert.assertEquals(df.size(), 2);
-    Assert.assertTrue(df.getLong(DataFrameUtils.COL_TIME, 0) > 0);
-    Assert.assertTrue(df.getDouble(DataFrameUtils.COL_VALUE, 0) > 0);
-    Assert.assertTrue(df.getLong(DataFrameUtils.COL_TIME, 1) > 0);
-    Assert.assertTrue(df.getDouble(DataFrameUtils.COL_VALUE, 1) > 0);
+    Assert.assertTrue(df.getLong(DataFrame.COL_TIME, 0) > 0);
+    Assert.assertTrue(df.getDouble(DataFrame.COL_VALUE, 0) > 0);
+    Assert.assertTrue(df.getLong(DataFrame.COL_TIME, 1) > 0);
+    Assert.assertTrue(df.getDouble(DataFrame.COL_VALUE, 1) > 0);
   }
 
   @Test
@@ -197,9 +197,9 @@ public class MockThirdEyeDataSourceIntegrationTest {
     ThirdEyeResponse resDesktop = this.cacheRegistry.getQueryCache().getQueryResult(reqDesktop.getRequest());
     DataFrame dfDesktop = DataFrameUtils.evaluateResponse(resDesktop, reqDesktop);
 
-    Assert.assertTrue(dfBasic.getDouble(DataFrameUtils.COL_VALUE, 0) >= dfMobile.getDouble(DataFrameUtils.COL_VALUE, 0));
-    Assert.assertTrue(dfBasic.getDouble(DataFrameUtils.COL_VALUE, 0) >= dfDesktop.getDouble(DataFrameUtils.COL_VALUE, 0));
-    Assert.assertEquals(dfBasic.getDouble(DataFrameUtils.COL_VALUE, 0),
-        dfDesktop.getDouble(DataFrameUtils.COL_VALUE, 0) + dfMobile.getDouble(DataFrameUtils.COL_VALUE, 0));
+    Assert.assertTrue(dfBasic.getDouble(DataFrame.COL_VALUE, 0) >= dfMobile.getDouble(DataFrame.COL_VALUE, 0));
+    Assert.assertTrue(dfBasic.getDouble(DataFrame.COL_VALUE, 0) >= dfDesktop.getDouble(DataFrame.COL_VALUE, 0));
+    Assert.assertEquals(dfBasic.getDouble(DataFrame.COL_VALUE, 0),
+        dfDesktop.getDouble(DataFrame.COL_VALUE, 0) + dfMobile.getDouble(DataFrame.COL_VALUE, 0));
   }
 }

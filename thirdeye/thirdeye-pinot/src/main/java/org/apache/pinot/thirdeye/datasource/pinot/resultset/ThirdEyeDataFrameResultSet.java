@@ -29,8 +29,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils;
-
 
 /**
  * An unified container that store Select, Aggregation, and Group-By {@link ResultSet} in a data frame.
@@ -106,7 +104,7 @@ public class ThirdEyeDataFrameResultSet extends AbstractThirdEyeResultSet {
 
     List<String> groupKeyColumnNames = new ArrayList<>();
     if (aggGranularity != null && !groupByKeys.contains(timeSpec.getColumnName())) {
-      groupKeyColumnNames.add(0, DataFrameUtils.COL_TIME);
+      groupKeyColumnNames.add(0, DataFrame.COL_TIME);
     }
 
     for (String groupByKey: groupByKeys) {

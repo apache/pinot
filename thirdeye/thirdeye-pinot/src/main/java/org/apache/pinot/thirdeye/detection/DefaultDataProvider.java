@@ -60,9 +60,6 @@ import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-
-
 public class DefaultDataProvider implements DataProvider {
   private static final Logger LOG = LoggerFactory.getLogger(DefaultDataProvider.class);
   private static final long TIMEOUT = 60000;
@@ -130,7 +127,9 @@ public class DefaultDataProvider implements DataProvider {
       for (MetricSlice slice : slices) {
         DataFrame result = futures.get(slice).get(DetectionUtils.makeTimeout(deadline), TimeUnit.MILLISECONDS);
         // fill in time stamps
-        result.dropSeries(COL_TIME).addSeries(COL_TIME, LongSeries.fillValues(result.size(), slice.getStart())).setIndex(COL_TIME);
+        result.dropSeries(DataFrame.COL_TIME).addSeries(
+            DataFrame.COL_TIME, LongSeries.fillValues(result.size(), slice.getStart())).setIndex(
+            DataFrame.COL_TIME);
         output.put(slice, result);
       }
       return output;

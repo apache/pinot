@@ -37,9 +37,6 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-
-
 public class AbsoluteChangeRuleAnomalyFilterTest {
   private static final String METRIC_URN = "thirdeye:metric:123";
   private static final long CONFIG_ID = 125L;
@@ -57,10 +54,14 @@ public class AbsoluteChangeRuleAnomalyFilterTest {
     MetricSlice baselineSlice2 = this.baseline.scatter(slice2).get(0);
 
     Map<MetricSlice, DataFrame> aggregates = new HashMap<>();
-    aggregates.put(slice1, new DataFrame().addSeries(COL_VALUE, 150).addSeries(COL_TIME, slice1.getStart()).setIndex(COL_TIME));
-    aggregates.put(baselineSlice1, new DataFrame().addSeries(COL_VALUE, 200).addSeries(COL_TIME, baselineSlice1.getStart()).setIndex(COL_TIME));
-    aggregates.put(slice2, new DataFrame().addSeries(COL_VALUE, 500).addSeries(COL_TIME, slice2.getStart()).setIndex(COL_TIME));
-    aggregates.put(baselineSlice2, new DataFrame().addSeries(COL_VALUE, 1000).addSeries(COL_TIME, baselineSlice2.getStart()).setIndex(COL_TIME));
+    aggregates.put(slice1, new DataFrame().addSeries(DataFrame.COL_VALUE, 150).addSeries(
+        DataFrame.COL_TIME, slice1.getStart()).setIndex(DataFrame.COL_TIME));
+    aggregates.put(baselineSlice1, new DataFrame().addSeries(DataFrame.COL_VALUE, 200).addSeries(
+        DataFrame.COL_TIME, baselineSlice1.getStart()).setIndex(DataFrame.COL_TIME));
+    aggregates.put(slice2, new DataFrame().addSeries(DataFrame.COL_VALUE, 500).addSeries(
+        DataFrame.COL_TIME, slice2.getStart()).setIndex(DataFrame.COL_TIME));
+    aggregates.put(baselineSlice2, new DataFrame().addSeries(DataFrame.COL_VALUE, 1000).addSeries(
+        DataFrame.COL_TIME, baselineSlice2.getStart()).setIndex(DataFrame.COL_TIME));
 
     this.testDataProvider = new MockDataProvider().setAggregates(aggregates);
   }

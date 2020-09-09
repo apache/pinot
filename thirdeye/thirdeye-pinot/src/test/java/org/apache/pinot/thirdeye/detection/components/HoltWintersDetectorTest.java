@@ -40,14 +40,9 @@ import org.apache.pinot.thirdeye.detection.spec.HoltWintersDetectorSpec;
 import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.joda.time.Interval;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
-
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-import static org.eclipse.jetty.http.HttpParser.*;
 
 /**
  * Test class for HoltWinters detector
@@ -61,12 +56,12 @@ public class HoltWintersDetectorTest {
     DataFrame hourlyData;
     try (Reader dataReader = new InputStreamReader(AlgorithmUtils.class.getResourceAsStream("daily.csv"))) {
       dailyData = DataFrame.fromCsv(dataReader);
-      dailyData.setIndex(COL_TIME);
+      dailyData.setIndex(DataFrame.COL_TIME);
     }
 
     try (Reader dataReader = new InputStreamReader(AlgorithmUtils.class.getResourceAsStream("hourly.csv"))) {
       hourlyData = DataFrame.fromCsv(dataReader);
-      hourlyData.setIndex(COL_TIME);
+      hourlyData.setIndex(DataFrame.COL_TIME);
     }
 
     MetricConfigDTO dailyMetricConfig = new MetricConfigDTO();

@@ -53,6 +53,13 @@ import org.joda.time.Period;
 public class DataFrame {
   public static final Pattern PATTERN_FORMULA_VARIABLE = Pattern.compile("\\$\\{([^}]*)}");
 
+  public static final String COL_TIME = "timestamp";
+  // baseline value
+  public static final String COL_VALUE = "value";
+  public static final String COL_CURRENT = "current";
+  public static final String COL_UPPER_BOUND = "upper_bound";
+  public static final String COL_LOWER_BOUND = "lower_bound";
+
   public static final String COLUMN_JOIN_KEY = "join_key";
 
   public static final String COLUMN_INDEX_DEFAULT = "index";

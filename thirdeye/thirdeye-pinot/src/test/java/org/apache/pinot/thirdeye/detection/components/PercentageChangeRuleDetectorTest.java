@@ -45,9 +45,6 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-
-
 public class PercentageChangeRuleDetectorTest {
 
   private DataProvider provider;
@@ -57,14 +54,14 @@ public class PercentageChangeRuleDetectorTest {
   public void beforeMethod() throws Exception {
     try (Reader dataReader = new InputStreamReader(AlgorithmUtils.class.getResourceAsStream("timeseries-4w.csv"))) {
       this.data = DataFrame.fromCsv(dataReader);
-      this.data.setIndex(COL_TIME);
-      this.data.addSeries(COL_TIME, this.data.getLongs(COL_TIME).multiply(1000));
+      this.data.setIndex(DataFrame.COL_TIME);
+      this.data.addSeries(DataFrame.COL_TIME, this.data.getLongs(DataFrame.COL_TIME).multiply(1000));
     }
 
     DataFrame weeklyData;
     try (Reader dataReader = new InputStreamReader(AlgorithmUtils.class.getResourceAsStream("timeseries-2y.csv"))) {
       weeklyData = DataFrame.fromCsv(dataReader);
-      weeklyData.setIndex(COL_TIME);
+      weeklyData.setIndex(DataFrame.COL_TIME);
     }
 
     MetricConfigDTO metricConfigDTO = new MetricConfigDTO();
@@ -86,14 +83,17 @@ public class PercentageChangeRuleDetectorTest {
     timeseries.put(MetricSlice.from(1L, 1561420800000L, 1562630400000L), weeklyData);
 
     timeseries.put(MetricSlice.from(1L, 1546214400000L, 1551312000000L),
-        new DataFrame().addSeries(COL_TIME, 1546214400000L, 1548892800000L).addSeries(COL_VALUE, 100, 200));
+        new DataFrame().addSeries(DataFrame.COL_TIME, 1546214400000L, 1548892800000L).addSeries(
+            DataFrame.COL_VALUE, 100, 200));
     timeseries.put(MetricSlice.from(1L, 1543536000000L, 1548633600000L),
-        new DataFrame().addSeries(COL_TIME, 1543536000000L, 1546214400000L)
-            .addSeries(COL_VALUE, 100, 100));
+        new DataFrame().addSeries(DataFrame.COL_TIME, 1543536000000L, 1546214400000L)
+            .addSeries(DataFrame.COL_VALUE, 100, 100));
     timeseries.put(MetricSlice.from(1L, 1551398400000L, 1551571200000L),
-        new DataFrame().addSeries(COL_TIME, 1551398400000L, 1551484800000L).addSeries(COL_VALUE, 0, 200));
+        new DataFrame().addSeries(DataFrame.COL_TIME, 1551398400000L, 1551484800000L).addSeries(
+            DataFrame.COL_VALUE, 0, 200));
     timeseries.put(MetricSlice.from(1L, 1550793600000L, 1550966400000L),
-        new DataFrame().addSeries(COL_TIME, 1550793600000L, 1550880000000L).addSeries(COL_VALUE, 0, 0));
+        new DataFrame().addSeries(DataFrame.COL_TIME, 1550793600000L, 1550880000000L).addSeries(
+            DataFrame.COL_VALUE, 0, 0));
 
     this.provider = new MockDataProvider()
         .setTimeseries(timeseries)

@@ -207,7 +207,7 @@ public class MetricBreakdownPipeline extends Pipeline {
 
     DataFrame out = new DataFrame();
     out.addSeries(dimension, raw.getStrings(dimension));
-    out.addSeries(COL_CONTRIB, raw.getDoubles(DataFrameUtils.COL_VALUE).normalizeSum());
+    out.addSeries(COL_CONTRIB, raw.getDoubles(DataFrame.COL_VALUE).normalizeSum());
     out.setIndex(dimension);
 
     return out;

@@ -55,8 +55,6 @@ import org.joda.time.Interval;
 import org.joda.time.Period;
 
 import static org.apache.pinot.thirdeye.dataframe.DoubleSeries.*;
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-
 
 @Components(title = "Percentage change rule detection", type = "PERCENTAGE_RULE", tags = {
     DetectionTag.RULE_DETECTION}, description =
@@ -105,13 +103,13 @@ public class PercentageChangeRuleDetector implements AnomalyDetector<PercentageC
     // aggregate data to specified weekly granularity
     if (this.monitoringGranularity.endsWith(TimeGranularity.WEEKS)) {
       Period monitoringGranularityPeriod = DetectionUtils.getMonitoringGranularityPeriod(this.monitoringGranularity, datasetConfig);
-      long latestDataTimeStamp = dfCurr.getLong(COL_TIME, dfCurr.size() - 1);
+      long latestDataTimeStamp = dfCurr.getLong(DataFrame.COL_TIME, dfCurr.size() - 1);
       dfCurr = DetectionUtils.aggregateByPeriod(dfCurr, windowStart, monitoringGranularityPeriod, metricConfig.getDefaultAggFunction());
       dfCurr = DetectionUtils.filterIncompleteAggregation(dfCurr, latestDataTimeStamp, datasetConfig.bucketTimeGranularity(), monitoringGranularityPeriod);
       dfBase = DetectionUtils.aggregateByPeriod(dfBase, windowStart, monitoringGranularityPeriod, metricConfig.getDefaultAggFunction());
     }
 
-    dfCurr = dfCurr.renameSeries(COL_VALUE, COL_CURR);
+    dfCurr = dfCurr.renameSeries(DataFrame.COL_VALUE, COL_CURR);
     DataFrame df = new DataFrame(dfCurr).addSeries(dfBase);
 
     // calculate percentage change
@@ -120,7 +118,7 @@ public class PercentageChangeRuleDetector implements AnomalyDetector<PercentageC
         return Double.compare(values[0], 0.0) == 0 ? 0.0 : (values[0] > 0 ? Double.POSITIVE_INFINITY : Double.NEGATIVE_INFINITY);
       }
       return (values[0] - values[1]) / values[1];
-    }, df.getDoubles(COL_CURR), df.get(COL_VALUE)));
+    }, df.getDoubles(COL_CURR), df.get(DataFrame.COL_VALUE)));
 
     // defaults
     df.addSeries(COL_ANOMALY, BooleanSeries.fillValues(df.size(), false));
@@ -154,16 +152,17 @@ public class PercentageChangeRuleDetector implements AnomalyDetector<PercentageC
     if (!Double.isNaN(this.percentageChange)) {
       switch (this.pattern) {
         case UP:
-          fillPercentageChangeBound(dfBase, COL_UPPER_BOUND, 1 + this.percentageChange);
-          dfBase.addSeries(COL_LOWER_BOUND, DoubleSeries.zeros(dfBase.size()));
+          fillPercentageChangeBound(dfBase, DataFrame.COL_UPPER_BOUND, 1 + this.percentageChange);
+          dfBase.addSeries(DataFrame.COL_LOWER_BOUND, DoubleSeries.zeros(dfBase.size()));
           break;
         case DOWN:
-          dfBase.addSeries(COL_UPPER_BOUND, DoubleSeries.fillValues(dfBase.size(), POSITIVE_INFINITY));
-          fillPercentageChangeBound(dfBase, COL_LOWER_BOUND, 1 - this.percentageChange);
+          dfBase.addSeries(
+              DataFrame.COL_UPPER_BOUND, DoubleSeries.fillValues(dfBase.size(), POSITIVE_INFINITY));
+          fillPercentageChangeBound(dfBase, DataFrame.COL_LOWER_BOUND, 1 - this.percentageChange);
           break;
         case UP_OR_DOWN:
-          fillPercentageChangeBound(dfBase, COL_UPPER_BOUND, 1 + this.percentageChange);
-          fillPercentageChangeBound(dfBase, COL_LOWER_BOUND, 1 - this.percentageChange);
+          fillPercentageChangeBound(dfBase, DataFrame.COL_UPPER_BOUND, 1 + this.percentageChange);
+          fillPercentageChangeBound(dfBase, DataFrame.COL_LOWER_BOUND, 1 - this.percentageChange);
           break;
         default:
           throw new IllegalArgumentException();
@@ -173,7 +172,8 @@ public class PercentageChangeRuleDetector implements AnomalyDetector<PercentageC
   }
 
   private void fillPercentageChangeBound(DataFrame dfBase, String colBound, double multiplier) {
-    dfBase.addSeries(colBound, map((DoubleFunction) values -> values[0] * multiplier, dfBase.getDoubles(COL_VALUE)));
+    dfBase.addSeries(colBound, map((DoubleFunction) values -> values[0] * multiplier, dfBase.getDoubles(
+        DataFrame.COL_VALUE)));
   }
 
   @Override
