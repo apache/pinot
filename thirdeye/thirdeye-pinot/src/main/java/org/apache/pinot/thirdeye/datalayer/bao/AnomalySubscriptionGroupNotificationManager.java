@@ -23,6 +23,9 @@ package org.apache.pinot.thirdeye.datalayer.bao;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalySubscriptionGroupNotificationDTO;
 
 
+/**
+ * The interface Anomaly subscription group notification manager.
+ */
 public interface AnomalySubscriptionGroupNotificationManager
     extends AbstractManager<AnomalySubscriptionGroupNotificationDTO> {
 }
