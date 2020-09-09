@@ -186,9 +186,11 @@ public class PinotSegmentUploadDownloadRestletResource {
     String uploadTypeStr = null;
     String crypterClassNameInHeader = null;
     String downloadUri = null;
+    String ingestionDescriptor = null;
     if (headers != null) {
       extractHttpHeader(headers, CommonConstants.Controller.SEGMENT_NAME_HTTP_HEADER);
       extractHttpHeader(headers, CommonConstants.Controller.TABLE_NAME_HTTP_HEADER);
+      ingestionDescriptor = extractHttpHeader(headers, CommonConstants.Controller.INGESTION_DESCRIPTOR);
       uploadTypeStr = extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE);
       crypterClassNameInHeader = extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.CRYPTER);
       downloadUri = extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);
@@ -242,9 +244,8 @@ public class PinotSegmentUploadDownloadRestletResource {
 
       String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
       String clientAddress = InetAddress.getByName(request.getRemoteAddr()).getHostName();
-      LOGGER
-          .info("Processing upload request for segment: {} of table: {} from client: {}", segmentName, offlineTableName,
-              clientAddress);
+      LOGGER.info("Processing upload request for segment: {} of table: {} from client: {}, ingestion descriptor: {}",
+          segmentName, offlineTableName, clientAddress, ingestionDescriptor);
 
       // Validate segment
       new SegmentValidator(_pinotHelixResourceManager, _controllerConf, _executor, _connectionManager,
