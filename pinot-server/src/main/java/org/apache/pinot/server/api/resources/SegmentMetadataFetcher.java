@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.server.api.resources;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -26,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.restlet.resources.SegmentLoadStatus;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
@@ -56,7 +56,8 @@ public class SegmentMetadataFetcher {
    * @param columns
    * @return
    */
-  public static String getSegmentMetadata(SegmentDataManager segmentDataManager, List<String> columns) {
+  public static String getSegmentMetadata(SegmentDataManager segmentDataManager, List<String> columns)
+      throws JsonProcessingException {
     SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) segmentDataManager.getSegment().getSegmentMetadata();
     Set<String> columnSet;
     if (columns.size() == 1 && columns.get(0).equals("*")) {
@@ -68,7 +69,7 @@ public class SegmentMetadataFetcher {
     JsonNode segmentMetadataJson = segmentMetadata.toJson(columnSet);
     ObjectNode segmentMetadataObject = segmentMetadataJson.deepCopy();
     segmentMetadataObject.set("indexes", indexes);
-    return ResourceUtils.convertToJsonString(segmentMetadataObject);
+    return JsonUtils.objectToPrettyString(segmentMetadataObject);
   }
 
   /**

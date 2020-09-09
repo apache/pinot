@@ -125,7 +125,8 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(jsonResponse.get("columns").size(), 0);
 
     jsonResponse = JsonUtils.stringToJsonNode(
-        _webTarget.path(segmentMetadataPath).queryParam("columns", "column1").queryParam("columns", "column2").request()
+        _webTarget.path(segmentMetadataPath)
+            .queryParam("columns", "column1").queryParam("columns", "column2").request()
             .get(String.class));
     Assert.assertEquals(jsonResponse.get("columns").size(), 2);
 
@@ -240,7 +241,8 @@ public class TablesResourceTest extends BaseResourceTest {
 
 
     jsonResponse = JsonUtils.stringToJsonNode(
-        _webTarget.path(segmentMetadataPath).queryParam("columns", "column1").queryParam("columns", "column2").request()
+        _webTarget.path(segmentMetadataPath)
+            .queryParam("columns", "column1").queryParam("columns", "column2").request()
             .get(String.class));
     Assert.assertEquals(jsonResponse.get("columns").size(), 2);
     Assert.assertEquals(jsonResponse.get("indexes").size(), 1);
