@@ -50,23 +50,6 @@ public class TableMetadataReader {
   }
 
   /**
-   * This helper method is used to retrieve the reload status for all segments of a table.
-   * NOTE: Currently supports only OFFLINE tables.
-   * @param tableNameWithType
-   * @param timeoutMs
-   * @return reload status object containing the refreshTime for each of the segments.
-   * @throws InvalidConfigException
-   */
-  public ServerSegmentMetadataReader.TableReloadStatus getReloadStatus(String tableNameWithType, int timeoutMs) throws InvalidConfigException {
-    final Map<String, List<String>> serverToSegments = _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
-    BiMap<String, String> endpoints = _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
-    ServerSegmentMetadataReader serverSegmentMetadataReader = new ServerSegmentMetadataReader(_executor, _connectionManager);
-
-    return serverSegmentMetadataReader.getSegmentReloadTime(tableNameWithType,
-        serverToSegments, endpoints, timeoutMs);
-  }
-
-  /**
    * This method retrieves the full segment metadata for a given table.
    * Currently supports only OFFLINE tables.
    * @param tableNameWithType

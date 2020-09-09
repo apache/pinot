@@ -25,7 +25,6 @@ import io.swagger.annotations.ApiParam;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -58,7 +57,6 @@ import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
-import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
 import org.apache.pinot.controller.util.TableMetadataReader;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -503,41 +501,6 @@ public class PinotSegmentRestletResource {
     } catch (IllegalArgumentException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.FORBIDDEN);
     }
-  }
-
-  @GET
-  @Path("segments/{tableName}/loadStatus")
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Load status of a table segment", notes = "Load status of a table segment")
-  public Map<String, ServerSegmentMetadataReader.TableReloadStatus> getReloadStatus(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr) {
-    TableType tableType = Constants.validateTableType(tableTypeStr);
-    if (tableType == TableType.REALTIME) {
-      throw new ControllerApplicationException(LOGGER,
-          "Table type : " + tableTypeStr + " not yet supported.", Status.NOT_IMPLEMENTED);
-    }
-
-    List<String> tableNamesWithType = getExistingTableNamesWithType(tableName, Constants.validateTableType(tableTypeStr));
-    Map<String, ServerSegmentMetadataReader.TableReloadStatus> reloadStatusMap = new HashMap<>();
-    for (String tableNameWithType : tableNamesWithType) {
-      ServerSegmentMetadataReader.TableReloadStatus tableReloadStatus;
-      try {
-        tableReloadStatus = getSegmentsReloadStatus(tableNameWithType);
-      } catch (InvalidConfigException e) {
-        throw new ControllerApplicationException(LOGGER, e.getMessage(), Status.BAD_REQUEST);
-      }
-      reloadStatusMap.put(tableNameWithType, tableReloadStatus);
-    }
-    return reloadStatusMap;
-  }
-
-  private ServerSegmentMetadataReader.TableReloadStatus getSegmentsReloadStatus(String tableNameWithType)
-      throws InvalidConfigException {
-    TableMetadataReader tableMetadataReader =
-        new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
-    return tableMetadataReader.getReloadStatus(tableNameWithType,
-        _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
   }
 
   @GET

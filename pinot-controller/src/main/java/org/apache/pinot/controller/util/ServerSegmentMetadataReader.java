@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.util;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.BiMap;
 import java.io.IOException;
@@ -27,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import org.apache.commons.httpclient.HttpConnectionManager;
-import org.apache.pinot.common.restlet.resources.SegmentLoadStatus;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,70 +92,5 @@ public class ServerSegmentMetadataReader {
 
   private String generateSegmentMetadataServerURL(String tableNameWithType, String segmentName, String endpoint) {
     return String.format("http://%s/tables/%s/segments/%s/metadata", endpoint, tableNameWithType, segmentName);
-  }
-
-  private String generateReloadStatusServerURL(String tableNameWithType, String segmentName, String endpoint) {
-    return String.format("http://%s/tables/%s/segments/%s/loadStatus", endpoint, tableNameWithType, segmentName);
-  }
-
-  /**
-   * This method is called when the API request is to fetch segment metadata for all segments of the table.
-   * It makes a MultiGet call to all servers that host their respective segments and gets the results.
-   * @param tableNameWithType
-   * @param serverToSegments
-   * @param serverToEndpoint
-   * @param timeoutMs
-   * @return list of segments along with their last reload times
-   */
-  public TableReloadStatus getSegmentReloadTime(String tableNameWithType,
-                                                Map<String, List<String>> serverToSegments,
-                                                BiMap<String, String> serverToEndpoint, int timeoutMs) {
-    LOGGER.debug("Reading segment reload status from servers for table {}.", tableNameWithType);
-    List<String> serverURLs = new ArrayList<>();
-    for (Map.Entry<String, List<String>> serverToSegmentsEntry : serverToSegments.entrySet()) {
-      List<String> segments = serverToSegmentsEntry.getValue();
-      for (String segment : segments) {
-        serverURLs.add(generateReloadStatusServerURL(tableNameWithType, segment, serverToEndpoint.get(serverToSegmentsEntry.getKey())));
-      }
-    }
-
-    BiMap<String, String> endpointsToServers = serverToEndpoint.inverse();
-    CompletionServiceHelper completionServiceHelper = new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
-    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-        completionServiceHelper.doMultiGetRequest(serverURLs, tableNameWithType, timeoutMs);
-    List<SegmentLoadStatus> segmentsStatus = new ArrayList<>();
-    int failedParses = 0;
-    for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
-      try {
-        SegmentLoadStatus segmentLoadStatus = JsonUtils.stringToObject(streamResponse.getValue(), SegmentLoadStatus.class);
-        segmentsStatus.add(segmentLoadStatus);
-      } catch (IOException e) {
-        failedParses++;
-        LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
-      }
-    }
-    if (failedParses != 0) {
-      LOGGER.warn("Failed to parse {} / {} segment load status responses from server.", failedParses, serverURLs.size());
-    }
-
-    TableReloadStatus tableReloadStatus = new TableReloadStatus();
-    tableReloadStatus._tableName = tableNameWithType;
-    tableReloadStatus._segmentLoadStatuses = segmentsStatus;
-    tableReloadStatus._numSegmentsFailed = serviceResponse._failedResponseCount;
-    return tableReloadStatus;
-  }
-
-  /**
-   * Structure to hold the load status for all segments of a given table.
-   */
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  public static class TableReloadStatus {
-    String _tableName;
-    List<SegmentLoadStatus> _segmentLoadStatuses;
-    int _numSegmentsFailed;
-
-    public List<SegmentLoadStatus> getSegmentStatus() {
-      return _segmentLoadStatuses;
-    }
   }
 }

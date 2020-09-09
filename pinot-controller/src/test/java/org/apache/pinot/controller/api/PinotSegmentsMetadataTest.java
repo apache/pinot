@@ -27,7 +27,6 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -37,7 +36,6 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
-import org.apache.pinot.common.restlet.resources.SegmentLoadStatus;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -105,13 +103,6 @@ public class PinotSegmentsMetadataTest {
     s.start(URI_PATH, createSegmentMetadataHandler(404, s.segmentMetadata, 0));
     serverMap.put(serverName(counter), s);
     ++counter;
-
-    // server3 ... reload status
-    s = new SegmentsServerMock("s4");
-    s.updateMetadataMock();
-    s.start(URI_PATH, createReloadStatusHandler(200, s.segmentsReloadStatus.get(0), 0));
-    serverMap.put(serverName(counter), s);
-    ++counter;
   }
 
   private String serverName(int counter) {
@@ -123,26 +114,6 @@ public class PinotSegmentsMetadataTest {
     for (Map.Entry<String, SegmentsServerMock> fakeServerEntry : serverMap.entrySet()) {
       fakeServerEntry.getValue().httpServer.stop(0);
     }
-  }
-
-  private HttpHandler createReloadStatusHandler(final int status,
-                                                final SegmentLoadStatus reloadStatus,
-                                                final int sleepTimeMs) {
-    return httpExchange -> {
-      if (sleepTimeMs > 0) {
-        try {
-          Thread.sleep(sleepTimeMs);
-        } catch (InterruptedException e) {
-          LOGGER.info("Handler interrupted during sleep");
-        }
-      }
-
-      String json = JsonUtils.objectToString(reloadStatus);
-      httpExchange.sendResponseHeaders(status, json.length());
-      OutputStream responseBody = httpExchange.getResponseBody();
-      responseBody.write(json.getBytes());
-      responseBody.close();
-    };
   }
 
   private HttpHandler createSegmentMetadataHandler(final int status, final String segmentMetadata, final int sleepTimeMs) {
@@ -167,13 +138,6 @@ public class PinotSegmentsMetadataTest {
                                             BiMap<String, String> endpoints) {
     ServerSegmentMetadataReader metadataReader = new ServerSegmentMetadataReader(executor, connectionManager);
     return metadataReader.getSegmentMetadataFromServer(table, serverToSegmentsMap, endpoints, timeoutMsec);
-  }
-
-  private ServerSegmentMetadataReader.TableReloadStatus testReloadStatusResponse(String table,
-                                                                                 Map<String, List<String>> serverToSegmentsMap,
-                                                                                 BiMap<String, String> endpoints) {
-    ServerSegmentMetadataReader metadataReader = new ServerSegmentMetadataReader(executor, connectionManager);
-    return metadataReader.getSegmentReloadTime(table, serverToSegmentsMap, endpoints, timeoutMsec);
   }
 
   private Map<String, List<String>> getServerToSegments(List<String> servers) {
@@ -212,33 +176,12 @@ public class PinotSegmentsMetadataTest {
     Assert.assertEquals(expectedNonResponsiveServers, totalResponses - metadata.size());
   }
 
-  @Test
-  public void testSegmentReloadTimeSuccess() {
-    final List<String> servers = MetadataConstants.SEGMENT_SERVERS.subList(2, 3);
-    Map<String, List<String>> serverToSegmentsMap = getServerToSegments(servers);
-    BiMap<String, String> endpoints = serverEndpoints(servers);
-    String table = "offline";
-    ServerSegmentMetadataReader.TableReloadStatus metadata = testReloadStatusResponse(table, serverToSegmentsMap, endpoints);
-    Assert.assertEquals(1, metadata.getSegmentStatus().size());
-  }
-
-  @Test
-  public void testSegmentReloadTimeError() {
-    final List<String> servers = MetadataConstants.SEGMENT_SERVERS.subList(1, 3);
-    Map<String, List<String>> serverToSegmentsMap = getServerToSegments(servers);
-    BiMap<String, String> endpoints = serverEndpoints(servers);
-    String table = "offline";
-    ServerSegmentMetadataReader.TableReloadStatus metadata = testReloadStatusResponse(table, serverToSegmentsMap, endpoints);
-    Assert.assertEquals(1, metadata.getSegmentStatus().size());
-  }
-
   public static class SegmentsServerMock {
     String segment;
     String endpoint;
     InetSocketAddress socket = new InetSocketAddress(0);
     String segmentMetadata;
     HttpServer httpServer;
-    List<SegmentLoadStatus> segmentsReloadStatus = new ArrayList<>();
 
     public SegmentsServerMock(String segment) {
       this.segment = segment;
@@ -249,10 +192,6 @@ public class PinotSegmentsMetadataTest {
       ObjectNode objectNode = jsonNode.deepCopy();
       objectNode.put("segmentName", segment);
       segmentMetadata = JsonUtils.objectToString(objectNode);
-      SegmentLoadStatus status = new SegmentLoadStatus();
-      status._segmentName = segment;
-      status._segmentReloadTimeMillis = 1598645309;
-      segmentsReloadStatus.add(status);
     }
 
     private void start(String path, HttpHandler handler)

@@ -29,7 +29,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
@@ -47,7 +46,6 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
-import org.apache.pinot.common.restlet.resources.SegmentLoadStatus;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -237,34 +235,6 @@ public class TablesResource {
       builder.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + segmentTarFile.getName());
       builder.header(HttpHeaders.CONTENT_LENGTH, segmentTarFile.length());
       return builder.build();
-    } finally {
-      tableDataManager.releaseSegment(segmentDataManager);
-    }
-  }
-
-  @GET
-  @Path("tables/{tableName}/segments/{segmentName}/loadStatus")
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Metadata from server segment metadata.properties", notes = "Metadata from server that hosts the segment provided.")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"), @ApiResponse(code = 404, message = "Table not found")})
-  public String getSegmentReloadStatus(
-      @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE") @PathParam("tableName") String tableName,
-      @ApiParam(value = "Segment name", required = true) @PathParam("segmentName") String segmentName) {
-    TableDataManager tableDataManager = checkGetTableDataManager(tableName);
-    SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
-    if (Objects.isNull(segmentDataManager)) {
-      throw new WebApplicationException(String.format("Table %s segments %s does not exist", tableName, segmentName),
-          Response.Status.NOT_FOUND);
-    }
-
-    try {
-      LOGGER.info("Get segment reload status for: {}", segmentName);
-      SegmentLoadStatus segmentLoadStatus = SegmentMetadataFetcher.getSegmentReloadStatus(segmentDataManager);
-      return ResourceUtils.convertToJsonString(segmentLoadStatus);
-    } catch (Exception e) {
-      LOGGER.error("Failed to convert table {} segment {} to json", tableName, segmentName);
-      throw new WebApplicationException("Failed to convert segment metadata to json",
-          Response.Status.INTERNAL_SERVER_ERROR);
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);
     }

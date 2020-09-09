@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import org.apache.pinot.common.restlet.resources.SegmentLoadStatus;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
@@ -70,17 +69,6 @@ public class SegmentMetadataFetcher {
     ObjectNode segmentMetadataObject = segmentMetadataJson.deepCopy();
     segmentMetadataObject.set("indexes", indexes);
     return JsonUtils.objectToPrettyString(segmentMetadataObject);
-  }
-
-  /**
-   * This is a helper method to fetch segment reload status.
-   * @param segmentDataManager
-   * @return segment refresh time
-   */
-  public static SegmentLoadStatus getSegmentReloadStatus(SegmentDataManager segmentDataManager) {
-    SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) segmentDataManager.getSegment().getSegmentMetadata();
-    long refreshTime = segmentMetadata.getRefreshTime();
-    return new SegmentLoadStatus(segmentDataManager.getSegmentName(), refreshTime, "");
   }
 
   /**

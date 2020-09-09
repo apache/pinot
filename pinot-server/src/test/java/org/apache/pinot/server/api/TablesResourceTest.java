@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.util.List;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.restlet.resources.SegmentLoadStatus;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -259,18 +258,5 @@ public class TablesResourceTest extends BaseResourceTest {
         .path("/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/segments/UNKNOWN_SEGMENT")
         .request().get(Response.class);
     Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
-  }
-
-  @Test
-  public void testOfflineTableSegmentsReloadStatus() throws Exception {
-    IndexSegment defaultSegment = _offlineIndexSegments.get(0);
-    String segmentMetadataPath =
-        "/tables/" + TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME) + "/segments/" + defaultSegment
-            .getSegmentName() + "/loadStatus";
-    SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) defaultSegment.getSegmentMetadata();
-    SegmentLoadStatus segmentLoadStatus =
-        JsonUtils.stringToObject(_webTarget.path(segmentMetadataPath).request().get(String.class), SegmentLoadStatus.class);
-    Assert.assertEquals(segmentLoadStatus._segmentName, segmentMetadata.getName());
-    Assert.assertEquals(Long.MIN_VALUE, segmentLoadStatus._segmentReloadTimeMillis);
   }
 }
