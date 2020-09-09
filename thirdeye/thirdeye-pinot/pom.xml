@@ -6,9 +6,8 @@
   <parent>
     <groupId>org.apache.pinot.thirdeye</groupId>
     <artifactId>thirdeye</artifactId>
-    <version>${revision}${sha1}</version>
+    <version>0.1.0-SNAPSHOT</version>
   </parent>
-  <groupId>org.apache.pinot.thirdeye</groupId>
   <artifactId>thirdeye-pinot</artifactId>
   <name>thirdeye-pinot</name>
   <url>http://maven.apache.org</url>
@@ -17,6 +16,10 @@
   </properties>
 
   <dependencies>
+    <dependency>
+      <groupId>org.apache.pinot.thirdeye</groupId>
+      <artifactId>thirdeye-spi</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.apache.httpcomponents</groupId>
       <artifactId>httpclient</artifactId>
@@ -85,29 +88,7 @@
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
     </dependency>
-    <dependency>
-      <groupId>com.fasterxml.jackson.core</groupId>
-      <artifactId>jackson-annotations</artifactId>
-    </dependency>
 
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-spi</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>javax.mail</groupId>
-          <artifactId>mail</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.slf4j</groupId>
-          <artifactId>slf4j-log4j12</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-java-client</artifactId>
-    </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
@@ -152,10 +133,6 @@
       <artifactId>guava</artifactId>
     </dependency>
     <dependency>
-      <groupId>joda-time</groupId>
-      <artifactId>joda-time</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.eclipse.jetty</groupId>
       <artifactId>jetty-proxy</artifactId>
       <version>${jetty.version}</version>
@@ -178,16 +155,6 @@
       <groupId>io.prestosql</groupId>
       <artifactId>presto-jdbc</artifactId>
       <version>333</version>
-    </dependency>
-
-    <!-- dataframe specific -->
-    <dependency>
-      <groupId>org.apache.commons</groupId>
-      <artifactId>commons-csv</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.udojava</groupId>
-      <artifactId>EvalEx</artifactId>
     </dependency>
 
     <!-- DB specific -->

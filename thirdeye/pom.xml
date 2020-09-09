@@ -22,17 +22,18 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.apache.pinot.thirdeye</groupId>
   <artifactId>thirdeye</artifactId>
-  <version>${revision}${sha1}</version>
+  <version>0.1.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>thirdeye</name>
 
   <modules>
     <module>thirdeye-frontend</module>
+    <module>thirdeye-spi</module>
     <module>thirdeye-pinot</module>
   </modules>
 
   <properties>
-    <revision>1.0.0</revision>
+    <revision>0.1.0</revision>
     <sha1>-SNAPSHOT</sha1>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <pinot.version>0.4.0</pinot.version>
@@ -48,7 +49,7 @@
     <httpclient.version>4.5.2</httpclient.version>
     <commons.email.version>1.4</commons.email.version>
     <commons-math3.version>3.2</commons-math3.version>
-    <commons-lang3.version>3.0</commons-lang3.version>
+    <commons-lang3.version>3.9</commons-lang3.version>
     <commons-io.version>2.4</commons-io.version>
     <commons-jexl.version>2.0</commons-jexl.version>
     <commons-cli.version>1.3</commons-cli.version>
@@ -162,6 +163,12 @@
 
   <dependencyManagement>
     <dependencies>
+      <dependency>
+        <groupId>org.apache.pinot.thirdeye</groupId>
+        <artifactId>thirdeye-spi</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+
       <!-- project dependencies -->
       <dependency>
         <groupId>org.apache.pinot</groupId>
@@ -543,6 +550,12 @@
         <artifactId>log4j-slf4j-impl</artifactId>
         <version>${log4j2.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-lang3</artifactId>
+        <version>${commons-lang3.version}</version>
+      </dependency>
+
     </dependencies>
   </dependencyManagement>
 
