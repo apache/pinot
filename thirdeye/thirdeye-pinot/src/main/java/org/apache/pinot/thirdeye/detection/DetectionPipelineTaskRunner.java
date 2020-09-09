@@ -178,7 +178,7 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
       // re-notify the anomalies if any
       for (MergedAnomalyResultDTO anomaly : result.getAnomalies()) {
         // if an anomaly should be re-notified, update the notification lookup table in the database
-        if (anomaly.shouldRenotify()) {
+        if (anomaly.isRenotify()) {
           DetectionUtils.renotifyAnomaly(anomaly);
         }
       }

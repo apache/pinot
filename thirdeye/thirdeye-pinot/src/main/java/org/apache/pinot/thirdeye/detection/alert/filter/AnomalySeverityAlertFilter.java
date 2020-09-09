@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.apache.pinot.thirdeye.constant.AnomalySeverity;
+import org.apache.pinot.thirdeye.anomaly.AnomalySeverity;
 import org.apache.pinot.thirdeye.datalayer.bao.AnomalySubscriptionGroupNotificationManager;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalySubscriptionGroupNotificationDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
@@ -112,7 +112,7 @@ public class AnomalySeverityAlertFilter extends StatefulDetectionAlertFilter {
           .collect(Collectors.toList());
       Set<MergedAnomalyResultDTO> notifyAnomalies = new HashSet<>();
       for (MergedAnomalyResultDTO anomaly : anomalies) {
-        if (severities.contains(anomaly.getSeverity())) {
+        if (severities.contains(anomaly.getSeverityLabel())) {
           notifyAnomalies.add(anomaly);
         }
       }

@@ -29,7 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.thirdeye.constant.AnomalySeverity;
+import org.apache.pinot.thirdeye.anomaly.AnomalySeverity;
 import org.apache.pinot.thirdeye.datalayer.bao.AnomalySubscriptionGroupNotificationManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalySubscriptionGroupNotificationDTO;
@@ -105,7 +105,7 @@ public class AnomalySeverityAlertFilterTest {
     Thread.sleep(10);
     this.detectionAnomalies.add(
         makeAnomaly(detectionConfigId1, this.baseTime, 0, 110, Collections.singletonMap("key", "anotherValue"), null,
-            AnomalySeverity.MODERATE));
+            AnomalySeverity.MEDIUM));
     Thread.sleep(20);
     this.detectionAnomalies.add(
         makeAnomaly(detectionConfigId1, this.baseTime, 0, 120, Collections.singletonMap("key", "unknownValue"), null,
@@ -131,7 +131,7 @@ public class AnomalySeverityAlertFilterTest {
   private DetectionAlertConfigDTO createDetectionAlertConfig() {
     DetectionAlertConfigDTO alertConfig = new DetectionAlertConfigDTO();
 
-    notify1.put("severity", Arrays.asList("LOW", "MODERATE"));
+    notify1.put("severity", Arrays.asList("LOW", "MEDIUM"));
     notify1.put("notify", ImmutableMap.of("emailScheme", ImmutableMap.of("recipients", PROP_TO_FOR_VALUE)));
     notify2.put("severity", Collections.singleton("HIGH"));
     notify2.put("notify", ImmutableMap.of("emailScheme", ImmutableMap.of("recipients", PROP_TO_FOR_ANOTHER_VALUE)));
