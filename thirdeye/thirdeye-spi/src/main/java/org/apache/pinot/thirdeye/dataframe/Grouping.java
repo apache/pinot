@@ -15,6 +15,7 @@
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
  * under the License.
+ *
  */
 
 package org.apache.pinot.thirdeye.dataframe;
@@ -38,7 +39,6 @@ import org.joda.time.Period;
 import org.joda.time.PeriodType;
 
 import static org.apache.pinot.thirdeye.dataframe.DoubleSeries.*;
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
 public abstract class Grouping {

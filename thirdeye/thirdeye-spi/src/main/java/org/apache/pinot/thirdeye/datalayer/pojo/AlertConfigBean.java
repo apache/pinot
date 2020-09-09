@@ -29,7 +29,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import org.eclipse.jetty.util.StringUtil;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -212,7 +211,7 @@ public class AlertConfigBean extends AbstractBean {
     String properties;
 
     public String getType() {
-      if (StringUtil.isBlank(type)) {
+      if (isBlank(type)) {
         return "";
       }
       return type;
@@ -223,10 +222,26 @@ public class AlertConfigBean extends AbstractBean {
     }
 
     public String getProperties() {
-      if (StringUtil.isBlank(properties)) {
+      if (isBlank(properties)) {
         return "";
       }
       return properties;
+    }
+
+    public static boolean isBlank(String str) {
+      if (str == null) {
+        return true;
+      } else {
+        int len = str.length();
+
+        for(int i = 0; i < len; ++i) {
+          if (!Character.isWhitespace(str.codePointAt(i))) {
+            return false;
+          }
+        }
+
+        return true;
+      }
     }
 
     public void setProperties(String properties) {

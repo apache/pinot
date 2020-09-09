@@ -25,8 +25,8 @@ import org.apache.pinot.thirdeye.datalayer.pojo.EvaluationBean;
 import org.apache.pinot.thirdeye.detection.Evaluation;
 import org.apache.pinot.thirdeye.detection.PredictionResult;
 
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-
+import static org.apache.pinot.thirdeye.dataframe.DataFrame.COL_CURRENT;
+import static org.apache.pinot.thirdeye.dataframe.DataFrame.COL_VALUE;
 
 /**
  * The evaluation DTO

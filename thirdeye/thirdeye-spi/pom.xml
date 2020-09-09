@@ -86,6 +86,11 @@
       <groupId>com.udojava</groupId>
       <artifactId>EvalEx</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-math</artifactId>
+      <scope>compile</scope>
+    </dependency>
 
   </dependencies>
 
