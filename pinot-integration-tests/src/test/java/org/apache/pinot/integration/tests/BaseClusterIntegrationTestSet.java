@@ -33,6 +33,8 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.core.query.utils.idset.IdSet;
+import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -52,7 +54,6 @@ import static org.testng.Assert.assertTrue;
  * Shared set of common tests for cluster integration tests.
  * <p>To enable the test, override it and add @Test annotation.
  */
-@SuppressWarnings("unused")
 public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseClusterIntegrationTestSet.class);
   private static final Random RANDOM = new Random();
@@ -186,11 +187,11 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     testSqlQuery(query, Collections.singletonList(query));
     query =
         "SELECT DistanceGroup FROM mytable WHERE \"Month\" BETWEEN 1 AND 1 AND DivAirportSeqIDs IN (1078102, 1142303, 1530402, 1172102, 1291503) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10";
-    h2queries = Arrays.asList(
+    h2queries = Collections.singletonList(
         "SELECT DistanceGroup FROM mytable WHERE Month BETWEEN 1 AND 1 AND (DivAirportSeqIDs__MV0 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV1 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV2 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV3 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV4 IN (1078102, 1142303, 1530402, 1172102, 1291503)) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10000");
     testSqlQuery(query, h2queries);
     query = "SELECT MAX(Quarter), MAX(FlightNum) FROM mytable LIMIT 8";
-    h2queries = Arrays.asList("SELECT MAX(Quarter),MAX(FlightNum) FROM mytable LIMIT 10000");
+    h2queries = Collections.singletonList("SELECT MAX(Quarter),MAX(FlightNum) FROM mytable LIMIT 10000");
     testSqlQuery(query, h2queries);
     query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch = 16312 AND Carrier = 'DL'";
     testSqlQuery(query, Collections.singletonList(query));
@@ -251,6 +252,21 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     query =
         "SELECT DaysSinceEpoch, MAX(ArrDelay) - MAX(AirTime) AS Diff FROM mytable GROUP BY DaysSinceEpoch HAVING (Diff >= 300 AND Diff < 500) OR Diff < -500 ORDER BY Diff DESC";
     testSqlQuery(query, Collections.singletonList(query));
+
+    // IN_ID_SET
+    IdSet idSet = IdSets.create(FieldSpec.DataType.LONG);
+    idSet.add(19690L);
+    idSet.add(20355L);
+    idSet.add(21171L);
+    // Also include a non-existing id
+    idSet.add(0L);
+    String serializedIdSet = idSet.toBase64String();
+    String inIdSetQuery = "SELECT COUNT(*) FROM mytable WHERE INIDSET(AirlineID, '" + serializedIdSet + "') = 1";
+    String inQuery = "SELECT COUNT(*) FROM mytable WHERE AirlineID IN (19690, 20355, 21171, 0)";
+    testSqlQuery(inIdSetQuery, Collections.singletonList(inQuery));
+    String notInIdSetQuery = "SELECT COUNT(*) FROM mytable WHERE INIDSET(AirlineID, '" + serializedIdSet + "') = 0";
+    String notInQuery = "SELECT COUNT(*) FROM mytable WHERE AirlineID NOT IN (19690, 20355, 21171, 0)";
+    testSqlQuery(notInIdSetQuery, Collections.singletonList(notInQuery));
   }
 
   /**
