@@ -93,7 +93,7 @@ public class ContinuumAnomalyFetcher extends BaseAnomalyFetcher {
         continue;
       }
 
-      String snapshotKey = AlertSnapshotDTO.getSnapshotKey(mergedAnomaly);
+      String snapshotKey = BaseAnomalyFetcher.getSnapshotKey(mergedAnomaly);
       if (snapshot.containsKey(snapshotKey)){
         // If the mergedAnomaly's start time is before last notify time and
         // the last notify time of the metric-dimension isn't REALERT_FREQUENCY ahead, discard

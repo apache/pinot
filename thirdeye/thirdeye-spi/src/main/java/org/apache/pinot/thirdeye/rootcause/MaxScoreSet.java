@@ -19,7 +19,6 @@
 
 package org.apache.pinot.thirdeye.rootcause;
 
-import org.apache.pinot.thirdeye.rootcause.Entity;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;

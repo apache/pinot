@@ -15,6 +15,7 @@
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
  * under the License.
+ *
  */
 
 package org.apache.pinot.thirdeye.common.dimension;
@@ -34,7 +35,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.slf4j.Logger;
@@ -102,7 +102,7 @@ public class DimensionMap implements SortedMap<String, String>, Comparable<Dimen
    */
   public static DimensionMap fromDimensionKey(DimensionKey dimensionKey, List<String> schemaDimensionNames) {
     DimensionMap dimensionMap = new DimensionMap();
-    if (CollectionUtils.isNotEmpty(schemaDimensionNames)) {
+    if (schemaDimensionNames != null && !schemaDimensionNames.isEmpty()) {
       String[] dimensionValues = dimensionKey.getDimensionValues();
       for (int i = 0; i < dimensionValues.length; ++i) {
         String dimensionValue = dimensionValues[i].trim();

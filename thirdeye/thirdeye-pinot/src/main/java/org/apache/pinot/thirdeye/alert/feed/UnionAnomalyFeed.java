@@ -19,13 +19,18 @@
 
 package org.apache.pinot.thirdeye.alert.feed;
 
+import com.google.common.collect.Multimap;
 import org.apache.pinot.thirdeye.alert.commons.AnomalyFeedConfig;
 import org.apache.pinot.thirdeye.alert.commons.AnomalyFetcherConfig;
 import org.apache.pinot.thirdeye.alert.commons.AnomalyFetcherFactory;
+import org.apache.pinot.thirdeye.alert.commons.AnomalyNotifiedStatus;
 import org.apache.pinot.thirdeye.alert.commons.AnomalySource;
 import org.apache.pinot.thirdeye.alert.fetcher.AnomalyFetcher;
+import org.apache.pinot.thirdeye.alert.fetcher.BaseAnomalyFetcher;
 import org.apache.pinot.thirdeye.anomaly.alert.util.AlertFilterHelper;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.datalayer.bao.AlertSnapshotManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.dto.AlertSnapshotDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
@@ -44,6 +49,8 @@ import org.slf4j.LoggerFactory;
 
 
 public class UnionAnomalyFeed implements AnomalyFeed {
+
+  public static final TimeGranularity EXPIRE_TIME = TimeGranularity.fromString("7_DAYS");
   private static final Logger LOG = LoggerFactory.getLogger(UnionAnomalyFeed.class);
 
   private AlertSnapshotManager alertSnapshotDAO;
@@ -130,7 +137,49 @@ public class UnionAnomalyFeed implements AnomalyFeed {
       throw new NullPointerException("Alert snapshot is null");
     }
 
-    alertSnapshot.updateSnapshot(alertTime, new ArrayList<>(alertedAnomalies));
+    updateSnapshot(alertTime, new ArrayList<>(alertedAnomalies));
     alertSnapshotDAO.update(alertSnapshot);
+  }
+
+  public void updateSnapshot(DateTime alertTime, List<MergedAnomalyResultDTO> alertedAnomalies) {
+    MergedAnomalyResultManager mergedAnomalyResultDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
+    // Set the lastNotifyTime to current time if there is alerted anomalies
+    if (alertedAnomalies.size() > 0) {
+      alertSnapshot.setLastNotifyTime(alertTime.getMillis());
+    }
+
+    Multimap<String, AnomalyNotifiedStatus> snapshot = alertSnapshot.getSnapshot();
+    // update snapshots based on anomalies
+    for (MergedAnomalyResultDTO anomaly : alertedAnomalies) {
+      String snapshotKey = BaseAnomalyFetcher.getSnapshotKey(anomaly);
+      AnomalyNotifiedStatus lastNotifyStatus = alertSnapshot.getLatestStatus(snapshot, snapshotKey);
+      AnomalyNotifiedStatus statusToBeUpdated = new AnomalyNotifiedStatus(alertTime.getMillis(), anomaly.getWeight());
+      if (lastNotifyStatus.getLastNotifyTime() > anomaly.getStartTime()) {
+        // anomaly is a continuing issue, and the status should be appended to the end of snapshot
+        snapshot.put(snapshotKey, statusToBeUpdated);
+      } else {
+        // anomaly is a new issue, override the status list
+        snapshot.removeAll(snapshotKey);
+        snapshot.put(snapshotKey, statusToBeUpdated);
+      }
+
+      // Set notified flag
+      anomaly.setNotified(true);
+      mergedAnomalyResultDAO.update(anomaly);
+    }
+
+    // cleanup stale status in snapshot
+    DateTime expiredTime = alertTime.minus(EXPIRE_TIME.toPeriod());
+    List<String> keysToBeRemoved = new ArrayList<>();
+    for (String snapshotKey : snapshot.keySet()) {
+      AnomalyNotifiedStatus latestStatus = alertSnapshot.getLatestStatus(snapshot, snapshotKey);
+      if (latestStatus.getLastNotifyTime() < expiredTime.getMillis()) {
+        keysToBeRemoved.add(snapshotKey);
+      }
+    }
+    for (String key : keysToBeRemoved) {
+      snapshot.removeAll(key);
+    }
+    alertSnapshot.setSnapshot(snapshot);
   }
 }

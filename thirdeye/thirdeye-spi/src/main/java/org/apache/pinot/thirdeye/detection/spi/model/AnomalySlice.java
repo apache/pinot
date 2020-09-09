@@ -15,10 +15,12 @@
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
  * under the License.
+ *
  */
 
 package org.apache.pinot.thirdeye.detection.spi.model;
 
+import static org.apache.pinot.thirdeye.detection.GrouperWrapperConstants.PROP_DETECTOR_COMPONENT_NAME;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
@@ -27,9 +29,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-
-import static org.apache.pinot.thirdeye.detection.wrapper.GrouperWrapper.*;
-
 
 /**
  * Selector for anomalies based on (optionally) detector id, start time, end time, and

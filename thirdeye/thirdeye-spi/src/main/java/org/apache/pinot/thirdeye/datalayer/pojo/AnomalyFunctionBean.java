@@ -27,7 +27,7 @@ import com.google.common.collect.Multimap;
 import org.apache.pinot.thirdeye.anomaly.merge.AnomalyMergeConfig;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.constant.MetricAggFunction;
-import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
+import org.apache.pinot.thirdeye.datalayer.util.ThirdEyeDataUtils;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -286,13 +286,13 @@ public class AnomalyFunctionBean extends AbstractBean {
   @JsonIgnore
   @JsonProperty("wrapper")
   public Multimap<String, String> getFilterSet() {
-    return ThirdEyeUtils.getFilterSet(filters);
+    return ThirdEyeDataUtils.getFilterSet(filters);
   }
 
   @JsonIgnore
   @JsonProperty("wrapper")
   public void setFilters(String filters) {
-    String sortedFilters = ThirdEyeUtils.getSortedFilters(filters);
+    String sortedFilters = ThirdEyeDataUtils.getSortedFilters(filters);
     this.filters = sortedFilters;
   }
 
