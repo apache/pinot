@@ -20,10 +20,12 @@ package org.apache.pinot.core.plan.maker;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import io.grpc.stub.StreamObserver;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.plan.AggregationGroupByOrderByPlanNode;
 import org.apache.pinot.core.plan.AggregationGroupByPlanNode;
@@ -36,6 +38,7 @@ import org.apache.pinot.core.plan.MetadataBasedAggregationPlanNode;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.plan.SelectionPlanNode;
+import org.apache.pinot.core.plan.StreamingSelectionPlanNode;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.config.QueryExecutorConfig;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
@@ -103,7 +106,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       planNodes.add(makeSegmentPlanNode(indexSegment, queryContext));
     }
     CombinePlanNode combinePlanNode =
-        new CombinePlanNode(planNodes, queryContext, executorService, endTimeMs, _numGroupsLimit);
+        new CombinePlanNode(planNodes, queryContext, executorService, endTimeMs, _numGroupsLimit, null);
     return new GlobalPlanImplV0(new InstanceResponsePlanNode(combinePlanNode));
   }
 
@@ -136,6 +139,28 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     } else {
       // Selection query
       return new SelectionPlanNode(indexSegment, queryContext);
+    }
+  }
+
+  @Override
+  public Plan makeStreamingInstancePlan(List<IndexSegment> indexSegments, QueryContext queryContext,
+      ExecutorService executorService, StreamObserver<Server.ServerResponse> streamObserver, long endTimeMs) {
+    List<PlanNode> planNodes = new ArrayList<>(indexSegments.size());
+    for (IndexSegment indexSegment : indexSegments) {
+      planNodes.add(makeStreamingSegmentPlanNode(indexSegment, queryContext));
+    }
+    CombinePlanNode combinePlanNode =
+        new CombinePlanNode(planNodes, queryContext, executorService, endTimeMs, _numGroupsLimit, streamObserver);
+    return new GlobalPlanImplV0(new InstanceResponsePlanNode(combinePlanNode));
+  }
+
+  @Override
+  public PlanNode makeStreamingSegmentPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
+    if (QueryContextUtils.isAggregationQuery(queryContext)) {
+      throw new UnsupportedOperationException("Queries with aggregations are not supported");
+    } else {
+      // Selection query
+      return new StreamingSelectionPlanNode(indexSegment, queryContext);
     }
   }
 

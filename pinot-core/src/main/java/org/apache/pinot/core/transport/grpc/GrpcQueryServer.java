@@ -16,8 +16,34 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.server.starter.grpc;
+package org.apache.pinot.core.transport.grpc;
 
-public class PinotQueryService {
+import io.grpc.Server;
+import io.grpc.ServerBuilder;
+import java.io.IOException;
+import org.apache.pinot.core.query.executor.GrpcQueryExecutor;
 
+
+public class GrpcQueryServer {
+  private final Server _server;
+
+  public GrpcQueryServer(int port, GrpcQueryExecutor queryExecutor) {
+    _server = ServerBuilder.forPort(port).addService(queryExecutor).build();
+  }
+
+  public void start() {
+    try {
+      _server.start();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  public void shutdown() {
+    try {
+      _server.shutdown().awaitTermination();
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    }
+  }
 }

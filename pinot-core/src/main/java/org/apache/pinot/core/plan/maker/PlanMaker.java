@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.core.plan.maker;
 
+import io.grpc.stub.StreamObserver;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
+import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.PlanNode;
@@ -43,4 +45,17 @@ public interface PlanMaker {
    * Returns a segment level {@link PlanNode} which contains the logical execution plan for one segment.
    */
   PlanNode makeSegmentPlanNode(IndexSegment indexSegment, QueryContext queryContext);
+
+  /**
+   * Returns an instance level {@link Plan} for a streaming query which contains the logical execution plan for multiple
+   * segments.
+   */
+  Plan makeStreamingInstancePlan(List<IndexSegment> indexSegments, QueryContext queryContext,
+      ExecutorService executorService, StreamObserver<Server.ServerResponse> streamObserver, long endTimeMs);
+
+  /**
+   * Returns a segment level {@link PlanNode} for a streaming query which contains the logical execution plan for one
+   * segment.
+   */
+  PlanNode makeStreamingSegmentPlanNode(IndexSegment indexSegment, QueryContext queryContext);
 }
