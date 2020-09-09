@@ -24,13 +24,13 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.thirdeye.anomaly.AnomalySeverity;
 import org.apache.pinot.thirdeye.anomaly.AnomalyType;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
-import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DetectionTestUtils;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterNotification;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
@@ -89,9 +89,14 @@ public class AlertFilterUtils {
 
     return new DetectionAlertFilterNotification(subsConfig);
   }
-
   static MergedAnomalyResultDTO makeAnomaly(Long configId, long baseTime, long start, long end,
       Map<String, String> dimensions, AnomalyFeedbackDTO feedback) {
+    return makeAnomaly(configId, baseTime, start, end, dimensions, feedback, AnomalySeverity.DEFAULT);
+  }
+
+
+  static MergedAnomalyResultDTO makeAnomaly(Long configId, long baseTime, long start, long end,
+      Map<String, String> dimensions, AnomalyFeedbackDTO feedback, AnomalySeverity severity) {
     MergedAnomalyResultDTO anomaly = DetectionTestUtils.makeAnomaly(configId, baseTime + start, baseTime + end);
     anomaly.setType(AnomalyType.DEVIATION);
     anomaly.setChildIds(Collections.emptySet());
@@ -108,6 +113,7 @@ public class AlertFilterUtils {
 
     anomaly.setCreatedBy("no-auth-user");
     anomaly.setUpdatedBy("no-auth-user");
+    anomaly.setSeverityLabel(severity);
     anomaly.setId(DAORegistry.getInstance().getMergedAnomalyResultDAO().save(anomaly));
 
     if (feedback != null) {

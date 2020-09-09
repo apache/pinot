@@ -22,6 +22,7 @@ package org.apache.pinot.thirdeye.datasource;
 import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.AlertSnapshotManager;
 import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import org.apache.pinot.thirdeye.datalayer.bao.AnomalySubscriptionGroupNotificationManager;
 import org.apache.pinot.thirdeye.datalayer.bao.ApplicationManager;
 import org.apache.pinot.thirdeye.datalayer.bao.ClassificationConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.ConfigManager;
@@ -48,6 +49,7 @@ import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.AlertConfigManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.AlertSnapshotManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl;
+import org.apache.pinot.thirdeye.datalayer.bao.jdbc.AnomalySubscriptionGroupNotificationManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.ApplicationManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.ClassificationConfigManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.ConfigManagerImpl;
@@ -201,5 +203,9 @@ public class DAORegistry {
 
   public OnlineDetectionDataManager getOnlineDetectionDataManager() {
     return DaoProviderUtil.getInstance(OnlineDetectionDataManagerImpl.class);
+  }
+
+  public AnomalySubscriptionGroupNotificationManager getAnomalySubscriptionGroupNotificationManager() {
+    return DaoProviderUtil.getInstance(AnomalySubscriptionGroupNotificationManagerImpl.class);
   }
 }

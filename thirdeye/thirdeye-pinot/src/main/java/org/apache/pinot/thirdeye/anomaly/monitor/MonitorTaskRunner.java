@@ -291,6 +291,16 @@ public class MonitorTaskRunner implements TaskRunner {
     } catch (Exception e) {
       LOG.error("Exception when deleting old online detection data.", e);
     }
+
+    // Delete old anomaly subscription notifications.
+    try {
+      int deletedRecords = DAO_REGISTRY.getAnomalySubscriptionGroupNotificationManager()
+          .deleteRecordsOlderThanDays(monitorTaskInfo.getDefaultRetentionDays());
+      LOG.info("Deleted {} anomaly subscription notifications that are older than {} days.", deletedRecords,
+          monitorTaskInfo.getDefaultRetentionDays());
+    } catch (Exception e) {
+      LOG.error("Exception when deleting old anomaly subscription notifications.", e);
+    }
   }
 
   private Map<Long, JobDTO> findScheduledJobsWithinDays(int days) {
