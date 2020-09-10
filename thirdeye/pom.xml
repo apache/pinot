@@ -22,7 +22,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.apache.pinot.thirdeye</groupId>
   <artifactId>thirdeye</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
+  <version>${revision}${sha1}</version>
   <packaging>pom</packaging>
   <name>thirdeye</name>
 
@@ -33,7 +33,7 @@
   </modules>
 
   <properties>
-    <revision>0.1.0</revision>
+    <revision>1.0.0</revision>
     <sha1>-SNAPSHOT</sha1>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <pinot.version>0.4.0</pinot.version>

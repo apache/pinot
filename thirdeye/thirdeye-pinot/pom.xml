@@ -6,7 +6,7 @@
   <parent>
     <groupId>org.apache.pinot.thirdeye</groupId>
     <artifactId>thirdeye</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>${revision}${sha1}</version>
   </parent>
   <artifactId>thirdeye-pinot</artifactId>
   <name>thirdeye-pinot</name>
