@@ -21,6 +21,7 @@
 package org.apache.pinot.thirdeye.datalayer.pojo;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.alert.commons.AnomalyFeedConfig;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import java.util.ArrayList;
@@ -211,7 +212,7 @@ public class AlertConfigBean extends AbstractBean {
     String properties;
 
     public String getType() {
-      if (isBlank(type)) {
+      if (StringUtils.isBlank(type)) {
         return "";
       }
       return type;
@@ -222,26 +223,10 @@ public class AlertConfigBean extends AbstractBean {
     }
 
     public String getProperties() {
-      if (isBlank(properties)) {
+      if (StringUtils.isBlank(properties)) {
         return "";
       }
       return properties;
-    }
-
-    public static boolean isBlank(String str) {
-      if (str == null) {
-        return true;
-      } else {
-        int len = str.length();
-
-        for(int i = 0; i < len; ++i) {
-          if (!Character.isWhitespace(str.codePointAt(i))) {
-            return false;
-          }
-        }
-
-        return true;
-      }
     }
 
     public void setProperties(String properties) {
