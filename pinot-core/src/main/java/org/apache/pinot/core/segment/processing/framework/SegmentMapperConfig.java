@@ -19,7 +19,7 @@
 package org.apache.pinot.core.segment.processing.framework;
 
 import org.apache.pinot.core.segment.processing.filter.RecordFilterConfig;
-import org.apache.pinot.core.segment.processing.partitioner.PartitioningConfig;
+import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
 import org.apache.pinot.core.segment.processing.transformer.RecordTransformerConfig;
 import org.apache.pinot.spi.data.Schema;
 
@@ -32,14 +32,14 @@ public class SegmentMapperConfig {
   private final Schema _pinotSchema;
   private final RecordTransformerConfig _recordTransformerConfig;
   private final RecordFilterConfig _recordFilterConfig;
-  private final PartitioningConfig _partitioningConfig;
+  private final PartitionerConfig _partitionerConfig;
 
   public SegmentMapperConfig(Schema pinotSchema, RecordTransformerConfig recordTransformerConfig,
-      RecordFilterConfig recordFilterConfig, PartitioningConfig partitioningConfig) {
+      RecordFilterConfig recordFilterConfig, PartitionerConfig partitionerConfig) {
     _pinotSchema = pinotSchema;
     _recordTransformerConfig = recordTransformerConfig;
     _recordFilterConfig = recordFilterConfig;
-    _partitioningConfig = partitioningConfig;
+    _partitionerConfig = partitionerConfig;
   }
 
   /**
@@ -66,7 +66,7 @@ public class SegmentMapperConfig {
   /**
    * The PartitioningConfig for the mapper
    */
-  public PartitioningConfig getPartitioningConfig() {
-    return _partitioningConfig;
+  public PartitionerConfig getPartitionerConfig() {
+    return _partitionerConfig;
   }
 }

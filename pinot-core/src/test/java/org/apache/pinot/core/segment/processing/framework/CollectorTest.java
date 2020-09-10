@@ -75,7 +75,6 @@ public class CollectorTest {
       row.putValue("d", uniqueD.get(RandomUtils.nextInt(uniqueD.size())));
       collector.collect(row);
     }
-    collector.finish();
     assertEquals(collector.size(), 100);
     Iterator<GenericRow> iterator = collector.iterator();
     while (iterator.hasNext()) {
@@ -104,7 +103,6 @@ public class CollectorTest {
       collector.collect(row);
       usedValues.add(value);
     }
-    collector.finish();
     assertEquals(collector.size(), usedValues.size());
     Iterator<GenericRow> iterator = collector.iterator();
     while (iterator.hasNext()) {
@@ -144,7 +142,6 @@ public class CollectorTest {
       }
       collector.collect(row);
     }
-    collector.finish();
     assertEquals(collector.size(), m1Map.size());
     Iterator<GenericRow> iterator = collector.iterator();
     while (iterator.hasNext()) {
@@ -219,7 +216,6 @@ public class CollectorTest {
       }
       collector.collect(row);
     }
-    collector.finish();
     assertEquals(collector.size(), m1Map.size());
     Iterator<GenericRow> iterator = collector.iterator();
     while (iterator.hasNext()) {
@@ -250,7 +246,6 @@ public class CollectorTest {
       dValues.add(dValue);
       collector.collect(row);
     }
-    collector.finish();
     assertEquals(collector.size(), 100);
     Collections.sort(dValues);
     Iterator<GenericRow> iterator = collector.iterator();
@@ -282,7 +277,6 @@ public class CollectorTest {
       row.putValue("m1", RandomUtils.nextInt(10));
       collector.collect(row);
     }
-    collector.finish();
     List<String> uniqueDValues = new ArrayList<>(dValues);
     Collections.sort(uniqueDValues);
     Iterator<GenericRow> iterator = collector.iterator();

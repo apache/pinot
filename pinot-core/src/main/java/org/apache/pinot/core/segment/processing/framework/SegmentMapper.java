@@ -70,7 +70,7 @@ public class SegmentMapper {
     _avroSchema = SegmentProcessorUtils.convertPinotSchemaToAvroSchema(mapperConfig.getPinotSchema());
     _recordTransformer = RecordTransformerFactory.getRecordTransformer(mapperConfig.getRecordTransformerConfig());
     _recordFilter = RecordFilterFactory.getRecordFilter(mapperConfig.getRecordFilterConfig());
-    _partitioner = PartitionerFactory.getPartitioner(mapperConfig.getPartitioningConfig());
+    _partitioner = PartitionerFactory.getPartitioner(mapperConfig.getPartitionerConfig());
     LOGGER.info(
         "Initialized mapper with id: {}, input segment: {}, output dir: {}, recordTransformer: {}, recordFilter: {}, partitioner: {}",
         _mapperId, _inputSegment, _mapperOutputDir, _recordTransformer.getClass(), _recordFilter.getClass(),
@@ -103,19 +103,20 @@ public class SegmentMapper {
       String partition = _partitioner.getPartition(reusableRow);
 
       // Create writer for the partition, if not exists
-      if (!_partitionToDataFileWriterMap.containsKey(partition)) {
+      DataFileWriter<GenericData.Record> recordWriter = _partitionToDataFileWriterMap.get(partition);
+      if (recordWriter == null) {
         File partDir = new File(_mapperOutputDir, partition);
         if (!partDir.exists()) {
           Files.createDirectory(Paths.get(partDir.getAbsolutePath()));
         }
-        DataFileWriter<GenericData.Record> recordWriter = new DataFileWriter<>(new GenericDatumWriter<>(_avroSchema));
+        recordWriter = new DataFileWriter<>(new GenericDatumWriter<>(_avroSchema));
         recordWriter.create(_avroSchema, new File(partDir, createMapperOutputFileName(_mapperId)));
         _partitionToDataFileWriterMap.put(partition, recordWriter);
       }
 
       // Write record to avro file for its partition
       SegmentProcessorUtils.convertGenericRowToAvroRecord(reusableRow, reusableRecord);
-      _partitionToDataFileWriterMap.get(partition).append(reusableRecord);
+      recordWriter.append(reusableRecord);
     }
   }
 

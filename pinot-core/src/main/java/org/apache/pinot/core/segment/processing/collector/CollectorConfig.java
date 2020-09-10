@@ -20,7 +20,6 @@ package org.apache.pinot.core.segment.processing.collector;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -62,6 +61,7 @@ public class CollectorConfig {
   /**
    * The columns on which to sort
    */
+  @Nullable
   public List<String> getSortOrder() {
     return _sortOrder;
   }
@@ -71,27 +71,27 @@ public class CollectorConfig {
    */
   @JsonPOJOBuilder(withPrefix = "set")
   public static class Builder {
-    private CollectorFactory.CollectorType collectorType = DEFAULT_COLLECTOR_TYPE;
-    private Map<String, ValueAggregatorFactory.ValueAggregatorType> aggregatorTypeMap;
-    private List<String> sortOrder = new ArrayList<>();
+    private CollectorFactory.CollectorType _collectorType = DEFAULT_COLLECTOR_TYPE;
+    private Map<String, ValueAggregatorFactory.ValueAggregatorType> _aggregatorTypeMap;
+    private List<String> _sortOrder;
 
     public Builder setCollectorType(CollectorFactory.CollectorType collectorType) {
-      this.collectorType = collectorType;
+      _collectorType = collectorType;
       return this;
     }
 
     public Builder setAggregatorTypeMap(Map<String, ValueAggregatorFactory.ValueAggregatorType> aggregatorTypeMap) {
-      this.aggregatorTypeMap = aggregatorTypeMap;
+      _aggregatorTypeMap = aggregatorTypeMap;
       return this;
     }
 
     public Builder setSortOrder(List<String> sortOrder) {
-      this.sortOrder = sortOrder;
+      _sortOrder = sortOrder;
       return this;
     }
 
     public CollectorConfig build() {
-      return new CollectorConfig(collectorType, aggregatorTypeMap, sortOrder);
+      return new CollectorConfig(_collectorType, _aggregatorTypeMap, _sortOrder);
     }
   }
 

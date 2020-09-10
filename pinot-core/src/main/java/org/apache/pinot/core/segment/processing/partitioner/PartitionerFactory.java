@@ -53,7 +53,7 @@ public final class PartitionerFactory {
   /**
    * Construct a Partitioner using the PartitioningConfig
    */
-  public static Partitioner getPartitioner(PartitioningConfig config) {
+  public static Partitioner getPartitioner(PartitionerConfig config) {
 
     Partitioner partitioner = null;
     switch (config.getPartitionerType()) {

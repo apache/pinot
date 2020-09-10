@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.segment.processing.collector;
 
+import org.apache.pinot.spi.data.FieldSpec;
+
+
 /**
  * Factory class to create instances of value aggregator from the given name.
  */
@@ -32,15 +35,15 @@ public class ValueAggregatorFactory {
   /**
    * Construct a ValueAggregator from the given aggregator type
    */
-  public static ValueAggregator getValueAggregator(String aggregatorTypeStr) {
+  public static ValueAggregator getValueAggregator(String aggregatorTypeStr, FieldSpec.DataType dataType) {
     ValueAggregatorType aggregatorType = ValueAggregatorType.valueOf(aggregatorTypeStr.toUpperCase());
     switch (aggregatorType) {
       case SUM:
-        return new SumValueAggregator();
+        return new SumValueAggregator(dataType);
       case MAX:
-        return new MaxValueAggregator();
+        return new MaxValueAggregator(dataType);
       case MIN:
-        return new MinValueAggregator();
+        return new MinValueAggregator(dataType);
       default:
         throw new IllegalStateException("Unsupported value aggregator type : " + aggregatorTypeStr);
     }

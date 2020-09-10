@@ -21,7 +21,7 @@ package org.apache.pinot.tools.segment.processor;
 import org.apache.pinot.core.segment.processing.collector.CollectorConfig;
 import org.apache.pinot.core.segment.processing.filter.RecordFilterConfig;
 import org.apache.pinot.core.segment.processing.framework.SegmentConfig;
-import org.apache.pinot.core.segment.processing.partitioner.PartitioningConfig;
+import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
 import org.apache.pinot.core.segment.processing.transformer.RecordTransformerConfig;
 
 
@@ -37,7 +37,7 @@ public class SegmentProcessorFrameworkSpec {
 
   private RecordTransformerConfig _recordTransformerConfig;
   private RecordFilterConfig _recordFilterConfig;
-  private PartitioningConfig _partitioningConfig;
+  private PartitionerConfig _partitionerConfig;
   private CollectorConfig _collectorConfig;
   private SegmentConfig _segmentConfig;
 
@@ -89,12 +89,12 @@ public class SegmentProcessorFrameworkSpec {
     _recordFilterConfig = recordFilterConfig;
   }
 
-  public PartitioningConfig getPartitioningConfig() {
-    return _partitioningConfig;
+  public PartitionerConfig getPartitionerConfig() {
+    return _partitionerConfig;
   }
 
-  public void setPartitioningConfig(PartitioningConfig partitioningConfig) {
-    _partitioningConfig = partitioningConfig;
+  public void setPartitionerConfig(PartitionerConfig partitionerConfig) {
+    _partitionerConfig = partitionerConfig;
   }
 
   public CollectorConfig getCollectorConfig() {

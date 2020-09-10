@@ -18,20 +18,14 @@
  */
 package org.apache.pinot.core.segment.processing.collector;
 
-import org.apache.pinot.spi.data.MetricFieldSpec;
-
-
 /**
  * Interface for value aggregator
  */
 public interface ValueAggregator {
 
   /**
-   * Given two values and its metric fieldspec, return the aggregated value
-   * @param value1 first metric column value
-   * @param value2 second metric column value
-   * @param metricFieldSpec metric field spec
+   * Given two values, return the aggregated value
    * @return aggregated value given two column values
    */
-  Object aggregate(Object value1, Object value2, MetricFieldSpec metricFieldSpec);
+  Object aggregate(Object value1, Object value2);
 }

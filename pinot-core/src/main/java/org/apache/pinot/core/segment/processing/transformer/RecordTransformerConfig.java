@@ -49,15 +49,15 @@ public class RecordTransformerConfig {
    */
   @JsonPOJOBuilder(withPrefix = "set")
   public static class Builder {
-    private Map<String, String> transformFunctionsMap;
+    private Map<String, String> _transformFunctionsMap;
 
     public Builder setTransformFunctionsMap(Map<String, String> transformFunctionsMap) {
-      this.transformFunctionsMap = transformFunctionsMap;
+      _transformFunctionsMap = transformFunctionsMap;
       return this;
     }
 
     public RecordTransformerConfig build() {
-      return new RecordTransformerConfig(transformFunctionsMap);
+      return new RecordTransformerConfig(_transformFunctionsMap);
     }
   }
 

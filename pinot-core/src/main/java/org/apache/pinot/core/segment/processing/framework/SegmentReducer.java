@@ -93,14 +93,12 @@ public class SegmentReducer {
 
         // Reached max records per part file. Flush
         if (_collector.size() == _numRecordsPerPart) {
-          _collector.finish();
           flushRecords(_collector, createReducerOutputFileName(_reducerId, part++));
           _collector.reset();
         }
       }
     }
     if (_collector.size() > 0) {
-      _collector.finish();
       flushRecords(_collector, createReducerOutputFileName(_reducerId, part));
       _collector.reset();
     }

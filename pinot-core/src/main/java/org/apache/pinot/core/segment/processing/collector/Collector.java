@@ -34,7 +34,8 @@ public interface Collector {
   void collect(GenericRow genericRow);
 
   /**
-   * Provides an iterator for the GenericRows in the collection
+   * Finish any pre-exit processing and seal the collection for reading
+   * Provide an iterator for the GenericRows in the collection
    */
   Iterator<GenericRow> iterator();
 
@@ -42,11 +43,6 @@ public interface Collector {
    * The number of rows in the collection
    */
   int size();
-
-  /**
-   * Finish any pre-exit processing and seal the collection for reading
-   */
-  void finish();
 
   /**
    * Resets the collection of this collector by deleting all existing GenericRows

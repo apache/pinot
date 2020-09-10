@@ -23,7 +23,7 @@ import org.apache.pinot.core.segment.processing.partitioner.ColumnValuePartition
 import org.apache.pinot.core.segment.processing.partitioner.NoOpPartitioner;
 import org.apache.pinot.core.segment.processing.partitioner.Partitioner;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerFactory;
-import org.apache.pinot.core.segment.processing.partitioner.PartitioningConfig;
+import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
 import org.apache.pinot.core.segment.processing.partitioner.RoundRobinPartitioner;
 import org.apache.pinot.core.segment.processing.partitioner.TableConfigPartitioner;
 import org.apache.pinot.core.segment.processing.partitioner.TransformFunctionPartitioner;
@@ -41,8 +41,8 @@ public class PartitionerTest {
 
   @Test
   public void testNoOpPartitioner() {
-    PartitioningConfig partitioningConfig = new PartitioningConfig.Builder().build();
-    Partitioner partitioner = PartitionerFactory.getPartitioner(partitioningConfig);
+    PartitionerConfig partitionerConfig = new PartitionerConfig.Builder().build();
+    Partitioner partitioner = PartitionerFactory.getPartitioner(partitionerConfig);
     assertEquals(partitioner.getClass(), NoOpPartitioner.class);
 
     GenericRow row = new GenericRow();
@@ -55,18 +55,18 @@ public class PartitionerTest {
 
   @Test
   public void testColumnValuePartitioner() {
-    PartitioningConfig partitioningConfig =
-        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.COLUMN_VALUE).build();
+    PartitionerConfig partitionerConfig =
+        new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.COLUMN_VALUE).build();
     try {
-      PartitionerFactory.getPartitioner(partitioningConfig);
+      PartitionerFactory.getPartitioner(partitionerConfig);
       fail("Should not create COLUMN_VALUE Partitioner without column name");
     } catch (IllegalStateException e) {
       // expected
     }
-    partitioningConfig =
-        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.COLUMN_VALUE)
+    partitionerConfig =
+        new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.COLUMN_VALUE)
             .setColumnName("foo").build();
-    Partitioner partitioner = PartitionerFactory.getPartitioner(partitioningConfig);
+    Partitioner partitioner = PartitionerFactory.getPartitioner(partitionerConfig);
     assertEquals(partitioner.getClass(), ColumnValuePartitioner.class);
 
     GenericRow row = new GenericRow();
@@ -77,28 +77,28 @@ public class PartitionerTest {
 
   @Test
   public void testRoundRobinPartitioner() {
-    PartitioningConfig partitioningConfig =
-        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.ROUND_ROBIN).build();
+    PartitionerConfig partitionerConfig =
+        new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.ROUND_ROBIN).build();
     try {
-      PartitionerFactory.getPartitioner(partitioningConfig);
+      PartitionerFactory.getPartitioner(partitionerConfig);
       fail("Should not create ROUND_ROBIN Partitioner without num partitions");
     } catch (IllegalStateException e) {
       // expected
     }
-    partitioningConfig =
-        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.ROUND_ROBIN)
+    partitionerConfig =
+        new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.ROUND_ROBIN)
             .setNumPartitions(0).build();
     try {
-      PartitionerFactory.getPartitioner(partitioningConfig);
+      PartitionerFactory.getPartitioner(partitionerConfig);
       fail("Should not create ROUND_ROBIN Partitioner without num partitions <=0");
     } catch (IllegalStateException e) {
       // expected
     }
     int numPartitions = 3;
-    partitioningConfig =
-        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.ROUND_ROBIN)
+    partitionerConfig =
+        new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.ROUND_ROBIN)
             .setNumPartitions(numPartitions).build();
-    Partitioner partitioner = PartitionerFactory.getPartitioner(partitioningConfig);
+    Partitioner partitioner = PartitionerFactory.getPartitioner(partitionerConfig);
     assertEquals(partitioner.getClass(), RoundRobinPartitioner.class);
 
     GenericRow row = new GenericRow();
@@ -113,28 +113,28 @@ public class PartitionerTest {
 
   @Test
   public void testTableColumnPartitionConfigPartitioner() {
-    PartitioningConfig partitioningConfig =
-        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TABLE_PARTITION_CONFIG)
+    PartitionerConfig partitionerConfig =
+        new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TABLE_PARTITION_CONFIG)
             .build();
     try {
-      PartitionerFactory.getPartitioner(partitioningConfig);
+      PartitionerFactory.getPartitioner(partitionerConfig);
       fail("Should not create TABLE_PARTITION_CONFIG Partitioner without column name");
     } catch (IllegalStateException e) {
       // expected
     }
-    partitioningConfig =
-        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TABLE_PARTITION_CONFIG)
+    partitionerConfig =
+        new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TABLE_PARTITION_CONFIG)
             .setColumnName("foo").build();
     try {
-      PartitionerFactory.getPartitioner(partitioningConfig);
+      PartitionerFactory.getPartitioner(partitionerConfig);
       fail("Should not create TABLE_PARTITION_CONFIG Partitioner without columnPartitionConfig");
     } catch (IllegalStateException e) {
       // expected
     }
-    partitioningConfig =
-        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TABLE_PARTITION_CONFIG)
+    partitionerConfig =
+        new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TABLE_PARTITION_CONFIG)
             .setColumnName("foo").setColumnPartitionConfig(new ColumnPartitionConfig("MURMUR", 3)).build();
-    Partitioner partitioner = PartitionerFactory.getPartitioner(partitioningConfig);
+    Partitioner partitioner = PartitionerFactory.getPartitioner(partitionerConfig);
     assertEquals(partitioner.getClass(), TableConfigPartitioner.class);
 
     GenericRow row = new GenericRow();
@@ -147,47 +147,47 @@ public class PartitionerTest {
 
   @Test
   public void testTransformFunctionPartitioner() {
-    PartitioningConfig partitioningConfig =
-        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION)
+    PartitionerConfig partitionerConfig =
+        new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION)
             .build();
     try {
-      PartitionerFactory.getPartitioner(partitioningConfig);
+      PartitionerFactory.getPartitioner(partitionerConfig);
       fail("Should not create TRANSFORM_FUNCTION Partitioner without transform function");
     } catch (IllegalStateException e) {
       // expected
     }
-    partitioningConfig =
-        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION)
+    partitionerConfig =
+        new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION)
             .setTransformFunction("bad function").build();
     try {
-      PartitionerFactory.getPartitioner(partitioningConfig);
+      PartitionerFactory.getPartitioner(partitionerConfig);
       fail("Should not create TRANSFORM_FUNCTION Partitioner for invalid transform function");
     } catch (IllegalArgumentException e) {
       // expected
     }
 
-    partitioningConfig =
-        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION)
+    partitionerConfig =
+        new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION)
             .setTransformFunction("toEpochDays(timestamp)").build();
-    Partitioner partitioner = PartitionerFactory.getPartitioner(partitioningConfig);
+    Partitioner partitioner = PartitionerFactory.getPartitioner(partitionerConfig);
     assertEquals(partitioner.getClass(), TransformFunctionPartitioner.class);
     GenericRow row = new GenericRow();
     row.putValue("timestamp", 1587410614000L);
     assertEquals(partitioner.getPartition(row), "18372");
 
-    partitioningConfig =
-        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION)
+    partitionerConfig =
+        new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION)
             .setTransformFunction("Groovy({a+b},a,b)").build();
-    partitioner = PartitionerFactory.getPartitioner(partitioningConfig);
+    partitioner = PartitionerFactory.getPartitioner(partitionerConfig);
     row.putValue("a", 10);
     row.putValue("b", 20);
     assertEquals(partitioner.getPartition(row), "30");
 
     // mv column
-    partitioningConfig =
-        new PartitioningConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION)
+    partitionerConfig =
+        new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION)
             .setTransformFunction("Groovy({dMv[1]},dMv)").build();
-    partitioner = PartitionerFactory.getPartitioner(partitioningConfig);
+    partitioner = PartitionerFactory.getPartitioner(partitionerConfig);
     row.putValue("dMv", new Object[]{1, 2, 3});
     assertEquals(partitioner.getPartition(row), "2");
   }

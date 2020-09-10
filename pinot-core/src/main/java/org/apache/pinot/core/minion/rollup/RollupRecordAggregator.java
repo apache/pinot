@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.core.minion.rollup;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -36,18 +38,23 @@ import org.apache.pinot.core.minion.segment.RecordAggregator;
  * whose metric column values are aggregated based on the given aggregator functions.
  */
 public class RollupRecordAggregator implements RecordAggregator {
-  private final static ValueAggregator DEFAULT_AGGREGATOR_FUNCTION =
-      ValueAggregatorFactory.getValueAggregator(ValueAggregatorFactory.ValueAggregatorType.SUM.name());
+  private static final String DEFAULT_VALUE_AGGREGATOR_TYPE = ValueAggregatorFactory.ValueAggregatorType.SUM.toString();
 
-  private Map<String, ValueAggregator> _valueAggregatorMap;
-  private Schema _schema;
+  private final Map<String, ValueAggregator> _valueAggregatorMap;
+  private final Schema _schema;
 
   public RollupRecordAggregator(Schema schema, Map<String, String> aggregateTypes) {
     _schema = schema;
     _valueAggregatorMap = new HashMap<>();
-    if (aggregateTypes != null) {
-      for (Map.Entry<String, String> entry : aggregateTypes.entrySet()) {
-        _valueAggregatorMap.put(entry.getKey(), ValueAggregatorFactory.getValueAggregator(entry.getValue()));
+    if (aggregateTypes == null) {
+      aggregateTypes = Collections.emptyMap();
+    }
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      if (!fieldSpec.isVirtualColumn() && fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC) {
+        String metricName = fieldSpec.getName();
+        String aggregateType = aggregateTypes.getOrDefault(metricName, DEFAULT_VALUE_AGGREGATOR_TYPE);
+        ValueAggregator valueAggregator = ValueAggregatorFactory.getValueAggregator(aggregateType, fieldSpec.getDataType());
+        _valueAggregatorMap.put(metricName, valueAggregator);
       }
     }
   }
@@ -59,11 +66,9 @@ public class RollupRecordAggregator implements RecordAggregator {
       GenericRow currentRow = rows.get(i);
       for (MetricFieldSpec metric : _schema.getMetricFieldSpecs()) {
         String metricName = metric.getName();
-        ValueAggregator aggregator = (_valueAggregatorMap == null) ? DEFAULT_AGGREGATOR_FUNCTION
-            : _valueAggregatorMap.getOrDefault(metricName, DEFAULT_AGGREGATOR_FUNCTION);
-        Object aggregatedResult =
-            aggregator.aggregate(resultRow.getValue(metricName), currentRow.getValue(metricName), metric);
-        resultRow.putField(metricName, aggregatedResult);
+        ValueAggregator aggregator = _valueAggregatorMap.get(metricName);
+        Object aggregatedResult = aggregator.aggregate(resultRow.getValue(metricName), currentRow.getValue(metricName));
+        resultRow.putValue(metricName, aggregatedResult);
       }
     }
     return resultRow;

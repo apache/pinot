@@ -24,6 +24,7 @@ import java.util.List;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
@@ -35,41 +36,49 @@ public class GenericRowSorter {
 
   public GenericRowSorter(List<String> sortOrder, Schema schema) {
     int sortOrderSize = sortOrder.size();
-    Comparator[] comparators = new Comparator[sortOrderSize];
+    FieldSpec.DataType[] dataTypes = new FieldSpec.DataType[sortOrderSize];
     for (int i = 0; i < sortOrderSize; i++) {
       String column = sortOrder.get(i);
       FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+      Preconditions.checkState(fieldSpec != null, "Column in sort order: %s does not exist in schema", column);
       Preconditions.checkState(fieldSpec.isSingleValueField(), "Cannot use multi value column: %s for sorting", column);
-      comparators[i] = getComparator(fieldSpec.getDataType());
+      dataTypes[i] = fieldSpec.getDataType();
     }
     _genericRowComparator = (o1, o2) -> {
-      for (int i = 0; i < comparators.length; i++) {
+      for (int i = 0; i < sortOrderSize; i++) {
         String column = sortOrder.get(i);
-        int result = comparators[i].compare(o1.getValue(column), o2.getValue(column));
+        FieldSpec.DataType dataType = dataTypes[i];
+        Object value1 = o1.getValue(column);
+        Object value2 = o2.getValue(column);
+        int result;
+        switch (dataType) {
+          case INT:
+            result = Integer.compare((int) value1, (int) value2);
+            break;
+          case LONG:
+            result = Long.compare((long) value1, (long) value2);
+            break;
+          case FLOAT:
+            result = Float.compare((float) value1, (float) value2);
+            break;
+          case DOUBLE:
+            result = Double.compare((double) value1, (double) value2);
+            break;
+          case STRING:
+            result = ((String) value1).compareTo((String) value2);
+            break;
+          case BYTES:
+            result = ByteArray.compare((byte[]) value1, (byte[]) value2);
+            break;
+          default:
+            throw new IllegalStateException("Cannot sort on column with dataType " + dataType);
+        }
         if (result != 0) {
           return result;
         }
       }
       return 0;
     };
-  }
-
-  private Comparator getComparator(FieldSpec.DataType dataType) {
-    switch (dataType) {
-
-      case INT:
-        return Comparator.comparingInt(o -> (int) o);
-      case LONG:
-        return Comparator.comparingLong(o -> (long) o);
-      case FLOAT:
-        return (o1, o2) -> Float.compare((float) o1, (float) o2);
-      case DOUBLE:
-        return Comparator.comparingDouble(o -> (double) o);
-      case STRING:
-        return Comparator.comparing(o -> ((String) o));
-      default:
-        throw new IllegalStateException("Cannot sort on column with dataType " + dataType);
-    }
   }
 
   /**

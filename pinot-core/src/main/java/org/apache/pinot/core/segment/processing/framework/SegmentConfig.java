@@ -48,16 +48,16 @@ public class SegmentConfig {
    */
   @JsonPOJOBuilder(withPrefix = "set")
   public static class Builder {
-    private int maxNumRecordsPerSegment = DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT;
+    private int _maxNumRecordsPerSegment = DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT;
 
     public Builder setMaxNumRecordsPerSegment(int maxNumRecordsPerSegment) {
-      this.maxNumRecordsPerSegment = maxNumRecordsPerSegment;
+      _maxNumRecordsPerSegment = maxNumRecordsPerSegment;
       return this;
     }
 
     public SegmentConfig build() {
-      Preconditions.checkState(maxNumRecordsPerSegment > 0, "Max num records per segment must be > 0");
-      return new SegmentConfig(maxNumRecordsPerSegment);
+      Preconditions.checkState(_maxNumRecordsPerSegment > 0, "Max num records per segment must be > 0");
+      return new SegmentConfig(_maxNumRecordsPerSegment);
     }
   }
 

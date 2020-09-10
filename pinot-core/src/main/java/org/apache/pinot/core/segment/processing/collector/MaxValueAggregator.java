@@ -18,17 +18,24 @@
  */
 package org.apache.pinot.core.segment.processing.collector;
 
-import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
  * Max value aggregator
  */
 public class MaxValueAggregator implements ValueAggregator {
+
+  private final FieldSpec.DataType _dataType;
+
+  public MaxValueAggregator(FieldSpec.DataType dataType) {
+    _dataType = dataType;
+  }
+
   @Override
-  public Object aggregate(Object value1, Object value2, MetricFieldSpec metricFieldSpec) {
+  public Object aggregate(Object value1, Object value2) {
     Object result;
-    switch (metricFieldSpec.getDataType()) {
+    switch (_dataType) {
       case INT:
         result = Math.max(((Number) value1).intValue(), ((Number) value2).intValue());
         break;
@@ -42,7 +49,7 @@ public class MaxValueAggregator implements ValueAggregator {
         result = Math.max(((Number) value1).doubleValue(), ((Number) value2).doubleValue());
         break;
       default:
-        throw new IllegalArgumentException("Unsupported metric type : " + metricFieldSpec.getDataType());
+        throw new IllegalArgumentException("Unsupported metric type : " + _dataType);
     }
     return result;
   }

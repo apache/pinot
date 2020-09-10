@@ -26,8 +26,8 @@ import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 /**
  * Config for Partitioner
  */
-@JsonDeserialize(builder = PartitioningConfig.Builder.class)
-public class PartitioningConfig {
+@JsonDeserialize(builder = PartitionerConfig.Builder.class)
+public class PartitionerConfig {
 
   private static final PartitionerFactory.PartitionerType DEFAULT_PARTITIONER_TYPE =
       PartitionerFactory.PartitionerType.NO_OP;
@@ -38,7 +38,7 @@ public class PartitioningConfig {
   private final String _transformFunction;
   private final ColumnPartitionConfig _columnPartitionConfig;
 
-  private PartitioningConfig(PartitionerFactory.PartitionerType partitionerType, int numPartitions, String columnName,
+  private PartitionerConfig(PartitionerFactory.PartitionerType partitionerType, int numPartitions, String columnName,
       String transformFunction, ColumnPartitionConfig columnPartitionConfig) {
     _partitionerType = partitionerType;
     _numPartitions = numPartitions;
@@ -87,40 +87,40 @@ public class PartitioningConfig {
    */
   @JsonPOJOBuilder(withPrefix = "set")
   public static class Builder {
-    private PartitionerFactory.PartitionerType partitionerType = DEFAULT_PARTITIONER_TYPE;
-    private int numPartitions;
-    private String columnName;
-    private String transformFunction;
-    private ColumnPartitionConfig columnPartitionConfig;
+    private PartitionerFactory.PartitionerType _partitionerType = DEFAULT_PARTITIONER_TYPE;
+    private int _numPartitions;
+    private String _columnName;
+    private String _transformFunction;
+    private ColumnPartitionConfig _columnPartitionConfig;
 
     public Builder setPartitionerType(PartitionerFactory.PartitionerType partitionerType) {
-      this.partitionerType = partitionerType;
+      _partitionerType = partitionerType;
       return this;
     }
 
     public Builder setNumPartitions(int numPartitions) {
-      this.numPartitions = numPartitions;
+      _numPartitions = numPartitions;
       return this;
     }
 
     public Builder setColumnName(String columnName) {
-      this.columnName = columnName;
+      _columnName = columnName;
       return this;
     }
 
     public Builder setTransformFunction(String transformFunction) {
-      this.transformFunction = transformFunction;
+      _transformFunction = transformFunction;
       return this;
     }
 
     public Builder setColumnPartitionConfig(ColumnPartitionConfig columnPartitionConfig) {
-      this.columnPartitionConfig = columnPartitionConfig;
+      _columnPartitionConfig = columnPartitionConfig;
       return this;
     }
 
-    public PartitioningConfig build() {
-      return new PartitioningConfig(partitionerType, numPartitions, columnName, transformFunction,
-          columnPartitionConfig);
+    public PartitionerConfig build() {
+      return new PartitionerConfig(_partitionerType, _numPartitions, _columnName, _transformFunction,
+          _columnPartitionConfig);
     }
   }
 

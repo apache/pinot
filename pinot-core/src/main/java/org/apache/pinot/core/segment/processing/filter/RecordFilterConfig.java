@@ -58,21 +58,21 @@ public class RecordFilterConfig {
    */
   @JsonPOJOBuilder(withPrefix = "set")
   public static class Builder {
-    private RecordFilterFactory.RecordFilterType recordFilterType = DEFAULT_RECORD_FILTER_TYPE;
-    private String filterFunction;
+    private RecordFilterFactory.RecordFilterType _recordFilterType = DEFAULT_RECORD_FILTER_TYPE;
+    private String _filterFunction;
 
     public Builder setRecordFilterType(RecordFilterFactory.RecordFilterType recordFilterType) {
-      this.recordFilterType = recordFilterType;
+      _recordFilterType = recordFilterType;
       return this;
     }
 
     public Builder setFilterFunction(String filterFunction) {
-      this.filterFunction = filterFunction;
+      _filterFunction = filterFunction;
       return this;
     }
 
     public RecordFilterConfig build() {
-      return new RecordFilterConfig(recordFilterType, filterFunction);
+      return new RecordFilterConfig(_recordFilterType, _filterFunction);
     }
   }
 
