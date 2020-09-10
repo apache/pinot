@@ -36,6 +36,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.TimeUtils;
 
 
@@ -54,10 +55,15 @@ public final class TableConfigUtils {
    * 1. Validation config
    * 2. IngestionConfig
    * 3. TierConfigs
+   *
+   * TODO: Add more validations for each section (e.g. verify column names used in the indexing, validate conditions are met for aggregateMetrics etc)
    */
-  public static void validate(TableConfig tableConfig) {
-    validateValidationConfig(tableConfig);
-    validateIngestionConfig(tableConfig.getIngestionConfig());
+  public static void validate(TableConfig tableConfig, @Nullable Schema schema) {
+    if (tableConfig.getTableType() == TableType.REALTIME) {
+      Preconditions.checkState(schema != null, "Schema should not be null for REALTIME table");
+    }
+    validateValidationConfig(tableConfig, schema);
+    validateIngestionConfig(tableConfig.getIngestionConfig(), schema);
     validateTierConfigList(tableConfig.getTierConfigsList());
   }
 
@@ -74,19 +80,37 @@ public final class TableConfigUtils {
     }
   }
 
-  private static void validateValidationConfig(TableConfig tableConfig) {
+  /**
+   * Validates the following in the validationConfig of the table
+   * 1. For REALTIME table
+   * - checks for non-null timeColumnName
+   * - checks for valid field spec for timeColumnName in schema
+   *
+   * 2. For OFFLINE table
+   * - checks for valid field spec for timeColumnName in schema, if timeColumnName and schema re non-null
+   *
+   * 3. Checks peerDownloadSchema
+   */
+  private static void validateValidationConfig(TableConfig tableConfig, @Nullable Schema schema) {
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-    if (validationConfig != null) {
-      if (tableConfig.getTableType() == TableType.REALTIME && validationConfig.getTimeColumnName() == null) {
-        throw new IllegalStateException("Must provide time column in real-time table config");
-      }
-      String peerSegmentDownloadScheme = validationConfig.getPeerSegmentDownloadScheme();
-      if (peerSegmentDownloadScheme != null) {
-        if (!CommonConstants.HTTP_PROTOCOL.equalsIgnoreCase(peerSegmentDownloadScheme)
-            && !CommonConstants.HTTPS_PROTOCOL.equalsIgnoreCase(peerSegmentDownloadScheme)) {
-          throw new IllegalStateException("Invalid value '" + peerSegmentDownloadScheme
-              + "' for peerSegmentDownloadScheme. Must be one of http nor https");
-        }
+    String timeColumnName = validationConfig.getTimeColumnName();
+    if (tableConfig.getTableType() == TableType.REALTIME) {
+      // For REALTIME table, must have a non-null timeColumnName
+      Preconditions.checkState(timeColumnName != null, "'timeColumnName' cannot be null in REALTIME table config");
+    }
+    // timeColumnName can be null in OFFLINE table
+    if (timeColumnName != null && schema != null) {
+      Preconditions.checkState(schema.getSpecForTimeColumn(timeColumnName) != null,
+          "Cannot find valid fieldSpec for timeColumn: %s from the table config, in the schema: %s", timeColumnName,
+          schema.getSchemaName());
+    }
+
+    String peerSegmentDownloadScheme = validationConfig.getPeerSegmentDownloadScheme();
+    if (peerSegmentDownloadScheme != null) {
+      if (!CommonConstants.HTTP_PROTOCOL.equalsIgnoreCase(peerSegmentDownloadScheme) && !CommonConstants.HTTPS_PROTOCOL
+          .equalsIgnoreCase(peerSegmentDownloadScheme)) {
+        throw new IllegalStateException("Invalid value '" + peerSegmentDownloadScheme
+            + "' for peerSegmentDownloadScheme. Must be one of http or https");
       }
     }
   }
@@ -99,8 +123,10 @@ public final class TableConfigUtils {
    * 4. validity of transform function string
    * 5. checks for source fields used in destination columns
    */
-  private static void validateIngestionConfig(@Nullable IngestionConfig ingestionConfig) {
+  private static void validateIngestionConfig(@Nullable IngestionConfig ingestionConfig, @Nullable Schema schema) {
     if (ingestionConfig != null) {
+
+      // Filter config
       FilterConfig filterConfig = ingestionConfig.getFilterConfig();
       if (filterConfig != null) {
         String filterFunction = filterConfig.getFilterFunction();
@@ -112,12 +138,18 @@ public final class TableConfigUtils {
           }
         }
       }
+
+      // Transform configs
       List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
       if (transformConfigs != null) {
         Set<String> transformColumns = new HashSet<>();
         Set<String> argumentColumns = new HashSet<>();
         for (TransformConfig transformConfig : transformConfigs) {
           String columnName = transformConfig.getColumnName();
+          if (schema != null) {
+            Preconditions.checkState(schema.getFieldSpecFor(columnName) != null,
+                "The destination column of the transform function must be present in the schema");
+          }
           String transformFunction = transformConfig.getTransformFunction();
           if (columnName == null || transformFunction == null) {
             throw new IllegalStateException(

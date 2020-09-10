@@ -33,6 +33,7 @@ import javax.ws.rs.core.Response;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.util.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,7 +59,8 @@ public class PinotTableIndexingConfigs {
     TableConfig tableConfig;
     try {
       tableConfig = JsonUtils.stringToObject(tableConfigString, TableConfig.class);
-      TableConfigUtils.validate(tableConfig);
+      Schema schema = pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
+      TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Invalid table config", Response.Status.BAD_REQUEST, e);
     }

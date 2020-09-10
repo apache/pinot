@@ -58,6 +58,7 @@ import org.apache.pinot.core.util.TableConfigUtils;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.LoggerFactory;
@@ -113,8 +114,9 @@ public class PinotTableRestletResource {
     TableConfig tableConfig;
     try {
       tableConfig = JsonUtils.stringToObject(tableConfigStr, TableConfig.class);
+      Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
       // TableConfigUtils.validate(...) is used across table create/update.
-      TableConfigUtils.validate(tableConfig);
+      TableConfigUtils.validate(tableConfig, schema);
       // TableConfigUtils.validateTableName(...) checks table name rules.
       // So it won't effect already created tables.
       TableConfigUtils.validateTableName(tableConfig);
@@ -325,7 +327,8 @@ public class PinotTableRestletResource {
     TableConfig tableConfig;
     try {
       tableConfig = JsonUtils.stringToObject(tableConfigString, TableConfig.class);
-      TableConfigUtils.validate(tableConfig);
+      Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
+      TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Invalid table config", Response.Status.BAD_REQUEST, e);
     }
@@ -368,7 +371,8 @@ public class PinotTableRestletResource {
   public String checkTableConfig(String tableConfigStr) {
     try {
       TableConfig tableConfig = JsonUtils.stringToObject(tableConfigStr, TableConfig.class);
-      TableConfigUtils.validate(tableConfig);
+      Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
+      TableConfigUtils.validate(tableConfig, schema);
       ObjectNode tableConfigValidateStr = JsonUtils.newObjectNode();
       if (tableConfig.getTableType() == TableType.OFFLINE) {
         tableConfigValidateStr.set(TableType.OFFLINE.name(), tableConfig.toJsonNode());
