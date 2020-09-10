@@ -80,6 +80,9 @@ public class AnomalyFilterWrapper extends DetectionPipeline {
 
     Set<Long> lastTimeStamps = new HashSet<>();
     for (Map<String, Object> properties : this.nestedProperties) {
+      if (this.metricUrn != null){
+        properties.put(PROP_METRIC_URN, this.metricUrn);
+      }
       DetectionPipelineResult intermediate = this.runNested(properties, this.startTime, this.endTime);
       lastTimeStamps.add(intermediate.getLastTimestamp());
       diagnostics.putAll(intermediate.getDiagnostics());
