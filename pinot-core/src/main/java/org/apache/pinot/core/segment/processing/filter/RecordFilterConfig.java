@@ -18,14 +18,15 @@
  */
 package org.apache.pinot.core.segment.processing.filter;
 
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 
 /**
  * Config for RecordFilter
  */
-@JsonDeserialize(builder = RecordFilterConfig.Builder.class)
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class RecordFilterConfig {
 
   private static final RecordFilterFactory.RecordFilterType DEFAULT_RECORD_FILTER_TYPE =
@@ -34,7 +35,10 @@ public class RecordFilterConfig {
   private final RecordFilterFactory.RecordFilterType _recordFilterType;
   private final String _filterFunction;
 
-  private RecordFilterConfig(RecordFilterFactory.RecordFilterType recordFilterType, String filterFunction) {
+  @JsonCreator
+  private RecordFilterConfig(
+      @JsonProperty(value = "recordFilterType", required = true) RecordFilterFactory.RecordFilterType recordFilterType,
+      @JsonProperty(value = "filterFunction") String filterFunction) {
     _recordFilterType = recordFilterType;
     _filterFunction = filterFunction;
   }
@@ -42,6 +46,7 @@ public class RecordFilterConfig {
   /**
    * The type of RecordFilter
    */
+  @JsonProperty
   public RecordFilterFactory.RecordFilterType getRecordFilterType() {
     return _recordFilterType;
   }
@@ -49,6 +54,7 @@ public class RecordFilterConfig {
   /**
    * Filter function to use for filtering out partitions
    */
+  @JsonProperty
   public String getFilterFunction() {
     return _filterFunction;
   }
@@ -56,7 +62,6 @@ public class RecordFilterConfig {
   /**
    * Builder for a RecordFilterConfig
    */
-  @JsonPOJOBuilder(withPrefix = "set")
   public static class Builder {
     private RecordFilterFactory.RecordFilterType _recordFilterType = DEFAULT_RECORD_FILTER_TYPE;
     private String _filterFunction;

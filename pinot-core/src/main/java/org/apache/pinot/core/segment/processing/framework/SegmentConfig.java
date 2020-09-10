@@ -18,27 +18,31 @@
  */
 package org.apache.pinot.core.segment.processing.framework;
 
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 
 
 /**
  * Config for the final segment generation phase of the SegmentProcessorFramework
  */
-@JsonDeserialize(builder = SegmentConfig.Builder.class)
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class SegmentConfig {
 
   private static final int DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT = 5_000_000;
   private final int _maxNumRecordsPerSegment;
 
-  private SegmentConfig(int maxNumRecordsPerSegment) {
+  @JsonCreator
+  private SegmentConfig(@JsonProperty(value = "maxNumRecordsPerSegment") int maxNumRecordsPerSegment) {
+    Preconditions.checkState(maxNumRecordsPerSegment > 0, "Max num records per segment must be > 0");
     _maxNumRecordsPerSegment = maxNumRecordsPerSegment;
   }
 
   /**
    * The max number of records allowed per segment
    */
+  @JsonProperty
   public int getMaxNumRecordsPerSegment() {
     return _maxNumRecordsPerSegment;
   }
@@ -46,7 +50,6 @@ public class SegmentConfig {
   /**
    * Builder for SegmentConfig
    */
-  @JsonPOJOBuilder(withPrefix = "set")
   public static class Builder {
     private int _maxNumRecordsPerSegment = DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT;
 

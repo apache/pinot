@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.core.segment.processing.transformer;
 
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Map;
 import javax.annotation.Nullable;
 
@@ -27,18 +28,21 @@ import javax.annotation.Nullable;
 /**
  * Config for record transformer
  */
-@JsonDeserialize(builder = RecordTransformerConfig.Builder.class)
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class RecordTransformerConfig {
 
   private final Map<String, String> _transformFunctionsMap;
 
-  private RecordTransformerConfig(@Nullable Map<String, String> transformFunctionsMap) {
+  @JsonCreator
+  private RecordTransformerConfig(
+      @JsonProperty(value = "transformFunctionsMap") Map<String, String> transformFunctionsMap) {
     _transformFunctionsMap = transformFunctionsMap;
   }
 
   /**
    * Map containing transform functions for column transformation of a record
    */
+  @JsonProperty
   @Nullable
   public Map<String, String> getTransformFunctionsMap() {
     return _transformFunctionsMap;
@@ -47,7 +51,6 @@ public class RecordTransformerConfig {
   /**
    * Builder for Record Transformer Config
    */
-  @JsonPOJOBuilder(withPrefix = "set")
   public static class Builder {
     private Map<String, String> _transformFunctionsMap;
 

@@ -18,15 +18,16 @@
  */
 package org.apache.pinot.core.segment.processing.partitioner;
 
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 
 
 /**
  * Config for Partitioner
  */
-@JsonDeserialize(builder = PartitionerConfig.Builder.class)
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class PartitionerConfig {
 
   private static final PartitionerFactory.PartitionerType DEFAULT_PARTITIONER_TYPE =
@@ -38,8 +39,13 @@ public class PartitionerConfig {
   private final String _transformFunction;
   private final ColumnPartitionConfig _columnPartitionConfig;
 
-  private PartitionerConfig(PartitionerFactory.PartitionerType partitionerType, int numPartitions, String columnName,
-      String transformFunction, ColumnPartitionConfig columnPartitionConfig) {
+  @JsonCreator
+  private PartitionerConfig(
+      @JsonProperty(value = "partitionerType", required = true) PartitionerFactory.PartitionerType partitionerType,
+      @JsonProperty(value = "numPartitions") int numPartitions,
+      @JsonProperty(value = "columnName") String columnName,
+      @JsonProperty(value = "transformFunction") String transformFunction,
+      @JsonProperty(value = "columnPartitionConfig") ColumnPartitionConfig columnPartitionConfig) {
     _partitionerType = partitionerType;
     _numPartitions = numPartitions;
     _columnName = columnName;
@@ -50,6 +56,7 @@ public class PartitionerConfig {
   /**
    * The type of Partitioner
    */
+  @JsonProperty
   public PartitionerFactory.PartitionerType getPartitionerType() {
     return _partitionerType;
   }
@@ -57,6 +64,7 @@ public class PartitionerConfig {
   /**
    * The number of partitions to create
    */
+  @JsonProperty
   public int getNumPartitions() {
     return _numPartitions;
   }
@@ -64,6 +72,7 @@ public class PartitionerConfig {
   /**
    * The column name to use for partitioning
    */
+  @JsonProperty
   public String getColumnName() {
     return _columnName;
   }
@@ -71,6 +80,7 @@ public class PartitionerConfig {
   /**
    * The transform function to use for calculating partitions
    */
+  @JsonProperty
   public String getTransformFunction() {
     return _transformFunction;
   }
@@ -78,6 +88,7 @@ public class PartitionerConfig {
   /**
    * Column partition config from a table config
    */
+  @JsonProperty
   public ColumnPartitionConfig getColumnPartitionConfig() {
     return _columnPartitionConfig;
   }
@@ -85,7 +96,6 @@ public class PartitionerConfig {
   /**
    * Builder for a PartitioningConfig
    */
-  @JsonPOJOBuilder(withPrefix = "set")
   public static class Builder {
     private PartitionerFactory.PartitionerType _partitionerType = DEFAULT_PARTITIONER_TYPE;
     private int _numPartitions;

@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.core.segment.processing.collector;
 
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -28,7 +29,7 @@ import javax.annotation.Nullable;
 /**
  * Config for Collector
  */
-@JsonDeserialize(builder = CollectorConfig.Builder.class)
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class CollectorConfig {
   private static final CollectorFactory.CollectorType DEFAULT_COLLECTOR_TYPE = CollectorFactory.CollectorType.CONCAT;
 
@@ -36,8 +37,11 @@ public class CollectorConfig {
   private final Map<String, ValueAggregatorFactory.ValueAggregatorType> _aggregatorTypeMap;
   private final List<String> _sortOrder;
 
-  private CollectorConfig(CollectorFactory.CollectorType collectorType,
-      Map<String, ValueAggregatorFactory.ValueAggregatorType> aggregatorTypeMap, List<String> sortOrder) {
+  @JsonCreator
+  private CollectorConfig(
+      @JsonProperty(value = "collectorType", required = true) CollectorFactory.CollectorType collectorType,
+      @JsonProperty(value = "aggregatorTypeMap") Map<String, ValueAggregatorFactory.ValueAggregatorType> aggregatorTypeMap,
+      @JsonProperty(value = "sortOrder") List<String> sortOrder) {
     _collectorType = collectorType;
     _aggregatorTypeMap = aggregatorTypeMap;
     _sortOrder = sortOrder;
@@ -46,6 +50,7 @@ public class CollectorConfig {
   /**
    * The type of the Collector
    */
+  @JsonProperty
   public CollectorFactory.CollectorType getCollectorType() {
     return _collectorType;
   }
@@ -53,6 +58,7 @@ public class CollectorConfig {
   /**
    * Map containing aggregation types for the metrics
    */
+  @JsonProperty
   @Nullable
   public Map<String, ValueAggregatorFactory.ValueAggregatorType> getAggregatorTypeMap() {
     return _aggregatorTypeMap;
@@ -61,6 +67,7 @@ public class CollectorConfig {
   /**
    * The columns on which to sort
    */
+  @JsonProperty
   @Nullable
   public List<String> getSortOrder() {
     return _sortOrder;
@@ -69,7 +76,6 @@ public class CollectorConfig {
   /**
    * Builder for CollectorConfig
    */
-  @JsonPOJOBuilder(withPrefix = "set")
   public static class Builder {
     private CollectorFactory.CollectorType _collectorType = DEFAULT_COLLECTOR_TYPE;
     private Map<String, ValueAggregatorFactory.ValueAggregatorType> _aggregatorTypeMap;
