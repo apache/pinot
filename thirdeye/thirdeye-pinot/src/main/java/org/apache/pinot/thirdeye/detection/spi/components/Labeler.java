@@ -20,14 +20,17 @@
 package org.apache.pinot.thirdeye.detection.spi.components;
 
 import java.util.List;
+import java.util.Map;
+import org.apache.pinot.thirdeye.anomaly.AnomalySeverity;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.spec.AbstractSpec;
 
 
 public interface Labeler <T extends AbstractSpec> extends BaseComponent<T> {
   /**
-   * add or modify labels of anomalies in place
-   * @param anomalies
+   * Calculate the severity for list of anomalies
+   * @param anomalies input anoamlies
+   * @return mapping from anomaly to severity
    */
-  void label(List<MergedAnomalyResultDTO> anomalies);
+  Map<MergedAnomalyResultDTO, AnomalySeverity> label(List<MergedAnomalyResultDTO> anomalies);
 }

@@ -225,6 +225,9 @@
           },
           "quality": {
             "$ref": "#/definitions/genericComponent"
+          },
+          "labeler": {
+            "$ref": "#/definitions/genericComponent"
           }
         },
         "additionalProperties": false

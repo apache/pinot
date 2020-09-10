@@ -1,6 +1,7 @@
 package org.apache.pinot.thirdeye.detection.yaml.translator;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
 import com.google.common.collect.ImmutableMap;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;

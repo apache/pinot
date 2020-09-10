@@ -22,6 +22,7 @@ package org.apache.pinot.thirdeye.detection;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import java.util.HashMap;
+import org.apache.pinot.thirdeye.anomaly.AnomalySeverity;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.Collections;
@@ -34,7 +35,8 @@ public class DetectionTestUtils {
   private static final Long PROP_ID_VALUE = 1000L;
 
   public static MergedAnomalyResultDTO makeAnomaly(Long configId, Long legacyFunctionId, long start, long end,
-      String metric, String dataset, Map<String, String> dimensions, Map<String, String> props) {
+      String metric, String dataset, Map<String, String> dimensions, Map<String, String> props,
+      AnomalySeverity severity) {
     MergedAnomalyResultDTO anomaly = new MergedAnomalyResultDTO();
     anomaly.setDetectionConfigId(configId);
     anomaly.setStartTime(start);
@@ -43,6 +45,7 @@ public class DetectionTestUtils {
     anomaly.setCollection(dataset);
     anomaly.setFunctionId(legacyFunctionId);
     anomaly.setProperties(props);
+    anomaly.setSeverityLabel(severity);
 
     Multimap<String, String> filters = HashMultimap.create();
     for (Map.Entry<String, String> dimension : dimensions.entrySet()) {
@@ -60,7 +63,7 @@ public class DetectionTestUtils {
   public static MergedAnomalyResultDTO makeAnomaly(Long configId, long start, long end, String metric, String dataset,
       Map<String, String> dimensions) {
     return DetectionTestUtils.makeAnomaly(configId, null, start, end, metric, dataset, dimensions,
-        new HashMap<>());
+        new HashMap<>(), AnomalySeverity.DEFAULT);
   }
 
   public static MergedAnomalyResultDTO setAnomalyId(MergedAnomalyResultDTO anomaly, long id) {
@@ -74,7 +77,7 @@ public class DetectionTestUtils {
 
   public static MergedAnomalyResultDTO makeAnomaly(Long configId, Long legacyFuncId, long start, long end) {
     return DetectionTestUtils.makeAnomaly(configId, legacyFuncId, start, end, null, null,
-        Collections.emptyMap(), new HashMap<>());
+        Collections.emptyMap(), new HashMap<>(), AnomalySeverity.DEFAULT);
   }
 
   public static MergedAnomalyResultDTO makeAnomaly(Long configId, long start, long end) {
@@ -122,7 +125,12 @@ public class DetectionTestUtils {
 
   public static MergedAnomalyResultDTO makeAnomalyWithProps(long start, long end, Map<String, String> props) {
     return DetectionTestUtils.makeAnomaly(PROP_ID_VALUE, null, start, end, null, null,
-        Collections.emptyMap(), props);
+        Collections.emptyMap(), props, AnomalySeverity.DEFAULT);
+  }
+
+  public static MergedAnomalyResultDTO makeAnomaly(long start, long end, AnomalySeverity severity) {
+    return DetectionTestUtils.makeAnomaly(PROP_ID_VALUE, null, start, end, null, null,
+        Collections.emptyMap(), Collections.emptyMap(), severity);
   }
 
 }

@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.detection.components;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -46,7 +47,8 @@ public class ThresholdSeverityLabeler implements Labeler<SeverityThresholdLabele
   private TreeMap<AnomalySeverity, Threshold> severityMap;
 
   @Override
-  public void label(List<MergedAnomalyResultDTO> anomalies) {
+  public Map<MergedAnomalyResultDTO, AnomalySeverity> label(List<MergedAnomalyResultDTO> anomalies) {
+    Map<MergedAnomalyResultDTO, AnomalySeverity> res = new HashMap<>();
     for (MergedAnomalyResultDTO anomaly : anomalies) {
       double currVal = anomaly.getAvgCurrentVal();
       double baseVal = anomaly.getAvgBaselineVal();
@@ -59,18 +61,12 @@ public class ThresholdSeverityLabeler implements Labeler<SeverityThresholdLabele
       long duration = anomaly.getEndTime() - anomaly.getStartTime();
       for (Map.Entry<AnomalySeverity, Threshold> entry : severityMap.entrySet()) {
         if (deviation >= entry.getValue().change || duration >= entry.getValue().duration) {
-          if (anomaly.getSeverityLabel() != entry.getKey()) {
-            // find the severity from highest to lowest
-            if (anomaly.getId() != null && anomaly.getSeverityLabel().compareTo(entry.getKey()) > 0) {
-              // only set renotify if the anomaly exists and its severity gets higher
-              anomaly.setRenotify(true);
-            }
-            anomaly.setSeverityLabel(entry.getKey());
-            break;
-          }
+          res.put(anomaly, entry.getKey());
+          break;
         }
       }
     }
+    return res;
   }
 
   @Override

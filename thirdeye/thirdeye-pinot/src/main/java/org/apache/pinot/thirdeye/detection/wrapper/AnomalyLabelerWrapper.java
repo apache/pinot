@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections4.MapUtils;
+import org.apache.pinot.thirdeye.anomaly.AnomalySeverity;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.EvaluationDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -76,7 +77,17 @@ public class AnomalyLabelerWrapper extends DetectionPipeline {
       diagnostics.putAll(intermediate.getDiagnostics());
       anomalies.addAll(intermediate.getAnomalies());
     }
-    this.labeler.label(anomalies);
+    Map<MergedAnomalyResultDTO, AnomalySeverity> res = this.labeler.label(anomalies);
+    for (MergedAnomalyResultDTO anomaly : anomalies) {
+      AnomalySeverity newSeverity = res.getOrDefault(anomaly, AnomalySeverity.DEFAULT);
+      if (anomaly.getSeverityLabel() != newSeverity) {
+        if (anomaly.getId() != null && anomaly.getSeverityLabel().compareTo(newSeverity) > 0) {
+          // only set renotify if the anomaly exists and its severity gets higher
+          anomaly.setRenotify(true);
+        }
+        anomaly.setSeverityLabel(newSeverity);
+      }
+    }
     return new DetectionPipelineResult(anomalies, DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps),
         predictionResults, evaluations).setDiagnostics(diagnostics);
   }
