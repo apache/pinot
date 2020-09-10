@@ -1986,6 +1986,27 @@ public class PinotHelixResourceManager {
     }
   }
 
+  /**
+   * Get all tableConfigs (offline and realtime) using this schema.
+   * If tables have not been created, this will return empty list.
+   * If table config raw name doesn't match schema, they will not be fetched.
+   *
+   * @param schemaName Schema name
+   * @return list of table configs using this schema.
+   */
+  public List<TableConfig> getTableConfigsForSchema(String schemaName) {
+    List<TableConfig> tableConfigs = new ArrayList<>();
+    TableConfig offlineTableConfig = getOfflineTableConfig(schemaName);
+    if (offlineTableConfig != null) {
+      tableConfigs.add(offlineTableConfig);
+    }
+    TableConfig realtimeTableConfig = getRealtimeTableConfig(schemaName);
+    if (realtimeTableConfig != null) {
+      tableConfigs.add(realtimeTableConfig);
+    }
+    return tableConfigs;
+  }
+
   public List<String> getServerInstancesForTable(String tableName, TableType tableType) {
     TableConfig tableConfig = getTableConfig(tableName, tableType);
     Preconditions.checkNotNull(tableConfig);

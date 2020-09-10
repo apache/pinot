@@ -26,10 +26,8 @@ import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -173,7 +171,7 @@ public class PinotSchemaRestletResource {
   public String validateSchema(FormDataMultiPart multiPart) {
     Schema schema = getSchemaFromMultiPart(multiPart);
     try {
-      List<TableConfig> tableConfigs = getTableConfigsForSchema(schema.getSchemaName());
+      List<TableConfig> tableConfigs = _pinotHelixResourceManager.getTableConfigsForSchema(schema.getSchemaName());
       SchemaUtils.validate(schema, tableConfigs);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
@@ -191,7 +189,7 @@ public class PinotSchemaRestletResource {
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully validated schema"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
   public String validateSchema(Schema schema) {
     try {
-      List<TableConfig> tableConfigs = getTableConfigsForSchema(schema.getSchemaName());
+      List<TableConfig> tableConfigs = _pinotHelixResourceManager.getTableConfigsForSchema(schema.getSchemaName());
       SchemaUtils.validate(schema, tableConfigs);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
@@ -208,7 +206,7 @@ public class PinotSchemaRestletResource {
   private SuccessResponse addSchema(Schema schema, boolean override) {
     String schemaName = schema.getSchemaName();
     try {
-      List<TableConfig> tableConfigs = getTableConfigsForSchema(schemaName);
+      List<TableConfig> tableConfigs = _pinotHelixResourceManager.getTableConfigsForSchema(schemaName);
       SchemaUtils.validate(schema, tableConfigs);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
@@ -239,7 +237,7 @@ public class PinotSchemaRestletResource {
    */
   private SuccessResponse updateSchema(String schemaName, Schema schema, boolean reload) {
     try {
-      List<TableConfig> tableConfigs = getTableConfigsForSchema(schemaName);
+      List<TableConfig> tableConfigs = _pinotHelixResourceManager.getTableConfigsForSchema(schemaName);
       SchemaUtils.validate(schema, tableConfigs);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
@@ -323,20 +321,5 @@ public class PinotSchemaRestletResource {
       throw new ControllerApplicationException(LOGGER, String.format("Failed to delete schema %s", schemaName),
           Response.Status.INTERNAL_SERVER_ERROR);
     }
-  }
-
-  private List<TableConfig> getTableConfigsForSchema(@Nullable String schemaName) {
-    List<TableConfig> tableConfigs = new ArrayList<>();
-    if (schemaName != null) {
-      TableConfig offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(schemaName);
-      if (offlineTableConfig != null) {
-        tableConfigs.add(offlineTableConfig);
-      }
-      TableConfig realtimeTableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(schemaName);
-      if (realtimeTableConfig != null) {
-        tableConfigs.add(realtimeTableConfig);
-      }
-    }
-    return tableConfigs;
   }
 }
