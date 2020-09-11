@@ -22,7 +22,6 @@ package org.apache.pinot.thirdeye.dashboard.resources.v2.rootcause;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import com.google.common.collect.SetMultimap;
 import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
 import org.apache.pinot.thirdeye.constant.MetricAggFunction;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.ResourceUtils;

@@ -33,8 +33,6 @@ import org.apache.pinot.thirdeye.detection.spi.model.InputDataSpec;
 import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.apache.pinot.thirdeye.rootcause.timeseries.Baseline;
 
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-
 @Components(title = "rule baseline",
     type = "RULE_BASELINE"
 )
