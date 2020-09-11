@@ -90,7 +90,7 @@ public class UnnotifiedAnomalyFetcher extends BaseAnomalyFetcher {
     Iterator<MergedAnomalyResultDTO> iterator = alertCandidates.iterator();
     while (iterator.hasNext()) {
       MergedAnomalyResultDTO mergedAnomaly = iterator.next();
-      String snapshotKey = AlertSnapshotDTO.getSnapshotKey(mergedAnomaly);
+      String snapshotKey = BaseAnomalyFetcher.getSnapshotKey(mergedAnomaly);
 
       if (snapshot.containsKey(snapshotKey)) {
         // If the mergedAnomaly's create time is before last notify time, discard

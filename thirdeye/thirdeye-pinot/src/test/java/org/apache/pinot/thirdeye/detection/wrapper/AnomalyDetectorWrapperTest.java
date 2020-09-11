@@ -42,7 +42,6 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 import static org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTranslator.*;
 
 
@@ -79,17 +78,17 @@ public class AnomalyDetectorWrapperTest {
     this.provider.setDatasets(Collections.singletonList(dataset));
     this.provider.setTimeseries(ImmutableMap.of(
         MetricSlice.from(1L, 1546646400000L, 1546732800000L),
-        new DataFrame().addSeries(COL_VALUE, 500, 1000).addSeries(COL_TIME, 1546646400000L, 1546732800000L),
+        new DataFrame().addSeries(DataFrame.COL_VALUE, 500, 1000).addSeries(DataFrame.COL_TIME, 1546646400000L, 1546732800000L),
         MetricSlice.from(1L, 1546819200000L, 1546905600000L),
-        DataFrame.builder(COL_TIME, COL_VALUE).build(),
+        DataFrame.builder(DataFrame.COL_TIME, DataFrame.COL_VALUE).build(),
         MetricSlice.from(1L, 1546300800000L, 1546560000000L),
-        new DataFrame().addSeries(COL_VALUE, 500, 1000).addSeries(COL_TIME, 1546300800000L, 1546387200000L),
+        new DataFrame().addSeries(DataFrame.COL_VALUE, 500, 1000).addSeries(DataFrame.COL_TIME, 1546300800000L, 1546387200000L),
         MetricSlice.from(1L, 1540147725000L - TimeUnit.DAYS.toMillis(90), 1540493325000L, HashMultimap.create(),
             new TimeGranularity(1, TimeUnit.DAYS)),
-        new DataFrame().addSeries(COL_VALUE, 500, 1000).addSeries(COL_TIME, 1546646400000L, 1546732800000L),
+        new DataFrame().addSeries(DataFrame.COL_VALUE, 500, 1000).addSeries(DataFrame.COL_TIME, 1546646400000L, 1546732800000L),
         MetricSlice.from(1L, 1540080000000L - TimeUnit.DAYS.toMillis(90), 1540425600000L, HashMultimap.create(),
             new TimeGranularity(1, TimeUnit.DAYS)),
-        new DataFrame().addSeries(COL_VALUE, 500, 1000).addSeries(COL_TIME, 1546646400000L, 1546732800000L)));
+        new DataFrame().addSeries(DataFrame.COL_VALUE, 500, 1000).addSeries(DataFrame.COL_TIME, 1546646400000L, 1546732800000L)));
   }
 
   @Test

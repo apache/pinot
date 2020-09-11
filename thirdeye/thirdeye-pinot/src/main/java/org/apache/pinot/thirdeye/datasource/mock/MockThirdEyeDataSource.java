@@ -52,8 +52,8 @@ import java.io.File;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.COL_TIME;
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.COL_VALUE;
+import static org.apache.pinot.thirdeye.dataframe.DataFrame.COL_TIME;
+import static org.apache.pinot.thirdeye.dataframe.DataFrame.COL_VALUE;
 import static org.apache.pinot.thirdeye.datasource.sql.SqlResponseCacheLoader.*;
 
 

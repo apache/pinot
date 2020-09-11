@@ -53,9 +53,6 @@ import org.joda.time.DateTimeZone;
 import org.joda.time.Period;
 import org.joda.time.PeriodType;
 
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-
-
 public class DetectionUtils {
   private static final String PROP_BASELINE_PROVIDER_COMPONENT_NAME = "baselineProviderComponentName";
 
@@ -120,7 +117,7 @@ public class DetectionUtils {
     }
 
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
-    LongSeries sTime = df.getLongs(COL_TIME);
+    LongSeries sTime = df.getLongs(DataFrame.COL_TIME);
     BooleanSeries sVal = df.getBooleans(seriesName);
 
     int lastStart = -1;
@@ -331,9 +328,11 @@ public class DetectionUtils {
   public static DataFrame aggregateByPeriod(DataFrame df, DateTime origin, Period granularityPeriod, MetricAggFunction aggregationFunction) {
     switch (aggregationFunction) {
       case SUM:
-        return df.groupByPeriod(df.getLongs(COL_TIME), origin, granularityPeriod).sum(COL_TIME, COL_VALUE);
+        return df.groupByPeriod(df.getLongs(DataFrame.COL_TIME), origin, granularityPeriod).sum(
+            DataFrame.COL_TIME, DataFrame.COL_VALUE);
       case AVG:
-        return df.groupByPeriod(df.getLongs(COL_TIME), origin, granularityPeriod).mean(COL_TIME, COL_VALUE);
+        return df.groupByPeriod(df.getLongs(DataFrame.COL_TIME), origin, granularityPeriod).mean(
+            DataFrame.COL_TIME, DataFrame.COL_VALUE);
       default:
         throw new NotImplementedException(String.format("The aggregate by period for %s is not supported in DataFrame.", aggregationFunction));
     }
@@ -355,10 +354,10 @@ public class DetectionUtils {
    */
   public static DataFrame filterIncompleteAggregation(DataFrame df, long latestDataTimeStamp,
       TimeGranularity bucketTimeGranularity, Period aggregationGranularityPeriod) {
-    long latestAggregationStartTimeStamp = df.getLong(COL_TIME, df.size() - 1);
+    long latestAggregationStartTimeStamp = df.getLong(DataFrame.COL_TIME, df.size() - 1);
     if (latestDataTimeStamp + bucketTimeGranularity.toMillis()
         < latestAggregationStartTimeStamp + aggregationGranularityPeriod.toStandardDuration().getMillis()) {
-      df = df.filter(df.getLongs(COL_TIME).neq(latestAggregationStartTimeStamp)).dropNull();
+      df = df.filter(df.getLongs(DataFrame.COL_TIME).neq(latestAggregationStartTimeStamp)).dropNull();
     }
     return df;
   }

@@ -56,9 +56,6 @@ import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-
-
 /**
  * The Legacy anomaly function algorithm. This can run existing anomaly functions.
  */
@@ -129,7 +126,7 @@ public class LegacyAnomalyFunctionAlgorithm extends DetectionPipeline {
           this.provider.fetchMetrics(Collections.singleton(this.metricEntity.getId())).get(this.metricEntity.getId());
 
       // get time series
-      DataFrame df = DataFrame.builder(COL_TIME + ":LONG", COL_VALUE + ":DOUBLE").build();
+      DataFrame df = DataFrame.builder(DataFrame.COL_TIME + ":LONG", DataFrame.COL_VALUE + ":DOUBLE").build();
       List<Pair<Long, Long>> timeIntervals = this.anomalyFunction.getDataRangeIntervals(this.startTime, this.endTime);
       for (Pair<Long, Long> startEndInterval : timeIntervals) {
         MetricSlice slice = MetricSlice.from(this.metricEntity.getId(), startEndInterval.getFirst(), startEndInterval.getSecond(), metricEntity.getFilters());
@@ -140,9 +137,10 @@ public class LegacyAnomalyFunctionAlgorithm extends DetectionPipeline {
       MetricTimeSeries metricTimeSeries = new MetricTimeSeries(MetricSchema.fromMetricSpecs(
           Collections.singletonList(new MetricSpec(metricConfig.getName(), MetricType.DOUBLE))));
 
-      LongSeries timestamps = df.getLongs(COL_TIME);
+      LongSeries timestamps = df.getLongs(DataFrame.COL_TIME);
       for (int i = 0; i < timestamps.size(); i++) {
-        metricTimeSeries.set(timestamps.get(i), metricConfig.getName(), df.getDoubles(COL_VALUE).get(i));
+        metricTimeSeries.set(timestamps.get(i), metricConfig.getName(), df.getDoubles(
+            DataFrame.COL_VALUE).get(i));
       }
 
       if (!this.dataFilter.isQualified(metricTimeSeries, dimension, this.startTime, this.endTime)) {

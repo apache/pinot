@@ -20,16 +20,10 @@ import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
 import java.io.InputStreamReader;
 import java.io.Reader;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
 import org.joda.time.Duration;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
-
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-
 
 public class AlgorithmUtilsTest {
   DataFrame data;
@@ -39,14 +33,14 @@ public class AlgorithmUtilsTest {
   public void beforeMethod() throws Exception {
     try (Reader dataReader = new InputStreamReader(this.getClass().getResourceAsStream("timeseries-4w.csv"))) {
       this.data = DataFrame.fromCsv(dataReader);
-      this.data.setIndex(COL_TIME);
-      this.data.addSeries(COL_TIME, this.data.getLongs(COL_TIME).multiply(1000));
+      this.data.setIndex(DataFrame.COL_TIME);
+      this.data.addSeries(DataFrame.COL_TIME, this.data.getLongs(DataFrame.COL_TIME).multiply(1000));
     }
 
     this.outlierData = new DataFrame(this.data);
-    this.outlierData.set(COL_VALUE,
-        this.outlierData.getLongs(COL_TIME).between(86400000L, 86400000L * 3),
-        this.outlierData.getDoubles(COL_VALUE).multiply(0.5));
+    this.outlierData.set(DataFrame.COL_VALUE,
+        this.outlierData.getLongs(DataFrame.COL_TIME).between(86400000L, 86400000L * 3),
+        this.outlierData.getDoubles(DataFrame.COL_VALUE).multiply(0.5));
   }
 
   @Test
@@ -161,12 +155,12 @@ public class AlgorithmUtilsTest {
       return false;
     }
 
-    if (!a.get(COL_TIME).equals(b.get(COL_TIME))) {
+    if (!a.get(DataFrame.COL_TIME).equals(b.get(DataFrame.COL_TIME))) {
       return false;
     }
 
-    DoubleSeries valA = a.getDoubles(COL_VALUE);
-    DoubleSeries valB = b.getDoubles(COL_VALUE);
+    DoubleSeries valA = a.getDoubles(DataFrame.COL_VALUE);
+    DoubleSeries valB = b.getDoubles(DataFrame.COL_VALUE);
 
     return equals(valA, valB, epsilon);
   }

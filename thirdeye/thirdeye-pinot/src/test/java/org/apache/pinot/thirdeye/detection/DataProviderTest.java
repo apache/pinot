@@ -68,9 +68,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-
-
 public class DataProviderTest {
 
   private DAOTestBase testBase;
@@ -147,8 +144,8 @@ public class DataProviderTest {
     // data
     try (Reader dataReader = new InputStreamReader(this.getClass().getResourceAsStream("algorithm/timeseries-4w.csv"))) {
       this.data = DataFrame.fromCsv(dataReader);
-      this.data.setIndex(COL_TIME);
-      this.data.addSeries(COL_TIME, this.data.getLongs(COL_TIME).multiply(1000));
+      this.data.setIndex(DataFrame.COL_TIME);
+      this.data.addSeries(DataFrame.COL_TIME, this.data.getLongs(DataFrame.COL_TIME).multiply(1000));
     }
 
     // register caches

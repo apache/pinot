@@ -18,7 +18,6 @@ package org.apache.pinot.thirdeye.detection.dataquality;
 
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -52,7 +51,6 @@ import org.apache.pinot.thirdeye.detection.MockDataProvider;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
 import org.apache.pinot.thirdeye.detection.components.ThresholdRuleDetector;
 import org.apache.pinot.thirdeye.detection.dataquality.components.DataSlaQualityChecker;
-import org.apache.pinot.thirdeye.detection.validators.ConfigValidationException;
 import org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTranslator;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -60,9 +58,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
-
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-
 
 public class DataQualityTaskRunnerTest {
   private DetectionPipelineTaskInfo info;
@@ -182,8 +177,8 @@ public class DataQualityTaskRunnerTest {
     }
 
     return new DataFrame()
-        .addSeries(COL_VALUE, values)
-        .addSeries(COL_TIME, timestamps);
+        .addSeries(DataFrame.COL_VALUE, values)
+        .addSeries(DataFrame.COL_TIME, timestamps);
   }
 
   private List<MergedAnomalyResultDTO> retrieveAllAnomalies() {

@@ -61,7 +61,6 @@ import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
-import org.apache.pinot.thirdeye.dashboard.views.TimeBucket;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -71,6 +70,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean.COMPARE_MODE;
 import org.apache.pinot.thirdeye.datalayer.pojo.MetricConfigBean;
 import org.apache.pinot.thirdeye.datalayer.util.DaoProviderUtil;
+import org.apache.pinot.thirdeye.datalayer.util.ThirdEyeDataUtils;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.MetricExpression;
 import org.apache.pinot.thirdeye.datasource.MetricFunction;
@@ -85,13 +85,11 @@ import org.joda.time.Period;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.thirdeye.detection.wrapper.GrouperWrapper.PROP_DETECTOR_COMPONENT_NAME;
+import static org.apache.pinot.thirdeye.detection.GrouperWrapperConstants.PROP_DETECTOR_COMPONENT_NAME;
 import static org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO.TIME_SERIES_SNAPSHOT_KEY;
 
 public abstract class ThirdEyeUtils {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeUtils.class);
-  private static final String FILTER_VALUE_ASSIGNMENT_SEPARATOR = "=";
-  private static final String FILTER_CLAUSE_SEPARATOR = ";";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
@@ -115,21 +113,6 @@ public abstract class ThirdEyeUtils {
 
   private ThirdEyeUtils () {
 
-  }
-
-  public static Multimap<String, String> getFilterSet(String filters) {
-    Multimap<String, String> filterSet = ArrayListMultimap.create();
-    if (StringUtils.isNotBlank(filters)) {
-      String[] filterClauses = filters.split(FILTER_CLAUSE_SEPARATOR);
-      for (String filterClause : filterClauses) {
-        String[] values = filterClause.split(FILTER_VALUE_ASSIGNMENT_SEPARATOR, 2);
-        if (values.length != 2) {
-          throw new IllegalArgumentException("Filter values assigments should in pairs: " + filters);
-        }
-        filterSet.put(values[0], values[1]);
-      }
-    }
-    return filterSet;
   }
 
   /**
@@ -199,38 +182,9 @@ public abstract class ThirdEyeUtils {
     return multimap;
   }
 
-  public static String getSortedFiltersFromMultiMap(Multimap<String, String> filterMultiMap) {
-    Set<String> filterKeySet = filterMultiMap.keySet();
-    ArrayList<String> filterKeyList = new ArrayList<String>(filterKeySet);
-    Collections.sort(filterKeyList);
-
-    StringBuilder sb = new StringBuilder();
-    for (String filterKey : filterKeyList) {
-      ArrayList<String> values = new ArrayList<String>(filterMultiMap.get(filterKey));
-      Collections.sort(values);
-      for (String value : values) {
-        sb.append(filterKey);
-        sb.append(FILTER_VALUE_ASSIGNMENT_SEPARATOR);
-        sb.append(value);
-        sb.append(FILTER_CLAUSE_SEPARATOR);
-      }
-    }
-    return StringUtils.chop(sb.toString());
-  }
-
-  public static String getSortedFilters(String filters) {
-    Multimap<String, String> filterMultiMap = getFilterSet(filters);
-    String sortedFilters = getSortedFiltersFromMultiMap(filterMultiMap);
-
-    if (StringUtils.isBlank(sortedFilters)) {
-      return null;
-    }
-    return sortedFilters;
-  }
-
   public static String getSortedFiltersFromJson(String filterJson) {
     Multimap<String, String> filterMultiMap = convertToMultiMap(filterJson);
-    String sortedFilters = getSortedFiltersFromMultiMap(filterMultiMap);
+    String sortedFilters = ThirdEyeDataUtils.getSortedFiltersFromMultiMap(filterMultiMap);
 
     if (StringUtils.isBlank(sortedFilters)) {
       return null;

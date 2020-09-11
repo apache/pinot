@@ -24,11 +24,9 @@ import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.DefaultInputDataFetcher;
-import org.apache.pinot.thirdeye.detection.InputDataFetcher;
 import org.apache.pinot.thirdeye.detection.MockDataProvider;
 import org.apache.pinot.thirdeye.detection.algorithm.AlgorithmUtils;
 import org.apache.pinot.thirdeye.detection.spec.AbsoluteChangeRuleDetectorSpec;
-import org.apache.pinot.thirdeye.detection.spec.PercentageChangeRuleDetectorSpec;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.Collections;
@@ -43,9 +41,6 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-
-
 public class AbsoluteChangeRuleDetectorTest {
   private DataProvider provider;
   private DataFrame data;
@@ -54,8 +49,8 @@ public class AbsoluteChangeRuleDetectorTest {
   public void beforeMethod() throws Exception {
     try (Reader dataReader = new InputStreamReader(AlgorithmUtils.class.getResourceAsStream("timeseries-4w.csv"))) {
       this.data = DataFrame.fromCsv(dataReader);
-      this.data.setIndex(COL_TIME);
-      this.data.addSeries(COL_TIME, this.data.getLongs(COL_TIME).multiply(1000));
+      this.data.setIndex(DataFrame.COL_TIME);
+      this.data.addSeries(DataFrame.COL_TIME, this.data.getLongs(DataFrame.COL_TIME).multiply(1000));
     }
 
     MetricConfigDTO metricConfigDTO = new MetricConfigDTO();
