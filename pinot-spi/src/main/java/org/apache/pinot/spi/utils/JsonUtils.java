@@ -193,17 +193,4 @@ public class JsonUtils {
         throw new IllegalArgumentException(String.format("Unsupported data type %s", dataType));
     }
   }
-
-  /**
-   * Converts from a GenericRecord to a json map
-   */
-  public static Map<String, Object> genericRecordToJson(GenericRecord genericRecord) {
-    try {
-      String jsonString = genericRecord.toString();
-      return DEFAULT_MAPPER.readValue(jsonString, new TypeReference<Map<String, Object>>() {
-      });
-    } catch (IOException e) {
-      throw new IllegalStateException("Caught exception when converting generic record " + genericRecord + " to JSON");
-    }
-  }
 }
