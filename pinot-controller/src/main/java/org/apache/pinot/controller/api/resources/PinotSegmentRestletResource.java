@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -83,7 +84,6 @@ import org.slf4j.LoggerFactory;
  *     <ul>
  *       <li>"/segments/{tableName}/{segmentName}/reload": reload a segment</li>
  *       <li>"/segments/{tableName}/reload": reload all segments</li>
- *       <li>"segments/{tableName}/loadStatus": retrieve load status of all segments</li>
  *     </ul>
  *   </li>
  *   <li>
@@ -507,7 +507,7 @@ public class PinotSegmentRestletResource {
   @Path("segments/{tableName}/metadata")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get the server metadata for all table segments", notes = "Get the server metadata for all table segments")
-  public Map<String, String> getServerMetadata(@ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+  public String getServerMetadata(@ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
                                                @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr) {
     LOGGER.info("Received a request to fetch metadata for all segments for table {}", tableName);
     TableType tableType = Constants.validateTableType(tableTypeStr);
@@ -517,9 +517,10 @@ public class PinotSegmentRestletResource {
     }
 
     String tableNameWithType = getExistingTableNamesWithType(tableName, tableType).get(0);
-    Map<String, String> segmentsMetadata;
+    String segmentsMetadata;
     try {
-      segmentsMetadata = getSegmentsMetadataFromServer(tableNameWithType);
+      JsonNode segmentsMetadataJson = getSegmentsMetadataFromServer(tableNameWithType);
+      segmentsMetadata = JsonUtils.objectToPrettyString(segmentsMetadataJson);
     } catch (InvalidConfigException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Status.BAD_REQUEST);
     } catch (IOException ioe) {
@@ -533,10 +534,8 @@ public class PinotSegmentRestletResource {
    * This is a helper method to get the metadata for all segments for a given table name.
    * @param tableNameWithType name of the table along with its type
    * @return Map<String, String>  metadata of the table segments -> map of segment name to its metadata
-   * @throws InvalidConfigException
-   * @throws IOException
    */
-  private Map<String, String> getSegmentsMetadataFromServer(String tableNameWithType)
+  private JsonNode getSegmentsMetadataFromServer(String tableNameWithType)
       throws InvalidConfigException, IOException {
     TableMetadataReader tableMetadataReader =
         new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);

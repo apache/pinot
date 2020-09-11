@@ -52,13 +52,9 @@ public class TableMetadataReader {
   /**
    * This method retrieves the full segment metadata for a given table.
    * Currently supports only OFFLINE tables.
-   * @param tableNameWithType
-   * @param timeoutMs
    * @return a map of segmentName to its metadata
-   * @throws InvalidConfigException
-   * @throws IOException
    */
-  public Map<String, String> getSegmentsMetadata(String tableNameWithType, int timeoutMs)
+  public JsonNode getSegmentsMetadata(String tableNameWithType, int timeoutMs)
       throws InvalidConfigException, IOException {
     final Map<String, List<String>> serverToSegments =
         _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
@@ -68,11 +64,11 @@ public class TableMetadataReader {
     List<String> segmentsMetadata = serverSegmentMetadataReader.getSegmentMetadataFromServer(tableNameWithType,
         serverToSegments, endpoints, timeoutMs);
 
-    Map<String, String> response = new HashMap<>();
+    Map<String, JsonNode> response = new HashMap<>();
     for (String segmentMetadata : segmentsMetadata) {
       JsonNode responseJson = JsonUtils.stringToJsonNode(segmentMetadata);
-      response.put(responseJson.get("segmentName").asText(), segmentMetadata);
+      response.put(responseJson.get("segmentName").asText(), responseJson);
     }
-    return response;
+    return JsonUtils.objectToJsonNode(response);
   }
 }

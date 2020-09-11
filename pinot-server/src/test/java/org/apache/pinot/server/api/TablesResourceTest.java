@@ -236,7 +236,7 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertTrue(jsonResponse.has("endTimeReadable"));
     Assert.assertTrue(jsonResponse.has("creationTimeReadable"));
     Assert.assertEquals(jsonResponse.get("columns").size(), 0);
-    Assert.assertEquals(jsonResponse.get("indexes").size(), 1);
+    Assert.assertEquals(jsonResponse.get("indexes").size(), 17);
 
 
     jsonResponse = JsonUtils.stringToJsonNode(

@@ -19,10 +19,10 @@
 package org.apache.pinot.server.api.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -51,9 +51,7 @@ public class SegmentMetadataFetcher {
 
   /**
    * This is a helper method that fetches the segment metadata for a given segment.
-   * @param segmentDataManager
-   * @param columns
-   * @return
+   * @param columns Columns to include for metadata
    */
   public static String getSegmentMetadata(SegmentDataManager segmentDataManager, List<String> columns)
       throws JsonProcessingException {
@@ -64,80 +62,74 @@ public class SegmentMetadataFetcher {
     } else {
       columnSet = new HashSet<>(columns);
     }
-    JsonNode indexes = getIndexesForSegmentColumns(segmentDataManager);
-    JsonNode segmentMetadataJson = segmentMetadata.toJson(columnSet);
-    ObjectNode segmentMetadataObject = segmentMetadataJson.deepCopy();
-    segmentMetadataObject.set("indexes", indexes);
-    return JsonUtils.objectToPrettyString(segmentMetadataObject);
+    ObjectNode segmentMetadataJson = (ObjectNode) segmentMetadata.toJson(columnSet);
+    segmentMetadataJson.set("indexes", JsonUtils.objectToJsonNode(getIndexesForSegmentColumns(segmentDataManager)));
+    return JsonUtils.objectToString(segmentMetadataJson);
   }
 
   /**
    * Get the JSON object with the segment column's indexing metadata.
-   * @param segmentDataManager
-   * @return
    */
-  private static JsonNode getIndexesForSegmentColumns(SegmentDataManager segmentDataManager) {
-    ArrayNode columnsIndexMetadata = JsonUtils.newArrayNode();
+  private static Map<String, Map<String, String>> getIndexesForSegmentColumns(SegmentDataManager segmentDataManager) {
+    Map<String, Map<String, String>> columnIndexMap = null;
     if (segmentDataManager instanceof ImmutableSegmentDataManager) {
       ImmutableSegmentDataManager immutableSegmentDataManager = (ImmutableSegmentDataManager) segmentDataManager;
       ImmutableSegment immutableSegment = immutableSegmentDataManager.getSegment();
       if (immutableSegment instanceof ImmutableSegmentImpl) {
         ImmutableSegmentImpl immutableSegmentImpl = (ImmutableSegmentImpl) immutableSegment;
         Map<String, ColumnIndexContainer> columnIndexContainerMap = immutableSegmentImpl.getIndexContainerMap();
-        columnsIndexMetadata.add(getImmutableSegmentColumnIndexes(columnIndexContainerMap));
+        columnIndexMap = getImmutableSegmentColumnIndexes(columnIndexContainerMap);
       }
     }
-    return columnsIndexMetadata;
+    return columnIndexMap;
   }
 
   /**
-   * Helper to loop through column index container to create a index map as follows:
+   * Helper to loop through column index container to create a index map as follows for each column:
    * {<"bloom-filter", "YES">, <"dictionary", "NO">}
-   * @param columnIndexContainerMap
-   * @return
    */
-  private static ObjectNode getImmutableSegmentColumnIndexes(Map<String, ColumnIndexContainer> columnIndexContainerMap) {
-    ObjectNode columnIndexMap = JsonUtils.newObjectNode();
-    for (Map.Entry<String, ColumnIndexContainer> e : columnIndexContainerMap.entrySet()) {
-      ColumnIndexContainer columnIndexContainer = e.getValue();
-      ObjectNode indexesNode = JsonUtils.newObjectNode();
+  private static Map<String, Map<String, String>> getImmutableSegmentColumnIndexes(Map<String, ColumnIndexContainer> columnIndexContainerMap) {
+    Map<String, Map<String, String>> columnIndexMap = new LinkedHashMap<>();
+    for (Map.Entry<String, ColumnIndexContainer> entry : columnIndexContainerMap.entrySet()) {
+      ColumnIndexContainer columnIndexContainer = entry.getValue();
+      Map<String, String> indexStatus = new LinkedHashMap<>();
       if (Objects.isNull(columnIndexContainer.getBloomFilter())) {
-        indexesNode.put(BLOOM_FILTER, INDEX_NOT_AVAILABLE);
+        indexStatus.put(BLOOM_FILTER, INDEX_NOT_AVAILABLE);
       } else {
-        indexesNode.put(BLOOM_FILTER, INDEX_AVAILABLE);
+        indexStatus.put(BLOOM_FILTER, INDEX_AVAILABLE);
       }
 
       if (Objects.isNull(columnIndexContainer.getDictionary())) {
-        indexesNode.put(DICTIONARY, INDEX_NOT_AVAILABLE);
+        indexStatus.put(DICTIONARY, INDEX_NOT_AVAILABLE);
       } else {
-        indexesNode.put(DICTIONARY, INDEX_AVAILABLE);
+        indexStatus.put(DICTIONARY, INDEX_AVAILABLE);
       }
 
       if (Objects.isNull(columnIndexContainer.getForwardIndex())) {
-        indexesNode.put(FORWARD_INDEX, INDEX_NOT_AVAILABLE);
+        indexStatus.put(FORWARD_INDEX, INDEX_NOT_AVAILABLE);
       } else {
-        indexesNode.put(FORWARD_INDEX, INDEX_AVAILABLE);
+        indexStatus.put(FORWARD_INDEX, INDEX_AVAILABLE);
       }
 
       if (Objects.isNull(columnIndexContainer.getInvertedIndex())) {
-        indexesNode.put(INVERTED_INDEX, INDEX_NOT_AVAILABLE);
+        indexStatus.put(INVERTED_INDEX, INDEX_NOT_AVAILABLE);
       } else {
-        indexesNode.put(INVERTED_INDEX, INDEX_AVAILABLE);
+        indexStatus.put(INVERTED_INDEX, INDEX_AVAILABLE);
       }
 
       if (Objects.isNull(columnIndexContainer.getNullValueVector())) {
-        indexesNode.put(NULL_VALUE_VECTOR_READER, INDEX_NOT_AVAILABLE);
+        indexStatus.put(NULL_VALUE_VECTOR_READER, INDEX_NOT_AVAILABLE);
       } else {
-        indexesNode.put(NULL_VALUE_VECTOR_READER, INDEX_AVAILABLE);
+        indexStatus.put(NULL_VALUE_VECTOR_READER, INDEX_AVAILABLE);
       }
 
       if (Objects.isNull(columnIndexContainer.getNullValueVector())) {
-        indexesNode.put(RANGE_INDEX, INDEX_NOT_AVAILABLE);
+        indexStatus.put(RANGE_INDEX, INDEX_NOT_AVAILABLE);
       } else {
-        indexesNode.put(RANGE_INDEX, INDEX_AVAILABLE);
+        indexStatus.put(RANGE_INDEX, INDEX_AVAILABLE);
       }
 
-      columnIndexMap.set(e.getKey(), indexesNode);
+      columnIndexMap.put(entry.getKey(), indexStatus);
     }
     return columnIndexMap;
   }

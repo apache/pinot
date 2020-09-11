@@ -49,10 +49,6 @@ public class ServerSegmentMetadataReader {
   /**
    * This method is called when the API request is to fetch segment metadata for all segments of the table.
    * This method makes a MultiGet call to all servers that host their respective segments and gets the results.
-   * @param tableNameWithType
-   * @param serversToSegmentsMap
-   * @param endpoints
-   * @param timeoutMs
    * @return list of segments and their metadata as a JSON string
    */
   public List<String> getSegmentMetadataFromServer(String tableNameWithType,
@@ -75,9 +71,9 @@ public class ServerSegmentMetadataReader {
     int failedParses = 0;
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
-        JsonNode segmentMetadata = JsonUtils.stringToJsonNode(streamResponse.getValue());
-        segmentsMetadata.add(JsonUtils.objectToPrettyString(segmentMetadata));
-      } catch (IOException e) {
+        String segmentMetadata = streamResponse.getValue();
+        segmentsMetadata.add(segmentMetadata);
+      } catch (Exception e) {
         failedParses++;
         LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
       }
