@@ -97,6 +97,7 @@ public class AvroIngestionSchemaValidator implements IngestionSchemaValidator {
                 fieldSpec.getDataType().name(), getInputSchemaType()));
         continue;
       }
+      String avroColumnName = avroColumnField.schema().getName();
       org.apache.avro.Schema avroColumnSchema = avroColumnField.schema();
       org.apache.avro.Schema.Type avroColumnType = avroColumnSchema.getType();
       if (avroColumnType == org.apache.avro.Schema.Type.UNION) {
@@ -111,36 +112,56 @@ public class AvroIngestionSchemaValidator implements IngestionSchemaValidator {
           }
         }
         if (nonNullSchema != null) {
+          avroColumnSchema = nonNullSchema;
           avroColumnType = nonNullSchema.getType();
         }
       }
 
-      if (!fieldSpec.getDataType().name().equalsIgnoreCase(avroColumnType.toString())) {
-        _dataTypeMismatch.addMismatchReason(String
-            .format("The Pinot column: (%s: %s) doesn't match with the column (%s: %s) in input %s schema.", columnName,
-                fieldSpec.getDataType().name(), avroColumnSchema.getName(), avroColumnType.toString(),
-                getInputSchemaType()));
-      }
-
       if (fieldSpec.isSingleValueField()) {
+        // check data type mismatch
+        if (!fieldSpec.getDataType().name().equalsIgnoreCase(avroColumnType.toString())) {
+          getDataTypeMismatchResult().addMismatchReason(String
+              .format("The Pinot column: (%s: %s) doesn't match with the column (%s: %s) in input %s schema.", columnName,
+                  fieldSpec.getDataType().name(), avroColumnName, avroColumnType.toString(),
+                  getInputSchemaType()));
+        }
+        // check single-value multi-value mismatch
         if (avroColumnType.ordinal() < org.apache.avro.Schema.Type.STRING.ordinal()) {
           // the column is a complex structure
-          _singleValueMultiValueFieldMismatch.addMismatchReason(String.format(
-              "The Pinot column: %s is 'single-value' column but the column: %s from input %s is 'multi-value' column.",
-              columnName, avroColumnSchema.getName(), getInputSchemaType()));
+          getSingleValueMultiValueFieldMismatchResult().addMismatchReason(String
+              .format(
+                  "The Pinot column: %s is 'single-value' column but the column: %s from input %s is 'multi-value' column.",
+                  columnName, avroColumnName, getInputSchemaType()));
         }
       } else {
+        // check data type mismatch
+        FieldSpec.DataType dataTypeForMVColumn = AvroUtils.extractFieldDataType(avroColumnField);
+        if (fieldSpec.getDataType() != dataTypeForMVColumn) {
+          getDataTypeMismatchResult().addMismatchReason(String
+              .format("The Pinot column: (%s: %s) doesn't match with the column (%s: %s) in input %s schema.",
+                  columnName, fieldSpec.getDataType().name(), avroColumnName, dataTypeForMVColumn.name(),
+                  getInputSchemaType()));
+        }
+        // check single-value multi-value mismatch
         if (avroColumnType.ordinal() >= org.apache.avro.Schema.Type.STRING.ordinal()) {
           // the column is a complex structure
-          _singleValueMultiValueFieldMismatch.addMismatchReason(String.format(
-              "The Pinot column: %s is 'multi-value' column but the column: %s from input %s schema is 'single-value' column.",
-              columnName, avroColumnSchema.getName(), getInputSchemaType()));
+          getSingleValueMultiValueFieldMismatchResult().addMismatchReason(String
+              .format(
+                  "The Pinot column: %s is 'multi-value' column but the column: %s from input %s schema is 'single-value' column.",
+                  columnName, avroColumnName, getInputSchemaType()));
         }
+        // check multi-value column structure mismatch
         if (avroColumnType != org.apache.avro.Schema.Type.ARRAY) {
           // multi-value column should use array structure for now.
-          _multiValueStructureMismatch.addMismatchReason(String.format(
+          getMultiValueStructureMismatchResult().addMismatchReason(String.format(
               "The Pinot column: %s is 'multi-value' column but the column: %s from input %s schema is of '%s' type, which should have been of 'array' type.",
-              columnName, avroColumnSchema.getName(), getInputSchemaType(), avroColumnType.getName()));
+              columnName, avroColumnName, getInputSchemaType(), avroColumnType.getName()));
+        } else if (avroColumnSchema.getElementType().getType().ordinal() < org.apache.avro.Schema.Type.STRING
+            .ordinal()) {
+          // even though the column schema is of array type, the element type of that array could be of complex type like array, map, etc.
+          getMultiValueStructureMismatchResult().addMismatchReason(String.format(
+              "The Pinot column: %s is 'multi-value' column and it's of 'array' type in input %s schema, but the element type is of '%s' type, which should have been of 'primitive' type.",
+              columnName, getInputSchemaType(), avroColumnSchema.getElementType().getType()));
         }
       }
     }

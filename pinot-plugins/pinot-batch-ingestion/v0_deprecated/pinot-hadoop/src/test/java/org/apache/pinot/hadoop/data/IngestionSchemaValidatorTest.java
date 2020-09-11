@@ -29,16 +29,16 @@ import org.testng.annotations.Test;
 
 
 public class IngestionSchemaValidatorTest {
+
   @Test
-  public void testAvroIngestionSchemaValidator()
+  public void testAvroIngestionSchemaValidatorForSingleValueColumns()
       throws Exception {
-    String inputFilePath = new File(
-        Preconditions.checkNotNull(IngestionSchemaValidatorTest.class.getClassLoader().getResource("data/test_sample_data.avro"))
-            .getFile()).toString();
+    String inputFilePath = new File(Preconditions
+        .checkNotNull(IngestionSchemaValidatorTest.class.getClassLoader().getResource("data/test_sample_data.avro"))
+        .getFile()).toString();
     String recordReaderClassName = "org.apache.pinot.plugin.inputformat.avro.AvroRecordReader";
 
-    Schema pinotSchema = new Schema.SchemaBuilder()
-        .addSingleValueDimension("column1", FieldSpec.DataType.LONG)
+    Schema pinotSchema = new Schema.SchemaBuilder().addSingleValueDimension("column1", FieldSpec.DataType.LONG)
         .addSingleValueDimension("column2", FieldSpec.DataType.INT)
         .addSingleValueDimension("column3", FieldSpec.DataType.STRING)
         .addSingleValueDimension("column7", FieldSpec.DataType.STRING)
@@ -53,8 +53,7 @@ public class IngestionSchemaValidatorTest {
     Assert.assertFalse(ingestionSchemaValidator.getMissingPinotColumnResult().isMismatchDetected());
 
     // Adding one extra column
-    pinotSchema = new Schema.SchemaBuilder()
-        .addSingleValueDimension("column1", FieldSpec.DataType.LONG)
+    pinotSchema = new Schema.SchemaBuilder().addSingleValueDimension("column1", FieldSpec.DataType.LONG)
         .addSingleValueDimension("column2", FieldSpec.DataType.INT)
         .addSingleValueDimension("column3", FieldSpec.DataType.STRING)
         .addSingleValueDimension("extra_column", FieldSpec.DataType.STRING)
@@ -69,11 +68,9 @@ public class IngestionSchemaValidatorTest {
     Assert.assertFalse(ingestionSchemaValidator.getMultiValueStructureMismatchResult().isMismatchDetected());
     Assert.assertTrue(ingestionSchemaValidator.getMissingPinotColumnResult().isMismatchDetected());
     Assert.assertNotNull(ingestionSchemaValidator.getMissingPinotColumnResult().getMismatchReason());
-    System.out.println(ingestionSchemaValidator.getMissingPinotColumnResult().getMismatchReason());
 
     // Change the data type of column1 from LONG to STRING
-    pinotSchema = new Schema.SchemaBuilder()
-        .addSingleValueDimension("column1", FieldSpec.DataType.STRING)
+    pinotSchema = new Schema.SchemaBuilder().addSingleValueDimension("column1", FieldSpec.DataType.STRING)
         .addSingleValueDimension("column2", FieldSpec.DataType.INT)
         .addSingleValueDimension("column3", FieldSpec.DataType.STRING)
         .addSingleValueDimension("column7", FieldSpec.DataType.STRING)
@@ -83,14 +80,12 @@ public class IngestionSchemaValidatorTest {
     Assert.assertNotNull(ingestionSchemaValidator);
     Assert.assertTrue(ingestionSchemaValidator.getDataTypeMismatchResult().isMismatchDetected());
     Assert.assertNotNull(ingestionSchemaValidator.getDataTypeMismatchResult().getMismatchReason());
-    System.out.println(ingestionSchemaValidator.getDataTypeMismatchResult().getMismatchReason());
     Assert.assertFalse(ingestionSchemaValidator.getSingleValueMultiValueFieldMismatchResult().isMismatchDetected());
     Assert.assertFalse(ingestionSchemaValidator.getMultiValueStructureMismatchResult().isMismatchDetected());
     Assert.assertFalse(ingestionSchemaValidator.getMissingPinotColumnResult().isMismatchDetected());
 
     // Change column2 from single-value column to multi-value column
-    pinotSchema = new Schema.SchemaBuilder()
-        .addSingleValueDimension("column1", FieldSpec.DataType.LONG)
+    pinotSchema = new Schema.SchemaBuilder().addSingleValueDimension("column1", FieldSpec.DataType.LONG)
         .addMultiValueDimension("column2", FieldSpec.DataType.INT)
         .addSingleValueDimension("column3", FieldSpec.DataType.STRING)
         .addSingleValueDimension("column7", FieldSpec.DataType.STRING)
@@ -101,11 +96,35 @@ public class IngestionSchemaValidatorTest {
     Assert.assertFalse(ingestionSchemaValidator.getDataTypeMismatchResult().isMismatchDetected());
     Assert.assertTrue(ingestionSchemaValidator.getSingleValueMultiValueFieldMismatchResult().isMismatchDetected());
     Assert.assertNotNull(ingestionSchemaValidator.getSingleValueMultiValueFieldMismatchResult().getMismatchReason());
-    System.out.println(ingestionSchemaValidator.getSingleValueMultiValueFieldMismatchResult().getMismatchReason());
     Assert.assertTrue(ingestionSchemaValidator.getMultiValueStructureMismatchResult().isMismatchDetected());
     Assert.assertNotNull(ingestionSchemaValidator.getMultiValueStructureMismatchResult().getMismatchReason());
-    System.out.println(ingestionSchemaValidator.getMultiValueStructureMismatchResult().getMismatchReason());
     Assert.assertFalse(ingestionSchemaValidator.getMissingPinotColumnResult().isMismatchDetected());
+  }
 
+  @Test
+  public void testAvroIngestionValidatorForMultiValueColumns()
+      throws Exception {
+    String inputFilePath = new File(Preconditions.checkNotNull(
+        IngestionSchemaValidatorTest.class.getClassLoader().getResource("data/test_sample_data_multi_value.avro"))
+        .getFile()).toString();
+    String recordReaderClassName = "org.apache.pinot.plugin.inputformat.avro.AvroRecordReader";
+
+    // column 2 is of int type in the AVRO.
+    // column3 and column16 are both of array of map structure.
+    // metric_not_found doesn't exist in input AVRO
+    Schema pinotSchema = new Schema.SchemaBuilder().addSingleValueDimension("column1", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("column2", FieldSpec.DataType.LONG)
+        .addSingleValueDimension("column3", FieldSpec.DataType.STRING)
+        .addMultiValueDimension("column16", FieldSpec.DataType.STRING)
+        .addMetric("metric_not_found", FieldSpec.DataType.LONG)
+        .addMetric("metric_nus_impressions", FieldSpec.DataType.LONG).build();
+
+    IngestionSchemaValidator ingestionSchemaValidator =
+        SchemaValidatorFactory.getSchemaValidator(pinotSchema, recordReaderClassName, inputFilePath);
+    Assert.assertNotNull(ingestionSchemaValidator);
+    Assert.assertTrue(ingestionSchemaValidator.getDataTypeMismatchResult().isMismatchDetected());
+    Assert.assertTrue(ingestionSchemaValidator.getSingleValueMultiValueFieldMismatchResult().isMismatchDetected());
+    Assert.assertTrue(ingestionSchemaValidator.getMultiValueStructureMismatchResult().isMismatchDetected());
+    Assert.assertTrue(ingestionSchemaValidator.getMissingPinotColumnResult().isMismatchDetected());
   }
 }
