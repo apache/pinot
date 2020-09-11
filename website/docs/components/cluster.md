@@ -96,7 +96,7 @@ docker run \
 
 <TabItem value="launcer">
 
-Download Pinot Distribution using instructions in [Download]()
+Download Pinot Distribution using instructions in Download
 
 Start Zookeeper
 
@@ -130,8 +130,8 @@ docker pull ${PINOT_IMAGE}
 
 To start other components to join the cluster
 
-- [Start Controller]()
-- [Start Broker]()
-- [Start Server]()
+- Start Controller
+- Start Broker
+- Start Server
 
 Explore your cluster via Pinot Data Explorer

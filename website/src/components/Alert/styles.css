@@ -3,64 +3,63 @@
  */
 
 .alert {
-  background: var(--ifm-panel-background) !important;
-  border: 0px none;
-  border-left: 6px solid var(--ifm-alert-background-color);
-  border-radius: 0;
-  font-size: 95%;
-  font-weight: 500;
-  margin-bottom: calc( var(--ifm-spacing-vertical) * 2 );
+    background: var(--ifm-panel-background) !important;
+    border: 0px none;
+    border-left: 6px solid var(--ifm-alert-background-color);
+    border-radius: 0;
+    font-size: 95%;
+    font-weight: 500;
+    margin-bottom: calc(var(--ifm-spacing-vertical) * 2);
 }
 
 .alert > i.feather {
-  float: left;
-  font-size: 2em !important;
-  margin-left: -1.65em;
-  position: relative;
-  top: -2px;
+    float: left;
+    font-size: 2em !important;
+    margin-left: -1.65em;
+    position: relative;
+    top: -2px;
 }
 
 .alert a,
 .alert code {
-  color: var(--ifm-alert-background-color);
+    color: var(--ifm-alert-background-color);
 }
 
 .alert.alert--icon {
-  padding-left: 5em;
+    padding-left: 5em;
 }
 
 .alert > *:last-child,
 .alert > ul:last-child > li:last-child {
-  margin-bottom: 0;
+    margin-bottom: 0;
 }
-
 
 /**
  * fill
  */
 
 .alert.alert--fill.alert--danger {
-  background: rgba( var(--ifm-color-danger-rgb), 0.15 ) !important;
-  border: 1px solid var(--ifm-color-danger);
-  color: var(--ifm-color-danger) !important;
+    background: rgba(var(--ifm-color-danger-rgb), 0.15) !important;
+    border: 1px solid var(--ifm-color-danger);
+    color: var(--ifm-color-danger) !important;
 }
 .alert.alert--fill.alert--primary {
-  background: rgba( var(--ifm-color-primary-rgb), 0.15 ) !important;
-  border: 1px solid var(--ifm-color-primary);
-  color: var(--ifm-color-primary) !important;
+    background: rgba(var(--ifm-color-primary-rgb), 0.15) !important;
+    border: 1px solid var(--ifm-color-primary);
+    color: var(--ifm-color-primary) !important;
 }
 .alert.alert--fill.alert--warning {
-  background: rgba( var(--ifm-color-warning-rgb), 0.15 ) !important;
-  border: 1px solid var(--ifm-color-warning);
-  color: var(--ifm-color-warning) !important;
+    background: rgba(var(--ifm-color-warning-rgb), 0.15) !important;
+    border: 1px solid var(--ifm-color-warning);
+    color: var(--ifm-color-warning) !important;
 }
 .alert.alert--fill a {
-  color: inherit;
-  text-decoration: underline;
+    color: inherit;
+    text-decoration: underline;
 }
 .alert.alert--fill a code {
-  color: inherit;
+    color: inherit;
 }
 .alert.alert--fill code {
-  color: inherit;
+    color: inherit;
 }
