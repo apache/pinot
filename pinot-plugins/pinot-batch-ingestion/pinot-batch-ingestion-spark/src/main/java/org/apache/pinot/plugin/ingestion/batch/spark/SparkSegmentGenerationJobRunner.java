@@ -188,6 +188,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
       }
     }
 
+    LOGGER.info("Found {} files to create Pinot segments!", filteredFiles.size());
     try {
       JavaSparkContext sparkContext = JavaSparkContext.fromSparkContext(SparkContext.getOrCreate());
 
