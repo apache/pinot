@@ -41,8 +41,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.datasketches.memory.Memory;
@@ -91,7 +93,8 @@ public class ObjectSerDeUtils {
     DoubleSet(17),
     StringSet(18),
     BytesSet(19),
-    IdSet(20);
+    IdSet(20),
+    List(21);
 
     private final int _value;
 
@@ -149,6 +152,8 @@ public class ObjectSerDeUtils {
         }
       } else if (value instanceof IdSet) {
         return ObjectType.IdSet;
+      } else if (value instanceof List) {
+        return ObjectType.List;
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());
       }
@@ -686,7 +691,9 @@ public class ObjectSerDeUtils {
   public static final ObjectSerDe<Sketch> DATA_SKETCH_SER_DE = new ObjectSerDe<Sketch>() {
     @Override
     public byte[] serialize(Sketch value) {
-      return value.compact().toByteArray();
+      // NOTE: Compact the sketch in unsorted, on-heap fashion for performance concern.
+      //       See https://datasketches.apache.org/docs/Theta/ThetaSize.html for more details.
+      return value.compact(false, null).toByteArray();
     }
 
     @Override
@@ -776,6 +783,69 @@ public class ObjectSerDeUtils {
     }
   };
 
+  public static final ObjectSerDe<List<Object>> LIST_SER_DE = new ObjectSerDe<List<Object>>() {
+
+    @Override
+    public byte[] serialize(List<Object> list) {
+      int size = list.size();
+
+      // Directly return the size (0) for empty list
+      if (size == 0) {
+        return new byte[Integer.BYTES];
+      }
+
+      // No need to close these 2 streams
+      ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+      DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
+
+      try {
+        // Write the size of the list
+        dataOutputStream.writeInt(size);
+
+        // Write the value type
+        Object firstValue = list.get(0);
+        int valueType = ObjectType.getObjectType(firstValue).getValue();
+        dataOutputStream.writeInt(valueType);
+
+        // Write the serialized values
+        for (Object value : list) {
+          byte[] bytes = ObjectSerDeUtils.serialize(value, valueType);
+          dataOutputStream.writeInt(bytes.length);
+          dataOutputStream.write(bytes);
+        }
+      } catch (IOException e) {
+        throw new RuntimeException("Caught exception while serializing List", e);
+      }
+
+      return byteArrayOutputStream.toByteArray();
+    }
+
+    @Override
+    public ArrayList<Object> deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public ArrayList<Object> deserialize(ByteBuffer byteBuffer) {
+      int size = byteBuffer.getInt();
+      ArrayList<Object> list = new ArrayList<>(size);
+
+      // De-serialize the values
+      if (size != 0) {
+        int valueType = byteBuffer.getInt();
+        for (int i = 0; i < size; i++) {
+          int numBytes = byteBuffer.getInt();
+          ByteBuffer slice = byteBuffer.slice();
+          slice.limit(numBytes);
+          list.add(ObjectSerDeUtils.deserialize(slice, valueType));
+          byteBuffer.position(byteBuffer.position() + numBytes);
+        }
+      }
+
+      return list;
+    }
+  };
+
   // NOTE: DO NOT change the order, it has to be the same order as the ObjectType
   //@formatter:off
   private static final ObjectSerDe[] SER_DES = {
@@ -799,7 +869,8 @@ public class ObjectSerDeUtils {
       DOUBLE_SET_SER_DE,
       STRING_SET_SER_DE,
       BYTES_SET_SER_DE,
-      ID_SET_SER_DE
+      ID_SET_SER_DE,
+      LIST_SER_DE
   };
   //@formatter:on
 

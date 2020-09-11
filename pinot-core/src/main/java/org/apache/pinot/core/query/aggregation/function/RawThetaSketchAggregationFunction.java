@@ -22,8 +22,6 @@ import com.google.common.base.Preconditions;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.datasketches.Util;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.SetOperationBuilder;
 import org.apache.datasketches.theta.Sketch;
@@ -35,10 +33,11 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
+import org.apache.pinot.core.query.aggregation.function.ThetaSketchAggregationFunction.Parameters;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
@@ -92,9 +91,9 @@ public class RawThetaSketchAggregationFunction extends BaseSingleInputAggregatio
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    FieldSpec.DataType valueType = blockValSet.getValueType();
+    DataType valueType = blockValSet.getValueType();
 
-    if (valueType != FieldSpec.DataType.BYTES) {
+    if (valueType != DataType.BYTES) {
       UpdateSketch updateSketch = getUpdateSketch(aggregationResultHolder);
       if (blockValSet.isSingleValue()) {
         switch (valueType) {
@@ -193,7 +192,7 @@ public class RawThetaSketchAggregationFunction extends BaseSingleInputAggregatio
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    FieldSpec.DataType valueType = blockValSet.getValueType();
+    DataType valueType = blockValSet.getValueType();
 
     if (blockValSet.isSingleValue()) {
       switch (valueType) {
@@ -296,7 +295,7 @@ public class RawThetaSketchAggregationFunction extends BaseSingleInputAggregatio
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    FieldSpec.DataType valueType = blockValSet.getValueType();
+    DataType valueType = blockValSet.getValueType();
 
     if (blockValSet.isSingleValue()) {
       switch (valueType) {
@@ -432,13 +431,15 @@ public class RawThetaSketchAggregationFunction extends BaseSingleInputAggregatio
   public Sketch extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     Object result = aggregationResultHolder.getResult();
     if (result == null) {
-      return _updateSketchBuilder.build();
+      return ThetaSketchAggregationFunction.EMPTY_SKETCH;
     } else {
       if (result instanceof Sketch) {
         return (Sketch) result;
       } else {
         assert result instanceof Union;
-        return ((Union) result).getResult();
+        // NOTE: Compact the sketch in unsorted, on-heap fashion for performance concern.
+        //       See https://datasketches.apache.org/docs/Theta/ThetaSize.html for more details.
+        return ((Union) result).getResult(false, null);
       }
     }
   }
@@ -450,16 +451,26 @@ public class RawThetaSketchAggregationFunction extends BaseSingleInputAggregatio
       return (Sketch) result;
     } else {
       assert result instanceof Union;
-      return ((Union) result).getResult();
+      // NOTE: Compact the sketch in unsorted, on-heap fashion for performance concern.
+      //       See https://datasketches.apache.org/docs/Theta/ThetaSize.html for more details.
+      return ((Union) result).getResult(false, null);
     }
   }
 
   @Override
   public Sketch merge(Sketch sketch1, Sketch sketch2) {
+    if (sketch1.isEmpty()) {
+      return sketch2;
+    }
+    if (sketch2.isEmpty()) {
+      return sketch1;
+    }
     Union union = _setOperationBuilder.buildUnion();
     union.update(sketch1);
     union.update(sketch2);
-    return union.getResult();
+    // NOTE: Compact the sketch in unsorted, on-heap fashion for performance concern.
+    //       See https://datasketches.apache.org/docs/Theta/ThetaSize.html for more details.
+    return union.getResult(false, null);
   }
 
   @Override
@@ -479,7 +490,9 @@ public class RawThetaSketchAggregationFunction extends BaseSingleInputAggregatio
 
   @Override
   public String extractFinalResult(Sketch sketch) {
-    return Base64.getEncoder().encodeToString(sketch.compact().toByteArray());
+    // NOTE: Compact the sketch in unsorted, on-heap fashion for performance concern.
+    //       See https://datasketches.apache.org/docs/Theta/ThetaSize.html for more details.
+    return Base64.getEncoder().encodeToString(sketch.compact(false, null).toByteArray());
   }
 
   /**
@@ -519,7 +532,7 @@ public class RawThetaSketchAggregationFunction extends BaseSingleInputAggregatio
   }
 
   /**
-   * Returns the UpdateSketch for the given group key or creates a new one if it does not exist.
+   * Returns the Union for the given group key or creates a new one if it does not exist.
    */
   private Union getUnion(GroupByResultHolder groupByResultHolder, int groupKey) {
     Union union = groupByResultHolder.getResult(groupKey);
@@ -528,36 +541,5 @@ public class RawThetaSketchAggregationFunction extends BaseSingleInputAggregatio
       groupByResultHolder.setValueForKey(groupKey, union);
     }
     return union;
-  }
-
-  /**
-   * Helper class to wrap the theta-sketch parameters.
-   */
-  static class Parameters {
-    private static final char PARAMETER_DELIMITER = ';';
-    private static final char PARAMETER_KEY_VALUE_SEPARATOR = '=';
-    private static final String NOMINAL_ENTRIES_KEY = "nominalEntries";
-
-    private int _nominalEntries = Util.DEFAULT_NOMINAL_ENTRIES;
-
-    Parameters(String parametersString) {
-      StringUtils.deleteWhitespace(parametersString);
-      String[] keyValuePairs = StringUtils.split(parametersString, PARAMETER_DELIMITER);
-      for (String keyValuePair : keyValuePairs) {
-        String[] keyAndValue = StringUtils.split(keyValuePair, PARAMETER_KEY_VALUE_SEPARATOR);
-        Preconditions.checkArgument(keyAndValue.length == 2, "Invalid parameter: %s", keyValuePair);
-        String key = keyAndValue[0];
-        String value = keyAndValue[1];
-        if (key.equalsIgnoreCase(NOMINAL_ENTRIES_KEY)) {
-          _nominalEntries = Integer.parseInt(value);
-        } else {
-          throw new IllegalArgumentException("Invalid parameter key: " + key);
-        }
-      }
-    }
-
-    int getNominalEntries() {
-      return _nominalEntries;
-    }
   }
 }
