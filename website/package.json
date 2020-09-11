@@ -10,10 +10,10 @@
     "deploy": "docusaurus deploy"
   },
   "dependencies": {
-    "@docusaurus/core": "2.0.0-alpha.61",
-    "@docusaurus/plugin-ideal-image": "2.0.0-alpha.61",
-    "@docusaurus/preset-classic": "2.0.0-alpha.61",
-    "@docusaurus/utils": "2.0.0-alpha.61",
+    "@docusaurus/core": "2.0.0-alpha.64",
+    "@docusaurus/plugin-ideal-image": "2.0.0-alpha.64",
+    "@docusaurus/preset-classic": "2.0.0-alpha.64",
+    "@docusaurus/utils": "2.0.0-alpha.64",
     "axios": "^0.19.2",
     "cash-dom": "^8.0.0",
     "classnames": "^2.2.6",
@@ -27,13 +27,14 @@
     "qs": "^6.9.4",
     "react": "^16.13.1",
     "react-dom": "^16.13.1",
+    "react-player": "^2.6.2",
     "react-github-btn": "^1.2.0",
     "react-inlinesvg": "^1.2.0",
     "react-select": "^3.1.0",
     "reading-time": "^1.2.0",
     "strftime": "^0.10.0",
     "svg.js": "^2.7.1",
-    "yarn": "^1.22.4"
+    "yarn": "^1.22.5"
   },
   "resolutions": {
     "**/sharp": "^0.25.2"
