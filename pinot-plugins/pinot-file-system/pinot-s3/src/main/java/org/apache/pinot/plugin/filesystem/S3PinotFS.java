@@ -29,6 +29,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
@@ -374,34 +375,42 @@ public class S3PinotFS extends PinotFS {
       throws IOException {
     try {
       ImmutableList.Builder<String> builder = ImmutableList.builder();
+      String continuationToken = null;
+      boolean isDone = false;
       String prefix = normalizeToDirectoryPrefix(fileUri);
-
-      ListObjectsV2Response listObjectsV2Response;
-      ListObjectsV2Request.Builder listObjectsV2RequestBuilder =
-          ListObjectsV2Request.builder().bucket(fileUri.getHost());
-
-      if (!prefix.equals(DELIMITER)) {
-        listObjectsV2RequestBuilder = listObjectsV2RequestBuilder.prefix(prefix);
-      }
-
-      if (!recursive) {
-        listObjectsV2RequestBuilder = listObjectsV2RequestBuilder.delimiter(DELIMITER);
-      }
-
-      ListObjectsV2Request listObjectsV2Request = listObjectsV2RequestBuilder.build();
-      listObjectsV2Response = _s3Client.listObjectsV2(listObjectsV2Request);
-
-      listObjectsV2Response.contents().stream().forEach(object -> {
-        //Only add files and not directories
-        if (!object.key().equals(fileUri.getPath()) && !object.key().endsWith(DELIMITER)) {
-          String fileKey = object.key();
-          if (fileKey.startsWith(DELIMITER)) {
-            fileKey = fileKey.substring(1);
-          }
-          builder.add(S3_SCHEME + fileUri.getHost() + DELIMITER + fileKey);
+      while(!isDone) {
+        ListObjectsV2Request.Builder listObjectsV2RequestBuilder =
+            ListObjectsV2Request.builder().bucket(fileUri.getHost());
+        if (!prefix.equals(DELIMITER)) {
+          listObjectsV2RequestBuilder = listObjectsV2RequestBuilder.prefix(prefix);
         }
-      });
-      return builder.build().toArray(new String[0]);
+        if (!recursive) {
+          listObjectsV2RequestBuilder = listObjectsV2RequestBuilder.delimiter(DELIMITER);
+        }
+        if (continuationToken != null) {
+          listObjectsV2RequestBuilder.continuationToken(continuationToken);
+        }
+        ListObjectsV2Request listObjectsV2Request = listObjectsV2RequestBuilder.build();
+        LOGGER.debug("Trying to send ListObjectsV2Request {}", listObjectsV2Request);
+        ListObjectsV2Response listObjectsV2Response = _s3Client.listObjectsV2(listObjectsV2Request);
+        LOGGER.debug("Getting ListObjectsV2Response: {}", listObjectsV2Response);
+        List<S3Object> filesReturned = listObjectsV2Response.contents();
+        filesReturned.stream().forEach(object -> {
+          //Only add files and not directories
+          if (!object.key().equals(fileUri.getPath()) && !object.key().endsWith(DELIMITER)) {
+            String fileKey = object.key();
+            if (fileKey.startsWith(DELIMITER)) {
+              fileKey = fileKey.substring(1);
+            }
+            builder.add(S3_SCHEME + fileUri.getHost() + DELIMITER + fileKey);
+          }
+        });
+        isDone = !listObjectsV2Response.isTruncated();
+        continuationToken = listObjectsV2Response.nextContinuationToken();
+      }
+      String[] listedFiles = builder.build().toArray(new String[0]);
+      LOGGER.info("Listed {} files from URI: {}, is recursive: {}", listedFiles.length, fileUri, recursive);
+      return listedFiles;
     } catch (Throwable t) {
       throw new IOException(t);
     }
