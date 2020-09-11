@@ -47,12 +47,14 @@ public class AvroRecordExtractor implements RecordExtractor<GenericRecord> {
   public GenericRow extract(GenericRecord from, GenericRow to) {
     if (_extractAll) {
       List<Schema.Field> fields = from.getSchema().getFields();
-      fields.forEach(field -> {
+      for (Schema.Field field : fields) {
         String fieldName = field.name();
         to.putValue(fieldName, AvroUtils.convert(from.get(fieldName)));
-      });
+      }
     } else {
-      _fields.forEach(fieldName -> to.putValue(fieldName, AvroUtils.convert(from.get(fieldName))));
+      for (String fieldName : _fields) {
+        to.putValue(fieldName, AvroUtils.convert(from.get(fieldName)));
+      }
     }
     return to;
   }
