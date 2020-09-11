@@ -62,8 +62,8 @@ import org.slf4j.LoggerFactory;
 public class CallGraphPipeline extends Pipeline {
   private static final Logger LOG = LoggerFactory.getLogger(CallGraphPipeline.class);
 
-  private static final String COL_TIME = DataFrameUtils.COL_TIME;
-  private static final String COL_VALUE = DataFrameUtils.COL_VALUE;
+  private static final String COL_TIME = DataFrame.COL_TIME;
+  private static final String COL_VALUE = DataFrame.COL_VALUE;
   private static final String COL_COUNT = "count";
   private static final String COL_LATENCY = "latency";
   private static final String COL_AVERAGE = "average";

@@ -45,7 +45,6 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 import static org.apache.pinot.thirdeye.detection.DetectionTestUtils.*;
 
 
@@ -101,7 +100,7 @@ public class BaselineFillingMergeWrapperTest {
     // mock time series
     Map<MetricSlice, DataFrame> timeseries = new HashMap<>();
     timeseries.put(MetricSlice.from(1, 3000, 3600),
-        DataFrame.builder(COL_TIME + ":LONG", COL_VALUE + ":DOUBLE").append(3000, 100).build());
+        DataFrame.builder(DataFrame.COL_TIME + ":LONG", DataFrame.COL_VALUE + ":DOUBLE").append(3000, 100).build());
 
     // mock metric
     MetricConfigDTO metric = new MetricConfigDTO();
@@ -113,7 +112,7 @@ public class BaselineFillingMergeWrapperTest {
         .setMetrics(Collections.singletonList(metric))
         .setTimeseries(timeseries)
         .setAggregates(ImmutableMap.of(MetricSlice.from(1, 3000, 3600),
-            DataFrame.builder(COL_TIME + ":LONG", COL_VALUE + ":DOUBLE").append(3000, 100).build()));
+            DataFrame.builder(DataFrame.COL_TIME + ":LONG", DataFrame.COL_VALUE + ":DOUBLE").append(3000, 100).build()));
 
     // set up detection config properties
     this.config.getProperties().put(PROP_MAX_GAP, 100);
@@ -125,7 +124,8 @@ public class BaselineFillingMergeWrapperTest {
     MockBaselineProviderSpec spec = new MockBaselineProviderSpec();
     spec.setBaselineAggregates(ImmutableMap.of(MetricSlice.from(1, 3000, 3600), 100.0));
     spec.setBaselineTimeseries(ImmutableMap.of(MetricSlice.from(1, 3000, 3600), TimeSeries.fromDataFrame(
-        DataFrame.builder(COL_TIME + ":LONG", COL_VALUE + ":DOUBLE" , COL_UPPER_BOUND + ":DOUBLE", COL_LOWER_BOUND + ":DOUBLE")
+        DataFrame.builder(
+            DataFrame.COL_TIME + ":LONG", DataFrame.COL_VALUE + ":DOUBLE" , DataFrame.COL_UPPER_BOUND + ":DOUBLE", DataFrame.COL_LOWER_BOUND + ":DOUBLE")
             .append(3000, 100, 200, 50).build())));
     InputDataFetcher dataFetcher = new DefaultInputDataFetcher(provider, this.config.getId());
     baselineProvider.init(spec, dataFetcher);

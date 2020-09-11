@@ -20,7 +20,6 @@
 package org.apache.pinot.thirdeye.datasource.loader;
 
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
-import org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import java.util.List;
 
@@ -28,7 +27,7 @@ import java.util.List;
 public interface AggregationLoader {
   String COL_DIMENSION_NAME = "dimName";
   String COL_DIMENSION_VALUE = "dimValue";
-  String COL_VALUE = DataFrameUtils.COL_VALUE;
+  String COL_VALUE = DataFrame.COL_VALUE;
 
   /**
    * Returns a de-aggregation data frame for a given slice with 3 columns:

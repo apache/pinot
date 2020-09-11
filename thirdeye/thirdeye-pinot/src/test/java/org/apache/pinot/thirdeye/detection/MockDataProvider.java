@@ -42,9 +42,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-
-
 public class MockDataProvider implements DataProvider {
   private static final String COL_KEY = Grouping.GROUP_KEY;
 
@@ -71,13 +68,13 @@ public class MockDataProvider implements DataProvider {
       final String[] arrCols = filters.toArray(new String[filters.size()]);
 
       List<String> groupBy = new ArrayList<>(filters);
-      groupBy.add(COL_TIME);
+      groupBy.add(DataFrame.COL_TIME);
 
       List<String> groupByExpr = new ArrayList<>();
       for (String dim : groupBy) {
         groupByExpr.add(dim + ":first");
       }
-      groupByExpr.add(COL_VALUE + ":sum");
+      groupByExpr.add(DataFrame.COL_VALUE + ":sum");
 
       DataFrame out = this.timeseries.get(slice.withFilters(NO_FILTERS));
       if (out == null) {
@@ -103,7 +100,7 @@ public class MockDataProvider implements DataProvider {
         public boolean apply(long... values) {
           return values[0] >= slice.getStart() && values[0] < slice.getEnd();
         }
-      }, COL_TIME).dropNull();
+      }, DataFrame.COL_TIME).dropNull();
 
       result.put(slice, out.groupByValue(groupBy).aggregate(groupByExpr).dropSeries(COL_KEY).setIndex(groupBy));
     }
@@ -118,7 +115,7 @@ public class MockDataProvider implements DataProvider {
       for (String dimName : dimensions) {
         expr.add(dimName + ":first");
       }
-      expr.add(COL_VALUE + ":sum");
+      expr.add(DataFrame.COL_VALUE + ":sum");
 
       if (dimensions.isEmpty()) {
         result.put(slice, this.aggregates.get(slice.withFilters(NO_FILTERS)));
@@ -128,7 +125,7 @@ public class MockDataProvider implements DataProvider {
             .groupByValue(new ArrayList<>(dimensions)).aggregate(expr);
 
         if (limit > 0) {
-          aggResult = aggResult.sortedBy(COL_VALUE).reverse().head(limit);
+          aggResult = aggResult.sortedBy(DataFrame.COL_VALUE).reverse().head(limit);
         }
         result.put(slice, aggResult.dropSeries(COL_KEY).setIndex(dimensions));
       }

@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Set;
 import org.apache.pinot.core.data.function.FunctionEvaluator;
 import org.apache.pinot.core.data.function.FunctionEvaluatorFactory;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.DateTimeGranularitySpec;
@@ -41,6 +42,22 @@ import org.apache.pinot.spi.data.TimeGranularitySpec;
 public class SchemaUtils {
   public static final String MAP_KEY_COLUMN_SUFFIX = "__KEYS";
   public static final String MAP_VALUE_COLUMN_SUFFIX = "__VALUES";
+
+  /**
+   * Validates the schema.
+   * First checks that the schema is compatible with any provided table configs associated with it.
+   * This check is useful to ensure schema and table are compatible, in the event that schema is updated or added after the table config
+   * Then validates the schema using {@link SchemaUtils#validate(Schema schema)}
+   *
+   * @param schema schema to validate
+   * @param tableConfigs table configs associated with this schema (table configs with raw name = schema name)
+   */
+  public static void validate(Schema schema, List<TableConfig> tableConfigs) {
+    for (TableConfig tableConfig : tableConfigs) {
+      validateCompatibilityWithTableConfig(schema, tableConfig);
+    }
+    validate(schema);
+  }
 
   /**
    * Validates the following:
@@ -87,6 +104,19 @@ public class SchemaUtils {
     Preconditions.checkState(Collections.disjoint(transformedColumns, argumentColumns),
         "Columns: %s are a result of transformations, and cannot be used as arguments to other transform functions",
         transformedColumns.retainAll(argumentColumns));
+  }
+
+  /**
+   * Validates that the schema is compatible with the given table config
+   */
+  private static void validateCompatibilityWithTableConfig(Schema schema, TableConfig tableConfig) {
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+    } catch (Exception e) {
+      throw new IllegalStateException(
+          "Schema is incompatible with tableConfig with name: " + tableConfig.getTableName() + " and type: "
+              + tableConfig.getTableType(), e);
+    }
   }
 
   /**

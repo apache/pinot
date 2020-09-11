@@ -41,9 +41,6 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-
-
 public class ThresholdRuleDetectorTest {
   private DataProvider testDataProvider;
 
@@ -51,9 +48,11 @@ public class ThresholdRuleDetectorTest {
   public void beforeMethod() {
     Map<MetricSlice, DataFrame> timeSeries = new HashMap<>();
     timeSeries.put(MetricSlice.from(123L, 0, 10),
-        new DataFrame().addSeries(COL_VALUE, 0, 100, 200, 500, 1000).addSeries(COL_TIME, 0, 2, 4, 6, 8));
+        new DataFrame().addSeries(DataFrame.COL_VALUE, 0, 100, 200, 500, 1000).addSeries(
+            DataFrame.COL_TIME, 0, 2, 4, 6, 8));
     timeSeries.put(MetricSlice.from(123L, 1546214400000L, 1551398400000L),
-        new DataFrame().addSeries(COL_TIME, 1546214400000L, 1548892800000L, 1551312000000L).addSeries(COL_VALUE, 100, 200, 300));
+        new DataFrame().addSeries(DataFrame.COL_TIME, 1546214400000L, 1548892800000L, 1551312000000L).addSeries(
+            DataFrame.COL_VALUE, 100, 200, 300));
 
     MetricConfigDTO metricConfigDTO = new MetricConfigDTO();
     metricConfigDTO.setId(123L);

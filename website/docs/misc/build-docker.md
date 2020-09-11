@@ -91,6 +91,7 @@ Please refer to [Kubernetes Quickstart](../administration/installation/cloud/on-
 
 [Kubernetes Quickstart](../administration/installation/cloud/on-premise.md)
 
+
 ## Pinot Presto
 
 Docker image for Presto with Pinot integration.

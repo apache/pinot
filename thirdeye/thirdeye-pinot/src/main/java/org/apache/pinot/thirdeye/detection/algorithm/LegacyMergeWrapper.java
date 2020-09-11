@@ -41,6 +41,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.util.ThirdEyeDataUtils;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
@@ -48,7 +49,6 @@ import org.apache.pinot.thirdeye.detection.DetectionPipeline;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
 import org.apache.pinot.thirdeye.detector.function.BaseAnomalyFunction;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
-import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -63,9 +63,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-
 
 /**
  *  The legacy merge wrapper. This runs the old anomaly function merger.
@@ -243,7 +240,8 @@ public class LegacyMergeWrapper extends DetectionPipeline {
           if (!StringUtils.isBlank(anomalyFunctionSpec.getGlobalMetric())) {
             MetricSlice slice = makeGlobalSlice(anomalyFunctionSpec, mergedAnomalyResult);
 
-            double valGlobal = this.provider.fetchAggregates(Collections.singleton(slice), Collections.<String>emptyList(), -1).get(slice).getDouble(COL_VALUE, 0);
+            double valGlobal = this.provider.fetchAggregates(Collections.singleton(slice), Collections.<String>emptyList(), -1).get(slice).getDouble(
+                DataFrame.COL_VALUE, 0);
             double diffLocal = mergedAnomalyResult.getAvgCurrentVal() - mergedAnomalyResult.getAvgBaselineVal();
 
             mergedAnomalyResult.setImpactToGlobal(diffLocal / valGlobal);
@@ -269,7 +267,7 @@ public class LegacyMergeWrapper extends DetectionPipeline {
     MetricEntity metricEntity = MetricEntity.fromMetric(1.0, anomalyFunction.getSpec().getMetricId(), getFiltersFromDimensionMap(dimension));
     MetricConfigDTO metricConfig = this.provider.fetchMetrics(Collections.singleton(metricEntity.getId())).get(metricEntity.getId());
 
-    DataFrame df = DataFrame.builder(COL_TIME + ":LONG", COL_VALUE + ":DOUBLE").build();
+    DataFrame df = DataFrame.builder(DataFrame.COL_TIME + ":LONG", DataFrame.COL_VALUE + ":DOUBLE").build();
     List<Pair<Long, Long>> timeIntervals = this.anomalyFunction.getDataRangeIntervals(this.startTime, this.endTime);
     for (Pair<Long, Long> startEndInterval : timeIntervals) {
       MetricSlice slice = MetricSlice.from(metricEntity.getId(), startEndInterval.getFirst(), startEndInterval.getSecond(), metricEntity.getFilters());
@@ -280,9 +278,10 @@ public class LegacyMergeWrapper extends DetectionPipeline {
     MetricTimeSeries metricTimeSeries = new MetricTimeSeries(MetricSchema.fromMetricSpecs(
         Collections.singletonList(new MetricSpec(metricConfig.getName(), MetricType.DOUBLE))));
 
-    LongSeries timestamps = df.getLongs(COL_TIME);
+    LongSeries timestamps = df.getLongs(DataFrame.COL_TIME);
     for (int i = 0; i < timestamps.size(); i++) {
-      metricTimeSeries.set(timestamps.get(i), metricConfig.getName(), df.getDoubles(COL_VALUE).get(i));
+      metricTimeSeries.set(timestamps.get(i), metricConfig.getName(), df.getDoubles(
+          DataFrame.COL_VALUE).get(i));
     }
     return metricTimeSeries;
   }
@@ -385,7 +384,7 @@ public class LegacyMergeWrapper extends DetectionPipeline {
       throw new IllegalArgumentException("Different local and global metrics not supported");
     }
 
-    Multimap<String, String> globalFilters = ThirdEyeUtils.getFilterSet(spec.getGlobalMetricFilters());
+    Multimap<String, String> globalFilters = ThirdEyeDataUtils.getFilterSet(spec.getGlobalMetricFilters());
     MetricEntity me = MetricEntity.fromURN(anomaly.getMetricUrn());
     return MetricSlice.from(me.getId(), anomaly.getStartTime(), anomaly.getEndTime(), globalFilters);
   }

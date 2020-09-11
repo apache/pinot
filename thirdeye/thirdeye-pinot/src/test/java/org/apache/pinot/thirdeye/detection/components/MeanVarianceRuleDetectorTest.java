@@ -28,7 +28,6 @@ import com.google.common.collect.TreeMultimap;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
-import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -47,9 +46,6 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-
-
 public class MeanVarianceRuleDetectorTest {
 
   private DataProvider provider;
@@ -60,7 +56,7 @@ public class MeanVarianceRuleDetectorTest {
   public void setUp() throws Exception {
     try (Reader dataReader = new InputStreamReader(AlgorithmUtils.class.getResourceAsStream("timeseries-2y.csv"))) {
       this.data = DataFrame.fromCsv(dataReader);
-      this.data.setIndex(COL_TIME);
+      this.data.setIndex(DataFrame.COL_TIME);
     }
 
     MetricConfigDTO dailyMetricConfig = new MetricConfigDTO();

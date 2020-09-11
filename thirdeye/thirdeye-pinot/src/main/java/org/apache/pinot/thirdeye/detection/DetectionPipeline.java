@@ -46,7 +46,6 @@ import org.joda.time.Period;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 import static org.apache.pinot.thirdeye.detection.DetectionUtils.*;
 
 
@@ -185,7 +184,8 @@ public abstract class DetectionPipeline {
       return Collections.emptyList();
     }
 
-    df = df.filter(df.getLongs(COL_TIME).between(slice.getStart(), slice.getEnd())).dropNull(COL_TIME);
+    df = df.filter(df.getLongs(DataFrame.COL_TIME).between(slice.getStart(), slice.getEnd())).dropNull(
+        DataFrame.COL_TIME);
 
     if (df.isEmpty()) {
       return Collections.emptyList();
@@ -199,7 +199,7 @@ public abstract class DetectionPipeline {
     MetricConfigDTO metric = metrics.get(slice.getMetricId());
 
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
-    LongSeries sTime = df.getLongs(COL_TIME);
+    LongSeries sTime = df.getLongs(DataFrame.COL_TIME);
     BooleanSeries sVal = df.getBooleans(seriesName);
 
     int lastStart = -1;

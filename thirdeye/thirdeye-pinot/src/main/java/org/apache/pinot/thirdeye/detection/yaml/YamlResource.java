@@ -63,6 +63,7 @@ import org.apache.pinot.thirdeye.anomaly.task.TaskRunner;
 import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.auth.ThirdEyePrincipal;
 import org.apache.pinot.thirdeye.dashboard.DetectionPreviewConfiguration;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
@@ -110,7 +111,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 import static org.apache.pinot.thirdeye.detection.yaml.translator.SubscriptionConfigTranslator.*;
 
 
@@ -952,16 +952,16 @@ public class YamlResource {
   private static Map<String, List<? extends Number>> makeTimeSeriesMap(TimeSeries baseline) {
     Map<String, List<? extends Number>> output = new HashMap<>();
     // time and baseline are mandatory
-    output.put(COL_TIME, baseline.getTime().toList());
-    output.put(COL_VALUE, baseline.getPredictedBaseline().toList());
-    if (baseline.getDataFrame().contains(COL_CURRENT)) {
-      output.put(COL_CURRENT, baseline.getCurrent().toList());
+    output.put(DataFrame.COL_TIME, baseline.getTime().toList());
+    output.put(DataFrame.COL_VALUE, baseline.getPredictedBaseline().toList());
+    if (baseline.getDataFrame().contains(DataFrame.COL_CURRENT)) {
+      output.put(DataFrame.COL_CURRENT, baseline.getCurrent().toList());
     }
-    if (baseline.getDataFrame().contains(COL_UPPER_BOUND)) {
-      output.put(COL_UPPER_BOUND, baseline.getPredictedUpperBound().toList());
+    if (baseline.getDataFrame().contains(DataFrame.COL_UPPER_BOUND)) {
+      output.put(DataFrame.COL_UPPER_BOUND, baseline.getPredictedUpperBound().toList());
     }
-    if (baseline.getDataFrame().contains(COL_LOWER_BOUND)) {
-      output.put(COL_LOWER_BOUND, baseline.getPredictedLowerBound().toList());
+    if (baseline.getDataFrame().contains(DataFrame.COL_LOWER_BOUND)) {
+      output.put(DataFrame.COL_LOWER_BOUND, baseline.getPredictedLowerBound().toList());
     }
     return output;
   }

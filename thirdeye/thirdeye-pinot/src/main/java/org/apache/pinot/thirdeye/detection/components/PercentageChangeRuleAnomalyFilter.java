@@ -39,8 +39,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-
 /**
  * Percentage change anomaly filter. Check if the anomaly's percentage change compared to baseline is above the threshold.
  * If not, filters the anomaly.
@@ -74,7 +72,7 @@ public class PercentageChangeRuleAnomalyFilter implements AnomalyFilter<Percenta
       baselineValue = anomaly.getAvgBaselineVal();
     } else {
       try {
-        baselineValue = this.baseline.gather(currentSlice, aggregates).getDouble(COL_VALUE, 0);
+        baselineValue = this.baseline.gather(currentSlice, aggregates).getDouble(DataFrame.COL_VALUE, 0);
       } catch (Exception e) {
         baselineValue = anomaly.getAvgBaselineVal();
         LOG.warn("Unable to fetch baseline for anomaly {}. start = {} end = {} filters = {}. Using anomaly"
