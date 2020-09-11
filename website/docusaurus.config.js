@@ -24,6 +24,7 @@ module.exports = {
   favicon: 'img/favicon.ico',
   organizationName: 'apache',
   projectName: 'pinot', 
+  onBrokenLinks: 'ignore',
   themeConfig: {
     navbar: {
       hideOnScroll: true,

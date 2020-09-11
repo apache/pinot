@@ -16,16 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import React from 'react';
+import React from "react";
 
-import './styles.css';
+import "./styles.css";
 
-function Steps({children, type}) {
-  return (
-    <ol className="steps">
-      {children}
-    </ol>
-  );
+function Steps({ children, type }) {
+    return <ol className="steps">{children}</ol>;
 }
 
 export default Steps;

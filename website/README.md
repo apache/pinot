@@ -16,6 +16,19 @@ $ yarn
 $ yarn start
 ```
 
+Link Check:
+
+```bash
+yarn lint-check
+-> All matched files use Prettier code style!
+```
+
+Then try out:
+
+```bash
+yarn run serve --build --port 3001 --host 0.0.0.0
+```
+
 This command starts a local development server and open up a browser window. Most changes are reflected live without having to restart the server.
 
 ### Build
