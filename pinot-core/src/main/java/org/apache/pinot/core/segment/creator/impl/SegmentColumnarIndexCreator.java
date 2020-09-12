@@ -42,6 +42,7 @@ import org.apache.pinot.core.segment.creator.DictionaryBasedInvertedIndexCreator
 import org.apache.pinot.core.segment.creator.ForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.SegmentCreator;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationInfo;
+import org.apache.pinot.core.segment.creator.TextIndexCreator;
 import org.apache.pinot.core.segment.creator.TextIndexType;
 import org.apache.pinot.core.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueFixedByteRawIndexCreator;
@@ -50,8 +51,8 @@ import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForward
 import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.inv.OnHeapBitmapInvertedIndexCreator;
-import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.nullvalue.NullValueVectorCreator;
+import org.apache.pinot.core.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -83,7 +84,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private Map<String, SegmentDictionaryCreator> _dictionaryCreatorMap = new HashMap<>();
   private Map<String, ForwardIndexCreator> _forwardIndexCreatorMap = new HashMap<>();
   private Map<String, DictionaryBasedInvertedIndexCreator> _invertedIndexCreatorMap = new HashMap<>();
-  private Map<String, DictionaryBasedInvertedIndexCreator> _textIndexCreatorMap = new HashMap<>();
+  private Map<String, TextIndexCreator> _textIndexCreatorMap = new HashMap<>();
   private Map<String, NullValueVectorCreator> _nullValueVectorCreatorMap = new HashMap<>();
   private String segmentName;
   private Schema schema;
@@ -358,9 +359,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         }
         // text-index enabled SV column
         if (_textIndexColumns.contains(columnName)) {
-          DictionaryBasedInvertedIndexCreator textIndexCreator = _textIndexCreatorMap.get(columnName);
-          // add the column value to lucene index
-          textIndexCreator.addDoc(columnValueToIndex, docIdCounter);
+          _textIndexCreatorMap.get(columnName).add((String) columnValueToIndex);
         }
       } else {
         // MV column (always dictionary encoded)
@@ -393,7 +392,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     for (DictionaryBasedInvertedIndexCreator invertedIndexCreator : _invertedIndexCreatorMap.values()) {
       invertedIndexCreator.seal();
     }
-    for (DictionaryBasedInvertedIndexCreator textIndexCreator : _textIndexCreatorMap.values()) {
+    for (TextIndexCreator textIndexCreator : _textIndexCreatorMap.values()) {
       textIndexCreator.seal();
     }
     for (NullValueVectorCreator nullValueVectorCreator : _nullValueVectorCreatorMap.values()) {

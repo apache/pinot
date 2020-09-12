@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.creator.impl.inv.text;
+package org.apache.pinot.core.segment.creator.impl.text;
 
 import java.io.File;
 import java.io.IOException;
@@ -32,7 +32,7 @@ import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.pinot.core.segment.creator.DictionaryBasedInvertedIndexCreator;
-import org.slf4j.LoggerFactory;
+import org.apache.pinot.core.segment.creator.TextIndexCreator;
 
 
 /**
@@ -40,8 +40,7 @@ import org.slf4j.LoggerFactory;
  * Used for both offline from {@link org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator}
  * and realtime from {@link org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneTextIndexReader}
  */
-public class LuceneTextIndexCreator implements DictionaryBasedInvertedIndexCreator {
-  private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(LuceneTextIndexCreator.class);
+public class LuceneTextIndexCreator implements TextIndexCreator {
   // TODO: make buffer size configurable choosing a default value based on the heap usage results in design doc
   private static final int LUCENE_INDEX_MAX_BUFFER_SIZE_MB = 500;
 
@@ -51,6 +50,8 @@ public class LuceneTextIndexCreator implements DictionaryBasedInvertedIndexCreat
   private final String _textColumn;
   private final Directory _indexDirectory;
   private final IndexWriter _indexWriter;
+
+  private int _nextDocId = 0;
 
   public static final CharArraySet ENGLISH_STOP_WORDS_SET = new CharArraySet(Arrays
       .asList("a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in", "into", "is", "it", "no",
@@ -94,9 +95,8 @@ public class LuceneTextIndexCreator implements DictionaryBasedInvertedIndexCreat
       indexWriterConfig.setCommitOnClose(commit);
       _indexWriter = new IndexWriter(_indexDirectory, indexWriterConfig);
     } catch (Exception e) {
-      LOGGER
-          .error("Failed to instantiate Lucene text index creator for column {}, exception {}", column, e.getMessage());
-      throw new RuntimeException(e);
+      throw new RuntimeException(
+          "Caught exception while instantiating the LuceneTextIndexCreator for column: " + column, e);
     }
   }
 
@@ -105,17 +105,16 @@ public class LuceneTextIndexCreator implements DictionaryBasedInvertedIndexCreat
   }
 
   @Override
-  public void addDoc(Object document, int docIdCounter) {
+  public void add(String document) {
     // text index on SV column
     Document docToIndex = new Document();
-    docToIndex.add(new TextField(_textColumn, document.toString(), Field.Store.NO));
-    docToIndex.add(new StoredField(LUCENE_INDEX_DOC_ID_COLUMN_NAME, docIdCounter));
+    docToIndex.add(new TextField(_textColumn, document, Field.Store.NO));
+    docToIndex.add(new StoredField(LUCENE_INDEX_DOC_ID_COLUMN_NAME, _nextDocId++));
     try {
       _indexWriter.addDocument(docToIndex);
     } catch (Exception e) {
-      LOGGER.error("Failure while adding a new document to index for column {}, exception {}", _textColumn,
-          e.getMessage());
-      throw new RuntimeException(e);
+      throw new RuntimeException(
+          "Caught exception while adding a new document to the Lucene index for column: " + _textColumn, e);
     }
   }
 
@@ -139,8 +138,7 @@ public class LuceneTextIndexCreator implements DictionaryBasedInvertedIndexCreat
       // as opposed to per column index.
       _indexWriter.forceMerge(1);
     } catch (Exception e) {
-      LOGGER.error("Lucene index writer failed to commit for column {}, exception {}", _textColumn, e.getMessage());
-      throw new RuntimeException(e);
+      throw new RuntimeException("Caught exception while sealing the Lucene index for column: " + _textColumn, e);
     }
   }
 
@@ -152,19 +150,8 @@ public class LuceneTextIndexCreator implements DictionaryBasedInvertedIndexCreat
       _indexWriter.close();
       _indexDirectory.close();
     } catch (Exception e) {
-      LOGGER.error("Lucene index writer failed to close for column {}, exception {}", _textColumn, e.getMessage());
-      throw new RuntimeException(e);
+      throw new RuntimeException("Caught exception while closing the Lucene index for column: " + _textColumn, e);
     }
-  }
-
-  @Override
-  public void add(int dictId) {
-    throw new IllegalStateException("Lucene text inverted index is not dictionary based");
-  }
-
-  @Override
-  public void add(int[] dictIds, int length) {
-    throw new IllegalStateException("Lucene text inverted index is not dictionary based");
   }
 
   private File getV1TextIndexFile(File indexDir) {

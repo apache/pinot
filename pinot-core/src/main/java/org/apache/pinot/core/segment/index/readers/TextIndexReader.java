@@ -19,12 +19,13 @@
 package org.apache.pinot.core.segment.index.readers;
 
 import java.io.Closeable;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-public interface InvertedIndexReader<T> extends Closeable {
+public interface TextIndexReader extends Closeable {
 
   /**
-   * Returns the document ids for the given dictionary id.
+   * Returns the matching document ids for the given search query.
    */
-  T getDocIds(int dictId);
+  MutableRoaringBitmap getDocIds(String searchQuery);
 }

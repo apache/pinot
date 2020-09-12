@@ -227,11 +227,6 @@ public final class RangeIndexCreator implements DictionaryBasedInvertedIndexCrea
     _nextDocId++;
   }
 
-  @Override
-  public void addDoc(Object document, int docIdCounter) {
-    throw new IllegalStateException("Range index creator does not support Object type currently");
-  }
-
   /**
    * Generates the range Index file
    * Sample output by running RangeIndexCreatorTest with TRACE=true and change log4.xml in core to info
