@@ -244,7 +244,7 @@ public class TablesResourceTest extends BaseResourceTest {
             .queryParam("columns", "column1").queryParam("columns", "column2").request()
             .get(String.class));
     Assert.assertEquals(jsonResponse.get("columns").size(), 2);
-    Assert.assertEquals(jsonResponse.get("indexes").size(), 1);
+    Assert.assertEquals(jsonResponse.get("indexes").size(), 17);
 
     jsonResponse = JsonUtils.stringToJsonNode(
         (_webTarget.path(segmentMetadataPath).queryParam("columns", "*").request().get(String.class)));
