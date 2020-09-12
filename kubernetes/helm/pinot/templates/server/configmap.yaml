@@ -27,4 +27,4 @@ data:
     pinot.server.adminapi.port={{ .Values.server.ports.admin }}
     pinot.server.instance.dataDir={{ .Values.server.dataDir }}
     pinot.server.instance.segmentTarDir={{ .Values.server.segmentTarDir }}
-    pinot.set.instance.id.to.hostname=true
+{{ .Values.server.extra.configs | indent 4 }}
