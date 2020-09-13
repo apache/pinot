@@ -44,6 +44,14 @@ public class ThreadSafeMutableRoaringBitmap {
     }
   }
 
+  public void remove(int docId) {
+    if(contains(docId)) {
+      synchronized (this) {
+        _mutableRoaringBitmap.remove(docId);
+      }
+    }
+  }
+
   public boolean contains(int docId) {
     return _mutableRoaringBitmap.contains(docId);
   }

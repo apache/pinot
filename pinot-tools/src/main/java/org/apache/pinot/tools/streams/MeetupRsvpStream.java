@@ -41,14 +41,20 @@ public class MeetupRsvpStream {
   private static final Logger LOGGER = LoggerFactory.getLogger(MeetupRsvpStream.class);
   private StreamDataProducer producer;
   private boolean keepPublishing = true;
+  private boolean _partitionByKey;
   private ClientManager client;
 
-  public MeetupRsvpStream()
+  public MeetupRsvpStream() throws Exception {
+    this(false);
+  }
+
+  public MeetupRsvpStream(boolean partitionByKey)
       throws Exception {
     Properties properties = new Properties();
     properties.put("metadata.broker.list", KafkaStarterUtils.DEFAULT_KAFKA_BROKER);
     properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
     properties.put("request.required.acks", "1");
+    _partitionByKey = partitionByKey;
     producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
   }
 
@@ -101,7 +107,13 @@ public class MeetupRsvpStream {
                   extracted.put("rsvp_count", 1);
 
                   if (keepPublishing) {
-                    producer.produce("meetupRSVPEvents", extracted.toString().getBytes(StandardCharsets.UTF_8));
+                    if(_partitionByKey) {
+                      producer.produce("meetupRSVPEvents",
+                          event.get("event_id").toString().getBytes(StandardCharsets.UTF_8),
+                          extracted.toString().getBytes(StandardCharsets.UTF_8));
+                    } else {
+                      producer.produce("meetupRSVPEvents", extracted.toString().getBytes(StandardCharsets.UTF_8));
+                    }
                   }
                 } catch (Exception e) {
                   LOGGER.error("error processing raw event ", e);

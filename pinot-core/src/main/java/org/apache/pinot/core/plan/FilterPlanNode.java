@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.plan;
 
+import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +40,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.predicate.Predicate;
 import org.apache.pinot.core.query.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
+import org.apache.pinot.core.upsert.UpsertMetadataTableManager;
 
 
 public class FilterPlanNode implements PlanNode {
@@ -58,7 +60,17 @@ public class FilterPlanNode implements PlanNode {
   public BaseFilterOperator run() {
     FilterContext filter = _queryContext.getFilter();
     if (filter != null) {
-      return constructPhysicalOperator(filter, _queryContext.getDebugOptions());
+      BaseFilterOperator filterOperator = constructPhysicalOperator(filter, _queryContext.getDebugOptions());
+      if (UpsertMetadataTableManager.isUpsertInQueryEnabled() && _indexSegment.getValidDocIndex() != null) {
+        BaseFilterOperator validDocFilter =
+            new BitmapBasedFilterOperator(_indexSegment.getValidDocIndex().getValidDocBitmap(), false, _numDocs);
+        return FilterOperatorUtils.getAndFilterOperator(Lists.newArrayList(filterOperator, validDocFilter), _numDocs,
+            _queryContext.getDebugOptions());
+      } else {
+        return filterOperator;
+      }
+    } else if (UpsertMetadataTableManager.isUpsertInQueryEnabled() && _indexSegment.getValidDocIndex() != null) {
+      return new BitmapBasedFilterOperator(_indexSegment.getValidDocIndex().getValidDocBitmap(), false, _numDocs);
     } else {
       return new MatchAllFilterOperator(_numDocs);
     }

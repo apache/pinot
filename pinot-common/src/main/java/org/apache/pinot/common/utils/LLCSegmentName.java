@@ -52,7 +52,7 @@ public class LLCSegmentName extends SegmentName implements Comparable {
     _sequenceNumber = sequenceNumber;
     // ISO8601 date: 20160120T1234Z
     DateTime dateTime = new DateTime(msSinceEpoch, DateTimeZone.UTC);
-    _creationTime = dateTime.toString("yyyyMMdd'T'HHmm'Z'");
+    _creationTime = dateTime.toString(DATE_FORMAT);
     _segmentName = tableName + SEPARATOR + partitionId + SEPARATOR + sequenceNumber + SEPARATOR + _creationTime;
   }
 

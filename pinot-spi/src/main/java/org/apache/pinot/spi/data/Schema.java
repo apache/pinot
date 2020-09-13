@@ -56,7 +56,7 @@ import org.slf4j.LoggerFactory;
  * <code>DataType</code>s will be converted to one of them.
  */
 @SuppressWarnings("unused")
-@JsonIgnoreProperties(ignoreUnknown = true)
+//@JsonIgnoreProperties(ignoreUnknown = true)
 public final class Schema {
   private static final Logger LOGGER = LoggerFactory.getLogger(Schema.class);
 
@@ -75,6 +75,8 @@ public final class Schema {
   private transient final List<String> _dimensionNames = new ArrayList<>();
   private transient final List<String> _metricNames = new ArrayList<>();
   private transient final List<String> _dateTimeNames = new ArrayList<>();
+
+
 
   public static Schema fromFile(File schemaFile)
       throws IOException {

@@ -20,6 +20,7 @@ package org.apache.pinot.core.indexsegment.mutable;
 
 import javax.annotation.Nullable;
 import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.upsert.UpsertMetadataTableManager;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.RowMetadata;
 
@@ -41,4 +42,6 @@ public interface MutableSegment extends IndexSegment {
    * @return The number of records indexed
    */
   int getNumDocsIndexed();
+
+  UpsertMetadataTableManager getUpsertMetadataTableManager();
 }

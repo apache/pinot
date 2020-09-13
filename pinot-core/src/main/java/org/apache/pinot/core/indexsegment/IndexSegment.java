@@ -20,8 +20,10 @@ package org.apache.pinot.core.indexsegment;
 
 import java.util.List;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
+import org.apache.pinot.core.segment.index.readers.ValidDocIndexReader;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -70,6 +72,10 @@ public interface IndexSegment {
    * Returns a list of star-trees (V2), or null if there is no star-tree (V2) in the segment.
    */
   List<StarTreeV2> getStarTrees();
+
+  // TODO(upsert): solve the coordination problems of getting validDoc across sealed segments and mutable segment for consistency
+  @Nullable
+  ValidDocIndexReader getValidDocIndex();
 
   /**
    * Returns the record for the given document Id. Virtual column values are not returned.

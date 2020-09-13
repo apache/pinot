@@ -54,6 +54,7 @@ import org.apache.pinot.core.util.CrcUtils;
 import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.IngestionSchemaValidator;

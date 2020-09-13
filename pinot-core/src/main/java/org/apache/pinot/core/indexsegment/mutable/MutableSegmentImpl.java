@@ -34,7 +34,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.common.DataSource;
@@ -42,6 +41,7 @@ import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
+import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.core.realtime.impl.dictionary.BaseMutableDictionary;
 import org.apache.pinot.core.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
 import org.apache.pinot.core.realtime.impl.dictionary.MutableDictionaryFactory;
@@ -61,21 +61,29 @@ import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.MutableForwardIndex;
+import org.apache.pinot.core.segment.index.readers.ValidDocIndexReader;
+import org.apache.pinot.core.segment.index.readers.ValidDocIndexReaderImpl;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
+import org.apache.pinot.core.upsert.RecordLocation;
+import org.apache.pinot.core.upsert.UpsertMetadataTableManager;
+import org.apache.pinot.core.upsert.UpsertProcessorUtil;
 import org.apache.pinot.core.util.FixedIntArray;
 import org.apache.pinot.core.util.FixedIntArrayOffHeapIdMap;
 import org.apache.pinot.core.util.IdMap;
+import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.stream.RowMetadata;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.IntIterator;
@@ -136,9 +144,16 @@ public class MutableSegmentImpl implements MutableSegment {
   private final Map<String, FieldSpec> _newlyAddedColumnsFieldMap = new ConcurrentHashMap();
   private final Map<String, FieldSpec> _newlyAddedPhysicalColumnsFieldMap = new ConcurrentHashMap();
 
+  // the primaryKeyIndex for local segment
+  private final int _partitionId;
+  private final UpsertConfig.Mode _mode;
+  private final UpsertMetadataTableManager _upsertMetadataTableManager;
+  private final Map<PrimaryKey, RecordLocation> _primaryKeyIndex;
+  private final ThreadSafeMutableRoaringBitmap _validDocIndex;
+
   public MutableSegmentImpl(RealtimeSegmentConfig config, @Nullable ServerMetrics serverMetrics) {
     _serverMetrics = serverMetrics;
-
+    _partitionId = config.getPartitionId();
     _tableNameWithType = config.getTableNameWithType();
     _segmentName = config.getSegmentName();
     _schema = config.getSchema();
@@ -321,6 +336,10 @@ public class MutableSegmentImpl implements MutableSegment {
     // Metric aggregation can be enabled only if config is specified, and all dimensions have dictionary,
     // and no metrics have dictionary. If not enabled, the map returned is null.
     _recordIdMap = enableMetricsAggregationIfPossible(config, noDictionaryColumns);
+    _mode = config.getUpsertMode();
+    _upsertMetadataTableManager = config.getUpsertMetadataTableManager();
+    _primaryKeyIndex = isUpsertEnabled() ? new ConcurrentHashMap() : null;
+    _validDocIndex = isUpsertEnabled() ? new ThreadSafeMutableRoaringBitmap() : null;
   }
 
   /**
@@ -374,7 +393,7 @@ public class MutableSegmentImpl implements MutableSegment {
    */
   @Deprecated
   public long getMinTime() {
-    Long minTime = extractTimeValue(_indexContainerMap.get(_timeColumnName)._minValue);
+    Long minTime = IngestionUtils.extractTimeValue(_indexContainerMap.get(_timeColumnName)._minValue);
     if (minTime != null) {
       return minTime;
     }
@@ -386,25 +405,11 @@ public class MutableSegmentImpl implements MutableSegment {
    */
   @Deprecated
   public long getMaxTime() {
-    Long maxTime = extractTimeValue(_indexContainerMap.get(_timeColumnName)._maxValue);
+    Long maxTime = IngestionUtils.extractTimeValue(_indexContainerMap.get(_timeColumnName)._maxValue);
     if (maxTime != null) {
       return maxTime;
     }
     return Long.MIN_VALUE;
-  }
-
-  private Long extractTimeValue(Comparable time) {
-    if (time != null) {
-      if (time instanceof Number) {
-        return ((Number) time).longValue();
-      } else {
-        String stringValue = time.toString();
-        if (StringUtils.isNumeric(stringValue)) {
-          return Long.parseLong(stringValue);
-        }
-      }
-    }
-    return null;
   }
 
   public void addExtraColumns(Schema newSchema) {
@@ -437,8 +442,12 @@ public class MutableSegmentImpl implements MutableSegment {
       addNewRow(row);
       // Update number of documents indexed at last to make the latest row queryable
       canTakeMore = _numDocsIndexed++ < _capacity;
+
+      if (isUpsertEnabled()) {
+        handleUpsert(row, docId);
+      }
     } else {
-      // Aggregate metrics for an existing row
+      Preconditions.checkArgument(!isUpsertEnabled(), "metrics aggregation cannot be used with upsert");
       assert _aggregateMetrics;
       aggregateMetrics(row, docId);
       canTakeMore = true;
@@ -451,6 +460,21 @@ public class MutableSegmentImpl implements MutableSegment {
     }
 
     return canTakeMore;
+  }
+
+  private boolean isUpsertEnabled() {
+    return _mode != UpsertConfig.Mode.NONE;
+  }
+
+  private void handleUpsert(GenericRow row, int docId) {
+    // below are upsert operations
+    PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
+    Object timeValue = row.getValue(_timeColumnName);
+    Preconditions.checkArgument(timeValue instanceof Comparable, "time column shall be comparable");
+    long timestamp = IngestionUtils.extractTimeValue((Comparable) timeValue);
+    UpsertProcessorUtil
+        .handleUpsert(primaryKey, timestamp, _segmentName, docId, _partitionId, _primaryKeyIndex, _validDocIndex,
+            _upsertMetadataTableManager);
   }
 
   private void updateDictionary(GenericRow row) {
@@ -627,6 +651,11 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   @Override
+  public UpsertMetadataTableManager getUpsertMetadataTableManager() {
+    return _upsertMetadataTableManager;
+  }
+
+  @Override
   public String getSegmentName() {
     return _segmentName;
   }
@@ -677,6 +706,12 @@ public class MutableSegmentImpl implements MutableSegment {
   @Override
   public List<StarTreeV2> getStarTrees() {
     return null;
+  }
+
+  @Nullable
+  @Override
+  public ValidDocIndexReader getValidDocIndex() {
+    return _validDocIndex == null ? null : new ValidDocIndexReaderImpl(_validDocIndex);
   }
 
   /**

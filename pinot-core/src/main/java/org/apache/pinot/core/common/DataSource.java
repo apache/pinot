@@ -26,7 +26,6 @@ import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
 import org.apache.pinot.core.segment.index.readers.TextIndexReader;
 
-
 /**
  * The {@code DataSource} contains all the indexes and metadata for a column for query execution purpose.
  */

@@ -247,6 +247,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       FileUtils.copyDirectory(segmentBackupDir, indexDir);
 
       // Load from index directory
+      // TODO(upsert): bootstrap segments?
       ImmutableSegment immutableSegment = ImmutableSegmentLoader
           .load(indexDir, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig), schema);
 
