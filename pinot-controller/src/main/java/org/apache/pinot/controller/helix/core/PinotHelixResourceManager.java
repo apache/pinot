@@ -1226,6 +1226,14 @@ public class PinotHelixResourceManager {
     }
   }
 
+  public boolean setZKData(String path, ZNRecord record, int expectedVersion, int accessOption) {
+    return _helixDataAccessor.getBaseDataAccessor().set(path, record, expectedVersion, accessOption);
+  }
+
+  public boolean deleteZKPath(String path) {
+    return _helixDataAccessor.getBaseDataAccessor().remove(path, -1);
+  }
+
   public ZNRecord readZKData(String path) {
     return _helixDataAccessor.getBaseDataAccessor().get(path, null, -1);
   }
@@ -1814,7 +1822,8 @@ public class PinotHelixResourceManager {
         _helixZkManager.getMessagingService().send(recipientCriteria, routingTableRebuildMessage, null, -1);
     if (numMessagesSent > 0) {
       // TODO: Would be nice if we can get the name of the instances to which messages were sent
-      LOGGER.info("Sent {} routing table rebuild messages to brokers for table: {}", numMessagesSent, tableNameWithType);
+      LOGGER
+          .info("Sent {} routing table rebuild messages to brokers for table: {}", numMessagesSent, tableNameWithType);
     } else {
       LOGGER.warn("No routing table rebuild message sent to brokers for table: {}", tableNameWithType);
     }
@@ -2474,9 +2483,9 @@ public class PinotHelixResourceManager {
       }
       Thread.sleep(EXTERNAL_VIEW_CHECK_INTERVAL_MS);
     } while (System.currentTimeMillis() < endTimeMs);
-    throw new TimeoutException(String.format(
-        "Time out while waiting segments become ONLINE. (tableNameWithType = %s, segmentsToCheck = %s)",
-        tableNameWithType, segmentsToCheck));
+    throw new TimeoutException(String
+        .format("Time out while waiting segments become ONLINE. (tableNameWithType = %s, segmentsToCheck = %s)",
+            tableNameWithType, segmentsToCheck));
   }
 
   private Set<String> getOnlineSegmentsFromExternalView(String tableNameWithType) {
