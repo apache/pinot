@@ -31,6 +31,7 @@
     <module>thirdeye-spi</module>
     <module>thirdeye-pinot</module>
     <module>thirdeye-coordinator</module>
+    <module>thirdeye-dist</module>
   </modules>
 
   <properties>
@@ -172,6 +173,11 @@
       <dependency>
         <groupId>org.apache.pinot.thirdeye</groupId>
         <artifactId>thirdeye-pinot</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot.thirdeye</groupId>
+        <artifactId>thirdeye-coordinator</artifactId>
         <version>${project.version}</version>
       </dependency>
 
