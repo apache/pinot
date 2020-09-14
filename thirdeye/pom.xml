@@ -30,6 +30,8 @@
     <module>thirdeye-frontend</module>
     <module>thirdeye-spi</module>
     <module>thirdeye-pinot</module>
+    <module>thirdeye-coordinator</module>
+    <module>thirdeye-dist</module>
   </modules>
 
   <properties>
@@ -166,6 +168,16 @@
       <dependency>
         <groupId>org.apache.pinot.thirdeye</groupId>
         <artifactId>thirdeye-spi</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot.thirdeye</groupId>
+        <artifactId>thirdeye-pinot</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot.thirdeye</groupId>
+        <artifactId>thirdeye-coordinator</artifactId>
         <version>${project.version}</version>
       </dependency>
 
@@ -559,6 +571,11 @@
         <groupId>org.apache.commons</groupId>
         <artifactId>commons-math</artifactId>
         <version>2.1</version>
+      </dependency>
+      <dependency>
+        <groupId>commons-collections</groupId>
+        <artifactId>commons-collections</artifactId>
+        <version>3.2.1</version>
       </dependency>
 
     </dependencies>

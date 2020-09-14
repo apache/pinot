@@ -9,7 +9,6 @@
     <version>${revision}${sha1}</version>
   </parent>
   <artifactId>thirdeye-pinot</artifactId>
-  <name>thirdeye-pinot</name>
   <url>http://maven.apache.org</url>
   <properties>
     <mainClass>org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardApplication</mainClass>
