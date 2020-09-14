@@ -204,19 +204,7 @@ data:
           seed: 4
           namePrefixes: [System, Model, Campaign, Welcome, Pinot, ThirdEye]
 
-  data-sources-config.yml: |-
-    # Please put the mock data source as the first in this configuration.
-    dataSourceConfigs:
-      - className: org.apache.pinot.thirdeye.datasource.pinot.PinotThirdEyeDataSource
-        properties:
-          zookeeperUrl: 'pinot-zookeeper:2181'
-          clusterName: 'pinot-quickstart'
-          controllerConnectionScheme: 'http'
-          controllerHost: 'pinot-controller'
-          controllerPort: 9000
-          cacheLoaderClassName: org.apache.pinot.thirdeye.datasource.pinot.PinotControllerResponseCacheLoader
-        metadataSourceConfigs:
-          - className: org.apache.pinot.thirdeye.auto.onboard.AutoOnboardPinotMetadataSource
+  data-sources-config.yml: {{ toYaml .Values.thirdeye.config.dataSources | indent 4 }}
 
   cache-config.yml: |-
     useInMemoryCache: true
