@@ -70,7 +70,7 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
   private final byte[] _reusableMD5Bytes = new byte[SCHEMA_HASH_LENGTH];
 
   private DecoderFactory _decoderFactory;
-  private RecordExtractor<GenericData.Record> _avroRecordExtractor;
+  private RecordExtractor<GenericData.Record, GenericData.Record> _avroRecordExtractor;
 
   private static final int MAGIC_BYTE_LENGTH = 1;
   private static final int SCHEMA_HASH_LENGTH = 16;

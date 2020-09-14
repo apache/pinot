@@ -31,6 +31,7 @@ import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 import org.apache.thrift.TBase;
 import org.apache.thrift.TFieldIdEnum;
+import org.apache.thrift.meta_data.FieldMetaData;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TProtocol;
 import org.apache.thrift.transport.TIOStreamTransport;
@@ -50,7 +51,7 @@ public class ThriftRecordReader implements RecordReader {
   private boolean _hasNext;
 
   @Override
-  public void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig config)
+  public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig config)
       throws IOException {
     ThriftRecordReaderConfig recordReaderConfig = (ThriftRecordReaderConfig) config;
     _dataFile = dataFile;
@@ -61,12 +62,13 @@ public class ThriftRecordReader implements RecordReader {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
-    int index = 1;
-    TFieldIdEnum tFieldIdEnum;
-    while ((tFieldIdEnum = tObject.fieldForId(index)) != null) {
-      _fieldIds.put(tFieldIdEnum.getFieldName(), index);
-      index++;
+
+    Map<? extends TFieldIdEnum, org.apache.thrift.meta_data.FieldMetaData> metaDataMap =
+        FieldMetaData.getStructMetaDataMap(tObject.getClass());
+    for (TFieldIdEnum tFieldIdEnum : metaDataMap.keySet()) {
+      _fieldIds.put(tFieldIdEnum.getFieldName(), Short.toUnsignedInt(tFieldIdEnum.getThriftFieldId()));
     }
+
     ThriftRecordExtractorConfig recordExtractorConfig = new ThriftRecordExtractorConfig();
     recordExtractorConfig.setFieldIds(_fieldIds);
     _recordExtractor = new ThriftRecordExtractor();

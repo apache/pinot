@@ -41,7 +41,7 @@ public class ParquetRecordReader implements RecordReader {
   private GenericRecord _nextRecord;
 
   @Override
-  public void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
+  public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
     _dataFilePath = new Path(dataFile.getAbsolutePath());
     _parquetReader = ParquetUtils.getParquetReader(_dataFilePath);

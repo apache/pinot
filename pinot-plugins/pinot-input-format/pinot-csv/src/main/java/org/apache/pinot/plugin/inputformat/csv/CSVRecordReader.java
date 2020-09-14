@@ -47,7 +47,7 @@ public class CSVRecordReader implements RecordReader {
   }
 
   @Override
-  public void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
+  public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
     _dataFile = dataFile;
     CSVRecordReaderConfig config = (CSVRecordReaderConfig) recordReaderConfig;
@@ -95,8 +95,13 @@ public class CSVRecordReader implements RecordReader {
     _recordExtractor = new CSVRecordExtractor();
     CSVRecordExtractorConfig recordExtractorConfig = new CSVRecordExtractorConfig();
     recordExtractorConfig.setMultiValueDelimiter(multiValueDelimiter);
-    _recordExtractor.init(fieldsToRead, recordExtractorConfig);
+
     init();
+
+    if (fieldsToRead == null || fieldsToRead.isEmpty()) {
+      fieldsToRead = _parser.getHeaderMap().keySet();
+    }
+    _recordExtractor.init(fieldsToRead, recordExtractorConfig);
   }
 
   private void init()

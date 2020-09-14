@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.data.readers;
 
 import java.util.Set;
+import javax.annotation.Nullable;
 
 
 /**
@@ -27,8 +28,9 @@ import java.util.Set;
  * 2) Collections become Object[] i.e. multi-value column
  * 3) Nested/Complex fields (e.g. json maps, avro maps, avro records) become Map<Object, Object>
  * @param <T> The format of the input record
+ * @param <V> The input record's field to be converted
  */
-public interface RecordExtractor<T> {
+public interface RecordExtractor<T, V> {
 
   /**
    * Initialize the record extractor with its config
@@ -46,4 +48,16 @@ public interface RecordExtractor<T> {
    * @return The output GenericRow
    */
   GenericRow extract(T from, GenericRow to);
+
+  /**
+   * Converts a field of the given input record. The field value will be converted to either a single value
+   * (string, number, bytebuffer), multi value (Object[]) or a Map.
+   *
+   * Natively Pinot only understands single values and multi values.
+   * Map is useful only if some ingestion transform functions operates on it in the transformation layer.
+   *
+   * @param value the field value to be converted
+   * @return The converted field value
+   */
+  Object convert(@Nullable V value);
 }

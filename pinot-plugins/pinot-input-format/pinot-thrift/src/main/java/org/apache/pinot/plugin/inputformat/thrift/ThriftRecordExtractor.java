@@ -18,41 +18,75 @@
  */
 package org.apache.pinot.plugin.inputformat.thrift;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.RecordExtractor;
+import org.apache.pinot.spi.data.readers.AbstractDefaultRecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
-import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 import org.apache.thrift.TBase;
+import org.apache.thrift.TFieldIdEnum;
+import org.apache.thrift.meta_data.FieldMetaData;
 
 
 /**
  * Extractor for records of Thrift input
  */
-public class ThriftRecordExtractor implements RecordExtractor<TBase> {
+public class ThriftRecordExtractor extends AbstractDefaultRecordExtractor<TBase, TBase> {
 
   private Map<String, Integer> _fieldIds;
   private Set<String> _fields;
+  private boolean _extractAll = false;
 
   @Override
-  public void init(Set<String> fields, RecordExtractorConfig recordExtractorConfig) {
+  public void init(@Nullable Set<String> fields, RecordExtractorConfig recordExtractorConfig) {
     _fields = fields;
     _fieldIds = ((ThriftRecordExtractorConfig) recordExtractorConfig).getFieldIds();
+    if (fields == null || fields.isEmpty()) {
+      _extractAll = true;
+    }
   }
 
   @Override
   public GenericRow extract(TBase from, GenericRow to) {
-    for (String fieldName : _fields) {
-      Object value = null;
-      Integer fieldId = _fieldIds.get(fieldName);
-      if (fieldId != null) {
-        //noinspection unchecked
-        value = from.getFieldValue(from.fieldForId(fieldId));
+    if (_extractAll) {
+      _fieldIds.entrySet().forEach(nameToId ->
+          to.putValue(
+              nameToId.getKey(),
+              convert(from.getFieldValue(from.fieldForId(nameToId.getValue()))))
+      );
+    } else {
+      for (String fieldName : _fields) {
+        Object value = null;
+        Integer fieldId = _fieldIds.get(fieldName);
+        if (fieldId != null) {
+          //noinspection unchecked
+          value = from.getFieldValue(from.fieldForId(fieldId));
+        }
+        to.putValue(fieldName, convert(value));
       }
-      Object convertedValue = RecordReaderUtils.convert(value);
-      to.putValue(fieldName, convertedValue);
     }
     return to;
+  }
+
+  /**
+   * Returns whether the object is a Thrift object.
+   */
+  @Override
+  protected boolean isInstanceOfRecord(Object value) {
+    return value instanceof TBase;
+  }
+
+  /**
+   * Handles the conversion of each field of a Thrift object.
+   */
+  @Override
+  protected Object convertRecord(TBase value) {
+    Map<Object, Object> convertedRecord = new HashMap<>();
+    for (TFieldIdEnum tFieldIdEnum: FieldMetaData.getStructMetaDataMap(value.getClass()).keySet()) {
+      convertedRecord.put(tFieldIdEnum.getFieldName(), convert(value.getFieldValue(tFieldIdEnum)));
+    }
+    return convertedRecord;
   }
 }

@@ -29,10 +29,15 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.zip.GZIPInputStream;
 import javax.annotation.Nullable;
 
 
+/**
+ * Utils for reading file records
+ */
 public class RecordReaderUtils {
   private RecordReaderUtils() {
   }
@@ -55,69 +60,6 @@ public class RecordReaderUtils {
       return new GZIPInputStream(new FileInputStream(dataFile));
     } else {
       return new FileInputStream(dataFile);
-    }
-  }
-
-  /**
-   * Converts the value to a multi-values value or a single values value
-   */
-  public static @Nullable Object convert(@Nullable Object value) {
-
-    if (value == null) {
-      return null;
-    }
-    if (value instanceof Collection) {
-      return convertMultiValue((Collection) value);
-    } else {
-      return convertSingleValue(value);
-    }
-  }
-
-  /**
-   * Converts the value to a single-valued value
-   */
-  public static @Nullable Object convertSingleValue(@Nullable Object value) {
-    if (value == null) {
-      return null;
-    }
-
-    if (value instanceof ByteBuffer) {
-      ByteBuffer byteBufferValue = (ByteBuffer) value;
-
-      // Use byteBufferValue.remaining() instead of byteBufferValue.capacity() so that it still works when buffer is
-      // over-sized
-      byte[] bytesValue = new byte[byteBufferValue.remaining()];
-      byteBufferValue.get(bytesValue);
-      return bytesValue;
-    }
-    if (value instanceof Number) {
-      return value;
-    }
-    return value.toString();
-  }
-
-  /**
-   * Converts the value to a multi-valued value
-   */
-  public static @Nullable Object convertMultiValue(@Nullable Collection values) {
-    if (values == null || values.isEmpty()) {
-      return null;
-    }
-    int numValues = values.size();
-    Object[] array = new Object[numValues];
-    int index = 0;
-    for (Object value : values) {
-      Object convertedValue = convertSingleValue(value);
-      if (convertedValue != null && !convertedValue.toString().equals("")) {
-        array[index++] = convertedValue;
-      }
-    }
-    if (index == numValues) {
-      return array;
-    } else if (index == 0) {
-      return null;
-    } else {
-      return Arrays.copyOf(array, index);
     }
   }
 }

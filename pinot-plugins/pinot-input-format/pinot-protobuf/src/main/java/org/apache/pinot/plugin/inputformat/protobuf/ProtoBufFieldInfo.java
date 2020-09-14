@@ -16,31 +16,35 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.data.readers;
+package org.apache.pinot.plugin.inputformat.protobuf;
 
-import java.util.Arrays;
-import java.util.Collections;
-import org.testng.annotations.Test;
-
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNull;
+import com.google.protobuf.Descriptors;
 
 
-public class RecordReaderUtilsTest {
+/**
+ * Object for associating a ProtoBuf field value and its field descriptor used when extracting ProtoBuf records.
+ */
+public class ProtoBufFieldInfo {
 
-  @Test
-  public void testConvertMultiValue() {
+  private Object _fieldValue;
+  private Descriptors.FieldDescriptor _fieldDescriptor;
 
-    assertNull(RecordReaderUtils.convertMultiValue(null));
+  public ProtoBufFieldInfo(Object fieldValue,  Descriptors.FieldDescriptor fieldDescriptor) {
+    _fieldValue = fieldValue;
+    _fieldDescriptor = fieldDescriptor;
+  }
 
-    assertNull(RecordReaderUtils.convertMultiValue(Collections.emptyList()));
+  /**
+   * Returns the field value
+   */
+  public Object getFieldValue() {
+    return _fieldValue;
+  }
 
-    assertNull(RecordReaderUtils.convertMultiValue(Collections.singletonList(null)));
-
-    assertNull(RecordReaderUtils.convertMultiValue(Collections.singletonList("")));
-
-    assertNull(RecordReaderUtils.convertMultiValue(Arrays.asList(null, "")));
-
-    assertEquals(RecordReaderUtils.convertMultiValue(Arrays.asList(null, "", 123)), new Object[]{123});
+  /**
+   * Returns the field descriptor
+   */
+  public Descriptors.FieldDescriptor getFieldDescriptor() {
+    return _fieldDescriptor;
   }
 }

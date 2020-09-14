@@ -42,7 +42,7 @@ public class KafkaJSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final String JSON_RECORD_EXTRACTOR_CLASS =
       "org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor";
 
-  private RecordExtractor<Map<String, Object>> _jsonRecordExtractor;
+  private RecordExtractor<Map<String, Object>, Object> _jsonRecordExtractor;
 
   @Override
   public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)

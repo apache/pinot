@@ -36,7 +36,7 @@ public interface RecordReader extends Closeable {
    * Initializes the record reader with data file, schema and (optional) record reader config.
    *
    * @param dataFile Data file
-   * @param fieldsToRead The fields to read from the data file. If blank, reads all fields (only for AVRO/JSON currently)
+   * @param fieldsToRead The fields to read from the data file. If blank, reads all fields.
    * @param recordReaderConfig Config for the reader specific to the format. e.g. delimiter for csv format etc
    * @throws IOException If an I/O error occurs
    */

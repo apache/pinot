@@ -21,15 +21,15 @@ package org.apache.pinot.plugin.inputformat.json;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.data.readers.AbstractDefaultRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 
 
 /**
  * Extractor for JSON records
  */
-public class JSONRecordExtractor implements RecordExtractor<Map<String, Object>> {
+public class JSONRecordExtractor extends AbstractDefaultRecordExtractor<Map<String, Object>, Object> {
 
   private Set<String> _fields;
   private boolean _extractAll = false;
@@ -45,18 +45,32 @@ public class JSONRecordExtractor implements RecordExtractor<Map<String, Object>>
   @Override
   public GenericRow extract(Map<String, Object> from, GenericRow to) {
     if (_extractAll) {
-      from.forEach((fieldName, value) -> to.putValue(fieldName, JSONRecordExtractorUtils.convertValue(value)));
+      from.forEach((fieldName, value) -> to.putValue(fieldName, convert(value)));
     } else {
       for (String fieldName : _fields) {
         Object value = from.get(fieldName);
         // NOTE about JSON behavior - cannot distinguish between INT/LONG and FLOAT/DOUBLE.
         // DataTypeTransformer fixes it.
-        Object convertedValue = JSONRecordExtractorUtils.convertValue(value);
+        Object convertedValue = convert(value);
         to.putValue(fieldName, convertedValue);
       }
     }
     return to;
   }
 
+  /**
+   * JSON structures should be handled as a map or an ordered collection. Therefore this will always return false.
+   */
+  @Override
+  protected boolean isInstanceOfRecord(Object value) {
+    return false;
+  }
 
+  /**
+   * This method should not be called when converting JSON objects.
+   */
+  @Override
+  protected Object convertRecord(Object record) {
+    throw new UnsupportedOperationException("JSON structures should be handled as a map or an ordered collection.");
+  }
 }
