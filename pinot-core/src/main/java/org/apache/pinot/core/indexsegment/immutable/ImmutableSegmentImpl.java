@@ -144,4 +144,8 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     // NOTE: Use PinotSegmentRecordReader to read immutable segment
     throw new UnsupportedOperationException();
   }
+
+  public Map<String, ColumnIndexContainer> getIndexContainerMap() {
+    return _indexContainerMap;
+  }
 }

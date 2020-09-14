@@ -27,10 +27,8 @@ import java.io.File;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
@@ -144,21 +142,13 @@ public class TablesResource {
       throw new WebApplicationException(String.format("Table %s segments %s does not exist", tableName, segmentName),
           Response.Status.NOT_FOUND);
     }
+
     try {
-      SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) segmentDataManager.getSegment().getSegmentMetadata();
-      Set<String> columnSet;
-      if (columns.size() == 1 && columns.get(0).equals("*")) {
-        columnSet = null;
-      } else {
-        columnSet = new HashSet<>(columns);
-      }
-      try {
-        return segmentMetadata.toJson(columnSet).toString();
-      } catch (Exception e) {
-        LOGGER.error("Failed to convert table {} segment {} to json", tableName, segmentMetadata);
-        throw new WebApplicationException("Failed to convert segment metadata to json",
-            Response.Status.INTERNAL_SERVER_ERROR);
-      }
+      return SegmentMetadataFetcher.getSegmentMetadata(segmentDataManager, columns);
+    } catch (Exception e) {
+      LOGGER.error("Failed to convert table {} segment {} to json", tableName, segmentName);
+      throw new WebApplicationException("Failed to convert segment metadata to json",
+          Response.Status.INTERNAL_SERVER_ERROR);
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);
     }
