@@ -28,6 +28,7 @@ includeFileNamePattern: 'glob:**/*.parquet'
 excludeFileNamePattern: 'glob:**/*.avro'
 outputDirURI: 'file:///path/to/output'
 overwriteOutput: true
+parallelism: 10000
 pinotFSSpecs:
   - scheme: file
     className: org.apache.pinot.spi.filesystem.LocalPinotFS

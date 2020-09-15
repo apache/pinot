@@ -60,6 +60,7 @@ public class IngestionJobLauncherTest {
         GroovyTemplateUtils.class.getClassLoader().getResource("job.config").getFile(), context);
     Assert.assertEquals(spec.getInputDirURI(), "file:///path/to/input/2020/06/07");
     Assert.assertEquals(spec.getOutputDirURI(), "file:///path/to/output/2020/06/07");
+    Assert.assertEquals(spec.getSegmentCreationJobParallelism(), 100);
   }
 
   @Test
@@ -70,5 +71,6 @@ public class IngestionJobLauncherTest {
         GroovyTemplateUtils.class.getClassLoader().getResource("job_json.config").getFile(), null);
     Assert.assertEquals(spec.getInputDirURI(), "file:///path/to/input/2020/07/22");
     Assert.assertEquals(spec.getOutputDirURI(), "file:///path/to/output/2020/07/22");
+    Assert.assertEquals(spec.getSegmentCreationJobParallelism(), 0);
   }
 }

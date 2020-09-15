@@ -205,7 +205,8 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
       }
 
       List<String> pathAndIdxList = new ArrayList<>();
-      String localDirectorySequenceIdString = _spec.getSegmentNameGeneratorSpec().getConfigs().get(LOCAL_DIRECTORY_SEQUENCE_ID);
+      String localDirectorySequenceIdString =
+          _spec.getSegmentNameGeneratorSpec().getConfigs().get(LOCAL_DIRECTORY_SEQUENCE_ID);
       boolean localDirectorySequenceId = false;
       if (localDirectorySequenceIdString != null) {
         localDirectorySequenceId = Boolean.parseBoolean(localDirectorySequenceIdString);
@@ -219,7 +220,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
           }
           localDirIndex.get(filteredParentPath.toString()).add(filteredFile);
         }
-        for (String parentPath: localDirIndex.keySet()){
+        for (String parentPath : localDirIndex.keySet()) {
           List<String> siblingFiles = localDirIndex.get(parentPath);
           Collections.sort(siblingFiles);
           for (int i = 0; i < siblingFiles.size(); i++) {
@@ -231,7 +232,12 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
           pathAndIdxList.add(String.format("%s %d", filteredFiles.get(i), i));
         }
       }
-      JavaRDD<String> pathRDD = sparkContext.parallelize(pathAndIdxList, pathAndIdxList.size());
+      int numDataFiles = pathAndIdxList.size();
+      int jobParallelism = _spec.getSegmentCreationJobParallelism();
+      if (jobParallelism <= 0 || jobParallelism > numDataFiles) {
+        jobParallelism = numDataFiles;
+      }
+      JavaRDD<String> pathRDD = sparkContext.parallelize(pathAndIdxList, jobParallelism);
 
       final String pluginsInclude =
           (sparkContext.getConf().contains(PLUGINS_INCLUDE_PROPERTY_NAME)) ? sparkContext.getConf()
