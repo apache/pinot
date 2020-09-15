@@ -23,6 +23,7 @@ export default Controller.extend({
   previewError: false,
   previewErrorMsg: null,
   previewErrorInfo: null,
+  previewErrorScroll: false,
 
   /**
    * Change subscription group button text depending on whether creating or updating
@@ -150,8 +151,19 @@ export default Controller.extend({
       this.setProperties({
         previewError: bubbledObject.previewError,
         previewErrorMsg: bubbledObject.previewErrorMsg,
-        previewErrorInfo: bubbledObject.previewErrorInfo
+        previewErrorInfo: bubbledObject.previewErrorInfo,
+        previewErrorScroll: bubbledObject.previewError
       });
+    },
+
+    /**
+     * set property value to false
+     * @method resetErrorScroll
+     * @param {string} propertyName - name of property to reset (ie 'detectionErrorScroll')
+     * @return {undefined}
+     */
+    resetErrorScroll(propertyName) {
+      set(this, propertyName, false);
     },
 
     /**
