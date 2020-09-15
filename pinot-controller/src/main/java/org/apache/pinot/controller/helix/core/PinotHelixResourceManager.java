@@ -104,7 +104,6 @@ import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssign
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentFactory;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
-import org.apache.pinot.controller.helix.core.listener.ClusterExternalViewChangeListener;
 import org.apache.pinot.controller.helix.core.listener.ClusterInstanceConfigChangeListener;
 import org.apache.pinot.controller.helix.core.listener.ClusterLiveInstanceChangeListener;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
@@ -166,7 +165,6 @@ public class PinotHelixResourceManager {
   private TableCache _tableCache;
   private ClusterInstanceConfigChangeListener _clusterInstanceConfigChangeListener;
   private ClusterLiveInstanceChangeListener _clusterLiveInstanceChangeListener;
-  private ClusterExternalViewChangeListener _clusterExternalViewChangeListener;
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, @Nullable String dataDir,
       long externalViewOnlineToOfflineTimeoutMillis, boolean isSingleTenantCluster, boolean enableBatchMessageMode,
@@ -231,13 +229,11 @@ public class PinotHelixResourceManager {
         .parseBoolean(configs.get(Helix.DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY));
     _tableCache = new TableCache(_propertyStore, caseInsensitive);
 
-    _clusterInstanceConfigChangeListener = new ClusterInstanceConfigChangeListener();
-    _clusterLiveInstanceChangeListener = new ClusterLiveInstanceChangeListener();
-    _clusterExternalViewChangeListener = new ClusterExternalViewChangeListener();
+    _clusterInstanceConfigChangeListener = new ClusterInstanceConfigChangeListener(_helixZkManager);
+    _clusterLiveInstanceChangeListener = new ClusterLiveInstanceChangeListener(_helixDataAccessor, _keyBuilder);
     try {
       addConfigListeners(_clusterInstanceConfigChangeListener);
       addLiveInstanceListeners(_clusterLiveInstanceChangeListener);
-      addExternalViewListeners(_clusterExternalViewChangeListener);
     } catch (Exception e) {
       LOGGER.warn(
           "Unable to add config listener in controller. This will result in incorrect response from controller's broker API");
@@ -2213,11 +2209,6 @@ public class PinotHelixResourceManager {
   public void addLiveInstanceListeners(LiveInstanceChangeListener liveInstanceChangeListener)
       throws Exception {
     _helixZkManager.addLiveInstanceChangeListener(liveInstanceChangeListener);
-  }
-
-  public void addExternalViewListeners(ExternalViewChangeListener externalViewChangeListener)
-      throws Exception {
-    _helixZkManager.addExternalViewChangeListener(externalViewChangeListener);
   }
 
   /**
