@@ -19,10 +19,17 @@
 package org.apache.pinot.core.segment.processing.framework;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.core.segment.processing.collector.CollectorConfig;
 import org.apache.pinot.core.segment.processing.filter.RecordFilterConfig;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
+import org.apache.pinot.core.segment.processing.partitioner.PartitionerFactory;
 import org.apache.pinot.core.segment.processing.transformer.RecordTransformerConfig;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
@@ -36,18 +43,18 @@ public class SegmentProcessorConfig {
   private final Schema _schema;
   private final RecordTransformerConfig _recordTransformerConfig;
   private final RecordFilterConfig _recordFilterConfig;
-  private final PartitionerConfig _partitionerConfig;
+  private final List<PartitionerConfig> _partitionerConfigs;
   private final CollectorConfig _collectorConfig;
   private final SegmentConfig _segmentConfig;
 
   private SegmentProcessorConfig(TableConfig tableConfig, Schema schema,
       RecordTransformerConfig recordTransformerConfig, RecordFilterConfig recordFilterConfig,
-      PartitionerConfig partitionerConfig, CollectorConfig collectorConfig, SegmentConfig segmentConfig) {
+      List<PartitionerConfig> partitionerConfigs, CollectorConfig collectorConfig, SegmentConfig segmentConfig) {
     _tableConfig = tableConfig;
     _schema = schema;
     _recordTransformerConfig = recordTransformerConfig;
     _recordFilterConfig = recordFilterConfig;
-    _partitionerConfig = partitionerConfig;
+    _partitionerConfigs = partitionerConfigs;
     _collectorConfig = collectorConfig;
     _segmentConfig = segmentConfig;
   }
@@ -83,8 +90,8 @@ public class SegmentProcessorConfig {
   /**
    * The PartitioningConfig for the SegmentProcessorFramework's map phase
    */
-  public PartitionerConfig getPartitionerConfig() {
-    return _partitionerConfig;
+  public List<PartitionerConfig> getPartitionerConfigs() {
+    return _partitionerConfigs;
   }
 
   /**
@@ -109,7 +116,7 @@ public class SegmentProcessorConfig {
     private Schema _schema;
     private RecordTransformerConfig _recordTransformerConfig;
     private RecordFilterConfig _recordFilterConfig;
-    private PartitionerConfig _partitionerConfig;
+    private List<PartitionerConfig> _partitionerConfigs;
     private CollectorConfig _collectorConfig;
     private SegmentConfig _segmentConfig;
 
@@ -133,8 +140,8 @@ public class SegmentProcessorConfig {
       return this;
     }
 
-    public Builder setPartitionerConfig(PartitionerConfig partitionerConfig) {
-      _partitionerConfig = partitionerConfig;
+    public Builder setPartitionerConfigs(List<PartitionerConfig> partitionerConfigs) {
+      _partitionerConfigs = partitionerConfigs;
       return this;
     }
 
@@ -151,14 +158,15 @@ public class SegmentProcessorConfig {
     public SegmentProcessorConfig build() {
       Preconditions.checkState(_tableConfig != null, "Must provide table config in SegmentProcessorConfig");
       Preconditions.checkState(_schema != null, "Must provide schema in SegmentProcessorConfig");
+
       if (_recordTransformerConfig == null) {
         _recordTransformerConfig = new RecordTransformerConfig.Builder().build();
       }
       if (_recordFilterConfig == null) {
         _recordFilterConfig = new RecordFilterConfig.Builder().build();
       }
-      if (_partitionerConfig == null) {
-        _partitionerConfig = new PartitionerConfig.Builder().build();
+      if (CollectionUtils.isEmpty(_partitionerConfigs)) {
+        _partitionerConfigs = Lists.newArrayList(new PartitionerConfig.Builder().build());
       }
       if (_collectorConfig == null) {
         _collectorConfig = new CollectorConfig.Builder().build();
@@ -167,7 +175,7 @@ public class SegmentProcessorConfig {
         _segmentConfig = new SegmentConfig.Builder().build();
       }
       return new SegmentProcessorConfig(_tableConfig, _schema, _recordTransformerConfig, _recordFilterConfig,
-          _partitionerConfig, _collectorConfig, _segmentConfig);
+          _partitionerConfigs, _collectorConfig, _segmentConfig);
     }
   }
 
@@ -175,7 +183,7 @@ public class SegmentProcessorConfig {
   public String toString() {
     return "SegmentProcessorConfig{" + "\n_tableConfig=" + _tableConfig + ", \n_schema=" + _schema
         .toSingleLineJsonString() + ", \n_recordFilterConfig=" + _recordFilterConfig + ", \n_recordTransformerConfig="
-        + _recordTransformerConfig + ", \n_partitioningConfig=" + _partitionerConfig + ", \n_collectorConfig="
+        + _recordTransformerConfig + ", \n_partitionerConfigs=" + _partitionerConfigs + ", \n_collectorConfig="
         + _collectorConfig + ", \n_segmentsConfig=" + _segmentConfig + "\n}";
   }
 }
