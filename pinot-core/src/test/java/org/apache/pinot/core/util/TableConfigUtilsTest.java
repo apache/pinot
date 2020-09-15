@@ -19,6 +19,7 @@
 package org.apache.pinot.core.util;
 
 import com.google.common.collect.Lists;
+import java.util.Arrays;
 import java.util.Collections;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.spi.config.table.IngestionConfig;
@@ -453,6 +454,90 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should have failed due to invalid server tag");
     } catch (IllegalStateException e) {
+      // expected
+    }
+  }
+
+  @Test
+  public void testTableName() {
+    String[] malformedTableName = {"test.table", "test table"};
+    for (int i = 0; i < 2; i++) {
+      String tableName = malformedTableName[i];
+      TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).build();
+      try {
+        TableConfigUtils.validateTableName(tableConfig);
+        Assert.fail("Should fail for malformed table name : " + tableName);
+      } catch (IllegalStateException e) {
+        // expected
+      }
+    }
+  }
+
+  @Test
+  public void testValidateIndexingConfig() {
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+            .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setBloomFilterColumns(Arrays.asList("myCol2")).build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail for invalid Bloom filter column name");
+    } catch (Exception e) {
+      // expected
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setInvertedIndexColumns(Arrays.asList("myCol2")).build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail for invalid Inverted Index column name");
+    } catch (Exception e) {
+      // expected
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setNoDictionaryColumns(Arrays.asList("myCol2")).build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail for invalid No Dictionary column name");
+    } catch (Exception e) {
+      // expected
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setOnHeapDictionaryColumns(Arrays.asList("myCol2")).build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail for invalid On Heap Dictionary column name");
+    } catch (Exception e) {
+      // expected
+    }
+
+    tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setRangeIndexColumns(Arrays.asList("myCol2"))
+            .build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail for invalid Range Index column name");
+    } catch (Exception e) {
+      // expected
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setSortedColumn("myCol2").build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail for invalid Sorted column name");
+    } catch (Exception e) {
+      // expected
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setVarLengthDictionaryColumns(Arrays.asList("myCol2")).build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail for invalid Var Length Dictionary column name");
+    } catch (Exception e) {
       // expected
     }
   }

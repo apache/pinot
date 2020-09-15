@@ -89,6 +89,7 @@ public class TableConfigBuilder {
   private Map<String, String> _streamConfigs;
   private SegmentPartitionConfig _segmentPartitionConfig;
   private boolean _nullHandlingEnabled;
+  private List<String> _varLengthDictionaryColumns;
 
   private TableCustomConfig _customConfig;
   private QuotaConfig _quotaConfig;
@@ -247,6 +248,11 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setVarLengthDictionaryColumns(List<String> varLengthDictionaryColumns) {
+    _varLengthDictionaryColumns = varLengthDictionaryColumns;
+    return this;
+  }
+
   public TableConfigBuilder setStreamConfigs(Map<String, String> streamConfigs) {
     Preconditions.checkState(_tableType == TableType.REALTIME);
     _streamConfigs = streamConfigs;
@@ -358,6 +364,7 @@ public class TableConfigBuilder {
     indexingConfig.setStreamConfigs(_streamConfigs);
     indexingConfig.setSegmentPartitionConfig(_segmentPartitionConfig);
     indexingConfig.setNullHandlingEnabled(_nullHandlingEnabled);
+    indexingConfig.setVarLengthDictionaryColumns(_varLengthDictionaryColumns);
 
     if (_customConfig == null) {
       _customConfig = new TableCustomConfig(null);
