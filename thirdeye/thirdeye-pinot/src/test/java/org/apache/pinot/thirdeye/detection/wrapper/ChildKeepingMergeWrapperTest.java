@@ -18,6 +18,7 @@ package org.apache.pinot.thirdeye.detection.wrapper;
 
 import com.google.common.collect.ImmutableSet;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.thirdeye.anomaly.AnomalySeverity;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.DataProvider;
@@ -349,5 +350,28 @@ public class ChildKeepingMergeWrapperTest {
     Assert.assertEquals(output.getAnomalies().size(), 5);
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2800, 3600, null, 3, 2)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(3500, 3800, null, 1, 2)));
+  }
+
+  @Test
+  public void testMergerDifferentSeverity() throws Exception {
+    this.config.getProperties().put(PROP_MAX_GAP, 200);
+    this.config.getProperties().put(PROP_MAX_DURATION, 1250);
+
+    this.outputs.add(new MockPipelineOutput(Arrays.asList(
+        makeAnomaly(2800, 3800, AnomalySeverity.MEDIUM),
+        makeAnomaly(3500, 3600, AnomalySeverity.CRITICAL)
+    ), 3700));
+
+    Map<String, Object> nestedProperties = new HashMap<>();
+    nestedProperties.put(PROP_CLASS_NAME, "none");
+    nestedProperties.put(PROP_METRIC_URN, "thirdeye:metric:3");
+
+    this.nestedProperties.add(nestedProperties);
+
+    this.wrapper = new ChildKeepingMergeWrapper(this.provider, this.config, 1000, 4000);
+    DetectionPipelineResult output = this.wrapper.run();
+
+    Assert.assertEquals(output.getAnomalies().size(), 4);
+    Assert.assertEquals(output.getAnomalies().get(3).getSeverityLabel(), AnomalySeverity.CRITICAL);
   }
 }

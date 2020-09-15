@@ -29,6 +29,17 @@ rules:
     name: thresholdFilter_2
     params:
       min: 50
+  labeler:
+    - type: THRESHOLD_SEVERITY_LABELER
+      name: labeler_1
+      params:
+        severity:
+          critical:
+            change: 0.5
+            duration: 43200000
+          high:
+            change: 0.3
+            duration: 21600000
 
 - detection:
   - type: THRESHOLD
@@ -40,6 +51,14 @@ rules:
     name: thresholdFilter_3
     params:
       min: 50
+  labeler:
+    - type: THRESHOLD_SEVERITY_LABELER
+      name: labeler_2
+      params:
+        severity:
+          high:
+            change: 0.2
+            duration: 43200000
 merger:
   maxGap: 0
   maxDuration: 100000000

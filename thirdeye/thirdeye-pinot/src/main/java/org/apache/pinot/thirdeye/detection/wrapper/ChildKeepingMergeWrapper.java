@@ -118,7 +118,11 @@ public class ChildKeepingMergeWrapper extends BaselineFillingMergeWrapper {
 
         // merge the anomaly's properties into parent
         ThirdEyeUtils.mergeAnomalyProperties(parent.getProperties(), anomaly.getProperties());
-
+        // merge the anomaly severity
+        if (parent.getSeverityLabel().compareTo(anomaly.getSeverityLabel()) > 0) {
+          // set the highest severity
+          parent.setSeverityLabel(anomaly.getSeverityLabel());
+        }
         if (anomaly.getChildren().isEmpty()) {
           parent.getChildren().add(anomaly);
         } else {

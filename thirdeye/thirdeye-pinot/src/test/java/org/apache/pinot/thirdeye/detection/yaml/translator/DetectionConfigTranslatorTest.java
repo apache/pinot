@@ -1,6 +1,7 @@
 package org.apache.pinot.thirdeye.detection.yaml.translator;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
 import com.google.common.collect.ImmutableMap;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
@@ -19,6 +20,7 @@ import org.apache.pinot.thirdeye.detection.components.ThresholdRuleDetector;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.thirdeye.detection.components.ThresholdSeverityLabeler;
 import org.apache.pinot.thirdeye.detection.validators.ConfigValidationException;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -71,6 +73,7 @@ public class DetectionConfigTranslatorTest {
     DetectionRegistry.registerComponent(ThresholdRuleAnomalyFilter.class.getName(), "THRESHOLD_RULE_FILTER");
     DetectionRegistry.registerComponent(RuleBaselineProvider.class.getName(), "RULE_BASELINE");
     DetectionRegistry.registerComponent(MockGrouper.class.getName(), "MOCK_GROUPER");
+    DetectionRegistry.registerComponent(ThresholdSeverityLabeler.class.getName(), "THRESHOLD_SEVERITY_LABELER");
     this.provider = new MockDataProvider().setMetrics(Collections.singletonList(metricConfig)).setDatasets(Collections.singletonList(datasetConfigDTO));
   }
 

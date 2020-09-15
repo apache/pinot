@@ -166,7 +166,7 @@ public class ThresholdSeverityLabelerTest {
     severityMap.put(AnomalySeverity.HIGH.toString(), new Threshold(0.15, 2000));
     severityMap.put(AnomalySeverity.MEDIUM.toString(), new Threshold(0.10, 1500));
     this.specs.put("severity", severityMap);
-    MergedAnomalyResultDTO anomaly = DetectionTestUtils.makeAnomaly(4000L, 6000L, METRIC_URN, 2700, 3000);
+    MergedAnomalyResultDTO anomaly = DetectionTestUtils.makeAnomaly(4200L, 6000L, METRIC_URN, 2700, 3000);
     anomaly.setSeverityLabel(AnomalySeverity.HIGH);
     anomaly.setId(125L);
     this.anomalies.set(this.anomalies.size() - 1, anomaly);
