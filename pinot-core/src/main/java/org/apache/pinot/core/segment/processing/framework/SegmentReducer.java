@@ -89,6 +89,7 @@ public class SegmentReducer {
         GenericRow next = avroRecordReader.next();
 
         // Aggregations
+        // TODO: Off-heap based implementation for aggregation/sorting
         _collector.collect(next);
 
         // Reached max records per part file. Flush

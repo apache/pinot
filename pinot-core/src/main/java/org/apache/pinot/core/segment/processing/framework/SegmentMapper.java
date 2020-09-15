@@ -100,6 +100,7 @@ public class SegmentMapper {
       }
 
       // Partitioning
+      // TODO: 2 step partitioner. 1) Apply custom partitioner 2) Apply table config partitioner. Combine both to get final partition.
       String partition = _partitioner.getPartition(reusableRow);
 
       // Create writer for the partition, if not exists

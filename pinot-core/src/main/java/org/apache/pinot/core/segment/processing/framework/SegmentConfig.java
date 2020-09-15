@@ -32,6 +32,7 @@ public class SegmentConfig {
 
   private static final int DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT = 5_000_000;
   private final int _maxNumRecordsPerSegment;
+  // TODO: more configs such as segment name prefix
 
   @JsonCreator
   private SegmentConfig(@JsonProperty(value = "maxNumRecordsPerSegment") int maxNumRecordsPerSegment) {
