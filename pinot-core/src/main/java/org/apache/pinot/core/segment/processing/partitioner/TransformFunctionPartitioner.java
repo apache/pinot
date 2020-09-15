@@ -16,21 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.minion.segment;
+package org.apache.pinot.core.segment.processing.partitioner;
 
+import org.apache.pinot.core.data.function.FunctionEvaluator;
+import org.apache.pinot.core.data.function.FunctionEvaluatorFactory;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
- * Interface for record transformer
+ * Partitioner which evaluates a transform function using the row to get the partition value
  */
-public interface RecordTransformer {
+public class TransformFunctionPartitioner implements Partitioner {
 
-  /**
-   * Transform the given row to another row
-   *
-   * @param row an original row
-   * @return a transformed row
-   */
-  GenericRow transformRecord(GenericRow row);
+  private final FunctionEvaluator _functionEvaluator;
+
+  public TransformFunctionPartitioner(String transformFunction) {
+    _functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
+  }
+
+  @Override
+  public String getPartition(GenericRow genericRow) {
+    return String.valueOf(_functionEvaluator.evaluate(genericRow));
+  }
 }

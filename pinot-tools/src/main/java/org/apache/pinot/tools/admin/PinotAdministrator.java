@@ -40,6 +40,7 @@ import org.apache.pinot.tools.admin.command.PostQueryCommand;
 import org.apache.pinot.tools.admin.command.QuickStartCommand;
 import org.apache.pinot.tools.admin.command.RealtimeProvisioningHelperCommand;
 import org.apache.pinot.tools.admin.command.RebalanceTableCommand;
+import org.apache.pinot.tools.admin.command.SegmentProcessorFrameworkCommand;
 import org.apache.pinot.tools.admin.command.ShowClusterInfoCommand;
 import org.apache.pinot.tools.admin.command.StartBrokerCommand;
 import org.apache.pinot.tools.admin.command.StartControllerCommand;
@@ -123,7 +124,8 @@ public class PinotAdministrator {
       @SubCommand(name = "CheckOfflineSegmentIntervals", impl = OfflineSegmentIntervalCheckerCommand.class),
       @SubCommand(name = "AnonymizeData", impl = AnonymizeDataCommand.class),
       @SubCommand(name = "GitHubEventsQuickStart", impl = GitHubEventsQuickStartCommand.class),
-      @SubCommand(name = "StreamGitHubEvents", impl = StreamGitHubEventsCommand.class)
+      @SubCommand(name = "StreamGitHubEvents", impl = StreamGitHubEventsCommand.class),
+      @SubCommand(name = "SegmentProcessorFramework", impl = SegmentProcessorFrameworkCommand.class)
   })
   Command _subCommand;
   //@formatter:on

@@ -16,28 +16,36 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.minion.rollup.aggregate;
+package org.apache.pinot.core.segment.processing.collector;
+
+import java.util.Iterator;
+import org.apache.pinot.spi.data.readers.GenericRow;
+
 
 /**
- * Factory class to create instances of value aggregator from the given name.
+ * Collects and stores GenericRows
  */
-public class ValueAggregatorFactory {
-  public enum ValueAggregatorType {
-    SUM, MAX
-  }
+public interface Collector {
 
-  private ValueAggregatorFactory() {
-  }
+  /**
+   * Collects the given GenericRow and stores it
+   * @param genericRow the generic row to add to the collection
+   */
+  void collect(GenericRow genericRow);
 
-  public static ValueAggregator getValueAggregator(String name) {
-    ValueAggregatorType aggregatorType = ValueAggregatorType.valueOf(name.toUpperCase());
-    switch (aggregatorType) {
-      case SUM:
-        return new SumValueAggregator();
-      case MAX:
-        return new MaxValueAggregator();
-      default:
-        throw new IllegalStateException("Unsupported value aggregator type : " + name);
-    }
-  }
+  /**
+   * Finish any pre-exit processing and seal the collection for reading
+   * Provide an iterator for the GenericRows in the collection
+   */
+  Iterator<GenericRow> iterator();
+
+  /**
+   * The number of rows in the collection
+   */
+  int size();
+
+  /**
+   * Resets the collection of this collector by deleting all existing GenericRows
+   */
+  void reset();
 }
