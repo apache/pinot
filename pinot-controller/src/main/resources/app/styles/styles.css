@@ -68,6 +68,11 @@ li.codemirror-column.CodeMirror-hint::before {
   background: #05a;
 }
 
+li.codemirror-func.CodeMirror-hint::before {
+  content: "F";
+  background: #74457a;
+}
+
 .CodeMirror-hints {
   padding: 4px;
   box-shadow: 0px 0px 5px rgba(0,0,0,.2);

@@ -102,8 +102,6 @@ const generateCodeMirrorOptions = (array, type, modeType?) => {
         filterText: oldObj
           ? `${oldObj.filterText}.${a.displayName || a.name || a}`
           : a.displayName || a.name || a,
-        argsType: '',
-        description: '',
         render: (el, cm, data) => {},
         className:
           type === 'FUNCTION'
@@ -124,12 +122,6 @@ const generateCodeMirrorOptions = (array, type, modeType?) => {
             : type === 'BINARY-OPERATORS'
               ? 'Binary Operators'
               : a.type;
-      if (type === 'FUNCTION') {
-        obj.argsType = a.argTypes.toString();
-        obj.description = a.description
-          ? `Description: ${a.description}`
-          : undefined;
-      }
       obj.render = (el, cm, data) => {
         codeMirrorOptionsTemplate(el, data);
       };
@@ -221,12 +213,6 @@ const codeMirrorOptionsTemplate = (el, data) => {
   fNameSpan.setAttribute('class', 'funcText');
   fNameSpan.innerHTML = data.displayText;
 
-  // data.argsType is only for UDF Function
-  if (data.argsType && data.argsType.length) {
-    const paramSpan = document.createElement('span');
-    paramSpan.innerHTML = `(${data.argsType})`;
-    fNameSpan.appendChild(paramSpan);
-  }
   text.appendChild(fNameSpan);
   el.appendChild(text);
 
@@ -242,10 +228,25 @@ const codeMirrorOptionsTemplate = (el, data) => {
   }
 };
 
+const serialize = (obj: any, prefix?: any) => {
+  let str = [], p;
+  for (p in obj) {
+    if (obj.hasOwnProperty(p)) {
+      var k = prefix ? prefix + "[" + p + "]" : p,
+        v = obj[p];
+      str.push((v !== null && typeof v === "object") ?
+        serialize(v, k) :
+        encodeURIComponent(k) + "=" + encodeURIComponent(v));
+    }
+  }
+  return str.join("&");
+}
+
 export default {
   sortArray,
   tableFormat,
   getSegmentStatus,
   findNestedObj,
-  generateCodeMirrorOptions
+  generateCodeMirrorOptions,
+  serialize
 };

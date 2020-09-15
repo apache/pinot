@@ -109,6 +109,13 @@ const sqloptions = {
   extraKeys: { "'@'": 'autocomplete' },
 };
 
+const sqlFuntionsList = [
+  "COUNT", "MIN", "MAX", "SUM", "AVG", "MINMAXRANGE", "DISTINCTCOUNT", "DISTINCTCOUNTBITMAP",
+  "SEGMENTPARTITIONEDDISTINCTCOUNT", "DISTINCTCOUNTHLL", "DISTINCTCOUNTRAWHLL", "FASTHLL",
+  "DISTINCTCOUNTTHETASKETCH", "DISTINCTCOUNTRAWTHETASKETCH", "COUNTMV", "MINMV", "MAXMV",
+  "SUMMV", "AVGMV", "MINMAXRANGEMV", "DISTINCTCOUNTMV", "DISTINCTCOUNTBITMAPMV", "DISTINCTCOUNTHLLMV",
+  "DISTINCTCOUNTRAWHLLMV", "DISTINCT", "ST_UNION"];
+
 const QueryPage = () => {
   const classes = useStyles();
   const [fetching, setFetching] = useState(true);
@@ -252,6 +259,7 @@ const QueryPage = () => {
 
     Array.prototype.push.apply(hintOptions, Utils.generateCodeMirrorOptions(tableNames, 'TABLE'));
     Array.prototype.push.apply(hintOptions, Utils.generateCodeMirrorOptions(columnNames, 'COLUMNS'));
+    Array.prototype.push.apply(hintOptions, Utils.generateCodeMirrorOptions(sqlFuntionsList, 'FUNCTION'));
 
     const cur = cm.getCursor();
     const curLine = cm.getLine(cur.line);
@@ -270,6 +278,7 @@ const QueryPage = () => {
 
     Array.prototype.push.apply(defaultHint.list, finalList);
 
+    defaultHint.list = _.uniqBy(defaultHint.list, 'text');
     return defaultHint;
   };
 

@@ -27,7 +27,7 @@ const handleError = (error: any) => {
   if (isDev) {
     console.log(error);
   }
-  return error;
+  return error.response || error;
 };
 
 const handleResponse = (response: any) => {
