@@ -170,12 +170,14 @@ public class SegmentProcessorFramework {
     // Segment generation phase.
     LOGGER.info("Beginning segment generation phase. Processing files: {}", Arrays.toString(_reducerOutputDir.list()));
     // Reducer output directory will have 1 or more avro files
+    int segmentNum = 0;
     for (File resultFile : reducerOutputFiles) {
       SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, _pinotSchema);
       segmentGeneratorConfig.setTableName(_tableConfig.getTableName());
       segmentGeneratorConfig.setOutDir(_outputSegmentsDir.getAbsolutePath());
       segmentGeneratorConfig.setInputFilePath(resultFile.getAbsolutePath());
       segmentGeneratorConfig.setFormat(FileFormat.AVRO);
+      segmentGeneratorConfig.setSequenceId(segmentNum ++);
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       driver.init(segmentGeneratorConfig);
       driver.build();

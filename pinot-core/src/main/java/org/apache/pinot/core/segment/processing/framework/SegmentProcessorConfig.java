@@ -149,8 +149,8 @@ public class SegmentProcessorConfig {
     }
 
     public SegmentProcessorConfig build() {
-      Preconditions.checkNotNull(_tableConfig, "Must provide table config in SegmentProcessorConfig");
-      Preconditions.checkNotNull(_schema, "Must provide schema in SegmentProcessorConfig");
+      Preconditions.checkState(_tableConfig != null, "Must provide table config in SegmentProcessorConfig");
+      Preconditions.checkState(_schema != null, "Must provide schema in SegmentProcessorConfig");
       if (_recordTransformerConfig == null) {
         _recordTransformerConfig = new RecordTransformerConfig.Builder().build();
       }
