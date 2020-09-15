@@ -51,6 +51,7 @@ services:
     ports:
       - 1426:1426
       - 1427:1427
+      - 8080:8080
         #entrypoint: ["/bin/sh", "/opt/thirdeye/bin/entrypoint_dev.sh", "frontend"]
     entrypoint: ["/bin/sh", "/opt/thirdeye/bin/entrypoint.sh", "frontend"]
     depends_on:
@@ -66,6 +67,8 @@ services:
         #- ./thirdeye/thirdeye-pinot/config-templates/dev/data-sources/data-sources-config.yml:/opt/thirdeye/config/default/data-sources/data-sources-config.yml
       - ./dockerconf/entrypoint_dev.sh:/opt/thirdeye/bin/entrypoint_dev.sh
       - ./dockerconf/entrypoint.sh:/opt/thirdeye/bin/entrypoint.sh
+    ports:
+      - 8081:8080
     environment:
       CONFIG_DIR: /opt/thirdeye/config/default
       POSTGRES_HOSTNAME: localhost

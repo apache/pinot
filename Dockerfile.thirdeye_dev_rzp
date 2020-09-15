@@ -44,10 +44,13 @@ RUN cd ${TE_BUILD_DIR}/thirdeye  \
     ## Override local config files for docker-compose
     && cp -rp ${TE_BUILD_DIR}/thirdeye/thirdeye-pinot/config-templates/dev/data-sources/* ${TE_HOME}/config/default/data-sources/ \
     && cp ${TE_BUILD_DIR}/thirdeye/thirdeye-pinot/config-templates/dev/persistence.yml ${TE_HOME}/config/default/ \
+    ## Copy the jmx config file
+    && cp ${TE_BUILD_DIR}/thirdeye/thirdeye-pinot/config.yml ${TE_HOME}/config/default/jmx_config.yml \
     ## Copy Create Schema for docker-compose run
     && cp ${TE_BUILD_DIR}/thirdeye/thirdeye-pinot/config-templates/dev/create-schema.sql ${TE_HOME}/config/default/ \
     && rm ${TE_BUILD_DIR}/thirdeye/thirdeye-pinot/target/thirdeye-pinot-*-sources.jar \
     && cp ${TE_BUILD_DIR}/thirdeye/thirdeye-pinot/target/thirdeye-pinot-*.jar ${TE_HOME}/bin/thirdeye-pinot.jar \
+    && cp ${TE_BUILD_DIR}/thirdeye/thirdeye-pinot/jmx_prometheus_javaagent-0.13.0.jar ${TE_HOME}/bin/jmx_prometheus_javaagent-0.13.0.jar \
     && cp ${TE_BUILD_DIR}/docker/images/pinot-thirdeye/bin/* ${TE_HOME}/bin/ \
     && rm -rf ${TE_BUILD_DIR}
 

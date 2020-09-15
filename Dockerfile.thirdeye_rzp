@@ -49,6 +49,7 @@ RUN cd ${TE_BUILD_DIR}/thirdeye  \
     && cp -rp ${TE_BUILD_DIR}/thirdeye/thirdeye-pinot/config/* ${TE_HOME}/config/default/. \
     && rm ${TE_BUILD_DIR}/thirdeye/thirdeye-pinot/target/thirdeye-pinot-*-sources.jar \
     && cp ${TE_BUILD_DIR}/thirdeye/thirdeye-pinot/target/thirdeye-pinot-*.jar ${TE_HOME}/bin/thirdeye-pinot.jar \
+    && cp ${TE_BUILD_DIR}/thirdeye/thirdeye-pinot/jmx_prometheus_javaagent-0.13.0.jar ${TE_HOME}/bin/jmx_prometheus_javaagent-0.13.0.jar \
     && cp ${TE_BUILD_DIR}/docker/images/pinot-thirdeye/bin/* ${TE_HOME}/bin/ \
     && cp ${TE_BUILD_DIR}/dockerconf/entrypoint.sh ${TE_HOME}/bin/ \
     && rm -rf ${TE_BUILD_DIR}
