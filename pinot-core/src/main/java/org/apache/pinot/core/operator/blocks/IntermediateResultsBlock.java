@@ -67,6 +67,9 @@ public class IntermediateResultsBlock implements Block {
 
   private Table _table;
 
+  public IntermediateResultsBlock() {
+  }
+
   /**
    * Constructor for selection result.
    */
@@ -270,11 +273,7 @@ public class IntermediateResultsBlock implements Block {
       return getAggregationGroupByResultDataTable();
     }
 
-    if (_processingExceptions != null && _processingExceptions.size() > 0) {
-      return getProcessingExceptionsDataTable();
-    }
-
-    throw new UnsupportedOperationException("No data inside IntermediateResultsBlock.");
+    return getMetadataDataTable();
   }
 
   private DataTable getResultDataTable()
@@ -405,7 +404,7 @@ public class IntermediateResultsBlock implements Block {
     return attachMetadataToDataTable(dataTable);
   }
 
-  private DataTable getProcessingExceptionsDataTable() {
+  private DataTable getMetadataDataTable() {
     return attachMetadataToDataTable(new DataTableImplV2());
   }
 

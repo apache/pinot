@@ -19,14 +19,17 @@
 package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -42,16 +45,20 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
+import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
+import org.apache.pinot.controller.util.TableMetadataReader;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -69,6 +76,7 @@ import org.slf4j.LoggerFactory;
  *       <li>"/segments/{tableName}/servers": get a map from server to segments hosted by the server</li>
  *       <li>"/segments/{tableName}/crc": get a map from segment to CRC of the segment (OFFLINE table only)</li>
  *       <li>"/segments/{tableName}/{segmentName}/metadata: get the metadata for a segment</li>
+ *       <li>"/segments/{tableName}/metadata: get the metadata for all segments from the server</li>
  *     </ul>
  *   </li>
  *   <li>
@@ -128,10 +136,19 @@ import org.slf4j.LoggerFactory;
 @Api(tags = Constants.SEGMENT_TAG)
 @Path("/")
 public class PinotSegmentRestletResource {
-  private static Logger LOGGER = LoggerFactory.getLogger(PinotSegmentRestletResource.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentRestletResource.class);
+
+  @Inject
+  ControllerConf _controllerConf;
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
+
+  @Inject
+  Executor _executor;
+
+  @Inject
+  HttpConnectionManager _connectionManager;
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
@@ -484,5 +501,45 @@ public class PinotSegmentRestletResource {
     } catch (IllegalArgumentException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.FORBIDDEN);
     }
+  }
+
+  @GET
+  @Path("segments/{tableName}/metadata")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get the server metadata for all table segments", notes = "Get the server metadata for all table segments")
+  public String getServerMetadata(@ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+                                               @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr) {
+    LOGGER.info("Received a request to fetch metadata for all segments for table {}", tableName);
+    TableType tableType = Constants.validateTableType(tableTypeStr);
+    if (tableType == TableType.REALTIME) {
+      throw new ControllerApplicationException(LOGGER,
+          "Table type : " + tableTypeStr + " not yet supported.", Status.NOT_IMPLEMENTED);
+    }
+
+    String tableNameWithType = getExistingTableNamesWithType(tableName, tableType).get(0);
+    String segmentsMetadata;
+    try {
+      JsonNode segmentsMetadataJson = getSegmentsMetadataFromServer(tableNameWithType);
+      segmentsMetadata = JsonUtils.objectToPrettyString(segmentsMetadataJson);
+    } catch (InvalidConfigException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Status.BAD_REQUEST);
+    } catch (IOException ioe) {
+      throw new ControllerApplicationException(LOGGER,
+          "Error parsing Pinot server response: " + ioe.getMessage(), Status.INTERNAL_SERVER_ERROR, ioe);
+    }
+    return segmentsMetadata;
+  }
+
+  /**
+   * This is a helper method to get the metadata for all segments for a given table name.
+   * @param tableNameWithType name of the table along with its type
+   * @return Map<String, String>  metadata of the table segments -> map of segment name to its metadata
+   */
+  private JsonNode getSegmentsMetadataFromServer(String tableNameWithType)
+      throws InvalidConfigException, IOException {
+    TableMetadataReader tableMetadataReader =
+        new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
+    return tableMetadataReader.getSegmentsMetadata(tableNameWithType,
+        _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
   }
 }

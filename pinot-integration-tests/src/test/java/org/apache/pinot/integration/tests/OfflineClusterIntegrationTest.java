@@ -30,21 +30,31 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.proto.Server;
+import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.common.utils.grpc.GrpcQueryClient;
+import org.apache.pinot.common.utils.grpc.GrpcRequestBuilder;
+import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
+import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -130,7 +140,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     startZk();
     startController();
     startBrokers(getNumBrokers());
-    startServers(getNumServers());
+    startServers();
 
     // Create and upload the schema and table config
     Schema schema = createSchema();
@@ -158,6 +168,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
+  }
+
+  protected void startServers() {
+    // Enable gRPC server
+    PinotConfiguration serverConfig = getDefaultServerConfiguration();
+    serverConfig.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_GRPC_SERVER, true);
+    startServer(serverConfig);
   }
 
   private void registerCallbackHandlers() {
@@ -973,15 +990,18 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testQueryWithSameAlias()
       throws Exception {
     //test repeated columns in selection query
-    String query = "SELECT ArrTime AS ArrTime, Carrier AS Carrier, DaysSinceEpoch AS DaysSinceEpoch FROM mytable ORDER BY DaysSinceEpoch DESC";
+    String query =
+        "SELECT ArrTime AS ArrTime, Carrier AS Carrier, DaysSinceEpoch AS DaysSinceEpoch FROM mytable ORDER BY DaysSinceEpoch DESC";
     testQuery(query, Collections.singletonList(query));
 
     //test repeated columns in selection query
-    query = "SELECT ArrTime AS ArrTime, DaysSinceEpoch AS DaysSinceEpoch, Carrier AS Carrier FROM mytable ORDER BY Carrier DESC";
+    query =
+        "SELECT ArrTime AS ArrTime, DaysSinceEpoch AS DaysSinceEpoch, Carrier AS Carrier FROM mytable ORDER BY Carrier DESC";
     testQuery(query, Collections.singletonList(query));
 
     //test repeated columns in selection query
-    query = "SELECT ArrTime AS ArrTime, DaysSinceEpoch AS DaysSinceEpoch, Carrier AS Carrier FROM mytable ORDER BY Carrier DESC, ArrTime DESC";
+    query =
+        "SELECT ArrTime AS ArrTime, DaysSinceEpoch AS DaysSinceEpoch, Carrier AS Carrier FROM mytable ORDER BY Carrier DESC, ArrTime DESC";
     testQuery(query, Collections.singletonList(query));
   }
 
@@ -1124,11 +1144,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     sql = "SELECT Carrier, DestAirportID FROM mytable GROUP BY Carrier, DestAirportID";
     testSqlQuery(pql, Collections.singletonList(sql));
 
-    pql = "SELECT Carrier, DestAirportID, DestStateName FROM mytable GROUP BY Carrier, DestAirportID, DestStateName LIMIT 1000000";
+    pql =
+        "SELECT Carrier, DestAirportID, DestStateName FROM mytable GROUP BY Carrier, DestAirportID, DestStateName LIMIT 1000000";
     sql = "SELECT Carrier, DestAirportID, DestStateName FROM mytable GROUP BY Carrier, DestAirportID, DestStateName";
     testSqlQuery(pql, Collections.singletonList(sql));
 
-    pql = "SELECT Carrier, DestAirportID, DestCityName FROM mytable GROUP BY Carrier, DestAirportID, DestCityName LIMIT 1000000";
+    pql =
+        "SELECT Carrier, DestAirportID, DestCityName FROM mytable GROUP BY Carrier, DestAirportID, DestCityName LIMIT 1000000";
     sql = "SELECT Carrier, DestAirportID, DestCityName FROM mytable GROUP BY Carrier, DestAirportID, DestCityName";
     testSqlQuery(pql, Collections.singletonList(sql));
 
@@ -1160,7 +1182,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')");
     List<String> queries = new ArrayList<>();
     baseQueries.forEach(q -> queries.add(q.replace("mytable", "MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch")));
-    baseQueries.forEach(q -> queries.add(q.replace("mytable", "MYDB.MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch")));
+    baseQueries
+        .forEach(q -> queries.add(q.replace("mytable", "MYDB.MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch")));
 
     for (String query : queries) {
       try {
@@ -1213,8 +1236,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "SELECT MAX(timeConvert(DaysSinceEpoch,'DAYS','SECONDS')) FROM mytable",
         "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')");
     List<String> queries = new ArrayList<>();
-    baseQueries.forEach(q -> queries.add(q.replace("mytable", "MYTABLE").replace("DaysSinceEpoch", "MYTABLE.DAYSSinceEpOch")));
-    baseQueries.forEach(q -> queries.add(q.replace("mytable", "MYDB.MYTABLE").replace("DaysSinceEpoch", "MYTABLE.DAYSSinceEpOch")));
+    baseQueries
+        .forEach(q -> queries.add(q.replace("mytable", "MYTABLE").replace("DaysSinceEpoch", "MYTABLE.DAYSSinceEpOch")));
+    baseQueries.forEach(
+        q -> queries.add(q.replace("mytable", "MYDB.MYTABLE").replace("DaysSinceEpoch", "MYTABLE.DAYSSinceEpOch")));
 
     for (String query : queries) {
       try {
@@ -1279,6 +1304,61 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     query = "SELECT c_o_u_n_t(FlightNum) FROM mytable ";
     assertEquals(postQuery(query).get("aggregationResults").get(0).get("value").asLong(), 115545);
     assertEquals(postSqlQuery(query, _brokerBaseApiUrl).get("resultTable").get("rows").get(0).get(0).asLong(), 115545);
+  }
 
+  @Test
+  public void testGrpcQueryServer()
+      throws Exception {
+    GrpcQueryClient queryClient = new GrpcQueryClient("localhost", CommonConstants.Server.DEFAULT_GRPC_PORT);
+    String sql = "SELECT * FROM mytable_OFFLINE LIMIT 1000000";
+    BrokerRequest brokerRequest = new Pql2Compiler().compileToBrokerRequest(sql);
+    List<String> segments = _helixResourceManager.getSegmentsFor("mytable_OFFLINE");
+
+    GrpcRequestBuilder requestBuilder = new GrpcRequestBuilder().setSegments(segments);
+    testNonStreamingRequest(queryClient.submit(requestBuilder.setSql(sql).build()));
+    testNonStreamingRequest(queryClient.submit(requestBuilder.setBrokerRequest(brokerRequest).build()));
+
+    requestBuilder.setEnableStreaming(true);
+    testStreamingRequest(queryClient.submit(requestBuilder.setSql(sql).build()));
+    testStreamingRequest(queryClient.submit(requestBuilder.setBrokerRequest(brokerRequest).build()));
+  }
+
+  private void testNonStreamingRequest(Iterator<Server.ServerResponse> nonStreamingResponses)
+      throws Exception {
+    int expectedNumDocs = (int) getCountStarResult();
+    assertTrue(nonStreamingResponses.hasNext());
+    Server.ServerResponse nonStreamingResponse = nonStreamingResponses.next();
+    assertEquals(nonStreamingResponse.getMetadataMap().get(CommonConstants.Query.Response.MetadataKeys.RESPONSE_TYPE),
+        CommonConstants.Query.Response.ResponseType.NON_STREAMING);
+    DataTable dataTable = DataTableFactory.getDataTable(nonStreamingResponse.getPayload().asReadOnlyByteBuffer());
+    assertNotNull(dataTable.getDataSchema());
+    assertEquals(dataTable.getNumberOfRows(), expectedNumDocs);
+    Map<String, String> metadata = dataTable.getMetadata();
+    assertEquals(metadata.get(DataTable.NUM_DOCS_SCANNED_METADATA_KEY), Integer.toString(expectedNumDocs));
+  }
+
+  private void testStreamingRequest(Iterator<Server.ServerResponse> streamingResponses)
+      throws Exception {
+    int expectedNumDocs = (int) getCountStarResult();
+    int numTotalDocs = 0;
+    while (streamingResponses.hasNext()) {
+      Server.ServerResponse streamingResponse = streamingResponses.next();
+      DataTable dataTable = DataTableFactory.getDataTable(streamingResponse.getPayload().asReadOnlyByteBuffer());
+      String responseType =
+          streamingResponse.getMetadataMap().get(CommonConstants.Query.Response.MetadataKeys.RESPONSE_TYPE);
+      if (responseType.equals(CommonConstants.Query.Response.ResponseType.DATA)) {
+        assertTrue(dataTable.getMetadata().isEmpty());
+        assertNotNull(dataTable.getDataSchema());
+        numTotalDocs += dataTable.getNumberOfRows();
+      } else {
+        assertEquals(responseType, CommonConstants.Query.Response.ResponseType.METADATA);
+        assertFalse(streamingResponses.hasNext());
+        assertEquals(numTotalDocs, expectedNumDocs);
+        assertNull(dataTable.getDataSchema());
+        assertEquals(dataTable.getNumberOfRows(), 0);
+        Map<String, String> metadata = dataTable.getMetadata();
+        assertEquals(metadata.get(DataTable.NUM_DOCS_SCANNED_METADATA_KEY), Integer.toString(expectedNumDocs));
+      }
+    }
   }
 }

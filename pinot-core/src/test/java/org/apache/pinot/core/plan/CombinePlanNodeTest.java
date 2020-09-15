@@ -27,6 +27,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import junit.framework.Assert;
+import org.apache.pinot.common.utils.CommonConstants.Server;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
@@ -55,8 +56,9 @@ public class CombinePlanNodeTest {
           return null;
         });
       }
-      CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, _queryContext, _executorService, 1000,
-          InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT);
+      CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, _queryContext, _executorService,
+          System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS,
+          InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, null);
       combinePlanNode.run();
       Assert.assertEquals(numPlans, count.get());
     }
@@ -64,15 +66,13 @@ public class CombinePlanNodeTest {
 
   @Test
   public void testSlowPlanNode() {
-    // Warning: this test is slow (take 10 seconds).
-
     AtomicBoolean notInterrupted = new AtomicBoolean();
 
     List<PlanNode> planNodes = new ArrayList<>();
     for (int i = 0; i < 20; i++) {
       planNodes.add(() -> {
         try {
-          Thread.sleep(20000);
+          Thread.sleep(10000);
         } catch (InterruptedException e) {
           // Thread should be interrupted
           throw new RuntimeException(e);
@@ -81,8 +81,9 @@ public class CombinePlanNodeTest {
         return null;
       });
     }
-    CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, _queryContext, _executorService, 0,
-        InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT);
+    CombinePlanNode combinePlanNode =
+        new CombinePlanNode(planNodes, _queryContext, _executorService, System.currentTimeMillis() + 100,
+            InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, null);
     try {
       combinePlanNode.run();
     } catch (RuntimeException e) {
@@ -102,8 +103,9 @@ public class CombinePlanNodeTest {
         throw new RuntimeException("Inner exception message.");
       });
     }
-    CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, _queryContext, _executorService, 0,
-        InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT);
+    CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, _queryContext, _executorService,
+        System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS,
+        InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, null);
     try {
       combinePlanNode.run();
     } catch (RuntimeException e) {

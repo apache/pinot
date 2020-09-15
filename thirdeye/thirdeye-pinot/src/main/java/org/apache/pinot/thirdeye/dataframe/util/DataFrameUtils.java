@@ -60,12 +60,6 @@ import org.joda.time.PeriodType;
  *
  */
 public class DataFrameUtils {
-  public static final String COL_TIME = "timestamp";
-  // baseline value
-  public static final String COL_VALUE = "value";
-  public static final String COL_CURRENT = "current";
-  public static final String COL_UPPER_BOUND = "upper_bound";
-  public static final String COL_LOWER_BOUND = "lower_bound";
 
   /**
    * Returns a Thirdeye response parsed as a DataFrame. The method stores the time values in
@@ -107,8 +101,8 @@ public class DataFrameUtils {
     String timeColumn = response.getDataTimeSpec().getColumnName();
 
     DataFrame df = new DataFrame();
-    df.addSeries(COL_TIME, timeBuilder.build());
-    df.setIndex(COL_TIME);
+    df.addSeries(DataFrame.COL_TIME, timeBuilder.build());
+    df.setIndex(DataFrame.COL_TIME);
 
     int i = 0;
     for(String n : response.getGroupKeyColumns()) {
@@ -129,7 +123,7 @@ public class DataFrameUtils {
       }
     }
 
-    return df.sortedBy(COL_TIME);
+    return df.sortedBy(DataFrame.COL_TIME);
   }
 
   /**
@@ -167,7 +161,7 @@ public class DataFrameUtils {
       df.dropSeries(f.toString());
     }
 
-    return df.addSeries(COL_VALUE, values);
+    return df.addSeries(DataFrame.COL_VALUE, values);
   }
 
   /**
@@ -184,7 +178,7 @@ public class DataFrameUtils {
       public long apply(long... values) {
         return origin.plus(interval.multipliedBy((int) values[0])).getMillis();
       }
-    }, COL_TIME);
+    }, DataFrame.COL_TIME);
   }
 
   /**

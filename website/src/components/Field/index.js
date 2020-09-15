@@ -16,117 +16,129 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import React, {useState} from 'react';
-import classnames from 'classnames';
-import {MDXProvider} from '@mdx-js/react';
-import CodeHeader from '@site/src/components/CodeHeader';
-import CodeBlock from '@theme/CodeBlock';
+import React, { useState } from "react";
+import classnames from "classnames";
+import { MDXProvider } from "@mdx-js/react";
+import CodeHeader from "@site/src/components/CodeHeader";
+import CodeBlock from "@theme/CodeBlock";
 
 function isObject(a) {
-  return (!!a) && (a.constructor === Object);
-};
+    return !!a && a.constructor === Object;
+}
 
 function toTOML(value) {
-  return JSON.stringify(value);
+    return JSON.stringify(value);
 }
 
 function keyToTOML(key) {
-  if ( key.includes(".") ) {
-    return "\"" + key + "\"";
-  } else {
-    return key;
-  }
+    if (key.includes(".")) {
+        return '"' + key + '"';
+    } else {
+        return key;
+    }
 }
 
 function exampleToTOML(name, example) {
-  if (isObject(example)) {
-    if ('name' in example && 'value' in example) {
-      return `${keyToTOML(example.name)} = ${toTOML(example.value)}`;
+    if (isObject(example)) {
+        if ("name" in example && "value" in example) {
+            return `${keyToTOML(example.name)} = ${toTOML(example.value)}`;
+        } else {
+            return `${keyToTOML(Object.keys(example)[0])} = ${toTOML(
+                Object.values(example)[0]
+            )}`;
+        }
+    } else if (name) {
+        return `${name} = ${toTOML(example)}`;
     } else {
-      return `${keyToTOML(Object.keys(example)[0])} = ${toTOML(Object.values(example)[0])}`
+        return `${toTOML(example)}`;
     }
-  } else if (name) {
-    return `${name} = ${toTOML(example)}`;
-  } else {
-    return `${toTOML(example)}`;
-  }
 }
 
-function Enum({values}) {
-  let elements = [];
+function Enum({ values }) {
+    let elements = [];
 
-  if (!Array.isArray(values)) {
-    for (var key in values) {
-      elements.push(<code key={key} title={values[key]}>{toTOML(key)}</code>);
-      elements.push(" ");
+    if (!Array.isArray(values)) {
+        for (var key in values) {
+            elements.push(
+                <code key={key} title={values[key]}>
+                    {toTOML(key)}
+                </code>
+            );
+            elements.push(" ");
+        }
+    } else {
+        for (var index in values) {
+            let value = values[index];
+            elements.push(<code key={value}>{toTOML(value)}</code>);
+            elements.push(" ");
+        }
     }
-  } else {
-    for (var index in values) {
-      let value = values[index];
-      elements.push(<code key={value}>{toTOML(value)}</code>);
-      elements.push(" ");
+
+    return elements;
+}
+
+function Example({ name, path, unit, value }) {
+    let unitText = "";
+
+    if (unit) {
+        unitText = <> ({unit})</>;
     }
-  }
 
-  return elements;
+    return (
+        <>
+            <code>{exampleToTOML(null, value)}</code>
+            {unitText}
+        </>
+    );
 }
 
-function Example({name, path, unit, value}) {
-  let unitText = '';
+function Examples({ name, path, values }) {
+    let code = "";
 
-  if (unit) {
-    unitText = <> ({unit})</>;
-  }
+    values.forEach(function (value) {
+        code += exampleToTOML(name, value) + "\n";
+    });
 
-  return <><code>{exampleToTOML(null, value)}</code>{unitText}</>;
+    if (path) {
+        code = `[${path}]\n${code}`;
+    }
+
+    return (
+        <div>
+            <CodeHeader fileName="pinot.toml" />
+
+            <CodeBlock className="language-toml">{code}</CodeBlock>
+        </div>
+    );
 }
 
-function Examples({name, path, values}) {
-  let code = '';
+function Groups({ values }) {
+    let elements = [];
 
-  values.forEach(function (value) {
-    code += (exampleToTOML(name, value) + "\n");
-  });
+    values.forEach(function (value) {
+        elements.push(<code key={value}>{value}</code>);
+        elements.push(" ");
+    });
 
-  if (path) {
-    code = `[${path}]\n${code}`;
-  }
-
-  return (
-    <div>
-      <CodeHeader fileName="pinot.toml" />
-
-      <CodeBlock className="language-toml">
-        {code}
-      </CodeBlock>
-    </div>
-  );
+    return elements;
 }
 
-function Groups({values}) {
-  let elements = [];
+function RelevantWhen({ value }) {
+    let relKey = Object.keys(value)[0];
+    let relValue = Object.values(value)[0];
 
-  values.forEach(function (value) {
-    elements.push(<code key={value}>{value}</code>);
-    elements.push(" ");
-  })
+    if (relValue == "") {
+        relValue = null;
+    }
 
-  return elements;
-}
-
-function RelevantWhen({value}) {
-  let relKey = Object.keys(value)[0];
-  let relValue = Object.values(value)[0];
-
-  if (relValue == "") {
-    relValue = null;
-  }
-
-  return (
-    <span>
-      <code><a href={`#${relKey}`}>{relKey}</a></code> = <code>{toTOML(relValue)}</code>
-    </span>
-  );
+    return (
+        <span>
+            <code>
+                <a href={`#${relKey}`}>{relKey}</a>
+            </code>{" "}
+            = <code>{toTOML(relValue)}</code>
+        </span>
+    );
 }
 
 // function FieldFooter({defaultValue, enumValues, examples, groups, name, path, relevantWhen, required, unit}) {
@@ -159,42 +171,100 @@ function RelevantWhen({value}) {
 //   }
 // }
 
-function Field({children, common, defaultValue, enumValues, examples, groups, name, path, relevantWhen, templateable, type, unit, required}) {
-  const [collapse, setCollapse] = useState(false);
+function Field({
+    children,
+    common,
+    defaultValue,
+    enumValues,
+    examples,
+    groups,
+    name,
+    path,
+    relevantWhen,
+    templateable,
+    type,
+    unit,
+    required,
+}) {
+    const [collapse, setCollapse] = useState(false);
 
-  let filteredChildren = children;
+    let filteredChildren = children;
 
-  if (collapse) {
-    filteredChildren = filteredChildren.filter(child => child.props.originalType != 'p');
-  }
+    if (collapse) {
+        filteredChildren = filteredChildren.filter(
+            (child) => child.props.originalType != "p"
+        );
+    }
 
-  return (
-    <div className={classnames('field', 'section', (required ? 'field-required' : ''), (collapse ? 'field-collapsed' : ''))} required={required}>
-      <div className="badges">
-        {groups && groups.map((group, idx) => <span key={idx} className="badge badge--secondary">{group}</span>)}
-        {templateable && <span className="badge badge--primary" title="This option is dynamic and accepts the Pinot template syntax">templateable</span>}
-        <span className="badge badge--secondary">{type}{unit && <> ({unit})</>}</span>
-        {enumValues && Object.keys(enumValues).length > 0 && <span className="badge badge--secondary" title="This option is an enumation and only allows specific values">enum</span>}
-        {common && <span className="badge badge--primary" title="This is a popular that we recommend for getting started">common</span>}
-        {required ?
-          <span className="badge badge--danger">required{relevantWhen && '*'}</span> :
-          <span className="badge badge--secondary">optional</span>}
-      </div>
-      {filteredChildren}
-      {!collapse && type != "table" &&
-        <FieldFooter
-          defaultValue={defaultValue}
-          enumValues={enumValues}
-          examples={examples}
-          groups={groups}
-          name={name}
-          path={path}
-          relevantWhen={relevantWhen}
-          required={required}
-          unit={unit} />
-          }
-    </div>
-  );
+    return (
+        <div
+            className={classnames(
+                "field",
+                "section",
+                required ? "field-required" : "",
+                collapse ? "field-collapsed" : ""
+            )}
+            required={required}
+        >
+            <div className="badges">
+                {groups &&
+                    groups.map((group, idx) => (
+                        <span key={idx} className="badge badge--secondary">
+                            {group}
+                        </span>
+                    ))}
+                {templateable && (
+                    <span
+                        className="badge badge--primary"
+                        title="This option is dynamic and accepts the Pinot template syntax"
+                    >
+                        templateable
+                    </span>
+                )}
+                <span className="badge badge--secondary">
+                    {type}
+                    {unit && <> ({unit})</>}
+                </span>
+                {enumValues && Object.keys(enumValues).length > 0 && (
+                    <span
+                        className="badge badge--secondary"
+                        title="This option is an enumation and only allows specific values"
+                    >
+                        enum
+                    </span>
+                )}
+                {common && (
+                    <span
+                        className="badge badge--primary"
+                        title="This is a popular that we recommend for getting started"
+                    >
+                        common
+                    </span>
+                )}
+                {required ? (
+                    <span className="badge badge--danger">
+                        required{relevantWhen && "*"}
+                    </span>
+                ) : (
+                    <span className="badge badge--secondary">optional</span>
+                )}
+            </div>
+            {filteredChildren}
+            {!collapse && type != "table" && (
+                <FieldFooter
+                    defaultValue={defaultValue}
+                    enumValues={enumValues}
+                    examples={examples}
+                    groups={groups}
+                    name={name}
+                    path={path}
+                    relevantWhen={relevantWhen}
+                    required={required}
+                    unit={unit}
+                />
+            )}
+        </div>
+    );
 }
 
 export default Field;

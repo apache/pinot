@@ -45,9 +45,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-
-
 /**
  * Site-wide impact anomaly filter
  */
@@ -89,7 +86,8 @@ public class SitewideImpactRuleAnomalyFilter implements AnomalyFilter<SitewideIm
         .getAggregates();
 
     double currentValue = anomaly.getAvgCurrentVal();
-    double baselineValue = baseline == null ? anomaly.getAvgBaselineVal() :  this.baseline.gather(currentSlice, aggregates).getDouble(COL_VALUE, 0);
+    double baselineValue = baseline == null ? anomaly.getAvgBaselineVal() :  this.baseline.gather(currentSlice, aggregates).getDouble(
+        DataFrame.COL_VALUE, 0);
     double siteWideValue = getValueFromAggregates(siteWideSlice, aggregates);
 
     // if inconsistent with up/down, filter the anomaly
@@ -140,6 +138,6 @@ public class SitewideImpactRuleAnomalyFilter implements AnomalyFilter<SitewideIm
   }
 
   private double getValueFromAggregates(MetricSlice slice, Map<MetricSlice, DataFrame> aggregates) {
-    return aggregates.get(slice).getDouble(COL_VALUE, 0);
+    return aggregates.get(slice).getDouble(DataFrame.COL_VALUE, 0);
   }
 }

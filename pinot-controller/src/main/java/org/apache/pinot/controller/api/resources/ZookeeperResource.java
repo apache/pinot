@@ -83,7 +83,7 @@ public class ZookeeperResource {
   @DELETE
   @Path("/zk/delete")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Delete content of the znode")
+  @ApiOperation(value = "Delete the znode at this path")
   @ApiResponses(value = { //
       @ApiResponse(code = 200, message = "Success"), //
       @ApiResponse(code = 404, message = "ZK Path not found"), //
@@ -95,7 +95,7 @@ public class ZookeeperResource {
     path = validateAndNormalizeZKPath(path);
 
     boolean success = pinotHelixResourceManager.deleteZKPath(path);
-    if(success) {
+    if (success) {
       return new SuccessResponse("Successfully deleted path: " + path);
     } else {
       throw new ControllerApplicationException(LOGGER, "Failed to delete path: " + path,

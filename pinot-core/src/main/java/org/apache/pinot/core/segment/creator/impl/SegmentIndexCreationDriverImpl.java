@@ -56,6 +56,8 @@ import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.IngestionSchemaValidator;
+import org.apache.pinot.spi.data.SchemaValidatorFactory;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
@@ -80,6 +82,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private SegmentIndexCreationInfo segmentIndexCreationInfo;
   private Schema dataSchema;
   private RecordTransformer _recordTransformer;
+  private IngestionSchemaValidator _ingestionSchemaValidator;
   private int totalDocs = 0;
   private File tempIndexDir;
   private String segmentName;
@@ -127,13 +130,19 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     }
   }
 
-  public void init(SegmentGeneratorConfig config, RecordReader recordReader) {
+  public RecordReader getRecordReader() {
+    return recordReader;
+  }
+
+  public void init(SegmentGeneratorConfig config, RecordReader recordReader)
+      throws Exception {
     init(config, new RecordReaderSegmentCreationDataSource(recordReader),
         CompositeTransformer.getDefaultTransformer(config.getTableConfig(), config.getSchema()));
   }
 
   public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource,
-      RecordTransformer recordTransformer) {
+      RecordTransformer recordTransformer)
+      throws Exception {
     this.config = config;
     recordReader = dataSource.getRecordReader();
     Preconditions.checkState(recordReader.hasNext(), "No record in data source");
@@ -158,6 +167,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     if (!indexDir.exists()) {
       indexDir.mkdirs();
     }
+
+    _ingestionSchemaValidator = SchemaValidatorFactory.getSchemaValidator(dataSchema, recordReader.getClass().getName(),
+        config.getInputFilePath());
 
     // Create a temporary directory used in segment creation
     tempIndexDir = new File(indexDir, "tmp-" + UUID.randomUUID());
@@ -378,6 +390,14 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   @Override
   public File getOutputDirectory() {
     return new File(new File(config.getOutDir()), segmentName);
+  }
+
+  /**
+   * Returns the schema validator.
+   */
+  @Override
+  public IngestionSchemaValidator getIngestionSchemaValidator() {
+    return _ingestionSchemaValidator;
   }
 
   public SegmentPreIndexStatsContainer getSegmentStats() {

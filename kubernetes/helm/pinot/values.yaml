@@ -47,7 +47,7 @@ controller:
     host: pinot-controller
     port: 9000
 
-  jvmOpts: "-Xms256M -Xmx1G"
+  jvmOpts: "-Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCApplicationStoppedTime -XX:+PrintGCApplicationConcurrentTime -Xloggc:/opt/pinot/gc-pinot-controller.log"
 
   log4j2ConfFile: /opt/pinot/conf/pinot-controller-log4j2.xml
   pluginsDir: /opt/pinot/plugins
@@ -80,6 +80,11 @@ controller:
   updateStrategy:
     type: RollingUpdate
 
+  # Extra configs will be appended to pinot-controller.conf file
+  extra:
+    configs: |-
+      pinot.set.instance.id.to.hostname=true
+
 broker:
   name: broker
 
@@ -87,7 +92,7 @@ broker:
 
   replicaCount: 1
 
-  jvmOpts: "-Xms256M -Xmx1G"
+  jvmOpts: "-Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCApplicationStoppedTime -XX:+PrintGCApplicationConcurrentTime -Xloggc:/opt/pinot/gc-pinot-broker.log"
 
   log4j2ConfFile: /opt/pinot/conf/pinot-broker-log4j2.xml
   pluginsDir: /opt/pinot/plugins
@@ -123,6 +128,11 @@ broker:
   updateStrategy:
     type: RollingUpdate
 
+  # Extra configs will be appended to pinot-broker.conf file
+  extra:
+    configs: |-
+      pinot.set.instance.id.to.hostname=true
+
 server:
   name: server
 
@@ -143,7 +153,7 @@ server:
     storageClass: ""
     #storageClass: "ssd"
 
-  jvmOpts: "-Xms512M -Xmx1G"
+  jvmOpts: "-Xms512M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCApplicationStoppedTime -XX:+PrintGCApplicationConcurrentTime -Xloggc:/opt/pinot/gc-pinot-server.log"
 
   log4j2ConfFile: /opt/pinot/conf/pinot-server-log4j2.xml
   pluginsDir: /opt/pinot/plugins
@@ -171,6 +181,11 @@ server:
   updateStrategy:
     type: RollingUpdate
 
+  # Extra configs will be appended to pinot-server.conf file
+  extra:
+    configs: |-
+      pinot.set.instance.id.to.hostname=true
+      pinot.server.instance.realtime.alloc.offheap=true
 # ------------------------------------------------------------------------------
 # Zookeeper:
 # ------------------------------------------------------------------------------

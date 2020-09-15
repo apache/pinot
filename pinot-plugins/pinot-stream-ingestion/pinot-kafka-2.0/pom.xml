@@ -26,7 +26,7 @@
   <parent>
     <artifactId>pinot-stream-ingestion</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>${revision}${sha1}</version>
+    <version>0.5.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
 

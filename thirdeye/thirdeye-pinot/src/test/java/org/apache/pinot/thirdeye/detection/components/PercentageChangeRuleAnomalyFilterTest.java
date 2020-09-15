@@ -38,9 +38,6 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-
-
 public class PercentageChangeRuleAnomalyFilterTest {
   private static final String METRIC_URN = "thirdeye:metric:123";
   private static final long CONFIG_ID = 125L;
@@ -61,17 +58,23 @@ public class PercentageChangeRuleAnomalyFilterTest {
 
     Map<MetricSlice, DataFrame> aggregates = new HashMap<>();
     aggregates.put(slice1,
-        new DataFrame().addSeries(COL_TIME, slice1.getStart()).addSeries(COL_VALUE, 150).setIndex(COL_TIME));
+        new DataFrame().addSeries(DataFrame.COL_TIME, slice1.getStart()).addSeries(
+            DataFrame.COL_VALUE, 150).setIndex(DataFrame.COL_TIME));
     aggregates.put(baselineSlice1,
-        new DataFrame().addSeries(COL_TIME, baselineSlice1.getStart()).addSeries(COL_VALUE, 200).setIndex(COL_TIME));
+        new DataFrame().addSeries(DataFrame.COL_TIME, baselineSlice1.getStart()).addSeries(
+            DataFrame.COL_VALUE, 200).setIndex(DataFrame.COL_TIME));
     aggregates.put(slice2,
-        new DataFrame().addSeries(COL_VALUE, 500).addSeries(COL_TIME, slice2.getStart()).setIndex(COL_TIME));
+        new DataFrame().addSeries(DataFrame.COL_VALUE, 500).addSeries(DataFrame.COL_TIME, slice2.getStart()).setIndex(
+            DataFrame.COL_TIME));
     aggregates.put(baselineSlice2,
-        new DataFrame().addSeries(COL_VALUE, 1000).addSeries(COL_TIME, baselineSlice2.getStart()).setIndex(COL_TIME));
+        new DataFrame().addSeries(DataFrame.COL_VALUE, 1000).addSeries(DataFrame.COL_TIME, baselineSlice2.getStart()).setIndex(
+            DataFrame.COL_TIME));
     aggregates.put(slice3,
-        new DataFrame().addSeries(COL_VALUE, 200).addSeries(COL_TIME, slice3.getStart()).setIndex(COL_TIME));
+        new DataFrame().addSeries(DataFrame.COL_VALUE, 200).addSeries(DataFrame.COL_TIME, slice3.getStart()).setIndex(
+            DataFrame.COL_TIME));
     aggregates.put(baselineSlice3,
-        new DataFrame().addSeries(COL_VALUE, 150).addSeries(COL_TIME, baselineSlice3.getStart()).setIndex(COL_TIME));
+        new DataFrame().addSeries(DataFrame.COL_VALUE, 150).addSeries(DataFrame.COL_TIME, baselineSlice3.getStart()).setIndex(
+            DataFrame.COL_TIME));
 
     this.testDataProvider = new MockDataProvider().setAggregates(aggregates);
   }

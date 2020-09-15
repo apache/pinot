@@ -100,7 +100,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     if (schedulerWaitTimer != null) {
       schedulerWaitTimer.stopAndRecord();
     }
-    long querySchedulingTimeMs = System.currentTimeMillis() - timerContext.getQueryArrivalTimeMs();
+    long queryArrivalTimeMs = timerContext.getQueryArrivalTimeMs();
+    long querySchedulingTimeMs = System.currentTimeMillis() - queryArrivalTimeMs;
     TimerContext.Timer queryProcessingTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PROCESSING);
 
     long requestId = queryRequest.getRequestId();
@@ -116,10 +117,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         queryTimeoutMs = timeoutFromQueryOptions;
       }
     }
-    long remainingTimeMs = queryTimeoutMs - querySchedulingTimeMs;
 
     // Query scheduler wait time already exceeds query timeout, directly return
-    if (remainingTimeMs <= 0) {
+    if (querySchedulingTimeMs >= queryTimeoutMs) {
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.SCHEDULING_TIMEOUT_EXCEPTIONS, 1);
       String errorMessage = String
           .format("Query scheduling took %dms (longer than query timeout of %dms)", querySchedulingTimeMs,
@@ -213,8 +213,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         for (SegmentDataManager segmentDataManager : segmentDataManagers) {
           indexSegments.add(segmentDataManager.getSegment());
         }
-        Plan globalQueryPlan =
-            _planMaker.makeInstancePlan(indexSegments, queryContext, executorService, remainingTimeMs);
+        long endTimeMs = queryArrivalTimeMs + queryTimeoutMs;
+        Plan globalQueryPlan = _planMaker.makeInstancePlan(indexSegments, queryContext, executorService, endTimeMs);
         planBuildTimer.stopAndRecord();
 
         TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);

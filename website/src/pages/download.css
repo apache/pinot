@@ -17,12 +17,12 @@
  * under the License.
  */
 .componentsHero {
-  padding: 0;
-  margin: 0;
-  overflow: hidden;
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
 }
 
 .componentsHeroOverlay {
-  margin-top: -15.25em;
-  margin-bottom: 2em;
+    margin-top: -15.25em;
+    margin-bottom: 2em;
 }

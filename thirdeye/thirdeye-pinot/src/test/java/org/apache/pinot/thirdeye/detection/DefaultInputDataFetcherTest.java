@@ -32,9 +32,6 @@ import java.util.concurrent.TimeUnit;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-
-
 public class DefaultInputDataFetcherTest {
   @Test
   public void testFetchData() {
@@ -42,7 +39,8 @@ public class DefaultInputDataFetcherTest {
     Map<MetricSlice, DataFrame> timeSeries = new HashMap<>();
     MetricSlice slice = MetricSlice.from(123L, 0, 10);
     timeSeries.put(slice,
-        new DataFrame().addSeries(COL_VALUE, 0, 100, 200, 500, 1000).addSeries(COL_TIME, 0, 2, 4, 6, 8));
+        new DataFrame().addSeries(DataFrame.COL_VALUE, 0, 100, 200, 500, 1000).addSeries(
+            DataFrame.COL_TIME, 0, 2, 4, 6, 8));
 
     MetricConfigDTO metricConfigDTO = new MetricConfigDTO();
     metricConfigDTO.setId(123L);

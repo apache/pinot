@@ -18,6 +18,7 @@ package org.apache.pinot.thirdeye.tools;
 
 import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
+import com.google.common.collect.Multimap;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
 import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
@@ -80,9 +81,22 @@ import java.util.List;
 import java.util.Map;
 
 import java.util.Set;
-import org.apache.commons.collections4.CollectionUtils;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
+import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
+import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
+import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
+import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
+import org.apache.pinot.thirdeye.detection.DefaultDataProvider;
+import org.apache.pinot.thirdeye.detection.DetectionPipelineLoader;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
-import org.jfree.util.Log;
+import org.apache.pinot.thirdeye.detection.cache.builder.AnomaliesCacheBuilder;
+import org.apache.pinot.thirdeye.detection.cache.builder.TimeSeriesCacheBuilder;
+import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -110,6 +124,11 @@ public class RunAdhocDatabaseQueriesTool {
   private AlertConfigManager alertConfigDAO;
   private ClassificationConfigManager classificationConfigDAO;
   private ApplicationManager applicationDAO;
+
+  private static final DateTimeZone TIMEZONE = DateTimeZone.forID("America/Los_Angeles");
+  private static final DateTimeFormatter DATE_FORMAT = DateTimeFormat.forPattern("YYYY-MM-dd");
+  private static final String ENTITY_STATS_TEMPLATE = "#children = {}, properties = {}";
+  private static final String ENTITY_TIME_TEMPLATE = "[create {}, start {}, end {}]";
 
   public RunAdhocDatabaseQueriesTool(File persistenceFile)
       throws Exception {
@@ -692,8 +711,7 @@ public class RunAdhocDatabaseQueriesTool {
 
           // find all recent anomalies (last 14 days) with end time <= watermark;
           long lookback = TimeUnit.DAYS.toMillis(14);
-          Predicate predicate = Predicate.AND(
-              Predicate.LE("createTime", clockEntry.getValue()),
+          Predicate predicate = Predicate.AND(Predicate.LE("createTime", clockEntry.getValue()),
               Predicate.GT("createTime", clockEntry.getValue() - lookback),
               Predicate.EQ("detectionConfigId", detectionConfigDTO.getId()));
           List<MergedAnomalyResultDTO> anomalies = mergedResultDAO.findByPredicate(predicate);
@@ -723,9 +741,65 @@ public class RunAdhocDatabaseQueriesTool {
     }
   }
 
-  public static void main(String[] args) throws Exception {
+  private void printEntityAnomalyDetails(MergedAnomalyResultDTO anomaly, String indent, int index) {
+    LOG.info("");
+    LOG.info("Exploring Entity Anomaly {} with id {}", index, anomaly.getId());
+    LOG.info(ENTITY_STATS_TEMPLATE, anomaly.getChildren().size(), anomaly.getProperties());
+    LOG.info(ENTITY_TIME_TEMPLATE,
+        new DateTime(anomaly.getCreatedTime(), TIMEZONE),
+        DATE_FORMAT.print(new DateTime(anomaly.getStartTime(), TIMEZONE)),
+        DATE_FORMAT.print(new DateTime(anomaly.getEndTime(), TIMEZONE)));
+  }
 
-    File persistenceFile = new File("/Users/akrai/persistence-linux.yml");
+  /**
+   * Visualizes the entity anomalies by printing them
+   *
+   * Eg: dq.printEntityAnomalyTrees(158750221, 0, System.currentTimeMillis())
+   *
+   * @param detectionId The detection id whose anomalies need to be printed
+   * @param start The start time of the anomaly slice
+   * @param end The end time of the anomaly slice
+   */
+  private void printEntityAnomalyTrees(long detectionId, long start, long end) {
+    TimeSeriesLoader timeseriesLoader =
+        new DefaultTimeSeriesLoader(metricConfigDAO, datasetConfigDAO,
+            ThirdEyeCacheRegistry.getInstance().getQueryCache(),
+            ThirdEyeCacheRegistry.getInstance().getTimeSeriesCache());
+    AggregationLoader aggregationLoader =
+        new DefaultAggregationLoader(metricConfigDAO, datasetConfigDAO,
+            ThirdEyeCacheRegistry.getInstance().getQueryCache(),
+            ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());
+    DefaultDataProvider provider =
+        new DefaultDataProvider(metricConfigDAO, datasetConfigDAO, eventDAO, mergedResultDAO,
+            DAORegistry.getInstance().getEvaluationManager(), timeseriesLoader, aggregationLoader,
+            new DetectionPipelineLoader(), TimeSeriesCacheBuilder.getInstance(), AnomaliesCacheBuilder.getInstance());
+
+    AnomalySlice anomalySlice = new AnomalySlice();
+    anomalySlice = anomalySlice.withDetectionId(detectionId).withStart(start).withEnd(end);
+    Multimap<AnomalySlice, MergedAnomalyResultDTO>
+        sliceToAnomaliesMap = provider.fetchAnomalies(Collections.singletonList(anomalySlice));
+
+    LOG.info("Total number of entity anomalies = " + sliceToAnomaliesMap.values().size());
+
+    int i = 1;
+    for (MergedAnomalyResultDTO parentAnomaly : sliceToAnomaliesMap.values()) {
+      printEntityAnomalyDetails(parentAnomaly, "", i);
+      int j = 1;
+      for (MergedAnomalyResultDTO child : parentAnomaly.getChildren()) {
+        printEntityAnomalyDetails(parentAnomaly, "\t", j);
+        int k = 1;
+        for (MergedAnomalyResultDTO grandchild : child.getChildren()) {
+          printEntityAnomalyDetails(grandchild, "\t\t", k);
+          k++;
+        }
+        j++;
+      }
+      i++;
+    }
+  }
+
+  public static void main(String[] args) throws Exception {
+    File persistenceFile = new File("/path/to/persistence.yml");
     if (!persistenceFile.exists()) {
       System.err.println("Missing file:" + persistenceFile);
       System.exit(1);
@@ -734,5 +808,4 @@ public class RunAdhocDatabaseQueriesTool {
     dq.disableAllActiveDetections(Collections.singleton(160640739L));
     LOG.info("DONE");
   }
-
 }

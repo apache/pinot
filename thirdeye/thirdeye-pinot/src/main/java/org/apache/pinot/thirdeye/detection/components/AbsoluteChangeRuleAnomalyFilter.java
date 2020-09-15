@@ -37,8 +37,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-
 /**
  * Absolute change anomaly filter. Check if the anomaly's absolute change compared to baseline is above the threshold.
  * If not, filters the anomaly.
@@ -67,7 +65,8 @@ public class AbsoluteChangeRuleAnomalyFilter implements AnomalyFilter<AbsoluteCh
 
     double currentValue = anomaly.getAvgCurrentVal();
     double baselineValue =
-        baseline == null ? anomaly.getAvgBaselineVal() : this.baseline.gather(currentSlice, aggregates).getDouble(COL_VALUE, 0);
+        baseline == null ? anomaly.getAvgBaselineVal() : this.baseline.gather(currentSlice, aggregates).getDouble(
+            DataFrame.COL_VALUE, 0);
     // if inconsistent with up/down, filter the anomaly
     if (!pattern.equals(Pattern.UP_OR_DOWN) && (currentValue < baselineValue && pattern.equals(Pattern.UP)) || (
         currentValue > baselineValue && pattern.equals(Pattern.DOWN))) {

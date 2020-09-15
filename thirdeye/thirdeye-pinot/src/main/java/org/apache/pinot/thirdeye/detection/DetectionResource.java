@@ -55,6 +55,7 @@ import org.apache.pinot.thirdeye.dashboard.resources.v2.ResourceUtils;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.rootcause.AnomalyEventFormatter;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
+import org.apache.pinot.thirdeye.datalayer.bao.AnomalySubscriptionGroupNotificationManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
@@ -64,6 +65,7 @@ import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalySubscriptionGroupNotificationDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
@@ -94,9 +96,6 @@ import org.quartz.CronExpression;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-
-
 @Produces(MediaType.APPLICATION_JSON)
 @Api(tags = {Constants.DETECTION_TAG})
 @Singleton
@@ -121,6 +120,7 @@ public class DetectionResource {
   private final DetectionAlertConfigFormatter subscriptionConfigFormatter;
   private final AggregationLoader aggregationLoader;
   private final DetectionConfigurationResource detectionConfigurationResource;
+  private final AnomalySubscriptionGroupNotificationManager anomalySubscriptionGroupNotificationManager;
 
   @Inject
   public DetectionResource(
@@ -135,6 +135,7 @@ public class DetectionResource {
     this.detectionAlertConfigDAO = DAORegistry.getInstance().getDetectionAlertConfigManager();
     this.evaluationDAO = DAORegistry.getInstance().getEvaluationManager();
     this.taskDAO = DAORegistry.getInstance().getTaskDAO();
+    this.anomalySubscriptionGroupNotificationManager = DAORegistry.getInstance().getAnomalySubscriptionGroupNotificationManager();
 
     TimeSeriesLoader timeseriesLoader =
         new DefaultTimeSeriesLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(), ThirdEyeCacheRegistry.getInstance().getTimeSeriesCache());
@@ -483,7 +484,7 @@ public class DetectionResource {
     try {
       MetricSlice currentSlice = MetricSlice.from(me.getId(), startTime, endTime, me.getFilters());
       DataFrame df = this.aggregationLoader.loadAggregate(currentSlice, Collections.<String>emptyList(), -1);
-      anomaly.setAvgCurrentVal(df.getDouble(COL_VALUE, 0));
+      anomaly.setAvgCurrentVal(df.getDouble(DataFrame.COL_VALUE, 0));
     } catch (Exception e) {
       LOG.warn("Can't get the current value for {}, from {}-{}", me.getId(), startTime, endTime, e);
       anomaly.setAvgCurrentVal(Double.NaN);
@@ -541,10 +542,11 @@ public class DetectionResource {
     MetricEntity me = MetricEntity.fromURN(anomaly.getMetricUrn());
     DataFrame baselineTimeseries = DetectionUtils.getBaselineTimeseries(anomaly, me.getFilters(), me.getId(),
         configDAO.findById(anomaly.getDetectionConfigId()), start, end, loader, provider).getDataFrame();
-    if (!baselineTimeseries.contains(COL_CURRENT)) {
+    if (!baselineTimeseries.contains(DataFrame.COL_CURRENT)) {
       // add current time series if not exists
       MetricSlice currentSlice = MetricSlice.from(me.getId(), start, end, me.getFilters());
-      DataFrame dfCurrent = this.provider.fetchTimeseries(Collections.singleton(currentSlice)).get(currentSlice).renameSeries(COL_VALUE, COL_CURRENT);
+      DataFrame dfCurrent = this.provider.fetchTimeseries(Collections.singleton(currentSlice)).get(currentSlice).renameSeries(
+          DataFrame.COL_VALUE, DataFrame.COL_CURRENT);
       baselineTimeseries = dfCurrent.joinOuter(baselineTimeseries);
     }
     return Response.ok(baselineTimeseries).build();
@@ -569,5 +571,16 @@ public class DetectionResource {
       return Response.status(Response.Status.BAD_REQUEST).entity(e.getMessage()).build();
     }
     return Response.ok(health).build();
+  }
+
+  @POST
+  @Path(value = "/re-notify")
+  @ApiOperation("Resend the notification for the anomalies to the subscribed notification groups, if the subscription group supports re-notify")
+  public Response alert(@QueryParam("id") List<Long> anomalyIds) {
+    List<MergedAnomalyResultDTO> anomalies = this.anomalyDAO.findByIds(anomalyIds);
+    for (MergedAnomalyResultDTO anomaly : anomalies) {
+      DetectionUtils.renotifyAnomaly(anomaly);
+    }
+    return Response.ok().build();
   }
 }

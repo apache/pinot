@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+import useDocusaurusContext from "@docusaurus/useDocusaurusContext";
 
 export default function repoUrl(url) {
-  const {siteConfig} = useDocusaurusContext();
-  const githubHost = siteConfig.githubHost || 'github.com';
+    const { siteConfig } = useDocusaurusContext();
+    const githubHost = siteConfig.githubHost || "github.com";
 
-  return `https://${githubHost}/${siteConfig.organizationName}/${siteConfig.projectName}`
+    return `https://${githubHost}/${siteConfig.organizationName}/${siteConfig.projectName}`;
 }

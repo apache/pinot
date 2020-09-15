@@ -27,7 +27,7 @@ public class FunctionDefinitionRegistry {
     try {
       AggregationFunctionType.getAggregationFunctionType(functionName);
       return true;
-    } catch (Exception e) {
+    } catch (IllegalArgumentException e) {
       return false;
     }
   }
@@ -36,7 +36,7 @@ public class FunctionDefinitionRegistry {
     try {
       TransformFunctionType.getTransformFunctionType(functionName);
       return true;
-    } catch (Exception e) {
+    } catch (IllegalArgumentException e) {
       return false;
     }
   }

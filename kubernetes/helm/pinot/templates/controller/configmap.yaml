@@ -29,4 +29,4 @@ data:
     controller.vip.port={{ .Values.controller.service.port }}
     controller.data.dir={{ .Values.controller.data.dir }}
     controller.zk.str={{ include "zookeeper.url" . }}
-    pinot.set.instance.id.to.hostname=true
+{{ .Values.controller.extra.configs | indent 4 }}

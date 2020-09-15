@@ -20,6 +20,7 @@ package org.apache.pinot.controller.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Function;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -135,6 +136,18 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
 
     checkInstanceInfo(brokerInstanceId, "Broker_1.2.3.4", 1234, new String[]{newBrokerTag}, null, null);
     checkInstanceInfo(serverInstanceId, "Server_1.2.3.4", 2345, new String[]{newServerTag}, null, null);
+
+    // Test Instance updateTags API
+    String brokerInstanceUpdateTagsUrl = _controllerRequestURLBuilder
+        .forInstanceUpdateTags(brokerInstanceId, Lists.newArrayList("tag_BROKER", "newTag_BROKER"));
+    sendPutRequest(brokerInstanceUpdateTagsUrl);
+    String serverInstanceUpdateTagsUrl = _controllerRequestURLBuilder.forInstanceUpdateTags(serverInstanceId,
+        Lists.newArrayList("tag_REALTIME", "newTag_OFFLINE", "newTag_REALTIME"));
+    sendPutRequest(serverInstanceUpdateTagsUrl);
+    checkInstanceInfo(brokerInstanceId, "Broker_1.2.3.4", 1234, new String[]{"tag_BROKER", "newTag_BROKER"}, null,
+        null);
+    checkInstanceInfo(serverInstanceId, "Server_1.2.3.4", 2345,
+        new String[]{"tag_REALTIME", "newTag_OFFLINE", "newTag_REALTIME"}, null, null);
   }
 
   private void checkInstanceInfo(String instanceName, String hostName, int port, String[] tags, String[] pools,

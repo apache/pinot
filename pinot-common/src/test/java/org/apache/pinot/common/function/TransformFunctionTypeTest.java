@@ -26,7 +26,22 @@ import static org.testng.Assert.assertEquals;
 public class TransformFunctionTypeTest {
 
   @Test
+  public void testSimpleLookupFunction() {
+    assertEquals(TransformFunctionType.getTransformFunctionType("add"), TransformFunctionType.ADD);
+  }
+
+  @Test
   public void testScalarFunction() {
     assertEquals(TransformFunctionType.getTransformFunctionType("toEpochSeconds"), TransformFunctionType.SCALAR);
+  }
+
+  @Test
+  public void testSnakeCaseLookupFunction() {
+    assertEquals(TransformFunctionType.getTransformFunctionType("json_extract_scalar"), TransformFunctionType.JSONEXTRACTSCALAR);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void invalidLookup() {
+    TransformFunctionType.getTransformFunctionType("foo_bar");
   }
 }

@@ -20,7 +20,6 @@
 package org.apache.pinot.thirdeye.rootcause.timeseries;
 
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
-import org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import java.util.List;
 import java.util.Map;
@@ -37,8 +36,8 @@ import java.util.Map;
  * and reduce the N results down to 1 aggregate result (gather).
  */
 public interface Baseline {
-  String COL_TIME = DataFrameUtils.COL_TIME;
-  String COL_VALUE = DataFrameUtils.COL_VALUE;
+  String COL_TIME = DataFrame.COL_TIME;
+  String COL_VALUE = DataFrame.COL_VALUE;
 
   /**
    * Returns the set of raw data slices required to compute the synthetic baseline for the given input slice.

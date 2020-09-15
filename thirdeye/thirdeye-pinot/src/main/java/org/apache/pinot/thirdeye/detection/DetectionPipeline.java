@@ -19,7 +19,9 @@
 
 package org.apache.pinot.thirdeye.detection;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Multimap;
+import java.util.HashMap;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.dataframe.BooleanSeries;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
@@ -44,7 +46,6 @@ import org.joda.time.Period;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 import static org.apache.pinot.thirdeye.detection.DetectionUtils.*;
 
 
@@ -183,7 +184,8 @@ public abstract class DetectionPipeline {
       return Collections.emptyList();
     }
 
-    df = df.filter(df.getLongs(COL_TIME).between(slice.getStart(), slice.getEnd())).dropNull(COL_TIME);
+    df = df.filter(df.getLongs(DataFrame.COL_TIME).between(slice.getStart(), slice.getEnd())).dropNull(
+        DataFrame.COL_TIME);
 
     if (df.isEmpty()) {
       return Collections.emptyList();
@@ -197,7 +199,7 @@ public abstract class DetectionPipeline {
     MetricConfigDTO metric = metrics.get(slice.getMetricId());
 
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
-    LongSeries sTime = df.getLongs(COL_TIME);
+    LongSeries sTime = df.getLongs(DataFrame.COL_TIME);
     BooleanSeries sVal = df.getBooleans(seriesName);
 
     int lastStart = -1;
@@ -242,6 +244,26 @@ public abstract class DetectionPipeline {
     }
 
     return anomalies;
+  }
+
+  /**
+   * Helper to initialize and run the next level wrapper
+   * @param nestedProps nested properties
+   * @return intermediate result of a detection pipeline
+   * @throws Exception
+   */
+  protected DetectionPipelineResult runNested(
+      Map<String, Object> nestedProps, final long startTime, final long endTime) throws Exception {
+    Preconditions.checkArgument(nestedProps.containsKey(PROP_CLASS_NAME), "Nested missing " + PROP_CLASS_NAME);
+    Map<String, Object> properties = new HashMap<>(nestedProps);
+    DetectionConfigDTO nestedConfig = new DetectionConfigDTO();
+    nestedConfig.setId(this.config.getId());
+    nestedConfig.setName(this.config.getName());
+    nestedConfig.setDescription(this.config.getDescription());
+    nestedConfig.setComponents(this.config.getComponents());
+    nestedConfig.setProperties(properties);
+    DetectionPipeline pipeline = this.provider.loadPipeline(nestedConfig, startTime, endTime);
+    return pipeline.run();
   }
 
   // TODO anomaly should support multimap

@@ -23,9 +23,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+
+import com.google.common.base.Preconditions;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
 import org.apache.pinot.core.segment.index.datasource.ImmutableDataSource;
+import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
@@ -91,7 +94,10 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
 
   @Override
   public DataSource getDataSource(String column) {
-    return new ImmutableDataSource(_segmentMetadata.getColumnMetadataFor(column), _indexContainerMap.get(column));
+    ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
+    Preconditions.checkNotNull(columnMetadata,
+        "ColumnMetadata for " + column + " should not be null. " + "Potentially invalid column name specified.");
+    return new ImmutableDataSource(columnMetadata, _indexContainerMap.get(column));
   }
 
   @Override
@@ -137,5 +143,9 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   public GenericRow getRecord(int docId, GenericRow reuse) {
     // NOTE: Use PinotSegmentRecordReader to read immutable segment
     throw new UnsupportedOperationException();
+  }
+
+  public Map<String, ColumnIndexContainer> getIndexContainerMap() {
+    return _indexContainerMap;
   }
 }

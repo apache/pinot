@@ -193,8 +193,8 @@ public class StreamConfigTest {
     Assert.assertEquals(streamConfig.getFetchTimeoutMillis(), StreamConfig.DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS);
     Assert.assertEquals(streamConfig.getFlushThresholdRows(), StreamConfig.DEFAULT_FLUSH_THRESHOLD_ROWS);
     Assert.assertEquals(streamConfig.getFlushThresholdTimeMillis(), StreamConfig.DEFAULT_FLUSH_THRESHOLD_TIME_MILLIS);
-    Assert.assertEquals(streamConfig.getFlushSegmentDesiredSizeBytes(),
-        StreamConfig.DEFAULT_FLUSH_SEGMENT_DESIRED_SIZE_BYTES);
+    Assert.assertEquals(streamConfig.getFlushThresholdSegmentSizeBytes(),
+        StreamConfig.DEFAULT_FLUSH_THRESHOLD_SEGMENT_SIZE_BYTES);
 
     consumerType = "lowLevel,highLevel";
     String offsetCriteria = "smallest";
@@ -221,7 +221,7 @@ public class StreamConfigTest {
         fetchTimeout);
     streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, flushThresholdRows);
     streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME, flushThresholdTime);
-    streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_DESIRED_SIZE, flushSegmentSize);
+    streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_SEGMENT_SIZE, flushSegmentSize);
 
     streamConfig = new StreamConfig(tableName, streamConfigMap);
     Assert.assertEquals(streamConfig.getType(), streamType);
@@ -238,7 +238,7 @@ public class StreamConfigTest {
     Assert.assertEquals(streamConfig.getFlushThresholdRows(), Integer.parseInt(flushThresholdRows));
     Assert.assertEquals(streamConfig.getFlushThresholdTimeMillis(),
         (long) TimeUtils.convertPeriodToMillis(flushThresholdTime));
-    Assert.assertEquals(streamConfig.getFlushSegmentDesiredSizeBytes(), DataSizeUtils.toBytes(flushSegmentSize));
+    Assert.assertEquals(streamConfig.getFlushThresholdSegmentSizeBytes(), DataSizeUtils.toBytes(flushSegmentSize));
 
     // Backward compatibility check for flushThresholdTime
     flushThresholdTime = "18000000";
@@ -249,6 +249,18 @@ public class StreamConfigTest {
     streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME, flushThresholdTime);
     streamConfig = new StreamConfig(tableName, streamConfigMap);
     Assert.assertEquals(streamConfig.getFlushThresholdTimeMillis(), StreamConfig.DEFAULT_FLUSH_THRESHOLD_TIME_MILLIS);
+
+    // Backward compatibility check for flush threshold rows
+    streamConfigMap.remove(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS);
+    streamConfigMap.put(StreamConfigProperties.DEPRECATED_SEGMENT_FLUSH_THRESHOLD_ROWS, "10000");
+    streamConfig = new StreamConfig(tableName, streamConfigMap);
+    Assert.assertEquals(streamConfig.getFlushThresholdRows(), 10000);
+
+    // Backward compatibility check for flush threshold segment size
+    streamConfigMap.remove(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_SEGMENT_SIZE);
+    streamConfigMap.put(StreamConfigProperties.DEPRECATED_SEGMENT_FLUSH_DESIRED_SIZE, "10M");
+    streamConfig = new StreamConfig(tableName, streamConfigMap);
+    Assert.assertEquals(streamConfig.getFlushThresholdSegmentSizeBytes(), DataSizeUtils.toBytes("10M"));
   }
 
   /**
@@ -313,25 +325,38 @@ public class StreamConfigTest {
     Assert
         .assertEquals(streamConfig.getConnectionTimeoutMillis(), StreamConfig.DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS);
 
-    // Invalid flush threshold rows
+    // Invalid flush threshold rows - deprecated property
     streamConfigMap.remove(StreamConfigProperties
         .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONNECTION_TIMEOUT_MILLIS));
+    streamConfigMap.put(StreamConfigProperties.DEPRECATED_SEGMENT_FLUSH_THRESHOLD_ROWS, "rows");
+    streamConfig = new StreamConfig(tableName, streamConfigMap);
+    Assert.assertEquals(streamConfig.getFlushThresholdRows(), StreamConfig.DEFAULT_FLUSH_THRESHOLD_ROWS);
+
+    // Invalid flush threshold rows - new property
+    streamConfigMap.remove(StreamConfigProperties.DEPRECATED_SEGMENT_FLUSH_THRESHOLD_ROWS);
     streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, "rows");
     streamConfig = new StreamConfig(tableName, streamConfigMap);
     Assert.assertEquals(streamConfig.getFlushThresholdRows(), StreamConfig.DEFAULT_FLUSH_THRESHOLD_ROWS);
 
     // Invalid flush threshold time
-    streamConfigMap.remove(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS);
+    streamConfigMap.remove(StreamConfigProperties.DEPRECATED_SEGMENT_FLUSH_THRESHOLD_ROWS);
     streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME, "time");
     streamConfig = new StreamConfig(tableName, streamConfigMap);
     Assert.assertEquals(streamConfig.getFlushThresholdTimeMillis(), StreamConfig.DEFAULT_FLUSH_THRESHOLD_TIME_MILLIS);
 
-    // Invalid flush segment size
+    // Invalid flush segment size - deprecated property
     streamConfigMap.remove(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME);
-    streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_DESIRED_SIZE, "size");
+    streamConfigMap.put(StreamConfigProperties.DEPRECATED_SEGMENT_FLUSH_DESIRED_SIZE, "size");
     streamConfig = new StreamConfig(tableName, streamConfigMap);
-    Assert.assertEquals(streamConfig.getFlushSegmentDesiredSizeBytes(),
-        StreamConfig.DEFAULT_FLUSH_SEGMENT_DESIRED_SIZE_BYTES);
+    Assert.assertEquals(streamConfig.getFlushThresholdSegmentSizeBytes(),
+        StreamConfig.DEFAULT_FLUSH_THRESHOLD_SEGMENT_SIZE_BYTES);
+
+    // Invalid flush segment size - new property
+    streamConfigMap.remove(StreamConfigProperties.DEPRECATED_SEGMENT_FLUSH_DESIRED_SIZE);
+    streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_SEGMENT_SIZE, "size");
+    streamConfig = new StreamConfig(tableName, streamConfigMap);
+    Assert.assertEquals(streamConfig.getFlushThresholdSegmentSizeBytes(),
+        StreamConfig.DEFAULT_FLUSH_THRESHOLD_SEGMENT_SIZE_BYTES);
   }
 
   /**
@@ -380,7 +405,7 @@ public class StreamConfigTest {
         (long) TimeUtils.convertPeriodToMillis(flushThresholdTime));
 
     // llc overrides provided, but base values will be picked in base StreamConfigs
-    streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS + StreamConfigProperties.LLC_SUFFIX,
+    streamConfigMap.put(StreamConfigProperties.DEPRECATED_SEGMENT_FLUSH_THRESHOLD_ROWS + StreamConfigProperties.LLC_SUFFIX,
         flushThresholdRowsLLC);
     streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME + StreamConfigProperties.LLC_SUFFIX,
         flushThresholdTimeLLC);
@@ -403,7 +428,7 @@ public class StreamConfigTest {
         (long) TimeUtils.convertPeriodToMillis(flushThresholdTimeLLC));
 
     // PartitionLevelStreamConfig should use base values if llc overrides not provided
-    streamConfigMap.remove(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS + StreamConfigProperties.LLC_SUFFIX);
+    streamConfigMap.remove(StreamConfigProperties.DEPRECATED_SEGMENT_FLUSH_THRESHOLD_ROWS + StreamConfigProperties.LLC_SUFFIX);
     streamConfigMap.remove(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME + StreamConfigProperties.LLC_SUFFIX);
     streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, flushThresholdRows);
     streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME, flushThresholdTime);

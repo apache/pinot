@@ -51,6 +51,9 @@
     },
     "grouper": {
       "$ref": "#/definitions/grouper"
+    },
+    "lastTimestamp": {
+      "type": "number"
     }
   },
 

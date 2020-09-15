@@ -29,7 +29,7 @@ There is a docker build script which will build a given Git repo/branch and tag 
 Usage:
 
 ```SHELL
-./docker-build.sh [Docker Tag] [Git Branch] [Pinot Git URL]
+./docker-build.sh [Docker Tag] [Git Branch] [Pinot Git URL] [Kafka Version] [Java Version]
 ```
 
 This script will check out Pinot Repo `[Pinot Git URL]` on branch `[Git Branch]` and build the docker image for that.
@@ -41,6 +41,10 @@ The docker image is tagged as `[Docker Tag]`.
 `Git Branch`: The Pinot branch to build. Default is `master`.
 
 `Pinot Git URL`: The Pinot Git Repo to build, users can set it to their own fork. Please note that, the URL is `https://` based, not `git://`. Default is the Apache Repo: `https://github.com/apache/incubator-pinot.git`.
+
+`Kafka Version`: The Kafka Version to build pinot with. Default is `2.0`
+
+`Java Version`: The Java Version to build pinot with. Default is `8`
 
 * Example of building and tagging a snapshot on your own fork:
 ```SHELL

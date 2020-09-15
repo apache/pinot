@@ -33,6 +33,7 @@ import org.apache.pinot.thirdeye.datalayer.entity.AlertConfigIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.AlertSnapshotIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.AnomalyFeedbackIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.AnomalyFunctionIndex;
+import org.apache.pinot.thirdeye.datalayer.entity.AnomalySubscriptionGroupNotificationIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.ApplicationIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.ClassificationConfigIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.ConfigIndex;
@@ -62,6 +63,7 @@ import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
 import org.apache.pinot.thirdeye.datalayer.pojo.AlertSnapshotBean;
 import org.apache.pinot.thirdeye.datalayer.pojo.AnomalyFeedbackBean;
 import org.apache.pinot.thirdeye.datalayer.pojo.AnomalyFunctionBean;
+import org.apache.pinot.thirdeye.datalayer.pojo.AnomalySubscriptionGroupNotificationBean;
 import org.apache.pinot.thirdeye.datalayer.pojo.ApplicationBean;
 import org.apache.pinot.thirdeye.datalayer.pojo.ClassificationConfigBean;
 import org.apache.pinot.thirdeye.datalayer.pojo.ConfigBean;
@@ -171,6 +173,8 @@ public class GenericPojoDao {
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, RootcauseTemplateIndex.class));
     pojoInfoMap.put(OnlineDetectionDataBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, OnlineDetectionDataIndex.class));
+    pojoInfoMap.put(AnomalySubscriptionGroupNotificationBean.class,
+        newPojoInfo(DEFAULT_BASE_TABLE_NAME, AnomalySubscriptionGroupNotificationIndex.class));
   }
 
   private static PojoInfo newPojoInfo(String baseTableName,

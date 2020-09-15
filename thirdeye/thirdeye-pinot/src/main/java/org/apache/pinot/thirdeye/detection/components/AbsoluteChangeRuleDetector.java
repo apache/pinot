@@ -49,8 +49,6 @@ import org.apache.pinot.thirdeye.rootcause.timeseries.Baseline;
 import org.joda.time.Interval;
 
 import static org.apache.pinot.thirdeye.dataframe.DoubleSeries.*;
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-
 
 @Components(title = "Absolute change rule detection",
     type = "ABSOLUTE_CHANGE_RULE",
@@ -86,12 +84,12 @@ public class AbsoluteChangeRuleDetector implements AnomalyDetector<AbsoluteChang
     slices.add(slice);
     InputData data = this.dataFetcher.fetchData(new InputDataSpec().withTimeseriesSlices(slices).withMetricIdsForDataset(
         Collections.singletonList(slice.getMetricId())));
-    DataFrame dfCurr = data.getTimeseries().get(slice).renameSeries(COL_VALUE, COL_CURR);
+    DataFrame dfCurr = data.getTimeseries().get(slice).renameSeries(DataFrame.COL_VALUE, COL_CURR);
     DataFrame dfBase = this.baseline.gather(slice, data.getTimeseries());
 
     DataFrame df = new DataFrame(dfCurr).addSeries(dfBase);
     // calculate absolute change
-    df.addSeries(COL_DIFF, df.getDoubles(COL_CURR).subtract(df.get(COL_VALUE)));
+    df.addSeries(COL_DIFF, df.getDoubles(COL_CURR).subtract(df.get(DataFrame.COL_VALUE)));
 
     // defaults
     df.addSeries(COL_ANOMALY, BooleanSeries.fillValues(df.size(), false));
@@ -125,16 +123,17 @@ public class AbsoluteChangeRuleDetector implements AnomalyDetector<AbsoluteChang
     if (!Double.isNaN(this.absoluteChange)) {
       switch (this.pattern) {
         case UP:
-          fillAbsoluteChangeBound(dfBase, COL_UPPER_BOUND, this.absoluteChange);
-          dfBase.addSeries(COL_LOWER_BOUND, DoubleSeries.zeros(dfBase.size()));
+          fillAbsoluteChangeBound(dfBase, DataFrame.COL_UPPER_BOUND, this.absoluteChange);
+          dfBase.addSeries(DataFrame.COL_LOWER_BOUND, DoubleSeries.zeros(dfBase.size()));
           break;
         case DOWN:
-          dfBase.addSeries(COL_UPPER_BOUND, DoubleSeries.fillValues(dfBase.size(), POSITIVE_INFINITY));
-          fillAbsoluteChangeBound(dfBase, COL_LOWER_BOUND, -this.absoluteChange);
+          dfBase.addSeries(
+              DataFrame.COL_UPPER_BOUND, DoubleSeries.fillValues(dfBase.size(), POSITIVE_INFINITY));
+          fillAbsoluteChangeBound(dfBase, DataFrame.COL_LOWER_BOUND, -this.absoluteChange);
           break;
         case UP_OR_DOWN:
-          fillAbsoluteChangeBound(dfBase, COL_UPPER_BOUND, this.absoluteChange);
-          fillAbsoluteChangeBound(dfBase, COL_LOWER_BOUND, -this.absoluteChange);
+          fillAbsoluteChangeBound(dfBase, DataFrame.COL_UPPER_BOUND, this.absoluteChange);
+          fillAbsoluteChangeBound(dfBase, DataFrame.COL_LOWER_BOUND, -this.absoluteChange);
           break;
         default:
           throw new IllegalArgumentException();
@@ -144,7 +143,8 @@ public class AbsoluteChangeRuleDetector implements AnomalyDetector<AbsoluteChang
   }
 
   private void fillAbsoluteChangeBound(DataFrame dfBase, String colBound, double change) {
-    dfBase.addSeries(colBound, map((DoubleFunction) values -> values[0] + change, dfBase.getDoubles(COL_VALUE)));
+    dfBase.addSeries(colBound, map((DoubleFunction) values -> values[0] + change, dfBase.getDoubles(
+        DataFrame.COL_VALUE)));
   }
     @Override
   public void init(AbsoluteChangeRuleDetectorSpec spec, InputDataFetcher dataFetcher) {

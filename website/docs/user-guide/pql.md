@@ -1,5 +1,5 @@
 ---
-title: Pinot Query Language (PQL)
+title: PQL
 sidebar_label: PQL
 description: Pinot Query Language
 ---
@@ -93,7 +93,7 @@ SELECT count(*) FROM SomeTable
 
 ### UDF
 
-As of now, functions have to be implemented within Pinot. Injecting functions is not allowed yet. The example below demonstrate the use of UDFs. More examples in [Transform Function in Aggregation Grouping]()
+As of now, functions have to be implemented within Pinot. Injecting functions is not allowed yet. The example below demonstrate the use of UDFs. More examples in Transform Function in Aggregation Grouping
 
 ```sql
 SELECT count(*) FROM myTable

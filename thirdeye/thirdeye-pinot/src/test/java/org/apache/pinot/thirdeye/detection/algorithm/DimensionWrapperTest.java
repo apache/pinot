@@ -42,8 +42,6 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-
 public class DimensionWrapperTest {
   // exploration
   private static final String PROP_METRIC_URN = "metricUrn";
@@ -92,7 +90,7 @@ public class DimensionWrapperTest {
         new DataFrame()
             .addSeries("a", StringSeries.buildFrom("1", "1", "1", "1", "1", "2", "2", "2", "2", "2"))
             .addSeries("b", StringSeries.buildFrom("1", "2", "1", "2", "3", "1", "2", "1", "2", "3"))
-            .addSeries(COL_VALUE, DoubleSeries.buildFrom(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)));
+            .addSeries(DataFrame.COL_VALUE, DoubleSeries.buildFrom(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)));
 
     this.runs = new ArrayList<>();
 

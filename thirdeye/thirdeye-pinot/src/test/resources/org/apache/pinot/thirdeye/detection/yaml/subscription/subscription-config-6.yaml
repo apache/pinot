@@ -1,9 +1,9 @@
 subscriptionGroupName: "Subscription Group Name"
 cron: "0 0/5 * 1/1 * ? *"
-application: "test_missing_application"
+application: "test_application"
 active: true
 subscribedDetections:
-  - test_detection_2
+  - test_detection_3
 
 type: DEFAULT_ALERTER_PIPELINE
 

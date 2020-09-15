@@ -20,9 +20,8 @@ package org.apache.pinot.server.conf;
 
 import java.util.Arrays;
 import java.util.List;
-
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants.Helix;
+import org.apache.pinot.common.utils.CommonConstants.Server;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
@@ -30,6 +29,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  * The config used for Server.
  */
 public class ServerConf {
+  // TODO: Replace with constants in CommonConstants
   private static final String PINOT_ = "pinot.";
   private static final String PINOT_SERVER_INSTANCE = "pinot.server.instance";
   private static final String PINOT_SERVER_METRICS = "pinot.server.metrics";
@@ -37,7 +37,6 @@ public class ServerConf {
   private static final String PINOT_SERVER_TABLE_LEVEL_METRICS = "pinot.server.enableTableLevelMetrics";
   private static final String PINOT_SERVER_QUERY = "pinot.server.query.executor";
   private static final String PINOT_SERVER_REQUEST = "pinot.server.request";
-  private static final String PINOT_SERVER_NETTY = "pinot.server.netty";
   private static final String PINOT_SERVER_INSTANCE_DATA_MANAGER_CLASS = "pinot.server.instance.data.manager.class";
   private static final String PINOT_SERVER_QUERY_EXECUTOR_CLASS = "pinot.server.query.executor.class";
   private static final String PINOT_SERVER_TRANSFORM_FUNCTIONS = "pinot.server.transforms";
@@ -70,9 +69,16 @@ public class ServerConf {
     return _serverConf.subset(PINOT_SERVER_METRICS);
   }
 
-  public NettyServerConfig getNettyConfig()
-      throws ConfigurationException {
-    return new NettyServerConfig(_serverConf.subset(PINOT_SERVER_NETTY));
+  public int getNettyPort() {
+    return _serverConf.getProperty(Helix.KEY_OF_SERVER_NETTY_PORT, Helix.DEFAULT_SERVER_NETTY_PORT);
+  }
+
+  public boolean isEnableGrpcServer() {
+    return _serverConf.getProperty(Server.CONFIG_OF_ENABLE_GRPC_SERVER, Server.DEFAULT_ENABLE_GRPC_SERVER);
+  }
+
+  public int getGrpcPort() {
+    return _serverConf.getProperty(Server.CONFIG_OF_GRPC_PORT, Server.DEFAULT_GRPC_PORT);
   }
 
   public PinotConfiguration getConfig(String component) {
@@ -104,6 +110,6 @@ public class ServerConf {
   }
 
   public String getMetricsPrefix() {
-    return _serverConf.getProperty(PINOT_SERVER_METRICS_PREFIX, CommonConstants.Server.DEFAULT_METRICS_PREFIX);
+    return _serverConf.getProperty(PINOT_SERVER_METRICS_PREFIX, Server.DEFAULT_METRICS_PREFIX);
   }
 }

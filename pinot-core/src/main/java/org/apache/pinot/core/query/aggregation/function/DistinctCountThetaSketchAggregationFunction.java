@@ -32,7 +32,6 @@ import org.apache.commons.collections.MapUtils;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.AnotB;
 import org.apache.datasketches.theta.Intersection;
-import org.apache.datasketches.theta.SetOperation;
 import org.apache.datasketches.theta.SetOperationBuilder;
 import org.apache.datasketches.theta.Sketch;
 import org.apache.datasketches.theta.Union;
@@ -43,7 +42,7 @@ import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.ThetaSketchParams;
+import org.apache.pinot.core.query.aggregation.function.RawThetaSketchAggregationFunction.Parameters;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
@@ -70,16 +69,14 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
     public static final String CSV_VALUES = String.join(",", STRING_VALUES);
 
     public static boolean isValid(String name) {
-      return SET_UNION.name().equalsIgnoreCase(name)
-          || SET_INTERSECT.name().equalsIgnoreCase(name)
-          || SET_DIFF.name().equalsIgnoreCase(name);
+      return SET_UNION.name().equalsIgnoreCase(name) || SET_INTERSECT.name().equalsIgnoreCase(name) || SET_DIFF.name()
+          .equalsIgnoreCase(name);
     }
   }
 
   private static final Pattern ARGUMENT_SUBSTITUTION = Pattern.compile("\\$(\\d+)");
 
   private final ExpressionContext _thetaSketchColumn;
-  private final ThetaSketchParams _thetaSketchParams;
   private final SetOperationBuilder _setOperationBuilder;
   private final List<ExpressionContext> _inputExpressions;
   private final ExpressionContext _postAggregationExpression;
@@ -111,13 +108,13 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
         "First argument of DistinctCountThetaSketch must be identifier (theta-sketch column)");
 
     // Initialize the theta-sketch parameters
-    ExpressionContext paramsExpression = arguments.get(1);
-    Preconditions.checkArgument(paramsExpression.getType() == ExpressionContext.Type.LITERAL,
+    ExpressionContext parametersExpression = arguments.get(1);
+    Preconditions.checkArgument(parametersExpression.getType() == ExpressionContext.Type.LITERAL,
         "Second argument of DistinctCountThetaSketch must be literal (parameters)");
-    _thetaSketchParams = ThetaSketchParams.fromString(paramsExpression.getLiteral());
+    Parameters parameters = new Parameters(parametersExpression.getLiteral());
 
     // Initialize the theta-sketch set operation builder
-    _setOperationBuilder = getSetOperationBuilder();
+    _setOperationBuilder = new SetOperationBuilder().setNominalEntries(parameters.getNominalEntries());
 
     // Index of the original input predicates
     // This list is zero indexed, whereas argument substitution is 1-indexed: index[0] = $1
@@ -131,7 +128,7 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
     // Initialize the post-aggregation expression
     // NOTE: It is modeled as a filter
     ExpressionContext postAggregationExpression = arguments.get(numArguments - 1);
-    Preconditions.checkArgument(paramsExpression.getType() == ExpressionContext.Type.LITERAL,
+    Preconditions.checkArgument(parametersExpression.getType() == ExpressionContext.Type.LITERAL,
         "Last argument of DistinctCountThetaSketch must be literal (post-aggregation expression)");
     _postAggregationExpression = QueryContextConverterUtils
         .getExpression(CalciteSqlParser.compileToExpression(postAggregationExpression.getLiteral()));
@@ -448,7 +445,7 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
       Sketch sketch = intermediateResult2.get(predicate);
       if (sketch != null) {
         // Merge the overlapping ones
-        Union union = getSetOperationBuilder().buildUnion();
+        Union union = _setOperationBuilder.buildUnion();
         union.update(entry.getValue());
         union.update(sketch);
         mergedResult.put(predicate, union.getResult());
@@ -485,7 +482,7 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
   @Override
   public Long extractFinalResult(Map<String, Sketch> intermediateResult) {
     Sketch finalSketch = extractFinalSketch(intermediateResult);
-    return Math.round(finalSketch.getEstimate());
+    return finalSketch != null ? Math.round(finalSketch.getEstimate()) : 0;
   }
 
   private Predicate getPredicate(String predicateString) {
@@ -544,25 +541,22 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
    * @param sketchMap Precomputed sketches for predicates that are part of the expression.
    * @return Overall evaluated sketch for the expression.
    */
-  private Sketch evalPostAggregationExpression(
-      ExpressionContext postAggregationExpression,
+  private Sketch evalPostAggregationExpression(ExpressionContext postAggregationExpression,
       Map<Predicate, Sketch> sketchMap) {
     if (postAggregationExpression.getType() == ExpressionContext.Type.LITERAL) {
       throw new IllegalArgumentException("Literal not supported in post-aggregation function");
     }
 
     if (postAggregationExpression.getType() == ExpressionContext.Type.IDENTIFIER) {
-      final Predicate exp =
-          _predicates.get(extractSubstitutionPosition(postAggregationExpression.getLiteral()) - 1);
+      final Predicate exp = _predicates.get(extractSubstitutionPosition(postAggregationExpression.getLiteral()) - 1);
       return sketchMap.get(exp);
     }
 
     // shouldn't throw exception because of the validation in the constructor
-    MergeFunction func =
-        MergeFunction.valueOf(postAggregationExpression.getFunction().getFunctionName().toUpperCase());
+    MergeFunction func = MergeFunction.valueOf(postAggregationExpression.getFunction().getFunctionName().toUpperCase());
 
     // handle functions recursively
-    switch(func) {
+    switch (func) {
       case SET_UNION:
         Union union = _setOperationBuilder.buildUnion();
         for (ExpressionContext exp : postAggregationExpression.getFunction().getArguments()) {
@@ -583,10 +577,8 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
         diff.update(a, b);
         return diff.getResult();
       default:
-        throw new IllegalStateException(
-            String.format(
-                "Invalid post-aggregation function: %s",
-                postAggregationExpression.getFunction().getFunctionName().toUpperCase()));
+        throw new IllegalStateException(String.format("Invalid post-aggregation function: %s",
+            postAggregationExpression.getFunction().getFunctionName().toUpperCase()));
     }
   }
 
@@ -603,16 +595,6 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
       sketchMap.put(predicate, entry.getValue());
     }
     return evalPostAggregationExpression(_postAggregationExpression, sketchMap);
-  }
-
-  /**
-   * Returns the theta-sketch SetOperation builder properly configured.
-   * Currently, only setting of nominalEntries is supported.
-   * @return SetOperationBuilder
-   */
-  private SetOperationBuilder getSetOperationBuilder() {
-    return _thetaSketchParams == null ? SetOperation.builder()
-        : SetOperation.builder().setNominalEntries(_thetaSketchParams.getNominalEntries());
   }
 
   /**
@@ -636,19 +618,19 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
 
     if (context.getType() == ExpressionContext.Type.IDENTIFIER) {
       int id = extractSubstitutionPosition(context.getIdentifier());
-      if (id <= 0)
+      if (id <= 0) {
         throw new IllegalArgumentException("Argument substitution starts at $1");
-      if (id > numPredicates)
+      }
+      if (id > numPredicates) {
         throw new IllegalArgumentException("Argument substitution exceeded number of predicates");
+      }
       // if none of the invalid conditions are met above, exit out early
       return;
     }
 
     if (!MergeFunction.isValid(context.getFunction().getFunctionName())) {
       throw new IllegalArgumentException(
-          String.format(
-              "Invalid Theta Sketch aggregation function. Allowed: [%s]",
-              MergeFunction.CSV_VALUES));
+          String.format("Invalid Theta Sketch aggregation function. Allowed: [%s]", MergeFunction.CSV_VALUES));
     }
 
     switch (MergeFunction.valueOf(context.getFunction().getFunctionName().toUpperCase())) {

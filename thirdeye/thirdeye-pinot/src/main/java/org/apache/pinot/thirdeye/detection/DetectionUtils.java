@@ -36,10 +36,13 @@ import org.apache.pinot.thirdeye.dataframe.BooleanSeries;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.LongSeries;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
+import org.apache.pinot.thirdeye.datalayer.bao.AnomalySubscriptionGroupNotificationManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalySubscriptionGroupNotificationDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detection.components.RuleBaselineProvider;
 import org.apache.pinot.thirdeye.detection.spec.RuleBaselineProviderSpec;
 import org.apache.pinot.thirdeye.detection.spi.components.BaseComponent;
@@ -49,9 +52,6 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Period;
 import org.joda.time.PeriodType;
-
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-
 
 public class DetectionUtils {
   private static final String PROP_BASELINE_PROVIDER_COMPONENT_NAME = "baselineProviderComponentName";
@@ -117,7 +117,7 @@ public class DetectionUtils {
     }
 
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
-    LongSeries sTime = df.getLongs(COL_TIME);
+    LongSeries sTime = df.getLongs(DataFrame.COL_TIME);
     BooleanSeries sVal = df.getBooleans(seriesName);
 
     int lastStart = -1;
@@ -328,9 +328,11 @@ public class DetectionUtils {
   public static DataFrame aggregateByPeriod(DataFrame df, DateTime origin, Period granularityPeriod, MetricAggFunction aggregationFunction) {
     switch (aggregationFunction) {
       case SUM:
-        return df.groupByPeriod(df.getLongs(COL_TIME), origin, granularityPeriod).sum(COL_TIME, COL_VALUE);
+        return df.groupByPeriod(df.getLongs(DataFrame.COL_TIME), origin, granularityPeriod).sum(
+            DataFrame.COL_TIME, DataFrame.COL_VALUE);
       case AVG:
-        return df.groupByPeriod(df.getLongs(COL_TIME), origin, granularityPeriod).mean(COL_TIME, COL_VALUE);
+        return df.groupByPeriod(df.getLongs(DataFrame.COL_TIME), origin, granularityPeriod).mean(
+            DataFrame.COL_TIME, DataFrame.COL_VALUE);
       default:
         throw new NotImplementedException(String.format("The aggregate by period for %s is not supported in DataFrame.", aggregationFunction));
     }
@@ -352,10 +354,10 @@ public class DetectionUtils {
    */
   public static DataFrame filterIncompleteAggregation(DataFrame df, long latestDataTimeStamp,
       TimeGranularity bucketTimeGranularity, Period aggregationGranularityPeriod) {
-    long latestAggregationStartTimeStamp = df.getLong(COL_TIME, df.size() - 1);
+    long latestAggregationStartTimeStamp = df.getLong(DataFrame.COL_TIME, df.size() - 1);
     if (latestDataTimeStamp + bucketTimeGranularity.toMillis()
         < latestAggregationStartTimeStamp + aggregationGranularityPeriod.toStandardDuration().getMillis()) {
-      df = df.filter(df.getLongs(COL_TIME).neq(latestAggregationStartTimeStamp)).dropNull();
+      df = df.filter(df.getLongs(DataFrame.COL_TIME).neq(latestAggregationStartTimeStamp)).dropNull();
     }
     return df;
   }
@@ -387,5 +389,29 @@ public class DetectionUtils {
     }
 
     return predicates;
+  }
+
+  /**
+   * Renotify the anomaly by creating or updating the record in the subscription group notification table
+   * @param anomaly the anomaly to be notified.
+   */
+  public static void renotifyAnomaly(MergedAnomalyResultDTO anomaly) {
+    AnomalySubscriptionGroupNotificationManager anomalySubscriptionGroupNotificationDAO =
+        DAORegistry.getInstance().getAnomalySubscriptionGroupNotificationManager();
+    List<AnomalySubscriptionGroupNotificationDTO> subscriptionGroupNotificationDTOs =
+        anomalySubscriptionGroupNotificationDAO.findByPredicate(Predicate.EQ("anomalyId", anomaly.getId()));
+    AnomalySubscriptionGroupNotificationDTO anomalyNotificationDTO;
+    if (subscriptionGroupNotificationDTOs.isEmpty()) {
+      // create a new record if it is not existed yet.
+      anomalyNotificationDTO = new AnomalySubscriptionGroupNotificationDTO();
+      new AnomalySubscriptionGroupNotificationDTO();
+      anomalyNotificationDTO.setAnomalyId(anomaly.getId());
+      anomalyNotificationDTO.setDetectionConfigId(anomaly.getDetectionConfigId());
+    } else {
+      // update the existing record if the anomaly needs to be re-notified
+      anomalyNotificationDTO = subscriptionGroupNotificationDTOs.get(0);
+      anomalyNotificationDTO.setNotifiedSubscriptionGroupIds(Collections.emptyList());
+    }
+    anomalySubscriptionGroupNotificationDAO.save(anomalyNotificationDTO);
   }
 }

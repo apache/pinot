@@ -24,10 +24,8 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.detection.DataProvider;
-import org.apache.pinot.thirdeye.detection.DefaultInputDataFetcher;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
 import org.apache.pinot.thirdeye.detection.DetectionTestUtils;
-import org.apache.pinot.thirdeye.detection.InputDataFetcher;
 import org.apache.pinot.thirdeye.detection.MockDataProvider;
 import org.apache.pinot.thirdeye.detection.MockPipeline;
 import org.apache.pinot.thirdeye.detection.MockPipelineLoader;
@@ -43,9 +41,6 @@ import java.util.concurrent.TimeUnit;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
-
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-
 
 public class ThresholdRuleAnomalyFilterTest {
   private static final String METRIC_URN = "thirdeye:metric:123";
@@ -63,10 +58,14 @@ public class ThresholdRuleAnomalyFilterTest {
   @BeforeMethod
   public void beforeMethod() {
     Map<MetricSlice, DataFrame> aggregates = new HashMap<>();
-    aggregates.put(MetricSlice.from(123L, 1551186000000L, 1551189600000L), new DataFrame().addSeries(COL_VALUE, 0));
-    aggregates.put(MetricSlice.from(123L, 1551189600000L, 1551193200000L), new DataFrame().addSeries(COL_VALUE, 200));
-    aggregates.put(MetricSlice.from(123L, 1551193200000L, 1551196800000L), new DataFrame().addSeries(COL_VALUE, 500));
-    aggregates.put(MetricSlice.from(123L, 1551196800000L, 1551200400000L), new DataFrame().addSeries(COL_VALUE, 1000));
+    aggregates.put(MetricSlice.from(123L, 1551186000000L, 1551189600000L), new DataFrame().addSeries(
+        DataFrame.COL_VALUE, 0));
+    aggregates.put(MetricSlice.from(123L, 1551189600000L, 1551193200000L), new DataFrame().addSeries(
+        DataFrame.COL_VALUE, 200));
+    aggregates.put(MetricSlice.from(123L, 1551193200000L, 1551196800000L), new DataFrame().addSeries(
+        DataFrame.COL_VALUE, 500));
+    aggregates.put(MetricSlice.from(123L, 1551196800000L, 1551200400000L), new DataFrame().addSeries(
+        DataFrame.COL_VALUE, 1000));
 
     MetricConfigDTO metricConfigDTO = new MetricConfigDTO();
     metricConfigDTO.setId(123L);

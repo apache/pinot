@@ -66,18 +66,18 @@ public class GroupByOrderByCombineOperator extends BaseOperator<IntermediateResu
   private final List<Operator> _operators;
   private final QueryContext _queryContext;
   private final ExecutorService _executorService;
-  private final long _timeOutMs;
+  private final long _endTimeMs;
   private final int _indexedTableCapacity;
   private final Lock _initLock;
   private DataSchema _dataSchema;
   private ConcurrentIndexedTable _indexedTable;
 
   public GroupByOrderByCombineOperator(List<Operator> operators, QueryContext queryContext,
-      ExecutorService executorService, long timeOutMs) {
+      ExecutorService executorService, long endTimeMs) {
     _operators = operators;
     _queryContext = queryContext;
     _executorService = executorService;
-    _timeOutMs = timeOutMs;
+    _endTimeMs = endTimeMs;
     _initLock = new ReentrantLock();
     _indexedTableCapacity = GroupByUtils.getTableCapacity(_queryContext);
   }
@@ -220,11 +220,12 @@ public class GroupByOrderByCombineOperator extends BaseOperator<IntermediateResu
     }
 
     try {
-      boolean opCompleted = operatorLatch.await(_timeOutMs, TimeUnit.MILLISECONDS);
+      long timeoutMs = _endTimeMs - System.currentTimeMillis();
+      boolean opCompleted = operatorLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
       if (!opCompleted) {
         // If this happens, the broker side should already timed out, just log the error and return
         String errorMessage = String
-            .format("Timed out while combining group-by order-by results after %dms, queryContext = %s", _timeOutMs,
+            .format("Timed out while combining group-by order-by results after %dms, queryContext = %s", timeoutMs,
                 _queryContext);
         LOGGER.error(errorMessage);
         return new IntermediateResultsBlock(new TimeoutException(errorMessage));
