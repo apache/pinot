@@ -20,6 +20,7 @@
 
 if [ -n "${DEPLOY_BUILD_OPTS}" ]; then
   echo "Deploying to bintray"
+  echo "Current branch name: ${TRAVIS_BRANCH}"
 
   BUILD_VERSION=$(grep -E "<version>(.*)-SNAPSHOT</version>" pom.xml | cut -d'>' -f2 | cut -d'<' -f1 | cut -d'-' -f1)
   echo "Current build version: $BUILD_VERSION${DEV_VERSION}"
@@ -27,5 +28,5 @@ if [ -n "${DEPLOY_BUILD_OPTS}" ]; then
   mvn versions:commit -q -B
 
   # Deploy to bintray
-  mvn deploy -s .travis/.ci.settings.xml -DskipTests -q -DretryFailedDeploymentCount=5 -DaltDeploymentRepository=bintray-linkedin-maven::default::'https://api.bintray.com/maven/linkedin/maven/pinot/;publish=1;override=1'
+  mvn deploy -s .travis/.ci.settings.xml -DscmBranch="${TRAVIS_BRANCH}" -DskipTests -q -DretryFailedDeploymentCount=5 -DaltDeploymentRepository=bintray-linkedin-maven::default::'https://api.bintray.com/maven/linkedin/maven/pinot/;publish=1;override=1'
 fi
