@@ -78,6 +78,9 @@ import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKey
 public class SegmentColumnarIndexCreator implements SegmentCreator {
   // TODO Refactor class name to match interface name
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentColumnarIndexCreator.class);
+  // Allow at most 512 characters for the metadata property
+  private static final int METADATA_PROPERTY_LENGTH_LIMIT = 512;
+
   private SegmentGeneratorConfig config;
   private Map<String, ColumnIndexCreationInfo> indexCreationInfoMap;
   private Map<String, SegmentDictionaryCreator> _dictionaryCreatorMap = new HashMap<>();
@@ -562,6 +565,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
    * Helper method to check whether the given value is a valid property value.
    * <p>Value is invalid iff:
    * <ul>
+   *   <li>It contains more than 512 characters</li>
    *   <li>It contains leading/trailing whitespace</li>
    *   <li>It contains list separator (',')</li>
    * </ul>
@@ -571,6 +575,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     int length = value.length();
     if (length == 0) {
       return true;
+    }
+    if (length > METADATA_PROPERTY_LENGTH_LIMIT) {
+      return false;
     }
     if (Character.isWhitespace(value.charAt(0)) || Character.isWhitespace(value.charAt(length - 1))) {
       return false;
