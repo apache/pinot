@@ -423,7 +423,7 @@ BSD 3-Clause
 com.google.protobuf:protobuf-java:3.12.0
 com.jcabi:jcabi-aspects:0.22
 com.jcabi:jcabi-log:0.17.1
-com.thoughtworks.paranamer:paranamer:2.6
+com.thoughtworks.paranamer:paranamer:2.8
 org.antlr:antlr4-runtime:4.6
 org.ow2.asm:asm:5.0.4
 org.threeten:threeten-extra:1.5.0
