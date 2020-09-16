@@ -1166,7 +1166,6 @@ export default Component.extend({
         })
         .catch(error => {
           if (error.name !== 'TaskCancelation') {
-            this.get('notifications').error(error, 'Error', toastOptions);
             set(this, 'getAnomaliesError', true);
             if (this.get('isPreviewMode')) {
               this.get('sendPreviewError')({
@@ -1174,6 +1173,8 @@ export default Component.extend({
                 previewErrorMsg: 'There was an error generating the preview.',
                 previewErrorInfo: error
               });
+            } else {
+              this.get('notifications').error(error, 'Error', toastOptions);
             }
           }
         });

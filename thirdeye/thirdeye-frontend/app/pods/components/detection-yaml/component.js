@@ -46,6 +46,7 @@ export default Component.extend({
   detectionError: false,
   detectionErrorMsg: null,
   detectionErrorInfo: null,
+  detectionErrorScroll: false,
 
 
   init() {
@@ -56,6 +57,24 @@ export default Component.extend({
     } = this.getProperties('detectionYaml', 'currentYamlAlertOriginal');
     if (!detectionYaml) {
       set(this, 'detectionYaml', currentYamlAlertOriginal);
+    }
+  },
+
+  didRender() {
+    this._super(...arguments);
+    if (this.get('detectionErrorScroll')) {
+      document.getElementById("detection-error").scrollIntoView();
+      const parentResetScroll = this.get('resetScroll');
+      // reset detectionErrorScroll in parent if present, then set in component
+      parentResetScroll ? parentResetScroll('detectionErrorScroll') : null;
+      set(this, 'detectionErrorScroll', false);
+    }
+    if (this.get('previewErrorScroll')) {
+      document.getElementById("preview-error").scrollIntoView();
+      const parentResetScroll = this.get('resetScroll');
+      // reset previewErrorScroll in parent if present, then set in component
+      parentResetScroll ? parentResetScroll('previewErrorScroll') : null;
+      set(this, 'previewErrorScroll', false);
     }
   },
 
@@ -288,7 +307,8 @@ export default Component.extend({
           this.setProperties({
             detectionError: true,
             detectionErrorMsg: alert_json.message,
-            detectionErrorInfo: alert_json["more-info"]
+            detectionErrorInfo: alert_json["more-info"],
+            detectionErrorScroll: true
           });
         } else {
           notifications.success('Detection configuration saved successfully', 'Done', toastOptions);
@@ -298,7 +318,8 @@ export default Component.extend({
         this.setProperties({
           detectionError: true,
           detectionErrorMsg: 'Error while saving detection config.',
-          detectionErrorInfo: error
+          detectionErrorInfo: error,
+          detectionErrorScroll: true
         });
       }
     }

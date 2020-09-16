@@ -88,9 +88,11 @@ export default Controller.extend({
   detectionError: false,
   detectionErrorMsg: null,
   detectionErrorInfo: null,
+  detectionErrorScroll: false,
   previewError: false,
   previewErrorMsg: null,
   previewErrorInfo: null,
+  previewErrorScroll: false,
 
 
 
@@ -1081,8 +1083,19 @@ export default Controller.extend({
       this.setProperties({
         previewError: bubbledObject.previewError,
         previewErrorMsg: bubbledObject.previewErrorMsg,
-        previewErrorInfo: bubbledObject.previewErrorInfo
+        previewErrorInfo: bubbledObject.previewErrorInfo,
+        previewErrorScroll: bubbledObject.previewError
       });
+    },
+
+    /**
+     * set property value to false
+     * @method resetErrorScroll
+     * @param {string} propertyName - name of property to reset (ie 'detectionErrorScroll')
+     * @return {undefined}
+     */
+    resetErrorScroll(propertyName) {
+      set(this, propertyName, false);
     },
 
     /**
@@ -1135,7 +1148,8 @@ export default Controller.extend({
               this.setProperties({
                 detectionError: true,
                 detectionErrorMsg: result.message,
-                detectionErrorInfo: result["more-info"]
+                detectionErrorInfo: result["more-info"],
+                detectionErrorScroll: true
               });
             }
           }
@@ -1145,7 +1159,8 @@ export default Controller.extend({
         this.setProperties({
           detectionError: true,
           detectionErrorMsg: 'Create alert failed.',
-          detectionErrorInfo: error
+          detectionErrorInfo: error,
+          detectionErrorScroll: true
         });
       });
     },

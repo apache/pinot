@@ -21,7 +21,7 @@
 </div>
 {{#if previewError}}
   <div class="col-xs-12">
-      <div class="detection-yaml-msg-preview">
+      <div class="detection-yaml-msg-preview" id="preview-error">
         <p>{{material-design-icon
           name='error-outline'
         }} {{previewErrorMsg}}
@@ -49,7 +49,7 @@
 {{/if}}
 {{#if detectionError}}
   <div class="col-xs-12">
-      <div class="detection-yaml-msg">
+      <div class="detection-yaml-msg" id="detection-error">
         <p><i class="detection-yaml-msg__icon--error glyphicon glyphicon-remove-circle"></i>{{detectionErrorMsg}}
           {{#if detectionErrorInfo}}
             <span class="detection-yaml-msg__tooltip-link" onclick={{action "toggleDetectionModal"}}>
