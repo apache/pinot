@@ -19,8 +19,14 @@
 
 package org.apache.pinot.thirdeye.anomaly.utils;
 
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
+import java.util.Map;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
+import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -161,4 +167,49 @@ public class AnomalyUtils {
       this.anomalyId = anomaly.getId();
     }
   }
+
+  /**
+   * Returns the filter set to query the time series on UI. The filter set is constructed by combining the dimension
+   * information of the given anomaly and the filter set from its corresponding anomaly function.
+   *
+   * For instance, assume that the dimension from the detected anomaly is {"country":"US"} and the filter on its
+   * anomaly function is {"country":["US", "IN"],"page_key":["p1,p2"]}, then the returned filter set for querying
+   * is {"country":["US"],"page_key":["p1,p2"]}.
+   *
+   * @param mergedAnomaly the target anomaly for which we want to generate the query filter set.
+   *
+   * @return the filter set for querying the time series that produce the anomaly.
+   */
+  public static Multimap<String, String> generateFilterSetForTimeSeriesQuery(MergedAnomalyResultDTO mergedAnomaly) {
+    AnomalyFunctionDTO anomalyFunctionDTO = mergedAnomaly.getFunction();
+    Multimap<String, String> filterSet = anomalyFunctionDTO.getFilterSet();
+    Multimap<String, String> newFilterSet = generateFilterSetWithDimensionMap(mergedAnomaly.getDimensions(), filterSet);
+    return newFilterSet;
+  }
+
+  public static Multimap<String, String> generateFilterSetWithDimensionMap(
+      DimensionMap dimensionMap,
+      Multimap<String, String> filterSet) {
+
+    Multimap<String, String> newFilterSet = HashMultimap.create();
+
+    // Dimension map gives more specified dimension information than filter set (i.e., Dimension Map should be a subset
+    // of filterSet), so it needs to be processed first.
+    if (MapUtils.isNotEmpty(dimensionMap)) {
+      for (Map.Entry<String, String> dimensionMapEntry : dimensionMap.entrySet()) {
+        newFilterSet.put(dimensionMapEntry.getKey(), dimensionMapEntry.getValue());
+      }
+    }
+
+    if (filterSet != null && filterSet.size() != 0) {
+      for (String key : filterSet.keySet()) {
+        if (!newFilterSet.containsKey(key)) {
+          newFilterSet.putAll(key, filterSet.get(key));
+        }
+      }
+    }
+
+    return newFilterSet;
+  }
+
 }

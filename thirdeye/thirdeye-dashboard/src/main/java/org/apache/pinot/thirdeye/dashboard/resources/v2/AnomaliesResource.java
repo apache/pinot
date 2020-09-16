@@ -51,6 +51,7 @@ import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.pql.parsers.utils.Pair;
 import org.apache.pinot.thirdeye.anomaly.detection.AnomalyDetectionInputContext;
 import org.apache.pinot.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
+import org.apache.pinot.thirdeye.anomaly.utils.AnomalyUtils;
 import org.apache.pinot.thirdeye.anomaly.views.AnomalyTimelinesView;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
@@ -674,7 +675,7 @@ public class AnomaliesResource {
     anomalyDetails.setAnomalyFunctionProps(anomalyFunction.getProperties());
 
     // Combine dimension map and filter set to construct a new filter set for the time series query of this anomaly
-    Multimap<String, String> newFilterSet = generateFilterSetForTimeSeriesQuery(mergedAnomaly);
+    Multimap<String, String> newFilterSet = AnomalyUtils.generateFilterSetForTimeSeriesQuery(mergedAnomaly);
     try {
       anomalyDetails.setAnomalyFunctionDimension(OBJECT_MAPPER.writeValueAsString(newFilterSet.asMap()));
     } catch (JsonProcessingException e) {
@@ -845,49 +846,6 @@ public class AnomaliesResource {
       return String.format("%.3f", value);
     }
     return String.valueOf(value);
-  }
-
-  /**
-   * Returns the filter set to query the time series on UI. The filter set is constructed by combining the dimension
-   * information of the given anomaly and the filter set from its corresponding anomaly function.
-   *
-   * For instance, assume that the dimension from the detected anomaly is {"country":"US"} and the filter on its
-   * anomaly function is {"country":["US", "IN"],"page_key":["p1,p2"]}, then the returned filter set for querying
-   * is {"country":["US"],"page_key":["p1,p2"]}.
-   *
-   * @param mergedAnomaly the target anomaly for which we want to generate the query filter set.
-   *
-   * @return the filter set for querying the time series that produce the anomaly.
-   */
-  public static Multimap<String, String> generateFilterSetForTimeSeriesQuery(MergedAnomalyResultDTO mergedAnomaly) {
-    AnomalyFunctionDTO anomalyFunctionDTO = mergedAnomaly.getFunction();
-    Multimap<String, String> filterSet = anomalyFunctionDTO.getFilterSet();
-    Multimap<String, String> newFilterSet = generateFilterSetWithDimensionMap(mergedAnomaly.getDimensions(), filterSet);
-    return newFilterSet;
-  }
-
-  public static Multimap<String, String> generateFilterSetWithDimensionMap(DimensionMap dimensionMap,
-      Multimap<String, String> filterSet) {
-
-    Multimap<String, String> newFilterSet = HashMultimap.create();
-
-    // Dimension map gives more specified dimension information than filter set (i.e., Dimension Map should be a subset
-    // of filterSet), so it needs to be processed first.
-    if (MapUtils.isNotEmpty(dimensionMap)) {
-      for (Map.Entry<String, String> dimensionMapEntry : dimensionMap.entrySet()) {
-        newFilterSet.put(dimensionMapEntry.getKey(), dimensionMapEntry.getValue());
-      }
-    }
-
-    if (filterSet != null && filterSet.size() != 0) {
-      for (String key : filterSet.keySet()) {
-        if (!newFilterSet.containsKey(key)) {
-          newFilterSet.putAll(key, filterSet.get(key));
-        }
-      }
-    }
-
-    return newFilterSet;
   }
 
   private TimeRange getAnomalyWindowOffset(DateTime windowStart, DateTime windowEnd, BaseAnomalyFunction anomalyFunction,

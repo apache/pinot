@@ -21,7 +21,7 @@ package org.apache.pinot.thirdeye.alert.fetcher;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.pinot.thirdeye.alert.commons.AnomalyFetcherConfig;
-import org.apache.pinot.thirdeye.dashboard.resources.v2.AnomaliesResource;
+import org.apache.pinot.thirdeye.anomaly.utils.AnomalyUtils;
 import org.apache.pinot.thirdeye.datalayer.dto.AlertSnapshotDTO;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -51,7 +51,7 @@ public abstract class BaseAnomalyFetcher implements AnomalyFetcher {
   }
 
   public static String getSnapshotKey(MergedAnomalyResultDTO anomaly) {
-    return anomaly.getMetric() + "::" + AnomaliesResource.generateFilterSetForTimeSeriesQuery(anomaly);
+    return anomaly.getMetric() + "::" + AnomalyUtils.generateFilterSetForTimeSeriesQuery(anomaly);
   }
 
   @Override

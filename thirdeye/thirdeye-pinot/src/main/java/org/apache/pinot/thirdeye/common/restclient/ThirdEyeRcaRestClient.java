@@ -29,8 +29,8 @@ import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.auth.ThirdEyePrincipal;
-import org.apache.pinot.thirdeye.dashboard.resources.v2.AuthResource;
 
+import static org.apache.pinot.thirdeye.auth.ThirdEyeAuthFilter.AUTH_TOKEN_NAME;
 import static org.apache.pinot.thirdeye.common.constants.rca.MultiDimensionalSummaryConstants.*;
 import static org.apache.pinot.thirdeye.common.constants.rca.RootCauseResourceConstants.*;
 
@@ -73,7 +73,7 @@ public class ThirdEyeRcaRestClient extends AbstractRestClient {
     queryParameters.put("anomalyId", String.valueOf(anomalyId));
 
     MultivaluedMap<String, Object> headers = new MultivaluedHashMap<>();
-    headers.put("Cookie", Arrays.asList(AuthResource.AUTH_TOKEN_NAME + "=" + principal.getSessionKey()));
+    headers.put("Cookie", Arrays.asList(AUTH_TOKEN_NAME + "=" + principal.getSessionKey()));
 
     return doGet(
         composeUrl(this.thirdEyeHost, THIRDEYE_RCA_HIGHLIGHTS_URI, queryParameters),
@@ -99,7 +99,7 @@ public class ThirdEyeRcaRestClient extends AbstractRestClient {
     queryParameters.put(CUBE_ORDER_TYPE, "auto");
 
     MultivaluedMap<String, Object> headers = new MultivaluedHashMap<>();
-    headers.put("Cookie", Arrays.asList(AuthResource.AUTH_TOKEN_NAME + "=" + principal.getSessionKey()));
+    headers.put("Cookie", Arrays.asList(AUTH_TOKEN_NAME + "=" + principal.getSessionKey()));
 
     return doGet(
         composeUrl(this.thirdEyeHost, THIRDEYE_RCA_CUBE_URI, queryParameters),
