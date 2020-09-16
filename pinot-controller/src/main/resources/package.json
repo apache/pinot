@@ -21,8 +21,6 @@
     ]
   },
   "devDependencies": {
-    "@types/react": "16.9.34",
-    "@types/react-dom": "16.9.6",
     "@typescript-eslint/eslint-plugin": "2.30.0",
     "@typescript-eslint/parser": "2.30.0",
     "clean-webpack-plugin": "^3.0.0",
@@ -59,7 +57,10 @@
     "@material-ui/icons": "^4.9.1",
     "@material-ui/lab": "^4.0.0-alpha.51",
     "@types/codemirror": "0.0.97",
+    "@types/react-dom": "16.9.6",
     "@types/react-router-dom": "^5.1.5",
+    "@types/react-router": "^5.1.8",
+    "@types/react": "16.9.34",
     "axios": "^0.19.2",
     "codemirror": "^5.55.0",
     "cross-fetch": "^3.0.4",
