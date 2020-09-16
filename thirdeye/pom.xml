@@ -32,6 +32,7 @@
     <module>thirdeye-pinot</module>
     <module>thirdeye-coordinator</module>
     <module>thirdeye-dist</module>
+    <module>thirdeye-dashboard</module>
   </modules>
 
   <properties>
