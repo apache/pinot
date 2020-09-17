@@ -35,6 +35,7 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.IngestionConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
@@ -276,6 +277,31 @@ public final class TableConfigUtils {
     if (indexingConfig.getVarLengthDictionaryColumns() != null) {
       for (String columnName : indexingConfig.getVarLengthDictionaryColumns()) {
         columnNameToConfigMap.put(columnName, "Var Length Column Config");
+      }
+    }
+    List<StarTreeIndexConfig> starTreeIndexConfigList = indexingConfig.getStarTreeIndexConfigs();
+    if (starTreeIndexConfigList != null) {
+      for (StarTreeIndexConfig starTreeIndexConfig : starTreeIndexConfigList) {
+        // Dimension split order cannot be null
+        for (String columnName : starTreeIndexConfig.getDimensionsSplitOrder()) {
+          columnNameToConfigMap.put(columnName, "StarTreeIndex Config");
+        }
+        // Function column pairs cannot be null
+        for (String functionColumnPair : starTreeIndexConfig.getFunctionColumnPairs()) {
+          String[] functionColumnArray = functionColumnPair.split("__");
+          if (functionColumnArray.length != 2) {
+            throw new IllegalStateException("Invalid StarTreeIndex config: " + functionColumnPair + ". Must be"
+                + "in the form <Aggregation function>__<Column name>");
+          }
+          String columnName = functionColumnArray[1];
+          columnNameToConfigMap.put(columnName, "StarTreeIndex Config");
+        }
+        List<String> skipDimensionList = starTreeIndexConfig.getSkipStarNodeCreationForDimensions();
+        if (skipDimensionList != null) {
+          for (String columnName : skipDimensionList) {
+            columnNameToConfigMap.put(columnName, "StarTreeIndex Config");
+          }
+        }
       }
     }
 
