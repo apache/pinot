@@ -646,6 +646,7 @@ export default Component.extend({
           set(a, 'start', a.startTime);
           set(a, 'end', a.endTime);
           set(a, 'feedback', a.feedback ? a.feedback.feedbackType : a.statusClassification);
+          set(a, 'severityLabel', a.severityLabel);
           if (a.feedback === 'NONE') {
             set(a, 'feedback', 'NO_FEEDBACK');
           }
@@ -674,6 +675,8 @@ export default Component.extend({
           set(a, 'start', a.startTime);
           set(a, 'end', a.endTime);
           set(a, 'feedback', a.feedback ? a.feedback.feedbackType : a.statusClassification);
+          set(a, 'severityLabel', a.severityLabel);
+
           if (a.feedback === 'NONE') {
             set(a, 'feedback', 'NO_FEEDBACK');
           }
@@ -747,6 +750,10 @@ export default Component.extend({
         component: 'custom/anomalies-table/rule',
         propertyName: 'rule',
         title: 'Rule'
+      }, {
+        component: 'custom/anomalies-table/severity-level',
+        propertyName: 'severityLabel',
+        title: 'Severity Level'
       }];
       const rightmostColumns = isPreviewMode ? [] : [{
         component: 'custom/anomalies-table/resolution',
