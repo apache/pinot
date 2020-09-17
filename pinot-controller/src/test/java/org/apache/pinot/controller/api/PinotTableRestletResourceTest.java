@@ -158,8 +158,19 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     realtimeTableConfig = _realtimeBuilder.setSchemaName(REALTIME_TABLE_NAME).build();
     sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
 
+    // Create a REALTIME table with the invalid time column name should fail
+    realtimeTableConfig =
+        _realtimeBuilder.setTableName(REALTIME_TABLE_NAME).setTimeColumnName("invalidTimeColumn").build();
+    try {
+      sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
+      Assert.fail("Creation of a REALTIME table with a invalid time column name does not fail");
+    } catch (IOException e) {
+      // Expected 400 Bad Request
+      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+    }
+
     // Create a REALTIME table with a valid name and schema which should succeed
-    realtimeTableConfig = _realtimeBuilder.setTableName(REALTIME_TABLE_NAME).build();
+    realtimeTableConfig = _realtimeBuilder.setTableName(REALTIME_TABLE_NAME).setTimeColumnName("timeColumn").build();
     String realtimeTableConfigString = realtimeTableConfig.toJsonString();
     sendPostRequest(_createTableUrl, realtimeTableConfigString);
 
