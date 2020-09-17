@@ -36,6 +36,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.TimeUtils;
 
@@ -100,9 +101,13 @@ public final class TableConfigUtils {
     }
     // timeColumnName can be null in OFFLINE table
     if (timeColumnName != null && schema != null) {
-      Preconditions.checkState(schema.getSpecForTimeColumn(timeColumnName) != null,
+      FieldSpec timeColumnFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
+      Preconditions.checkState(timeColumnFieldSpec != null,
           "Cannot find valid fieldSpec for timeColumn: %s from the table config, in the schema: %s", timeColumnName,
           schema.getSchemaName());
+      Preconditions.checkState(timeColumnFieldSpec.getFieldType() == FieldSpec.FieldType.DATE_TIME
+              || timeColumnFieldSpec.getFieldType() == FieldSpec.FieldType.TIME,
+          "Time column type has to be either 'DATE_TIME' or 'TIME'");
     }
 
     String peerSegmentDownloadScheme = validationConfig.getPeerSegmentDownloadScheme();
