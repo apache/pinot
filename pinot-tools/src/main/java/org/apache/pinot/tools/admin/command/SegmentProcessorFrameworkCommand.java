@@ -95,7 +95,7 @@ public class SegmentProcessorFrameworkCommand extends AbstractBaseAdminCommand i
         new SegmentProcessorConfig.Builder().setSchema(schema).setTableConfig(tableConfig)
             .setRecordTransformerConfig(segmentProcessorFrameworkSpec.getRecordTransformerConfig())
             .setRecordFilterConfig(segmentProcessorFrameworkSpec.getRecordFilterConfig())
-            .setPartitionerConfig(segmentProcessorFrameworkSpec.getPartitionerConfig())
+            .setPartitionerConfigs(segmentProcessorFrameworkSpec.getPartitionerConfigs())
             .setCollectorConfig(segmentProcessorFrameworkSpec.getCollectorConfig())
             .setSegmentConfig(segmentProcessorFrameworkSpec.getSegmentConfig()).build();
 

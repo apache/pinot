@@ -277,9 +277,9 @@ public class SegmentProcessingFrameworkTest {
 
     // partitioning
     config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_pinotSchema)
-        .setPartitionerConfig(
+        .setPartitionerConfigs(Lists.newArrayList(
             new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.ROUND_ROBIN)
-                .setNumPartitions(3).build()).build();
+                .setNumPartitions(3).build())).build();
     FileUtils.deleteQuietly(outputSegmentDir);
     assertTrue(outputSegmentDir.mkdirs());
     framework = new SegmentProcessorFramework(_singleDaySingleSegment, config, outputSegmentDir);
@@ -393,9 +393,9 @@ public class SegmentProcessingFrameworkTest {
 
     // date partition
     config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_pinotSchema)
-        .setPartitionerConfig(
+        .setPartitionerConfigs(Lists.newArrayList(
             new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.COLUMN_VALUE)
-                .setColumnName("timeValue").build()).build();
+                .setColumnName("timeValue").build())).build();
     FileUtils.deleteQuietly(outputSegmentDir);
     assertTrue(outputSegmentDir.mkdirs());
     framework = new SegmentProcessorFramework(_multipleDaysSingleSegment, config, outputSegmentDir);
@@ -465,9 +465,9 @@ public class SegmentProcessingFrameworkTest {
 
     // date partition
     config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_pinotSchema)
-        .setPartitionerConfig(
+        .setPartitionerConfigs(Lists.newArrayList(
             new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION)
-                .setTransformFunction("round(timeValue, 86400000)").build()).build();
+                .setTransformFunction("round(timeValue, 86400000)").build())).build();
     FileUtils.deleteQuietly(outputSegmentDir);
     assertTrue(outputSegmentDir.mkdirs());
     framework = new SegmentProcessorFramework(_multipleDaysSingleSegment, config, outputSegmentDir);
@@ -487,9 +487,9 @@ public class SegmentProcessingFrameworkTest {
     config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_pinotSchema)
         .setRecordTransformerConfig(
             new RecordTransformerConfig.Builder().setTransformFunctionsMap(recordTransformationMap).build())
-        .setPartitionerConfig(
+        .setPartitionerConfigs(Lists.newArrayList(
             new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.COLUMN_VALUE)
-                .setColumnName("timeValue").build()).setCollectorConfig(
+                .setColumnName("timeValue").build())).setCollectorConfig(
             new CollectorConfig.Builder().setCollectorType(CollectorFactory.CollectorType.ROLLUP).build()).build();
     FileUtils.deleteQuietly(outputSegmentDir);
     assertTrue(outputSegmentDir.mkdirs());

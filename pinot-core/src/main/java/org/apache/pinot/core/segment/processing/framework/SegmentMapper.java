@@ -22,16 +22,21 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
+import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.segment.processing.filter.RecordFilter;
 import org.apache.pinot.core.segment.processing.filter.RecordFilterFactory;
 import org.apache.pinot.core.segment.processing.partitioner.Partitioner;
+import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerFactory;
 import org.apache.pinot.core.segment.processing.transformer.RecordTransformer;
 import org.apache.pinot.core.segment.processing.transformer.RecordTransformerFactory;
@@ -59,7 +64,8 @@ public class SegmentMapper {
   private final Schema _avroSchema;
   private final RecordTransformer _recordTransformer;
   private final RecordFilter _recordFilter;
-  private final Partitioner _partitioner;
+  private final int _numPartitioners;
+  private final List<Partitioner> _partitioners = new ArrayList<>();
   private final Map<String, DataFileWriter<GenericData.Record>> _partitionToDataFileWriterMap = new HashMap<>();
 
   public SegmentMapper(String mapperId, File inputSegment, SegmentMapperConfig mapperConfig, File mapperOutputDir) {
@@ -70,11 +76,14 @@ public class SegmentMapper {
     _avroSchema = SegmentProcessorUtils.convertPinotSchemaToAvroSchema(mapperConfig.getPinotSchema());
     _recordTransformer = RecordTransformerFactory.getRecordTransformer(mapperConfig.getRecordTransformerConfig());
     _recordFilter = RecordFilterFactory.getRecordFilter(mapperConfig.getRecordFilterConfig());
-    _partitioner = PartitionerFactory.getPartitioner(mapperConfig.getPartitionerConfig());
+    for (PartitionerConfig partitionerConfig : mapperConfig.getPartitionerConfigs()) {
+      _partitioners.add(PartitionerFactory.getPartitioner(partitionerConfig));
+    }
+    _numPartitioners = _partitioners.size();
     LOGGER.info(
-        "Initialized mapper with id: {}, input segment: {}, output dir: {}, recordTransformer: {}, recordFilter: {}, partitioner: {}",
+        "Initialized mapper with id: {}, input segment: {}, output dir: {}, recordTransformer: {}, recordFilter: {}, partitioners: {}",
         _mapperId, _inputSegment, _mapperOutputDir, _recordTransformer.getClass(), _recordFilter.getClass(),
-        _partitioner.getClass());
+        _partitioners.stream().map(p -> p.getClass().toString()).collect(Collectors.joining(",")));
   }
 
   /**
@@ -87,6 +96,7 @@ public class SegmentMapper {
     PinotSegmentRecordReader segmentRecordReader = new PinotSegmentRecordReader(_inputSegment);
     GenericRow reusableRow = new GenericRow();
     GenericData.Record reusableRecord = new GenericData.Record(_avroSchema);
+    String[] partitions = new String[_numPartitioners];
 
     while (segmentRecordReader.hasNext()) {
       reusableRow = segmentRecordReader.next(reusableRow);
@@ -100,8 +110,11 @@ public class SegmentMapper {
       }
 
       // Partitioning
-      // TODO: 2 step partitioner. 1) Apply custom partitioner 2) Apply table config partitioner. Combine both to get final partition.
-      String partition = _partitioner.getPartition(reusableRow);
+      int p = 0;
+      for (Partitioner partitioner : _partitioners) {
+        partitions[p++] = partitioner.getPartition(reusableRow);
+      }
+      String partition = StringUtil.join("_", partitions);
 
       // Create writer for the partition, if not exists
       DataFileWriter<GenericData.Record> recordWriter = _partitionToDataFileWriterMap.get(partition);
