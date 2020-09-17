@@ -27,6 +27,7 @@ import org.apache.pinot.spi.data.Schema;
 
 
 public class RealtimeSegmentConfig {
+  private final String _tableNameWithType;
   private final String _segmentName;
   private final String _streamName;
   private final Schema _schema;
@@ -49,12 +50,13 @@ public class RealtimeSegmentConfig {
   private final String _consumerDir;
 
   // TODO: Clean up this constructor. Most of these things can be extracted from tableConfig.
-  private RealtimeSegmentConfig(String segmentName, String streamName, Schema schema, String timeColumnName,
-      int capacity, int avgNumMultiValues, Set<String> noDictionaryColumns, Set<String> varLengthDictionaryColumns,
-      Set<String> invertedIndexColumns, Set<String> textIndexColumns,
+  private RealtimeSegmentConfig(String tableNameWithType, String segmentName, String streamName, Schema schema,
+      String timeColumnName, int capacity, int avgNumMultiValues, Set<String> noDictionaryColumns,
+      Set<String> varLengthDictionaryColumns, Set<String> invertedIndexColumns, Set<String> textIndexColumns,
       RealtimeSegmentZKMetadata realtimeSegmentZKMetadata, boolean offHeap, PinotDataBufferMemoryManager memoryManager,
       RealtimeSegmentStatsHistory statsHistory, String partitionColumn, PartitionFunction partitionFunction,
       int partitionId, boolean aggregateMetrics, boolean nullHandlingEnabled, String consumerDir) {
+    _tableNameWithType = tableNameWithType;
     _segmentName = segmentName;
     _streamName = streamName;
     _schema = schema;
@@ -75,6 +77,10 @@ public class RealtimeSegmentConfig {
     _aggregateMetrics = aggregateMetrics;
     _nullHandlingEnabled = nullHandlingEnabled;
     _consumerDir = consumerDir;
+  }
+
+  public String getTableNameWithType() {
+    return _tableNameWithType;
   }
 
   public String getSegmentName() {
@@ -163,6 +169,7 @@ public class RealtimeSegmentConfig {
   }
 
   public static class Builder {
+    private String _tableNameWithType;
     private String _segmentName;
     private String _streamName;
     private Schema _schema;
@@ -185,6 +192,11 @@ public class RealtimeSegmentConfig {
     private String _consumerDir;
 
     public Builder() {
+    }
+
+    public Builder setTableNameWithType(String tableNameWithType) {
+      _tableNameWithType = tableNameWithType;
+      return this;
     }
 
     public Builder setSegmentName(String segmentName) {
@@ -296,8 +308,8 @@ public class RealtimeSegmentConfig {
     }
 
     public RealtimeSegmentConfig build() {
-      return new RealtimeSegmentConfig(_segmentName, _streamName, _schema, _timeColumnName, _capacity,
-          _avgNumMultiValues, _noDictionaryColumns, _varLengthDictionaryColumns, _invertedIndexColumns,
+      return new RealtimeSegmentConfig(_tableNameWithType, _segmentName, _streamName, _schema, _timeColumnName,
+          _capacity, _avgNumMultiValues, _noDictionaryColumns, _varLengthDictionaryColumns, _invertedIndexColumns,
           _textIndexColumns, _realtimeSegmentZKMetadata, _offHeap, _memoryManager, _statsHistory, _partitionColumn,
           _partitionFunction, _partitionId, _aggregateMetrics, _nullHandlingEnabled, _consumerDir);
     }
