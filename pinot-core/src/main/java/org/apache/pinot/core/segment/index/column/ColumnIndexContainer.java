@@ -24,6 +24,7 @@ import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReaderImpl;
+import org.apache.pinot.core.segment.index.readers.TextIndexReader;
 
 
 /**
@@ -42,14 +43,14 @@ public interface ColumnIndexContainer extends Closeable {
   InvertedIndexReader<?> getInvertedIndex();
 
   /**
-   * Returns the inverted index for the column, or {@code null} if it does not exist.
+   * Returns the range index for the column, or {@code null} if it does not exist.
    */
   InvertedIndexReader<?> getRangeIndex();
 
   /**
    * Returns the text index for the column, or {@code null} if it does not exist.
    */
-  InvertedIndexReader<?> getTextIndex();
+  TextIndexReader getTextIndex();
 
   /**
    * Returns the dictionary for the column, or {@code null} if it does not exist.

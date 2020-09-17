@@ -63,9 +63,4 @@ public interface DictionaryBasedInvertedIndexCreator extends InvertedIndexCreato
    * For multi-value column, adds the dictionary ids for the next document.
    */
   void add(int[] dictIds, int length);
-
-  /**
-   * For text column, adds the document of the given document id.
-   */
-  void addDoc(Object document, int docId);
 }

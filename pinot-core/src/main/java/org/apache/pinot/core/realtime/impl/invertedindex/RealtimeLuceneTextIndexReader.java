@@ -27,8 +27,8 @@ import org.apache.lucene.search.Collector;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.SearcherManager;
-import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreator;
-import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.apache.pinot.core.segment.creator.impl.text.LuceneTextIndexCreator;
+import org.apache.pinot.core.segment.index.readers.TextIndexReader;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.LoggerFactory;
@@ -40,7 +40,7 @@ import org.slf4j.LoggerFactory;
  * Internally it uses {@link LuceneTextIndexCreator} for adding documents to the lucene index
  * as and when they are indexed by the consuming segment.
  */
-public class RealtimeLuceneTextIndexReader implements InvertedIndexReader<MutableRoaringBitmap> {
+public class RealtimeLuceneTextIndexReader implements TextIndexReader {
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(RealtimeLuceneTextIndexReader.class);
 
   private final QueryParser _queryParser;
@@ -82,11 +82,11 @@ public class RealtimeLuceneTextIndexReader implements InvertedIndexReader<Mutabl
     _queryParser = new QueryParser(column, analyzer);
   }
 
-  @Override
-  public MutableRoaringBitmap getDocIds(int dictId) {
-    // This should not be called from anywhere. If it happens, there is a bug
-    // and that's why we throw illegal state exception
-    throw new UnsupportedOperationException("Using dictionary ID is not supported on Lucene inverted index");
+  /**
+   * Adds a new document.
+   */
+  public void add(String document) {
+    _indexCreator.add(document);
   }
 
   @Override
@@ -134,10 +134,6 @@ public class RealtimeLuceneTextIndexReader implements InvertedIndexReader<Mutabl
       throw new RuntimeException(e);
     }
     return actualDocIDs;
-  }
-
-  public void addDoc(Object doc, int docIdCounter) {
-    _indexCreator.addDoc(doc, docIdCounter);
   }
 
   @Override

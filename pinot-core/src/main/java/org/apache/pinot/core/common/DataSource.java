@@ -24,6 +24,7 @@ import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
+import org.apache.pinot.core.segment.index.readers.TextIndexReader;
 
 
 /**
@@ -62,10 +63,9 @@ public interface DataSource {
 
   /**
    * Returns the text index for the column if exists, or {@code null} if not.
-   * <p>TODO: Have a separate interface for text index.
    */
   @Nullable
-  InvertedIndexReader<?> getTextIndex();
+  TextIndexReader getTextIndex();
 
   /**
    * Returns the bloom filter for the column if exists, or {@code null} if not.

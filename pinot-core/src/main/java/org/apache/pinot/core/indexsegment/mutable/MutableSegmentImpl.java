@@ -544,7 +544,7 @@ public class MutableSegmentImpl implements MutableSegment {
         // Update text index
         RealtimeLuceneTextIndexReader textIndex = indexContainer._textIndex;
         if (textIndex != null) {
-          textIndex.addDoc(value, docId);
+          textIndex.add((String) value);
         }
       } else {
         // Multi-value column (always dictionary-encoded)

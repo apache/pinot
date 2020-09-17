@@ -16,15 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.index.readers;
+package org.apache.pinot.core.segment.creator;
 
 import java.io.Closeable;
+import java.io.IOException;
 
 
-public interface InvertedIndexReader<T> extends Closeable {
+/**
+ * Index creator for text index.
+ */
+public interface TextIndexCreator extends Closeable {
 
   /**
-   * Returns the document ids for the given dictionary id.
+   * Adds the next document.
    */
-  T getDocIds(int dictId);
+  void add(String document);
+
+  /**
+   * Seals the index and flushes it to disk.
+   */
+  void seal()
+      throws IOException;
 }
