@@ -253,7 +253,7 @@
   ],
   "metricFieldSpecs": [
     {
-      "name": "ArrDel15",
+      "name": "ActualElapsedTime",
       "dataType": "INT"
     },
     {

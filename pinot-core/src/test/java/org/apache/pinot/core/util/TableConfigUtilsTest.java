@@ -22,6 +22,7 @@ import com.google.common.collect.Lists;
 import java.util.Arrays;
 import java.util.Collections;
 import org.apache.pinot.common.tier.TierFactory;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IngestionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -537,6 +538,16 @@ public class TableConfigUtilsTest {
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for invalid Var Length Dictionary column name");
+    } catch (Exception e) {
+      // expected
+    }
+
+    FieldConfig fieldConfig = new FieldConfig("mycol2", null, null, null);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setFieldConfigList(Arrays.asList(fieldConfig)).build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail for invalid column name in Field Config List");
     } catch (Exception e) {
       // expected
     }

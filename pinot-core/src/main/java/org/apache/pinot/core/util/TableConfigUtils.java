@@ -31,6 +31,7 @@ import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.core.data.function.FunctionEvaluator;
 import org.apache.pinot.core.data.function.FunctionEvaluatorFactory;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.IngestionConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
@@ -58,8 +59,9 @@ public final class TableConfigUtils {
    * 1. Validation config
    * 2. IngestionConfig
    * 3. TierConfigs
+   * 4. Indexing config
    *
-   * TODO: Add more validations for each section (e.g. verify column names used in the indexing, validate conditions are met for aggregateMetrics etc)
+   * TODO: Add more validations for each section (e.g. validate conditions are met for aggregateMetrics)
    */
   public static void validate(TableConfig tableConfig, @Nullable Schema schema) {
     if (tableConfig.getTableType() == TableType.REALTIME) {
@@ -69,6 +71,7 @@ public final class TableConfigUtils {
     validateIngestionConfig(tableConfig.getIngestionConfig(), schema);
     validateTierConfigList(tableConfig.getTierConfigsList());
     validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
+    validateFieldConfigList(tableConfig.getFieldConfigList(), schema);
   }
 
   /**
@@ -230,6 +233,10 @@ public final class TableConfigUtils {
     }
   }
 
+  /**
+   * Validates the Indexing Config
+   * Ensures that every referred column name exists in the corresponding schema
+   */
   private static void validateIndexingConfig(@Nullable IndexingConfig indexingConfig, @Nullable Schema schema) {
     if (indexingConfig == null || schema == null) {
       return;
@@ -277,6 +284,22 @@ public final class TableConfigUtils {
       String configName = entry.getValue();
       Preconditions.checkState(schema.getFieldSpecFor(columnName) != null,
           "Column Name " + columnName + " defined in " + configName + " must be a valid column defined in the schema");
+    }
+  }
+
+  /**
+   * Validates the Field Config List in the given TableConfig
+   * Ensures that every referred column name exists in the corresponding schema
+   */
+  private static void validateFieldConfigList(@Nullable List<FieldConfig> fieldConfigList, @Nullable Schema schema) {
+    if (fieldConfigList == null || schema == null) {
+      return;
+    }
+
+    for (FieldConfig fieldConfig : fieldConfigList) {
+      String columnName = fieldConfig.getName();
+      Preconditions.checkState(schema.getFieldSpecFor(columnName) != null,
+          "Column Name " + columnName + " defined in field config list must be a valid column defined in the schema");
     }
   }
 }
