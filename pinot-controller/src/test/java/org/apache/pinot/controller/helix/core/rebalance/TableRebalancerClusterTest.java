@@ -65,7 +65,7 @@ public class TableRebalancerClusterTest extends ControllerTest {
   private static final String NO_TIER_NAME = "noTier";
   private static final String TIER_A_NAME = "tierA";
   private static final String TIER_B_NAME = "tierB";
-  public static final long SLEEP_TIME_AFTER_INSTANCE_UPDATE = 100L;
+  public static final long SLEEP_TIME_AFTER_INSTANCE_UPDATE = 1000L;
 
   @BeforeClass
   public void setUp()

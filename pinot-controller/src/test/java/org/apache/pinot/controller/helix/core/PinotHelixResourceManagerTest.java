@@ -95,7 +95,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
   private static final int MAX_TIMEOUT_IN_MILLISECOND = 5_000;
   private static final int MAXIMUM_NUMBER_OF_CONTROLLER_INSTANCES = 10;
   private static final long TIMEOUT_IN_MS = 10_000L;
-  public static final long SLEEP_TIME_AFTER_INSTANCE_UPDATE = 200L;
+  public static final long SLEEP_TIME_AFTER_INSTANCE_UPDATE = 1000L;
 
   @BeforeClass
   public void setUp()
