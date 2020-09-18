@@ -57,6 +57,7 @@ public class ValidationManagerTest extends ControllerTest {
   private static final String TEST_TABLE_NAME = "testTable";
   private static final String TEST_TABLE_TWO = "testTable2";
   private static final String TEST_SEGMENT_NAME = "testSegment";
+  public static final long SLEEP_TIME_AFTER_INSTANCE_UPDATE = 100L;
 
   private TableConfig _offlineTableConfig;
 
@@ -100,11 +101,16 @@ public class ValidationManagerTest extends ControllerTest {
     helixAdmin.addInstance(getHelixClusterName(), instanceConfig);
     helixAdmin.addInstanceTag(getHelixClusterName(), instanceConfig.getInstanceName(),
         TagNameUtils.getBrokerTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME));
+
+    Thread.sleep(SLEEP_TIME_AFTER_INSTANCE_UPDATE);
     idealState = HelixHelper.getBrokerIdealStates(helixAdmin, getHelixClusterName());
     // Assert that the two don't equal before the call to rebuild the broker resource.
     Assert.assertTrue(!idealState.getInstanceSet(partitionNameTwo)
         .equals(_helixResourceManager.getAllInstancesForBrokerTenant(TagNameUtils.DEFAULT_TENANT_NAME)));
     _helixResourceManager.rebuildBrokerResourceFromHelixTags(partitionNameTwo);
+
+    Thread.sleep(SLEEP_TIME_AFTER_INSTANCE_UPDATE);
+
     idealState = HelixHelper.getBrokerIdealStates(helixAdmin, getHelixClusterName());
     // Assert that the two do equal after being rebuilt.
     Assert.assertTrue(idealState.getInstanceSet(partitionNameTwo)

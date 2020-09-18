@@ -95,6 +95,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
   private static final int MAX_TIMEOUT_IN_MILLISECOND = 5_000;
   private static final int MAXIMUM_NUMBER_OF_CONTROLLER_INSTANCES = 10;
   private static final long TIMEOUT_IN_MS = 10_000L;
+  public static final long SLEEP_TIME_AFTER_INSTANCE_UPDATE = 200L;
 
   @BeforeClass
   public void setUp()
@@ -165,7 +166,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     InstanceConfig latestCachedInstanceConfig = _helixResourceManager.getHelixInstanceConfig(instanceName);
     String latestPort = latestCachedInstanceConfig.getPort();
     while (!newPort.equals(latestPort) && System.currentTimeMillis() < maxTime) {
-      Thread.sleep(100L);
+      Thread.sleep(SLEEP_TIME_AFTER_INSTANCE_UPDATE);
       latestCachedInstanceConfig = _helixResourceManager.getHelixInstanceConfig(instanceName);
       latestPort = latestCachedInstanceConfig.getPort();
     }
@@ -217,7 +218,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
 
     // Untag all Brokers assigned to broker tenant
     untagBrokers();
-    Thread.sleep(100L);
+    Thread.sleep(SLEEP_TIME_AFTER_INSTANCE_UPDATE);
     Assert.assertEquals(_helixResourceManager.getOnlineUnTaggedBrokerInstanceList().size(), NUM_INSTANCES);
 
     // Rebuilding the broker tenant should update the ideal state size
@@ -232,7 +233,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 5, 0, 0);
     response = _helixResourceManager.createBrokerTenant(brokerTenant);
     Assert.assertTrue(response.isSuccessful());
-    Thread.sleep(100L);
+    Thread.sleep(SLEEP_TIME_AFTER_INSTANCE_UPDATE);
     // Rebuilding the broker tenant should update the ideal state size
     response = _helixResourceManager.rebuildBrokerResourceFromHelixTags(OFFLINE_TABLE_NAME);
     Assert.assertTrue(response.isSuccessful());
@@ -242,10 +243,10 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
 
     // Delete the table
     _helixResourceManager.deleteOfflineTable(TABLE_NAME);
-    Thread.sleep(100L);
+    Thread.sleep(SLEEP_TIME_AFTER_INSTANCE_UPDATE);
     // Untag the brokers
     untagBrokers();
-    Thread.sleep(100L);
+    Thread.sleep(SLEEP_TIME_AFTER_INSTANCE_UPDATE);
     Assert.assertEquals(_helixResourceManager.getOnlineUnTaggedBrokerInstanceList().size(), NUM_INSTANCES);
   }
 
@@ -287,7 +288,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 1, 0, 0);
     PinotResourceManagerResponse response = _helixResourceManager.createBrokerTenant(brokerTenant);
     Assert.assertTrue(response.isSuccessful());
-    Thread.sleep(100L);
+    Thread.sleep(SLEEP_TIME_AFTER_INSTANCE_UPDATE);
 
     Set<String> brokerTenantNames = _helixResourceManager.getAllBrokerTenantNames();
     Assert.assertEquals(brokerTenantNames.size(), 1);
@@ -297,7 +298,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
         _helixResourceManager.getAllInstancesForBrokerTenant(BROKER_TENANT_NAME).iterator().next();
     _helixAdmin.addInstanceTag(getHelixClusterName(), testBrokerInstance, "wrong_tag");
 
-    Thread.sleep(100L);
+    Thread.sleep(SLEEP_TIME_AFTER_INSTANCE_UPDATE);
     brokerTenantNames = _helixResourceManager.getAllBrokerTenantNames();
     Assert.assertEquals(brokerTenantNames.size(), 1);
     Assert.assertEquals(brokerTenantNames.iterator().next(), BROKER_TENANT_NAME);
@@ -305,7 +306,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     _helixAdmin.removeInstanceTag(getHelixClusterName(), testBrokerInstance, "wrong_tag");
 
     // Server tenant is already created during setup.
-    Thread.sleep(100L);
+    Thread.sleep(SLEEP_TIME_AFTER_INSTANCE_UPDATE);
     Set<String> serverTenantNames = _helixResourceManager.getAllServerTenantNames();
     Assert.assertEquals(serverTenantNames.size(), 1);
     Assert.assertEquals(serverTenantNames.iterator().next(), SERVER_TENANT_NAME);
@@ -314,16 +315,16 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
         _helixResourceManager.getAllInstancesForServerTenant(SERVER_TENANT_NAME).iterator().next();
     _helixAdmin.addInstanceTag(getHelixClusterName(), testServerInstance, "wrong_tag");
 
-    Thread.sleep(100L);
+    Thread.sleep(SLEEP_TIME_AFTER_INSTANCE_UPDATE);
     serverTenantNames = _helixResourceManager.getAllServerTenantNames();
     Assert.assertEquals(serverTenantNames.size(), 1);
     Assert.assertEquals(serverTenantNames.iterator().next(), SERVER_TENANT_NAME);
 
     _helixAdmin.removeInstanceTag(getHelixClusterName(), testServerInstance, "wrong_tag");
 
-    Thread.sleep(100L);
+    Thread.sleep(SLEEP_TIME_AFTER_INSTANCE_UPDATE);
     untagBrokers();
-    Thread.sleep(100L);
+    Thread.sleep(SLEEP_TIME_AFTER_INSTANCE_UPDATE);
     Assert.assertEquals(_helixResourceManager.getOnlineUnTaggedBrokerInstanceList().size(), NUM_INSTANCES);
   }
 
@@ -333,7 +334,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     // Create broker tenant on 3 Brokers
     Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 3, 0, 0);
     _helixResourceManager.createBrokerTenant(brokerTenant);
-    Thread.sleep(100L);
+    Thread.sleep(SLEEP_TIME_AFTER_INSTANCE_UPDATE);
 
     String rawTableName = "testTable";
     TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).build();
@@ -421,7 +422,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     _helixResourceManager.validateTableTenantConfig(realtimeTableConfig);
 
     untagBrokers();
-    Thread.sleep(100L);
+    Thread.sleep(SLEEP_TIME_AFTER_INSTANCE_UPDATE);
     Assert.assertEquals(_helixResourceManager.getOnlineUnTaggedBrokerInstanceList().size(), NUM_INSTANCES);
   }
 
@@ -531,7 +532,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 1, 0, 0);
     PinotResourceManagerResponse response = _helixResourceManager.createBrokerTenant(brokerTenant);
     Assert.assertTrue(response.isSuccessful());
-    Thread.sleep(100L);
+    Thread.sleep(SLEEP_TIME_AFTER_INSTANCE_UPDATE);
 
     // Create the table
     TableConfig tableConfig =

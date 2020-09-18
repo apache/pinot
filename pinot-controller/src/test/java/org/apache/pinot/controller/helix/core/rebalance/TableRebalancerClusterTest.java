@@ -65,6 +65,7 @@ public class TableRebalancerClusterTest extends ControllerTest {
   private static final String NO_TIER_NAME = "noTier";
   private static final String TIER_A_NAME = "tierA";
   private static final String TIER_B_NAME = "tierB";
+  public static final long SLEEP_TIME_AFTER_INSTANCE_UPDATE = 100L;
 
   @BeforeClass
   public void setUp()
@@ -360,24 +361,27 @@ public class TableRebalancerClusterTest extends ControllerTest {
     for (int i = 0; i < 3; i++) {
       addFakeServerInstanceToAutoJoinHelixCluster(TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + i, false);
     }
+    Thread.sleep(SLEEP_TIME_AFTER_INSTANCE_UPDATE);
     _helixResourceManager.createServerTenant(new Tenant(TenantRole.SERVER, TIER_A_NAME, 3, 3, 0));
     for (int i = 0; i < 3; i++) {
       addFakeServerInstanceToAutoJoinHelixCluster(TIER_B_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + i, false);
     }
+    Thread.sleep(SLEEP_TIME_AFTER_INSTANCE_UPDATE);
     _helixResourceManager.createServerTenant(new Tenant(TenantRole.SERVER, TIER_B_NAME, 3, 3, 0));
 
     // rebalance is NOOP and no change in assignment caused by new instances
     rebalanceResult = tableRebalancer.rebalance(tableConfig, new BaseConfiguration());
+    Thread.sleep(SLEEP_TIME_AFTER_INSTANCE_UPDATE);
+
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
     // Segment assignment should not change
     assertEquals(rebalanceResult.getSegmentAssignment(), oldSegmentAssignment);
 
     // add tier config
     tableConfig.setTierConfigsList(Lists.newArrayList(
-        new TierConfig(TIER_A_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "7d",
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, TIER_A_NAME + "_OFFLINE"),
-        new TierConfig(TIER_B_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "15d",
-            TierFactory.PINOT_SERVER_STORAGE_TYPE,  TIER_B_NAME + "_OFFLINE")));
+        new TierConfig(TIER_A_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "7d", TierFactory.PINOT_SERVER_STORAGE_TYPE,
+            TIER_A_NAME + "_OFFLINE"), new TierConfig(TIER_B_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "15d",
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, TIER_B_NAME + "_OFFLINE")));
     _helixResourceManager.updateTableConfig(tableConfig);
 
     // rebalance should change assignment
