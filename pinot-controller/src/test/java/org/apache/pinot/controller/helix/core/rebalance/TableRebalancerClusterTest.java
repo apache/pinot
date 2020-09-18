@@ -387,10 +387,12 @@ public class TableRebalancerClusterTest extends ControllerTest {
             TIER_A_NAME + "_OFFLINE"), new TierConfig(TIER_B_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "15d",
             TierFactory.PINOT_SERVER_STORAGE_TYPE, TIER_B_NAME + "_OFFLINE")));
     _helixResourceManager.updateTableConfig(tableConfig);
+    Thread.sleep(SLEEP_TIME_AFTER_INSTANCE_UPDATE);
 
     // rebalance should change assignment
     rebalanceResult = tableRebalancer.rebalance(tableConfig, new BaseConfiguration());
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+    Thread.sleep(SLEEP_TIME_AFTER_INSTANCE_UPDATE);
 
     // check that segments have moved to tiers
     Map<String, Map<String, String>> tierSegmentAssignment = rebalanceResult.getSegmentAssignment();
