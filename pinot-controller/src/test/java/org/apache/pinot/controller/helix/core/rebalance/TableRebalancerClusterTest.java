@@ -331,7 +331,11 @@ public class TableRebalancerClusterTest extends ControllerTest {
     for (int i = 0; i < numServers; i++) {
       addFakeServerInstanceToAutoJoinHelixCluster(NO_TIER_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + i, false);
     }
+    Thread.sleep(SLEEP_TIME_AFTER_INSTANCE_UPDATE);
+
     _helixResourceManager.createServerTenant(new Tenant(TenantRole.SERVER, NO_TIER_NAME, numServers, numServers, 0));
+
+    Thread.sleep(SLEEP_TIME_AFTER_INSTANCE_UPDATE);
 
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TIERED_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
