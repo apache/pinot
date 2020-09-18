@@ -34,7 +34,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.thirdeye.constant.AnomalyFeedbackType.*;
-import static org.junit.Assert.*;
+import static org.testng.Assert.*;
 
 
 public class TestPrecisionRecallEvaluator {

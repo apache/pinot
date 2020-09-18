@@ -39,11 +39,10 @@ import org.apache.pinot.thirdeye.detection.MockPipeline;
 import org.apache.pinot.thirdeye.detection.MockPipelineLoader;
 import org.apache.pinot.thirdeye.detection.MockPipelineOutput;
 import org.apache.pinot.thirdeye.detection.wrapper.AnomalyLabelerWrapper;
+
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
-
-import static org.apache.pinot.thirdeye.detection.spec.SeverityThresholdLabelerSpec.Threshold;
 
 public class ThresholdSeverityLabelerTest {
   private static final String METRIC_URN = "thirdeye:metric:123";
@@ -106,10 +105,10 @@ public class ThresholdSeverityLabelerTest {
 
   @Test
   public void testLabeling() throws Exception {
-    Map<String, Object> severityMap = new HashMap<>();
-    severityMap.put(AnomalySeverity.CRITICAL.toString(), new Threshold(0.2, 3000));
-    severityMap.put(AnomalySeverity.HIGH.toString(), new Threshold(0.15, 2000));
-    severityMap.put(AnomalySeverity.MEDIUM.toString(), new Threshold(0.12, 1500));
+    Map<String, Map<String, Object>> severityMap = new HashMap<>();
+    severityMap.put(AnomalySeverity.CRITICAL.toString(), ImmutableMap.of("change",0.2, "duration", 3000));
+    severityMap.put(AnomalySeverity.HIGH.toString(), ImmutableMap.of("change", 0.15, "duration", 2000));
+    severityMap.put(AnomalySeverity.MEDIUM.toString(), ImmutableMap.of("change", 0.12, "duration", 1500));
     this.specs.put("severity", severityMap);
     this.thresholdSeverityLabeler = new AnomalyLabelerWrapper(this.testDataProvider, this.config, 1000L, 6000L);
     DetectionPipelineResult result = this.thresholdSeverityLabeler.run();
@@ -124,10 +123,8 @@ public class ThresholdSeverityLabelerTest {
   @Test
   public void testLabelingSingleThreshold() throws Exception {
     Map<String, Object> severityMap = new HashMap<>();
-    Threshold singleThreshold = new Threshold();
-    singleThreshold.duration = 2000L;
-    severityMap.put(AnomalySeverity.CRITICAL.toString(), singleThreshold);
-    severityMap.put(AnomalySeverity.HIGH.toString(), new Threshold(0.15, 2000));
+    severityMap.put(AnomalySeverity.CRITICAL.toString(), ImmutableMap.of("duration", 2000));
+    severityMap.put(AnomalySeverity.HIGH.toString(), ImmutableMap.of("change", 0.15, "duration", 2000));
     this.specs.put("severity", severityMap);
     this.thresholdSeverityLabeler = new AnomalyLabelerWrapper(this.testDataProvider, this.config, 1000L, 6000L);
     DetectionPipelineResult result = this.thresholdSeverityLabeler.run();
@@ -142,9 +139,9 @@ public class ThresholdSeverityLabelerTest {
   @Test
   public void testLabelingHigherSeverity() throws Exception {
     Map<String, Object> severityMap = new HashMap<>();
-    severityMap.put(AnomalySeverity.CRITICAL.toString(), new Threshold(0.2, 3000));
-    severityMap.put(AnomalySeverity.HIGH.toString(), new Threshold(0.15, 2000));
-    severityMap.put(AnomalySeverity.MEDIUM.toString(), new Threshold(0.12, 1500));
+    severityMap.put(AnomalySeverity.CRITICAL.toString(), ImmutableMap.of("change",0.2, "duration", 3000));
+    severityMap.put(AnomalySeverity.HIGH.toString(), ImmutableMap.of("change", 0.15, "duration", 2000));
+    severityMap.put(AnomalySeverity.MEDIUM.toString(), ImmutableMap.of("change", 0.12, "duration", 1500));
     this.specs.put("severity", severityMap);
     MergedAnomalyResultDTO anomaly = DetectionTestUtils.makeAnomaly(4000L, 6000L, METRIC_URN, 2400, 3000);
     anomaly.setSeverityLabel(AnomalySeverity.HIGH);
@@ -162,9 +159,9 @@ public class ThresholdSeverityLabelerTest {
   @Test
   public void testLabelingLowerSeverity() throws Exception {
     Map<String, Object> severityMap = new HashMap<>();
-    severityMap.put(AnomalySeverity.CRITICAL.toString(), new Threshold(0.2, 3000));
-    severityMap.put(AnomalySeverity.HIGH.toString(), new Threshold(0.15, 2000));
-    severityMap.put(AnomalySeverity.MEDIUM.toString(), new Threshold(0.10, 1500));
+    severityMap.put(AnomalySeverity.CRITICAL.toString(), ImmutableMap.of("change",0.2, "duration", 3000));
+    severityMap.put(AnomalySeverity.HIGH.toString(), ImmutableMap.of("change", 0.15, "duration", 2000));
+    severityMap.put(AnomalySeverity.MEDIUM.toString(), ImmutableMap.of("change", 0.1, "duration", 1500));
     this.specs.put("severity", severityMap);
     MergedAnomalyResultDTO anomaly = DetectionTestUtils.makeAnomaly(4200L, 6000L, METRIC_URN, 2700, 3000);
     anomaly.setSeverityLabel(AnomalySeverity.HIGH);

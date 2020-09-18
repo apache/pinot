@@ -42,6 +42,12 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-java-client</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>org.slf4j</groupId>
+          <artifactId>slf4j-log4j12</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
 
     <dependency>

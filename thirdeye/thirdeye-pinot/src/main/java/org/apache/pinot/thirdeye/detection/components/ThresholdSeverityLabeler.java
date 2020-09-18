@@ -30,10 +30,11 @@ import org.apache.pinot.thirdeye.detection.annotation.Components;
 import org.apache.pinot.thirdeye.detection.annotation.DetectionTag;
 import org.apache.pinot.thirdeye.detection.spec.SeverityThresholdLabelerSpec;
 import org.apache.pinot.thirdeye.detection.spi.components.Labeler;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.thirdeye.detection.spec.SeverityThresholdLabelerSpec.Threshold;
+import static org.apache.pinot.thirdeye.detection.spec.SeverityThresholdLabelerSpec.*;
 
 /**
  * Threshold-based severity labeler, which labels anomalies with severity based on deviation from baseline and duration
@@ -45,6 +46,21 @@ public class ThresholdSeverityLabeler implements Labeler<SeverityThresholdLabele
   private final static Logger LOG = LoggerFactory.getLogger(ThresholdSeverityLabeler.class);
   // severity map ordered by priority from top to bottom
   private TreeMap<AnomalySeverity, Threshold> severityMap;
+
+  public static class Threshold {
+    public double change;
+    public long duration;
+
+    public Threshold() {
+      this.change = Double.MAX_VALUE;
+      this.duration = Long.MAX_VALUE;
+    }
+
+    public Threshold(double change, long duration) {
+      this.change = change;
+      this.duration = duration;
+    }
+  }
 
   @Override
   public Map<MergedAnomalyResultDTO, AnomalySeverity> label(List<MergedAnomalyResultDTO> anomalies) {
@@ -74,8 +90,19 @@ public class ThresholdSeverityLabeler implements Labeler<SeverityThresholdLabele
     this.severityMap = new TreeMap<>();
     for (String key : spec.getSeverity().keySet()) {
       try {
-        AnomalySeverity severity = AnomalySeverity.valueOf(key);
-        this.severityMap.put(severity, spec.getSeverity().get(key));
+        AnomalySeverity severity = AnomalySeverity.valueOf(key.toUpperCase());
+        Threshold threshold = new Threshold();
+        if (spec.getSeverity().get(key).containsKey(CHANGE_KEY)) {
+          threshold.change = (Double) spec.getSeverity().get(key).get(CHANGE_KEY);
+        }
+        if (spec.getSeverity().get(key).containsKey(DURATION_KEY)) {
+          try {
+            threshold.duration = (Long) spec.getSeverity().get(key).get(DURATION_KEY);
+          } catch (ClassCastException e) {
+            threshold.duration = ((Integer) spec.getSeverity().get(key).get(DURATION_KEY)).longValue();
+          }
+        }
+        this.severityMap.put(severity, threshold);
       } catch (IllegalArgumentException e) {
         LOG.error("Cannot find valid anomaly severity, so ignoring...", e);
       }
