@@ -71,6 +71,7 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
   private static final int NUM_REALTIME_SERVERS = 2;
   private static final int NUM_OFFLINE_AVRO_FILES = 8;
   private static final int NUM_REALTIME_AVRO_FILES = 6;
+  public static final long SLEEP_TIME_AFTER_INSTANCE_UPDATE = 1000L;
 
   private String _currentTable = DEFAULT_TABLE_NAME;
 
@@ -109,15 +110,22 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
 
     Map<String, Object> properties = getDefaultControllerConfiguration();
     properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
-    properties.put(ControllerPeriodicTasksConf.STATUS_CHECKER_INITIAL_DELAY_IN_SECONDS, PERIODIC_TASK_INITIAL_DELAY_SECONDS);
+    properties
+        .put(ControllerPeriodicTasksConf.STATUS_CHECKER_INITIAL_DELAY_IN_SECONDS, PERIODIC_TASK_INITIAL_DELAY_SECONDS);
     properties.put(ControllerPeriodicTasksConf.STATUS_CHECKER_FREQUENCY_IN_SECONDS, PERIODIC_TASK_FREQUENCY_SECONDS);
-    properties.put(ControllerPeriodicTasksConf.DEPRECATED_REALTIME_SEGMENT_RELOCATION_INITIAL_DELAY_IN_SECONDS, PERIODIC_TASK_INITIAL_DELAY_SECONDS);
-    properties.put(ControllerPeriodicTasksConf.DEPRECATED_REALTIME_SEGMENT_RELOCATOR_FREQUENCY, PERIODIC_TASK_FREQUENCY);
-    properties.put(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_INITIAL_DELAY_IN_SECONDS, PERIODIC_TASK_INITIAL_DELAY_SECONDS);
-    properties.put(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS, PERIODIC_TASK_FREQUENCY_SECONDS);
-    properties.put(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_INITIAL_DELAY_IN_SECONDS, PERIODIC_TASK_INITIAL_DELAY_SECONDS);
-    properties.put(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS, PERIODIC_TASK_FREQUENCY_SECONDS);
-    
+    properties.put(ControllerPeriodicTasksConf.DEPRECATED_REALTIME_SEGMENT_RELOCATION_INITIAL_DELAY_IN_SECONDS,
+        PERIODIC_TASK_INITIAL_DELAY_SECONDS);
+    properties
+        .put(ControllerPeriodicTasksConf.DEPRECATED_REALTIME_SEGMENT_RELOCATOR_FREQUENCY, PERIODIC_TASK_FREQUENCY);
+    properties.put(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_INITIAL_DELAY_IN_SECONDS,
+        PERIODIC_TASK_INITIAL_DELAY_SECONDS);
+    properties.put(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS,
+        PERIODIC_TASK_FREQUENCY_SECONDS);
+    properties.put(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_INITIAL_DELAY_IN_SECONDS,
+        PERIODIC_TASK_INITIAL_DELAY_SECONDS);
+    properties.put(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS,
+        PERIODIC_TASK_FREQUENCY_SECONDS);
+
     startController(properties);
     startBrokers(NUM_BROKERS);
     startServers(NUM_OFFLINE_SERVERS + NUM_REALTIME_SERVERS);
@@ -299,13 +307,16 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
   }
 
   @Test
-  public void testBrokerResourceValidationManager() {
+  public void testBrokerResourceValidationManager()
+      throws Exception {
     // Add a new broker with the same tag
     String brokerId = "Broker_localhost_1234";
     InstanceConfig instanceConfig = InstanceConfig.toInstanceConfig(brokerId);
     instanceConfig.addTag(TagNameUtils.getBrokerTagForTenant(TENANT_NAME));
     String helixClusterName = getHelixClusterName();
     _helixAdmin.addInstance(helixClusterName, instanceConfig);
+
+    Thread.sleep(SLEEP_TIME_AFTER_INSTANCE_UPDATE);
     Set<String> brokersAfterAdd = _helixResourceManager.getAllInstancesForBrokerTenant(TENANT_NAME);
     assertTrue(brokersAfterAdd.contains(brokerId));
 
@@ -318,6 +329,7 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
 
     // Drop the new added broker
     _helixAdmin.dropInstance(helixClusterName, instanceConfig);
+    Thread.sleep(SLEEP_TIME_AFTER_INSTANCE_UPDATE);
     Set<String> brokersAfterDrop = _helixResourceManager.getAllInstancesForBrokerTenant(TENANT_NAME);
     assertFalse(brokersAfterDrop.contains(brokerId));
 
