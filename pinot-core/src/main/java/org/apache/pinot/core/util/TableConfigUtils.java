@@ -31,6 +31,7 @@ import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.core.data.function.FunctionEvaluator;
 import org.apache.pinot.core.data.function.FunctionEvaluatorFactory;
+import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.IngestionConfig;
@@ -288,13 +289,17 @@ public final class TableConfigUtils {
         }
         // Function column pairs cannot be null
         for (String functionColumnPair : starTreeIndexConfig.getFunctionColumnPairs()) {
-          String[] functionColumnArray = functionColumnPair.split("__");
-          if (functionColumnArray.length != 2) {
+          AggregationFunctionColumnPair columnPair;
+          try {
+            columnPair = AggregationFunctionColumnPair.fromColumnName(functionColumnPair);
+          } catch (Exception e) {
             throw new IllegalStateException("Invalid StarTreeIndex config: " + functionColumnPair + ". Must be"
                 + "in the form <Aggregation function>__<Column name>");
           }
-          String columnName = functionColumnArray[1];
-          columnNameToConfigMap.put(columnName, "StarTreeIndex Config");
+          String columnName = columnPair.getColumn();
+          if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {
+            columnNameToConfigMap.put(columnName, "StarTreeIndex Config");
+          }
         }
         List<String> skipDimensionList = starTreeIndexConfig.getSkipStarNodeCreationForDimensions();
         if (skipDimensionList != null) {
