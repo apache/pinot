@@ -20,8 +20,10 @@ package org.apache.pinot.core.util;
 
 import com.google.common.base.Preconditions;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.tier.TierFactory;
@@ -29,8 +31,12 @@ import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.core.data.function.FunctionEvaluator;
 import org.apache.pinot.core.data.function.FunctionEvaluatorFactory;
+import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
+import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.IngestionConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
@@ -55,8 +61,9 @@ public final class TableConfigUtils {
    * 1. Validation config
    * 2. IngestionConfig
    * 3. TierConfigs
+   * 4. Indexing config
    *
-   * TODO: Add more validations for each section (e.g. verify column names used in the indexing, validate conditions are met for aggregateMetrics etc)
+   * TODO: Add more validations for each section (e.g. validate conditions are met for aggregateMetrics)
    */
   public static void validate(TableConfig tableConfig, @Nullable Schema schema) {
     if (tableConfig.getTableType() == TableType.REALTIME) {
@@ -65,6 +72,8 @@ public final class TableConfigUtils {
     validateValidationConfig(tableConfig, schema);
     validateIngestionConfig(tableConfig.getIngestionConfig(), schema);
     validateTierConfigList(tableConfig.getTierConfigsList());
+    validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
+    validateFieldConfigList(tableConfig.getFieldConfigList(), schema);
   }
 
   /**
@@ -75,8 +84,8 @@ public final class TableConfigUtils {
    */
   public static void validateTableName(TableConfig tableConfig) {
     String tableName = tableConfig.getTableName();
-    if (tableName.contains(".")) {
-      throw new IllegalStateException("Table name: '" + tableName + "' containing '.' is not allowed");
+    if (tableName.contains(".") || tableName.contains(" ")) {
+      throw new IllegalStateException("Table name: '" + tableName + "' containing '.' or space is not allowed");
     }
   }
 
@@ -223,6 +232,105 @@ public final class TableConfigUtils {
       } else {
         throw new IllegalStateException("Unsupported storageType: " + storageType + " in tier: " + tierName);
       }
+    }
+  }
+
+  /**
+   * Validates the Indexing Config
+   * Ensures that every referred column name exists in the corresponding schema
+   */
+  private static void validateIndexingConfig(@Nullable IndexingConfig indexingConfig, @Nullable Schema schema) {
+    if (indexingConfig == null || schema == null) {
+      return;
+    }
+    Map<String, String> columnNameToConfigMap = new HashMap<>();
+
+    if (indexingConfig.getBloomFilterColumns() != null) {
+      for (String columnName : indexingConfig.getBloomFilterColumns()) {
+        columnNameToConfigMap.put(columnName, "Bloom Filter Config");
+      }
+    }
+    if (indexingConfig.getInvertedIndexColumns() != null) {
+      for (String columnName : indexingConfig.getInvertedIndexColumns()) {
+        columnNameToConfigMap.put(columnName, "Inverted Index Config");
+      }
+    }
+    if (indexingConfig.getNoDictionaryColumns() != null) {
+      for (String columnName : indexingConfig.getNoDictionaryColumns()) {
+        columnNameToConfigMap.put(columnName, "No Dictionary Column Config");
+      }
+    }
+    if (indexingConfig.getOnHeapDictionaryColumns() != null) {
+      for (String columnName : indexingConfig.getOnHeapDictionaryColumns()) {
+        columnNameToConfigMap.put(columnName, "On Heap Dictionary Column Config");
+      }
+    }
+    if (indexingConfig.getRangeIndexColumns() != null) {
+      for (String columnName : indexingConfig.getRangeIndexColumns()) {
+        columnNameToConfigMap.put(columnName, "Range Column Config");
+      }
+    }
+    if (indexingConfig.getSortedColumn() != null) {
+      for (String columnName : indexingConfig.getSortedColumn()) {
+        columnNameToConfigMap.put(columnName, "Sorted Column Config");
+      }
+    }
+    if (indexingConfig.getVarLengthDictionaryColumns() != null) {
+      for (String columnName : indexingConfig.getVarLengthDictionaryColumns()) {
+        columnNameToConfigMap.put(columnName, "Var Length Column Config");
+      }
+    }
+    List<StarTreeIndexConfig> starTreeIndexConfigList = indexingConfig.getStarTreeIndexConfigs();
+    if (starTreeIndexConfigList != null) {
+      for (StarTreeIndexConfig starTreeIndexConfig : starTreeIndexConfigList) {
+        // Dimension split order cannot be null
+        for (String columnName : starTreeIndexConfig.getDimensionsSplitOrder()) {
+          columnNameToConfigMap.put(columnName, "StarTreeIndex Config");
+        }
+        // Function column pairs cannot be null
+        for (String functionColumnPair : starTreeIndexConfig.getFunctionColumnPairs()) {
+          AggregationFunctionColumnPair columnPair;
+          try {
+            columnPair = AggregationFunctionColumnPair.fromColumnName(functionColumnPair);
+          } catch (Exception e) {
+            throw new IllegalStateException("Invalid StarTreeIndex config: " + functionColumnPair + ". Must be"
+                + "in the form <Aggregation function>__<Column name>");
+          }
+          String columnName = columnPair.getColumn();
+          if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {
+            columnNameToConfigMap.put(columnName, "StarTreeIndex Config");
+          }
+        }
+        List<String> skipDimensionList = starTreeIndexConfig.getSkipStarNodeCreationForDimensions();
+        if (skipDimensionList != null) {
+          for (String columnName : skipDimensionList) {
+            columnNameToConfigMap.put(columnName, "StarTreeIndex Config");
+          }
+        }
+      }
+    }
+
+    for (Map.Entry<String, String> entry : columnNameToConfigMap.entrySet()) {
+      String columnName = entry.getKey();
+      String configName = entry.getValue();
+      Preconditions.checkState(schema.getFieldSpecFor(columnName) != null,
+          "Column Name " + columnName + " defined in " + configName + " must be a valid column defined in the schema");
+    }
+  }
+
+  /**
+   * Validates the Field Config List in the given TableConfig
+   * Ensures that every referred column name exists in the corresponding schema
+   */
+  private static void validateFieldConfigList(@Nullable List<FieldConfig> fieldConfigList, @Nullable Schema schema) {
+    if (fieldConfigList == null || schema == null) {
+      return;
+    }
+
+    for (FieldConfig fieldConfig : fieldConfigList) {
+      String columnName = fieldConfig.getName();
+      Preconditions.checkState(schema.getFieldSpecFor(columnName) != null,
+          "Column Name " + columnName + " defined in field config list must be a valid column defined in the schema");
     }
   }
 }
