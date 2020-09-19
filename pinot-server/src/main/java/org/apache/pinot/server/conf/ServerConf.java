@@ -19,10 +19,16 @@
 package org.apache.pinot.server.conf;
 
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Server;
 import org.apache.pinot.spi.env.PinotConfiguration;
+
+import static org.apache.pinot.common.utils.CommonConstants.Server.DEFAULT_ENABLE_TABLE_LEVEL_METRICS;
+import static org.apache.pinot.common.utils.CommonConstants.Server.CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS;
+import static org.apache.pinot.common.utils.CommonConstants.Server.CONFIG_OF_WHITELISTED_TABLES_FOR_EMITTING_METRICS;
 
 
 /**
@@ -34,7 +40,6 @@ public class ServerConf {
   private static final String PINOT_SERVER_INSTANCE = "pinot.server.instance";
   private static final String PINOT_SERVER_METRICS = "pinot.server.metrics";
   private static final String PINOT_SERVER_METRICS_PREFIX = "pinot.server.metrics.prefix";
-  private static final String PINOT_SERVER_TABLE_LEVEL_METRICS = "pinot.server.enableTableLevelMetrics";
   private static final String PINOT_SERVER_QUERY = "pinot.server.query.executor";
   private static final String PINOT_SERVER_REQUEST = "pinot.server.request";
   private static final String PINOT_SERVER_INSTANCE_DATA_MANAGER_CLASS = "pinot.server.instance.data.manager.class";
@@ -106,7 +111,11 @@ public class ServerConf {
   }
 
   public boolean emitTableLevelMetrics() {
-    return _serverConf.getProperty(PINOT_SERVER_TABLE_LEVEL_METRICS, true);
+    return _serverConf.getProperty(CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS, DEFAULT_ENABLE_TABLE_LEVEL_METRICS);
+  }
+
+  public Collection<String> getWhitelistedTablesForEmittingMetrics() {
+    return _serverConf.getProperty(CONFIG_OF_WHITELISTED_TABLES_FOR_EMITTING_METRICS, Collections.emptyList());
   }
 
   public String getMetricsPrefix() {

@@ -19,8 +19,10 @@
 package org.apache.pinot.common.metrics;
 
 import com.yammer.metrics.core.MetricsRegistry;
+import java.util.Collection;
+import java.util.Collections;
 
-import static org.apache.pinot.common.utils.CommonConstants.Broker.DEFAULT_METRICS_GLOBAL_ENABLED;
+import static org.apache.pinot.common.utils.CommonConstants.Broker.DEFAULT_ENABLE_TABLE_LEVEL_METRICS;
 import static org.apache.pinot.common.utils.CommonConstants.Broker.DEFAULT_METRICS_NAME_PREFIX;
 
 
@@ -36,15 +38,17 @@ public class BrokerMetrics extends AbstractMetrics<BrokerQueryPhase, BrokerMeter
    * @param metricsRegistry The metric registry used to register timers and meters.
    */
   public BrokerMetrics(MetricsRegistry metricsRegistry) {
-    this(metricsRegistry, DEFAULT_METRICS_GLOBAL_ENABLED);
+    this(metricsRegistry, DEFAULT_ENABLE_TABLE_LEVEL_METRICS, Collections.emptySet());
   }
 
-  public BrokerMetrics(MetricsRegistry metricsRegistry, boolean global) {
-    this(DEFAULT_METRICS_NAME_PREFIX, metricsRegistry, global);
+  public BrokerMetrics(MetricsRegistry metricsRegistry, boolean isTableLevelMetricsEnabled,
+      Collection<String> whitelistedTables) {
+    this(DEFAULT_METRICS_NAME_PREFIX, metricsRegistry, isTableLevelMetricsEnabled, whitelistedTables);
   }
 
-  public BrokerMetrics(String prefix, MetricsRegistry metricsRegistry, boolean global) {
-    super(prefix, metricsRegistry, BrokerMetrics.class, global);
+  public BrokerMetrics(String prefix, MetricsRegistry metricsRegistry, boolean isTableLevelMetricsEnabled,
+      Collection<String> whitelistedTables) {
+    super(prefix, metricsRegistry, BrokerMetrics.class, isTableLevelMetricsEnabled, whitelistedTables);
   }
 
   @Override
