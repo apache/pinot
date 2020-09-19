@@ -35,6 +35,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
@@ -96,7 +98,9 @@ public class MutableSegmentImpl implements MutableSegment {
 
   private final Logger _logger;
   private final long _startTimeMillis = System.currentTimeMillis();
+  private final ServerMetrics _serverMetrics;
 
+  private final String _tableNameWithType;
   private final String _segmentName;
   private final Schema _schema;
   private final String _timeColumnName;
@@ -107,7 +111,6 @@ public class MutableSegmentImpl implements MutableSegment {
   private final RealtimeSegmentStatsHistory _statsHistory;
   private final String _partitionColumn;
   private final PartitionFunction _partitionFunction;
-  private final int _partitionId;
   private final boolean _nullHandlingEnabled;
 
   private final Map<String, IndexContainer> _indexContainerMap = new HashMap<>();
@@ -133,7 +136,10 @@ public class MutableSegmentImpl implements MutableSegment {
   private final Map<String, FieldSpec> _newlyAddedColumnsFieldMap = new ConcurrentHashMap();
   private final Map<String, FieldSpec> _newlyAddedPhysicalColumnsFieldMap = new ConcurrentHashMap();
 
-  public MutableSegmentImpl(RealtimeSegmentConfig config) {
+  public MutableSegmentImpl(RealtimeSegmentConfig config, @Nullable ServerMetrics serverMetrics) {
+    _serverMetrics = serverMetrics;
+
+    _tableNameWithType = config.getTableNameWithType();
     _segmentName = config.getSegmentName();
     _schema = config.getSchema();
     _timeColumnName = config.getTimeColumnName();
@@ -160,7 +166,6 @@ public class MutableSegmentImpl implements MutableSegment {
     _statsHistory = config.getStatsHistory();
     _partitionColumn = config.getPartitionColumn();
     _partitionFunction = config.getPartitionFunction();
-    _partitionId = config.getPartitionId();
     _nullHandlingEnabled = config.isNullHandlingEnabled();
     _aggregateMetrics = config.aggregateMetrics();
 
@@ -205,10 +210,16 @@ public class MutableSegmentImpl implements MutableSegment {
 
       // Partition info
       PartitionFunction partitionFunction = null;
-      int partitionId = 0;
+      Set<Integer> partitions = null;
       if (column.equals(_partitionColumn)) {
         partitionFunction = _partitionFunction;
-        partitionId = _partitionId;
+
+        // NOTE: Use a concurrent set because the partitions can be updated when the partition of the ingested record
+        //       does not match the stream partition. This could happen when stream partition changes, or the records
+        //       are not properly partitioned from the stream. Log an warning and emit a metric if it happens, then add
+        //       the new partition into this set.
+        partitions = ConcurrentHashMap.newKeySet();
+        partitions.add(config.getPartitionId());
       }
 
       // Check whether to generate raw index for the column while consuming
@@ -297,7 +308,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
       // TODO: Support range index and bloom filter for mutable segment
       _indexContainerMap.put(column,
-          new IndexContainer(fieldSpec, partitionFunction, partitionId, new NumValuesInfo(), forwardIndex, dictionary,
+          new IndexContainer(fieldSpec, partitionFunction, partitions, new NumValuesInfo(), forwardIndex, dictionary,
               invertedIndexReader, null, textIndex, null, nullValueVector));
     }
 
@@ -471,6 +482,17 @@ public class MutableSegmentImpl implements MutableSegment {
       FieldSpec fieldSpec = indexContainer._fieldSpec;
       if (fieldSpec.isSingleValueField()) {
         // Single-value column
+
+        // Check partitions
+        if (column.equals(_partitionColumn)) {
+          int partition = _partitionFunction.getPartition(value);
+          if (indexContainer._partitions.add(partition)) {
+            _logger.warn("Found new partition: {} from partition column: {}, value: {}", partition, column, value);
+            if (_serverMetrics != null) {
+              _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REALTIME_PARTITION_MISMATCH, 1);
+            }
+          }
+        }
 
         // Update numValues info
         indexContainer._numValuesInfo.updateSVEntry();
@@ -967,7 +989,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private class IndexContainer implements Closeable {
     final FieldSpec _fieldSpec;
     final PartitionFunction _partitionFunction;
-    final int _partitionId;
+    final Set<Integer> _partitions;
     final NumValuesInfo _numValuesInfo;
     final MutableForwardIndex _forwardIndex;
     final BaseMutableDictionary _dictionary;
@@ -984,14 +1006,14 @@ public class MutableSegmentImpl implements MutableSegment {
     int _dictId = Integer.MIN_VALUE;
     int[] _dictIds;
 
-    IndexContainer(FieldSpec fieldSpec, @Nullable PartitionFunction partitionFunction, int partitionId,
-        NumValuesInfo numValuesInfo, MutableForwardIndex forwardIndex, @Nullable BaseMutableDictionary dictionary,
-        @Nullable RealtimeInvertedIndexReader invertedIndex, @Nullable InvertedIndexReader rangeIndex,
-        @Nullable RealtimeLuceneTextIndexReader textIndex, @Nullable BloomFilterReader bloomFilter,
-        @Nullable MutableNullValueVector nullValueVector) {
+    IndexContainer(FieldSpec fieldSpec, @Nullable PartitionFunction partitionFunction,
+        @Nullable Set<Integer> partitions, NumValuesInfo numValuesInfo, MutableForwardIndex forwardIndex,
+        @Nullable BaseMutableDictionary dictionary, @Nullable RealtimeInvertedIndexReader invertedIndex,
+        @Nullable InvertedIndexReader rangeIndex, @Nullable RealtimeLuceneTextIndexReader textIndex,
+        @Nullable BloomFilterReader bloomFilter, @Nullable MutableNullValueVector nullValueVector) {
       _fieldSpec = fieldSpec;
       _partitionFunction = partitionFunction;
-      _partitionId = partitionId;
+      _partitions = partitions;
       _numValuesInfo = numValuesInfo;
       _forwardIndex = forwardIndex;
       _dictionary = dictionary;
@@ -1004,7 +1026,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
     DataSource toDataSource() {
       return new MutableDataSource(_fieldSpec, _numDocsIndexed, _numValuesInfo._numValues,
-          _numValuesInfo._maxNumValuesPerMVEntry, _partitionFunction, _partitionId, _minValue, _maxValue, _forwardIndex,
+          _numValuesInfo._maxNumValuesPerMVEntry, _partitionFunction, _partitions, _minValue, _maxValue, _forwardIndex,
           _dictionary, _invertedIndex, _rangeIndex, _textIndex, _bloomFilter, _nullValueVector);
     }
 

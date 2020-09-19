@@ -364,7 +364,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     final long idlePipeSleepTimeMillis = 100;
     final long maxIdleCountBeforeStatUpdate = (3 * 60 * 1000) / (idlePipeSleepTimeMillis + _partitionLevelStreamConfig
         .getFetchTimeoutMillis());  // 3 minute count
-    StreamPartitionMsgOffset lastUpdatedOffset = _streamPartitionMsgOffsetFactory.create(_currentOffset);  // so that we always update the metric when we enter this method.
+    StreamPartitionMsgOffset lastUpdatedOffset = _streamPartitionMsgOffsetFactory
+        .create(_currentOffset);  // so that we always update the metric when we enter this method.
     long consecutiveIdleCount = 0;
     // At this point, we know that we can potentially move the offset, so the old saved segment file is not valid
     // anymore. Remove the file if it exists.
@@ -473,7 +474,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               GenericRow transformedRow = _recordTransformer.transform((GenericRow) singleRow);
               if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
                 realtimeRowsConsumedMeter = _serverMetrics
-                    .addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1, realtimeRowsConsumedMeter);
+                    .addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1,
+                        realtimeRowsConsumedMeter);
                 indexedMessageCount++;
                 canTakeMore = _realtimeSegment.index(transformedRow, msgMetadata);
               } else {
@@ -486,7 +488,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             GenericRow transformedRow = _recordTransformer.transform(decodedRow);
             if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
               realtimeRowsConsumedMeter = _serverMetrics
-                  .addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1, realtimeRowsConsumedMeter);
+                  .addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1,
+                      realtimeRowsConsumedMeter);
               indexedMessageCount++;
               canTakeMore = _realtimeSegment.index(transformedRow, msgMetadata);
             } else {
@@ -901,8 +904,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   protected void postStopConsumedMsg(String reason) {
     do {
       SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
-      params.withStreamPartitionMsgOffset(_currentOffset.toString()).withReason(reason)
-          .withSegmentName(_segmentNameStr).withInstanceId(_instanceId);
+      params.withStreamPartitionMsgOffset(_currentOffset.toString()).withReason(reason).withSegmentName(_segmentNameStr)
+          .withInstanceId(_instanceId);
 
       SegmentCompletionProtocol.Response response = _protocolHandler.segmentStoppedConsuming(params);
       if (response.getStatus() == SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED) {
@@ -919,7 +922,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // Retry maybe once if leader is not found.
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
     params.withStreamPartitionMsgOffset(_currentOffset.toString()).withSegmentName(_segmentNameStr)
-        .withReason(_stopReason) .withNumRows(_numRowsConsumed).withInstanceId(_instanceId);
+        .withReason(_stopReason).withNumRows(_numRowsConsumed).withInstanceId(_instanceId);
     if (_isOffHeap) {
       params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
     }
@@ -1165,9 +1168,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // Start new realtime segment
     String consumerDir = realtimeTableDataManager.getConsumerDir();
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
-        new RealtimeSegmentConfig.Builder().setSegmentName(_segmentNameStr).setStreamName(_streamTopic)
-            .setSchema(_schema).setTimeColumnName(timeColumnName).setCapacity(_segmentMaxRowCount)
-            .setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
+        new RealtimeSegmentConfig.Builder().setTableNameWithType(_tableNameWithType).setSegmentName(_segmentNameStr)
+            .setStreamName(_streamTopic).setSchema(_schema).setTimeColumnName(timeColumnName)
+            .setCapacity(_segmentMaxRowCount).setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
             .setNoDictionaryColumns(indexLoadingConfig.getNoDictionaryColumns())
             .setVarLengthDictionaryColumns(indexLoadingConfig.getVarLengthDictionaryColumns())
             .setInvertedIndexColumns(invertedIndexColumns).setTextIndexColumns(textIndexColumns)
@@ -1204,6 +1207,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         String partitionColumn = entry.getKey();
         ColumnPartitionConfig columnPartitionConfig = entry.getValue();
         String partitionFunctionName = columnPartitionConfig.getFunctionName();
+
+        // NOTE: Here we compare the number of partitions from the config and the stream, and log a warning and emit a
+        //       metric when they don't match, but use the one from the stream. The mismatch could happen when the
+        //       stream partitions are changed, but the table config has not been updated to reflect the change. In such
+        //       case, picking the number of partitions from the stream can keep the segment properly partitioned as
+        //       long as the partition function is not changed.
         int numPartitions = columnPartitionConfig.getNumPartitions();
         try {
           int numStreamPartitions = _streamMetadataProvider.fetchPartitionCount(/*maxWaitTimeMs=*/5000L);
@@ -1211,6 +1220,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             segmentLogger.warn(
                 "Number of stream partitions: {} does not match number of partitions in the partition config: {}, using number of stream partitions",
                 numStreamPartitions, numPartitions);
+            _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REALTIME_PARTITION_MISMATCH, 1);
             numPartitions = numStreamPartitions;
           }
         } catch (Exception e) {
@@ -1219,6 +1229,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               numPartitions, e);
           makeStreamMetadataProvider("Timeout getting number of stream partitions");
         }
+
         realtimeSegmentConfigBuilder.setPartitionColumn(partitionColumn);
         realtimeSegmentConfigBuilder
             .setPartitionFunction(PartitionFunctionFactory.getPartitionFunction(partitionFunctionName, numPartitions));
@@ -1228,7 +1239,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       }
     }
 
-    _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build());
+    _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), serverMetrics);
     _startOffset = _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getStartOffset());
     _currentOffset = _streamPartitionMsgOffsetFactory.create(_startOffset);
     _resourceTmpDir = new File(resourceDataDir, "_tmp");
@@ -1256,7 +1267,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       _consumeEndTime = now + minConsumeTimeMillis;
     }
 
-    _segmentCommitterFactory = new SegmentCommitterFactory(segmentLogger, _protocolHandler, tableConfig, indexLoadingConfig, serverMetrics);
+    _segmentCommitterFactory =
+        new SegmentCommitterFactory(segmentLogger, _protocolHandler, tableConfig, indexLoadingConfig, serverMetrics);
 
     segmentLogger
         .info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}", _llcSegmentName,
