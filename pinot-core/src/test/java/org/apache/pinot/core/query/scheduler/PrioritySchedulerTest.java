@@ -18,12 +18,10 @@
  */
 package org.apache.pinot.core.query.scheduler;
 
-import static org.apache.pinot.core.query.scheduler.TestHelper.createQueryRequest;
-import static org.apache.pinot.core.query.scheduler.TestHelper.createServerQueryRequest;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
-
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.Uninterruptibles;
+import com.yammer.metrics.core.MetricsRegistry;
+import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -39,12 +37,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.LongAccumulator;
-
-import javax.annotation.Nonnull;
-
+import javax.annotation.Nullable;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.common.datatable.DataTableImplV2;
@@ -58,9 +55,11 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.Uninterruptibles;
-import com.yammer.metrics.core.MetricsRegistry;
+import static org.apache.pinot.core.query.scheduler.TestHelper.createQueryRequest;
+import static org.apache.pinot.core.query.scheduler.TestHelper.createServerQueryRequest;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class PrioritySchedulerTest {
@@ -251,9 +250,9 @@ public class PrioritySchedulerTest {
     }
 
     // store locally for easy access
-    public TestPriorityScheduler(@Nonnull PinotConfiguration config, @Nonnull ResourceManager resourceManager,
-        @Nonnull QueryExecutor queryExecutor, @Nonnull SchedulerPriorityQueue queue, @Nonnull ServerMetrics metrics,
-        @Nonnull LongAccumulator latestQueryTime) {
+    public TestPriorityScheduler(PinotConfiguration config, ResourceManager resourceManager,
+        QueryExecutor queryExecutor, SchedulerPriorityQueue queue, ServerMetrics metrics,
+        LongAccumulator latestQueryTime) {
       super(config, resourceManager, queryExecutor, queue, metrics, latestQueryTime);
     }
 
@@ -286,8 +285,7 @@ public class PrioritySchedulerTest {
   static class TestQueryExecutor implements QueryExecutor {
 
     @Override
-    public void init(@Nonnull PinotConfiguration config, @Nonnull InstanceDataManager instanceDataManager,
-        @Nonnull ServerMetrics serverMetrics) {
+    public void init(PinotConfiguration config, InstanceDataManager instanceDataManager, ServerMetrics serverMetrics) {
     }
 
     @Override
@@ -298,9 +296,9 @@ public class PrioritySchedulerTest {
     public void shutDown() {
     }
 
-    @Nonnull
     @Override
-    public DataTable processQuery(@Nonnull ServerQueryRequest queryRequest, @Nonnull ExecutorService executorService) {
+    public DataTable processQuery(ServerQueryRequest queryRequest, ExecutorService executorService,
+        @Nullable StreamObserver<Server.ServerResponse> responseObserver) {
       if (useBarrier) {
         try {
           startupBarrier.await();
