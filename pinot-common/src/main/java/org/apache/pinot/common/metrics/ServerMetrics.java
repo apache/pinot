@@ -37,13 +37,13 @@ public class ServerMetrics extends AbstractMetrics<ServerQueryPhase, ServerMeter
   }
 
   public ServerMetrics(MetricsRegistry metricsRegistry, boolean isTableLevelMetricsEnabled,
-      Collection<String> whitelistedTables) {
-    this(DEFAULT_METRICS_PREFIX, metricsRegistry, isTableLevelMetricsEnabled, whitelistedTables);
+      Collection<String> allowedTables) {
+    this(DEFAULT_METRICS_PREFIX, metricsRegistry, isTableLevelMetricsEnabled, allowedTables);
   }
 
   public ServerMetrics(String prefix, MetricsRegistry metricsRegistry, boolean isTableLevelMetricsEnabled,
-      Collection<String> whitelistedTables) {
-    super(prefix, metricsRegistry, ServerMetrics.class, isTableLevelMetricsEnabled, whitelistedTables);
+      Collection<String> allowedTables) {
+    super(prefix, metricsRegistry, ServerMetrics.class, isTableLevelMetricsEnabled, allowedTables);
   }
 
   @Override

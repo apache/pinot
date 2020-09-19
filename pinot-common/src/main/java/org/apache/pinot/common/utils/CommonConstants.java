@@ -142,8 +142,8 @@ public class CommonConstants {
     public static final long DEFAULT_DELAY_SHUTDOWN_TIME_MS = 10_000L;
     public static final String CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS = "pinot.broker.enableTableLevelMetrics";
     public static final boolean DEFAULT_ENABLE_TABLE_LEVEL_METRICS = true;
-    public static final String CONFIG_OF_WHITELISTED_TABLES_FOR_EMITTING_METRICS =
-        "pinot.broker.whitelistedTablesForEmittingMetrics";
+    public static final String CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS =
+        "pinot.broker.allowedTablesForEmittingMetrics";
 
     public static final String CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT = "pinot.broker.query.response.limit";
     public static final int DEFAULT_BROKER_QUERY_RESPONSE_LIMIT = Integer.MAX_VALUE;
@@ -283,8 +283,8 @@ public class CommonConstants {
     public static final String DEFAULT_METRICS_PREFIX = "pinot.server.";
     public static final String CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS = "pinot.server.enableTableLevelMetrics";
     public static final boolean DEFAULT_ENABLE_TABLE_LEVEL_METRICS = true;
-    public static final String CONFIG_OF_WHITELISTED_TABLES_FOR_EMITTING_METRICS =
-        "pinot.server.whitelistedTablesForEmittingMetrics";
+    public static final String CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS =
+        "pinot.server.allowedTablesForEmittingMetrics";
     public static final String ACCESS_CONTROL_FACTORY_CLASS = "pinot.server.admin.access.control.factory.class";
     public static final String DEFAULT_ACCESS_CONTROL_FACTORY_CLASS =
         "org.apache.pinot.server.api.access.AllowAllAccessFactory";

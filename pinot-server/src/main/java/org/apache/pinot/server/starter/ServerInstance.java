@@ -69,7 +69,7 @@ public class ServerInstance {
     MetricsHelper.registerMetricsRegistry(metricsRegistry);
     _serverMetrics =
         new ServerMetrics(serverConf.getMetricsPrefix(), metricsRegistry, serverConf.emitTableLevelMetrics(),
-            serverConf.getWhitelistedTablesForEmittingMetrics());
+            serverConf.getAllowedTablesForEmittingMetrics());
     _serverMetrics.initializeGlobalMeters();
 
     String instanceDataManagerClassName = serverConf.getInstanceDataManagerClassName();

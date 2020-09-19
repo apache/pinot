@@ -28,7 +28,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 
 import static org.apache.pinot.common.utils.CommonConstants.Server.DEFAULT_ENABLE_TABLE_LEVEL_METRICS;
 import static org.apache.pinot.common.utils.CommonConstants.Server.CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS;
-import static org.apache.pinot.common.utils.CommonConstants.Server.CONFIG_OF_WHITELISTED_TABLES_FOR_EMITTING_METRICS;
+import static org.apache.pinot.common.utils.CommonConstants.Server.CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS;
 
 
 /**
@@ -114,8 +114,8 @@ public class ServerConf {
     return _serverConf.getProperty(CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS, DEFAULT_ENABLE_TABLE_LEVEL_METRICS);
   }
 
-  public Collection<String> getWhitelistedTablesForEmittingMetrics() {
-    return _serverConf.getProperty(CONFIG_OF_WHITELISTED_TABLES_FOR_EMITTING_METRICS, Collections.emptyList());
+  public Collection<String> getAllowedTablesForEmittingMetrics() {
+    return _serverConf.getProperty(CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS, Collections.emptyList());
   }
 
   public String getMetricsPrefix() {

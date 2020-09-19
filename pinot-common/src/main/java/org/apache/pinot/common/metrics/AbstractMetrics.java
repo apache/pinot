@@ -55,28 +55,28 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
   private final boolean _isTableLevelMetricsEnabled;
 
-  // Table level metrics are still emitted for whitelisted tables even if emitting table level metrics is disabled
-  private final Set<String> _whitelistedTables;
+  // Table level metrics are still emitted for allowed tables even if emitting table level metrics is disabled
+  private final Set<String> _allowedTables;
 
   public AbstractMetrics(String metricPrefix, MetricsRegistry metricsRegistry, Class clazz) {
     this(metricPrefix, metricsRegistry, clazz, true, Collections.emptySet());
   }
 
   public AbstractMetrics(String metricPrefix, MetricsRegistry metricsRegistry, Class clazz,
-      boolean isTableLevelMetricsEnabled, Collection<String> whitelistedTables) {
+      boolean isTableLevelMetricsEnabled, Collection<String> allowedTables) {
     _metricPrefix = metricPrefix;
     _metricsRegistry = metricsRegistry;
     _clazz = clazz;
     _isTableLevelMetricsEnabled = isTableLevelMetricsEnabled;
-    _whitelistedTables = addNameVariations(whitelistedTables);
+    _allowedTables = addNameVariations(allowedTables);
   }
 
   /**
    * Some metrics use raw table name and some use table name with type. This method adds all variations of the table
-   * name to the whitelist entries to make sure that all metrics are checked against whitelisted tables.
+   * name to the allowed entries to make sure that all metrics are checked against the allowed tables.
    */
-  private static Set<String> addNameVariations(Collection<String> whitelistedTables) {
-    return whitelistedTables.stream()
+  private static Set<String> addNameVariations(Collection<String> allowedTables) {
+    return allowedTables.stream()
         .flatMap(tableName -> TableNameBuilder.getTableNameVariations(tableName).stream())
         .collect(Collectors.toCollection(HashSet::new));
   }
@@ -468,6 +468,6 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   protected abstract G[] getGauges();
 
   protected String getTableName(String tableName) {
-    return _isTableLevelMetricsEnabled || _whitelistedTables.contains(tableName) ? tableName : "allTables";
+    return _isTableLevelMetricsEnabled || _allowedTables.contains(tableName) ? tableName : "allTables";
   }
 }

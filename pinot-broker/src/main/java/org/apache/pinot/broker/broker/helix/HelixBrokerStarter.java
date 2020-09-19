@@ -226,7 +226,7 @@ public class HelixBrokerStarter implements ServiceStartable {
         _brokerConf.getProperty(Broker.CONFIG_OF_METRICS_NAME_PREFIX, Broker.DEFAULT_METRICS_NAME_PREFIX),
         _metricsRegistry,
         _brokerConf.getProperty(Broker.CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS, Broker.DEFAULT_ENABLE_TABLE_LEVEL_METRICS),
-        _brokerConf.getProperty(Broker.CONFIG_OF_WHITELISTED_TABLES_FOR_EMITTING_METRICS, Collections.emptyList()));
+        _brokerConf.getProperty(Broker.CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS, Collections.emptyList()));
     _brokerMetrics.initializeGlobalMeters();
     // Set up request handling classes
     _routingManager = new RoutingManager(_brokerMetrics);
