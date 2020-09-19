@@ -59,7 +59,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   private final Set<String> _whitelistedTables;
 
   public AbstractMetrics(String metricPrefix, MetricsRegistry metricsRegistry, Class clazz) {
-    this(metricPrefix, metricsRegistry, clazz, false, Collections.emptySet());
+    this(metricPrefix, metricsRegistry, clazz, true, Collections.emptySet());
   }
 
   public AbstractMetrics(String metricPrefix, MetricsRegistry metricsRegistry, Class clazz,
