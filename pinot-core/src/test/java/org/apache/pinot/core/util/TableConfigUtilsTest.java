@@ -21,6 +21,7 @@ package org.apache.pinot.core.util;
 import com.google.common.collect.Lists;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IngestionConfig;
@@ -544,13 +545,10 @@ public class TableConfigUtilsTest {
     }
 
     // Although this config makes no sense, it should pass the validation phase
-    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("myCol"),
-        Arrays.asList("myCol"),
-        Arrays.asList("SUM__myCol"),
-        1);
+    StarTreeIndexConfig starTreeIndexConfig =
+        new StarTreeIndexConfig(Arrays.asList("myCol"), Arrays.asList("myCol"), Arrays.asList("SUM__myCol"), 1);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setStarTreeIndexConfigs(Arrays.asList(starTreeIndexConfig))
-        .build();
+        .setStarTreeIndexConfigs(Arrays.asList(starTreeIndexConfig)).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
@@ -558,13 +556,10 @@ public class TableConfigUtilsTest {
       // expected
     }
 
-    starTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("myCol2"),
-        Arrays.asList("myCol"),
-        Arrays.asList("SUM__myCol"),
-        1);
+    starTreeIndexConfig =
+        new StarTreeIndexConfig(Arrays.asList("myCol2"), Arrays.asList("myCol"), Arrays.asList("SUM__myCol"), 1);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setStarTreeIndexConfigs(Arrays.asList(starTreeIndexConfig))
-        .build();
+        .setStarTreeIndexConfigs(Arrays.asList(starTreeIndexConfig)).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for invalid StarTreeIndex config column name in dimension split order");
@@ -572,13 +567,10 @@ public class TableConfigUtilsTest {
       // expected
     }
 
-    starTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("myCol"),
-        Arrays.asList("myCol2"),
-        Arrays.asList("SUM__myCol"),
-        1);
+    starTreeIndexConfig =
+        new StarTreeIndexConfig(Arrays.asList("myCol"), Arrays.asList("myCol2"), Arrays.asList("SUM__myCol"), 1);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setStarTreeIndexConfigs(Arrays.asList(starTreeIndexConfig))
-        .build();
+        .setStarTreeIndexConfigs(Arrays.asList(starTreeIndexConfig)).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for invalid StarTreeIndex config column name in skip star node for dimension");
@@ -586,13 +578,10 @@ public class TableConfigUtilsTest {
       // expected
     }
 
-    starTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("myCol"),
-        Arrays.asList("myCol"),
-        Arrays.asList("SUM__myCol2"),
-        1);
+    starTreeIndexConfig =
+        new StarTreeIndexConfig(Arrays.asList("myCol"), Arrays.asList("myCol"), Arrays.asList("SUM__myCol2"), 1);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setStarTreeIndexConfigs(Arrays.asList(starTreeIndexConfig))
-        .build();
+        .setStarTreeIndexConfigs(Arrays.asList(starTreeIndexConfig)).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for invalid StarTreeIndex config column name in function column pair");
@@ -606,6 +595,25 @@ public class TableConfigUtilsTest {
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for invalid column name in Field Config List");
+    } catch (Exception e) {
+      // expected
+    }
+
+    List<String> columnList = Arrays.asList("myCol");
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setNoDictionaryColumns(columnList)
+        .setInvertedIndexColumns(columnList).build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail for valid column name in both no dictionary and inverted index column config");
+    } catch (Exception e) {
+      // expected
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setNoDictionaryColumns(columnList)
+        .setBloomFilterColumns(columnList).build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail for valid column name in both no dictionary and bloom filter column config");
     } catch (Exception e) {
       // expected
     }

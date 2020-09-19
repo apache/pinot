@@ -237,29 +237,42 @@ public final class TableConfigUtils {
 
   /**
    * Validates the Indexing Config
-   * Ensures that every referred column name exists in the corresponding schema
+   * Ensures that every referred column name exists in the corresponding schema.
+   * Also ensures proper dependency between index types (eg: Inverted Index columns
+   * cannot be present in no-dictionary columns).
    */
   private static void validateIndexingConfig(@Nullable IndexingConfig indexingConfig, @Nullable Schema schema) {
     if (indexingConfig == null || schema == null) {
       return;
     }
     Map<String, String> columnNameToConfigMap = new HashMap<>();
+    Set<String> noDictionaryColumnsSet = new HashSet<>();
 
+    if (indexingConfig.getNoDictionaryColumns() != null) {
+      for (String columnName : indexingConfig.getNoDictionaryColumns()) {
+        columnNameToConfigMap.put(columnName, "No Dictionary Column Config");
+        noDictionaryColumnsSet.add(columnName);
+      }
+    }
     if (indexingConfig.getBloomFilterColumns() != null) {
       for (String columnName : indexingConfig.getBloomFilterColumns()) {
+        if (noDictionaryColumnsSet.contains(columnName)) {
+          throw new IllegalStateException(
+              "Cannot create a Bloom Filter on column " + columnName + " specified in the noDictionaryColumns config");
+        }
         columnNameToConfigMap.put(columnName, "Bloom Filter Config");
       }
     }
     if (indexingConfig.getInvertedIndexColumns() != null) {
       for (String columnName : indexingConfig.getInvertedIndexColumns()) {
+        if (noDictionaryColumnsSet.contains(columnName)) {
+          throw new IllegalStateException("Cannot create an Inverted index on column " + columnName
+              + " specified in the noDictionaryColumns config");
+        }
         columnNameToConfigMap.put(columnName, "Inverted Index Config");
       }
     }
-    if (indexingConfig.getNoDictionaryColumns() != null) {
-      for (String columnName : indexingConfig.getNoDictionaryColumns()) {
-        columnNameToConfigMap.put(columnName, "No Dictionary Column Config");
-      }
-    }
+
     if (indexingConfig.getOnHeapDictionaryColumns() != null) {
       for (String columnName : indexingConfig.getOnHeapDictionaryColumns()) {
         columnNameToConfigMap.put(columnName, "On Heap Dictionary Column Config");
