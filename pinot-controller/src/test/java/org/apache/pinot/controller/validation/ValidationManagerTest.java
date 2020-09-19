@@ -57,7 +57,7 @@ public class ValidationManagerTest extends ControllerTest {
   private static final String TEST_TABLE_NAME = "testTable";
   private static final String TEST_TABLE_TWO = "testTable2";
   private static final String TEST_SEGMENT_NAME = "testSegment";
-  public static final long SLEEP_TIME_AFTER_INSTANCE_UPDATE = 100L;
+  public static final long SLEEP_TIME_AFTER_INSTANCE_UPDATE = 1000L;
 
   private TableConfig _offlineTableConfig;
 
