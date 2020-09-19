@@ -72,8 +72,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   /**
-   * Some metrics use raw table name and some use table name with type. This method adds all variation of table name to
-   * the whitelist entries to make sure that all metrics are checked against whitelisted tables.
+   * Some metrics use raw table name and some use table name with type. This method adds all variations of the table
+   * name to the whitelist entries to make sure that all metrics are checked against whitelisted tables.
    */
   private static Set<String> addNameVariations(Collection<String> whitelistedTables) {
     return whitelistedTables.stream()
