@@ -67,7 +67,7 @@ public class SelectionDataTableReducer implements DataTableReducer {
   @Override
   public void reduceAndSetResults(String tableName, DataSchema dataSchema,
       Map<ServerRoutingInstance, DataTable> dataTableMap, BrokerResponseNative brokerResponseNative,
-      BrokerMetrics brokerMetrics) {
+      DataTableReducerContext reducerContext, BrokerMetrics brokerMetrics) {
     if (dataTableMap.isEmpty()) {
       // For empty data table map, construct empty result using the cached data schema for selection query
       List<String> selectionColumns =

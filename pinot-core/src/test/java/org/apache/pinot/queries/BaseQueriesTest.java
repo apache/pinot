@@ -24,12 +24,15 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.common.utils.CommonConstants.Server;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
@@ -41,6 +44,7 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUt
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 
 
@@ -203,10 +207,27 @@ public abstract class BaseQueriesTest {
     DataTable instanceResponse = plan.execute();
 
     // Broker side.
-    BrokerReduceService brokerReduceService = new BrokerReduceService();
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY, 2); // 2 Threads for 2 Data-tables.
+    BrokerReduceService brokerReduceService = new BrokerReduceService(new PinotConfiguration(properties));
     Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
-    dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.OFFLINE), instanceResponse);
-    dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.REALTIME), instanceResponse);
-    return brokerReduceService.reduceOnDataTable(queryContext.getBrokerRequest(), dataTableMap, null);
+
+    try {
+
+      // For multi-threaded BrokerReduceService, we cannot reuse the same data-table.
+      byte[] serializedResponse = instanceResponse.toBytes();
+      dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.OFFLINE),
+          DataTableFactory.getDataTable(serializedResponse));
+      dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.REALTIME),
+          DataTableFactory.getDataTable(serializedResponse));
+    } catch (Exception e) {
+      Utils.rethrowException(e);
+    }
+
+    BrokerResponseNative brokerResponse = brokerReduceService
+        .reduceOnDataTable(queryContext.getBrokerRequest(), dataTableMap,
+            CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS, null);
+    brokerReduceService.shutDown();
+    return brokerResponse;
   }
 }

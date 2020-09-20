@@ -102,7 +102,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   protected final AtomicLong _requestIdGenerator = new AtomicLong();
   protected final BrokerRequestOptimizer _brokerRequestOptimizer = new BrokerRequestOptimizer();
-  protected final BrokerReduceService _brokerReduceService = new BrokerReduceService();
+  protected final BrokerReduceService _brokerReduceService;
 
   protected final String _brokerId;
   protected final long _brokerTimeoutMs;
@@ -145,6 +145,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _numDroppedLog = new AtomicInteger(0);
     _numDroppedLogRateLimiter = RateLimiter.create(1.0);
 
+    _brokerReduceService = new BrokerReduceService(_config);
     LOGGER
         .info("Broker Id: {}, timeout: {}ms, query response limit: {}, query log length: {}, query log max rate: {}qps",
             _brokerId, _brokerTimeoutMs, _queryResponseLimit, _queryLogLength, _queryLogRateLimiter.getRate());

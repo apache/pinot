@@ -166,6 +166,11 @@ public class CommonConstants {
     public static final double DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START = 100.0;
     public static final String CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE = "pinot.broker.enable.query.limit.override";
 
+    // Config for number of threads to use for Broker reduce-phase.
+    public static final String CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY = "pinot.broker.max.reduce.threads.per.query";
+    public static final int DEFAULT_MAX_REDUCE_THREADS_PER_QUERY =
+        Math.max(1, Math.min(10, Runtime.getRuntime().availableProcessors() / 2)); // Same logic as CombineOperatorUtils
+
     public static class Request {
       public static final String PQL = "pql";
       public static final String SQL = "sql";

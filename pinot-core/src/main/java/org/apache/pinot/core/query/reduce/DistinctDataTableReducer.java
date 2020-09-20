@@ -61,7 +61,7 @@ public class DistinctDataTableReducer implements DataTableReducer {
   @Override
   public void reduceAndSetResults(String tableName, DataSchema dataSchema,
       Map<ServerRoutingInstance, DataTable> dataTableMap, BrokerResponseNative brokerResponseNative,
-      BrokerMetrics brokerMetrics) {
+      DataTableReducerContext reducerContext, BrokerMetrics brokerMetrics) {
     // DISTINCT is implemented as an aggregation function in the execution engine. Just like
     // other aggregation functions, DISTINCT returns its result as a single object
     // (of type DistinctTable) serialized by the server into the DataTable and deserialized

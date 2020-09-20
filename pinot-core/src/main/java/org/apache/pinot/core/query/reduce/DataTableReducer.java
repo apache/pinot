@@ -37,9 +37,9 @@ public interface DataTableReducer {
    * @param dataSchema schema from broker reduce service
    * @param dataTableMap map of servers to data tables
    * @param brokerResponseNative broker response
+   * @param reducerContext DataTableReducer context
    * @param brokerMetrics broker metrics
    */
-  void reduceAndSetResults(String tableName, DataSchema dataSchema,
-      Map<ServerRoutingInstance, DataTable> dataTableMap, BrokerResponseNative brokerResponseNative,
-      BrokerMetrics brokerMetrics);
+  void reduceAndSetResults(String tableName, DataSchema dataSchema, Map<ServerRoutingInstance, DataTable> dataTableMap,
+      BrokerResponseNative brokerResponseNative, DataTableReducerContext reducerContext, BrokerMetrics brokerMetrics);
 }
