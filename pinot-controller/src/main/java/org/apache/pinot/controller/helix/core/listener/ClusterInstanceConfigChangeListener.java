@@ -13,6 +13,7 @@ import org.apache.pinot.common.utils.helix.HelixHelper;
 public class ClusterInstanceConfigChangeListener implements InstanceConfigChangeListener {
     private HelixManager _helixManager;
     private List<InstanceConfig> _instanceConfigs = new ArrayList<>();
+    private Long _lastEventTimestamp = null;
 
     public ClusterInstanceConfigChangeListener(HelixManager helixManager) {
         _helixManager = helixManager;
@@ -20,7 +21,10 @@ public class ClusterInstanceConfigChangeListener implements InstanceConfigChange
 
     @Override
     public void onInstanceConfigChange(List<InstanceConfig> instanceConfigs, NotificationContext context) {
-        _instanceConfigs = instanceConfigs;
+        if(_lastEventTimestamp == null || _lastEventTimestamp <= context.getCreationTime()) {
+            _instanceConfigs = instanceConfigs;
+            _lastEventTimestamp = context.getCreationTime();
+        }
     }
 
     public List<InstanceConfig> getInstanceConfigs() {
