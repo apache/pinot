@@ -32,7 +32,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants.Segment;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.data.partition.PartitionFunction;
@@ -76,17 +76,32 @@ public class PartitionSegmentPruner implements SegmentPruner {
     List<ZNRecord> znRecords = _propertyStore.get(segmentZKMetadataPaths, null, AccessOption.PERSISTENT);
     for (int i = 0; i < numSegments; i++) {
       String segment = segments.get(i);
-      _partitionInfoMap.put(segment, extractPartitionInfoFromSegmentZKMetadataZNRecord(segment, znRecords.get(i)));
+      PartitionInfo partitionInfo = extractPartitionInfoFromSegmentZKMetadataZNRecord(segment, znRecords.get(i));
+      if (partitionInfo != null) {
+        _partitionInfoMap.put(segment, partitionInfo);
+      }
     }
   }
 
+  /**
+   * NOTE: Returns {@code null} when the ZNRecord is missing (could be transient Helix issue), or the segment is a
+   *       consuming segment so that we can retry later. Returns {@link #INVALID_PARTITION_INFO} when the segment does
+   *       not have valid partition metadata in its ZK metadata, in which case we won't retry later.
+   */
+  @Nullable
   private PartitionInfo extractPartitionInfoFromSegmentZKMetadataZNRecord(String segment, @Nullable ZNRecord znRecord) {
     if (znRecord == null) {
       LOGGER.warn("Failed to find segment ZK metadata for segment: {}, table: {}", segment, _tableNameWithType);
-      return INVALID_PARTITION_INFO;
+      return null;
     }
 
-    String partitionMetadataJson = znRecord.getSimpleField(CommonConstants.Segment.PARTITION_METADATA);
+    // Skip processing the partition metadata for the consuming segment because the partition metadata is updated when
+    // the consuming segment is committed
+    if (Segment.Realtime.Status.IN_PROGRESS.name().equals(znRecord.getSimpleField(Segment.Realtime.STATUS))) {
+      return null;
+    }
+
+    String partitionMetadataJson = znRecord.getSimpleField(Segment.PARTITION_METADATA);
     if (partitionMetadataJson == null) {
       LOGGER.warn("Failed to find segment partition metadata for segment: {}, table: {}", segment, _tableNameWithType);
       return INVALID_PARTITION_INFO;
@@ -127,8 +142,13 @@ public class PartitionSegmentPruner implements SegmentPruner {
 
   @Override
   public synchronized void refreshSegment(String segment) {
-    _partitionInfoMap.put(segment, extractPartitionInfoFromSegmentZKMetadataZNRecord(segment,
-        _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT)));
+    PartitionInfo partitionInfo = extractPartitionInfoFromSegmentZKMetadataZNRecord(segment,
+        _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT));
+    if (partitionInfo != null) {
+      _partitionInfoMap.put(segment, partitionInfo);
+    } else {
+      _partitionInfoMap.remove(segment);
+    }
   }
 
   @Override

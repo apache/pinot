@@ -27,7 +27,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -69,8 +68,6 @@ import org.apache.pinot.controller.helix.core.realtime.segment.FlushThresholdUpd
 import org.apache.pinot.controller.util.SegmentCompletionUtils;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
-import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -552,12 +549,8 @@ public class PinotLLCRealtimeSegmentManager {
     newSegmentZKMetadata.setNumReplicas(numReplicas);
     newSegmentZKMetadata.setStatus(Status.IN_PROGRESS);
 
-    // Add the partition metadata if available
-    SegmentPartitionMetadata partitionMetadata =
-        getPartitionMetadataFromTableConfig(tableConfig, newLLCSegmentName.getPartitionId());
-    if (partitionMetadata != null) {
-      newSegmentZKMetadata.setPartitionMetadata(partitionMetadata);
-    }
+    // NOTE: DO NOT add the partition metadata for the consuming segment to prevent mis-pruning the segment when the
+    //       stream is not partitioned properly.
 
     // Update the flush threshold
     FlushThresholdUpdater flushThresholdUpdater = _flushThresholdUpdateManager.getFlushThresholdUpdater(streamConfig);
@@ -565,23 +558,6 @@ public class PinotLLCRealtimeSegmentManager {
         committingSegmentZKMetadata, getMaxNumPartitionsPerInstance(instancePartitions, numPartitions, numReplicas));
 
     persistSegmentZKMetadata(realtimeTableName, newSegmentZKMetadata, -1);
-  }
-
-  @Nullable
-  private SegmentPartitionMetadata getPartitionMetadataFromTableConfig(TableConfig tableConfig, int partitionId) {
-    SegmentPartitionConfig partitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
-    if (partitionConfig == null) {
-      return null;
-    }
-    Map<String, ColumnPartitionMetadata> partitionMetadataMap = new TreeMap<>();
-    for (Map.Entry<String, ColumnPartitionConfig> entry : partitionConfig.getColumnPartitionMap().entrySet()) {
-      String columnName = entry.getKey();
-      ColumnPartitionConfig columnPartitionConfig = entry.getValue();
-      partitionMetadataMap.put(columnName,
-          new ColumnPartitionMetadata(columnPartitionConfig.getFunctionName(), columnPartitionConfig.getNumPartitions(),
-              Collections.singleton(partitionId)));
-    }
-    return new SegmentPartitionMetadata(partitionMetadataMap);
   }
 
   @Nullable
