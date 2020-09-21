@@ -57,10 +57,10 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.thirdeye.anomaly.views.AnomalyTimelinesView;
+import org.apache.pinot.thirdeye.common.ThirdEyeConfiguration;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
-import org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -517,12 +517,13 @@ public abstract class ThirdEyeUtils {
     DaoProviderUtil.init(new File(persistenceConfig));
 
     // Read configuration for data sources, etc.
-    ThirdEyeDashboardConfiguration config;
+    // TODO spyne Fix dependency loading
+    ThirdEyeConfiguration config;
     try {
       String dashboardConfigFilePath = thirdEyeConfigDir + "/dashboard.yml";
       File configFile = new File(dashboardConfigFilePath);
-      YamlConfigurationFactory<ThirdEyeDashboardConfiguration> factory =
-          new YamlConfigurationFactory<>(ThirdEyeDashboardConfiguration.class,
+      YamlConfigurationFactory<ThirdEyeConfiguration> factory =
+          new YamlConfigurationFactory<>(ThirdEyeConfiguration.class,
               Validation.buildDefaultValidatorFactory().getValidator(), Jackson.newObjectMapper(), "");
       config = factory.build(configFile);
       config.setRootDir(thirdEyeConfigDir);

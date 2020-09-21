@@ -20,7 +20,6 @@
 package org.apache.pinot.thirdeye.auth;
 
 import javax.ws.rs.core.SecurityContext;
-import org.apache.pinot.thirdeye.dashboard.resources.v2.AuthResource;
 import org.apache.pinot.thirdeye.datalayer.bao.SessionManager;
 import org.apache.pinot.thirdeye.datalayer.dto.SessionDTO;
 import io.dropwizard.auth.AuthFilter;
@@ -39,6 +38,7 @@ import org.slf4j.LoggerFactory;
 
 public class ThirdEyeAuthFilter extends AuthFilter<ThirdEyeCredentials, ThirdEyePrincipal> {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeAuthFilter.class);
+  public static final String AUTH_TOKEN_NAME = "te_auth";
 
   private static final ThreadLocal<ThirdEyePrincipal> principalAuthContextThreadLocal = new ThreadLocal<>();
 
@@ -112,8 +112,8 @@ public class ThirdEyeAuthFilter extends AuthFilter<ThirdEyeCredentials, ThirdEye
   private boolean isAuthenticated(ContainerRequestContext containerRequestContext, ThirdEyePrincipal principal) {
     Map<String, Cookie> cookies = containerRequestContext.getCookies();
 
-    if (cookies != null && cookies.containsKey(AuthResource.AUTH_TOKEN_NAME)) {
-      String sessionKey = cookies.get(AuthResource.AUTH_TOKEN_NAME).getValue();
+    if (cookies != null && cookies.containsKey(AUTH_TOKEN_NAME)) {
+      String sessionKey = cookies.get(AUTH_TOKEN_NAME).getValue();
       if (sessionKey.isEmpty()) {
         LOG.error("Empty sessionKey. Skipping.");
       } else {

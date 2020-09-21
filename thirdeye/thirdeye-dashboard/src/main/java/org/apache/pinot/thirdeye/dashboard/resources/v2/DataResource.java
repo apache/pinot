@@ -51,6 +51,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.thirdeye.anomaly.utils.AnomalyUtils;
 import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.common.time.TimeRange;
 import org.apache.pinot.thirdeye.dashboard.Utils;
@@ -631,7 +632,7 @@ public class DataResource {
    * @return {@code true} if anomaly passed the filters, {@code false} otherwise
    */
   static boolean applyAnomalyFilters(MergedAnomalyResultDTO anomaly, Multimap<String, String> filters) {
-    Multimap<String, String> anomalyFilter = AnomaliesResource.generateFilterSetForTimeSeriesQuery(anomaly);
+    Multimap<String, String> anomalyFilter = AnomalyUtils.generateFilterSetForTimeSeriesQuery(anomaly);
     for (String filterKey : filters.keySet()) {
       if (!anomalyFilter.containsKey(filterKey))
         return false;

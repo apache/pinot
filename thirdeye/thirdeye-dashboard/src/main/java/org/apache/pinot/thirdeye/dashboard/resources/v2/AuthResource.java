@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.dashboard.resources.v2;
 
+import static org.apache.pinot.thirdeye.auth.ThirdEyeAuthFilter.AUTH_TOKEN_NAME;
 import java.util.Optional;
 import org.apache.pinot.thirdeye.auth.ThirdEyeAuthFilter;
 import org.apache.pinot.thirdeye.auth.ThirdEyeCredentials;
@@ -48,7 +49,6 @@ import org.slf4j.LoggerFactory;
 @Path("/auth")
 @Produces(MediaType.APPLICATION_JSON)
 public class AuthResource {
-  public static final String AUTH_TOKEN_NAME = "te_auth";
   private static final Logger LOG = LoggerFactory.getLogger(AuthResource.class);
   private final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
