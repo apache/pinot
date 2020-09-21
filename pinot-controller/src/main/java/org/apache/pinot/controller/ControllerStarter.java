@@ -350,6 +350,8 @@ public class ControllerStarter implements ServiceStartable {
     LOGGER.info("Starting Pinot Helix resource manager and connecting to Zookeeper");
     _helixResourceManager.start(_helixParticipantManager);
 
+    // TODO: ideally we can block to do schema/table install here, as it is before the thing is listening..
+
     LOGGER.info("Starting task resource manager");
     _helixTaskResourceManager = new PinotHelixTaskResourceManager(new TaskDriver(_helixParticipantManager));
 

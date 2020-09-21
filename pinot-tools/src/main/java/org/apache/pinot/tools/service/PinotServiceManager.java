@@ -92,6 +92,8 @@ public class PinotServiceManager {
         return startBroker(new PinotConfiguration(properties));
       case SERVER:
         return startServer(new PinotConfiguration(properties));
+      case ADD_TABLE:
+        return addTable(new PinotConfiguration(properties));
     }
     return null;
   }
@@ -137,6 +139,17 @@ public class PinotServiceManager {
     String instanceId = brokerStarter.getInstanceId();
     _runningInstanceMap.put(instanceId, brokerStarter);
     LOGGER.info("Pinot Broker instance [{}] is Started...", instanceId);
+    return instanceId;
+  }
+
+  public String addTable(PinotConfiguration addTableConf)
+      throws Exception {
+    AddTableStarter addTableStarter = new AddTableStarter(addTableConf);
+    addTableStarter.start();
+
+    String instanceId = addTableStarter.getInstanceId();
+    _runningInstanceMap.put(instanceId, addTableStarter);
+    LOGGER.info("Pinot Add Table instance [{}] is Started...", instanceId);
     return instanceId;
   }
 
