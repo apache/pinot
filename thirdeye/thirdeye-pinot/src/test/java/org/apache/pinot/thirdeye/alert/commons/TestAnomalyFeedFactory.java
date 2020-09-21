@@ -18,7 +18,7 @@ package org.apache.pinot.thirdeye.alert.commons;
 
 import org.apache.pinot.thirdeye.alert.feed.AnomalyFeed;
 import org.apache.pinot.thirdeye.alert.feed.UnionAnomalyFeed;
-import org.junit.Assert;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
