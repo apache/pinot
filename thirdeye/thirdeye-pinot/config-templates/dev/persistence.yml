@@ -2,4 +2,4 @@ databaseConfiguration:
   url: jdbc:mysql://thirdeye_mysql:3306/thirdeye
   user: root
   password: root
-  driver: com.mysql.jdbc.Driver
+  driver: com.mysql.cj.jdbc.Driver

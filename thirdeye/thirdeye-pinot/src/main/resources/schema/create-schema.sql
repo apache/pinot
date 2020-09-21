@@ -269,8 +269,8 @@ create index classification_config_name_index on classification_config_index(nam
 create index classification_config_base_id_idx ON classification_config_index(base_id);
 
 create table if not exists entity_to_entity_mapping_index (
-    from_urn varchar(500) not null,
-    to_urn varchar(500) not null,
+    from_urn varchar(256) not null,
+    to_urn varchar(256) not null,
     mapping_type varchar(500) not null,
     base_id bigint(20) not null,
     create_time timestamp,
