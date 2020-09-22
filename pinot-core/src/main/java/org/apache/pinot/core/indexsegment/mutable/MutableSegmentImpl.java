@@ -36,6 +36,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
@@ -153,7 +154,6 @@ public class MutableSegmentImpl implements MutableSegment {
 
   public MutableSegmentImpl(RealtimeSegmentConfig config, @Nullable ServerMetrics serverMetrics) {
     _serverMetrics = serverMetrics;
-    _partitionId = config.getPartitionId();
     _tableNameWithType = config.getTableNameWithType();
     _segmentName = config.getSegmentName();
     _schema = config.getSchema();
@@ -340,6 +340,7 @@ public class MutableSegmentImpl implements MutableSegment {
     _upsertMetadataTableManager = config.getUpsertMetadataTableManager();
     _primaryKeyIndex = isUpsertEnabled() ? new ConcurrentHashMap() : null;
     _validDocIndex = isUpsertEnabled() ? new ThreadSafeMutableRoaringBitmap() : null;
+    _partitionId = new LLCSegmentName(_segmentName).getPartitionId();
   }
 
   /**

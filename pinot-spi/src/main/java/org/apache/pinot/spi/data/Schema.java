@@ -56,7 +56,7 @@ import org.slf4j.LoggerFactory;
  * <code>DataType</code>s will be converted to one of them.
  */
 @SuppressWarnings("unused")
-//@JsonIgnoreProperties(ignoreUnknown = true)
+@JsonIgnoreProperties(ignoreUnknown = true)
 public final class Schema {
   private static final Logger LOGGER = LoggerFactory.getLogger(Schema.class);
 
