@@ -123,6 +123,9 @@ public class TransformFunctionFactory {
           // geo relationship
           put(TransformFunctionType.ST_CONTAINS.getName().toLowerCase(), StContainsFunction.class);
           put(TransformFunctionType.ST_EQUALS.getName().toLowerCase(), StEqualsFunction.class);
+
+          // big decimal
+          put(TransformFunctionType.ADD_WITH_PRECISION.getName().toLowerCase(), AdditionWithPrecisionTransformFunction.class);
         }
       };
 
