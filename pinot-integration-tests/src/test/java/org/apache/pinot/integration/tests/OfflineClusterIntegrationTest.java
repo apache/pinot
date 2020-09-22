@@ -1453,4 +1453,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       }
     }
   }
+
+  @Test
+  @Override
+  public void testHardcodedServerPartitionedSqlQueries()
+      throws Exception {
+    super.testHardcodedServerPartitionedSqlQueries();
+  }
 }

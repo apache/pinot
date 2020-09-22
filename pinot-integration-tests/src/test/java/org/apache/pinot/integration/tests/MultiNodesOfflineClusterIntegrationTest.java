@@ -63,4 +63,10 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
   public void testGrpcQueryServer() {
     // Ignored
   }
+
+  @Test(enabled = false)
+  @Override
+  public void testHardcodedServerPartitionedSqlQueries() {
+    // Ignored
+  }
 }

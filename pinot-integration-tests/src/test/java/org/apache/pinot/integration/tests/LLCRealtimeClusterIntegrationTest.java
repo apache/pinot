@@ -173,4 +173,11 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
       throws Exception {
     testReload(false);
   }
+
+  @Test
+  @Override
+  public void testHardcodedServerPartitionedSqlQueries()
+      throws Exception {
+    super.testHardcodedServerPartitionedSqlQueries();
+  }
 }

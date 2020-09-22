@@ -19,12 +19,9 @@
 package org.apache.pinot.core.query.pruner;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import org.apache.pinot.core.data.manager.SegmentDataManager;
-import org.apache.pinot.core.data.manager.TableDataManager;
 import org.apache.pinot.core.indexsegment.IndexSegment;
-import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
@@ -36,31 +33,27 @@ public interface SegmentPruner {
   void init(PinotConfiguration config);
 
   /**
-   * Prunes the segments based on the query request, returns the segments that are not pruned. The pruned segments need
-   * to be released by calling {@link TableDataManager#releaseSegment(SegmentDataManager)}.
-   * <p>Override this method or {@link #prune(IndexSegment, ServerQueryRequest)} for the pruner logic.
+   * Prunes the segments based on the query, returns the segments that are not pruned.
+   * <p>Override this method or {@link #prune(IndexSegment, QueryContext)} for the pruner logic.
    */
-  default List<SegmentDataManager> prune(TableDataManager tableDataManager,
-      List<SegmentDataManager> segmentDataManagers, ServerQueryRequest queryRequest) {
-    if (segmentDataManagers.isEmpty()) {
-      return Collections.emptyList();
+  default List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query) {
+    if (segments.isEmpty()) {
+      return segments;
     }
-    List<SegmentDataManager> remainingSegmentDataManagers = new ArrayList<>(segmentDataManagers.size());
-    for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-      if (prune(segmentDataManager.getSegment(), queryRequest)) {
-        tableDataManager.releaseSegment(segmentDataManager);
-      } else {
-        remainingSegmentDataManagers.add(segmentDataManager);
+    List<IndexSegment> selectedSegments = new ArrayList<>(segments.size());
+    for (IndexSegment segment : segments) {
+      if (!prune(segment, query)) {
+        selectedSegments.add(segment);
       }
     }
-    return remainingSegmentDataManagers;
+    return selectedSegments;
   }
 
   /**
-   * Returns {@code true} if the segment can be pruned based on the query request.
-   * <p>Override this method or {@link #prune(TableDataManager, List, ServerQueryRequest)} for the pruner logic.
+   * Returns {@code true} if the segment can be pruned based on the query.
+   * <p>Override this method or {@link #prune(List, QueryContext)} for the pruner logic.
    */
-  default boolean prune(IndexSegment segment, ServerQueryRequest queryRequest) {
+  default boolean prune(IndexSegment segment, QueryContext query) {
     throw new UnsupportedOperationException();
   }
 }

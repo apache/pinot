@@ -19,7 +19,7 @@
 package org.apache.pinot.core.query.pruner;
 
 import org.apache.pinot.core.indexsegment.IndexSegment;
-import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
@@ -29,22 +29,18 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  * invalid/bad data.
  */
 public class ValidSegmentPruner implements SegmentPruner {
+
   @Override
   public void init(PinotConfiguration config) {
-
   }
 
   /**
    * Returns true if a segment should be pruned-out due to bad/invalid data.
    * Current check(s) below:
    * - Empty segment.
-   *
-   * @param segment
-   * @param queryRequest
-   * @return
    */
   @Override
-  public boolean prune(IndexSegment segment, ServerQueryRequest queryRequest) {
+  public boolean prune(IndexSegment segment, QueryContext query) {
     SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
 
     // Check for empty segment.

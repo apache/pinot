@@ -23,9 +23,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import org.apache.pinot.core.common.DataSourceMetadata;
-import org.apache.pinot.core.data.manager.SegmentDataManager;
-import org.apache.pinot.core.data.manager.TableDataManager;
-import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
@@ -53,43 +51,37 @@ public class SelectionQuerySegmentPruner implements SegmentPruner {
   }
 
   @Override
-  public List<SegmentDataManager> prune(TableDataManager tableDataManager, List<SegmentDataManager> segmentDataManagers,
-      ServerQueryRequest queryRequest) {
-    int numSegments = segmentDataManagers.size();
-    if (numSegments == 0) {
-      return Collections.emptyList();
+  public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query) {
+    if (segments.isEmpty()) {
+      return segments;
     }
 
     // Do not prune aggregation queries
-    QueryContext queryContext = queryRequest.getQueryContext();
-    if (QueryContextUtils.isAggregationQuery(queryContext)) {
-      return segmentDataManagers;
+    if (QueryContextUtils.isAggregationQuery(query)) {
+      return segments;
     }
 
     // For LIMIT 0 case, keep one segment to create the schema
-    int limit = queryContext.getLimit();
+    int limit = query.getLimit();
     if (limit == 0) {
-      for (int i = 1; i < numSegments; i++) {
-        tableDataManager.releaseSegment(segmentDataManagers.get(i));
-      }
-      return Collections.singletonList(segmentDataManagers.get(0));
+      return Collections.singletonList(segments.get(0));
     }
 
     // If LIMIT is not 0, only prune segments for selection queries without filter
-    FilterContext filter = queryContext.getFilter();
+    FilterContext filter = query.getFilter();
     if (filter != null) {
-      return segmentDataManagers;
+      return segments;
     }
 
     // Skip pruning segments for upsert table because valid doc index is equivalent to a filter
-    if (segmentDataManagers.get(0).getSegment().getValidDocIndex() != null) {
-      return segmentDataManagers;
+    if (segments.get(0).getValidDocIndex() != null) {
+      return segments;
     }
 
-    if (queryContext.getOrderByExpressions() == null) {
-      return pruneSelectionOnly(tableDataManager, segmentDataManagers, queryContext);
+    if (query.getOrderByExpressions() == null) {
+      return pruneSelectionOnly(segments, query);
     } else {
-      return pruneSelectionOrderBy(tableDataManager, segmentDataManagers, queryContext);
+      return pruneSelectionOrderBy(segments, query);
     }
   }
 
@@ -97,19 +89,18 @@ public class SelectionQuerySegmentPruner implements SegmentPruner {
    * Helper method to prune segments for selection only queries without filter.
    * <p>We just need to keep enough documents to fulfill the LIMIT requirement.
    */
-  private List<SegmentDataManager> pruneSelectionOnly(TableDataManager tableDataManager,
-      List<SegmentDataManager> segmentDataManagers, QueryContext queryContext) {
-    List<SegmentDataManager> selectedSegmentDataManagers = new ArrayList<>(segmentDataManagers.size());
-    int remainingDocs = queryContext.getLimit();
-    for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+  private List<IndexSegment> pruneSelectionOnly(List<IndexSegment> segments, QueryContext query) {
+    List<IndexSegment> selectedSegments = new ArrayList<>(segments.size());
+    int remainingDocs = query.getLimit();
+    for (IndexSegment segment : segments) {
       if (remainingDocs > 0) {
-        selectedSegmentDataManagers.add(segmentDataManager);
-        remainingDocs -= segmentDataManager.getSegment().getSegmentMetadata().getTotalDocs();
+        selectedSegments.add(segment);
+        remainingDocs -= segment.getSegmentMetadata().getTotalDocs();
       } else {
-        tableDataManager.releaseSegment(segmentDataManager);
+        break;
       }
     }
-    return selectedSegmentDataManagers;
+    return selectedSegments;
   }
 
   /**
@@ -122,66 +113,62 @@ public class SelectionQuerySegmentPruner implements SegmentPruner {
    *   <li>3. Keep the segments that has value overlap with the selected ones; remove the others</li>
    * </ul>
    */
-  private List<SegmentDataManager> pruneSelectionOrderBy(TableDataManager tableDataManager,
-      List<SegmentDataManager> segmentDataManagers, QueryContext queryContext) {
-    List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
+  private List<IndexSegment> pruneSelectionOrderBy(List<IndexSegment> segments, QueryContext query) {
+    List<OrderByExpressionContext> orderByExpressions = query.getOrderByExpressions();
     assert orderByExpressions != null;
     int numOrderByExpressions = orderByExpressions.size();
     assert numOrderByExpressions > 0;
     OrderByExpressionContext firstOrderByExpression = orderByExpressions.get(0);
     if (firstOrderByExpression.getExpression().getType() != ExpressionContext.Type.IDENTIFIER) {
-      return segmentDataManagers;
+      return segments;
     }
     String firstOrderByColumn = firstOrderByExpression.getExpression().getIdentifier();
 
     // Extract the column min/max value from each segment
-    int numSegments = segmentDataManagers.size();
-    List<SegmentDataManager> selectedSegmentDataManagers = new ArrayList<>(numSegments);
+    int numSegments = segments.size();
+    List<IndexSegment> selectedSegments = new ArrayList<>(numSegments);
     List<MinMaxValue> minMaxValues = new ArrayList<>(numSegments);
     for (int i = 0; i < numSegments; i++) {
-      SegmentDataManager segmentDataManager = segmentDataManagers.get(i);
-      DataSourceMetadata dataSourceMetadata =
-          segmentDataManager.getSegment().getDataSource(firstOrderByColumn).getDataSourceMetadata();
+      IndexSegment segment = segments.get(i);
+      DataSourceMetadata dataSourceMetadata = segment.getDataSource(firstOrderByColumn).getDataSourceMetadata();
       Comparable minValue = dataSourceMetadata.getMinValue();
       Comparable maxValue = dataSourceMetadata.getMaxValue();
       // Always keep the segment if it does not have column min/max value in the metadata
       if (minValue == null || maxValue == null) {
-        selectedSegmentDataManagers.add(segmentDataManager);
+        selectedSegments.add(segment);
       } else {
         minMaxValues.add(new MinMaxValue(i, minValue, maxValue));
       }
     }
     if (minMaxValues.isEmpty()) {
-      return segmentDataManagers;
+      return segments;
     }
 
-    int remainingDocs = queryContext.getLimit() + queryContext.getOffset();
+    int remainingDocs = query.getLimit() + query.getOffset();
     if (firstOrderByExpression.isAsc()) {
       // For ascending order, sort on column max value in ascending order
       try {
         minMaxValues.sort(Comparator.comparing(o -> o._maxValue));
       } catch (Exception e) {
         // Skip the pruning when segments have different data types for the first order-by column
-        return segmentDataManagers;
+        return segments;
       }
 
       // Maintain the max value for all the selected segments
       Comparable maxValue = null;
       for (MinMaxValue minMaxValue : minMaxValues) {
-        SegmentDataManager segmentDataManager = segmentDataManagers.get(minMaxValue._index);
+        IndexSegment segment = segments.get(minMaxValue._index);
         if (remainingDocs > 0) {
-          selectedSegmentDataManagers.add(segmentDataManager);
-          remainingDocs -= segmentDataManager.getSegment().getSegmentMetadata().getTotalDocs();
+          selectedSegments.add(segment);
+          remainingDocs -= segment.getSegmentMetadata().getTotalDocs();
           maxValue = minMaxValue._maxValue;
         } else {
           // After getting enough documents, prune all the segments with min value larger than the current max value, or
           // min value equal to the current max value and there is only one order-by expression
           assert maxValue != null;
           int result = minMaxValue._minValue.compareTo(maxValue);
-          if (result > 0 || (result == 0 && numOrderByExpressions == 1)) {
-            tableDataManager.releaseSegment(segmentDataManager);
-          } else {
-            selectedSegmentDataManagers.add(segmentDataManager);
+          if (result < 0 || (result == 0 && numOrderByExpressions != 1)) {
+            selectedSegments.add(segment);
           }
         }
       }
@@ -191,32 +178,30 @@ public class SelectionQuerySegmentPruner implements SegmentPruner {
         minMaxValues.sort((o1, o2) -> o2._minValue.compareTo(o1._minValue));
       } catch (Exception e) {
         // Skip the pruning when segments have different data types for the first order-by column
-        return segmentDataManagers;
+        return segments;
       }
 
       // Maintain the min value for all the selected segments
       Comparable minValue = null;
       for (MinMaxValue minMaxValue : minMaxValues) {
-        SegmentDataManager segmentDataManager = segmentDataManagers.get(minMaxValue._index);
+        IndexSegment segment = segments.get(minMaxValue._index);
         if (remainingDocs > 0) {
-          selectedSegmentDataManagers.add(segmentDataManager);
-          remainingDocs -= segmentDataManager.getSegment().getSegmentMetadata().getTotalDocs();
+          selectedSegments.add(segment);
+          remainingDocs -= segment.getSegmentMetadata().getTotalDocs();
           minValue = minMaxValue._minValue;
         } else {
           // After getting enough documents, prune all the segments with max value smaller than the current min value,
           // or max value equal to the current min value and there is only one order-by expression
           assert minValue != null;
           int result = minMaxValue._maxValue.compareTo(minValue);
-          if (result < 0 || (result == 0 && numOrderByExpressions == 1)) {
-            tableDataManager.releaseSegment(segmentDataManager);
-          } else {
-            selectedSegmentDataManagers.add(segmentDataManager);
+          if (result > 0 || (result == 0 && numOrderByExpressions != 1)) {
+            selectedSegments.add(segment);
           }
         }
       }
     }
 
-    return selectedSegmentDataManagers;
+    return selectedSegments;
   }
 
   private static class MinMaxValue {

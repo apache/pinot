@@ -21,8 +21,10 @@ package org.apache.pinot.core.query.request.context;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -55,8 +57,9 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFacto
  *   </li>
  * </ul>
  */
-@SuppressWarnings("rawtypes")
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class QueryContext {
+  private final String _tableName;
   private final List<ExpressionContext> _selectExpressions;
   private final Map<ExpressionContext, String> _aliasMap;
   private final FilterContext _filter;
@@ -72,15 +75,18 @@ public class QueryContext {
   // TODO: Remove it once the whole query engine is using the QueryContext
   private final BrokerRequest _brokerRequest;
 
-  // Pre-generate the aggregation functions for the query so that it can be shared among all the segments
+  // Pre-calculate the aggregation functions and columns for the query so that it can be shared among all the segments
   private AggregationFunction[] _aggregationFunctions;
   private Map<FunctionContext, Integer> _aggregationFunctionIndexMap;
+  private Set<String> _columns;
 
-  private QueryContext(List<ExpressionContext> selectExpressions, Map<ExpressionContext, String> aliasMap,
-      @Nullable FilterContext filter, @Nullable List<ExpressionContext> groupByExpressions,
-      @Nullable FilterContext havingFilter, @Nullable List<OrderByExpressionContext> orderByExpressions, int limit,
-      int offset, @Nullable Map<String, String> queryOptions, @Nullable Map<String, String> debugOptions,
+  private QueryContext(String tableName, List<ExpressionContext> selectExpressions,
+      Map<ExpressionContext, String> aliasMap, @Nullable FilterContext filter,
+      @Nullable List<ExpressionContext> groupByExpressions, @Nullable FilterContext havingFilter,
+      @Nullable List<OrderByExpressionContext> orderByExpressions, int limit, int offset,
+      @Nullable Map<String, String> queryOptions, @Nullable Map<String, String> debugOptions,
       BrokerRequest brokerRequest) {
+    _tableName = tableName;
     _selectExpressions = selectExpressions;
     _aliasMap = Collections.unmodifiableMap(aliasMap);
     _filter = filter;
@@ -92,6 +98,13 @@ public class QueryContext {
     _queryOptions = queryOptions;
     _debugOptions = debugOptions;
     _brokerRequest = brokerRequest;
+  }
+
+  /**
+   * Returns the table name.
+   */
+  public String getTableName() {
+    return _tableName;
   }
 
   /**
@@ -195,18 +208,26 @@ public class QueryContext {
   }
 
   /**
+   * Returns the columns (IDENTIFIER expressions) in the query.
+   */
+  public Set<String> getColumns() {
+    return _columns;
+  }
+
+  /**
    * NOTE: For debugging only.
    */
   @Override
   public String toString() {
-    return "QueryContext{" + "_selectExpressions=" + _selectExpressions + ", _aliasMap=" + _aliasMap + ", _filter="
-        + _filter + ", _groupByExpressions=" + _groupByExpressions + ", _havingFilter=" + _havingFilter
-        + ", _orderByExpressions=" + _orderByExpressions + ", _limit=" + _limit + ", _offset=" + _offset
-        + ", _queryOptions=" + _queryOptions + ", _debugOptions=" + _debugOptions + ", _brokerRequest=" + _brokerRequest
-        + '}';
+    return "QueryContext{" + "_tableName='" + _tableName + '\'' + ", _selectExpressions=" + _selectExpressions
+        + ", _aliasMap=" + _aliasMap + ", _filter=" + _filter + ", _groupByExpressions=" + _groupByExpressions
+        + ", _havingFilter=" + _havingFilter + ", _orderByExpressions=" + _orderByExpressions + ", _limit=" + _limit
+        + ", _offset=" + _offset + ", _queryOptions=" + _queryOptions + ", _debugOptions=" + _debugOptions
+        + ", _brokerRequest=" + _brokerRequest + '}';
   }
 
   public static class Builder {
+    private String _tableName;
     private List<ExpressionContext> _selectExpressions;
     private Map<ExpressionContext, String> _aliasMap;
     private FilterContext _filter;
@@ -218,6 +239,11 @@ public class QueryContext {
     private Map<String, String> _queryOptions;
     private Map<String, String> _debugOptions;
     private BrokerRequest _brokerRequest;
+
+    public Builder setTableName(String tableName) {
+      _tableName = tableName;
+      return this;
+    }
 
     public Builder setSelectExpressions(List<ExpressionContext> selectExpressions) {
       _selectExpressions = selectExpressions;
@@ -278,11 +304,12 @@ public class QueryContext {
       // TODO: Add validation logic here
 
       QueryContext queryContext =
-          new QueryContext(_selectExpressions, _aliasMap, _filter, _groupByExpressions, _havingFilter,
+          new QueryContext(_tableName, _selectExpressions, _aliasMap, _filter, _groupByExpressions, _havingFilter,
               _orderByExpressions, _limit, _offset, _queryOptions, _debugOptions, _brokerRequest);
 
-      // Pre-generate the aggregation functions for the query
+      // Pre-calculate the aggregation functions and columns for the query
       generateAggregationFunctions(queryContext);
+      extractColumns(queryContext);
 
       return queryContext;
     }
@@ -371,6 +398,47 @@ public class QueryContext {
       } else {
         getAggregations(filter.getPredicate().getLhs(), aggregations);
       }
+    }
+
+    /**
+     * Helper method to extract the columns (IDENTIFIER expressions) for the query.
+     */
+    private void extractColumns(QueryContext query) {
+      Set<String> columns = new HashSet<>();
+
+      for (ExpressionContext expression : query._selectExpressions) {
+        expression.getColumns(columns);
+      }
+      if (query._filter != null) {
+        query._filter.getColumns(columns);
+      }
+      if (query._groupByExpressions != null) {
+        for (ExpressionContext expression : query._groupByExpressions) {
+          expression.getColumns(columns);
+        }
+      }
+      if (query._havingFilter != null) {
+        query._havingFilter.getColumns(columns);
+      }
+      if (query._orderByExpressions != null) {
+        for (OrderByExpressionContext orderByExpression : query._orderByExpressions) {
+          orderByExpression.getColumns(columns);
+        }
+      }
+
+      // NOTE: Also gather columns from the input expressions of the aggregation functions because for certain types of
+      //       aggregation (e.g. DistinctCountThetaSketch), some input expressions are compiled while constructing the
+      //       aggregation function.
+      if (query._aggregationFunctions != null) {
+        for (AggregationFunction aggregationFunction : query._aggregationFunctions) {
+          List<ExpressionContext> inputExpressions = aggregationFunction.getInputExpressions();
+          for (ExpressionContext expression : inputExpressions) {
+            expression.getColumns(columns);
+          }
+        }
+      }
+
+      query._columns = columns;
     }
   }
 }

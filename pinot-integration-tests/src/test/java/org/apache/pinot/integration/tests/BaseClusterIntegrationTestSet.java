@@ -270,6 +270,27 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   }
 
   /**
+   * Test hardcoded queries on server partitioned data (all the segments for a partition is served by a single server).
+   */
+  public void testHardcodedServerPartitionedSqlQueries()
+      throws Exception {
+    // IN_PARTITIONED_SUBQUERY
+    {
+      String inPartitionedSubqueryQuery =
+          "SELECT COUNT(*) FROM mytable WHERE INPARTITIONEDSUBQUERY(DestAirportID, 'SELECT IDSET(DestAirportID) FROM mytable WHERE DaysSinceEpoch = 16430') = 1";
+      String inQuery =
+          "SELECT COUNT(*) FROM mytable WHERE DestAirportID IN (SELECT DestAirportID FROM mytable WHERE DaysSinceEpoch = 16430)";
+      testSqlQuery(inPartitionedSubqueryQuery, Collections.singletonList(inQuery));
+
+      String notInPartitionedSubqueryQuery =
+          "SELECT COUNT(*) FROM mytable WHERE INPARTITIONEDSUBQUERY(DestAirportID, 'SELECT IDSET(DestAirportID) FROM mytable WHERE DaysSinceEpoch = 16430') = 0";
+      String notInQuery =
+          "SELECT COUNT(*) FROM mytable WHERE DestAirportID NOT IN (SELECT DestAirportID FROM mytable WHERE DaysSinceEpoch = 16430)";
+      testSqlQuery(notInPartitionedSubqueryQuery, Collections.singletonList(notInQuery));
+    }
+  }
+
+  /**
    * Test to ensure that broker response contains expected stats
    *
    * @throws Exception

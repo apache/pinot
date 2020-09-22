@@ -20,10 +20,9 @@ package org.apache.pinot.core.query.pruner;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.pinot.core.data.manager.SegmentDataManager;
-import org.apache.pinot.core.data.manager.TableDataManager;
+import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.query.config.SegmentPrunerConfig;
-import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,11 +49,10 @@ public class SegmentPrunerService {
   /**
    * Prunes the segments based on the query request, returns the segments that are not pruned.
    */
-  public List<SegmentDataManager> prune(TableDataManager tableDataManager, List<SegmentDataManager> segmentDataManagers,
-      ServerQueryRequest queryRequest) {
+  public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query) {
     for (SegmentPruner segmentPruner : _segmentPruners) {
-      segmentDataManagers = segmentPruner.prune(tableDataManager, segmentDataManagers, queryRequest);
+      segments = segmentPruner.prune(segments, query);
     }
-    return segmentDataManagers;
+    return segments;
   }
 }
