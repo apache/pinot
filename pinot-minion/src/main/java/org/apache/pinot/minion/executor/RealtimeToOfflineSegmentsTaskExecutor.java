@@ -19,6 +19,7 @@
 package org.apache.pinot.minion.executor;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -117,7 +118,7 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
       Map<String, ColumnPartitionConfig> columnPartitionMap =
           tableConfig.getIndexingConfig().getSegmentPartitionConfig().getColumnPartitionMap();
       PartitionerConfig partitionerConfig = getPartitionerConfig(columnPartitionMap, tableNameWithType, schemaColumns);
-      segmentProcessorConfigBuilder.setPartitionerConfig(partitionerConfig);
+      segmentProcessorConfigBuilder.setPartitionerConfigs(Lists.newArrayList(partitionerConfig));
     }
 
     // Aggregations using configured Collector
