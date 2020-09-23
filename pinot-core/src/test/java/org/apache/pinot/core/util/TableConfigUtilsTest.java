@@ -21,9 +21,13 @@ package org.apache.pinot.core.util;
 import com.google.common.collect.Lists;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.pinot.common.tier.TierFactory;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IngestionConfig;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -539,6 +543,20 @@ public class TableConfigUtilsTest {
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for invalid Var Length Dictionary column name");
+    } catch (Exception e) {
+      // expected
+    }
+
+    ColumnPartitionConfig columnPartitionConfig = new ColumnPartitionConfig("Murmur", 4);
+    Map<String, ColumnPartitionConfig> partitionConfigMap = new HashMap<>();
+    partitionConfigMap.put("myCol2", columnPartitionConfig);
+    SegmentPartitionConfig partitionConfig = new SegmentPartitionConfig(partitionConfigMap);
+    tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setSegmentPartitionConfig(partitionConfig)
+            .build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail for invalid Segment Partition column name");
     } catch (Exception e) {
       // expected
     }
