@@ -90,14 +90,20 @@
 
       </fieldset>
       <fieldset class="te-form__section-submit">
-        {{bs-button
+        {{#bs-button
             defaultText=subGroupButtonText
             type="primary"
             buttonType="submit"
             disabled=disableSubGroupSave
             onClick=(action "submitSubscriptionGroup")
             class="te-button te-button--submit"
-          }}
+        }}
+          {{#if _handleSubscriptionGroup.isRunning}}
+            <span class="loading-spinner">
+              {{ember-spinner position='relative' right='20px' top='-10px' scale=0.5 color='#ffffff'}}
+            </span>
+          {{/if}}
+        {{/bs-button}}
       </fieldset>
     {{/if}}
   </div>

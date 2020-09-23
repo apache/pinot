@@ -91,7 +91,7 @@
     </label>
   {{/unless}}
   {{#if isEditMode}}
-    {{bs-button
+    {{#bs-button
       defaultText="Update Alert"
       type="primary"
       buttonType="submit"
@@ -99,5 +99,11 @@
       onClick=(action "submitAlertEdit")
       class="te-button te-button--submit"
     }}
+      {{#if _updateDetection.isRunning}}
+        <span class="loading-spinner">
+          {{ember-spinner position='relative' right='20px' top='-10px' scale=0.5 color='#ffffff'}}
+        </span>
+      {{/if}}
+    {{/bs-button}}
   {{/if}}
 </div>
