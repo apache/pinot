@@ -1,7 +1,6 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.math.MathContext;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -61,7 +60,7 @@ public class AdditionWithPrecisionTransformFunction extends BaseTransformFunctio
     }
 
     int length = projectionBlock.getNumDocs();
-
+    Arrays.fill(_sums, 0, length, new BigDecimal(0));
     MathContext mathContext;
     if (_precision != null) {
       mathContext = new MathContext(_precision);
