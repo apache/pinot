@@ -552,8 +552,7 @@ public class TableConfigUtilsTest {
     try {
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
-      Assert.fail("Should fail for valid StarTreeIndex config column name");
-      // expected
+      Assert.fail("Should not fail for valid StarTreeIndex config column name");
     }
 
     starTreeIndexConfig =
