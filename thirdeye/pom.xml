@@ -42,8 +42,8 @@
     <pinot.version>0.4.0</pinot.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <jdk.version>1.8</jdk.version>
-    <dropwizard.version>1.3.12</dropwizard.version>
-    <dropwizard-auth.version>1.3.12</dropwizard-auth.version>
+    <dropwizard.version>1.3.19</dropwizard.version>
+    <dropwizard-auth.version>1.3.19</dropwizard-auth.version>
     <dropwizard.redirect.bundle.version>1.3.5</dropwizard.redirect.bundle.version>
     <jetty.version>9.4.18.v20190429</jetty.version>
     <jackson.version>2.10.2</jackson.version>
@@ -58,7 +58,7 @@
     <commons-cli.version>1.3</commons-cli.version>
     <commons-csv.version>1.3</commons-csv.version>
     <commons-dbcp2.version>2.1.1</commons-dbcp2.version>
-    <commons-conf2.version>2.5</commons-conf2.version>
+    <commons-conf2.version>2.7</commons-conf2.version>
     <commons-collection4.version>4.1</commons-collection4.version>
     <reflections.version>0.9.10</reflections.version>
     <mrunit.version>1.1.0</mrunit.version>
