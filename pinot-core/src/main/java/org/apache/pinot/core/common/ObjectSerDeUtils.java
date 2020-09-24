@@ -40,6 +40,7 @@ import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -49,6 +50,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.Sketch;
+import org.apache.pinot.common.function.scalar.DataTypeConversionFunctions;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.geospatial.serde.GeometrySerializer;
 import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
@@ -94,8 +96,8 @@ public class ObjectSerDeUtils {
     StringSet(18),
     BytesSet(19),
     IdSet(20),
-    List(21);
-
+    List(21),
+    BigDecimal(22);
     private final int _value;
 
     ObjectType(int value) {
@@ -113,6 +115,8 @@ public class ObjectSerDeUtils {
         return ObjectType.Long;
       } else if (value instanceof Double) {
         return ObjectType.Double;
+      } else if (value instanceof BigDecimal) {
+        return ObjectType.BigDecimal;
       } else if (value instanceof DoubleArrayList) {
         return ObjectType.DoubleArrayList;
       } else if (value instanceof AvgPair) {
@@ -850,6 +854,26 @@ public class ObjectSerDeUtils {
     }
   };
 
+  public static final ObjectSerDe<BigDecimal> BIGDECIMAL_SER_DE = new ObjectSerDe<BigDecimal>() {
+
+    @Override
+    public byte[] serialize(BigDecimal value) {
+      return DataTypeConversionFunctions.bigDecimalToBytes(value);
+    }
+
+    @Override
+    public BigDecimal deserialize(byte[] bytes) {
+      return new BigDecimal(DataTypeConversionFunctions.bytesToBigDecimal(bytes));
+    }
+
+    @Override
+    public BigDecimal deserialize(ByteBuffer byteBuffer) {
+      byte[] bytes = new byte[byteBuffer.remaining()];
+      byteBuffer.get(bytes);
+      return deserialize(bytes);
+    }
+  };
+
   // NOTE: DO NOT change the order, it has to be the same order as the ObjectType
   //@formatter:off
   private static final ObjectSerDe[] SER_DES = {
@@ -874,7 +898,8 @@ public class ObjectSerDeUtils {
       STRING_SET_SER_DE,
       BYTES_SET_SER_DE,
       ID_SET_SER_DE,
-      LIST_SER_DE
+      LIST_SER_DE,
+      BIGDECIMAL_SER_DE
   };
   //@formatter:on
 

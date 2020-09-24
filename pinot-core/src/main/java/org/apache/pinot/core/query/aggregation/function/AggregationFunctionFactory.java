@@ -117,6 +117,14 @@ public class AggregationFunctionFactory {
             return new MaxAggregationFunction(firstArgument);
           case SUM:
             return new SumAggregationFunction(firstArgument);
+          case SUMPRECISION:
+            int numArguments = arguments.size();
+            if (numArguments == 2) {
+              Integer precision = Integer.parseInt(arguments.get(1).getLiteral());
+              return new SumWithPrecisionAggregationFunction(firstArgument, precision);
+            } else {
+              return new SumWithPrecisionAggregationFunction(firstArgument);
+            }
           case AVG:
             return new AvgAggregationFunction(firstArgument);
           case MINMAXRANGE:

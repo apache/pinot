@@ -30,6 +30,7 @@ public enum AggregationFunctionType {
   MIN("min"),
   MAX("max"),
   SUM("sum"),
+  SUMPRECISION("sumPrecision"),
   AVG("avg"),
   MINMAXRANGE("minMaxRange"),
   DISTINCTCOUNT("distinctCount"),
