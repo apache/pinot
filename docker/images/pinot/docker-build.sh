@@ -51,7 +51,7 @@ fi
 
 if [[ "$#" -gt 4 ]]
 then
-  JAVA_VERSION=$4
+  JAVA_VERSION=$5
 else
   JAVA_VERSION=8
 fi
