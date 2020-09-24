@@ -79,10 +79,7 @@ public enum TransformFunctionType {
 
   // Geo relationship
   ST_CONTAINS("ST_Contains"),
-  ST_EQUALS("ST_Equals"),
-
-  //Big decimal
-  ADD_WITH_PRECISION("add_with_precision");
+  ST_EQUALS("ST_Equals");
 
   private final String _name;
 
