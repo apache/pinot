@@ -40,7 +40,6 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
-import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
@@ -197,59 +196,59 @@ public class SegmentPushUtils implements Serializable {
         Arrays.toString(spec.getPinotClusterSpecs()), tableName);
     for (String segmentUriPath : segmentUriToTarPathMap.keySet()) {
       String tarFilePath = segmentUriToTarPathMap.get(segmentUriPath);
-      URI tarFileURI = URI.create(tarFilePath);
-      File segmentMetadataFile = getSegmentMetadataZipFile(fileSystem, tarFileURI);
-      File tarFile = new File(tarFilePath);
-      String fileName = tarFile.getName();
+      String fileName = new File(tarFilePath).getName();
       Preconditions.checkArgument(fileName.endsWith(Constants.TAR_GZ_FILE_EXT));
       String segmentName = fileName.substring(0, fileName.length() - Constants.TAR_GZ_FILE_EXT.length());
-      for (PinotClusterSpec pinotClusterSpec : spec.getPinotClusterSpecs()) {
-        URI controllerURI;
-        try {
-          controllerURI = new URI(pinotClusterSpec.getControllerURI());
-        } catch (URISyntaxException e) {
-          throw new RuntimeException("Got invalid controller uri - '" + pinotClusterSpec.getControllerURI() + "'");
-        }
-        LOGGER.info("Pushing segment: {} to location: {} for table {}", segmentName, controllerURI, tableName);
-        int attempts = 1;
-        if (spec.getPushJobSpec() != null && spec.getPushJobSpec().getPushAttempts() > 0) {
-          attempts = spec.getPushJobSpec().getPushAttempts();
-        }
-        long retryWaitMs = 1000L;
-        if (spec.getPushJobSpec() != null && spec.getPushJobSpec().getPushRetryIntervalMillis() > 0) {
-          retryWaitMs = spec.getPushJobSpec().getPushRetryIntervalMillis();
-        }
-        RetryPolicies.exponentialBackoffRetryPolicy(attempts, retryWaitMs, 5).attempt(() -> {
+      File segmentMetadataFile = new File(FileUtils.getTempDirectory(), "segmentMetadataFile-" + System.nanoTime() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+      generateSegmentMetadataFile(fileSystem, URI.create(tarFilePath), segmentMetadataFile);
+      try {
+        for (PinotClusterSpec pinotClusterSpec : spec.getPinotClusterSpecs()) {
+          URI controllerURI;
           try {
-            List<Header> headers = ImmutableList
-                .of(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI, segmentUriPath));
-            // Add table name as a request parameter
-            NameValuePair
-                tableNameValuePair = new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME,
-                tableName);
-            List<NameValuePair> parameters = Arrays.asList(tableNameValuePair);
-            SimpleHttpResponse response = FILE_UPLOAD_DOWNLOAD_CLIENT.uploadSegmentMetadata(
-                FileUploadDownloadClient.getUploadSegmentMetadataURI(controllerURI), segmentName, segmentMetadataFile, headers,
-                parameters, FILE_UPLOAD_DOWNLOAD_CLIENT.DEFAULT_SOCKET_TIMEOUT_MS);
-            LOGGER.info("Response for pushing table {} segment {} to location {} - {}: {}", tableName, segmentName,
-                controllerURI, response.getStatusCode(), response.getResponse());
-            return true;
-          } catch (HttpErrorStatusException e) {
-            int statusCode = e.getStatusCode();
-            if (statusCode >= 500) {
-              // Temporary exception
-              LOGGER.warn("Caught temporary exception while pushing table: {} segment: {} to {}, will retry", tableName,
-                  segmentName, controllerURI, e);
-              return false;
-            } else {
-              // Permanent exception
-              LOGGER
-                  .error("Caught permanent exception while pushing table: {} segment: {} to {}, won't retry", tableName,
-                      segmentName, controllerURI, e);
-              throw e;
-            }
+            controllerURI = new URI(pinotClusterSpec.getControllerURI());
+          } catch (URISyntaxException e) {
+            throw new RuntimeException("Got invalid controller uri - '" + pinotClusterSpec.getControllerURI() + "'");
           }
-        });
+          LOGGER.info("Pushing segment: {} to location: {} for table {}", segmentName, controllerURI, tableName);
+          int attempts = 1;
+          if (spec.getPushJobSpec() != null && spec.getPushJobSpec().getPushAttempts() > 0) {
+            attempts = spec.getPushJobSpec().getPushAttempts();
+          }
+          long retryWaitMs = 1000L;
+          if (spec.getPushJobSpec() != null && spec.getPushJobSpec().getPushRetryIntervalMillis() > 0) {
+            retryWaitMs = spec.getPushJobSpec().getPushRetryIntervalMillis();
+          }
+          RetryPolicies.exponentialBackoffRetryPolicy(attempts, retryWaitMs, 5).attempt(() -> {
+            try {
+              List<Header> headers = ImmutableList.of(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI, segmentUriPath));
+              // Add table name as a request parameter
+              NameValuePair tableNameValuePair =
+                  new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME, tableName);
+              List<NameValuePair> parameters = Arrays.asList(tableNameValuePair);
+              SimpleHttpResponse response = FILE_UPLOAD_DOWNLOAD_CLIENT.uploadSegmentMetadata(FileUploadDownloadClient.getUploadSegmentMetadataURI(controllerURI),
+                  segmentName, segmentMetadataFile, headers, parameters, FILE_UPLOAD_DOWNLOAD_CLIENT.DEFAULT_SOCKET_TIMEOUT_MS);
+              LOGGER.info("Response for pushing table {} segment {} to location {} - {}: {}", tableName, segmentName,
+                  controllerURI, response.getStatusCode(), response.getResponse());
+              return true;
+            } catch (HttpErrorStatusException e) {
+              int statusCode = e.getStatusCode();
+              if (statusCode >= 500) {
+                // Temporary exception
+                LOGGER
+                    .warn("Caught temporary exception while pushing table: {} segment: {} to {}, will retry", tableName,
+                        segmentName, controllerURI, e);
+                return false;
+              } else {
+                // Permanent exception
+                LOGGER.error("Caught permanent exception while pushing table: {} segment: {} to {}, won't retry",
+                    tableName, segmentName, controllerURI, e);
+                throw e;
+              }
+            }
+          });
+        }
+      } finally {
+        FileUtils.deleteQuietly(segmentMetadataFile);
       }
     }
   }
@@ -266,13 +265,23 @@ public class SegmentPushUtils implements Serializable {
     return segmentUriToTarPathMap;
   }
 
-  private static File getSegmentMetadataZipFile(PinotFS fileSystem, URI tarFileURI)
+  /**
+   * Generate a segment metadata only tar file, which contains only metadata.properties and creation.meta file.
+   * The purpose of this is to create a lean tar to push to Pinot controller for adding segments without downloading
+   * the complete segment and untar the segment tarball.
+   *
+   * 1. Download segment tar file to temp dir;
+   * 2. Extract only metadata.properties and creation.meta files from the segment tar file;
+   * 3. Tar both files into a segment metadata file.
+   *
+   */
+  private static boolean generateSegmentMetadataFile(PinotFS fileSystem, URI tarFileURI, File segmentMetadataTarFile)
       throws Exception {
     long currentTime = System.nanoTime();
-    File tarFile = new File("segmentTar-" + currentTime + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION).getAbsoluteFile();
+    File tarFile = new File(FileUtils.getTempDirectory(), "segmentTar-" + currentTime + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION).getAbsoluteFile();
+    File segmentMetadataDir = new File(FileUtils.getTempDirectory(), "segmentMetadataDir-" + currentTime).getAbsoluteFile();
     try {
       fileSystem.copyToLocalFile(tarFileURI, tarFile);
-      File segmentMetadataDir = new File("segmentMetadataDir-" + currentTime).getAbsoluteFile();
       if (segmentMetadataDir.exists()) {
         FileUtils.forceDelete(segmentMetadataDir);
       }
@@ -288,12 +297,15 @@ public class SegmentPushUtils implements Serializable {
       TarGzCompressionUtils.untarOneFile(tarFile, V1Constants.SEGMENT_CREATION_META,
           new File(segmentMetadataDir, V1Constants.SEGMENT_CREATION_META));
 
-      File segmentMetadataFile = new File("segmentMetadataFile-" + currentTime + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-      LOGGER.info("Trying to tar segment metadata dir [{}] to [{}]", segmentMetadataDir, segmentMetadataFile);
-      TarGzCompressionUtils.createTarGzFile(segmentMetadataDir, segmentMetadataFile);
-      return segmentMetadataFile;
+      if (segmentMetadataTarFile.exists()) {
+        FileUtils.forceDelete(segmentMetadataTarFile);
+      }
+      LOGGER.info("Trying to tar segment metadata dir [{}] to [{}]", segmentMetadataDir, segmentMetadataTarFile);
+      TarGzCompressionUtils.createTarGzFile(segmentMetadataDir, segmentMetadataTarFile);
+      return true;
     } finally {
       FileUtils.deleteQuietly(tarFile);
+      FileUtils.deleteQuietly(segmentMetadataDir);
     }
   }
 }
