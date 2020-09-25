@@ -111,7 +111,7 @@ public class LocalPinotFS extends PinotFS {
     if (!recursive) {
       return Arrays.stream(file.list()).map(s -> new File(file, s)).map(File::getAbsolutePath).toArray(String[]::new);
     } else {
-      return Files.walk(Paths.get(fileUri)).
+      return Files.walk(Paths.get(file.getAbsolutePath())).
           filter(s -> !s.equals(file.toPath())).map(Path::toString).toArray(String[]::new);
     }
   }
