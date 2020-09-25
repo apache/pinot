@@ -67,6 +67,7 @@ import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegment
 import org.apache.pinot.controller.helix.core.realtime.segment.FlushThresholdUpdateManager;
 import org.apache.pinot.controller.helix.core.realtime.segment.FlushThresholdUpdater;
 import org.apache.pinot.controller.util.SegmentCompletionUtils;
+import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
@@ -512,6 +513,11 @@ public class PinotLLCRealtimeSegmentManager {
     committingSegmentZKMetadata.setIndexVersion(segmentMetadata.getVersion());
     committingSegmentZKMetadata.setTotalDocs(segmentMetadata.getTotalDocs());
 
+    // Update the partition metadata based on the segment metadata
+    // NOTE: When the stream partition changes, or the records are not properly partitioned from the stream, the
+    //       partition of the segment (based on the actual consumed records) can be different from the stream partition.
+    committingSegmentZKMetadata.setPartitionMetadata(getPartitionMetadataFromSegmentMetadata(segmentMetadata));
+
     persistSegmentZKMetadata(realtimeTableName, committingSegmentZKMetadata, stat.getVersion());
     return committingSegmentZKMetadata;
   }
@@ -578,6 +584,25 @@ public class PinotLLCRealtimeSegmentManager {
     return new SegmentPartitionMetadata(partitionMetadataMap);
   }
 
+  @Nullable
+  private SegmentPartitionMetadata getPartitionMetadataFromSegmentMetadata(SegmentMetadataImpl segmentMetadata) {
+    Map<String, ColumnPartitionMetadata> partitionMetadataMap = new HashMap<>();
+    for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
+      String columnName = entry.getKey();
+      ColumnMetadata columnMetadata = entry.getValue();
+      if (columnMetadata.getPartitionFunction() != null) {
+        partitionMetadataMap.put(columnName,
+            new ColumnPartitionMetadata(columnMetadata.getPartitionFunction().toString(),
+                columnMetadata.getNumPartitions(), columnMetadata.getPartitions()));
+      }
+    }
+    if (!partitionMetadataMap.isEmpty()) {
+      return new SegmentPartitionMetadata(partitionMetadataMap);
+    } else {
+      return null;
+    }
+  }
+
   public long getCommitTimeoutMS(String realtimeTableName) {
     long commitTimeoutMS = SegmentCompletionProtocol.getMaxSegmentCommitTimeMs();
     if (_propertyStore == null) {
@@ -603,7 +628,8 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   @VisibleForTesting
-  StreamPartitionMsgOffset getPartitionOffset(StreamConfig streamConfig, OffsetCriteria offsetCriteria, int partitionId) {
+  StreamPartitionMsgOffset getPartitionOffset(StreamConfig streamConfig, OffsetCriteria offsetCriteria,
+      int partitionId) {
     PartitionOffsetFetcher partitionOffsetFetcher =
         new PartitionOffsetFetcher(offsetCriteria, partitionId, streamConfig);
     try {
@@ -1011,7 +1037,8 @@ public class PinotLLCRealtimeSegmentManager {
     LLCSegmentName newLLCSegmentName =
         new LLCSegmentName(rawTableName, partitionId, STARTING_SEQUENCE_NUMBER, creationTimeMs);
     String newSegmentName = newLLCSegmentName.getSegmentName();
-    StreamPartitionMsgOffset startOffset = getPartitionOffset(streamConfig, streamConfig.getOffsetCriteria(), partitionId);
+    StreamPartitionMsgOffset startOffset =
+        getPartitionOffset(streamConfig, streamConfig.getOffsetCriteria(), partitionId);
     CommittingSegmentDescriptor committingSegmentDescriptor =
         new CommittingSegmentDescriptor(null, startOffset.toString(), 0);
     createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, creationTimeMs,

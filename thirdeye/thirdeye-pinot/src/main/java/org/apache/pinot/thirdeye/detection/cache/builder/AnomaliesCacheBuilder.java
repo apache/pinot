@@ -34,6 +34,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
@@ -159,8 +160,12 @@ public class AnomaliesCacheBuilder {
 
       int anomalies = output.values().stream().mapToInt(Collection::size).sum();
       LOG.info("Fetched {} anomalies, from {} slices, took {} milliseconds, {} slices hit cache, {} slices missed cache",
-          anomalies, slices.size(), System.currentTimeMillis() - ts,
-          (slices.size() - futures.size()), futures.size());
+          anomalies, slices.size(), System.currentTimeMillis() - ts, (slices.size() - futures.size()), futures.size());
+    } catch (TimeoutException e) {
+      LOG.error("Timeout when fetching anomalies so assuming the result is empty.", e);
+      for (AnomalySlice slice : slices) {
+          output.put(slice, Collections.emptyList());
+      }
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

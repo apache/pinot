@@ -25,28 +25,16 @@ import java.util.Map;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class SeverityThresholdLabelerSpec  extends AbstractSpec{
-  private Map<String, Threshold> severity;
+  public static final String CHANGE_KEY = "change";
+  public static final String DURATION_KEY = "duration";
 
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  public static class Threshold {
-    public double change = Double.MAX_VALUE;
-    public long duration = Long.MAX_VALUE;
+  private Map<String, Map<String, Object>> severity;
 
-    public Threshold() {
-
-    }
-
-    public Threshold(double change, long duration) {
-      this.change = change;
-      this.duration = duration;
-    }
-  }
-
-  public Map<String, Threshold> getSeverity() {
+  public Map<String, Map<String, Object>> getSeverity() {
     return severity;
   }
 
-  public void setSeverity(Map<String, Threshold> severity) {
+  public void setSeverity(Map<String, Map<String, Object>> severity) {
     this.severity = severity;
   }
 }

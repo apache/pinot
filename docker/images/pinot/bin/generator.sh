@@ -47,7 +47,7 @@ sed -i -e "s/\"schemaName\": \"$TEMPLATE_NAME\"/\"schemaName\": \"$TABLE_NAME\"/
 sed -i -e "s/\"schemaName\": \"$TEMPLATE_NAME\"/\"schemaName\": \"$TABLE_NAME\"/g" "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_schema.json"
 
 echo "Generating data for ${TEMPLATE_NAME} in ${DATA_DIR}"
-${ADMIN_PATH} GenerateData \
+JAVA_OPTS="" ${ADMIN_PATH} GenerateData \
 -numFiles 1 -numRecords 631152  -format csv \
 -schemaFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_schema.json" \
 -schemaAnnotationFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_generator.json" \
@@ -60,7 +60,7 @@ if [ ! -d "${DATA_DIR}" ]; then
 fi
 
 echo "Creating segment for ${TEMPLATE_NAME} in ${SEGMENT_DIR}"
-${ADMIN_PATH} CreateSegment \
+JAVA_OPTS="" ${ADMIN_PATH} CreateSegment \
 -format csv \
 -tableConfigFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_config.json" \
 -schemaFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_schema.json" \
@@ -74,12 +74,12 @@ if [ ! -d "${SEGMENT_DIR}" ]; then
 fi
 
 echo "Adding table ${TABLE_NAME} from template ${TEMPLATE_NAME}"
-${ADMIN_PATH} AddTable -exec \
+JAVA_OPTS="" ${ADMIN_PATH} AddTable -exec \
 -tableConfigFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_config.json" \
 -schemaFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_schema.json" || exit 1
 
 echo "Uploading segment for ${TEMPLATE_NAME}"
-${ADMIN_PATH} UploadSegment \
+JAVA_OPTS="" ${ADMIN_PATH} UploadSegment \
 -tableName "${TABLE_NAME}" \
 -segmentDir "${SEGMENT_DIR}"
 

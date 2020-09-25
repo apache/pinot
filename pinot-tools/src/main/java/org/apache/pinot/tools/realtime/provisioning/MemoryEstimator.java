@@ -85,7 +85,7 @@ public class MemoryEstimator {
       throw new RuntimeException("Caught exception when reading segment index dir", e);
     }
     _totalDocsInSampleSegment = _segmentMetadata.getTotalDocs();
-    _sampleSegmentConsumedSeconds = (int)(_totalDocsInSampleSegment/ingestionRate);
+    _sampleSegmentConsumedSeconds = (int) (_totalDocsInSampleSegment / ingestionRate);
 
     if (CollectionUtils.isNotEmpty(_tableConfig.getIndexingConfig().getNoDictionaryColumns())) {
       _noDictionaryColumns.addAll(_tableConfig.getIndexingConfig().getNoDictionaryColumns());
@@ -130,7 +130,8 @@ public class MemoryEstimator {
 
     // create a config
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
-        new RealtimeSegmentConfig.Builder().setSegmentName(_segmentMetadata.getName()).setStreamName(_tableNameWithType)
+        new RealtimeSegmentConfig.Builder().setTableNameWithType(_tableNameWithType)
+            .setSegmentName(_segmentMetadata.getName()).setStreamName(_tableNameWithType)
             .setSchema(_segmentMetadata.getSchema()).setCapacity(_segmentMetadata.getTotalDocs())
             .setAvgNumMultiValues(_avgMultiValues).setNoDictionaryColumns(_noDictionaryColumns)
             .setVarLengthDictionaryColumns(_varLengthDictionaryColumns).setInvertedIndexColumns(_invertedIndexColumns)
@@ -138,13 +139,13 @@ public class MemoryEstimator {
             .setStatsHistory(sampleStatsHistory);
 
     // create mutable segment impl
-    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build());
+    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
 
     // read all rows and index them
     try (PinotSegmentRecordReader segmentRecordReader = new PinotSegmentRecordReader(_sampleCompletedSegment)) {
       GenericRow row = new GenericRow();
       while (segmentRecordReader.hasNext()) {
-        segmentRecordReader.next(row);
+        row = segmentRecordReader.next(row);
         mutableSegmentImpl.index(row, null);
         row.clear();
       }
@@ -224,9 +225,10 @@ public class MemoryEstimator {
 
       memoryForConsumingSegmentPerPartition += getMemoryForInvertedIndex(memoryForConsumingSegmentPerPartition);
 
-      int numActiveSegmentsPerPartition = (retentionHours  + numHoursToConsume - 1)/numHoursToConsume;
-      long activeMemoryForCompletedSegmentsPerPartition = completedSegmentSizeBytes * (numActiveSegmentsPerPartition - 1);
-      int numCompletedSegmentsPerPartition = (_tableRetentionHours + numHoursToConsume - 1)/numHoursToConsume - 1;
+      int numActiveSegmentsPerPartition = (retentionHours + numHoursToConsume - 1) / numHoursToConsume;
+      long activeMemoryForCompletedSegmentsPerPartition =
+          completedSegmentSizeBytes * (numActiveSegmentsPerPartition - 1);
+      int numCompletedSegmentsPerPartition = (_tableRetentionHours + numHoursToConsume - 1) / numHoursToConsume - 1;
 
       for (int j = 0; j < numHosts.length; j++) {
         int numHostsToProvision = numHosts[j];
@@ -238,22 +240,26 @@ public class MemoryEstimator {
             activeMemoryForCompletedSegmentsPerPartition * totalConsumingPartitionsPerHost;
         long totalMemoryForConsumingSegmentsPerHost =
             memoryForConsumingSegmentPerPartition * totalConsumingPartitionsPerHost;
-        long activeMemoryPerHostBytes = activeMemoryForCompletedSegmentsPerHost + totalMemoryForConsumingSegmentsPerHost;
-        long mappedMemoryPerHost = totalMemoryForConsumingSegmentsPerHost +
-            (numCompletedSegmentsPerPartition * totalConsumingPartitionsPerHost * completedSegmentSizeBytes);
+        long activeMemoryPerHostBytes =
+            activeMemoryForCompletedSegmentsPerHost + totalMemoryForConsumingSegmentsPerHost;
+        long mappedMemoryPerHost =
+            totalMemoryForConsumingSegmentsPerHost + (numCompletedSegmentsPerPartition * totalConsumingPartitionsPerHost
+                * completedSegmentSizeBytes);
 
         if (activeMemoryPerHostBytes <= _maxUsableHostMemory) {
-          _activeMemoryPerHost[i][j] = DataSizeUtils.fromBytes(activeMemoryPerHostBytes)
-              + "/" + DataSizeUtils.fromBytes(mappedMemoryPerHost);
+          _activeMemoryPerHost[i][j] =
+              DataSizeUtils.fromBytes(activeMemoryPerHostBytes) + "/" + DataSizeUtils.fromBytes(mappedMemoryPerHost);
           _consumingMemoryPerHost[i][j] = DataSizeUtils.fromBytes(totalMemoryForConsumingSegmentsPerHost);
           _optimalSegmentSize[i][j] = DataSizeUtils.fromBytes(completedSegmentSizeBytes);
-          _numSegmentsQueriedPerHost[i][j] = String.valueOf(numActiveSegmentsPerPartition * totalConsumingPartitionsPerHost);
+          _numSegmentsQueriedPerHost[i][j] =
+              String.valueOf(numActiveSegmentsPerPartition * totalConsumingPartitionsPerHost);
         }
       }
     }
   }
 
-  private long getMemoryForConsumingSegmentPerPartition(File statsFile, int totalDocs) throws IOException {
+  private long getMemoryForConsumingSegmentPerPartition(File statsFile, int totalDocs)
+      throws IOException {
     // We don't want the stats history to get updated from all our dummy runs
     // So we copy over the original stats history every time we start
     File statsFileCopy = new File(_tableDataDir, STATS_FILE_COPY_NAME);
@@ -269,15 +275,15 @@ public class MemoryEstimator {
     RealtimeSegmentZKMetadata segmentZKMetadata = getRealtimeSegmentZKMetadata(_segmentMetadata, totalDocs);
 
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
-        new RealtimeSegmentConfig.Builder().setSegmentName(_segmentMetadata.getName())
-            .setStreamName(_tableNameWithType).setSchema(_segmentMetadata.getSchema()).setCapacity(totalDocs)
-            .setAvgNumMultiValues(_avgMultiValues).setNoDictionaryColumns(_noDictionaryColumns)
-            .setVarLengthDictionaryColumns(_varLengthDictionaryColumns).setInvertedIndexColumns(_invertedIndexColumns)
-            .setRealtimeSegmentZKMetadata(segmentZKMetadata).setOffHeap(true).setMemoryManager(memoryManager)
-            .setStatsHistory(statsHistory);
+        new RealtimeSegmentConfig.Builder().setTableNameWithType(_tableNameWithType)
+            .setSegmentName(_segmentMetadata.getName()).setStreamName(_tableNameWithType)
+            .setSchema(_segmentMetadata.getSchema()).setCapacity(totalDocs).setAvgNumMultiValues(_avgMultiValues)
+            .setNoDictionaryColumns(_noDictionaryColumns).setVarLengthDictionaryColumns(_varLengthDictionaryColumns)
+            .setInvertedIndexColumns(_invertedIndexColumns).setRealtimeSegmentZKMetadata(segmentZKMetadata)
+            .setOffHeap(true).setMemoryManager(memoryManager).setStatsHistory(statsHistory);
 
     // create mutable segment impl
-    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build());
+    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
     long memoryForConsumingSegmentPerPartition = memoryManager.getTotalAllocatedBytes();
     mutableSegmentImpl.destroy();
     FileUtils.deleteQuietly(statsFileCopy);
@@ -362,7 +368,7 @@ public class MemoryEstimator {
   private long calculateMemoryForCompletedSegmentsPerPartition(long completedSegmentSizeBytes, int numHoursToConsume,
       int retentionHours) {
 
-    int numSegmentsInMemory = (retentionHours + numHoursToConsume - 1)/numHoursToConsume;
+    int numSegmentsInMemory = (retentionHours + numHoursToConsume - 1) / numHoursToConsume;
     return completedSegmentSizeBytes * (numSegmentsInMemory - 1);
   }
 

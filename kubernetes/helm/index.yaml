@@ -2,8 +2,36 @@ apiVersion: v1
 entries:
   pinot:
   - apiVersion: v1
+    appVersion: 0.2.1
+    created: "2020-09-18T14:07:53.823402-07:00"
+    dependencies:
+    - condition: pinot.zookeeper.enabled,zookeeper.enabled
+      name: zookeeper
+      repository: https://kubernetes-charts-incubator.storage.googleapis.com/
+      version: 2.1.3
+    description: Apache Pinot is a realtime distributed OLAP datastore, which is used
+      to deliver scalable real time analytics with low latency. It can ingest data
+      from offline data sources (such as Hadoop and flat files) as well as online
+      sources (such as Kafka). Pinot is designed to scale horizontally.
+    digest: 605b74fb6203f62500638fd679859cc771ca37ed420f89e02a0c82c3ede92690
+    home: https://pinot.apache.org/
+    keywords:
+    - olap
+    - analytics
+    - database
+    - pinot
+    maintainers:
+    - email: dev@pinot.apache.org
+      name: pinot-dev
+    name: pinot
+    sources:
+    - https://github.com/apache/incubator-pinot
+    urls:
+    - pinot-0.2.1.tgz
+    version: 0.2.1
+  - apiVersion: v1
     appVersion: 0.2.0
-    created: "2020-05-10T01:58:56.42736-07:00"
+    created: "2020-09-18T14:07:53.82094-07:00"
     dependencies:
     - condition: pinot.zookeeper.enabled,zookeeper.enabled
       name: zookeeper
@@ -32,7 +60,7 @@ entries:
   presto:
   - apiVersion: v1
     appVersion: 0.2.0
-    created: "2020-05-10T01:58:56.428267-07:00"
+    created: "2020-09-18T14:07:53.825113-07:00"
     description: Presto is an open source distributed SQL query engine for running
       interactive analytic queries against data sources of all sizes ranging from
       gigabytes to petabytes.
@@ -51,4 +79,4 @@ entries:
     urls:
     - presto-0.2.0.tgz
     version: 0.2.0
-generated: "2020-05-10T01:58:56.423122-07:00"
+generated: "2020-09-18T14:07:53.817977-07:00"

@@ -45,10 +45,12 @@ import org.apache.pinot.thirdeye.detection.spi.components.Labeler;
 public class AnomalyLabelerWrapper extends DetectionPipeline {
   private static final String PROP_NESTED = "nested";
   private static final String PROP_LABELER = "labeler";
+  private static final String PROP_METRIC_URN = "metricUrn";
 
   private final List<Map<String, Object>> nestedProperties;
   private String labelerName;
   private Labeler labeler;
+  private String metricUrn;
 
   public AnomalyLabelerWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
     super(provider, config, startTime, endTime);
@@ -59,6 +61,8 @@ public class AnomalyLabelerWrapper extends DetectionPipeline {
     this.labelerName = DetectionUtils.getComponentKey(MapUtils.getString(config.getProperties(), PROP_LABELER));
     Preconditions.checkArgument(this.config.getComponents().containsKey(this.labelerName));
     this.labeler = (Labeler) this.config.getComponents().get(this.labelerName);
+    this.metricUrn = MapUtils.getString(properties, PROP_METRIC_URN);
+
   }
 
   @Override
@@ -70,6 +74,9 @@ public class AnomalyLabelerWrapper extends DetectionPipeline {
 
     Set<Long> lastTimeStamps = new HashSet<>();
     for (Map<String, Object> properties : this.nestedProperties) {
+      if (this.metricUrn != null){
+        properties.put(PROP_METRIC_URN, this.metricUrn);
+      }
       DetectionPipelineResult intermediate = this.runNested(properties, this.startTime, this.endTime);
       lastTimeStamps.add(intermediate.getLastTimestamp());
       predictionResults.addAll(intermediate.getPredictions());

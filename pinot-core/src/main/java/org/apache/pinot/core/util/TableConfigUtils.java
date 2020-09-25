@@ -293,6 +293,13 @@ public final class TableConfigUtils {
         columnNameToConfigMap.put(columnName, "Var Length Column Config");
       }
     }
+    if (indexingConfig.getSegmentPartitionConfig() != null
+        && indexingConfig.getSegmentPartitionConfig().getColumnPartitionMap() != null) {
+      for (String columnName : indexingConfig.getSegmentPartitionConfig().getColumnPartitionMap().keySet()) {
+        columnNameToConfigMap.put(columnName, "Segment Partition Config");
+      }
+    }
+
     List<StarTreeIndexConfig> starTreeIndexConfigList = indexingConfig.getStarTreeIndexConfigs();
     if (starTreeIndexConfigList != null) {
       for (StarTreeIndexConfig starTreeIndexConfig : starTreeIndexConfigList) {
