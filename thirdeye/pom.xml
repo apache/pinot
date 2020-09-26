@@ -42,8 +42,8 @@
     <pinot.version>0.4.0</pinot.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <jdk.version>1.8</jdk.version>
-    <dropwizard.version>1.3.19</dropwizard.version>
-    <dropwizard-auth.version>1.3.19</dropwizard-auth.version>
+    <dropwizard.version>1.3.21</dropwizard.version>
+    <dropwizard-auth.version>1.3.21</dropwizard-auth.version>
     <dropwizard.redirect.bundle.version>1.3.5</dropwizard.redirect.bundle.version>
     <jetty.version>9.4.18.v20190429</jetty.version>
     <jackson.version>2.10.2</jackson.version>
