@@ -19,7 +19,6 @@
 package org.apache.pinot.core.geospatial.transform.function;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.common.function.annotations.ScalarFunction;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.geospatial.serde.GeometrySerializer;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
