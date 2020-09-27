@@ -52,7 +52,7 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMes
   private static final String SCHEMA_REGISTRY_REST_URL = "schema.registry.rest.url";
   private static final String SCHEMA_REGISTRY_OPTS_PREFIX = "schema.registry.";
   private KafkaAvroDeserializer _deserializer;
-  private RecordExtractor<Record, Record> _avroRecordExtractor;
+  private RecordExtractor<Record> _avroRecordExtractor;
   private String _topicName;
 
   public RestService createRestService(String schemaRegistryUrl, Map<String, String> configs) {

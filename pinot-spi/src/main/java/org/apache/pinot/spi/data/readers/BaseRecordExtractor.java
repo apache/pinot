@@ -27,17 +27,15 @@ import javax.annotation.Nullable;
 
 
 /**
- * Abstract class for extracting and converting the fields of various data formats into supported Pinot data types.
+ * Base abstract class for extracting and converting the fields of various data formats into supported Pinot data types.
  *
  * @param <T> the format of the input record
- * @param <V> value used for converting the nested/complex fields of the file format (e.g. GenericRecord for Avro).
- *            In most cases, this will be the same type as {@code T}.
  */
-public abstract class AbstractDefaultRecordExtractor<T, V> implements RecordExtractor<T, Object> {
+public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
 
   /**
-   * Converts the field value to either a single value (string, number, bytebuffer), multi value (Object[]) or a Map.
-   * Returns {@code null} if the field value is {@code null}.
+   * Converts the field value to either a single value (string, number, byte[]), multi value (Object[]) or a Map.
+   * Returns {@code null} if the field value is {@code null} or if the value is an empty array/collection/map.
    *
    * Natively Pinot only understands single values and multi values.
    * Map is useful only if some ingestion transform functions operates on it in the transformation layer.
@@ -53,7 +51,7 @@ public abstract class AbstractDefaultRecordExtractor<T, V> implements RecordExtr
     } else if (isInstanceOfMap(value)) {
       convertedValue = convertMap(value);
     } else if (isInstanceOfRecord(value)) {
-      convertedValue = convertRecord((V) value);
+      convertedValue = convertRecord(value);
     } else {
       convertedValue = convertSingleValue(value);
     }
@@ -61,9 +59,12 @@ public abstract class AbstractDefaultRecordExtractor<T, V> implements RecordExtr
   }
 
   /**
-   * Returns whether the object is an instance of the data format's base type.
+   * Returns whether the object is an instance of the data format's base type. Override this method if the extractor
+   * can handle the conversion of nested record types.
    */
-  protected abstract boolean isInstanceOfRecord(Object value);
+  protected boolean isInstanceOfRecord(Object value) {
+    return false;
+  }
 
   /**
    * Returns whether the object is of a multi-value type. Override this method if the data format represents
@@ -82,10 +83,13 @@ public abstract class AbstractDefaultRecordExtractor<T, V> implements RecordExtr
   }
 
   /**
-   * Handles the conversion of every field of the object for the particular data format.
+   * Handles the conversion of every field of the object for the particular data format. Override this method if the
+   * extractor can convert nested record types.
    */
   @Nullable
-  protected abstract Object convertRecord(V value);
+  protected Object convertRecord(Object value) {
+    throw new UnsupportedOperationException("Extractor cannot convert record type structures for this data format.");
+  }
 
   /**
    * Handles the conversion of each element of a multi-value object. Returns {@code null} if the field value is

@@ -28,7 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.data.readers.AbstractDefaultRecordExtractor;
+import org.apache.pinot.spi.data.readers.BaseRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 
@@ -36,7 +36,7 @@ import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 /**
  * Extractor for ProtoBuf records
  */
-public class ProtoBufRecordExtractor extends AbstractDefaultRecordExtractor<Message, ProtoBufFieldInfo> {
+public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
 
   private Set<String> _fields;
   private boolean _extractAll = false;
@@ -178,7 +178,8 @@ public class ProtoBufRecordExtractor extends AbstractDefaultRecordExtractor<Mess
    */
   @Override
   @Nullable
-  protected Object convertRecord(ProtoBufFieldInfo record) {
+  protected Object convertRecord(Object value) {
+    ProtoBufFieldInfo record = (ProtoBufFieldInfo) value;
     Map<Descriptors.FieldDescriptor, Object> fields = ((Message) record.getFieldValue()).getAllFields();
     if (fields.isEmpty()) {
       return null;

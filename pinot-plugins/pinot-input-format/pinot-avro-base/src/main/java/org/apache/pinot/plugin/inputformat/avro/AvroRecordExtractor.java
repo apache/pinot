@@ -25,7 +25,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
-import org.apache.pinot.spi.data.readers.AbstractDefaultRecordExtractor;
+import org.apache.pinot.spi.data.readers.BaseRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 
@@ -33,7 +33,7 @@ import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 /**
  * Extractor for Avro Records
  */
-public class AvroRecordExtractor extends AbstractDefaultRecordExtractor<GenericRecord, GenericRecord> {
+public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
   private Set<String> _fields;
   private boolean _extractAll = false;
 
@@ -74,7 +74,8 @@ public class AvroRecordExtractor extends AbstractDefaultRecordExtractor<GenericR
    */
   @Override
   @Nullable
-  protected Object convertRecord(GenericRecord record) {
+  protected Object convertRecord(Object value) {
+    GenericRecord record = (GenericRecord) value;
     List<Schema.Field> fields = record.getSchema().getFields();
     if (fields.isEmpty()) {
       return null;

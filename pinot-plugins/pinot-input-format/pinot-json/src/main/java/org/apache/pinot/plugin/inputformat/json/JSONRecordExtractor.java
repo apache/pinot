@@ -21,7 +21,7 @@ package org.apache.pinot.plugin.inputformat.json;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.data.readers.AbstractDefaultRecordExtractor;
+import org.apache.pinot.spi.data.readers.BaseRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 
@@ -29,7 +29,7 @@ import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 /**
  * Extractor for JSON records
  */
-public class JSONRecordExtractor extends AbstractDefaultRecordExtractor<Map<String, Object>, Object> {
+public class JSONRecordExtractor extends BaseRecordExtractor<Map<String, Object>> {
 
   private Set<String> _fields;
   private boolean _extractAll = false;
@@ -56,21 +56,5 @@ public class JSONRecordExtractor extends AbstractDefaultRecordExtractor<Map<Stri
       }
     }
     return to;
-  }
-
-  /**
-   * JSON structures should be handled as a map or an ordered collection. Therefore this will always return false.
-   */
-  @Override
-  protected boolean isInstanceOfRecord(Object value) {
-    return false;
-  }
-
-  /**
-   * This method should not be called when converting JSON objects.
-   */
-  @Override
-  protected Object convertRecord(Object record) {
-    throw new UnsupportedOperationException("JSON structures should be handled as a map or an ordered collection.");
   }
 }

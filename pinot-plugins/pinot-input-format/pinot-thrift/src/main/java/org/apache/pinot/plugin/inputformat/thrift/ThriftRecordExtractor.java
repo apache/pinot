@@ -23,7 +23,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.AbstractDefaultRecordExtractor;
+import org.apache.pinot.spi.data.readers.BaseRecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 import org.apache.thrift.TBase;
 import org.apache.thrift.TFieldIdEnum;
@@ -33,7 +33,7 @@ import org.apache.thrift.meta_data.FieldMetaData;
 /**
  * Extractor for records of Thrift input
  */
-public class ThriftRecordExtractor extends AbstractDefaultRecordExtractor<TBase, TBase> {
+public class ThriftRecordExtractor extends BaseRecordExtractor<TBase> {
 
   private Map<String, Integer> _fieldIds;
   private Set<String> _fields;
@@ -82,10 +82,11 @@ public class ThriftRecordExtractor extends AbstractDefaultRecordExtractor<TBase,
    * Handles the conversion of each field of a Thrift object.
    */
   @Override
-  protected Object convertRecord(TBase value) {
+  protected Object convertRecord(Object value) {
+    TBase record = (TBase) value;
     Map<Object, Object> convertedRecord = new HashMap<>();
-    for (TFieldIdEnum tFieldIdEnum: FieldMetaData.getStructMetaDataMap(value.getClass()).keySet()) {
-      convertedRecord.put(tFieldIdEnum.getFieldName(), convert(value.getFieldValue(tFieldIdEnum)));
+    for (TFieldIdEnum tFieldIdEnum: FieldMetaData.getStructMetaDataMap(record.getClass()).keySet()) {
+      convertedRecord.put(tFieldIdEnum.getFieldName(), convert(record.getFieldValue(tFieldIdEnum)));
     }
     return convertedRecord;
   }

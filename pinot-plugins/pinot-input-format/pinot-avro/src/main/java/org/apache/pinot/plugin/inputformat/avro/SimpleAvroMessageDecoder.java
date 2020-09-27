@@ -48,7 +48,7 @@ public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
 
   private org.apache.avro.Schema _avroSchema;
   private DatumReader<GenericData.Record> _datumReader;
-  private RecordExtractor<GenericData.Record, GenericData.Record> _avroRecordExtractor;
+  private RecordExtractor<GenericData.Record> _avroRecordExtractor;
   private BinaryDecoder _binaryDecoderToReuse;
   private GenericData.Record _avroRecordToReuse;
 
