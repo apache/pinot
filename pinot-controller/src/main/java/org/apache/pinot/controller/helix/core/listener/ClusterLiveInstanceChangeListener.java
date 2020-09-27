@@ -33,6 +33,7 @@ public class ClusterLiveInstanceChangeListener implements LiveInstanceChangeList
   private Builder _keyBuilder;
   private List<LiveInstance> _liveInstances = new ArrayList<>();
   private Long _lastEventTimestamp = null;
+  private boolean _listenerInitiated = false;
 
   public ClusterLiveInstanceChangeListener(HelixDataAccessor helixDataAccessor, Builder keyBuilder) {
     _helixDataAccessor = helixDataAccessor;
@@ -41,6 +42,10 @@ public class ClusterLiveInstanceChangeListener implements LiveInstanceChangeList
 
   @Override
   public void onLiveInstanceChange(List<LiveInstance> liveInstances, NotificationContext changeContext) {
+    if(changeContext.getType() == NotificationContext.Type.INIT){
+      _listenerInitiated = true;
+    }
+
     if(_lastEventTimestamp == null || _lastEventTimestamp <= changeContext.getCreationTime()) {
       _liveInstances = liveInstances;
       _lastEventTimestamp = changeContext.getCreationTime();
@@ -48,7 +53,7 @@ public class ClusterLiveInstanceChangeListener implements LiveInstanceChangeList
   }
 
   public List<LiveInstance> getLiveInstances() {
-    if (_liveInstances.isEmpty()) {
+    if (_liveInstances.isEmpty() || !_listenerInitiated) {
       _liveInstances = _helixDataAccessor.getChildValues(_keyBuilder.liveInstances());
     }
     return _liveInstances;

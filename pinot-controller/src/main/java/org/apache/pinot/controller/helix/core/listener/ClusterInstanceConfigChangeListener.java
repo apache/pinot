@@ -32,6 +32,7 @@ public class ClusterInstanceConfigChangeListener implements InstanceConfigChange
     private HelixManager _helixManager;
     private List<InstanceConfig> _instanceConfigs = new ArrayList<>();
     private Long _lastEventTimestamp = null;
+    private boolean _listenerInitiated = false;
 
     public ClusterInstanceConfigChangeListener(HelixManager helixManager) {
         _helixManager = helixManager;
@@ -39,6 +40,10 @@ public class ClusterInstanceConfigChangeListener implements InstanceConfigChange
 
     @Override
     public void onInstanceConfigChange(List<InstanceConfig> instanceConfigs, NotificationContext context) {
+        if(context.getType() == NotificationContext.Type.INIT){
+            _listenerInitiated = true;
+        }
+
         if(_lastEventTimestamp == null || _lastEventTimestamp <= context.getCreationTime()) {
             _instanceConfigs = instanceConfigs;
             _lastEventTimestamp = context.getCreationTime();
@@ -46,7 +51,7 @@ public class ClusterInstanceConfigChangeListener implements InstanceConfigChange
     }
 
     public List<InstanceConfig> getInstanceConfigs() {
-        if(_instanceConfigs.isEmpty()){
+        if(_instanceConfigs.isEmpty() || !_listenerInitiated){
             _instanceConfigs = HelixHelper.getInstanceConfigs(_helixManager);
         }
         return _instanceConfigs;
