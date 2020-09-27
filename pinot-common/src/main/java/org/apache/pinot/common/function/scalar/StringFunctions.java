@@ -20,7 +20,7 @@ package org.apache.pinot.common.function.scalar;
 
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.function.annotations.ScalarFunction;
+import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
 /**
