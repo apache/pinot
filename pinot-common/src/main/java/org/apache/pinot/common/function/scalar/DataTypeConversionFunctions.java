@@ -20,7 +20,7 @@ package org.apache.pinot.common.function.scalar;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import org.apache.pinot.common.function.annotations.ScalarFunction;
+import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
 public class DataTypeConversionFunctions {
