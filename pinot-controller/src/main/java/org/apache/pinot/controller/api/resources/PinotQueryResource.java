@@ -167,7 +167,7 @@ public class PinotQueryResource {
       brokerRequest.getQuerySource().setTableName(_pinotHelixResourceManager.getActualTableName(inputTableName));
     } catch (Exception e) {
       LOGGER.error("Caught exception while compiling {} query: {}", querySyntax.toUpperCase(), query, e);
-      return QueryException.getException(QueryException.PQL_PARSING_ERROR, e).toString();
+      return QueryException.getException(QueryException.QUERY_PARSING_ERROR, e).toString();
     }
     String tableName = TableNameBuilder.extractRawTableName(brokerRequest.getQuerySource().getTableName());
 

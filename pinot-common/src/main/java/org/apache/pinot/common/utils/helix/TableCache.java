@@ -216,15 +216,15 @@ public class TableCache {
       throws IOException {
     Schema schema = SchemaUtils.fromZNRecord(znRecord);
     String rawTableName = schema.getSchemaName();
-    if (_caseInsensitive) {
-      Map<String, String> columnNameMap = new HashMap<>();
-      for (String columnName : schema.getColumnNames()) {
+    Map<String, String> columnNameMap = new HashMap<>();
+    for (String columnName : schema.getColumnNames()) {
+      if (_caseInsensitive) {
         columnNameMap.put(columnName.toLowerCase(), columnName);
+      } else {
+        columnNameMap.put(columnName, null);
       }
-      _schemaInfoMap.put(rawTableName, new SchemaInfo(schema, columnNameMap));
-    } else {
-      _schemaInfoMap.put(rawTableName, new SchemaInfo(schema, null));
     }
+    _schemaInfoMap.put(rawTableName, new SchemaInfo(schema, columnNameMap));
   }
 
   private void removeSchema(String path) {

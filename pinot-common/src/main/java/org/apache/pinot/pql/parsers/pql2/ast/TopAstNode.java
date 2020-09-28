@@ -30,7 +30,7 @@ public class TopAstNode extends BaseAstNode {
 
   public TopAstNode(int count) {
     if (count < 0) {
-      throw new RuntimeException(QueryException.PQL_PARSING_ERROR);
+      throw new RuntimeException(QueryException.QUERY_PARSING_ERROR);
     }
     if (count == 0) {
       _count = DEFAULT_TOP_N;
