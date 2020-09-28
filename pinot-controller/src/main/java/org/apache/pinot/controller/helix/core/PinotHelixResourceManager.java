@@ -2486,7 +2486,6 @@ public class PinotHelixResourceManager {
     return onlineSegments;
   }
 
-
   /*
    * Uncomment and use for testing on a real cluster
   public static void main(String[] args) throws Exception {
