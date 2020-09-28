@@ -28,6 +28,7 @@ import org.apache.pinot.pql.parsers.pql2.ast.AstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.LiteralAstNode;
+import org.apache.pinot.pql.parsers.pql2.ast.StringLiteralAstNode;
 import org.apache.pinot.spi.utils.EqualityUtils;
 
 
@@ -67,10 +68,16 @@ public class TransformExpressionTree {
       return standardizeExpression(((FunctionCallAstNode) astNode).getExpression());
     } else if (astNode instanceof LiteralAstNode) {
       // Literal
+      String stringValue = ((LiteralAstNode) astNode).getValueAsString();
+
       // NOTE: String is treated as column name for backward-compatibility
       // TODO: This can cause problem for string literals (e.g. in DistinctCountThetaSketch where we have to add special
       //       handling). Fix this legacy behavior when we migrate to SQL format.
-      return ((LiteralAstNode) astNode).getValueAsString();
+      if (astNode instanceof StringLiteralAstNode) {
+        return stringValue;
+      } else {
+        return '\'' + stringValue + '\'';
+      }
     } else {
       throw new IllegalStateException("Cannot get standard expression from " + astNode.getClass().getSimpleName());
     }
@@ -224,7 +231,7 @@ public class TransformExpressionTree {
       case IDENTIFIER:
         return _value;
       case LITERAL:
-        return "\'" + _value + "\'";
+        return '\'' + _value + '\'';
       default:
         throw new IllegalStateException();
     }

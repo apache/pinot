@@ -93,7 +93,7 @@ public class PinotQuery2BrokerRequestConverter {
       //order by is always a function (ASC or DESC)
       Function functionCall = orderByExpr.getFunctionCall();
       selectionSort.setIsAsc(functionCall.getOperator().equalsIgnoreCase(OrderByAstNode.ASCENDING_ORDER));
-      selectionSort.setColumn(ParserUtils.standardizeExpression(functionCall.getOperands().get(0), true));
+      selectionSort.setColumn(ParserUtils.standardizeExpression(functionCall.getOperands().get(0)));
       sortSequenceList.add(selectionSort);
     }
     if (!sortSequenceList.isEmpty()) {
@@ -109,7 +109,7 @@ public class PinotQuery2BrokerRequestConverter {
     if (groupByList != null && groupByList.size() > 0) {
       GroupBy groupBy = new GroupBy();
       for (Expression expression : groupByList) {
-        String expressionStr = ParserUtils.standardizeExpression(expression, true);
+        String expressionStr = ParserUtils.standardizeExpression(expression);
         groupBy.addToExpressions(expressionStr);
       }
       groupBy.setTopN(pinotQuery.getLimit());
@@ -153,7 +153,7 @@ public class PinotQuery2BrokerRequestConverter {
             if (selection == null) {
               selection = new Selection();
             }
-            selection.addToSelectionColumns(ParserUtils.standardizeExpression(expression, false));
+            selection.addToSelectionColumns(ParserUtils.standardizeExpression(expression));
           }
           break;
       }
@@ -202,14 +202,14 @@ public class PinotQuery2BrokerRequestConverter {
         Set<String> expressionSet = new TreeSet<>();
 
         for (Expression operand : operands) {
-          String expression = getColumnExpression(operand);
+          String expression = ParserUtils.standardizeExpression(operand);
           if (expressionSet.add(expression)) {
             args.add(expression);
           }
         }
       } else {
         for (Expression operand : operands) {
-          args.add(getColumnExpression(operand));
+          args.add(ParserUtils.standardizeExpression(operand));
         }
       }
     }
@@ -225,19 +225,6 @@ public class PinotQuery2BrokerRequestConverter {
         String.join(CompilerConstants.AGGREGATION_FUNCTION_ARG_SEPARATOR, args));
 
     return aggregationInfo;
-  }
-
-  private String getColumnExpression(Expression functionParam) {
-    switch (functionParam.getType()) {
-      case LITERAL:
-        return functionParam.getLiteral().getFieldValue().toString();
-      case IDENTIFIER:
-        return functionParam.getIdentifier().getName();
-      case FUNCTION:
-        return ParserUtils.standardizeExpression(functionParam, false, true);
-      default:
-        throw new UnsupportedOperationException("Unrecognized functionParamType:" + functionParam.getType());
-    }
   }
 
   private FilterQuery traverseFilterExpression(Expression filterExpression, FilterQueryMap filterSubQueryMap) {
@@ -272,13 +259,13 @@ public class PinotQuery2BrokerRequestConverter {
           case TEXT_MATCH:
           case RANGE:
             //first operand is the always the column
-            filterQuery.setColumn(ParserUtils.standardizeExpression(operands.get(0), false));
+            filterQuery.setColumn(ParserUtils.standardizeExpression(operands.get(0)));
             filterQuery.setValue(ParserUtils.getFilterValues(filterKind, operands));
             break;
           case IS_NULL:
           case IS_NOT_NULL:
             //first operand is the always the column
-            filterQuery.setColumn(ParserUtils.standardizeExpression(operands.get(0), false));
+            filterQuery.setColumn(ParserUtils.standardizeExpression(operands.get(0)));
             break;
           default:
             throw new UnsupportedOperationException("Filter UDF not supported");

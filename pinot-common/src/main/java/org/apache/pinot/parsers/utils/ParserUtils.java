@@ -19,13 +19,13 @@
 package org.apache.pinot.parsers.utils;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.Function;
-import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 
 
@@ -94,33 +94,6 @@ public class ParserUtils {
   }
 
   /**
-   * Returns the filter column from a given expression.
-   * Assumes that the passed expression is a filter expression of form LHS Operator RHS.
-   * LHS is expected to be a single column name.
-   *
-   * @param expression Filter expression
-   * @return
-   */
-  public static String getFilterColumn(Expression expression) {
-    Function functionCall = expression.getFunctionCall();
-    Expression operand = functionCall.getOperands().get(0);
-    return standardizeExpression(operand, false);
-  }
-
-  /**
-   * Utility method that returns the RHS of a filter expression as a list of String's.
-   *
-   * @param filterExpression Filter expression
-   * @return RHS of the filter expression
-   */
-  public static List<String> getFilterValues(Expression filterExpression) {
-    Function function = filterExpression.getFunctionCall();
-    FilterKind filterKind = FilterKind.valueOf(function.getOperator());
-
-    return getFilterValues(filterKind, function.getOperands());
-  }
-
-  /**
    * Given a expression filter, returns the values (RHS) on which the filter predicate applies.
    *
    * @param filterKind Kind of filter
@@ -128,79 +101,57 @@ public class ParserUtils {
    * @return Values to filter on, as a list of strings.
    */
   public static List<String> getFilterValues(FilterKind filterKind, List<Expression> operands) {
-    List<String> valueList = new ArrayList<>();
+    int numOperands = operands.size();
 
     // For non-range expressions, RHS is just the list of values from first index.
     if (!filterKind.isRange()) {
-      for (int i = 1; i < operands.size(); i++) {
-        valueList.add(standardizeExpression(operands.get(i), true));
+      List<String> values = new ArrayList<>(numOperands - 1);
+      for (int i = 1; i < numOperands; i++) {
+        values.add(operands.get(i).getLiteral().getFieldValue().toString());
       }
-      return valueList;
+      return values;
     }
 
+    // TODO: Switch to RangePredicate.DELIMITER after releasing 0.6.0
     String rangeExpression;
-    //PQL does not quote the string literals when we create expression
-    boolean treatLiteralAsIdentifier = true;
-
-    if (FilterKind.LESS_THAN == filterKind) {
-
-      String value = standardizeExpression(operands.get(1), treatLiteralAsIdentifier);
-      rangeExpression = "(*\t\t" + value + ")";
-    } else if (FilterKind.LESS_THAN_OR_EQUAL == filterKind) {
-
-      String value = standardizeExpression(operands.get(1), treatLiteralAsIdentifier);
-      rangeExpression = "(*\t\t" + value + "]";
-    } else if (FilterKind.GREATER_THAN == filterKind) {
-
-      String value = standardizeExpression(operands.get(1), treatLiteralAsIdentifier);
-      rangeExpression = "(" + value + "\t\t*)";
-    } else if (FilterKind.GREATER_THAN_OR_EQUAL == filterKind) {
-
-      String value = standardizeExpression(operands.get(1), treatLiteralAsIdentifier);
-      rangeExpression = "[" + value + "\t\t*)";
-    } else if (FilterKind.BETWEEN == filterKind) {
-
-      String left = standardizeExpression(operands.get(1), treatLiteralAsIdentifier);
-      String right = standardizeExpression(operands.get(2), treatLiteralAsIdentifier);
-      rangeExpression = "[" + left + "\t\t" + right + "]";
-    } else {
-      throw new UnsupportedOperationException("Unknown Filter Kind:" + filterKind);
+    switch (filterKind) {
+      case GREATER_THAN:
+        rangeExpression = "(" + operands.get(1).getLiteral().getFieldValue().toString() + "\t\t*)";
+        break;
+      case GREATER_THAN_OR_EQUAL:
+        rangeExpression = "[" + operands.get(1).getLiteral().getFieldValue().toString() + "\t\t*)";
+        break;
+      case LESS_THAN:
+        rangeExpression = "(*\t\t" + operands.get(1).getLiteral().getFieldValue().toString() + ")";
+        break;
+      case LESS_THAN_OR_EQUAL:
+        rangeExpression = "(*\t\t" + operands.get(1).getLiteral().getFieldValue().toString() + "]";
+        break;
+      case BETWEEN:
+        rangeExpression =
+            "[" + operands.get(1).getLiteral().getFieldValue().toString() + "\t\t" + operands.get(2).getLiteral()
+                .getFieldValue().toString() + "]";
+        break;
+      default:
+        throw new IllegalStateException("Unsupported range FilterKind: " + filterKind);
     }
-
-    valueList.add(rangeExpression);
-    return valueList;
+    return Collections.singletonList(rangeExpression);
   }
 
   /**
-   * Standardizes a given expression, by quoting String literals.
+   * Standardizes the given expression by quoting the literals.
    *
    * @param expression Expression to standardize
-   * @param treatLiteralAsIdentifier If true, literals are not quoted
    * @return Standardized expression
    */
-  public static String standardizeExpression(Expression expression, boolean treatLiteralAsIdentifier) {
-    return standardizeExpression(expression, treatLiteralAsIdentifier, false);
-  }
-
-  public static String standardizeExpression(Expression expression, boolean treatLiteralAsIdentifier,
-      boolean forceSingleQuoteOnNonStringLiteral) {
+  public static String standardizeExpression(Expression expression) {
     switch (expression.getType()) {
       case LITERAL:
-        Literal literal = expression.getLiteral();
-        // Force single quote on non-string literal inside a function.
-        if (forceSingleQuoteOnNonStringLiteral && !literal.isSetStringValue()) {
-          return "'" + literal.getFieldValue() + "'";
-        }
-        if (treatLiteralAsIdentifier || !literal.isSetStringValue()) {
-          return literal.getFieldValue().toString();
-        } else {
-          return "'" + literal.getFieldValue() + "'";
-        }
+        return '\'' + expression.getLiteral().getFieldValue().toString() + '\'';
       case IDENTIFIER:
         return expression.getIdentifier().getName();
       case FUNCTION:
-        Function functionCall = expression.getFunctionCall();
-        return standardizeFunction(functionCall);
+        return standardizeFunction(expression.getFunctionCall());
       default:
         throw new UnsupportedOperationException("Unknown Expression type: " + expression.getType());
     }
@@ -219,7 +170,7 @@ public class ParserUtils {
     String delim = "";
     for (Expression operand : functionCall.getOperands()) {
       sb.append(delim);
-      sb.append(standardizeExpression(operand, false, true));
+      sb.append(standardizeExpression(operand));
       delim = ",";
     }
     sb.append(")");

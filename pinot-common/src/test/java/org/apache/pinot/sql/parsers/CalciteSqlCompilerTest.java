@@ -373,6 +373,18 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(tempBrokerRequest.getQuerySource().getTableName(), "mytable");
     Assert.assertEquals(tempBrokerRequest.getSelections().getSelectionColumns().get(0),
         String.format("'%s'", literal.getFieldValue().toString()));
+
+    pinotQuery = CalciteSqlParser.compileToPinotQuery("select idset(A, 'fpp=0.05') from mytable");
+    tempBrokerRequest = converter.convert(pinotQuery);
+    List<String> expressions = tempBrokerRequest.getAggregationsInfo().get(0).getExpressions();
+    Assert.assertEquals(expressions.get(0), "A");
+    Assert.assertEquals(expressions.get(1), "'fpp=0.05'");
+
+    pinotQuery = CalciteSqlParser.compileToPinotQuery("select idset(A, '') from mytable");
+    tempBrokerRequest = converter.convert(pinotQuery);
+    expressions = tempBrokerRequest.getAggregationsInfo().get(0).getExpressions();
+    Assert.assertEquals(expressions.get(0), "A");
+    Assert.assertEquals(expressions.get(1), "''");
   }
 
   @Test
@@ -732,14 +744,16 @@ public class CalciteSqlCompilerTest {
 
   @Test
   public void testTimeTransformFunction() {
-    PinotQuery pinotQuery = CalciteSqlParser
-        .compileToPinotQuery("  select hour(ts), d1, sum(m1) from baseballStats group by hour(ts), d1");
+    PinotQuery pinotQuery =
+        CalciteSqlParser.compileToPinotQuery("  select hour(ts), d1, sum(m1) from baseballStats group by hour(ts), d1");
     Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "HOUR");
-    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "ts");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "ts");
     Assert.assertEquals(pinotQuery.getSelectList().get(1).getIdentifier().getName(), "d1");
     Assert.assertEquals(pinotQuery.getSelectList().get(2).getFunctionCall().getOperator(), "SUM");
     Assert.assertEquals(pinotQuery.getGroupByList().get(0).getFunctionCall().getOperator(), "HOUR");
-    Assert.assertEquals(pinotQuery.getGroupByList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "ts");
+    Assert.assertEquals(
+        pinotQuery.getGroupByList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "ts");
     Assert.assertEquals(pinotQuery.getGroupByList().get(1).getIdentifier().getName(), "d1");
   }
 
