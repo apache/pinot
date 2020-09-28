@@ -84,6 +84,7 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
 
   GROUP_BY_SIZE("queries", false),
   TOTAL_SERVER_RESPONSE_SIZE("queries", false),
+  QUERY_COLUMN_NAME_MISMATCH("queries", false),
 
   QUERY_QUOTA_EXCEEDED("exceptions", false),
 

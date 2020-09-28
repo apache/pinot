@@ -598,14 +598,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     queryResponse = postQuery(SELECT_STAR_QUERY);
     assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
     assertEquals(queryResponse.get("selectionResults").get("columns").size(), 79);
-
-    // The query would fail if 'failQueryWhenColumnMismatch' is set true and the query tried to query a non-existing column.
-    ObjectNode payload = JsonUtils.newObjectNode();
-    payload.put("sql", TEST_DEFAULT_COLUMNS_QUERY);
-    payload.put("queryOptions", "failQueryWhenColumnMismatch=true");
-    queryResponse = JsonUtils.stringToJsonNode(sendPostRequest(_brokerBaseApiUrl + "/query", payload.toString()));
-    Assert.assertEquals(queryResponse.get("totalDocs").asLong(), 0);
-    assertNotNull(queryResponse.get("exceptions"));
   }
 
   private void reloadDefaultColumns(boolean withExtraColumns)
@@ -1260,23 +1252,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     pql = "SELECT ArrTime-DepTime FROM mytable GROUP BY ArrTime, DepTime LIMIT 1000000";
     sql = "SELECT ArrTime-DepTime FROM mytable GROUP BY ArrTime, DepTime";
-    try {
-      testSqlQuery(pql, Collections.singletonList(sql));
-      Assert.fail("The test should fail because it tried to query non-existing column in SQL query.");
-    } catch (Exception e) {
-      // Expected.
-    }
-
-    pql = "SELECT CRSArrTime-CRSDepTime FROM mytable GROUP BY CRSArrTime, CRSDepTime LIMIT 1000000";
-    sql = "SELECT CRSArrTime-CRSDepTime FROM mytable GROUP BY CRSArrTime, CRSDepTime";
     testSqlQuery(pql, Collections.singletonList(sql));
 
-    pql = "SELECT CRSArrTime-CRSDepTime,CRSArrTime/3,CRSDepTime*2 FROM mytable GROUP BY CRSArrTime, CRSDepTime LIMIT 1000000";
-    sql = "SELECT CRSArrTime-CRSDepTime,CRSArrTime/3,CRSDepTime*2 FROM mytable GROUP BY CRSArrTime, CRSDepTime";
+    pql = "SELECT ArrTime-DepTime,ArrTime/3,DepTime*2 FROM mytable GROUP BY ArrTime, DepTime LIMIT 1000000";
+    sql = "SELECT ArrTime-DepTime,ArrTime/3,DepTime*2 FROM mytable GROUP BY ArrTime, DepTime";
     testSqlQuery(pql, Collections.singletonList(sql));
 
-    pql = "SELECT CRSArrTime+CRSDepTime FROM mytable GROUP BY CRSArrTime + CRSDepTime LIMIT 1000000";
-    sql = "SELECT CRSArrTime+CRSDepTime FROM mytable GROUP BY CRSArrTime + CRSDepTime";
+    pql = "SELECT ArrTime+DepTime FROM mytable GROUP BY ArrTime + DepTime LIMIT 1000000";
+    sql = "SELECT ArrTime+DepTime FROM mytable GROUP BY ArrTime + DepTime";
     testSqlQuery(pql, Collections.singletonList(sql));
   }
 

@@ -78,7 +78,6 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.helix.TableCache;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
-import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
 import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.core.requesthandler.BrokerRequestOptimizer;
@@ -125,6 +124,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private final int _defaultHllLog2m;
   private final boolean _enableQueryLimitOverride;
   private final boolean _enableDistinctCountBitmapOverride;
+  private final boolean _enableFailQueryOnColumnMismatch;
 
   public BaseBrokerRequestHandler(PinotConfiguration config, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
@@ -141,6 +141,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _enableQueryLimitOverride = _config.getProperty(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, false);
     _enableDistinctCountBitmapOverride =
         _config.getProperty(CommonConstants.Helix.ENABLE_DISTINCT_COUNT_BITMAP_OVERRIDE_KEY, false);
+    _enableFailQueryOnColumnMismatch =
+        _config.getProperty(Broker.CONFIG_OF_ENABLE_FAIL_QUERY_ON_COLUMN_MISMATCH, false);
 
     _brokerId = config.getProperty(Broker.CONFIG_OF_BROKER_ID, getDefaultBrokerId());
     _brokerTimeoutMs = config.getProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, Broker.DEFAULT_BROKER_TIMEOUT_MS);
@@ -224,13 +226,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     updateTableName(brokerRequest);
     try {
-<<<<<<< HEAD
-      updateColumnNames(brokerRequest);
-=======
       updateColumnNames(brokerRequest, pinotQueryRequest.getQueryFormat());
-    } catch(BadQueryRequestException be) {
-      return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_PARSING_ERROR, be));
->>>>>>> Address PR comments
     } catch (Exception e) {
       LOGGER.warn("Caught exception while updating Column names in Query {}: {}, {}", requestId, query, e.getMessage());
     }
@@ -1008,9 +1004,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       boolean throwExceptionWhenColumnNameMismatch) {
     ExpressionType expressionType = expression.getType();
     if (expressionType == ExpressionType.IDENTIFIER) {
-      Identifier identifier = expression.getIdentifier();
-      identifier.setName(
-          getActualColumnName(rawTableName, identifier.getName(), columnNameMap, throwExceptionWhenColumnNameMismatch));
+      if (!isStarIdentifier(expression)) {
+        Identifier identifier = expression.getIdentifier();
+        identifier.setName(getActualColumnName(rawTableName, identifier.getName(), columnNameMap,
+            throwExceptionWhenColumnNameMismatch));
+      }
     } else if (expressionType == ExpressionType.FUNCTION) {
       String operator = expression.getFunctionCall().getOperator();
       List<Expression> expressions = expression.getFunctionCall().getOperands();
@@ -1027,8 +1025,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private boolean isCountStarFromExpression(Expression expression) {
     String operator = expression.getFunctionCall().getOperator();
     List<Expression> expressions = expression.getFunctionCall().getOperands();
-    return "COUNT".equals(operator) && expressions.size() == 1 && "*"
-        .equals(expressions.get(0).getIdentifier().getName());
+    return "COUNT".equals(operator) && expressions.size() == 1 && isStarIdentifier(expressions.get(0));
+  }
+
+  private boolean isStarIdentifier(Expression expression) {
+    return "*".equals(expression.getIdentifier().getName());
   }
 
   private String getActualColumnName(String rawTableName, String columnName, Map<String, String> columnNameMap,
@@ -1045,20 +1046,21 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       String actualColumnName = columnNameMap.get(columnName.toLowerCase());
       if (actualColumnName != null) {
         return actualColumnName;
-      } else if (failQueryWhenColumnMismatch) {
-        throw new BadQueryRequestException("Invalid column name in the query: " + columnName);
       } else {
+        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_COLUMN_NAME_MISMATCH, 1L);
         return columnName;
       }
     } else {
       if (splits.length == 2 && rawTableName.equals(splits[0])) {
         columnName = splits[1];
       }
-      if (!columnNameMap.containsKey(columnName) && failQueryWhenColumnMismatch) {
-        throw new BadQueryRequestException("Invalid column name in the query: " + columnName);
-      } else {
+      if (columnNameMap == null) {
         return columnName;
       }
+      if (!columnNameMap.containsKey(columnName)) {
+        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_COLUMN_NAME_MISMATCH, 1L);
+      }
+      return columnName;
     }
   }
 

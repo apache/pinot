@@ -167,6 +167,7 @@ public class CommonConstants {
         "pinot.broker.startup.minResourcePercent";
     public static final double DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START = 100.0;
     public static final String CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE = "pinot.broker.enable.query.limit.override";
+    public static final String CONFIG_OF_ENABLE_FAIL_QUERY_ON_COLUMN_MISMATCH = "pinot.broker.enable.fail.query.column.mismatch";
 
     // Config for number of threads to use for Broker reduce-phase.
     public static final String CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY = "pinot.broker.max.reduce.threads.per.query";
