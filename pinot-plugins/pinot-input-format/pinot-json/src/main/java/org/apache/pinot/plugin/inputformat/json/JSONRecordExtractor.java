@@ -45,7 +45,9 @@ public class JSONRecordExtractor extends BaseRecordExtractor<Map<String, Object>
   @Override
   public GenericRow extract(Map<String, Object> from, GenericRow to) {
     if (_extractAll) {
-      from.forEach((fieldName, value) -> to.putValue(fieldName, convert(value)));
+      for (Map.Entry<String, Object> fieldToVal : from.entrySet()) {
+        to.putValue(fieldToVal.getKey(), convert(fieldToVal.getValue()));
+      }
     } else {
       for (String fieldName : _fields) {
         Object value = from.get(fieldName);

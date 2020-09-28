@@ -51,11 +51,9 @@ public class ThriftRecordExtractor extends BaseRecordExtractor<TBase> {
   @Override
   public GenericRow extract(TBase from, GenericRow to) {
     if (_extractAll) {
-      _fieldIds.entrySet().forEach(nameToId ->
-          to.putValue(
-              nameToId.getKey(),
-              convert(from.getFieldValue(from.fieldForId(nameToId.getValue()))))
-      );
+      for (Map.Entry<String, Integer> nameToId : _fieldIds.entrySet()) {
+        to.putValue(nameToId.getKey(), convert(from.getFieldValue(from.fieldForId(nameToId.getValue()))));
+      }
     } else {
       for (String fieldName : _fields) {
         Object value = null;

@@ -53,8 +53,12 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
   public GenericRow extract(Message from, GenericRow to) {
     Descriptors.Descriptor descriptor = from.getDescriptorForType();
     if (_extractAll) {
-      descriptor.getFields().forEach(field ->
-          to.putValue(field.getName(), convert(new ProtoBufFieldInfo(from.getField(field), field))));
+      for (Descriptors.FieldDescriptor fieldDescriptor : descriptor.getFields()) {
+        to.putValue(
+            fieldDescriptor.getName(),
+            convert(new ProtoBufFieldInfo(from.getField(fieldDescriptor), fieldDescriptor))
+        );
+      }
     } else {
       for (String fieldName : _fields) {
         Descriptors.FieldDescriptor fieldDescriptor = descriptor.findFieldByName(fieldName);
