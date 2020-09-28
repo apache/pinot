@@ -224,7 +224,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     updateTableName(brokerRequest);
     try {
+<<<<<<< HEAD
       updateColumnNames(brokerRequest);
+=======
+      updateColumnNames(brokerRequest, pinotQueryRequest.getQueryFormat());
+    } catch(BadQueryRequestException be) {
+      return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_PARSING_ERROR, be));
+>>>>>>> Address PR comments
     } catch (Exception e) {
       LOGGER.warn("Caught exception while updating Column names in Query {}: {}, {}", requestId, query, e.getMessage());
     }
@@ -881,12 +887,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   /**
    * Fixes the column names to the actual column names in the given broker request.
    */
-  private void updateColumnNames(BrokerRequest brokerRequest) {
+  private void updateColumnNames(BrokerRequest brokerRequest, String queryFormat) {
     String rawTableName = TableNameBuilder.extractRawTableName(brokerRequest.getQuerySource().getTableName());
     Map<String, String> columnNameMap =
         _tableCache.isCaseInsensitive() ? _tableCache.getColumnNameMap(rawTableName) : null;
+    // Enable 'failQueryWhenColumnMismatch' if the query format is SQL, or the flag in PQL.
     Map<String, String> queryOptions = brokerRequest.getQueryOptions();
-    boolean failQueryWhenColumnMismatch =
+    boolean failQueryWhenColumnMismatch = Broker.Request.SQL.equals(queryFormat) ||
         (queryOptions != null && Boolean.parseBoolean(queryOptions.get("failQueryWhenColumnMismatch")));
 
     if (brokerRequest.getFilterSubQueryMap() != null) {
@@ -1031,6 +1038,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (_tableCache.isCaseInsensitive()) {
       if (splits.length == 2 && rawTableName.equalsIgnoreCase(splits[0])) {
         columnName = splits[1];
+      }
+      if (columnNameMap == null) {
+        return columnName;
       }
       String actualColumnName = columnNameMap.get(columnName.toLowerCase());
       if (actualColumnName != null) {

@@ -1260,14 +1260,23 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     pql = "SELECT ArrTime-DepTime FROM mytable GROUP BY ArrTime, DepTime LIMIT 1000000";
     sql = "SELECT ArrTime-DepTime FROM mytable GROUP BY ArrTime, DepTime";
+    try {
+      testSqlQuery(pql, Collections.singletonList(sql));
+      Assert.fail("The test should fail because it tried to query non-existing column in SQL query.");
+    } catch (Exception e) {
+      // Expected.
+    }
+
+    pql = "SELECT CRSArrTime-CRSDepTime FROM mytable GROUP BY CRSArrTime, CRSDepTime LIMIT 1000000";
+    sql = "SELECT CRSArrTime-CRSDepTime FROM mytable GROUP BY CRSArrTime, CRSDepTime";
     testSqlQuery(pql, Collections.singletonList(sql));
 
-    pql = "SELECT ArrTime-DepTime,ArrTime/3,DepTime*2 FROM mytable GROUP BY ArrTime, DepTime LIMIT 1000000";
-    sql = "SELECT ArrTime-DepTime,ArrTime/3,DepTime*2 FROM mytable GROUP BY ArrTime, DepTime";
+    pql = "SELECT CRSArrTime-CRSDepTime,CRSArrTime/3,CRSDepTime*2 FROM mytable GROUP BY CRSArrTime, CRSDepTime LIMIT 1000000";
+    sql = "SELECT CRSArrTime-CRSDepTime,CRSArrTime/3,CRSDepTime*2 FROM mytable GROUP BY CRSArrTime, CRSDepTime";
     testSqlQuery(pql, Collections.singletonList(sql));
 
-    pql = "SELECT ArrTime+DepTime FROM mytable GROUP BY ArrTime + DepTime LIMIT 1000000";
-    sql = "SELECT ArrTime+DepTime FROM mytable GROUP BY ArrTime + DepTime";
+    pql = "SELECT CRSArrTime+CRSDepTime FROM mytable GROUP BY CRSArrTime + CRSDepTime LIMIT 1000000";
+    sql = "SELECT CRSArrTime+CRSDepTime FROM mytable GROUP BY CRSArrTime + CRSDepTime";
     testSqlQuery(pql, Collections.singletonList(sql));
   }
 
