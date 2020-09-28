@@ -55,6 +55,11 @@ public class DataTypeConversionFunctions {
   }
 
   @ScalarFunction
+  public static byte[] bigDecimalFromString(String bigDecimal) {
+    return bigDecimalToBytes(new BigDecimal(bigDecimal));
+  }
+
+  @ScalarFunction
   public static byte[] hexToBytes(String hex) {
     int len = hex.length();
     byte[] data = new byte[len / 2];
