@@ -74,6 +74,7 @@
     <avro.version>1.7.7</avro.version>
     <avro-mapred.version>1.7.4</avro-mapred.version>
     <testng.version>6.8</testng.version>
+    <assertj.version>3.17.2</assertj.version>
     <mockito.version>1.8.4</mockito.version>
     <jcommander.version>1.35</jcommander.version>
     <hsqldb.version>2.3.4</hsqldb.version>
@@ -499,6 +500,12 @@
         <groupId>org.mockito</groupId>
         <artifactId>mockito-all</artifactId>
         <version>${mockito.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.assertj</groupId>
+        <artifactId>assertj-core</artifactId>
+        <version>${assertj.version}</version>
+        <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>com.beust</groupId>

@@ -1,0 +1,32 @@
+######################################################
+# ThirdEye Coordinator default config
+######################################################
+
+server:
+  type: simple
+  applicationContextPath: /
+  adminContextPath: /admin
+
+  connector:
+    type: http
+    port: 8080
+    idleTimeout: 620s
+#   SSL connector is disabled since APP Engine only allows exposing a single port.
+#   A sample keystore and password is added so that this can be tested locally.
+#   However, the settings currently don't work on GAE
+#    - type: https
+#      port: 8443
+#      keyStorePath: conf/keystore.jks
+#      keyStorePassword: password
+
+logging:
+  level: INFO
+  loggers:
+    org.apache.pinot.thirdeye: DEBUG
+
+swagger:
+  # Enable/Disable the swagger resource. Helps in API documentation. Should be true by default
+  enabled: true
+
+  # package to scan for jersey resources
+  resourcePackage: org.apache.pinot.thirdeye.resources
