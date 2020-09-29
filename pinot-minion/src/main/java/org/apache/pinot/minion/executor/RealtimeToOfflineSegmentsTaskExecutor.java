@@ -72,6 +72,7 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     String taskType = pinotTaskConfig.getTaskType();
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     LOGGER.info("Starting task: {} with configs: {}", taskType, configs);
+    long startMillis = System.currentTimeMillis();
 
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY); // rawTableName_OFFLINE expected here
     TableConfig tableConfig = getTableConfig(tableNameWithType);
@@ -79,7 +80,9 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     Set<String> schemaColumns = schema.getPhysicalColumnNames();
     String timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
     DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(timeColumn);
-    assert dateTimeFieldSpec != null;
+    Preconditions
+        .checkState(dateTimeFieldSpec != null, "No valid spec found for time column: %s in schema for table: %s",
+            timeColumn, tableNameWithType);
 
     long windowStartMs =
         Long.parseLong(configs.get(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MILLIS_KEY));
@@ -96,7 +99,7 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
       }
     }
     String numRecordsPerSegment =
-        configs.get(MinionConstants.RealtimeToOfflineSegmentsTask.NUM_RECORDS_PER_SEGMENT_KEY);
+        configs.get(MinionConstants.RealtimeToOfflineSegmentsTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY);
 
     SegmentProcessorConfig.Builder segmentProcessorConfigBuilder =
         new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema);
@@ -153,7 +156,8 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
       segmentProcessorFramework.cleanup();
     }
 
-    LOGGER.info("Finished task: {} with configs: {}", taskType, configs);
+    long endMillis = System.currentTimeMillis();
+    LOGGER.info("Finished task: {} with configs: {}. Total time: {}ms", taskType, configs, (endMillis - startMillis));
     List<SegmentConversionResult> results = new ArrayList<>();
     for (File file : outputSegmentsDir.listFiles()) {
       String outputSegmentName = file.getName();

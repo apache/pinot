@@ -71,7 +71,7 @@ public class MinionConstants {
     public static final String TIME_COLUMN_TRANSFORM_FUNCTION_KEY = "timeColumnTransformFunction";
     public static final String COLLECTOR_TYPE_KEY = "collectorType";
     public static final String AGGREGATION_TYPE_KEY_SUFFIX = ".aggregationType";
-    public static final String NUM_RECORDS_PER_SEGMENT_KEY = "numRecordsPerSegment";
+    public static final String MAX_NUM_RECORDS_PER_SEGMENT_KEY = "maxNumRecordsPerSegment";
 
   }
 }
