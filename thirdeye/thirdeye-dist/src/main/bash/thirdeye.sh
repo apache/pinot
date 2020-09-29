@@ -51,10 +51,7 @@ cd "$SAVED" >/dev/null
 CONFIG_DIR="${APP_HOME}/config"
 LIB_DIR="${APP_HOME}/lib"
 
-CLASSPATH=""
-for filepath in "${LIB_DIR}"/*; do
-  CLASSPATH="${CLASSPATH}:${filepath}"
-done
+CLASSPATH="${APP_HOME}/lib/fat/*"
 
 function start_server {
   class_ref=$1
@@ -87,6 +84,16 @@ function start_db {
   fi
 }
 
+function start_coordinator {
+  CLASSPATH=""
+  for filepath in "${LIB_DIR}"/*; do
+    CLASSPATH="${CLASSPATH}:${filepath}"
+  done
+  class_ref="org.apache.pinot.thirdeye.ThirdEyeServer"
+
+  java -Dlog4j.configurationFile=log4j2.xml -cp "${CLASSPATH}" ${class_ref} "${config_dir}"
+}
+
 function start_all {
   start_db
 
@@ -99,6 +106,7 @@ function start_all {
 
 MODE=$1
 case ${MODE} in
+    "coordinator" )  start_coordinator ;;
     "frontend" )  start_frontend ;;
     "backend"  )  start_backend ;;
     "database" )  start_db;;

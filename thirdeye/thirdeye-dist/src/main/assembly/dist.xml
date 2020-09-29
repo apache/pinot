@@ -29,12 +29,13 @@
     <format>dir</format>
     <format>tar.gz</format>
   </formats>
-<!--  <files>-->
-<!--    <file>-->
-<!--      <source>target/${pom.artifactId}-${pom.version}.jar</source>-->
-<!--      <outputDirectory>lib/</outputDirectory>-->
-<!--    </file>-->
-<!--  </files>-->
+  <files>
+    <file>
+      <source>${thirdeye.root}/thirdeye-dashboard/target/thirdeye-dashboard-${pom.version}.jar</source>
+      <outputDirectory>lib/fat/</outputDirectory>
+      <fileMode>0444</fileMode>
+    </file>
+  </files>
   <fileSets>
     <fileSet>
       <directory>${thirdeye.root}/thirdeye-pinot/config</directory>
@@ -58,6 +59,7 @@
       <excludes>
         <exclude>*:sources</exclude>
       </excludes>
+      <fileMode>0444</fileMode>
     </dependencySet>
   </dependencySets>
 </assembly>
