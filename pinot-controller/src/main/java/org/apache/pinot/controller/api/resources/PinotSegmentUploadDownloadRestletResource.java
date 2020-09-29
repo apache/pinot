@@ -182,8 +182,7 @@ public class PinotSegmentUploadDownloadRestletResource {
   }
 
   private SuccessResponse uploadSegment(@Nullable String tableName, FormDataMultiPart multiPart,
-      boolean enableParallelPushProtection, HttpHeaders headers, Request request, boolean moveSegmentToFinalLocation,
-      boolean segmentMetadataOnly) {
+      boolean enableParallelPushProtection, HttpHeaders headers, Request request, boolean moveSegmentToFinalLocation) {
     String uploadTypeStr = null;
     String crypterClassNameInHeader = null;
     String downloadUri = null;
@@ -196,11 +195,6 @@ public class PinotSegmentUploadDownloadRestletResource {
       crypterClassNameInHeader = extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.CRYPTER);
       downloadUri = extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);
     }
-    if (segmentMetadataOnly) {
-      moveSegmentToFinalLocation = false;
-      Preconditions.checkState(downloadUri != null, "Download URI is required in segment metadata upload mode");
-    }
-
     File tempEncryptedFile = null;
     File tempDecryptedFile = null;
     File tempSegmentDir = null;
@@ -212,22 +206,22 @@ public class PinotSegmentUploadDownloadRestletResource {
       tempSegmentDir = new File(provider.getUntarredFileTempDir(), tempFileName);
 
       boolean uploadedSegmentIsEncrypted = !Strings.isNullOrEmpty(crypterClassNameInHeader);
-
+      FileUploadDownloadClient.FileUploadType uploadType = getUploadType(uploadTypeStr);
       File dstFile = uploadedSegmentIsEncrypted ? tempEncryptedFile : tempDecryptedFile;
-      if (segmentMetadataOnly) {
-        createSegmentFileFromMultipart(multiPart, dstFile);
-      } else {
-        FileUploadDownloadClient.FileUploadType uploadType = getUploadType(uploadTypeStr);
-        switch (uploadType) {
-          case URI:
-            downloadSegmentFileFromURI(downloadUri, dstFile, tableName);
-            break;
-          case SEGMENT:
-            createSegmentFileFromMultipart(multiPart, dstFile);
-            break;
-          default:
-            throw new UnsupportedOperationException("Unsupported upload type: " + uploadType);
-        }
+      switch (uploadType) {
+        case URI:
+          downloadSegmentFileFromURI(downloadUri, dstFile, tableName);
+          break;
+        case SEGMENT:
+          createSegmentFileFromMultipart(multiPart, dstFile);
+          break;
+        case METADATA:
+          moveSegmentToFinalLocation = false;
+          Preconditions.checkState(downloadUri != null, "Download URI is required in segment metadata upload mode");
+          createSegmentFileFromMultipart(multiPart, dstFile);
+          break;
+        default:
+          throw new UnsupportedOperationException("Unsupported upload type: " + uploadType);
       }
 
       if (uploadedSegmentIsEncrypted) {
@@ -244,11 +238,11 @@ public class PinotSegmentUploadDownloadRestletResource {
       String rawTableName;
       if (tableName != null && !tableName.isEmpty()) {
         rawTableName = TableNameBuilder.extractRawTableName(tableName);
-        LOGGER.info("Uploading segment {} to table: {}, (Derived from API parameter)", segmentName, tableName);
+        LOGGER.info("Uploading a segment {} to table: {}, push type {}, (Derived from API parameter)", segmentName, tableName, uploadType);
       } else {
         // TODO: remove this when we completely deprecate the table name from segment metadata
         rawTableName = segmentMetadata.getTableName();
-        LOGGER.info("Uploading a segment {} to table: {}, (Derived from segment metadata)", segmentName, tableName);
+        LOGGER.info("Uploading a segment {} to table: {}, push type {}, (Derived from segment metadata)", segmentName, tableName, uploadType);
       }
 
       String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
@@ -257,7 +251,7 @@ public class PinotSegmentUploadDownloadRestletResource {
           segmentName, offlineTableName, clientAddress, ingestionDescriptor);
 
       // Skip segment validation if upload only segment metadata
-      if (!segmentMetadataOnly) {
+      if (uploadType != FileUploadDownloadClient.FileUploadType.METADATA) {
         // Validate segment
         new SegmentValidator(_pinotHelixResourceManager, _controllerConf, _executor, _connectionManager,
             _controllerMetrics, _leadControllerManager.isLeaderForTable(offlineTableName)).validateOfflineSegment(offlineTableName, segmentMetadata, tempSegmentDir);
@@ -409,7 +403,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
       @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
     try {
-      asyncResponse.resume(uploadSegment(tableName, null, enableParallelPushProtection, headers, request, false, false));
+      asyncResponse.resume(uploadSegment(tableName, null, enableParallelPushProtection, headers, request, false));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
@@ -427,7 +421,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
       @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
     try {
-      asyncResponse.resume(uploadSegment(tableName, multiPart, enableParallelPushProtection, headers, request, true, false));
+      asyncResponse.resume(uploadSegment(tableName, multiPart, enableParallelPushProtection, headers, request, true));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
@@ -447,7 +441,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
       @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
     try {
-      asyncResponse.resume(uploadSegment(tableName, null, enableParallelPushProtection, headers, request, true, false));
+      asyncResponse.resume(uploadSegment(tableName, null, enableParallelPushProtection, headers, request, true));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
@@ -465,41 +459,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
       @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
     try {
-      asyncResponse.resume(uploadSegment(tableName, multiPart, enableParallelPushProtection, headers, request, true, false));
-    } catch (Throwable t) {
-      asyncResponse.resume(t);
-    }
-  }
-
-  @POST
-  @ManagedAsync
-  @Produces(MediaType.APPLICATION_JSON)
-  @Consumes(MediaType.APPLICATION_JSON)
-  @Path("/segmentmetadata")
-  @ApiOperation(value = "Upload a segment with metadata", notes = "Upload a segment using segment metadata")
-  public void uploadSegmentMetadataAsJson(String segmentJsonStr,
-      @ApiParam(value = "Name of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME) String tableName,
-      @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
-      @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
-    try {
-      asyncResponse.resume(uploadSegment(tableName, null, enableParallelPushProtection, headers, request, false, true));
-    } catch (Throwable t) {
-      asyncResponse.resume(t);
-    }
-  }
-
-  @POST
-  @ManagedAsync
-  @Produces(MediaType.APPLICATION_JSON)
-  @Consumes(MediaType.MULTIPART_FORM_DATA)
-  @Path("/segmentmetadata")
-  @ApiOperation(value = "Upload a segment with metadata", notes = "Upload a segment using segment metadata")
-  public void uploadSegmentMetadataAsMultiPart(FormDataMultiPart multiPart,
-      @ApiParam(value = "Name of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME) String tableName,
-      @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
-      @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
-    try {
-      asyncResponse.resume(uploadSegment(tableName, multiPart, enableParallelPushProtection, headers, request, false, true));
+      asyncResponse.resume(uploadSegment(tableName, multiPart, enableParallelPushProtection, headers, request, true));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }

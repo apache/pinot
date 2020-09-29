@@ -119,7 +119,7 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
             Map<String, String> segmentUriToTarPathMap = SegmentPushUtils
                 .getSegmentUriToTarPathMap(finalOutputDirURI, _spec.getPushJobSpec().getSegmentUriPrefix(),
                     _spec.getPushJobSpec().getSegmentUriSuffix(), new String[]{segmentTarPath});
-            SegmentPushUtils.sendSegmentUriToTarPathMap(_spec, PinotFSFactory.create(finalOutputDirURI.getScheme()),
+            SegmentPushUtils.sendSegmentUriAndMetadata(_spec, PinotFSFactory.create(finalOutputDirURI.getScheme()),
                 segmentUriToTarPathMap);
           } catch (RetriableOperationException | AttemptsExceededException e) {
             throw new RuntimeException(e);

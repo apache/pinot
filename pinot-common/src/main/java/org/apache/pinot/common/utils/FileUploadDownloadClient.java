@@ -87,7 +87,7 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   public enum FileUploadType {
-    URI, JSON, SEGMENT;
+    URI, JSON, SEGMENT, METADATA;
 
     public static FileUploadType getDefaultUploadType() {
       return SEGMENT;
@@ -103,7 +103,6 @@ public class FileUploadDownloadClient implements Closeable {
   private static final String SCHEMA_PATH = "/schemas";
   private static final String OLD_SEGMENT_PATH = "/segments";
   private static final String SEGMENT_PATH = "/v2/segments";
-  private static final String SEGMENT_METADATA_PATH = "/segmentmetadata";
   private static final String TABLES_PATH = "/tables";
   private static final String TYPE_DELIMITER = "?type=";
 
@@ -194,16 +193,6 @@ public class FileUploadDownloadClient implements Closeable {
     return getURI(HTTP, host, port, SEGMENT_PATH);
   }
 
-  public static URI getUploadSegmentMetadataHttpURI(String host, int port)
-      throws URISyntaxException {
-    return getURI(HTTP, host, port, SEGMENT_METADATA_PATH);
-  }
-
-  public static URI getUploadSegmentMetadataHttpsURI(String host, int port)
-      throws URISyntaxException {
-    return getURI(HTTPS, host, port, SEGMENT_METADATA_PATH);
-  }
-
   public static URI getUploadSegmentHttpsURI(String host, int port)
       throws URISyntaxException {
     return getURI(HTTPS, host, port, SEGMENT_PATH);
@@ -212,11 +201,6 @@ public class FileUploadDownloadClient implements Closeable {
   public static URI getUploadSegmentURI(URI controllerURI)
       throws URISyntaxException {
     return getURI(controllerURI.getScheme(), controllerURI.getHost(), controllerURI.getPort(), SEGMENT_PATH);
-  }
-
-  public static URI getUploadSegmentMetadataURI(URI controllerURI)
-      throws URISyntaxException {
-    return getURI(controllerURI.getScheme(), controllerURI.getHost(), controllerURI.getPort(), SEGMENT_METADATA_PATH);
   }
 
   private static HttpUriRequest getUploadFileRequest(String method, URI uri, ContentBody contentBody,

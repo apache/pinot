@@ -83,7 +83,7 @@ public class SegmentMetadataPushJobRunner implements IngestionJobRunner {
         .getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec().getSegmentUriPrefix(),
             _spec.getPushJobSpec().getSegmentUriSuffix(), files);
     try {
-      SegmentPushUtils.sendSegmentUriToTarPathMap(_spec, outputDirFS, segmentUriToTarPathMap);
+      SegmentPushUtils.sendSegmentUriAndMetadata(_spec, outputDirFS, segmentUriToTarPathMap);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

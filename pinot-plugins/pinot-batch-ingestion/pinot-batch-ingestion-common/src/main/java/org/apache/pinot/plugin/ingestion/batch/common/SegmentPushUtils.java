@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.Header;
@@ -188,19 +189,31 @@ public class SegmentPushUtils implements Serializable {
     }
   }
 
-  public static void sendSegmentUriToTarPathMap(SegmentGenerationJobSpec spec, PinotFS fileSystem, Map<String, String> segmentUriToTarPathMap)
+  /**
+   * This method takes a map of segment downloadURI to corresponding tar file path, and push those segments in metadata mode.
+   * The steps are:
+   * 1. Download segment from tar file path;
+   * 2. Untar segment metadata and creation meta files from the tar file to a segment metadata directory;
+   * 3. Tar this segment metadata directory into a tar file
+   * 4. Generate a POST request with segmentDownloadURI in header to push tar file to Pinot controller.
+   *
+   * @param spec is the segment generation job spec
+   * @param fileSystem is the PinotFs used to copy segment tar file
+   * @param segmentUriToTarPathMap contains the map of segment DownloadURI to segment tar file path
+   * @throws Exception
+   */
+  public static void sendSegmentUriAndMetadata(SegmentGenerationJobSpec spec, PinotFS fileSystem, Map<String, String> segmentUriToTarPathMap)
       throws Exception {
     String tableName = spec.getTableSpec().getTableName();
-    LOGGER.info("Start pushing segments: {}... to locations: {} for table {}",
-        Arrays.toString(segmentUriToTarPathMap.entrySet().toArray()),
+    LOGGER.info("Start pushing segment metadata: {} to locations: {} for table {}",
+        segmentUriToTarPathMap,
         Arrays.toString(spec.getPinotClusterSpecs()), tableName);
     for (String segmentUriPath : segmentUriToTarPathMap.keySet()) {
       String tarFilePath = segmentUriToTarPathMap.get(segmentUriPath);
       String fileName = new File(tarFilePath).getName();
       Preconditions.checkArgument(fileName.endsWith(Constants.TAR_GZ_FILE_EXT));
       String segmentName = fileName.substring(0, fileName.length() - Constants.TAR_GZ_FILE_EXT.length());
-      File segmentMetadataFile = new File(FileUtils.getTempDirectory(), "segmentMetadataFile-" + System.nanoTime() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-      generateSegmentMetadataFile(fileSystem, URI.create(tarFilePath), segmentMetadataFile);
+      File segmentMetadataFile = generateSegmentMetadataFile(fileSystem, URI.create(tarFilePath));
       try {
         for (PinotClusterSpec pinotClusterSpec : spec.getPinotClusterSpecs()) {
           URI controllerURI;
@@ -220,12 +233,14 @@ public class SegmentPushUtils implements Serializable {
           }
           RetryPolicies.exponentialBackoffRetryPolicy(attempts, retryWaitMs, 5).attempt(() -> {
             try {
-              List<Header> headers = ImmutableList.of(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI, segmentUriPath));
+              List<Header> headers = ImmutableList.of(
+                  new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI, segmentUriPath),
+                  new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE, FileUploadDownloadClient.FileUploadType.METADATA.toString()));
               // Add table name as a request parameter
               NameValuePair tableNameValuePair =
                   new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME, tableName);
               List<NameValuePair> parameters = Arrays.asList(tableNameValuePair);
-              SimpleHttpResponse response = FILE_UPLOAD_DOWNLOAD_CLIENT.uploadSegmentMetadata(FileUploadDownloadClient.getUploadSegmentMetadataURI(controllerURI),
+              SimpleHttpResponse response = FILE_UPLOAD_DOWNLOAD_CLIENT.uploadSegmentMetadata(FileUploadDownloadClient.getUploadSegmentURI(controllerURI),
                   segmentName, segmentMetadataFile, headers, parameters, FILE_UPLOAD_DOWNLOAD_CLIENT.DEFAULT_SOCKET_TIMEOUT_MS);
               LOGGER.info("Response for pushing table {} segment {} to location {} - {}: {}", tableName, segmentName,
                   controllerURI, response.getStatusCode(), response.getResponse());
@@ -275,11 +290,11 @@ public class SegmentPushUtils implements Serializable {
    * 3. Tar both files into a segment metadata file.
    *
    */
-  private static boolean generateSegmentMetadataFile(PinotFS fileSystem, URI tarFileURI, File segmentMetadataTarFile)
+  private static File generateSegmentMetadataFile(PinotFS fileSystem, URI tarFileURI)
       throws Exception {
-    long currentTime = System.nanoTime();
-    File tarFile = new File(FileUtils.getTempDirectory(), "segmentTar-" + currentTime + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION).getAbsoluteFile();
-    File segmentMetadataDir = new File(FileUtils.getTempDirectory(), "segmentMetadataDir-" + currentTime).getAbsoluteFile();
+    String uuid = UUID.randomUUID().toString();
+    File tarFile = new File(FileUtils.getTempDirectory(), "segmentTar-" + uuid + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    File segmentMetadataDir = new File(FileUtils.getTempDirectory(), "segmentMetadataDir-" + uuid);
     try {
       fileSystem.copyToLocalFile(tarFileURI, tarFile);
       if (segmentMetadataDir.exists()) {
@@ -297,12 +312,13 @@ public class SegmentPushUtils implements Serializable {
       TarGzCompressionUtils.untarOneFile(tarFile, V1Constants.SEGMENT_CREATION_META,
           new File(segmentMetadataDir, V1Constants.SEGMENT_CREATION_META));
 
+      File segmentMetadataTarFile = new File(FileUtils.getTempDirectory(), "segmentMetadata-" + uuid + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
       if (segmentMetadataTarFile.exists()) {
         FileUtils.forceDelete(segmentMetadataTarFile);
       }
       LOGGER.info("Trying to tar segment metadata dir [{}] to [{}]", segmentMetadataDir, segmentMetadataTarFile);
       TarGzCompressionUtils.createTarGzFile(segmentMetadataDir, segmentMetadataTarFile);
-      return true;
+      return segmentMetadataTarFile;
     } finally {
       FileUtils.deleteQuietly(tarFile);
       FileUtils.deleteQuietly(segmentMetadataDir);
