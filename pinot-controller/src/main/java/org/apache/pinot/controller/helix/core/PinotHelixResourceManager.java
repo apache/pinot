@@ -231,12 +231,13 @@ public class PinotHelixResourceManager {
 
     _clusterInstanceConfigChangeListener = new ClusterInstanceConfigChangeListener(_helixZkManager);
     _clusterLiveInstanceChangeListener = new ClusterLiveInstanceChangeListener(_helixDataAccessor, _keyBuilder);
+
     try {
       addConfigListeners(_clusterInstanceConfigChangeListener);
       addLiveInstanceListeners(_clusterLiveInstanceChangeListener);
     } catch (Exception e) {
-      LOGGER.warn(
-          "Unable to add config listener in controller. This will result in incorrect response from controller's broker API");
+      LOGGER.error(
+          "Unable to register instance config listeners. This will not result in any failure but can cause  slow response in APIs due to multiple zokeeper calls");
     }
   }
 
@@ -2203,12 +2204,30 @@ public class PinotHelixResourceManager {
 
   public void addConfigListeners(ClusterInstanceConfigChangeListener clusterInstanceConfigChangeListener)
       throws Exception {
-    _helixZkManager.addInstanceConfigChangeListener(clusterInstanceConfigChangeListener);
+    RetryPolicies.exponentialBackoffRetryPolicy(3, 100, 5).attempt(() -> {
+      try {
+        _helixZkManager.addInstanceConfigChangeListener(clusterInstanceConfigChangeListener);
+        return true;
+      } catch (Exception e) {
+        LOGGER.warn(
+            "Unable to add instance config change listener in controller. This might result in incorrect response from controller's API");
+        return false;
+      }
+    });
   }
 
   public void addLiveInstanceListeners(LiveInstanceChangeListener liveInstanceChangeListener)
       throws Exception {
-    _helixZkManager.addLiveInstanceChangeListener(liveInstanceChangeListener);
+    RetryPolicies.exponentialBackoffRetryPolicy(3, 100, 5).attempt(() -> {
+      try {
+        _helixZkManager.addLiveInstanceChangeListener(liveInstanceChangeListener);
+        return true;
+      } catch (Exception e) {
+        LOGGER.warn(
+            "Unable to add live instance config change listener in controller. This might result in incorrect response from controller's API");
+        return false;
+      }
+    });
   }
 
   /**
