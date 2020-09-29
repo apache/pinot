@@ -34,10 +34,17 @@ import org.apache.pinot.core.query.request.context.ExpressionContext;
 
 public class SumWithPrecisionAggregationFunction extends BaseSingleInputAggregationFunction<BigDecimal, BigDecimal> {
   MathContext _mathContext = new MathContext(0);
+  Integer _scale = null;
 
   public SumWithPrecisionAggregationFunction(ExpressionContext expression, Integer precision) {
     super(expression);
     _mathContext = new MathContext(precision);
+  }
+
+  public SumWithPrecisionAggregationFunction(ExpressionContext expression, Integer precision, Integer scale) {
+    super(expression);
+    _mathContext = new MathContext(precision);
+    _scale = scale;
   }
 
   public SumWithPrecisionAggregationFunction(ExpressionContext expression) {
@@ -68,7 +75,7 @@ public class SumWithPrecisionAggregationFunction extends BaseSingleInputAggregat
       BigDecimal value = new BigDecimal(DataTypeConversionFunctions.bytesToBigDecimal(valueArray[i]));
       sumValue = sumValue.add(value, _mathContext);
     }
-    aggregationResultHolder.setValue(sumValue);
+    aggregationResultHolder.setValue(setScale(sumValue));
   }
 
   @Override
@@ -80,7 +87,7 @@ public class SumWithPrecisionAggregationFunction extends BaseSingleInputAggregat
       BigDecimal groupByResultValue = getDefaultResult(groupByResultHolder, groupKey);
       BigDecimal value = new BigDecimal(DataTypeConversionFunctions.bytesToBigDecimal(valueArray[i]));
       groupByResultValue = groupByResultValue.add(value, _mathContext);
-      groupByResultHolder.setValueForKey(groupKey, groupByResultValue);
+      groupByResultHolder.setValueForKey(groupKey, setScale(groupByResultValue));
     }
   }
 
@@ -94,7 +101,7 @@ public class SumWithPrecisionAggregationFunction extends BaseSingleInputAggregat
         BigDecimal groupByResultValue = getDefaultResult(groupByResultHolder, groupKey);
         BigDecimal valueBigDecimal = new BigDecimal(DataTypeConversionFunctions.bytesToBigDecimal(value));
         groupByResultValue = groupByResultValue.add(valueBigDecimal, _mathContext);
-        groupByResultHolder.setValueForKey(groupKey, groupByResultValue);
+        groupByResultHolder.setValueForKey(groupKey, setScale(groupByResultValue));
       }
     }
   }
@@ -112,7 +119,7 @@ public class SumWithPrecisionAggregationFunction extends BaseSingleInputAggregat
   @Override
   public BigDecimal merge(BigDecimal intermediateResult1, BigDecimal intermediateResult2) {
     try {
-      return intermediateResult1.add(intermediateResult2, _mathContext);
+      return setScale(intermediateResult1.add(intermediateResult2, _mathContext));
     } catch (Exception e) {
       throw new RuntimeException("Caught Exception while merging results in sum with precision function", e);
     }
@@ -144,6 +151,7 @@ public class SumWithPrecisionAggregationFunction extends BaseSingleInputAggregat
       result = new BigDecimal(0, _mathContext);
       aggregationResultHolder.setValue(result);
     }
+    result = setScale(result);
     return result;
   }
 
@@ -153,6 +161,14 @@ public class SumWithPrecisionAggregationFunction extends BaseSingleInputAggregat
       result = new BigDecimal(0, _mathContext);
       groupByResultHolder.setValueForKey(groupKey, result);
     }
+    result = setScale(result);
     return result;
+  }
+
+  private BigDecimal setScale(BigDecimal value) {
+    if (_scale != null) {
+      value = value.setScale(_scale, BigDecimal.ROUND_HALF_EVEN);
+    }
+    return value;
   }
 }

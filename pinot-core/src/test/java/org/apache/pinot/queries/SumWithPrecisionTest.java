@@ -179,6 +179,31 @@ public class SumWithPrecisionTest extends BaseSingleValueQueriesTest {
     assertTrue(_aggregatedValuePerSegment.subtract((BigDecimal) aggregationResult.get(0)).abs().doubleValue() <= 0.1);
   }
 
+  @Test
+  public void testAggregationWithPrecisionAndScale() {
+    String query = "SELECT SUMPRECISION(bytesColumn, 10, 3) FROM testTable";
+
+    // Inner segment
+    Operator operator = getOperatorForPqlQuery(query);
+    assertTrue(operator instanceof AggregationOperator);
+    IntermediateResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0, NUM_RECORDS,
+        NUM_RECORDS);
+    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+
+    operator = getOperatorForPqlQueryWithFilter(query);
+    assertTrue(operator instanceof AggregationOperator);
+    IntermediateResultsBlock resultsBlockWithFilter = ((AggregationOperator) operator).nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0, NUM_RECORDS,
+        NUM_RECORDS);
+    List<Object> aggregationResultWithFilter = resultsBlockWithFilter.getAggregationResult();
+
+    assertNotNull(aggregationResult);
+    assertNotNull(aggregationResultWithFilter);
+    assertEquals(aggregationResult, aggregationResultWithFilter);
+    assertTrue(_aggregatedValuePerSegment.subtract((BigDecimal) aggregationResult.get(0)).abs().doubleValue() <= 0.1);
+  }
+
   @AfterClass
   public void tearDown()
       throws IOException {
