@@ -81,4 +81,9 @@ public class AggregationFunctionColumnPair {
     }
     return false;
   }
+
+  @Override
+  public String toString() {
+    return toColumnName();
+  }
 }
