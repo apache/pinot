@@ -31,6 +31,7 @@ import {
 
 export default Controller.extend({
   queryParams: ['testMode'],
+  detectionHealthQueryTimeRange: [moment().add(1, 'day').subtract(30, 'day').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()],
 
   /**
    * One-way CP to store all sub groups
@@ -228,6 +229,11 @@ export default Controller.extend({
           break;
         }
       }
+
+      for (const alert of alerts) {
+        this._fetchDetectionHealth(alert);
+      }
+
       // Return one page of sorted alerts
       return alerts;
     }
@@ -333,6 +339,13 @@ export default Controller.extend({
   _fetchAlerts() {
     const paramsForAlerts = get(this, 'paramsForAlerts');
     return this.get('_getAlerts').perform(paramsForAlerts);
+  },
+
+  async _fetchDetectionHealth(alert) {
+    const healthQueryTimeRange = get(this, 'detectionHealthQueryTimeRange');
+    const healthUrl = `/detection/health/${alert.id}?start=${healthQueryTimeRange[0]}&end=${healthQueryTimeRange[1]}`;
+    const health_result = await fetch(healthUrl).then(checkStatus);
+    set(alert, 'health', health_result);
   },
 
   _handlePrimaryFilter(primaryFilter, paramsForAlerts) {
