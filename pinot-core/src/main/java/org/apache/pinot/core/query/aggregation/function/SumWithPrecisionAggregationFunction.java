@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.function.scalar.DataTypeConversionFunctions;
@@ -36,19 +37,18 @@ public class SumWithPrecisionAggregationFunction extends BaseSingleInputAggregat
   MathContext _mathContext = new MathContext(0);
   Integer _scale = null;
 
-  public SumWithPrecisionAggregationFunction(ExpressionContext expression, Integer precision) {
+  public SumWithPrecisionAggregationFunction(ExpressionContext expression, List<ExpressionContext> arguments) {
     super(expression);
-    _mathContext = new MathContext(precision);
-  }
+    int numArguments = arguments.size();
 
-  public SumWithPrecisionAggregationFunction(ExpressionContext expression, Integer precision, Integer scale) {
-    super(expression);
-    _mathContext = new MathContext(precision);
-    _scale = scale;
-  }
-
-  public SumWithPrecisionAggregationFunction(ExpressionContext expression) {
-    super(expression);
+    if (numArguments == 3) {
+      Integer precision = Integer.parseInt(arguments.get(1).getLiteral());
+      _scale = Integer.parseInt(arguments.get(2).getLiteral());
+      _mathContext = new MathContext(precision);
+    } else if (numArguments == 2) {
+      Integer precision = Integer.parseInt(arguments.get(1).getLiteral());
+      _mathContext = new MathContext(precision);
+    }
   }
 
   @Override
