@@ -20,6 +20,7 @@ package org.apache.pinot.common.function.scalar;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.Base64;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
@@ -77,5 +78,15 @@ public class DataTypeConversionFunctions {
     }
 
     return sb.toString();
+  }
+
+  @ScalarFunction
+  public static String base64Encode(String input) {
+    return Base64.getEncoder().encodeToString(input.getBytes());
+  }
+
+  @ScalarFunction
+  public static String base64Decode(String input) {
+    return new String(Base64.getDecoder().decode(input.getBytes());
   }
 }
