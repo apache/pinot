@@ -87,6 +87,6 @@ public class DataTypeConversionFunctions {
 
   @ScalarFunction
   public static String base64Decode(String input) {
-    return new String(Base64.getDecoder().decode(input.getBytes());
+    return new String(Base64.getDecoder().decode(input.getBytes()));
   }
 }
