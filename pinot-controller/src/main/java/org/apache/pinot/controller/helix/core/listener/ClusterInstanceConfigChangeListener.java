@@ -45,14 +45,18 @@ public class ClusterInstanceConfigChangeListener implements InstanceConfigChange
         }
 
         if(_lastEventTimestamp == null || _lastEventTimestamp <= context.getCreationTime()) {
-            _instanceConfigs = instanceConfigs;
-            _lastEventTimestamp = context.getCreationTime();
+            synchronized (this) {
+                _instanceConfigs = instanceConfigs;
+                _lastEventTimestamp = context.getCreationTime();
+            }
         }
     }
 
     public List<InstanceConfig> getInstanceConfigs() {
         if(_instanceConfigs.isEmpty() || !_listenerInitiated){
-            _instanceConfigs = HelixHelper.getInstanceConfigs(_helixManager);
+            synchronized (this) {
+                _instanceConfigs = HelixHelper.getInstanceConfigs(_helixManager);
+            }
         }
         return _instanceConfigs;
     }

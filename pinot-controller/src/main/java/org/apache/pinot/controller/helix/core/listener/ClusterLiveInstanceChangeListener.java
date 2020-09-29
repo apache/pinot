@@ -47,14 +47,18 @@ public class ClusterLiveInstanceChangeListener implements LiveInstanceChangeList
     }
 
     if(_lastEventTimestamp == null || _lastEventTimestamp <= changeContext.getCreationTime()) {
-      _liveInstances = liveInstances;
-      _lastEventTimestamp = changeContext.getCreationTime();
+      synchronized (this) {
+        _liveInstances = liveInstances;
+        _lastEventTimestamp = changeContext.getCreationTime();
+      }
     }
   }
 
   public List<LiveInstance> getLiveInstances() {
     if (_liveInstances.isEmpty() || !_listenerInitiated) {
-      _liveInstances = _helixDataAccessor.getChildValues(_keyBuilder.liveInstances());
+      synchronized (this) {
+        _liveInstances = _helixDataAccessor.getChildValues(_keyBuilder.liveInstances());
+      }
     }
     return _liveInstances;
   }
