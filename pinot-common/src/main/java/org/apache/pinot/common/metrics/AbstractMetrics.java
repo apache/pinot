@@ -21,12 +21,18 @@ package org.apache.pinot.common.metrics;
 import com.google.common.annotations.VisibleForTesting;
 import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricsRegistry;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,21 +53,36 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
   private final Map<String, AtomicLong> _gaugeValues = new ConcurrentHashMap<String, AtomicLong>();
 
-  protected final boolean _global;
+  private final boolean _isTableLevelMetricsEnabled;
+
+  // Table level metrics are still emitted for allowed tables even if emitting table level metrics is disabled
+  private final Set<String> _allowedTables;
 
   public AbstractMetrics(String metricPrefix, MetricsRegistry metricsRegistry, Class clazz) {
-    this(metricPrefix, metricsRegistry, clazz, false);
+    this(metricPrefix, metricsRegistry, clazz, true, Collections.emptySet());
+  }
+
+  public AbstractMetrics(String metricPrefix, MetricsRegistry metricsRegistry, Class clazz,
+      boolean isTableLevelMetricsEnabled, Collection<String> allowedTables) {
+    _metricPrefix = metricPrefix;
+    _metricsRegistry = metricsRegistry;
+    _clazz = clazz;
+    _isTableLevelMetricsEnabled = isTableLevelMetricsEnabled;
+    _allowedTables = addNameVariations(allowedTables);
+  }
+
+  /**
+   * Some metrics use raw table name and some use table name with type. This method adds all variations of the table
+   * name to the allowed entries to make sure that all metrics are checked against the allowed tables.
+   */
+  private static Set<String> addNameVariations(Collection<String> allowedTables) {
+    return allowedTables.stream()
+        .flatMap(tableName -> TableNameBuilder.getTableNameVariations(tableName).stream())
+        .collect(Collectors.toCollection(HashSet::new));
   }
 
   public MetricsRegistry getMetricsRegistry() {
     return _metricsRegistry;
-  }
-
-  public AbstractMetrics(String metricPrefix, MetricsRegistry metricsRegistry, Class clazz, boolean global) {
-    _metricPrefix = metricPrefix;
-    _metricsRegistry = metricsRegistry;
-    _clazz = clazz;
-    _global = global;
   }
 
   public interface QueryPhase {
@@ -447,6 +468,6 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   protected abstract G[] getGauges();
 
   protected String getTableName(String tableName) {
-    return (_global ? "allTables" : tableName);
+    return _isTableLevelMetricsEnabled || _allowedTables.contains(tableName) ? tableName : "allTables";
   }
 }
