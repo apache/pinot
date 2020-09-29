@@ -137,8 +137,6 @@ public class AggregationFunctionFactory {
             return new DistinctCountThetaSketchAggregationFunction(arguments);
           case DISTINCTCOUNTRAWTHETASKETCH:
             return new DistinctCountRawThetaSketchAggregationFunction(arguments);
-          case RAWTHETASKETCH:
-            return new RawThetaSketchAggregationFunction(arguments);
           case IDSET:
             return new IdSetAggregationFunction(arguments);
           case COUNTMV:
