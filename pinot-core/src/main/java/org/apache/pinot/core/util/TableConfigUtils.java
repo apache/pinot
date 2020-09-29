@@ -25,6 +25,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.CommonConstants;
@@ -39,6 +40,7 @@ import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
@@ -62,6 +64,7 @@ public final class TableConfigUtils {
    * 2. IngestionConfig
    * 3. TierConfigs
    * 4. Indexing config
+   * 5. Field Config List
    *
    * TODO: Add more validations for each section (e.g. validate conditions are met for aggregateMetrics)
    */
@@ -77,9 +80,38 @@ public final class TableConfigUtils {
   }
 
   /**
+   * Validates all table config including tenant config. This is specifically invoked
+   * during table config creation, update or validate API calls.
+   */
+  public static void validate(TableConfig tableConfig, @Nullable Schema schema, Set<String> serverTenants,
+      Set<String> brokerTenants) {
+    validate(tableConfig, schema);
+    validateTenants(tableConfig, serverTenants, brokerTenants);
+  }
+
+  /**
+   * Ensures a valid tenant config is provided in the table config.
+   * Ensures the broker and server tenant names are valid.
+   */
+  private static void validateTenants(TableConfig tableConfig, Set<String> serverTenants,
+      Set<String> brokerTenants) {
+    TenantConfig tenantConfig = tableConfig.getTenantConfig();
+    Preconditions.checkNotNull(tenantConfig, "Tenant config missing in table config");
+    Preconditions.checkNotNull(serverTenants, "Error in retrieving server tenant names");
+    Preconditions.checkNotNull(brokerTenants, "Error in retrieving broker tenant names");
+
+    String serverTenant = tenantConfig.getServer();
+    String brokerTenant = tenantConfig.getBroker();
+    Preconditions.checkState(serverTenants.stream().anyMatch(s -> s.equals(serverTenant)),
+        String.format("Server tenant %s specified in table config does not exist", serverTenant));
+    Preconditions.checkState(brokerTenants.stream().anyMatch(b -> b.equals(brokerTenant)),
+        String.format("Broker tenant %s specified in table config does not exist", brokerTenant));
+  }
+
+  /**
    * Validates the table name with the following rules:
    * <ul>
-   *   <li>Table name shouldn't contain dot in it</li>
+   *   <li>Table name shouldn't contain dot or space in it</li>
    * </ul>
    */
   public static void validateTableName(TableConfig tableConfig) {
@@ -90,13 +122,53 @@ public final class TableConfigUtils {
   }
 
   /**
+   * Validates retention config. Checks for following things:
+   * - Valid segmentPushType
+   * - Valid retentionTimeUnit
+   */
+  public static void validateRetentionConfig(TableConfig tableConfig) {
+    SegmentsValidationAndRetentionConfig segmentsConfig = tableConfig.getValidationConfig();
+    String tableName = tableConfig.getTableName();
+
+    if (segmentsConfig == null) {
+      throw new IllegalStateException(
+          String.format("Table: %s, \"segmentsConfig\" field is missing in table config", tableName));
+    }
+
+    String segmentPushType = segmentsConfig.getSegmentPushType();
+    // segmentPushType is not needed for Realtime table
+    if (tableConfig.getTableType() == TableType.OFFLINE) {
+      if (segmentPushType == null) {
+        throw new IllegalStateException(String.format("Table: %s, null push type", tableName));
+      }
+
+      if (!segmentPushType.equalsIgnoreCase("REFRESH") && !segmentPushType.equalsIgnoreCase("APPEND")) {
+        throw new IllegalStateException(
+            String.format("Table: %s, invalid push type: %s", tableName, segmentPushType));
+      }
+    }
+
+    // Retention may not be specified. Ignore validation in that case.
+    String timeUnitString = segmentsConfig.getRetentionTimeUnit();
+    if (timeUnitString == null || timeUnitString.isEmpty()) {
+      return;
+    }
+    try {
+      TimeUnit.valueOf(timeUnitString.toUpperCase());
+    } catch (Exception e) {
+      throw new IllegalStateException(String.format("Table: %s, invalid time unit: %s", tableName, timeUnitString));
+    }
+  }
+
+  /**
    * Validates the following in the validationConfig of the table
    * 1. For REALTIME table
    * - checks for non-null timeColumnName
    * - checks for valid field spec for timeColumnName in schema
+   * - Validates retention config
    *
    * 2. For OFFLINE table
-   * - checks for valid field spec for timeColumnName in schema, if timeColumnName and schema re non-null
+   * - checks for valid field spec for timeColumnName in schema, if timeColumnName and schema are non-null
    *
    * 3. Checks peerDownloadSchema
    */
@@ -122,6 +194,8 @@ public final class TableConfigUtils {
             + "' for peerSegmentDownloadScheme. Must be one of http or https");
       }
     }
+
+    validateRetentionConfig(tableConfig);
   }
 
   /**
