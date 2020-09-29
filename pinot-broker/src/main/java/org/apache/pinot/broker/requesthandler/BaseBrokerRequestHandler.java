@@ -750,10 +750,20 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
     if (brokerRequest.isSetAggregationsInfo()) {
       for (AggregationInfo info : brokerRequest.getAggregationsInfo()) {
-        if (!info.getAggregationType().equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
+        String functionName = StringUtils.remove(info.getAggregationType(), '_');
+        if (!functionName.equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
           // Always read from backward compatible api in AggregationFunctionUtils.
           List<String> arguments = AggregationFunctionUtils.getArguments(info);
-          arguments.replaceAll(e -> fixColumnName(rawTableName, e, columnNameMap));
+
+          if (functionName.equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {
+            // For DISTINCT query, all arguments are expressions
+            arguments.replaceAll(e -> fixColumnName(rawTableName, e, columnNameMap));
+          } else {
+            // For non-DISTINCT query, only the first argument is expression, others are literals
+            // NOTE: We skip fixing the literal arguments because of the legacy behavior of PQL compiler treating string
+            //       literal as identifier in the aggregation function.
+            arguments.set(0, fixColumnName(rawTableName, arguments.get(0), columnNameMap));
+          }
           info.setExpressions(arguments);
         }
       }

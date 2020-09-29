@@ -689,6 +689,7 @@ public class ObjectSerDeUtils {
   };
 
   public static final ObjectSerDe<Sketch> DATA_SKETCH_SER_DE = new ObjectSerDe<Sketch>() {
+
     @Override
     public byte[] serialize(Sketch value) {
       // NOTE: Compact the sketch in unsorted, on-heap fashion for performance concern.
@@ -710,6 +711,7 @@ public class ObjectSerDeUtils {
   };
 
   public static final ObjectSerDe<Geometry> GEOMETRY_SER_DE = new ObjectSerDe<Geometry>() {
+
     @Override
     public byte[] serialize(Geometry value) {
       return GeometrySerializer.serialize(value);
@@ -729,6 +731,7 @@ public class ObjectSerDeUtils {
   };
 
   public static final ObjectSerDe<RoaringBitmap> ROARING_BITMAP_SER_DE = new ObjectSerDe<RoaringBitmap>() {
+
     @Override
     public byte[] serialize(RoaringBitmap bitmap) {
       byte[] bytes = new byte[bitmap.serializedSizeInBytes()];
@@ -755,6 +758,7 @@ public class ObjectSerDeUtils {
   };
 
   public static final ObjectSerDe<IdSet> ID_SET_SER_DE = new ObjectSerDe<IdSet>() {
+
     @Override
     public byte[] serialize(IdSet idSet) {
       try {
@@ -794,7 +798,7 @@ public class ObjectSerDeUtils {
         return new byte[Integer.BYTES];
       }
 
-      // No need to close these 2 streams
+      // No need to close these 2 streams (close() is no-op)
       ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
       DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
 

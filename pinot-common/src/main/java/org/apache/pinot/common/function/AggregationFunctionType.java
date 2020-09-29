@@ -43,8 +43,6 @@ public enum AggregationFunctionType {
   PERCENTILE("percentile"),
   PERCENTILEEST("percentileEst"),
   PERCENTILETDIGEST("percentileTDigest"),
-  THETASKETCH("thetaSketch"),
-  RAWTHETASKETCH("rawThetaSketch"),
   IDSET("idSet"),
 
   // Geo aggregation functions
