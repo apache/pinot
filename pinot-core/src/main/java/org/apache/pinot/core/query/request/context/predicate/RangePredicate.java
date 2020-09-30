@@ -29,7 +29,7 @@ import org.apache.pinot.core.query.request.context.ExpressionContext;
  */
 public class RangePredicate implements Predicate {
   public static final char DELIMITER = '\0';
-  // TODO: Remove the legacy delimiter after releasing 0.5.0
+  // TODO: Remove the legacy delimiter after releasing 0.6.0
   public static final String LEGACY_DELIMITER = "\t\t";
   public static final char LOWER_INCLUSIVE = '[';
   public static final char LOWER_EXCLUSIVE = '(';
