@@ -41,11 +41,11 @@ import org.apache.pinot.core.query.request.context.ExpressionContext;
  * precision - precision to be set to the final result
  * scale - scale to be set to the final result
  */
-public class SumWithPrecisionAggregationFunction extends BaseSingleInputAggregationFunction<BigDecimal, BigDecimal> {
+public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationFunction<BigDecimal, BigDecimal> {
   MathContext _mathContext = new MathContext(0);
   Integer _scale = null;
 
-  public SumWithPrecisionAggregationFunction(List<ExpressionContext> arguments) {
+  public SumPrecisionAggregationFunction(List<ExpressionContext> arguments) {
     super(arguments.get(0));
     int numArguments = arguments.size();
 
