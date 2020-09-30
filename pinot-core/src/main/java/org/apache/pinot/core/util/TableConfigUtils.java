@@ -80,37 +80,6 @@ public final class TableConfigUtils {
   }
 
   /**
-   * Validates all table config including tenant config. This is specifically invoked
-   * during table config creation, update or validate API calls.
-   */
-  public static void validate(TableConfig tableConfig, @Nullable Schema schema, Set<String> serverTenants,
-      Set<String> brokerTenants) {
-    validate(tableConfig, schema);
-    validateTenants(tableConfig, serverTenants, brokerTenants);
-  }
-
-  /**
-   * Ensures a valid tenant config is provided in the table config.
-   * Ensures the broker and server tenant names are valid.
-   */
-  private static void validateTenants(TableConfig tableConfig, Set<String> serverTenants, Set<String> brokerTenants) {
-    TenantConfig tenantConfig = tableConfig.getTenantConfig();
-    Preconditions.checkNotNull(serverTenants, "Error in retrieving server tenant names");
-    Preconditions.checkNotNull(brokerTenants, "Error in retrieving broker tenant names");
-
-    String serverTenant = tenantConfig.getServer();
-    if (serverTenant != null) {
-      Preconditions.checkState(serverTenants.stream().anyMatch(s -> s.equals(serverTenant)),
-          String.format("Server tenant %s specified in table config does not exist", serverTenant));
-    }
-    String brokerTenant = tenantConfig.getBroker();
-    if (brokerTenant != null) {
-      Preconditions.checkState(brokerTenants.stream().anyMatch(b -> b.equals(brokerTenant)),
-          String.format("Broker tenant %s specified in table config does not exist", brokerTenant));
-    }
-  }
-
-  /**
    * Validates the table name with the following rules:
    * <ul>
    *   <li>Table name shouldn't contain dot or space in it</li>

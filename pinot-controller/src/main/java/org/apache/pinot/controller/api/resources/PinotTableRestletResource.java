@@ -116,8 +116,7 @@ public class PinotTableRestletResource {
       tableConfig = JsonUtils.stringToObject(tableConfigStr, TableConfig.class);
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
       // TableConfigUtils.validate(...) is used across table create/update.
-      TableConfigUtils.validate(tableConfig, schema, _pinotHelixResourceManager.getAllServerTenantNames(),
-          _pinotHelixResourceManager.getAllBrokerTenantNames());
+      TableConfigUtils.validate(tableConfig, schema);
       // TableConfigUtils.validateTableName(...) checks table name rules.
       // So it won't effect already created tables.
       TableConfigUtils.validateTableName(tableConfig);
@@ -329,8 +328,7 @@ public class PinotTableRestletResource {
     try {
       tableConfig = JsonUtils.stringToObject(tableConfigString, TableConfig.class);
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
-      TableConfigUtils.validate(tableConfig, schema, _pinotHelixResourceManager.getAllServerTenantNames(),
-          _pinotHelixResourceManager.getAllBrokerTenantNames());
+      TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Invalid table config", Response.Status.BAD_REQUEST, e);
     }
@@ -374,8 +372,7 @@ public class PinotTableRestletResource {
     try {
       TableConfig tableConfig = JsonUtils.stringToObject(tableConfigStr, TableConfig.class);
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
-      TableConfigUtils.validate(tableConfig, schema, _pinotHelixResourceManager.getAllServerTenantNames(),
-          _pinotHelixResourceManager.getAllBrokerTenantNames());
+      TableConfigUtils.validate(tableConfig, schema);
       ObjectNode tableConfigValidateStr = JsonUtils.newObjectNode();
       if (tableConfig.getTableType() == TableType.OFFLINE) {
         tableConfigValidateStr.set(TableType.OFFLINE.name(), tableConfig.toJsonNode());

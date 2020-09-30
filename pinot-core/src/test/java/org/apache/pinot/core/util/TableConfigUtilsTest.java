@@ -639,43 +639,6 @@ public class TableConfigUtilsTest {
   }
 
   @Test
-  public void testValidateTenantConfig() {
-
-    Set<String> serverTenants = Sets.newHashSet(Arrays.asList("server-tenant"));
-    Set<String> brokerTenants = Sets.newHashSet(Arrays.asList("broker-tenant"));
-
-    Schema schema =
-        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-            .build();
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setServerTenant("server-tenant")
-            .setBrokerTenant("broker-tenant").build();
-    try {
-      TableConfigUtils.validate(tableConfig, schema, serverTenants, brokerTenants);
-    } catch (Exception e) {
-      Assert.fail("Should not fail for valid tenant config");
-    }
-
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setServerTenant("unknown")
-        .setBrokerTenant("broker-tenant").build();
-    try {
-      TableConfigUtils.validate(tableConfig, schema, serverTenants, brokerTenants);
-      Assert.fail("Should fail for invalid server tenant config");
-    } catch (Exception e) {
-      // Expected
-    }
-
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setServerTenant("server-tenant")
-        .setBrokerTenant("unknown").build();
-    try {
-      TableConfigUtils.validate(tableConfig, schema, serverTenants, brokerTenants);
-      Assert.fail("Should fail for invalid broker tenant config");
-    } catch (Exception e) {
-      // Expected
-    }
-  }
-
-  @Test
   public void testValidateRetentionConfig() {
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
