@@ -18,34 +18,32 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import org.apache.pinot.core.query.exception.BadQueryRequestException;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.testng.Assert;
-import org.testng.annotations.DataProvider;
-import org.testng.annotations.Test;
 
 
-public class ArrayLengthTransformFunctionTest extends ArrayBaseTransformFunctionTest {
+public class ArrayMaxTransformFunctionTest extends ArrayBaseTransformFunctionTest {
 
   @Override
   String getFunctionName() {
-    return ArrayLengthTransformFunction.FUNCTION_NAME;
+    return ArrayMaxTransformFunction.FUNCTION_NAME;
   }
 
   @Override
   Object getExpectResult(int[] intArrary) {
-    return intArrary.length;
+    int maxValue = Integer.MIN_VALUE;
+    for (int v : intArrary) {
+      maxValue = Math.max(maxValue, v);
+    }
+    return maxValue;
   }
 
   @Override
   Class getArrayFunctionClass() {
-    return ArrayLengthTransformFunction.class;
+    return ArrayMaxTransformFunction.class;
   }
 
   @Override
   FieldSpec.DataType getResultDataType(FieldSpec.DataType inputDataType) {
-    return FieldSpec.DataType.INT;
+    return inputDataType;
   }
 }
