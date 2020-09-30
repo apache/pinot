@@ -858,7 +858,7 @@ public class ObjectSerDeUtils {
 
     @Override
     public byte[] serialize(BigDecimal value) {
-      return DataTypeConversionFunctions.bigDecimalToBytes(value);
+      return DataTypeConversionFunctions.bigDecimalToBytes(value.toString());
     }
 
     @Override

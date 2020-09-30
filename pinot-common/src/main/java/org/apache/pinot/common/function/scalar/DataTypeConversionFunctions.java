@@ -30,26 +30,27 @@ public class DataTypeConversionFunctions {
   }
 
   @ScalarFunction
-  public static byte[] bigDecimalToBytes(BigDecimal number) {
-    int scale = number.scale();
-    BigInteger unscaled = number.unscaledValue();
+  public static byte[] bigDecimalToBytes(String number) {
+    BigDecimal bigDecimal = new BigDecimal(number);
+    int scale = bigDecimal.scale();
+    BigInteger unscaled = bigDecimal.unscaledValue();
     byte[] value = unscaled.toByteArray();
-    byte[] bigDecimalBytesArray = new byte[value.length + 4];
-    for (int i = 0; i < 4; i++) {
-      bigDecimalBytesArray[i] = (byte) (scale >>> (8 * (3 - i)));
-    }
-    System.arraycopy(value, 0, bigDecimalBytesArray, 4, value.length);
+    byte[] bigDecimalBytesArray = new byte[value.length + 2];
+
+    bigDecimalBytesArray[0] = (byte) (scale >>> 8);
+    bigDecimalBytesArray[1] = (byte) (scale);
+
+    System.arraycopy(value, 0, bigDecimalBytesArray, 2, value.length);
     return bigDecimalBytesArray;
   }
 
   @ScalarFunction
   public static String bytesToBigDecimal(byte[] bytes) {
     int scale = 0;
-    for (int i = 0; i < 4; i++) {
-      scale += (((int) bytes[i]) << (8 * (3 - i)));
-    }
-    byte[] vals = new byte[bytes.length - 4];
-    System.arraycopy(bytes, 4, vals, 0, vals.length);
+    scale += (((int) bytes[0]) << (8));
+    scale += (((int) bytes[1]));
+    byte[] vals = new byte[bytes.length - 2];
+    System.arraycopy(bytes, 2, vals, 0, vals.length);
     BigInteger unscaled = new BigInteger(vals);
     BigDecimal number = new BigDecimal(unscaled, scale);
     return number.toString();
@@ -57,7 +58,7 @@ public class DataTypeConversionFunctions {
 
   @ScalarFunction
   public static byte[] bigDecimalFromString(String bigDecimal) {
-    return bigDecimalToBytes(new BigDecimal(bigDecimal));
+    return bigDecimalToBytes(bigDecimal);
   }
 
   @ScalarFunction
@@ -81,12 +82,12 @@ public class DataTypeConversionFunctions {
   }
 
   @ScalarFunction
-  public static String base64Encode(String input) {
-    return Base64.getEncoder().encodeToString(input.getBytes());
+  public static byte[] base64Encode(byte[] input) {
+    return Base64.getEncoder().encodeToString(input).getBytes();
   }
 
   @ScalarFunction
-  public static String base64Decode(String input) {
-    return new String(Base64.getDecoder().decode(input.getBytes()));
+  public static byte[] base64Decode(String input) {
+    return Base64.getDecoder().decode(input.getBytes());
   }
 }

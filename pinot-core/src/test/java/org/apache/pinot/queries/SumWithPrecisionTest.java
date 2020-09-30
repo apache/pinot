@@ -118,7 +118,7 @@ public class SumWithPrecisionTest extends BaseSingleValueQueriesTest {
       BigDecimal bigDecimalValue = bigDecimalValueLeft.multiply(bigDecimalValueRight);
 
       _aggregatedValuePerSegment = _aggregatedValuePerSegment.add(bigDecimalValue);
-      byte[] bytesValue = DataTypeConversionFunctions.bigDecimalToBytes(bigDecimalValue);
+      byte[] bytesValue = DataTypeConversionFunctions.bigDecimalToBytes(bigDecimalValue.toString());
       record.putValue(BYTES_COLUMN, bytesValue);
       records.add(record);
     }
