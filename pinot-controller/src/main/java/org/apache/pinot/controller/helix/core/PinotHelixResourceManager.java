@@ -1692,7 +1692,7 @@ public class PinotHelixResourceManager {
     LOGGER.info("Updated segment: {} of table: {} to property store", segmentName, offlineTableName);
 
     // Send a message to servers and brokers hosting the table to refresh the segment
-    sendSegmentRefreshMessage(offlineTableName, segmentName);
+    sendSegmentRefreshMessage(offlineTableName, segmentName, true, true);
   }
 
   public int reloadAllSegments(String tableNameWithType) {
@@ -1743,45 +1743,55 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Attempt to send a message to refresh the new segment. We do not wait for any acknowledgements.
-   * The message is sent as session-specific, so if a new zk session is created (e.g. server restarts)
+   * Sends a segment refresh message to:
+   * <ul>
+   *   <li>Server: Refresh (replace) the segment by downloading a new one based on the segment ZK metadata</li>
+   *   <li>Broker: Refresh the routing for the segment based on the segment ZK metadata</li>
+   * </ul>
+   * This method can be used to refresh the segment when segment ZK metadata changed. It does not wait for any
+   * acknowledgements. The message is sent as session-specific, so if a new zk session is created (e.g. server restarts)
    * it will not get the message.
    */
-  private void sendSegmentRefreshMessage(String offlineTableName, String segmentName) {
-    SegmentRefreshMessage segmentRefreshMessage = new SegmentRefreshMessage(offlineTableName, segmentName);
+  public void sendSegmentRefreshMessage(String tableNameWithType, String segmentName, boolean refreshServerSegment,
+      boolean refreshBrokerRouting) {
+    SegmentRefreshMessage segmentRefreshMessage = new SegmentRefreshMessage(tableNameWithType, segmentName);
 
     // Send segment refresh message to servers
     Criteria recipientCriteria = new Criteria();
     recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
     recipientCriteria.setInstanceName("%");
-    recipientCriteria.setResource(offlineTableName);
-    recipientCriteria.setPartition(segmentName);
     recipientCriteria.setSessionSpecific(true);
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
-    // Send message with no callback and infinite timeout on the recipient
-    int numMessagesSent = messagingService.send(recipientCriteria, segmentRefreshMessage, null, -1);
-    if (numMessagesSent > 0) {
-      // TODO: Would be nice if we can get the name of the instances to which messages were sent
-      LOGGER.info("Sent {} segment refresh messages to servers for segment: {} of table: {}", numMessagesSent,
-          segmentName, offlineTableName);
-    } else {
-      // May be the case when none of the servers are up yet. That is OK, because when they come up they will get the
-      // new version of the segment.
-      LOGGER.warn("No segment refresh message sent to servers for segment: {} of table: {}", segmentName,
-          offlineTableName);
+
+    if (refreshServerSegment) {
+      // Send segment refresh message to servers
+      recipientCriteria.setResource(tableNameWithType);
+      recipientCriteria.setPartition(segmentName);
+      // Send message with no callback and infinite timeout on the recipient
+      int numMessagesSent = messagingService.send(recipientCriteria, segmentRefreshMessage, null, -1);
+      if (numMessagesSent > 0) {
+        // TODO: Would be nice if we can get the name of the instances to which messages were sent
+        LOGGER.info("Sent {} segment refresh messages to servers for segment: {} of table: {}", numMessagesSent,
+            segmentName, tableNameWithType);
+      } else {
+        LOGGER.warn("No segment refresh message sent to servers for segment: {} of table: {}", segmentName,
+            tableNameWithType);
+      }
     }
 
-    // Send segment refresh message to brokers
-    recipientCriteria.setResource(Helix.BROKER_RESOURCE_INSTANCE);
-    recipientCriteria.setPartition(offlineTableName);
-    numMessagesSent = messagingService.send(recipientCriteria, segmentRefreshMessage, null, -1);
-    if (numMessagesSent > 0) {
-      // TODO: Would be nice if we can get the name of the instances to which messages were sent
-      LOGGER.info("Sent {} segment refresh messages to brokers for segment: {} of table: {}", numMessagesSent,
-          segmentName, offlineTableName);
-    } else {
-      LOGGER.warn("No segment refresh message sent to brokers for segment: {} of table: {}", segmentName,
-          offlineTableName);
+    if (refreshBrokerRouting) {
+      // Send segment refresh message to brokers
+      recipientCriteria.setResource(Helix.BROKER_RESOURCE_INSTANCE);
+      recipientCriteria.setPartition(tableNameWithType);
+      int numMessagesSent = messagingService.send(recipientCriteria, segmentRefreshMessage, null, -1);
+      if (numMessagesSent > 0) {
+        // TODO: Would be nice if we can get the name of the instances to which messages were sent
+        LOGGER.info("Sent {} segment refresh messages to brokers for segment: {} of table: {}", numMessagesSent,
+            segmentName, tableNameWithType);
+      } else {
+        LOGGER.warn("No segment refresh message sent to brokers for segment: {} of table: {}", segmentName,
+            tableNameWithType);
+      }
     }
   }
 
