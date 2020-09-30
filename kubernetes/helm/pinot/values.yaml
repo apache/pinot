@@ -44,6 +44,7 @@ controller:
 
 
   vip:
+    enabled: false
     host: pinot-controller
     port: 9000
 
