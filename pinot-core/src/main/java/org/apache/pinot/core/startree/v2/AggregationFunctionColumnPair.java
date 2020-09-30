@@ -57,7 +57,7 @@ public class AggregationFunctionColumnPair {
 
   public static AggregationFunctionColumnPair fromColumnName(String columnName) {
     String[] parts = columnName.split(DELIMITER, 2);
-    AggregationFunctionType functionType = AggregationFunctionType.valueOf(parts[0].toUpperCase());
+    AggregationFunctionType functionType = AggregationFunctionType.getAggregationFunctionType(parts[0]);
     if (functionType == AggregationFunctionType.COUNT) {
       return COUNT_STAR;
     } else {
