@@ -21,7 +21,7 @@
 package org.apache.pinot.thirdeye.dashboard;
 
 import com.codahale.metrics.MetricRegistry;
-import com.google.common.cache.CacheBuilder;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
 import com.google.inject.Scopes;
@@ -190,7 +190,7 @@ public class ThirdEyeDashboardModule extends AbstractModule {
       authenticator = new CachingAuthenticator<>(
           metricRegistry,
           authenticatorLdap,
-          CacheBuilder.newBuilder().expireAfterWrite(authConfig.getCacheTTL(), TimeUnit.SECONDS));
+          Caffeine.newBuilder().expireAfterWrite(authConfig.getCacheTTL(), TimeUnit.SECONDS));
     }
     return authenticator;
   }
