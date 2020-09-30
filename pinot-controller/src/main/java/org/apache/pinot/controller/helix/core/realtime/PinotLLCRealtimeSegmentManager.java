@@ -27,7 +27,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -445,6 +444,8 @@ public class PinotLLCRealtimeSegmentManager {
     // Step-1
     LLCRealtimeSegmentZKMetadata committingSegmentZKMetadata =
         updateCommittingSegmentZKMetadata(realtimeTableName, committingSegmentDescriptor);
+    // Refresh the Broker routing to reflect the changes in the segment ZK metadata
+    _helixResourceManager.sendSegmentRefreshMessage(realtimeTableName, committingSegmentName, false, true);
 
     // Step-2
     long newSegmentCreationTimeMs = getCurrentTimeMs();
@@ -573,34 +574,35 @@ public class PinotLLCRealtimeSegmentManager {
     if (partitionConfig == null) {
       return null;
     }
-    Map<String, ColumnPartitionMetadata> partitionMetadataMap = new TreeMap<>();
-    for (Map.Entry<String, ColumnPartitionConfig> entry : partitionConfig.getColumnPartitionMap().entrySet()) {
-      String columnName = entry.getKey();
+    Map<String, ColumnPartitionConfig> columnPartitionMap = partitionConfig.getColumnPartitionMap();
+    if (columnPartitionMap.size() == 1) {
+      Map.Entry<String, ColumnPartitionConfig> entry = columnPartitionMap.entrySet().iterator().next();
       ColumnPartitionConfig columnPartitionConfig = entry.getValue();
-      partitionMetadataMap.put(columnName,
+      ColumnPartitionMetadata columnPartitionMetadata =
           new ColumnPartitionMetadata(columnPartitionConfig.getFunctionName(), columnPartitionConfig.getNumPartitions(),
-              Collections.singleton(partitionId)));
+              Collections.singleton(partitionId));
+      return new SegmentPartitionMetadata(Collections.singletonMap(entry.getKey(), columnPartitionMetadata));
+    } else {
+      LOGGER.warn(
+          "Skip persisting partition metadata because there are other than exact one partition column for table: {}",
+          tableConfig.getTableName());
+      return null;
     }
-    return new SegmentPartitionMetadata(partitionMetadataMap);
   }
 
   @Nullable
   private SegmentPartitionMetadata getPartitionMetadataFromSegmentMetadata(SegmentMetadataImpl segmentMetadata) {
-    Map<String, ColumnPartitionMetadata> partitionMetadataMap = new HashMap<>();
     for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
-      String columnName = entry.getKey();
+      // NOTE: There is at most one partition column.
       ColumnMetadata columnMetadata = entry.getValue();
       if (columnMetadata.getPartitionFunction() != null) {
-        partitionMetadataMap.put(columnName,
+        ColumnPartitionMetadata columnPartitionMetadata =
             new ColumnPartitionMetadata(columnMetadata.getPartitionFunction().toString(),
-                columnMetadata.getNumPartitions(), columnMetadata.getPartitions()));
+                columnMetadata.getNumPartitions(), columnMetadata.getPartitions());
+        return new SegmentPartitionMetadata(Collections.singletonMap(entry.getKey(), columnPartitionMetadata));
       }
     }
-    if (!partitionMetadataMap.isEmpty()) {
-      return new SegmentPartitionMetadata(partitionMetadataMap);
-    } else {
-      return null;
-    }
+    return null;
   }
 
   public long getCommitTimeoutMS(String realtimeTableName) {

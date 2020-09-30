@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.integration.tests;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.util.Arrays;
 import java.util.Collections;
@@ -30,6 +31,7 @@ import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
+import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -52,8 +54,15 @@ import static org.testng.Assert.assertTrue;
  * Integration test that enables segment partition for the LLC real-time table.
  */
 public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
-  // Number of documents in the first Avro file
-  private static final long NUM_DOCS = 9292;
+  private static final String PARTITION_COLUMN = "DestState";
+  // Number of documents in the first and second Avro file
+  private static final long NUM_DOCS_IN_FIRST_AVRO_FILE = 9292;
+  private static final long NUM_DOCS_IN_SECOND_AVRO_FILE = 8736;
+  private static final long NUM_DOCS_IN_THIRD_AVRO_FILE = 9378;
+
+  private List<File> _avroFiles;
+  private String _partitionColumn;
+  private long _countStarResult;
 
   @BeforeClass
   public void setUp()
@@ -70,37 +79,51 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
     startKafka();
 
     // Unpack the Avro files
-    List<File> avroFiles = unpackAvroData(_tempDir);
+    _avroFiles = unpackAvroData(_tempDir);
 
     // Create and upload the schema and table config with reduced number of columns and partition config
-    Schema schema =
-        new Schema.SchemaBuilder().setSchemaName(getSchemaName()).addSingleValueDimension("Carrier", DataType.STRING)
-            .addDateTime("DaysSinceEpoch", DataType.INT, "1:DAYS:EPOCH", "1:DAYS").build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(getSchemaName())
+        .addSingleValueDimension(PARTITION_COLUMN, DataType.STRING)
+        .addDateTime("DaysSinceEpoch", DataType.INT, "1:DAYS:EPOCH", "1:DAYS").build();
     addSchema(schema);
 
-    TableConfig tableConfig = createRealtimeTableConfig(avroFiles.get(0));
+    TableConfig tableConfig = createRealtimeTableConfig(_avroFiles.get(0));
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     indexingConfig.setSegmentPartitionConfig(
-        new SegmentPartitionConfig(Collections.singletonMap("Carrier", new ColumnPartitionConfig("murmur", 5))));
+        new SegmentPartitionConfig(Collections.singletonMap(PARTITION_COLUMN, new ColumnPartitionConfig("murmur", 2))));
     tableConfig.setRoutingConfig(
         new RoutingConfig(null, Collections.singletonList(RoutingConfig.PARTITION_SEGMENT_PRUNER_TYPE), null));
     addTableConfig(tableConfig);
 
     // Push data into Kafka (only ingest the first Avro file)
-    pushAvroIntoKafka(Collections.singletonList(avroFiles.get(0)));
+    _partitionColumn = PARTITION_COLUMN;
+    pushAvroIntoKafka(Collections.singletonList(_avroFiles.get(0)));
 
     // Wait for all documents loaded
+    _countStarResult = NUM_DOCS_IN_FIRST_AVRO_FILE;
     waitForAllDocsLoaded(600_000L);
   }
 
   @Override
   protected long getCountStarResult() {
-    return NUM_DOCS;
+    return _countStarResult;
   }
 
   @Override
   protected boolean useLlc() {
     return true;
+  }
+
+  @Nullable
+  @Override
+  protected String getPartitionColumn() {
+    return _partitionColumn;
+  }
+
+  @Nullable
+  @Override
+  protected String getSortedColumn() {
+    return null;
   }
 
   @Nullable
@@ -129,6 +152,7 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
 
   @Test
   public void testPartitionMetadata() {
+    int[] numSegmentsForPartition = new int[2];
     List<RealtimeSegmentZKMetadata> segmentZKMetadataList =
         _helixResourceManager.getRealtimeSegmentMetadata(getTableName());
     for (RealtimeSegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
@@ -137,39 +161,220 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       Map<String, ColumnPartitionMetadata> columnPartitionMetadataMap =
           segmentPartitionMetadata.getColumnPartitionMap();
       assertEquals(columnPartitionMetadataMap.size(), 1);
-      ColumnPartitionMetadata columnPartitionMetadata = columnPartitionMetadataMap.get("Carrier");
+      ColumnPartitionMetadata columnPartitionMetadata = columnPartitionMetadataMap.get(PARTITION_COLUMN);
       assertNotNull(columnPartitionMetadata);
-
-      // The function name should be aligned with the partition config in the table config
       assertTrue(columnPartitionMetadata.getFunctionName().equalsIgnoreCase("murmur"));
+      assertEquals(columnPartitionMetadata.getNumPartitions(), 2);
+      int streamPartitionId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionId();
+      assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(streamPartitionId));
+      numSegmentsForPartition[streamPartitionId]++;
+    }
 
-      if (segmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
-        // Consuming segment
+    // There should be 2 segments for partition 0, 2 segments for partition 1
+    assertEquals(numSegmentsForPartition[0], 2);
+    assertEquals(numSegmentsForPartition[1], 2);
+  }
 
-        // Number of partitions should be aligned with the partition config in the table config
-        assertEquals(columnPartitionMetadata.getNumPartitions(), 5);
+  @Test(dependsOnMethods = "testPartitionMetadata")
+  public void testPartitionRouting()
+      throws Exception {
+    // Query partition 0
+    {
+      String query = "SELECT COUNT(*) FROM mytable WHERE DestState = 'CA'";
+      JsonNode response = postQuery(query);
 
-        // Should contain only the stream partition
-        assertEquals(columnPartitionMetadata.getPartitions(),
-            Collections.singleton(new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionId()));
-      } else {
-        // Completed segment
+      String queryToCompare = "SELECT COUNT(*) FROM mytable WHERE DestState BETWEEN 'CA' AND 'CA'";
+      JsonNode responseToCompare = postQuery(queryToCompare);
 
-        // Number of partitions should be the same as number of stream partitions
-        assertEquals(columnPartitionMetadata.getNumPartitions(), 2);
+      // Should only query the segments for partition 0
+      assertEquals(response.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), 2);
+      assertEquals(responseToCompare.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), 4);
 
-        // Should contain the partitions based on the ingested records. Since the records are not partitioned in Kafka,
-        // it should contain all the partitions.
-        assertEquals(columnPartitionMetadata.getPartitions(), new HashSet<>(Arrays.asList(0, 1)));
-      }
+      assertEquals(response.get("aggregationResults").get(0).get("value").asInt(),
+          responseToCompare.get("aggregationResults").get(0).get("value").asInt());
+    }
+
+    // Query partition 1
+    {
+      String query = "SELECT COUNT(*) FROM mytable WHERE DestState = 'FL'";
+      JsonNode response = postQuery(query);
+
+      String queryToCompare = "SELECT COUNT(*) FROM mytable WHERE DestState BETWEEN 'FL' AND 'FL'";
+      JsonNode responseToCompare = postQuery(queryToCompare);
+
+      // Should only query the segments for partition 1
+      assertEquals(response.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), 2);
+      assertEquals(responseToCompare.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), 4);
+
+      assertEquals(response.get("aggregationResults").get(0).get("value").asInt(),
+          responseToCompare.get("aggregationResults").get(0).get("value").asInt());
     }
   }
 
-  // TODO: Add test on partition routing once the consuming segment behavior is fixed.
-  //       Currently the partition info is cached in the PartitionSegmentPruner, and won't be reloaded when the
-  //       consuming segment gets committed. The segment will be pruned based on the consuming segment partition info
-  //       (using stream partition as the segment partition), even if the partition info changed for the completed
-  //       segment.
+  @Test(dependsOnMethods = "testPartitionRouting")
+  public void testNonPartitionedStream()
+      throws Exception {
+    // Push the second Avro file into Kafka without partitioning
+    _partitionColumn = null;
+    pushAvroIntoKafka(Collections.singletonList(_avroFiles.get(1)));
+
+    // Wait for all documents loaded
+    _countStarResult += NUM_DOCS_IN_SECOND_AVRO_FILE;
+    waitForAllDocsLoaded(600_000L);
+
+    // Check partition metadata
+    int[] numSegmentsForPartition = new int[2];
+    List<RealtimeSegmentZKMetadata> segmentZKMetadataList =
+        _helixResourceManager.getRealtimeSegmentMetadata(getTableName());
+    for (RealtimeSegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
+      SegmentPartitionMetadata segmentPartitionMetadata = segmentZKMetadata.getPartitionMetadata();
+      assertNotNull(segmentPartitionMetadata);
+      Map<String, ColumnPartitionMetadata> columnPartitionMetadataMap =
+          segmentPartitionMetadata.getColumnPartitionMap();
+      assertEquals(columnPartitionMetadataMap.size(), 1);
+      ColumnPartitionMetadata columnPartitionMetadata = columnPartitionMetadataMap.get(PARTITION_COLUMN);
+      assertNotNull(columnPartitionMetadata);
+      assertTrue(columnPartitionMetadata.getFunctionName().equalsIgnoreCase("murmur"));
+      assertEquals(columnPartitionMetadata.getNumPartitions(), 2);
+      int streamPartitionId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionId();
+      numSegmentsForPartition[streamPartitionId]++;
+
+      if (segmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
+        // For consuming segment, the partition metadata should only contain the stream partition
+        assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(streamPartitionId));
+      } else {
+        LLCSegmentName llcSegmentName = new LLCSegmentName(segmentZKMetadata.getSegmentName());
+        int sequenceNumber = llcSegmentName.getSequenceNumber();
+        if (sequenceNumber == 0) {
+          // The partition metadata for the first completed segment should only contain the stream partition
+          assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(streamPartitionId));
+        } else {
+          // The partition metadata for the new completed segments should contain both partitions
+          assertEquals(columnPartitionMetadata.getPartitions(), new HashSet<>(Arrays.asList(0, 1)));
+        }
+      }
+    }
+
+    // There should be 4 segments for partition 0, 4 segments for partition 1
+    assertEquals(numSegmentsForPartition[0], 4);
+    assertEquals(numSegmentsForPartition[1], 4);
+
+    // Check partition routing
+    int numSegments = segmentZKMetadataList.size();
+
+    // Query partition 0
+    {
+      String query = "SELECT COUNT(*) FROM mytable WHERE DestState = 'CA'";
+      JsonNode response = postQuery(query);
+
+      String queryToCompare = "SELECT COUNT(*) FROM mytable WHERE DestState BETWEEN 'CA' AND 'CA'";
+      JsonNode responseToCompare = postQuery(queryToCompare);
+
+      // Should skip the first completed segments and the consuming segment for partition 1
+      assertEquals(response.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), numSegments - 2);
+      assertEquals(responseToCompare.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), numSegments);
+
+      // The result won't match because the consuming segment for partition 1 is pruned out
+    }
+
+    // Query partition 1
+    {
+      String query = "SELECT COUNT(*) FROM mytable WHERE DestState = 'FL'";
+      JsonNode response = postQuery(query);
+
+      String queryToCompare = "SELECT COUNT(*) FROM mytable WHERE DestState BETWEEN 'FL' AND 'FL'";
+      JsonNode responseToCompare = postQuery(queryToCompare);
+
+      // Should skip the first completed segments and the consuming segment for partition 0
+      assertEquals(response.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), numSegments - 2);
+      assertEquals(responseToCompare.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), numSegments);
+
+      // The result won't match because the consuming segment for partition 0 is pruned out
+    }
+
+    // Push the third Avro file into Kafka with partitioning
+    _partitionColumn = PARTITION_COLUMN;
+    pushAvroIntoKafka(Collections.singletonList(_avroFiles.get(2)));
+
+    // Wait for all documents loaded
+    _countStarResult += NUM_DOCS_IN_THIRD_AVRO_FILE;
+    waitForAllDocsLoaded(600_000L);
+
+    // Check partition metadata
+    numSegmentsForPartition = new int[2];
+    segmentZKMetadataList = _helixResourceManager.getRealtimeSegmentMetadata(getTableName());
+    for (RealtimeSegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
+      SegmentPartitionMetadata segmentPartitionMetadata = segmentZKMetadata.getPartitionMetadata();
+      assertNotNull(segmentPartitionMetadata);
+      Map<String, ColumnPartitionMetadata> columnPartitionMetadataMap =
+          segmentPartitionMetadata.getColumnPartitionMap();
+      assertEquals(columnPartitionMetadataMap.size(), 1);
+      ColumnPartitionMetadata columnPartitionMetadata = columnPartitionMetadataMap.get(PARTITION_COLUMN);
+      assertNotNull(columnPartitionMetadata);
+      assertTrue(columnPartitionMetadata.getFunctionName().equalsIgnoreCase("murmur"));
+      assertEquals(columnPartitionMetadata.getNumPartitions(), 2);
+      int streamPartitionId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionId();
+      numSegmentsForPartition[streamPartitionId]++;
+
+      if (segmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
+        // For consuming segment, the partition metadata should only contain the stream partition
+        assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(streamPartitionId));
+      } else {
+        // The partition metadata for the new completed segments should only contain the stream partition
+        LLCSegmentName llcSegmentName = new LLCSegmentName(segmentZKMetadata.getSegmentName());
+        int sequenceNumber = llcSegmentName.getSequenceNumber();
+        if (sequenceNumber == 0 || sequenceNumber >= 4) {
+          // The partition metadata for the first and new completed segments should only contain the stream partition
+          assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(streamPartitionId));
+        } else {
+          // The partition metadata for the completed segments containing records from the second Avro file should
+          // contain both partitions
+          assertEquals(columnPartitionMetadata.getPartitions(), new HashSet<>(Arrays.asList(0, 1)));
+        }
+      }
+    }
+
+    // There should be 6 segments for partition 0, 6 segments for partition 1
+    assertEquals(numSegmentsForPartition[0], 6);
+    assertEquals(numSegmentsForPartition[1], 6);
+
+    // Check partition routing
+    numSegments = segmentZKMetadataList.size();
+
+    // Query partition 0
+    {
+      String query = "SELECT COUNT(*) FROM mytable WHERE DestState = 'CA'";
+      JsonNode response = postQuery(query);
+
+      String queryToCompare = "SELECT COUNT(*) FROM mytable WHERE DestState BETWEEN 'CA' AND 'CA'";
+      JsonNode responseToCompare = postQuery(queryToCompare);
+
+      // Should skip 2 completed segments and the consuming segment for partition 1
+      assertEquals(response.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), numSegments - 3);
+      assertEquals(responseToCompare.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), numSegments);
+
+      // The result should match again after all the segments with the non-partitioning records are committed
+      assertEquals(response.get("aggregationResults").get(0).get("value").asInt(),
+          responseToCompare.get("aggregationResults").get(0).get("value").asInt());
+    }
+
+    // Query partition 1
+    {
+      String query = "SELECT COUNT(*) FROM mytable WHERE DestState = 'FL'";
+      JsonNode response = postQuery(query);
+
+      String queryToCompare = "SELECT COUNT(*) FROM mytable WHERE DestState BETWEEN 'FL' AND 'FL'";
+      JsonNode responseToCompare = postQuery(queryToCompare);
+
+      // Should skip 2 completed segments and the consuming segment for partition 0
+      assertEquals(response.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), numSegments - 3);
+      assertEquals(responseToCompare.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), numSegments);
+
+      // The result should match again after all the segments with the non-partitioning records are committed
+      assertEquals(response.get("aggregationResults").get(0).get("value").asInt(),
+          responseToCompare.get("aggregationResults").get(0).get("value").asInt());
+    }
+  }
 
   @AfterClass
   public void tearDown()
