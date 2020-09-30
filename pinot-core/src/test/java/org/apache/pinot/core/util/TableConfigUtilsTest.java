@@ -665,29 +665,11 @@ public class TableConfigUtilsTest {
       // Expected
     }
 
-    tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setBrokerTenant("broker-tenant").build();
-    try {
-      TableConfigUtils.validate(tableConfig, schema, serverTenants, brokerTenants);
-      Assert.fail("Should fail for null server tenant config");
-    } catch (Exception e) {
-      // Expected
-    }
-
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setServerTenant("server-tenant")
         .setBrokerTenant("unknown").build();
     try {
       TableConfigUtils.validate(tableConfig, schema, serverTenants, brokerTenants);
       Assert.fail("Should fail for invalid broker tenant config");
-    } catch (Exception e) {
-      // Expected
-    }
-
-    tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setServerTenant("server-tenant").build();
-    try {
-      TableConfigUtils.validate(tableConfig, schema, serverTenants, brokerTenants);
-      Assert.fail("Should fail for null broker tenant config");
     } catch (Exception e) {
       // Expected
     }
@@ -707,20 +689,10 @@ public class TableConfigUtilsTest {
       Assert.fail("Should not fail for valid retention time unit value");
     }
 
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setRetentionTimeUnit("abc")
-        .setRetentionTimeValue("24").build();
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setRetentionTimeUnit("abc").build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for invalid retention time unit value");
-    } catch (Exception e) {
-      // expected
-    }
-
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setRetentionTimeUnit("days")
-        .setRetentionTimeValue("abc").build();
-    try {
-      TableConfigUtils.validate(tableConfig, schema);
-      Assert.fail("Should fail for invalid retention time value");
     } catch (Exception e) {
       // expected
     }

@@ -93,19 +93,21 @@ public final class TableConfigUtils {
    * Ensures a valid tenant config is provided in the table config.
    * Ensures the broker and server tenant names are valid.
    */
-  private static void validateTenants(TableConfig tableConfig, Set<String> serverTenants,
-      Set<String> brokerTenants) {
+  private static void validateTenants(TableConfig tableConfig, Set<String> serverTenants, Set<String> brokerTenants) {
     TenantConfig tenantConfig = tableConfig.getTenantConfig();
-    Preconditions.checkNotNull(tenantConfig, "Tenant config missing in table config");
     Preconditions.checkNotNull(serverTenants, "Error in retrieving server tenant names");
     Preconditions.checkNotNull(brokerTenants, "Error in retrieving broker tenant names");
 
     String serverTenant = tenantConfig.getServer();
+    if (serverTenant != null) {
+      Preconditions.checkState(serverTenants.stream().anyMatch(s -> s.equals(serverTenant)),
+          String.format("Server tenant %s specified in table config does not exist", serverTenant));
+    }
     String brokerTenant = tenantConfig.getBroker();
-    Preconditions.checkState(serverTenants.stream().anyMatch(s -> s.equals(serverTenant)),
-        String.format("Server tenant %s specified in table config does not exist", serverTenant));
-    Preconditions.checkState(brokerTenants.stream().anyMatch(b -> b.equals(brokerTenant)),
-        String.format("Broker tenant %s specified in table config does not exist", brokerTenant));
+    if (brokerTenant != null) {
+      Preconditions.checkState(brokerTenants.stream().anyMatch(b -> b.equals(brokerTenant)),
+          String.format("Broker tenant %s specified in table config does not exist", brokerTenant));
+    }
   }
 
   /**
@@ -143,8 +145,7 @@ public final class TableConfigUtils {
       }
 
       if (!segmentPushType.equalsIgnoreCase("REFRESH") && !segmentPushType.equalsIgnoreCase("APPEND")) {
-        throw new IllegalStateException(
-            String.format("Table: %s, invalid push type: %s", tableName, segmentPushType));
+        throw new IllegalStateException(String.format("Table: %s, invalid push type: %s", tableName, segmentPushType));
       }
     }
 
