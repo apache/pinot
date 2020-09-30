@@ -38,8 +38,10 @@ public class SegmentGenerationJobSpec implements Serializable {
    *  'SegmentCreation'
    *  'SegmentTarPush'
    *  'SegmentUriPush'
+   *  'SegmentMetadataPush'
    *  'SegmentCreationAndTarPush'
    *  'SegmentCreationAndUriPush'
+   *  'SegmentCreationAndMetadataPush'
    */
   private String _jobType;
 

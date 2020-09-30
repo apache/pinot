@@ -195,7 +195,6 @@ public class PinotSegmentUploadDownloadRestletResource {
       crypterClassNameInHeader = extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.CRYPTER);
       downloadUri = extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);
     }
-
     File tempEncryptedFile = null;
     File tempDecryptedFile = null;
     File tempSegmentDir = null;
@@ -207,14 +206,18 @@ public class PinotSegmentUploadDownloadRestletResource {
       tempSegmentDir = new File(provider.getUntarredFileTempDir(), tempFileName);
 
       boolean uploadedSegmentIsEncrypted = !Strings.isNullOrEmpty(crypterClassNameInHeader);
-
-      File dstFile = uploadedSegmentIsEncrypted ? tempEncryptedFile : tempDecryptedFile;
       FileUploadDownloadClient.FileUploadType uploadType = getUploadType(uploadTypeStr);
+      File dstFile = uploadedSegmentIsEncrypted ? tempEncryptedFile : tempDecryptedFile;
       switch (uploadType) {
         case URI:
           downloadSegmentFileFromURI(downloadUri, dstFile, tableName);
           break;
         case SEGMENT:
+          createSegmentFileFromMultipart(multiPart, dstFile);
+          break;
+        case METADATA:
+          moveSegmentToFinalLocation = false;
+          Preconditions.checkState(downloadUri != null, "Download URI is required in segment metadata upload mode");
           createSegmentFileFromMultipart(multiPart, dstFile);
           break;
         default:
@@ -235,11 +238,11 @@ public class PinotSegmentUploadDownloadRestletResource {
       String rawTableName;
       if (tableName != null && !tableName.isEmpty()) {
         rawTableName = TableNameBuilder.extractRawTableName(tableName);
-        LOGGER.info("Uploading segment {} to table: {}, (Derived from API parameter)", segmentName, tableName);
+        LOGGER.info("Uploading a segment {} to table: {}, push type {}, (Derived from API parameter)", segmentName, tableName, uploadType);
       } else {
         // TODO: remove this when we completely deprecate the table name from segment metadata
         rawTableName = segmentMetadata.getTableName();
-        LOGGER.info("Uploading a segment {} to table: {}, (Derived from segment metadata)", segmentName, tableName);
+        LOGGER.info("Uploading a segment {} to table: {}, push type {}, (Derived from segment metadata)", segmentName, tableName, uploadType);
       }
 
       String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
@@ -247,10 +250,12 @@ public class PinotSegmentUploadDownloadRestletResource {
       LOGGER.info("Processing upload request for segment: {} of table: {} from client: {}, ingestion descriptor: {}",
           segmentName, offlineTableName, clientAddress, ingestionDescriptor);
 
-      // Validate segment
-      new SegmentValidator(_pinotHelixResourceManager, _controllerConf, _executor, _connectionManager,
-          _controllerMetrics, _leadControllerManager.isLeaderForTable(offlineTableName))
-          .validateOfflineSegment(offlineTableName, segmentMetadata, tempSegmentDir);
+      // Skip segment validation if upload only segment metadata
+      if (uploadType != FileUploadDownloadClient.FileUploadType.METADATA) {
+        // Validate segment
+        new SegmentValidator(_pinotHelixResourceManager, _controllerConf, _executor, _connectionManager,
+            _controllerMetrics, _leadControllerManager.isLeaderForTable(offlineTableName)).validateOfflineSegment(offlineTableName, segmentMetadata, tempSegmentDir);
+      }
 
       // Encrypt segment
       String crypterClassNameInTableConfig =
