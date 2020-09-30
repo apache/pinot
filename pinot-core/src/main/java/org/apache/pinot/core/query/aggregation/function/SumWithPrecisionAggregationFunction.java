@@ -33,6 +33,14 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 
 
+/**
+ * This function is used for BigDecimal calculcations. It supports the sum aggregation using both precision and scale.
+ * The function can be used as SUMPRECISION(column, 10, 2)
+ * Following arguments are supported
+ * bytes column - this is a column which contains big decimal value as bytes
+ * precision - precision to be set to the final result
+ * scale - scale to be set to the final result
+ */
 public class SumWithPrecisionAggregationFunction extends BaseSingleInputAggregationFunction<BigDecimal, BigDecimal> {
   MathContext _mathContext = new MathContext(0);
   Integer _scale = null;
