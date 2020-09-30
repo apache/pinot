@@ -214,7 +214,6 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
    */
   private PartitionerConfig getPartitionerConfig(Map<String, ColumnPartitionConfig> columnPartitionMap,
       String tableNameWithType, Set<String> schemaColumns) {
-
     Preconditions.checkState(columnPartitionMap.size() == 1,
         "Cannot partition using more than 1 ColumnPartitionConfig for table: %s", tableNameWithType);
     String partitionColumn = columnPartitionMap.keySet().iterator().next();
