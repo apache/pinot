@@ -118,7 +118,7 @@ public class AggregationFunctionFactory {
           case SUM:
             return new SumAggregationFunction(firstArgument);
           case SUMPRECISION:
-            return new SumWithPrecisionAggregationFunction(firstArgument, arguments);
+            return new SumWithPrecisionAggregationFunction(arguments);
           case AVG:
             return new AvgAggregationFunction(firstArgument);
           case MINMAXRANGE:

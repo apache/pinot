@@ -37,8 +37,8 @@ public class SumWithPrecisionAggregationFunction extends BaseSingleInputAggregat
   MathContext _mathContext = new MathContext(0);
   Integer _scale = null;
 
-  public SumWithPrecisionAggregationFunction(ExpressionContext expression, List<ExpressionContext> arguments) {
-    super(expression);
+  public SumWithPrecisionAggregationFunction(List<ExpressionContext> arguments) {
+    super(arguments.get(0));
     int numArguments = arguments.size();
 
     if (numArguments == 3) {
@@ -73,9 +73,9 @@ public class SumWithPrecisionAggregationFunction extends BaseSingleInputAggregat
     BigDecimal sumValue = getDefaultResult(aggregationResultHolder);
     for (int i = 0; i < length; i++) {
       BigDecimal value = new BigDecimal(DataTypeConversionFunctions.bytesToBigDecimal(valueArray[i]));
-      sumValue = sumValue.add(value, _mathContext);
+      sumValue = sumValue.add(value);
     }
-    aggregationResultHolder.setValue(setScale(sumValue));
+    aggregationResultHolder.setValue(sumValue);
   }
 
   @Override
@@ -86,8 +86,8 @@ public class SumWithPrecisionAggregationFunction extends BaseSingleInputAggregat
       int groupKey = groupKeyArray[i];
       BigDecimal groupByResultValue = getDefaultResult(groupByResultHolder, groupKey);
       BigDecimal value = new BigDecimal(DataTypeConversionFunctions.bytesToBigDecimal(valueArray[i]));
-      groupByResultValue = groupByResultValue.add(value, _mathContext);
-      groupByResultHolder.setValueForKey(groupKey, setScale(groupByResultValue));
+      groupByResultValue = groupByResultValue.add(value);
+      groupByResultHolder.setValueForKey(groupKey, groupByResultValue);
     }
   }
 
@@ -100,8 +100,8 @@ public class SumWithPrecisionAggregationFunction extends BaseSingleInputAggregat
       for (int groupKey : groupKeysArray[i]) {
         BigDecimal groupByResultValue = getDefaultResult(groupByResultHolder, groupKey);
         BigDecimal valueBigDecimal = new BigDecimal(DataTypeConversionFunctions.bytesToBigDecimal(value));
-        groupByResultValue = groupByResultValue.add(valueBigDecimal, _mathContext);
-        groupByResultHolder.setValueForKey(groupKey, setScale(groupByResultValue));
+        groupByResultValue = groupByResultValue.add(valueBigDecimal);
+        groupByResultHolder.setValueForKey(groupKey, groupByResultValue);
       }
     }
   }
@@ -119,7 +119,7 @@ public class SumWithPrecisionAggregationFunction extends BaseSingleInputAggregat
   @Override
   public BigDecimal merge(BigDecimal intermediateResult1, BigDecimal intermediateResult2) {
     try {
-      return setScale(intermediateResult1.add(intermediateResult2, _mathContext));
+      return intermediateResult1.add(intermediateResult2);
     } catch (Exception e) {
       throw new RuntimeException("Caught Exception while merging results in sum with precision function", e);
     }
@@ -142,26 +142,24 @@ public class SumWithPrecisionAggregationFunction extends BaseSingleInputAggregat
 
   @Override
   public BigDecimal extractFinalResult(BigDecimal intermediateResult) {
-    return intermediateResult;
+    return setScale(new BigDecimal(intermediateResult.toString(), _mathContext));
   }
 
   public BigDecimal getDefaultResult(AggregationResultHolder aggregationResultHolder) {
     BigDecimal result = aggregationResultHolder.getResult();
     if (result == null) {
-      result = new BigDecimal(0, _mathContext);
+      result = new BigDecimal(0);
       aggregationResultHolder.setValue(result);
     }
-    result = setScale(result);
     return result;
   }
 
   public BigDecimal getDefaultResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     BigDecimal result = groupByResultHolder.getResult(groupKey);
     if (result == null) {
-      result = new BigDecimal(0, _mathContext);
+      result = new BigDecimal(0);
       groupByResultHolder.setValueForKey(groupKey, result);
     }
-    result = setScale(result);
     return result;
   }
 
