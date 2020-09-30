@@ -8,6 +8,7 @@ import {computed, set, get, getProperties} from '@ember/object';
 import {toastOptions} from 'thirdeye-frontend/utils/constants';
 import {inject as service} from '@ember/service';
 import { putAlertActiveStatus } from 'thirdeye-frontend/utils/anomaly';
+import { task } from 'ember-concurrency';
 
 const CREATE_GROUP_TEXT = 'Create a new subscription group';
 
@@ -38,8 +39,15 @@ export default Controller.extend({
     }
   ),
 
-  // Method for handling subscription group, whether there are any or not
-  async _handleSubscriptionGroup(subscriptionYaml, notifications, subscriptionGroupId) {
+  /**
+   * Handler for subscription group, whether there are any or not - using ember concurrency (task)
+   * @method _handleSubscriptionGroup
+   * @param {subscriptionYaml} String - Yaml config for subscription group
+   * @param {notifications} Service - toast service for notifying user of errors
+   * @param {subscriptionGroupId} Number - id number of subscription group
+   * @return {Promise}
+   */
+  _handleSubscriptionGroup: task(function* (subscriptionYaml, notifications, subscriptionGroupId) {
     set(this, 'subscriptionError', false);
     const groupName = get(this, 'groupName');
     if (!groupName || groupName.name === CREATE_GROUP_TEXT) {
@@ -51,9 +59,9 @@ export default Controller.extend({
         headers: { 'content-type': 'text/plain' }
       };
       try {
-        const subscription_result = await fetch(subscription_url, subscriptionPostProps);
+        const subscription_result = yield fetch(subscription_url, subscriptionPostProps);
         const subscription_status  = get(subscription_result, 'status');
-        const subscription_json = await subscription_result.json();
+        const subscription_json = yield subscription_result.json();
         if (subscription_status !== 200) {
           set(this, 'errorMsg', get(subscription_json, 'message'));
           notifications.error(`Failed to save the subscription configuration due to: ${subscription_json.message}.`, 'Error', toastOptions);
@@ -82,9 +90,9 @@ export default Controller.extend({
         headers: { 'content-type': 'text/plain' }
       };
       try {
-        const subscription_result = await fetch(subscription_url, subscriptionPostProps);
+        const subscription_result = yield fetch(subscription_url, subscriptionPostProps);
         const subscription_status  = get(subscription_result, 'status');
-        const subscription_json = await subscription_result.json();
+        const subscription_json = yield subscription_result.json();
         if (subscription_status !== 200) {
           set(this, 'errorMsg', get(subscription_json, 'message'));
           notifications.error(`Failed to save the subscription configuration due to: ${subscription_json.message}.`, 'Error', toastOptions);
@@ -105,7 +113,7 @@ export default Controller.extend({
         });
       }
     }
-  },
+  }).drop(),
 
   actions: {
     changeAccordion() {
@@ -195,14 +203,14 @@ export default Controller.extend({
      * Fired by subscription group button in YAML UI in edit mode
      * Grabs subscription group yaml and posts or puts it to the backend.
      */
-    async submitSubscriptionGroup() {
+    submitSubscriptionGroup() {
       const {
         subscriptionYaml,
         notifications,
         subscriptionGroupId
       } = getProperties(this, 'subscriptionYaml', 'notifications', 'subscriptionGroupId');
       // If there is no existing subscription group, this method will handle it
-      this._handleSubscriptionGroup(subscriptionYaml, notifications, subscriptionGroupId);
+      this.get('_handleSubscriptionGroup').perform(subscriptionYaml, notifications, subscriptionGroupId);
     }
   }
 });

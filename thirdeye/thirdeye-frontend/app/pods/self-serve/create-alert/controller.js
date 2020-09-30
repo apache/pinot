@@ -17,7 +17,7 @@ import {
   isNone,
   isBlank
 } from "@ember/utils";
-import { checkStatus } from 'thirdeye-frontend/utils/utils';
+import { checkStatus, postProps } from 'thirdeye-frontend/utils/utils';
 import {toastOptions} from 'thirdeye-frontend/utils/constants';
 import {
   selfServeApiGraph,
@@ -236,6 +236,49 @@ export default Controller.extend({
     this.get('metricLookupCache').push(...autoCompleteResults);
     return autoCompleteResults;
   }),
+
+  /**
+   * Handler for creating an alert - using ember concurrency (task)
+   * @method _createAlert
+   * @param {detectionYaml} String - Yaml config for detection
+   * @param {subscriptionYaml} String - Yaml config for subscription group
+   * @return {Promise}
+   */
+  _createAlert: task(function* (detectionYaml, subscriptionYaml) {
+    const content = {
+      detection: detectionYaml,
+      subscription: subscriptionYaml
+    };
+    const url = '/yaml/create-alert';
+    const notifications = get(this, 'notifications');
+
+    yield fetch(url, postProps(content)).then((res) => {
+      res.json().then((result) => {
+        if(result){
+          if (result.subscriptionConfigId && result.detectionConfigId) {
+            notifications.success('Created alert successfully.', 'Created', toastOptions);
+            this.transitionToRoute('manage.explore', result.detectionConfigId);
+          } else {
+            notifications.error(result.message, 'Error', toastOptions);
+            this.setProperties({
+              detectionError: true,
+              detectionErrorMsg: result.message,
+              detectionErrorInfo: result["more-info"],
+              detectionErrorScroll: true
+            });
+          }
+        }
+      });
+    }).catch((error) => {
+      notifications.error('Create alert failed.', error, toastOptions);
+      this.setProperties({
+        detectionError: true,
+        detectionErrorMsg: 'Create alert failed.',
+        detectionErrorInfo: error,
+        detectionErrorScroll: true
+      });
+    });
+  }).drop(),
 
   /**
    * Determines if a metric should be filtered out
@@ -1125,44 +1168,11 @@ export default Controller.extend({
      */
     createAlertYamlAction() {
       set(this, 'detectionError', false);
-      const content = {
-        detection: get(this, 'detectionYaml'),
-        subscription: get(this, 'subscriptionYaml')
-      };
-      const url = '/yaml/create-alert';
-      const postProps = {
-        method: 'post',
-        body: JSON.stringify(content),
-        headers: { 'content-type': 'application/json' }
-      };
-      const notifications = get(this, 'notifications');
-
-      fetch(url, postProps).then((res) => {
-        res.json().then((result) => {
-          if(result){
-            if (result.subscriptionConfigId && result.detectionConfigId) {
-              notifications.success('Created alert successfully.', 'Created', toastOptions);
-              this.transitionToRoute('manage.explore', result.detectionConfigId);
-            } else {
-              notifications.error(result.message, 'Error', toastOptions);
-              this.setProperties({
-                detectionError: true,
-                detectionErrorMsg: result.message,
-                detectionErrorInfo: result["more-info"],
-                detectionErrorScroll: true
-              });
-            }
-          }
-        });
-      }).catch((error) => {
-        notifications.error('Create alert failed.', error, toastOptions);
-        this.setProperties({
-          detectionError: true,
-          detectionErrorMsg: 'Create alert failed.',
-          detectionErrorInfo: error,
-          detectionErrorScroll: true
-        });
-      });
+      const {
+        detectionYaml,
+        subscriptionYaml
+      } = this.getProperties('detectionYaml', 'subscriptionYaml');
+      this.get('_createAlert').perform(detectionYaml, subscriptionYaml);
     },
 
     /**
