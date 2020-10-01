@@ -367,11 +367,11 @@ public class SegmentGeneratorConfig {
 
   public void setOutDir(String dir) {
     Preconditions.checkNotNull(dir);
-    final File outputDir = new File(dir);
+    File outputDir = new File(dir);
     if (outputDir.exists()) {
-      Preconditions.checkState(outputDir.isDirectory(), "Path {} is not a directory.", dir);
+      Preconditions.checkState(outputDir.isDirectory(), "Path: %s is not a directory", dir);
     } else {
-      Preconditions.checkState(outputDir.mkdirs(), "Cannot create output dir: {}", dir);
+      Preconditions.checkState(outputDir.mkdirs(), "Cannot create output dir: %s", dir);
     }
     _outDir = outputDir.getAbsolutePath();
   }
