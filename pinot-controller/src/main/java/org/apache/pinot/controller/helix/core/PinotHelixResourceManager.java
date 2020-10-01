@@ -1190,18 +1190,19 @@ public class PinotHelixResourceManager {
   @VisibleForTesting
   void validateTableTenantConfig(TableConfig tableConfig) {
     TenantConfig tenantConfig = tableConfig.getTenantConfig();
+    String tableNameWithType = tableConfig.getTableName();
     String brokerTag = tenantConfig.getBroker();
     String serverTag = tenantConfig.getServer();
     if (brokerTag == null || serverTag == null) {
       if (!_isSingleTenantCluster) {
-        throw new InvalidTableConfigException("server and broker tenants must be specified for multi-tenant cluster");
+        throw new InvalidTableConfigException(
+            "server and broker tenants must be specified for multi-tenant cluster for table: " + tableNameWithType);
       }
 
       String newBrokerTag = brokerTag == null ? TagNameUtils.DEFAULT_TENANT_NAME : brokerTag;
       String newServerTag = serverTag == null ? TagNameUtils.DEFAULT_TENANT_NAME : serverTag;
       tableConfig.setTenantConfig(new TenantConfig(newBrokerTag, newServerTag, tenantConfig.getTagOverrideConfig()));
     }
-    String tableNameWithType = tableConfig.getTableName();
 
     // Check if tenant exists before creating the table
     Set<String> tagsToCheck = new TreeSet<>();
