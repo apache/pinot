@@ -18,10 +18,10 @@
 # under the License.
 #
 
-if [ "$TRAVIS_EVENT_TYPE" = "cron" ]; then
+# if [ "$TRAVIS_EVENT_TYPE" = "cron" ]; then
   export DEV_VERSION="-dev-${TRAVIS_BUILD_NUMBER}"
   export DEPLOY_BUILD_OPTS="-Dsha1=-dev-${TRAVIS_BUILD_NUMBER}"
   npm install -g npm-login-noninteractive
-else
-  export DEPLOY_BUILD_OPTS=""
-fi
+# else
+#   export DEPLOY_BUILD_OPTS=""
+# fi
