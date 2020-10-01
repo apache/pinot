@@ -92,7 +92,12 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    File defaultTableSegmentDir = new File(_segmentDir, DEFAULT_TABLE_NAME);
+    File defaultTableTarDir = new File(_tarDir, DEFAULT_TABLE_NAME);
+    File starTreeTableSegmentDir = new File(_segmentDir, STAR_TREE_TABLE_NAME);
+    File starTreeTableTarDir = new File(_tarDir, STAR_TREE_TABLE_NAME);
+    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir, defaultTableSegmentDir, defaultTableTarDir,
+        starTreeTableSegmentDir, starTreeTableTarDir);
 
     // Start the Pinot cluster
     startZk();
@@ -135,14 +140,15 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
     List<File> avroFiles = unpackAvroData(_tempDir);
 
     // Create and upload segments
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, defaultTableConfig, schema, 0, _segmentDir, _tarDir);
-    uploadSegments(DEFAULT_TABLE_NAME, _tarDir);
-    TestUtils.ensureDirectoriesExistAndEmpty(_segmentDir, _tarDir);
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, starTreeTableConfig, schema, 0, _segmentDir, _tarDir);
-    uploadSegments(STAR_TREE_TABLE_NAME, _tarDir);
+    ClusterIntegrationTestUtils
+        .buildSegmentsFromAvro(avroFiles, defaultTableConfig, schema, 0, defaultTableSegmentDir, defaultTableTarDir);
+    uploadSegments(DEFAULT_TABLE_NAME, defaultTableTarDir);
+    ClusterIntegrationTestUtils
+        .buildSegmentsFromAvro(avroFiles, starTreeTableConfig, schema, 0, starTreeTableSegmentDir, starTreeTableTarDir);
+    uploadSegments(STAR_TREE_TABLE_NAME, starTreeTableTarDir);
 
     // Set up the query generators
-    SegmentInfoProvider segmentInfoProvider = new SegmentInfoProvider(_tarDir.getPath());
+    SegmentInfoProvider segmentInfoProvider = new SegmentInfoProvider(defaultTableTarDir.getPath());
     List<String> aggregationFunctions = new ArrayList<>(AGGREGATION_FUNCTION_TYPES.size());
     for (AggregationFunctionType functionType : AGGREGATION_FUNCTION_TYPES) {
       aggregationFunctions.add(functionType.getName());
