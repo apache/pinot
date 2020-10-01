@@ -80,7 +80,7 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
     byte[][] valueArray = blockValSetMap.get(_expression).getBytesValuesSV();
     BigDecimal sumValue = getDefaultResult(aggregationResultHolder);
     for (int i = 0; i < length; i++) {
-      BigDecimal value = new BigDecimal(DataTypeConversionFunctions.bytesToBigDecimal(valueArray[i]));
+      BigDecimal value = DataTypeConversionFunctions.bytesToBigDecimalObject(valueArray[i]);
       sumValue = sumValue.add(value);
     }
     aggregationResultHolder.setValue(sumValue);
@@ -93,7 +93,7 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeyArray[i];
       BigDecimal groupByResultValue = getDefaultResult(groupByResultHolder, groupKey);
-      BigDecimal value = new BigDecimal(DataTypeConversionFunctions.bytesToBigDecimal(valueArray[i]));
+      BigDecimal value =  DataTypeConversionFunctions.bytesToBigDecimalObject(valueArray[i]);
       groupByResultValue = groupByResultValue.add(value);
       groupByResultHolder.setValueForKey(groupKey, groupByResultValue);
     }
@@ -107,7 +107,7 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
       byte[] value = valueArray[i];
       for (int groupKey : groupKeysArray[i]) {
         BigDecimal groupByResultValue = getDefaultResult(groupByResultHolder, groupKey);
-        BigDecimal valueBigDecimal = new BigDecimal(DataTypeConversionFunctions.bytesToBigDecimal(value));
+        BigDecimal valueBigDecimal = DataTypeConversionFunctions.bytesToBigDecimalObject(value);
         groupByResultValue = groupByResultValue.add(valueBigDecimal);
         groupByResultHolder.setValueForKey(groupKey, groupByResultValue);
       }
