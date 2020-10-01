@@ -51,11 +51,19 @@ public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
       List<Schema.Field> fields = from.getSchema().getFields();
       for (Schema.Field field : fields) {
         String fieldName = field.name();
-        to.putValue(fieldName, convert(from.get(fieldName)));
+        Object value = from.get(fieldName);
+        if (value != null) {
+          value = convert(value);
+        }
+        to.putValue(fieldName, value);
       }
     } else {
       for (String fieldName : _fields) {
-        to.putValue(fieldName, convert(from.get(fieldName)));
+        Object value = from.get(fieldName);
+        if (value != null) {
+          value = convert(value);
+        }
+        to.putValue(fieldName, value);
       }
     }
     return to;
@@ -84,7 +92,11 @@ public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
     Map<Object, Object> convertedMap = new HashMap<>();
     for (Schema.Field field : fields) {
       String fieldName = field.name();
-      convertedMap.put(fieldName, convert(record.get(fieldName)));
+      Object fieldValue = record.get(fieldName);
+      if (fieldValue != null) {
+        fieldValue = convert(fieldValue);
+      }
+      convertedMap.put(fieldName, fieldValue);
     }
     return convertedMap;
   }

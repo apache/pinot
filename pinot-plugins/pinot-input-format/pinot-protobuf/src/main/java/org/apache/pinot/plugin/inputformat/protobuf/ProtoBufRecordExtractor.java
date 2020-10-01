@@ -54,17 +54,20 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
     Descriptors.Descriptor descriptor = from.getDescriptorForType();
     if (_extractAll) {
       for (Descriptors.FieldDescriptor fieldDescriptor : descriptor.getFields()) {
-        to.putValue(
-            fieldDescriptor.getName(),
-            convert(new ProtoBufFieldInfo(from.getField(fieldDescriptor), fieldDescriptor))
-        );
+        Object fieldValue = from.getField(fieldDescriptor);
+        if (fieldValue != null) {
+          fieldValue = convert(new ProtoBufFieldInfo(fieldValue, fieldDescriptor));
+        }
+        to.putValue(fieldDescriptor.getName(), fieldValue);
       }
     } else {
       for (String fieldName : _fields) {
         Descriptors.FieldDescriptor fieldDescriptor = descriptor.findFieldByName(fieldName);
-        Object convertedValue = convert(new ProtoBufFieldInfo(from.getField(fieldDescriptor),
-            descriptor.findFieldByName(fieldName)));
-        to.putValue(fieldName, convertedValue);
+        Object fieldValue = from.getField(fieldDescriptor);
+        if (fieldValue != null) {
+          fieldValue = convert(new ProtoBufFieldInfo(fieldValue, descriptor.findFieldByName(fieldName)));
+        }
+        to.putValue(fieldName, fieldValue);
       }
     }
     return to;
@@ -118,9 +121,13 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
     Descriptors.FieldDescriptor valueFieldDescriptor = fieldDescriptors.get(1);
     Map<Object, Object> convertedMap = new HashMap<>();
     for (Message message : messages) {
+      Object fieldValue = message.getField(valueFieldDescriptor);
+      if (fieldValue != null) {
+        fieldValue = convert(new ProtoBufFieldInfo(fieldValue, valueFieldDescriptor));
+      }
       convertedMap.put(
           convertSingleValue(new ProtoBufFieldInfo(message.getField(keyFieldDescriptor), keyFieldDescriptor)),
-          convert(new ProtoBufFieldInfo(message.getField(valueFieldDescriptor), valueFieldDescriptor))
+          fieldValue
       );
     }
     return convertedMap;
@@ -143,7 +150,10 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
     int index = 0;
 
     for (Object fieldValue : fieldValues) {
-      Object convertedValue = convert(new ProtoBufFieldInfo(fieldValue, protoBufFieldInfo.getFieldDescriptor()));
+      Object convertedValue = null;
+      if (fieldValue != null) {
+        convertedValue = convert(new ProtoBufFieldInfo(fieldValue, protoBufFieldInfo.getFieldDescriptor()));
+      }
       if (convertedValue != null && !convertedValue.toString().equals("")) {
         array[index++] = convertedValue;
       }
@@ -192,7 +202,11 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
     Map<Object, Object> convertedMap = new HashMap<>();
     for (Map.Entry<Descriptors.FieldDescriptor, Object> entry : fields.entrySet()) {
       Descriptors.FieldDescriptor fieldDescriptor = entry.getKey();
-      convertedMap.put(fieldDescriptor.getName(), convert(new ProtoBufFieldInfo(entry.getValue(), fieldDescriptor)));
+      Object fieldValue = entry.getValue();
+      if (fieldValue != null) {
+        fieldValue = convert(new ProtoBufFieldInfo(fieldValue, fieldDescriptor));
+      }
+      convertedMap.put(fieldDescriptor.getName(), fieldValue);
     }
     return convertedMap;
   }

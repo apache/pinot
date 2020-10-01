@@ -35,16 +35,13 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
 
   /**
    * Converts the field value to either a single value (string, number, byte[]), multi value (Object[]) or a Map.
-   * Returns {@code null} if the field value is {@code null} or if the value is an empty array/collection/map.
+   * Returns {@code null} if the value is an empty array/collection/map.
    *
    * Natively Pinot only understands single values and multi values.
    * Map is useful only if some ingestion transform functions operates on it in the transformation layer.
    */
   @Nullable
-  public Object convert(@Nullable Object value) {
-    if (value == null) {
-      return null;
-    }
+  public Object convert(Object value) {
     Object convertedValue;
     if (isInstanceOfMultiValue(value)) {
       convertedValue = convertMultiValue(value);
@@ -109,7 +106,10 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
     Object[] array = new Object[numValues];
     int index = 0;
     for (Object element : collection) {
-      Object convertedValue = convert(element);
+      Object convertedValue = null;
+      if (element != null) {
+        convertedValue = convert(element);
+      }
       if (convertedValue != null && !convertedValue.toString().equals("")) {
         array[index++] = convertedValue;
       }
@@ -138,7 +138,11 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
 
     Map<Object, Object> convertedMap = new HashMap<>();
     for (Object key : map.keySet()) {
-      convertedMap.put(convertSingleValue(key), convert(map.get(key)));
+      Object convertedValue = null;
+      if (key != null) {
+        convertedValue = convert(map.get(key));
+      }
+      convertedMap.put(convertSingleValue(key), convertedValue);
     }
     return convertedMap;
   }

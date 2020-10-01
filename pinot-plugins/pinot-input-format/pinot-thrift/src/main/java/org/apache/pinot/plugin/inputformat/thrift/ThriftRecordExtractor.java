@@ -52,7 +52,11 @@ public class ThriftRecordExtractor extends BaseRecordExtractor<TBase> {
   public GenericRow extract(TBase from, GenericRow to) {
     if (_extractAll) {
       for (Map.Entry<String, Integer> nameToId : _fieldIds.entrySet()) {
-        to.putValue(nameToId.getKey(), convert(from.getFieldValue(from.fieldForId(nameToId.getValue()))));
+        Object value = from.getFieldValue(from.fieldForId(nameToId.getValue()));
+        if (value != null) {
+          value = convert(value);
+        }
+        to.putValue(nameToId.getKey(), value);
       }
     } else {
       for (String fieldName : _fields) {
@@ -62,7 +66,10 @@ public class ThriftRecordExtractor extends BaseRecordExtractor<TBase> {
           //noinspection unchecked
           value = from.getFieldValue(from.fieldForId(fieldId));
         }
-        to.putValue(fieldName, convert(value));
+        if (value != null) {
+          value = convert(value);
+        }
+        to.putValue(fieldName, value);
       }
     }
     return to;
@@ -84,7 +91,11 @@ public class ThriftRecordExtractor extends BaseRecordExtractor<TBase> {
     TBase record = (TBase) value;
     Map<Object, Object> convertedRecord = new HashMap<>();
     for (TFieldIdEnum tFieldIdEnum: FieldMetaData.getStructMetaDataMap(record.getClass()).keySet()) {
-      convertedRecord.put(tFieldIdEnum.getFieldName(), convert(record.getFieldValue(tFieldIdEnum)));
+      Object fieldValue = record.getFieldValue(tFieldIdEnum);
+      if (fieldValue != null) {
+        fieldValue = convert(fieldValue);
+      }
+      convertedRecord.put(tFieldIdEnum.getFieldName(), fieldValue);
     }
     return convertedRecord;
   }

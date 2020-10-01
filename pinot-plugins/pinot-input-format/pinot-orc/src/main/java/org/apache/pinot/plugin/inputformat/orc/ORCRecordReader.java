@@ -117,14 +117,7 @@ public class ORCRecordReader implements RecordReader {
     int fieldId = fieldType.getId();
     orcReaderInclude[fieldId] = true; // Include ID for top level field
     TypeDescription.Category category = fieldType.getCategory();
-    if (category == TypeDescription.Category.STRUCT) {
-      List<String> childrenFieldNames = fieldType.getFieldNames();
-      List<TypeDescription> childrenFieldTypes = fieldType.getChildren();
-      // Struct columns have one child column for each field of the struct
-      for (int i = 0; i < childrenFieldNames.size(); i++) {
-        initFieldsToRead(orcReaderInclude, childrenFieldTypes.get(i), childrenFieldNames.get(i));
-      }
-    } else if (category == TypeDescription.Category.LIST) {
+    if (category == TypeDescription.Category.LIST) {
       // Lists always have a single child column for its elements
       TypeDescription childFieldType = fieldType.getChildren().get(0);
       initFieldsToRead(orcReaderInclude, childFieldType, field);
@@ -137,6 +130,13 @@ public class ORCRecordReader implements RecordReader {
       Preconditions.checkState(isSupportedSingleValueType(keyCategory),
           "Illegal map key field type: %s (field %s)", keyCategory, field);
       initFieldsToRead(orcReaderInclude, children.get(1), field);
+    } else if (category == TypeDescription.Category.STRUCT) {
+      List<String> childrenFieldNames = fieldType.getFieldNames();
+      List<TypeDescription> childrenFieldTypes = fieldType.getChildren();
+      // Struct columns have one child column for each field of the struct
+      for (int i = 0; i < childrenFieldNames.size(); i++) {
+        initFieldsToRead(orcReaderInclude, childrenFieldTypes.get(i), childrenFieldNames.get(i));
+      }
     } else {
       // Single-value field
       Preconditions
@@ -209,22 +209,7 @@ public class ORCRecordReader implements RecordReader {
   private Object extractValue(String field, ColumnVector columnVector, TypeDescription fieldType, int rowId) {
     TypeDescription.Category category = fieldType.getCategory();
 
-    if (category == TypeDescription.Category.STRUCT) {
-      StructColumnVector structColumnVector = (StructColumnVector) columnVector;
-      if (!structColumnVector.isNull[rowId]) {
-        List<TypeDescription> childrenFieldTypes = fieldType.getChildren();
-        List<String> childrenFieldNames = fieldType.getFieldNames();
-
-        Map<Object, Object> convertedMap = new HashMap<>();
-        for (int i = 0; i < childrenFieldNames.size(); i++) {
-          convertedMap.put(childrenFieldNames.get(i),
-              extractValue(childrenFieldNames.get(i), structColumnVector.fields[i], childrenFieldTypes.get(i), rowId));
-        }
-        return convertedMap;
-      } else {
-        return null;
-      }
-    } else if (category == TypeDescription.Category.LIST) {
+    if (category == TypeDescription.Category.LIST) {
       TypeDescription childType = fieldType.getChildren().get(0);
       ListColumnVector listColumnVector = (ListColumnVector) columnVector;
       if (columnVector.isRepeating) {
@@ -272,6 +257,21 @@ public class ORCRecordReader implements RecordReader {
         }
 
         return map;
+      } else {
+        return null;
+      }
+    } else if (category == TypeDescription.Category.STRUCT) {
+      StructColumnVector structColumnVector = (StructColumnVector) columnVector;
+      if (!structColumnVector.isNull[rowId]) {
+        List<TypeDescription> childrenFieldTypes = fieldType.getChildren();
+        List<String> childrenFieldNames = fieldType.getFieldNames();
+
+        Map<Object, Object> convertedMap = new HashMap<>();
+        for (int i = 0; i < childrenFieldNames.size(); i++) {
+          convertedMap.put(childrenFieldNames.get(i),
+              extractValue(childrenFieldNames.get(i), structColumnVector.fields[i], childrenFieldTypes.get(i), rowId));
+        }
+        return convertedMap;
       } else {
         return null;
       }

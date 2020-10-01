@@ -59,5 +59,5 @@ public interface RecordExtractor<T> {
    * @return The converted field value. Returns null for empty array/collection/map.
    */
   @Nullable
-  Object convert(@Nullable Object value);
+  Object convert(Object value);
 }

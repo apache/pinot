@@ -46,15 +46,21 @@ public class JSONRecordExtractor extends BaseRecordExtractor<Map<String, Object>
   public GenericRow extract(Map<String, Object> from, GenericRow to) {
     if (_extractAll) {
       for (Map.Entry<String, Object> fieldToVal : from.entrySet()) {
-        to.putValue(fieldToVal.getKey(), convert(fieldToVal.getValue()));
+        Object value = fieldToVal.getValue();
+        if (value != null) {
+          value = convert(value);
+        }
+        to.putValue(fieldToVal.getKey(), value);
       }
     } else {
       for (String fieldName : _fields) {
         Object value = from.get(fieldName);
         // NOTE about JSON behavior - cannot distinguish between INT/LONG and FLOAT/DOUBLE.
         // DataTypeTransformer fixes it.
-        Object convertedValue = convert(value);
-        to.putValue(fieldName, convertedValue);
+        if (value != null) {
+          value = convert(value);
+        }
+        to.putValue(fieldName, value);
       }
     }
     return to;
