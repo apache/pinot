@@ -1099,6 +1099,10 @@ public class PinotHelixResourceManager {
     String brokerTag = tenantConfig.getBroker();
     String serverTag = tenantConfig.getServer();
     if (brokerTag == null || serverTag == null) {
+      if (!_isSingleTenantCluster) {
+        throw new InvalidTableConfigException("server and broker tenants must be specified for multi-tenant cluster");
+      }
+
       String newBrokerTag = brokerTag == null ? TagNameUtils.DEFAULT_TENANT_NAME : brokerTag;
       String newServerTag = serverTag == null ? TagNameUtils.DEFAULT_TENANT_NAME : serverTag;
       tableConfig.setTenantConfig(new TenantConfig(newBrokerTag, newServerTag, tenantConfig.getTagOverrideConfig()));
@@ -1374,6 +1378,14 @@ public class PinotHelixResourceManager {
    */
   public void updateTableConfig(TableConfig tableConfig)
       throws IOException {
+    TenantConfig tenantConfig = tableConfig.getTenantConfig();
+    String brokerTag = tenantConfig.getBroker();
+    String serverTag = tenantConfig.getServer();
+    if (brokerTag == null || serverTag == null) {
+      if (!_isSingleTenantCluster) {
+        throw new InvalidTableConfigException("server and broker tenants must be specified for multi-tenant cluster");
+      }
+    }
     validateTableTenantConfig(tableConfig);
     setExistingTableConfig(tableConfig);
   }
