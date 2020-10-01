@@ -29,15 +29,15 @@ import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
- * The ArrayMinTransformFunction class implements array_min function for multi-valued columns
+ * The ArrayMinTransformFunction class implements arrayMin function for multi-valued columns
  *
  * Sample queries:
- * SELECT COUNT(*) FROM table WHERE array_min(mvColumn) > 2
- * SELECT COUNT(*) FROM table GROUP BY array_min(mvColumn)
- * SELECT SUM(array_min(mvColumn)) FROM table
+ * SELECT COUNT(*) FROM table WHERE arrayMin(mvColumn) > 2
+ * SELECT COUNT(*) FROM table GROUP BY arrayMin(mvColumn)
+ * SELECT SUM(arrayMin(mvColumn)) FROM table
  */
 public class ArrayMinTransformFunction extends BaseTransformFunction {
-  public static final String FUNCTION_NAME = "array_min";
+  public static final String FUNCTION_NAME = "arrayMin";
 
   private int[] _intValuesSV;
   private long[] _longValuesSV;
@@ -56,14 +56,14 @@ public class ArrayMinTransformFunction extends BaseTransformFunction {
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     // Check that there is only 1 argument
     if (arguments.size() != 1) {
-      throw new IllegalArgumentException("Exactly 1 argument is required for ARRAY_MIN transform function");
+      throw new IllegalArgumentException("Exactly 1 argument is required for ArrayMin transform function");
     }
 
     // Check that the argument is a multi-valued column or transform function
     TransformFunction firstArgument = arguments.get(0);
     if (firstArgument instanceof LiteralTransformFunction || firstArgument.getResultMetadata().isSingleValue()) {
       throw new IllegalArgumentException(
-          "The argument of ARRAY_MIN transform function must be a multi-valued column or a transform function");
+          "The argument of ArrayMin transform function must be a multi-valued column or a transform function");
     }
     _resultMetadata = new TransformResultMetadata(firstArgument.getResultMetadata().getDataType(), true, false);
     _argument = firstArgument;
@@ -86,8 +86,8 @@ public class ArrayMinTransformFunction extends BaseTransformFunction {
     int[][] intValuesMV = _argument.transformToIntValuesMV(projectionBlock);
     for (int i = 0; i < length; i++) {
       int minRes = Integer.MAX_VALUE;
-      for (int j = 0; j < intValuesMV[i].length; j++) {
-        minRes = Math.min(minRes, intValuesMV[i][j]);
+      for (int value : intValuesMV[i]) {
+        minRes = Math.min(minRes, value);
       }
       _intValuesSV[i] = minRes;
     }
@@ -106,8 +106,8 @@ public class ArrayMinTransformFunction extends BaseTransformFunction {
     long[][] longValuesMV = _argument.transformToLongValuesMV(projectionBlock);
     for (int i = 0; i < length; i++) {
       long minRes = Long.MAX_VALUE;
-      for (int j = 0; j < longValuesMV[i].length; j++) {
-        minRes = Math.min(minRes, longValuesMV[i][j]);
+      for (long value : longValuesMV[i]) {
+        minRes = Math.min(minRes, value);
       }
       _longValuesSV[i] = minRes;
     }
@@ -126,8 +126,8 @@ public class ArrayMinTransformFunction extends BaseTransformFunction {
     float[][] floatValuesMV = _argument.transformToFloatValuesMV(projectionBlock);
     for (int i = 0; i < length; i++) {
       float minRes = Float.POSITIVE_INFINITY;
-      for (int j = 0; j < floatValuesMV[i].length; j++) {
-        minRes = Math.min(minRes, floatValuesMV[i][j]);
+      for (float value : floatValuesMV[i]) {
+        minRes = Math.min(minRes, value);
       }
       _floatValuesSV[i] = minRes;
     }
@@ -146,8 +146,8 @@ public class ArrayMinTransformFunction extends BaseTransformFunction {
     double[][] doubleValuesMV = _argument.transformToDoubleValuesMV(projectionBlock);
     for (int i = 0; i < length; i++) {
       double minRes = Double.POSITIVE_INFINITY;
-      for (int j = 0; j < doubleValuesMV[i].length; j++) {
-        minRes = Math.min(minRes, doubleValuesMV[i][j]);
+      for (double value : doubleValuesMV[i]) {
+        minRes = Math.min(minRes, value);
       }
       _doubleValuesSV[i] = minRes;
     }
@@ -166,9 +166,9 @@ public class ArrayMinTransformFunction extends BaseTransformFunction {
     String[][] stringValuesMV = _argument.transformToStringValuesMV(projectionBlock);
     for (int i = 0; i < length; i++) {
       String minRes = null;
-      for (int j = 0; j < stringValuesMV[i].length; j++) {
-        if (StringUtils.compare(minRes, stringValuesMV[i][j]) > 0) {
-          minRes = stringValuesMV[i][j];
+      for (String value : stringValuesMV[i]) {
+        if (StringUtils.compare(minRes, value) > 0) {
+          minRes = value;
         }
       }
       _stringValuesSV[i] = minRes;

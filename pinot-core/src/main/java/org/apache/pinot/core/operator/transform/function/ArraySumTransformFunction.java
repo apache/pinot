@@ -24,25 +24,21 @@ import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
-import org.apache.pinot.core.util.ArrayCopyUtils;
-import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
- * The ArraySumTransformFunction class implements array_sum function for multi-valued columns
+ * The ArraySumTransformFunction class implements arraySum function for multi-valued columns
  *
  * Sample queries:
- * SELECT COUNT(*) FROM table WHERE array_sum(mvColumn) > 2
- * SELECT COUNT(*) FROM table GROUP BY array_sum(mvColumn)
- * SELECT SUM(array_sum(mvColumn)) FROM table
+ * SELECT COUNT(*) FROM table WHERE arraySum(mvColumn) > 2
+ * SELECT COUNT(*) FROM table GROUP BY arraySum(mvColumn)
+ * SELECT SUM(arraySum(mvColumn)) FROM table
  */
 public class ArraySumTransformFunction extends BaseTransformFunction {
-  public static final String FUNCTION_NAME = "array_sum";
+  public static final String FUNCTION_NAME = "arraySum";
 
-  private long[] _longResults;
-  private double[] _doubleResults;
+  private double[] _results;
   private TransformFunction _argument;
-  private TransformResultMetadata _resultMetadata;
 
   @Override
   public String getName() {
@@ -53,96 +49,40 @@ public class ArraySumTransformFunction extends BaseTransformFunction {
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     // Check that there is only 1 argument
     if (arguments.size() != 1) {
-      throw new IllegalArgumentException("Exactly 1 argument is required for ARRAY_AVERAGE transform function");
+      throw new IllegalArgumentException("Exactly 1 argument is required for ArraySum transform function");
     }
 
     // Check that the argument is a multi-valued column or transform function
     TransformFunction firstArgument = arguments.get(0);
     if (firstArgument instanceof LiteralTransformFunction || firstArgument.getResultMetadata().isSingleValue()) {
       throw new IllegalArgumentException(
-          "The argument of ARRAY_AVERAGE transform function must be a multi-valued column or a transform function");
+          "The argument of ArraySum transform function must be a multi-valued column or a transform function");
     }
-    FieldSpec.DataType resultDataType;
-    switch (firstArgument.getResultMetadata().getDataType()) {
-      case INT:
-      case LONG:
-        resultDataType = FieldSpec.DataType.LONG;
-        break;
-      case FLOAT:
-      case DOUBLE:
-        resultDataType = FieldSpec.DataType.DOUBLE;
-        break;
-      default:
-        throw new IllegalArgumentException(
-            "The argument of ARRAY_AVERAGE transform function must be numeric");
+    if (!firstArgument.getResultMetadata().getDataType().isNumeric()) {
+      throw new IllegalArgumentException("The argument of ArraySum transform function must be numeric");
     }
-    _resultMetadata = new TransformResultMetadata(resultDataType, true, false);
     _argument = firstArgument;
   }
 
   @Override
   public TransformResultMetadata getResultMetadata() {
-    return _resultMetadata;
-  }
-
-  @Override
-  public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
-    if (_longResults == null) {
-      _longResults = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-    }
-    int length = projectionBlock.getNumDocs();
-    long sumRes;
-    switch (_argument.getResultMetadata().getDataType()) {
-      case INT:
-      case LONG:
-        long[][] longValuesMV = _argument.transformToLongValuesMV(projectionBlock);
-        for (int i = 0; i < length; i++) {
-          sumRes = 0;
-          for (int j = 0; j < longValuesMV[i].length; j++) {
-            sumRes += longValuesMV[i][j];
-          }
-          _longResults[i] = sumRes;
-        }
-        break;
-      case FLOAT:
-      case DOUBLE:
-        double[] doubleValues = transformToDoubleValuesSV(projectionBlock);
-        ArrayCopyUtils.copy(doubleValues, _longResults, length);
-        break;
-      default:
-        throw new IllegalStateException();
-    }
-    return _longResults;
+    return DOUBLE_SV_NO_DICTIONARY_METADATA;
   }
 
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    if (_doubleResults == null) {
-      _doubleResults = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    if (_results == null) {
+      _results = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
-
     int length = projectionBlock.getNumDocs();
-    double sumRes;
-    switch (_argument.getResultMetadata().getDataType()) {
-      case INT:
-      case LONG:
-        long[] longValues = transformToLongValuesSV(projectionBlock);
-        ArrayCopyUtils.copy(longValues, _doubleResults, length);
-        break;
-      case FLOAT:
-      case DOUBLE:
-        double[][] doubleValuesMV = _argument.transformToDoubleValuesMV(projectionBlock);
-        for (int i = 0; i < length; i++) {
-          sumRes = 0;
-          for (int j = 0; j < doubleValuesMV[i].length; j++) {
-            sumRes += doubleValuesMV[i][j];
-          }
-          _doubleResults[i] = sumRes;
-        }
-        break;
-      default:
-        throw new IllegalStateException();
+    double[][] doubleValuesMV = _argument.transformToDoubleValuesMV(projectionBlock);
+    for (int i = 0; i < length; i++) {
+      double sumRes = 0;
+      for (double value : doubleValuesMV[i]) {
+        sumRes += value;
+      }
+      _results[i] = sumRes;
     }
-    return _doubleResults;
+    return _results;
   }
 }

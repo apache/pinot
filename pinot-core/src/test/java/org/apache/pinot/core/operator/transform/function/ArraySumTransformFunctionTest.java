@@ -30,7 +30,7 @@ public class ArraySumTransformFunctionTest extends ArrayBaseTransformFunctionTes
 
   @Override
   Object getExpectResult(int[] intArrary) {
-    long sumRes = 0;
+    double sumRes = 0;
     for (int v : intArrary) {
       sumRes += v;
     }
@@ -44,14 +44,6 @@ public class ArraySumTransformFunctionTest extends ArrayBaseTransformFunctionTes
 
   @Override
   FieldSpec.DataType getResultDataType(FieldSpec.DataType inputDataType) {
-    switch (inputDataType) {
-      case INT:
-      case LONG:
-        return FieldSpec.DataType.LONG;
-      case FLOAT:
-      case DOUBLE:
-        return FieldSpec.DataType.DOUBLE;
-    }
-    throw new IllegalArgumentException("Unsupported input data type - " + inputDataType);
+    return FieldSpec.DataType.DOUBLE;
   }
 }

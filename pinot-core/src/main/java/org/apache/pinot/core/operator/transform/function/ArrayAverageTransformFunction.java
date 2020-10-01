@@ -27,15 +27,15 @@ import org.apache.pinot.core.plan.DocIdSetPlanNode;
 
 
 /**
- * The ArrayAverageTransformFunction class implements array_average function for multi-valued columns
+ * The ArrayAverageTransformFunction class implements arrayAverage function for multi-valued columns
  *
  * Sample queries:
- * SELECT COUNT(*) FROM table WHERE array_average(mvColumn) > 2
- * SELECT COUNT(*) FROM table GROUP BY array_average(mvColumn)
- * SELECT SUM(array_average(mvColumn)) FROM table
+ * SELECT COUNT(*) FROM table WHERE arrayAverage(mvColumn) > 2
+ * SELECT COUNT(*) FROM table GROUP BY arrayAverage(mvColumn)
+ * SELECT SUM(arrayAverage(mvColumn)) FROM table
  */
 public class ArrayAverageTransformFunction extends BaseTransformFunction {
-  public static final String FUNCTION_NAME = "array_average";
+  public static final String FUNCTION_NAME = "arrayAverage";
 
   private double[] _results;
   private TransformFunction _argument;
@@ -49,18 +49,17 @@ public class ArrayAverageTransformFunction extends BaseTransformFunction {
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     // Check that there is only 1 argument
     if (arguments.size() != 1) {
-      throw new IllegalArgumentException("Exactly 1 argument is required for ARRAY_AVERAGE transform function");
+      throw new IllegalArgumentException("Exactly 1 argument is required for ArrayAverage transform function");
     }
 
     // Check that the argument is a multi-valued column or transform function
     TransformFunction firstArgument = arguments.get(0);
     if (firstArgument instanceof LiteralTransformFunction || firstArgument.getResultMetadata().isSingleValue()) {
       throw new IllegalArgumentException(
-          "The argument of ARRAY_AVERAGE transform function must be a multi-valued column or a transform function");
+          "The argument of ArrayAverage transform function must be a multi-valued column or a transform function");
     }
     if (!firstArgument.getResultMetadata().getDataType().isNumeric()) {
-      throw new IllegalArgumentException(
-          "The argument of ARRAY_AVERAGE transform function must be numeric");
+      throw new IllegalArgumentException("The argument of ArrayAverage transform function must be numeric");
     }
     _argument = firstArgument;
   }
@@ -77,14 +76,13 @@ public class ArrayAverageTransformFunction extends BaseTransformFunction {
     }
 
     int numDocs = projectionBlock.getNumDocs();
-    double sumRes;
     switch (_argument.getResultMetadata().getDataType()) {
       case INT:
         int[][] intValuesMV = _argument.transformToIntValuesMV(projectionBlock);
         for (int i = 0; i < numDocs; i++) {
-          sumRes = 0;
-          for (int j = 0; j < intValuesMV[i].length; j++) {
-            sumRes += intValuesMV[i][j];
+          double sumRes = 0;
+          for (int value : intValuesMV[i]) {
+            sumRes += value;
           }
           _results[i] = sumRes / intValuesMV[i].length;
         }
@@ -92,9 +90,9 @@ public class ArrayAverageTransformFunction extends BaseTransformFunction {
       case LONG:
         long[][] longValuesMV = _argument.transformToLongValuesMV(projectionBlock);
         for (int i = 0; i < numDocs; i++) {
-          sumRes = 0;
-          for (int j = 0; j < longValuesMV[i].length; j++) {
-            sumRes += longValuesMV[i][j];
+          double sumRes = 0;
+          for (long value : longValuesMV[i]) {
+            sumRes += value;
           }
           _results[i] = sumRes / longValuesMV[i].length;
         }
@@ -102,9 +100,9 @@ public class ArrayAverageTransformFunction extends BaseTransformFunction {
       case FLOAT:
         float[][] floatValuesMV = _argument.transformToFloatValuesMV(projectionBlock);
         for (int i = 0; i < numDocs; i++) {
-          sumRes = 0;
-          for (int j = 0; j < floatValuesMV[i].length; j++) {
-            sumRes += floatValuesMV[i][j];
+          double sumRes = 0;
+          for (float value : floatValuesMV[i]) {
+            sumRes += value;
           }
           _results[i] = sumRes / floatValuesMV[i].length;
         }
@@ -112,9 +110,9 @@ public class ArrayAverageTransformFunction extends BaseTransformFunction {
       case DOUBLE:
         double[][] doubleValuesMV = _argument.transformToDoubleValuesMV(projectionBlock);
         for (int i = 0; i < numDocs; i++) {
-          sumRes = 0;
-          for (int j = 0; j < doubleValuesMV[i].length; j++) {
-            sumRes += doubleValuesMV[i][j];
+          double sumRes = 0;
+          for (double value : doubleValuesMV[i]) {
+            sumRes += value;
           }
           _results[i] = sumRes / doubleValuesMV[i].length;
         }

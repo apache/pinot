@@ -30,15 +30,15 @@ import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
- * The ArrayMaxTransformFunction class implements array_max function for multi-valued columns
+ * The ArrayMaxTransformFunction class implements arrayMax function for multi-valued columns
  *
  * Sample queries:
- * SELECT COUNT(*) FROM table WHERE array_max(mvColumn) > 2
- * SELECT COUNT(*) FROM table GROUP BY array_max(mvColumn)
- * SELECT SUM(array_max(mvColumn)) FROM table
+ * SELECT COUNT(*) FROM table WHERE arrayMax(mvColumn) > 2
+ * SELECT COUNT(*) FROM table GROUP BY arrayMax(mvColumn)
+ * SELECT SUM(arrayMax(mvColumn)) FROM table
  */
 public class ArrayMaxTransformFunction extends BaseTransformFunction {
-  public static final String FUNCTION_NAME = "array_max";
+  public static final String FUNCTION_NAME = "arrayMax";
 
   private int[] _intValuesSV;
   private long[] _longValuesSV;
@@ -57,14 +57,14 @@ public class ArrayMaxTransformFunction extends BaseTransformFunction {
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     // Check that there is only 1 argument
     if (arguments.size() != 1) {
-      throw new IllegalArgumentException("Exactly 1 argument is required for ARRAY_MAX transform function");
+      throw new IllegalArgumentException("Exactly 1 argument is required for ArrayMax transform function");
     }
 
     // Check that the argument is a multi-valued column or transform function
     TransformFunction firstArgument = arguments.get(0);
     if (firstArgument instanceof LiteralTransformFunction || firstArgument.getResultMetadata().isSingleValue()) {
       throw new IllegalArgumentException(
-          "The argument of ARRAY_MAX transform function must be a multi-valued column or a transform function");
+          "The argument of ArrayMax transform function must be a multi-valued column or a transform function");
     }
     _resultMetadata = new TransformResultMetadata(firstArgument.getResultMetadata().getDataType(), true, false);
     _argument = firstArgument;
@@ -87,8 +87,8 @@ public class ArrayMaxTransformFunction extends BaseTransformFunction {
     int[][] intValuesMV = _argument.transformToIntValuesMV(projectionBlock);
     for (int i = 0; i < length; i++) {
       int maxRes = Integer.MIN_VALUE;
-      for (int j = 0; j < intValuesMV[i].length; j++) {
-        maxRes = Math.max(maxRes, intValuesMV[i][j]);
+      for (int value : intValuesMV[i]) {
+        maxRes = Math.max(maxRes, value);
       }
       _intValuesSV[i] = maxRes;
     }
@@ -107,8 +107,8 @@ public class ArrayMaxTransformFunction extends BaseTransformFunction {
     long[][] longValuesMV = _argument.transformToLongValuesMV(projectionBlock);
     for (int i = 0; i < length; i++) {
       long maxRes = Long.MIN_VALUE;
-      for (int j = 0; j < longValuesMV[i].length; j++) {
-        maxRes = Math.max(maxRes, longValuesMV[i][j]);
+      for (long value : longValuesMV[i]) {
+        maxRes = Math.max(maxRes, value);
       }
       _longValuesSV[i] = maxRes;
     }
@@ -127,8 +127,8 @@ public class ArrayMaxTransformFunction extends BaseTransformFunction {
     float[][] floatValuesMV = _argument.transformToFloatValuesMV(projectionBlock);
     for (int i = 0; i < length; i++) {
       float maxRes = Float.NEGATIVE_INFINITY;
-      for (int j = 0; j < floatValuesMV[i].length; j++) {
-        maxRes = Math.max(maxRes, floatValuesMV[i][j]);
+      for (float value : floatValuesMV[i]) {
+        maxRes = Math.max(maxRes, value);
       }
       _floatValuesSV[i] = maxRes;
     }
@@ -147,8 +147,8 @@ public class ArrayMaxTransformFunction extends BaseTransformFunction {
     double[][] doubleValuesMV = _argument.transformToDoubleValuesMV(projectionBlock);
     for (int i = 0; i < length; i++) {
       double maxRes = Double.NEGATIVE_INFINITY;
-      for (int j = 0; j < doubleValuesMV[i].length; j++) {
-        maxRes = Math.max(maxRes, doubleValuesMV[i][j]);
+      for (double value : doubleValuesMV[i]) {
+        maxRes = Math.max(maxRes, value);
       }
       _doubleValuesSV[i] = maxRes;
     }
@@ -167,9 +167,9 @@ public class ArrayMaxTransformFunction extends BaseTransformFunction {
     String[][] stringValuesMV = _argument.transformToStringValuesMV(projectionBlock);
     for (int i = 0; i < length; i++) {
       String maxRes = null;
-      for (int j = 0; j < stringValuesMV[i].length; j++) {
-        if (StringUtils.compare(maxRes, stringValuesMV[i][j]) < 0) {
-          maxRes = stringValuesMV[i][j];
+      for (String value : stringValuesMV[i]) {
+        if (StringUtils.compare(maxRes, value) < 0) {
+          maxRes = value;
         }
       }
       _stringValuesSV[i] = maxRes;
