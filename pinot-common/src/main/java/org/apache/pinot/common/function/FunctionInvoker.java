@@ -23,6 +23,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.utils.PinotDataType;
 
 
@@ -108,7 +109,23 @@ public class FunctionInvoker {
       PinotDataType argumentType = FunctionUtils.getArgumentType(argumentClass);
       Preconditions.checkArgument(parameterType != null && argumentType != null,
           "Cannot convert value from class: %s to class: %s", argumentClass, parameterClass);
-      arguments[i] = parameterType.convert(argument, argumentType);
+      Object convertedArgument = parameterType.convert(argument, argumentType);
+      // For primitive array parameter, convert the argument from Object array to primitive array
+      switch (parameterType) {
+        case INTEGER_ARRAY:
+          convertedArgument = ArrayUtils.toPrimitive((Integer[]) convertedArgument);
+          break;
+        case LONG_ARRAY:
+          convertedArgument = ArrayUtils.toPrimitive((Long[]) convertedArgument);
+          break;
+        case FLOAT_ARRAY:
+          convertedArgument = ArrayUtils.toPrimitive((Float[]) convertedArgument);
+          break;
+        case DOUBLE_ARRAY:
+          convertedArgument = ArrayUtils.toPrimitive((Double[]) convertedArgument);
+          break;
+      }
+      arguments[i] = convertedArgument;
     }
   }
 

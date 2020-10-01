@@ -73,6 +73,11 @@ public abstract class BaseTransformFunctionTest {
   protected static final String BYTES_SV_COLUMN = "bytesSV";
   protected static final String STRING_ALPHANUM_SV_COLUMN = "stringAlphaNumSV";
   protected static final String INT_MV_COLUMN = "intMV";
+  protected static final String LONG_MV_COLUMN = "longMV";
+  protected static final String FLOAT_MV_COLUMN = "floatMV";
+  protected static final String DOUBLE_MV_COLUMN = "doubleMV";
+  protected static final String STRING_MV_COLUMN = "stringMV";
+  protected static final String STRING_ALPHANUM_MV_COLUMN = "stringAlphaNumMV";
   protected static final String TIME_COLUMN = "time";
   protected static final String JSON_COLUMN = "json";
   protected final int[] _intSVValues = new int[NUM_ROWS];
@@ -83,6 +88,11 @@ public abstract class BaseTransformFunctionTest {
   protected final String[] _stringAlphaNumericSVValues = new String[NUM_ROWS];
   protected final byte[][] _bytesSVValues = new byte[NUM_ROWS][];
   protected final int[][] _intMVValues = new int[NUM_ROWS][];
+  protected final long[][] _longMVValues = new long[NUM_ROWS][];
+  protected final float[][] _floatMVValues = new float[NUM_ROWS][];
+  protected final double[][] _doubleMVValues = new double[NUM_ROWS][];
+  protected final String[][] _stringMVValues = new String[NUM_ROWS][];
+  protected final String[][] _stringAlphaNumericMVValues = new String[NUM_ROWS][];
   protected final long[] _timeValues = new long[NUM_ROWS];
   protected final String[] _jsonValues = new String[NUM_ROWS];
 
@@ -107,8 +117,19 @@ public abstract class BaseTransformFunctionTest {
 
       int numValues = 1 + RANDOM.nextInt(MAX_NUM_MULTI_VALUES);
       _intMVValues[i] = new int[numValues];
+      _longMVValues[i] = new long[numValues];
+      _floatMVValues[i] = new float[numValues];
+      _doubleMVValues[i] = new double[numValues];
+      _stringMVValues[i] = new String[numValues];
+      _stringAlphaNumericMVValues[i] = new String[numValues];
+
       for (int j = 0; j < numValues; j++) {
         _intMVValues[i][j] = 1 + RANDOM.nextInt(MAX_MULTI_VALUE);
+        _longMVValues[i][j] = 1 + RANDOM.nextLong();
+        _floatMVValues[i][j] = 1 + RANDOM.nextFloat();
+        _doubleMVValues[i][j] = 1 + RANDOM.nextDouble();
+        _stringMVValues[i][j] = df.format(_intSVValues[i] * RANDOM.nextDouble());
+        _stringAlphaNumericMVValues[i][j] = RandomStringUtils.randomAlphanumeric(26);
       }
 
       // Time in the past year
@@ -126,6 +147,11 @@ public abstract class BaseTransformFunctionTest {
       map.put(STRING_ALPHANUM_SV_COLUMN, _stringAlphaNumericSVValues[i]);
       map.put(BYTES_SV_COLUMN, _bytesSVValues[i]);
       map.put(INT_MV_COLUMN, ArrayUtils.toObject(_intMVValues[i]));
+      map.put(LONG_MV_COLUMN, ArrayUtils.toObject(_longMVValues[i]));
+      map.put(FLOAT_MV_COLUMN, ArrayUtils.toObject(_floatMVValues[i]));
+      map.put(DOUBLE_MV_COLUMN, ArrayUtils.toObject(_doubleMVValues[i]));
+      map.put(STRING_MV_COLUMN, _stringMVValues[i]);
+      map.put(STRING_ALPHANUM_MV_COLUMN, _stringAlphaNumericMVValues[i]);
       map.put(TIME_COLUMN, _timeValues[i]);
       _jsonValues[i] = JsonUtils.objectToJsonNode(map).toString();
       map.put(JSON_COLUMN, _jsonValues[i]);
@@ -141,8 +167,13 @@ public abstract class BaseTransformFunctionTest {
         .addSingleValueDimension(STRING_SV_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(STRING_ALPHANUM_SV_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(BYTES_SV_COLUMN, FieldSpec.DataType.BYTES)
-        .addSingleValueDimension(JSON_COLUMN, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(JSON_COLUMN, FieldSpec.DataType.STRING, Integer.MAX_VALUE, null)
         .addMultiValueDimension(INT_MV_COLUMN, FieldSpec.DataType.INT)
+        .addMultiValueDimension(LONG_MV_COLUMN, FieldSpec.DataType.LONG)
+        .addMultiValueDimension(FLOAT_MV_COLUMN, FieldSpec.DataType.FLOAT)
+        .addMultiValueDimension(DOUBLE_MV_COLUMN, FieldSpec.DataType.DOUBLE)
+        .addMultiValueDimension(STRING_MV_COLUMN, FieldSpec.DataType.STRING)
+        .addMultiValueDimension(STRING_ALPHANUM_MV_COLUMN, FieldSpec.DataType.STRING)
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME_COLUMN), null).build();
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME_COLUMN).build();
@@ -206,6 +237,20 @@ public abstract class BaseTransformFunctionTest {
     byte[][] bytesValues = transformFunction.transformToBytesValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       Assert.assertEquals(bytesValues[i], expectedValues[i]);
+    }
+  }
+
+  protected void testTransformFunctionMV(TransformFunction transformFunction, int[][] expectedValues) {
+    int[][] intMVValues = transformFunction.transformToIntValuesMV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      Assert.assertEquals(intMVValues[i], expectedValues[i]);
+    }
+  }
+
+  protected void testTransformFunctionMV(TransformFunction transformFunction, String[][] expectedValues) {
+    String[][] stringMVValues = transformFunction.transformToStringValuesMV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      Assert.assertEquals(stringMVValues[i], expectedValues[i]);
     }
   }
 
