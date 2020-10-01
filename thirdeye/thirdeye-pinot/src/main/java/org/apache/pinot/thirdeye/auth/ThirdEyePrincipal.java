@@ -20,29 +20,18 @@
 package org.apache.pinot.thirdeye.auth;
 
 import java.security.Principal;
-import java.util.HashSet;
-import java.util.Set;
-
 
 public class ThirdEyePrincipal implements Principal {
-  String name; // 'username@domainName'
-  Set<String> groups = new HashSet<>();
-  String sessionKey;
 
-  public ThirdEyePrincipal(String name, String token) {
+  private final String name; // 'username@domainName'
+  private final String sessionKey;
+
+  public ThirdEyePrincipal(final String name) {
+    this(name, null);
+  }
+
+  public ThirdEyePrincipal(final String name, final String sessionKey) {
     this.name = name;
-    this.sessionKey = token;
-  }
-
-  public ThirdEyePrincipal() {
-
-  }
-
-  public String getSessionKey() {
-    return sessionKey;
-  }
-
-  public void setSessionKey(String sessionKey) {
     this.sessionKey = sessionKey;
   }
 
@@ -51,15 +40,7 @@ public class ThirdEyePrincipal implements Principal {
     return name;
   }
 
-  public void setName(String name) {
-    this.name = name;
-  }
-
-  public Set<String> getGroups() {
-    return groups;
-  }
-
-  public void setGroups(Set<String> groups) {
-    this.groups = groups;
+  public String getSessionKey() {
+    return sessionKey;
   }
 }

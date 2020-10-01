@@ -36,9 +36,6 @@ public class ThirdEyeAuthenticatorDisabled implements Authenticator<ThirdEyeCred
   public Optional<ThirdEyePrincipal> authenticate(ThirdEyeCredentials credentials) throws AuthenticationException {
     LOG.info("Authentication is disabled. Accepting any credentials for {}.", credentials.getPrincipal());
 
-    ThirdEyePrincipal principal = new ThirdEyePrincipal();
-    principal.setName(credentials.getPrincipal());
-
-    return Optional.of(principal);
+    return Optional.of(new ThirdEyePrincipal(credentials.getPrincipal()));
   }
 }

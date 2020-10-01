@@ -93,8 +93,7 @@ public class ThirdEyeLdapAuthenticator implements Authenticator<ThirdEyeCredenti
     }
 
     if (authenticationResults.isAuthenticated()) {
-      ThirdEyePrincipal principal = new ThirdEyePrincipal();
-      principal.setName(env.get(Context.SECURITY_PRINCIPAL));
+      ThirdEyePrincipal principal = new ThirdEyePrincipal(env.get(Context.SECURITY_PRINCIPAL));
       LOG.info("Successfully authenticated {} with LDAP", env.get(Context.SECURITY_PRINCIPAL));
       return Optional.of(principal);
     } else {

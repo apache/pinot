@@ -19,9 +19,6 @@
 
 package org.apache.pinot.thirdeye.auth;
 
-import javax.ws.rs.core.SecurityContext;
-import org.apache.pinot.thirdeye.datalayer.bao.SessionManager;
-import org.apache.pinot.thirdeye.datalayer.dto.SessionDTO;
 import io.dropwizard.auth.AuthFilter;
 import io.dropwizard.auth.Authenticator;
 import java.util.HashSet;
@@ -32,6 +29,9 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.Cookie;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.SecurityContext;
+import org.apache.pinot.thirdeye.datalayer.bao.SessionManager;
+import org.apache.pinot.thirdeye.datalayer.dto.SessionDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,9 +62,8 @@ public class ThirdEyeAuthFilter extends AuthFilter<ThirdEyeCredentials, ThirdEye
     String uriPath = requestContext.getUriInfo().getPath();
     LOG.info("Checking auth for {}", uriPath);
 
-    ThirdEyePrincipal principal = new ThirdEyePrincipal();
-
-    if (!isAuthenticated(requestContext, principal)) {
+    final ThirdEyePrincipal principal = getPrincipal(requestContext);
+    if (principal == null) {
       // not authenticated, check exceptions
 
       // authenticate end points should be out of auth filter
@@ -109,7 +108,7 @@ public class ThirdEyeAuthFilter extends AuthFilter<ThirdEyeCredentials, ThirdEye
     }
   }
 
-  private boolean isAuthenticated(ContainerRequestContext containerRequestContext, ThirdEyePrincipal principal) {
+  private ThirdEyePrincipal getPrincipal(ContainerRequestContext containerRequestContext) {
     Map<String, Cookie> cookies = containerRequestContext.getCookies();
 
     if (cookies != null && cookies.containsKey(AUTH_TOKEN_NAME)) {
@@ -120,14 +119,14 @@ public class ThirdEyeAuthFilter extends AuthFilter<ThirdEyeCredentials, ThirdEye
         SessionDTO sessionDTO = this.sessionDAO.findBySessionKey(sessionKey);
         if (sessionDTO != null && System.currentTimeMillis() < sessionDTO.getExpirationTime()) {
           // session exist in database and has not expired
-          principal.setName(sessionDTO.getPrincipal());
-          principal.setSessionKey(sessionKey);
+
+          final ThirdEyePrincipal principal = new ThirdEyePrincipal(sessionDTO.getPrincipal(), sessionKey);
           LOG.info("Found valid session {} for user {}", sessionDTO.getSessionKey(), sessionDTO.getPrincipal());
-          return true;
+          return principal;
         }
       }
     }
-    return false;
+    return null;
   }
 
   private static void setCurrentPrincipal(ThirdEyePrincipal principal) {
