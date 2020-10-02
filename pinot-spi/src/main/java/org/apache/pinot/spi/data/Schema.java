@@ -66,6 +66,9 @@ public final class Schema {
   private TimeFieldSpec _timeFieldSpec;
   private final List<DateTimeFieldSpec> _dateTimeFieldSpecs = new ArrayList<>();
   private final List<ComplexFieldSpec> _complexFieldSpecs = new ArrayList<>();
+  // names of the columns that used as primary keys
+  // TODO: add validation checks like duplicate columns and use of time column
+  private List<String> _primaryKeyColumns;
 
   // Json ignored fields
   private transient final Map<String, FieldSpec> _fieldSpecMap = new HashMap<>();
@@ -97,6 +100,14 @@ public final class Schema {
 
   public void setSchemaName(String schemaName) {
     _schemaName = schemaName;
+  }
+
+  public void setPrimaryKeyColumns(List<String> primaryKeyColumns) {
+    _primaryKeyColumns = primaryKeyColumns;
+  }
+
+  public List<String> getPrimaryKeyColumns() {
+    return _primaryKeyColumns;
   }
 
   public List<DimensionFieldSpec> getDimensionFieldSpecs() {
@@ -375,6 +386,13 @@ public final class Schema {
       }
       jsonObject.set("complexFieldSpecs", jsonArray);
     }
+    if (_primaryKeyColumns != null && !_primaryKeyColumns.isEmpty()) {
+      ArrayNode jsonArray = JsonUtils.newArrayNode();
+      for (String column : _primaryKeyColumns) {
+        jsonArray.add(column);
+      }
+      jsonObject.set("primaryKeyColumns", jsonArray);
+    }
     return jsonObject;
   }
 
@@ -558,6 +576,11 @@ public final class Schema {
       return this;
     }
 
+    public SchemaBuilder addPrimaryKeyColumns(List<String> primaryKeyColumns) {
+      _schema.setPrimaryKeyColumns(primaryKeyColumns);
+      return this;
+    }
+
     public Schema build() {
       try {
         _schema.validate();
@@ -590,7 +613,8 @@ public final class Schema {
         .isEqualIgnoreOrder(_dimensionFieldSpecs, that._dimensionFieldSpecs) && EqualityUtils
         .isEqualIgnoreOrder(_metricFieldSpecs, that._metricFieldSpecs) && EqualityUtils
         .isEqual(_timeFieldSpec, that._timeFieldSpec) && EqualityUtils
-        .isEqualIgnoreOrder(_dateTimeFieldSpecs, that._dateTimeFieldSpecs);
+        .isEqualIgnoreOrder(_dateTimeFieldSpecs, that._dateTimeFieldSpecs) && EqualityUtils
+        .isEqual(_primaryKeyColumns, that._primaryKeyColumns);
   }
 
   /**
@@ -623,6 +647,7 @@ public final class Schema {
     result = EqualityUtils.hashCodeOf(result, _metricFieldSpecs);
     result = EqualityUtils.hashCodeOf(result, _timeFieldSpec);
     result = EqualityUtils.hashCodeOf(result, _dateTimeFieldSpecs);
+    result = EqualityUtils.hashCodeOf(result, _primaryKeyColumns);
     return result;
   }
 
@@ -662,11 +687,13 @@ public final class Schema {
       int incomingTimeSize = incomingGranularitySpec.getTimeUnitSize();
       TimeUnit incomingTimeUnit = incomingGranularitySpec.getTimeType();
       String incomingTimeFormat = incomingGranularitySpec.getTimeFormat();
-      Preconditions.checkState(incomingTimeFormat.equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString()) && outgoingTimeFormat
+      Preconditions.checkState(
+          incomingTimeFormat.equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString()) && outgoingTimeFormat
               .equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString()),
           "Conversion from incoming to outgoing is not supported for SIMPLE_DATE_FORMAT");
       String transformFunction =
-          constructTransformFunctionString(incomingName, incomingTimeSize, incomingTimeUnit, outgoingTimeSize, outgoingTimeUnit);
+          constructTransformFunctionString(incomingName, incomingTimeSize, incomingTimeUnit, outgoingTimeSize,
+              outgoingTimeUnit);
       dateTimeFieldSpec.setTransformFunction(transformFunction);
     }
 
@@ -679,8 +706,8 @@ public final class Schema {
   /**
    * Constructs a transformFunction string for the time column, based on incoming and outgoing timeGranularitySpec
    */
-  private static String constructTransformFunctionString(String incomingName, int incomingTimeSize, TimeUnit incomingTimeUnit,
-      int outgoingTimeSize, TimeUnit outgoingTimeUnit) {
+  private static String constructTransformFunctionString(String incomingName, int incomingTimeSize,
+      TimeUnit incomingTimeUnit, int outgoingTimeSize, TimeUnit outgoingTimeUnit) {
 
     String innerFunction = incomingName;
     switch (incomingTimeUnit) {
