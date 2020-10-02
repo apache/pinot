@@ -56,6 +56,10 @@ public final class SegmentProcessorUtils {
 
   /**
    * Converts a Pinot schema to an Avro schema
+   *
+   * NOTE: for all types, we use "union['int/long/float/double/string/bytes', 'null'] in order to be able to handle
+   * "null" values correctly. When reading the data from Pinot segments, it's possible that the value can be "null".
+   * (e.g. Add new columns to the schema and read the old segment that doesn't have the data on the new columns)
    */
   public static Schema convertPinotSchemaToAvroSchema(org.apache.pinot.spi.data.Schema pinotSchema) {
     SchemaBuilder.FieldAssembler<org.apache.avro.Schema> fieldAssembler = SchemaBuilder.record("record").fields();
@@ -66,22 +70,28 @@ public final class SegmentProcessorUtils {
       if (fieldSpec.isSingleValueField()) {
         switch (dataType) {
           case INT:
-            fieldAssembler = fieldAssembler.name(name).type().intType().noDefault();
+            fieldAssembler =
+                fieldAssembler.name(name).type().unionOf().intType().and().nullType().endUnion().noDefault();
             break;
           case LONG:
-            fieldAssembler = fieldAssembler.name(name).type().longType().noDefault();
+            fieldAssembler =
+                fieldAssembler.name(name).type().unionOf().longType().and().nullType().endUnion().noDefault();
             break;
           case FLOAT:
-            fieldAssembler = fieldAssembler.name(name).type().floatType().noDefault();
+            fieldAssembler =
+                fieldAssembler.name(name).type().unionOf().floatType().and().nullType().endUnion().noDefault();
             break;
           case DOUBLE:
-            fieldAssembler = fieldAssembler.name(name).type().doubleType().noDefault();
+            fieldAssembler =
+                fieldAssembler.name(name).type().unionOf().doubleType().and().nullType().endUnion().noDefault();
             break;
           case STRING:
-            fieldAssembler = fieldAssembler.name(name).type().stringType().noDefault();
+            fieldAssembler =
+                fieldAssembler.name(name).type().unionOf().stringType().and().nullType().endUnion().noDefault();
             break;
           case BYTES:
-            fieldAssembler = fieldAssembler.name(name).type().bytesType().noDefault();
+            fieldAssembler =
+                fieldAssembler.name(name).type().unionOf().bytesType().and().nullType().endUnion().noDefault();
             break;
           default:
             throw new RuntimeException("Unsupported data type: " + dataType);
@@ -89,19 +99,29 @@ public final class SegmentProcessorUtils {
       } else {
         switch (dataType) {
           case INT:
-            fieldAssembler = fieldAssembler.name(name).type().array().items().intType().noDefault();
+            fieldAssembler =
+                fieldAssembler.name(name).type().unionOf().array().items().intType().and().nullType().endUnion()
+                    .noDefault();
             break;
           case LONG:
-            fieldAssembler = fieldAssembler.name(name).type().array().items().longType().noDefault();
+            fieldAssembler =
+                fieldAssembler.name(name).type().unionOf().array().items().longType().and().nullType().endUnion()
+                    .noDefault();
             break;
           case FLOAT:
-            fieldAssembler = fieldAssembler.name(name).type().array().items().floatType().noDefault();
+            fieldAssembler =
+                fieldAssembler.name(name).type().unionOf().array().items().floatType().and().nullType().endUnion()
+                    .noDefault();
             break;
           case DOUBLE:
-            fieldAssembler = fieldAssembler.name(name).type().array().items().doubleType().noDefault();
+            fieldAssembler =
+                fieldAssembler.name(name).type().unionOf().array().items().doubleType().and().nullType().endUnion()
+                    .noDefault();
             break;
           case STRING:
-            fieldAssembler = fieldAssembler.name(name).type().array().items().stringType().noDefault();
+            fieldAssembler =
+                fieldAssembler.name(name).type().unionOf().array().items().stringType().and().nullType().endUnion()
+                    .noDefault();
             break;
           default:
             throw new RuntimeException("Unsupported data type: " + dataType);

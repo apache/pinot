@@ -31,13 +31,28 @@ import com.google.common.base.Preconditions;
 public class SegmentConfig {
 
   private static final int DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT = 5_000_000;
+  private static final String DEFAULT_SEGMENT_NAME_GENERATOR_TYPE = "simple";
+
   private final int _maxNumRecordsPerSegment;
-  // TODO: more configs such as segment name prefix
+
+  // Currently, 'simple', 'normalizedDate' are supported
+  private final String _segmentNameGeneratorType;
+  private final String _segmentPrefix;
+  private final String _segmentPostfix;
+  private final boolean _excludeSequenceId;
 
   @JsonCreator
-  private SegmentConfig(@JsonProperty(value = "maxNumRecordsPerSegment") int maxNumRecordsPerSegment) {
+  private SegmentConfig(@JsonProperty(value = "maxNumRecordsPerSegment") int maxNumRecordsPerSegment,
+      @JsonProperty(value = "segmentNameGeneratorType") String segmentNameGeneratorType,
+      @JsonProperty(value = "segmentPrefix") String segmentPrefix,
+      @JsonProperty(value = "segmentPostfix") String segmentPostfix,
+      @JsonProperty(value = "excludeSequenceId") boolean excludeSequenceId) {
     Preconditions.checkState(maxNumRecordsPerSegment > 0, "Max num records per segment must be > 0");
     _maxNumRecordsPerSegment = maxNumRecordsPerSegment;
+    _segmentNameGeneratorType = segmentNameGeneratorType;
+    _segmentPrefix = segmentPrefix;
+    _segmentPostfix = segmentPostfix;
+    _excludeSequenceId = excludeSequenceId;
   }
 
   /**
@@ -48,25 +63,72 @@ public class SegmentConfig {
     return _maxNumRecordsPerSegment;
   }
 
+  @JsonProperty
+  public String getSegmentNameGeneratorType() {
+    return _segmentNameGeneratorType;
+  }
+
+  @JsonProperty
+  public String getSegmentPrefix() {
+    return _segmentPrefix;
+  }
+
+  @JsonProperty
+  public String getSegmentPostfix() {
+    return _segmentPostfix;
+  }
+
+  @JsonProperty
+  public boolean getExcludeSequenceId() {
+    return _excludeSequenceId;
+  }
+
   /**
    * Builder for SegmentConfig
    */
   public static class Builder {
     private int _maxNumRecordsPerSegment = DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT;
+    private String _segmentNameGeneratorType = DEFAULT_SEGMENT_NAME_GENERATOR_TYPE;
+    private String _segmentPrefix;
+    private String _segmentPostfix;
+    private boolean _excludeSequenceId;
 
     public Builder setMaxNumRecordsPerSegment(int maxNumRecordsPerSegment) {
       _maxNumRecordsPerSegment = maxNumRecordsPerSegment;
       return this;
     }
 
+    public Builder setSegmentNameGeneratorType(String segmentNameGeneratorType) {
+      _segmentNameGeneratorType = segmentNameGeneratorType;
+      return this;
+    }
+
+    public Builder setSegmentPrefix(String segmentPrefix) {
+      _segmentPrefix = segmentPrefix;
+      return this;
+    }
+
+    public Builder setSegmentPostfix(String segmentPostfix) {
+      _segmentPostfix = segmentPostfix;
+      return this;
+    }
+
+    public Builder setExcludeSequenceId(boolean excludeSequenceId) {
+      _excludeSequenceId = excludeSequenceId;
+      return this;
+    }
+
     public SegmentConfig build() {
       Preconditions.checkState(_maxNumRecordsPerSegment > 0, "Max num records per segment must be > 0");
-      return new SegmentConfig(_maxNumRecordsPerSegment);
+      return new SegmentConfig(_maxNumRecordsPerSegment, _segmentNameGeneratorType, _segmentPrefix, _segmentPostfix,
+          _excludeSequenceId);
     }
   }
 
   @Override
   public String toString() {
-    return "SegmentsConfig{" + "_maxNumRecordsPerSegment=" + _maxNumRecordsPerSegment + '}';
+    return "SegmentConfig{" + "_maxNumRecordsPerSegment=" + _maxNumRecordsPerSegment + ", _segmentNameGeneratorType='"
+        + _segmentNameGeneratorType + '\'' + ", _segmentPrefix='" + _segmentPrefix + '\'' + ", _segmentPostfix='"
+        + _segmentPostfix + '\'' + ", _excludeSequenceId=" + _excludeSequenceId + '}';
   }
 }

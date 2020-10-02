@@ -35,6 +35,7 @@ import org.apache.pinot.spi.data.DateTimeFormatSpec;
  */
 public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator {
   private String _segmentNamePrefix;
+  private String _segmentNamePostfix;
   private boolean _excludeSequenceId;
   private boolean _appendPushType;
 
@@ -48,7 +49,14 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
   public NormalizedDateSegmentNameGenerator(String tableName, @Nullable String segmentNamePrefix,
       boolean excludeSequenceId, @Nullable String pushType, @Nullable String pushFrequency, @Nullable
       DateTimeFormatSpec dateTimeFormatSpec) {
+    this(tableName, segmentNamePrefix, excludeSequenceId, pushType, pushFrequency, dateTimeFormatSpec, null);
+  }
+
+  public NormalizedDateSegmentNameGenerator(String tableName, @Nullable String segmentNamePrefix,
+      boolean excludeSequenceId, @Nullable String pushType, @Nullable String pushFrequency, @Nullable
+      DateTimeFormatSpec dateTimeFormatSpec, @Nullable String segmentNamePostfix) {
     _segmentNamePrefix = segmentNamePrefix != null ? segmentNamePrefix.trim() : tableName;
+    _segmentNamePostfix = segmentNamePostfix != null ? segmentNamePostfix.trim() : null;
     _excludeSequenceId = excludeSequenceId;
     _appendPushType = "APPEND".equalsIgnoreCase(pushType);
 
@@ -88,9 +96,9 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
     // Include time value for APPEND push type
     if (_appendPushType) {
       return JOINER.join(_segmentNamePrefix, getNormalizedDate(Preconditions.checkNotNull(minTimeValue)),
-          getNormalizedDate(Preconditions.checkNotNull(maxTimeValue)), sequenceIdInSegmentName);
+          getNormalizedDate(Preconditions.checkNotNull(maxTimeValue)), _segmentNamePostfix, sequenceIdInSegmentName);
     } else {
-      return JOINER.join(_segmentNamePrefix, sequenceIdInSegmentName);
+        return JOINER.join(_segmentNamePrefix, _segmentNamePostfix, sequenceIdInSegmentName);
     }
   }
 
@@ -130,6 +138,9 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
     }
     if (_inputSDF != null) {
       stringBuilder.append(", inputSDF=").append(_inputSDF.toPattern());
+    }
+    if (_segmentNamePostfix != null) {
+      stringBuilder.append(", segmentNamePostfix=").append(_segmentNamePostfix);
     }
     return stringBuilder.toString();
   }

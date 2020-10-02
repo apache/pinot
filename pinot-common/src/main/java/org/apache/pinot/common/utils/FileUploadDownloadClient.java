@@ -61,6 +61,7 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -104,7 +105,11 @@ public class FileUploadDownloadClient implements Closeable {
   private static final String OLD_SEGMENT_PATH = "/segments";
   private static final String SEGMENT_PATH = "/v2/segments";
   private static final String TABLES_PATH = "/tables";
+  private static final String START_REPLACE_SEGMENTS_PATH = "/startReplaceSegments";
+  private static final String END_REPLACE_SEGMENTS_PATH = "/endReplaceSegments";
+  private static final String SEGMENT_LINEAGE_ENTRY_ID_PARAMETER = "&segmentLineageEntryId=";
   private static final String TYPE_DELIMITER = "?type=";
+  private static final String JSON_CONTENT_TYPE = "application/json";
 
   private final CloseableHttpClient _httpClient;
 
@@ -146,6 +151,23 @@ public class FileUploadDownloadClient implements Closeable {
       throws URISyntaxException {
     return new URI(StringUtil.join("/", StringUtils.chomp(HTTP + "://" + host + ":" + port, "/"), OLD_SEGMENT_PATH,
         rawTableName + TYPE_DELIMITER + tableType));
+  }
+
+  public static URI getStartReplaceSegmentsURI(URI controllerURI, String rawTableName, String tableType)
+      throws URISyntaxException {
+    return new URI(StringUtil.join("/", StringUtils
+            .chomp(controllerURI.getScheme() + "://" + controllerURI.getHost() + ":" + controllerURI.getPort(), "/"),
+        OLD_SEGMENT_PATH, rawTableName + START_REPLACE_SEGMENTS_PATH + TYPE_DELIMITER + tableType));
+  }
+
+  public static URI getEndReplaceSegmentsURI(URI controllerURI, String rawTableName, String tableType,
+      String segmentLineageEntryId)
+      throws URISyntaxException {
+    return new URI(StringUtil.join("/", StringUtils
+            .chomp(controllerURI.getScheme() + "://" + controllerURI.getHost() + ":" + controllerURI.getPort(), "/"),
+        OLD_SEGMENT_PATH,
+        rawTableName + END_REPLACE_SEGMENTS_PATH + TYPE_DELIMITER + tableType + SEGMENT_LINEAGE_ENTRY_ID_PARAMETER
+            + segmentLineageEntryId));
   }
 
   public static URI getRetrieveSchemaHttpURI(String host, int port, String schemaName)
@@ -287,11 +309,26 @@ public class FileUploadDownloadClient implements Closeable {
     return requestBuilder.build();
   }
 
+  private static HttpUriRequest getStartReplaceSegmentsRequest(URI uri, String jsonRequestBody, int socketTimeoutMs) {
+    RequestBuilder requestBuilder = RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
+        .setHeader(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE)
+        .setEntity(new StringEntity(jsonRequestBody, ContentType.APPLICATION_JSON));
+    setTimeout(requestBuilder, socketTimeoutMs);
+    return requestBuilder.build();
+  }
+
+  private static HttpUriRequest endStartReplaceSegmentsRequest(URI uri, int socketTimeoutMs) {
+    RequestBuilder requestBuilder = RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
+        .setHeader(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE);
+    setTimeout(requestBuilder, socketTimeoutMs);
+    return requestBuilder.build();
+  }
+
   private static HttpUriRequest getSendSegmentUriRequest(URI uri, String downloadUri, @Nullable List<Header> headers,
       @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
     RequestBuilder requestBuilder = RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
         .setHeader(CustomHeaders.UPLOAD_TYPE, FileUploadType.URI.toString())
-        .setHeader(CustomHeaders.DOWNLOAD_URI, downloadUri).setHeader(HttpHeaders.CONTENT_TYPE, "application/json");
+        .setHeader(CustomHeaders.DOWNLOAD_URI, downloadUri).setHeader(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE);
     addHeadersAndParameters(requestBuilder, headers, parameters);
     setTimeout(requestBuilder, socketTimeoutMs);
     return requestBuilder.build();
@@ -545,6 +582,37 @@ public class FileUploadDownloadClient implements Closeable {
     NameValuePair tableNameValuePair = new BasicNameValuePair(QueryParameters.TABLE_NAME, rawTableName);
     List<NameValuePair> parameters = Arrays.asList(tableNameValuePair);
     return uploadSegment(uri, segmentName, inputStream, null, parameters, DEFAULT_SOCKET_TIMEOUT_MS);
+  }
+
+  /**
+   * Start the segment replacement process
+   *
+   * @param uri URI
+   * @param startReplaceSegmentsRequest Request object for startReplaceSegments API
+   * @param socketTimeoutMs Socket timeout in milliseconds
+   * @return Response
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public SimpleHttpResponse startReplaceSegments(URI uri, StartReplaceSegmentsRequest startReplaceSegmentsRequest,
+      int socketTimeoutMs)
+      throws IOException, HttpErrorStatusException {
+    return sendRequest(
+        getStartReplaceSegmentsRequest(uri, JsonUtils.objectToString(startReplaceSegmentsRequest), socketTimeoutMs));
+  }
+
+  /**
+   * End the segment replacement process
+   *
+   * @param uri URI
+   * @param socketTimeoutMs Socket timeout in milliseconds
+   * @return Response
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public SimpleHttpResponse endReplaceSegments(URI uri, int socketTimeoutMs)
+      throws IOException, HttpErrorStatusException {
+    return sendRequest(endStartReplaceSegmentsRequest(uri, socketTimeoutMs));
   }
 
   /**

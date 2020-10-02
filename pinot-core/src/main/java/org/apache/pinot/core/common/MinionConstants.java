@@ -28,6 +28,8 @@ public class MinionConstants {
   public static final String SEGMENT_NAME_KEY = "segmentName";
   public static final String DOWNLOAD_URL_KEY = "downloadURL";
   public static final String UPLOAD_URL_KEY = "uploadURL";
+  public static final String VIP_URL_KEY = "vipURL";
+  public static final String REPLACE_SEGMENTS_KEY = "replaceSegments";
   public static final String URL_SEPARATOR = ",";
 
   /**
@@ -43,7 +45,6 @@ public class MinionConstants {
   public static final String MAX_NUM_ATTEMPTS_KEY = "maxNumAttempts";
   public static final String INITIAL_RETRY_DELAY_MS_KEY = "initialRetryDelayMs";
   public static final String RETRY_SCALE_FACTOR_KEY = "retryScaleFactor";
-
   public static final String TABLE_MAX_NUM_TASKS_KEY = "tableMaxNumTasks";
 
   public static class ConvertToRawIndexTask {
@@ -57,9 +58,20 @@ public class MinionConstants {
   }
 
   public static class MergeRollupTask {
-    public static final String TASK_TYPE = "mergeRollupTask";
-    public static final String MERGE_TYPE_KEY = "mergeTypeKey";
-    public static final String MERGED_SEGMENT_NAME_KEY = "mergedSegmentNameKey";
+    public static final String TASK_TYPE = "MergeRollupTask";
+
+    public static final String MERGE_STRATEGY_TYPE = "mergeStrategyType";
+    public static final String MAX_NUM_SEGMENTS_PER_TASK_KEY = "maxNumSegmentsPerTask";
+    public static final String MAX_NUM_RECORDS_PER_SEGMENT_KEY = "maxNumRecordsPerSegment";
+    public static final String BUFFER_TIME_PERIOD_KEY = "bufferTimePeriod";
+    public static final String COLLECTOR_TYPE_KEY = "collectorType";
+    public static final String SEGMENT_GRANULARITY = "segmentGranularity";
+
+    // segment name generator related configs
+    public static final String SEGMENT_NAME_GENERATOR_TYPE_KEY = "segmentNameGeneratorType";
+    public static final String SEGMENT_PREFIX_KEY = "segmentPrefix";
+    public static final String SEGMENT_POSTFIX_KEY = "segmentSuffix";
+    public static final String EXCLUDE_SEQUENCE_ID_KEY = "excludeSequenceId";
   }
 
   /**

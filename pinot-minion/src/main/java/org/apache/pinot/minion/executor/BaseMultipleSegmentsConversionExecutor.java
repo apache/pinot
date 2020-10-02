@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicNameValuePair;
+import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
@@ -50,6 +51,8 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseMultipleSegmentsConversionExecutor.class);
+
+  private static String SEGMENTS_PATH = "/segments";
 
   /**
    * Converts the segment based on the given {@link PinotTaskConfig}.
@@ -87,10 +90,14 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     String inputSegmentNames = configs.get(MinionConstants.SEGMENT_NAME_KEY);
     String downloadURLString = configs.get(MinionConstants.DOWNLOAD_URL_KEY);
     String[] downloadURLs = downloadURLString.split(MinionConstants.URL_SEPARATOR);
-    String uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
+    String vipURL = configs.get(MinionConstants.VIP_URL_KEY);
+    String uploadURL = vipURL + SEGMENTS_PATH;
+    String replaceSegmentsString = configs.get(MinionConstants.REPLACE_SEGMENTS_KEY);
+    boolean replaceSegmentsEnabled = Boolean.parseBoolean(replaceSegmentsString);
 
-    LOGGER.info("Start executing {} on table: {}, input segments: {} with downloadURLs: {}, uploadURL: {}", taskType,
-        tableNameWithType, inputSegmentNames, downloadURLString, uploadURL);
+    LOGGER.info(
+        "Start executing {} on table: {}, input segments: {} with downloadURLs: {}, uploadURL: {}, replaceSegmentsEnabled: {}",
+        taskType, tableNameWithType, inputSegmentNames, downloadURLString, uploadURL, replaceSegmentsEnabled);
 
     File tempDataDir = new File(new File(MINION_CONTEXT.getDataDir(), taskType), "tmp-" + UUID.randomUUID());
     Preconditions.checkState(tempDataDir.mkdirs());
@@ -137,6 +144,17 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
             taskType + " on table: " + tableNameWithType + ", segments: " + inputSegmentNames + " got cancelled");
       }
 
+      // Update the segment lineage to indicate that the segment replacement is in progress.
+      String lineageEntryId = null;
+      if (replaceSegmentsEnabled) {
+        List<String> segmentsFrom =
+            Arrays.stream(inputSegmentNames.split(",")).map(String::trim).collect(Collectors.toList());
+        List<String> segmentsTo =
+            segmentConversionResults.stream().map(SegmentConversionResult::getSegmentName).collect(Collectors.toList());
+        lineageEntryId = SegmentConversionUtils
+            .startSegmentReplace(tableNameWithType, vipURL, new StartReplaceSegmentsRequest(segmentsFrom, segmentsTo));
+      }
+
       // Upload the tarred segments
       for (int i = 0; i < numOutputSegments; i++) {
         File convertedTarredSegmentFile = tarredSegmentFiles.get(i);
@@ -151,6 +169,11 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
 
         SegmentConversionUtils.uploadSegment(configs, null, parameters, tableNameWithType, resultSegmentName, uploadURL,
             convertedTarredSegmentFile);
+      }
+
+      // Update the segment lineage to indicate that the segment replacement is done.
+      if (replaceSegmentsEnabled) {
+        SegmentConversionUtils.endSegmentReplace(tableNameWithType, vipURL, lineageEntryId);
       }
 
       String outputSegmentNames = segmentConversionResults.stream().map(SegmentConversionResult::getSegmentName)

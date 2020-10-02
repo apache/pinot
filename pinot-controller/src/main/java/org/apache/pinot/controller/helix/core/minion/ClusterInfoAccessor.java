@@ -22,6 +22,8 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.helix.task.TaskState;
+import org.apache.pinot.common.lineage.SegmentLineage;
+import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
@@ -156,5 +158,18 @@ public class ClusterInfoAccessor {
    */
   public String getVipUrl() {
     return _controllerConf.generateVipUrl();
+  }
+
+
+  /**
+   * Get the segment lineage for the given table name with type suffix.
+   *
+   * @param tableNameWithType Table name with type suffix
+   * @return Segment lineage
+   */
+  @Nullable
+  public SegmentLineage getSegmentLineage(String tableNameWithType) {
+    return SegmentLineageAccessHelper
+        .getSegmentLineage(_pinotHelixResourceManager.getPropertyStore(), tableNameWithType);
   }
 }

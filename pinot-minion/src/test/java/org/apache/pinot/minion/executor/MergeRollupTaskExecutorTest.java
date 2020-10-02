@@ -27,14 +27,15 @@ import org.apache.commons.io.FileUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.minion.PinotTaskConfig;
-import org.apache.pinot.core.minion.rollup.MergeType;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.core.segment.processing.collector.CollectorFactory;
 import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -43,6 +44,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -57,7 +59,7 @@ public class MergeRollupTaskExecutorTest {
   private static final File WORKING_DIR = new File(TEMP_DIR, "workingDir");
   private static final int NUM_SEGMENTS = 10;
   private static final int NUM_ROWS = 5;
-  private static final String MERGED_SEGMENT_NAME = "testMergedSegment";
+  private static final String SEGMENT_NAME = "testMergedSegment";
   private static final String TABLE_NAME = "testTable";
   private static final String D1 = "d1";
 
@@ -79,7 +81,7 @@ public class MergeRollupTaskExecutorTest {
 
     _segmentIndexDirList = new ArrayList<>();
     for (int i = 0; i < NUM_SEGMENTS; i++) {
-      String segmentName = MERGED_SEGMENT_NAME + i;
+      String segmentName = SEGMENT_NAME + i;
       RecordReader recordReader = new GenericRowRecordReader(rows);
       SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
       config.setOutDir(ORIGINAL_SEGMENT_DIR.getPath());
@@ -96,6 +98,8 @@ public class MergeRollupTaskExecutorTest {
     ZkHelixPropertyStore<ZNRecord> helixPropertyStore = mock(ZkHelixPropertyStore.class);
     when(helixPropertyStore.get("/CONFIGS/TABLE/testTable_OFFLINE", null, AccessOption.PERSISTENT))
         .thenReturn(TableConfigUtils.toZNRecord(tableConfig));
+    when(helixPropertyStore.get("/SCHEMAS/testTable", null, AccessOption.PERSISTENT))
+        .thenReturn(SchemaUtils.toZNRecord(schema));
     minionContext.setHelixPropertyStore(helixPropertyStore);
   }
 
@@ -104,16 +108,17 @@ public class MergeRollupTaskExecutorTest {
       throws Exception {
     MergeRollupTaskExecutor mergeRollupTaskExecutor = new MergeRollupTaskExecutor();
     Map<String, String> configs = new HashMap<>();
-    configs.put(MinionConstants.MergeRollupTask.MERGE_TYPE_KEY, MergeType.CONCATENATE.toString());
-    configs.put(MinionConstants.MergeRollupTask.MERGED_SEGMENT_NAME_KEY, MERGED_SEGMENT_NAME);
-    configs.put(MinionConstants.TABLE_NAME_KEY, "testTable_OFFLINE");
+    configs.put(MinionConstants.TABLE_NAME_KEY, TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME));
+    configs.put(MinionConstants.MergeRollupTask.COLLECTOR_TYPE_KEY, CollectorFactory.CollectorType.CONCAT.toString());
+    configs.put(MinionConstants.MergeRollupTask.SEGMENT_NAME_GENERATOR_TYPE_KEY, "simple");
+    configs.put(MinionConstants.MergeRollupTask.SEGMENT_POSTFIX_KEY, "12345");
 
     PinotTaskConfig pinotTaskConfig = new PinotTaskConfig(MinionConstants.MergeRollupTask.TASK_TYPE, configs);
     List<SegmentConversionResult> conversionResults =
         mergeRollupTaskExecutor.convert(pinotTaskConfig, _segmentIndexDirList, WORKING_DIR);
 
     Assert.assertEquals(conversionResults.size(), 1);
-    Assert.assertEquals(conversionResults.get(0).getSegmentName(), MERGED_SEGMENT_NAME);
+    Assert.assertEquals(conversionResults.get(0).getSegmentName(), "testTable_12345_0");
     File mergedSegment = conversionResults.get(0).getFile();
     try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(mergedSegment)) {
       int numRecords = 0;

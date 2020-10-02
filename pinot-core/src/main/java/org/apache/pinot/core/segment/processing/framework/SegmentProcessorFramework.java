@@ -25,9 +25,16 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.core.segment.name.NormalizedDateSegmentNameGenerator;
+import org.apache.pinot.core.segment.name.SegmentNameGenerator;
+import org.apache.pinot.core.segment.name.SimpleSegmentNameGenerator;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,6 +52,9 @@ import org.slf4j.LoggerFactory;
 public class SegmentProcessorFramework {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentProcessorFramework.class);
+
+  public static final String SIMPLE_SEGMENT_NAME_GENERATOR = "simple";
+  public static final String NORMALIZED_DATE_SEGMENT_NAME_GENERATOR = "normalizedDate";
 
   private final File _inputSegmentsDir;
   private final File _outputSegmentsDir;
@@ -178,6 +188,12 @@ public class SegmentProcessorFramework {
       segmentGeneratorConfig.setInputFilePath(resultFile.getAbsolutePath());
       segmentGeneratorConfig.setFormat(FileFormat.AVRO);
       segmentGeneratorConfig.setSequenceId(segmentNum ++);
+
+      // Resolve segment name generator
+      SegmentNameGenerator segmentNameGenerator =
+          getSegmentNameGenerator(_tableConfig, _pinotSchema, _segmentProcessorConfig.getSegmentConfig());
+      segmentGeneratorConfig.setSegmentNameGenerator(segmentNameGenerator);
+
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       driver.init(segmentGeneratorConfig);
       driver.build();
@@ -185,6 +201,36 @@ public class SegmentProcessorFramework {
 
     LOGGER.info("Successfully converted segments from: {} to {}", _inputSegmentsDir,
         Arrays.toString(_outputSegmentsDir.list()));
+  }
+
+  private SegmentNameGenerator getSegmentNameGenerator(TableConfig tableConfig, Schema schema,
+      SegmentConfig segmentConfig) {
+    String rawTableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
+    String segmentNameGeneratorType = segmentConfig.getSegmentNameGeneratorType();
+    if (segmentNameGeneratorType == null) {
+      segmentNameGeneratorType = SIMPLE_SEGMENT_NAME_GENERATOR;
+    }
+
+    switch (segmentNameGeneratorType) {
+      case SIMPLE_SEGMENT_NAME_GENERATOR:
+        return new SimpleSegmentNameGenerator(rawTableName, segmentConfig.getSegmentPostfix());
+      case NORMALIZED_DATE_SEGMENT_NAME_GENERATOR:
+        SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+        DateTimeFormatSpec dateTimeFormatSpec = null;
+        String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+
+        if (timeColumnName != null) {
+          DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
+          if (dateTimeFieldSpec != null) {
+            dateTimeFormatSpec = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
+          }
+        }
+        return new NormalizedDateSegmentNameGenerator(rawTableName, segmentConfig.getSegmentPrefix(),
+            segmentConfig.getExcludeSequenceId(), validationConfig.getSegmentPushType(),
+            validationConfig.getSegmentPushFrequency(), dateTimeFormatSpec, segmentConfig.getSegmentPostfix());
+      default:
+        throw new UnsupportedOperationException("Unsupported segment name generator type: " + segmentNameGeneratorType);
+    }
   }
 
   /**

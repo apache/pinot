@@ -27,8 +27,11 @@ import org.apache.http.Header;
 import org.apache.http.HttpStatus;
 import org.apache.http.NameValuePair;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.apache.pinot.core.common.MinionConstants;
@@ -93,6 +96,37 @@ public class SegmentConversionUtils {
           return false;
         }
       });
+    }
+  }
+
+  public static String startSegmentReplace(String tableNameWithType, String vipURL,
+      StartReplaceSegmentsRequest startReplaceSegmentsRequest)
+      throws Exception {
+    SSLContext sslContext = MinionContext.getInstance().getSSLContext();
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient(sslContext)) {
+      URI uri = FileUploadDownloadClient
+          .getStartReplaceSegmentsURI(new URI(vipURL), TableNameBuilder.extractRawTableName(tableNameWithType),
+              TableNameBuilder.getTableTypeFromTableName(tableNameWithType).name());
+      SimpleHttpResponse response = fileUploadDownloadClient
+          .startReplaceSegments(uri, startReplaceSegmentsRequest, FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+      String responseString = response.getResponse();
+      LOGGER.info("Got response {}: {} while uploading table: {}, vipURL: {}, request: {}", response.getStatusCode(),
+          responseString, tableNameWithType, vipURL, startReplaceSegmentsRequest);
+      return JsonUtils.stringToJsonNode(responseString).get("segmentLineageEntryId").asText();
+    }
+  }
+
+  public static void endSegmentReplace(String tableNameWithType, String vipURL, String segmentLineageEntryId)
+      throws Exception {
+    SSLContext sslContext = MinionContext.getInstance().getSSLContext();
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient(sslContext)) {
+      URI uri = FileUploadDownloadClient
+          .getEndReplaceSegmentsURI(new URI(vipURL), TableNameBuilder.extractRawTableName(tableNameWithType),
+              TableNameBuilder.getTableTypeFromTableName(tableNameWithType).name(), segmentLineageEntryId);
+      SimpleHttpResponse response =
+          fileUploadDownloadClient.endReplaceSegments(uri, FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+      LOGGER.info("Got response {}: {} while uploading table: {}, vipURL: {}", response.getStatusCode(),
+          response.getResponse(), tableNameWithType, vipURL);
     }
   }
 }

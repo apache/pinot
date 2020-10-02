@@ -325,7 +325,7 @@ public class SegmentProcessingFrameworkTest {
 
     // record transformation
     Map<String, String> recordTransformationMap = new HashMap<>();
-    recordTransformationMap.put("clicks", "times(clicks, 0)");
+    recordTransformationMap.put("clicks", "Groovy({clicks * 0}, clicks)");
     config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_pinotSchema)
         .setRecordTransformerConfig(
             new RecordTransformerConfig.Builder().setTransformFunctionsMap(recordTransformationMap).build()).build();
