@@ -29,35 +29,31 @@ import org.apache.pinot.common.utils.helix.HelixHelper;
 
 
 public class ClusterInstanceConfigChangeListener implements InstanceConfigChangeListener {
-    private HelixManager _helixManager;
-    private List<InstanceConfig> _instanceConfigs = new ArrayList<>();
-    private Long _lastEventTimestamp = null;
-    private boolean _listenerInitiated = false;
+  private final HelixManager _helixManager;
+  private List<InstanceConfig> _instanceConfigs = new ArrayList<>();
+  private Long _lastEventTimestamp = null;
+  private boolean _listenerInitiated = false;
 
-    public ClusterInstanceConfigChangeListener(HelixManager helixManager) {
-        _helixManager = helixManager;
+  public ClusterInstanceConfigChangeListener(HelixManager helixManager) {
+    _helixManager = helixManager;
+  }
+
+  @Override
+  public synchronized void onInstanceConfigChange(List<InstanceConfig> instanceConfigs, NotificationContext context) {
+    if (context.getType() == NotificationContext.Type.INIT) {
+      _listenerInitiated = true;
     }
 
-    @Override
-    public void onInstanceConfigChange(List<InstanceConfig> instanceConfigs, NotificationContext context) {
-        if(context.getType() == NotificationContext.Type.INIT){
-            _listenerInitiated = true;
-        }
-
-        if(_lastEventTimestamp == null || _lastEventTimestamp <= context.getCreationTime()) {
-            synchronized (this) {
-                _instanceConfigs = instanceConfigs;
-                _lastEventTimestamp = context.getCreationTime();
-            }
-        }
+    if (_lastEventTimestamp == null || _lastEventTimestamp <= context.getCreationTime()) {
+      _instanceConfigs = instanceConfigs;
+      _lastEventTimestamp = context.getCreationTime();
     }
+  }
 
-    public List<InstanceConfig> getInstanceConfigs() {
-        if(_instanceConfigs.isEmpty() || !_listenerInitiated){
-            synchronized (this) {
-                _instanceConfigs = HelixHelper.getInstanceConfigs(_helixManager);
-            }
-        }
-        return _instanceConfigs;
+  public List<InstanceConfig> getInstanceConfigs() {
+    if (_instanceConfigs.isEmpty() || !_listenerInitiated) {
+      _instanceConfigs = HelixHelper.getInstanceConfigs(_helixManager);
     }
+    return _instanceConfigs;
+  }
 }
