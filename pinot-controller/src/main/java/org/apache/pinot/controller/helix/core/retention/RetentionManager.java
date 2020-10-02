@@ -44,6 +44,7 @@ import org.apache.pinot.controller.helix.core.retention.strategy.RetentionStrate
 import org.apache.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
@@ -96,9 +97,11 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       LOGGER.error("Failed to get table config for table: {}", tableNameWithType);
       return;
     }
+
+    // For offline tables, ensure that the segmentPushType is APPEND.
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     String segmentPushType = validationConfig.getSegmentPushType();
-    if (!"APPEND".equalsIgnoreCase(segmentPushType)) {
+    if (tableConfig.getTableType() == TableType.OFFLINE && !"APPEND".equalsIgnoreCase(segmentPushType)) {
       LOGGER.info("Segment push type is not APPEND for table: {}, skip", tableNameWithType);
       return;
     }

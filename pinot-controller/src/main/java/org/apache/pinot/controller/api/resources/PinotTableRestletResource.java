@@ -151,7 +151,7 @@ public class PinotTableRestletResource {
   public String recommendConfig(String inputStr) {
     try {
       return RecommenderDriver.run(inputStr);
-    }catch (Exception e){
+    } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     }
   }

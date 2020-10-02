@@ -1095,16 +1095,7 @@ public class PinotHelixResourceManager {
    */
   public void addTable(TableConfig tableConfig)
       throws IOException {
-    TenantConfig tenantConfig = tableConfig.getTenantConfig();
-    String brokerTag = tenantConfig.getBroker();
-    String serverTag = tenantConfig.getServer();
-    if (brokerTag == null || serverTag == null) {
-      String newBrokerTag = brokerTag == null ? TagNameUtils.DEFAULT_TENANT_NAME : brokerTag;
-      String newServerTag = serverTag == null ? TagNameUtils.DEFAULT_TENANT_NAME : serverTag;
-      tableConfig.setTenantConfig(new TenantConfig(newBrokerTag, newServerTag, tenantConfig.getTagOverrideConfig()));
-    }
     validateTableTenantConfig(tableConfig);
-
     String tableNameWithType = tableConfig.getTableName();
     SegmentsValidationAndRetentionConfig segmentsConfig = tableConfig.getValidationConfig();
 
@@ -1191,12 +1182,27 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Validates the tenant config for the table
+   * Validates the tenant config for the table. In case of a single tenant cluster,
+   * if the server and broker tenants are not specified in the config, they're
+   * auto-populated with the default tenant name. In case of a multi-tenant cluster,
+   * these parameters must be specified in the table config.
    */
   @VisibleForTesting
   void validateTableTenantConfig(TableConfig tableConfig) {
-    String tableNameWithType = tableConfig.getTableName();
     TenantConfig tenantConfig = tableConfig.getTenantConfig();
+    String tableNameWithType = tableConfig.getTableName();
+    String brokerTag = tenantConfig.getBroker();
+    String serverTag = tenantConfig.getServer();
+    if (brokerTag == null || serverTag == null) {
+      if (!_isSingleTenantCluster) {
+        throw new InvalidTableConfigException(
+            "server and broker tenants must be specified for multi-tenant cluster for table: " + tableNameWithType);
+      }
+
+      String newBrokerTag = brokerTag == null ? TagNameUtils.DEFAULT_TENANT_NAME : brokerTag;
+      String newServerTag = serverTag == null ? TagNameUtils.DEFAULT_TENANT_NAME : serverTag;
+      tableConfig.setTenantConfig(new TenantConfig(newBrokerTag, newServerTag, tenantConfig.getTagOverrideConfig()));
+    }
 
     // Check if tenant exists before creating the table
     Set<String> tagsToCheck = new TreeSet<>();
