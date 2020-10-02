@@ -54,8 +54,7 @@ public class TestThirdEyeRcaRestClient {
 
     Client client = MockAbstractRestClient.setupMockClient(expectedResponse);
 
-    ThirdEyePrincipal principal = new ThirdEyePrincipal();
-    principal.setSessionKey("dummy");
+    ThirdEyePrincipal principal = new ThirdEyePrincipal(null, "dummy");
     ThirdEyeRcaRestClient rcaClient = new ThirdEyeRcaRestClient(client, principal);
     Map<String, Object> result = rcaClient.getRootCauseHighlights(anomalyId);
 

@@ -19,6 +19,10 @@
 
 package org.apache.pinot.thirdeye.common.restclient;
 
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import java.util.Map;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.Invocation;
@@ -26,9 +30,6 @@ import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.GenericType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.thirdeye.auth.ThirdEyePrincipal;
-
-import static org.mockito.Matchers.*;
-import static org.mockito.Mockito.*;
 
 
 public class MockThirdEyeRcaRestClient {
@@ -47,8 +48,7 @@ public class MockThirdEyeRcaRestClient {
     when(builder.get()).thenReturn(response);
     when(response.readEntity(any(GenericType.class))).thenReturn(expectedResponse);
 
-    ThirdEyePrincipal principal = new ThirdEyePrincipal();
-    principal.setSessionKey("dummy");
+    ThirdEyePrincipal principal = new ThirdEyePrincipal(null, "dummy");
 
     return new ThirdEyeRcaRestClient(client, principal);
   }
