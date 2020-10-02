@@ -50,7 +50,7 @@ public class ClusterInstanceConfigChangeListener implements InstanceConfigChange
     }
   }
 
-  public List<InstanceConfig> getInstanceConfigs() {
+  public synchronized List<InstanceConfig> getInstanceConfigs() {
     if (_instanceConfigs.isEmpty() || !_listenerInitiated) {
        return HelixHelper.getInstanceConfigs(_helixManager);
     }
