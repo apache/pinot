@@ -54,7 +54,7 @@ public class ClusterLiveInstanceChangeListener implements LiveInstanceChangeList
 
   public List<LiveInstance> getLiveInstances() {
     if (_liveInstances.isEmpty() || !_listenerInitiated) {
-      _liveInstances = _helixDataAccessor.getChildValues(_keyBuilder.liveInstances());
+       return _helixDataAccessor.getChildValues(_keyBuilder.liveInstances());
     }
     return _liveInstances;
   }
