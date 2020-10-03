@@ -83,6 +83,7 @@ import org.apache.pinot.thirdeye.detection.cache.builder.TimeSeriesCacheBuilder;
 import org.apache.pinot.thirdeye.detection.finetune.GridSearchTuningAlgorithm;
 import org.apache.pinot.thirdeye.detection.finetune.TuningAlgorithm;
 import org.apache.pinot.thirdeye.detection.health.DetectionHealth;
+import org.apache.pinot.thirdeye.detection.performance.PerformanceMetrics;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.apache.pinot.thirdeye.detector.function.BaseAnomalyFunction;
 import org.apache.pinot.thirdeye.formatter.DetectionAlertConfigFormatter;
@@ -220,6 +221,38 @@ public class DetectionResource {
       return anomalyResult;
     }).collect(Collectors.toList());
     return Response.ok(result).build();
+  }
+
+  @Path("performance/{id}")
+  @GET
+  @ApiOperation("Get performance metrics for detection with given id in time range")
+  public Response getPerformanceMetrics(@PathParam("id") Long detectionConfigId, @QueryParam("start") long startTime,
+      @QueryParam("end") long endTime) {
+    List<MergedAnomalyResultDTO> anomalies = this.anomalyDAO
+        .findByPredicate(Predicate.AND(
+          Predicate.EQ("detectionConfigId", detectionConfigId),
+          Predicate.LT("startTime", endTime),
+          Predicate.GT("endTime", startTime)));
+
+    List<String> statusClassifications = anomalies
+        .parallelStream()
+        .filter(anomaly -> !anomaly.isChild())
+        .map(anomaly -> ResourceUtils.getStatusClassification(anomaly).toString())
+        .collect(Collectors.toList());
+
+    PerformanceMetrics pm;
+    try {
+      pm = new PerformanceMetrics.Builder(statusClassifications)
+          .addTotalAnomalies()
+          .addResponseRate()
+          .addPrecision()
+          .addRecall()
+          .build();
+    } catch (Exception e) {
+      return Response.status(Response.Status.BAD_REQUEST).entity(e.getMessage()).build();
+    }
+    return Response.ok(pm).build();
+
   }
 
   @POST
