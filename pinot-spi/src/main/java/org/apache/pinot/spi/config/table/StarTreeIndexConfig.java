@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
@@ -42,8 +43,10 @@ public class StarTreeIndexConfig extends BaseJsonConfig {
       @JsonProperty("skipStarNodeCreationForDimensions") @Nullable List<String> skipStarNodeCreationForDimensions,
       @JsonProperty(value = "functionColumnPairs", required = true) List<String> functionColumnPairs,
       @JsonProperty("maxLeafRecords") int maxLeafRecords) {
-    Preconditions.checkArgument(dimensionsSplitOrder != null, "'dimensionsSplitOrder' must be configured");
-    Preconditions.checkArgument(functionColumnPairs != null, "'functionColumnPairs' must be configured");
+    Preconditions
+        .checkArgument(CollectionUtils.isNotEmpty(dimensionsSplitOrder), "'dimensionsSplitOrder' must be configured");
+    Preconditions
+        .checkArgument(CollectionUtils.isNotEmpty(functionColumnPairs), "'functionColumnPairs' must be configured");
     _dimensionsSplitOrder = dimensionsSplitOrder;
     _skipStarNodeCreationForDimensions = skipStarNodeCreationForDimensions;
     _functionColumnPairs = functionColumnPairs;
