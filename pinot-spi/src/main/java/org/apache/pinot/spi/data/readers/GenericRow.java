@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -121,6 +122,14 @@ public class GenericRow {
    */
   public void putValue(String fieldName, @Nullable Object value) {
     _fieldToValueMap.put(fieldName, value);
+  }
+
+  public PrimaryKey getPrimaryKey(List<String> primaryKeyColumns) {
+    Object[] fields = new Object[primaryKeyColumns.size()];
+    for (int i = 0; i < primaryKeyColumns.size(); i++) {
+      fields[i] = getValue(primaryKeyColumns.get(i));
+    }
+    return new PrimaryKey(fields);
   }
 
   /**

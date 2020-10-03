@@ -108,6 +108,7 @@ public class ProtoBufRecordReaderTest extends AbstractRecordReaderTest {
     _pinotSchema = getPinotSchema();
     // Generate random records based on Pinot schema
     _records = generateRandomRecords(_pinotSchema);
+    _primaryKeys = generatePrimaryKeys(_records, getPrimaryKeyColumns());
     // Write generated random records to file
     writeRecordsToFile(_records);
     // Create and init RecordReader
@@ -124,9 +125,9 @@ public class ProtoBufRecordReaderTest extends AbstractRecordReaderTest {
   @Test
   public void testRecordReader()
       throws Exception {
-    checkValue(_recordReader, _records);
+    checkValue(_recordReader, _records, _primaryKeys);
     _recordReader.rewind();
-    checkValue(_recordReader, _records);
+    checkValue(_recordReader, _records, _primaryKeys);
   }
 
   @Override

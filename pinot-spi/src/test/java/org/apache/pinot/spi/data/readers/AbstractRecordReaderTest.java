@@ -34,6 +34,7 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+import org.testng.collections.Lists;
 
 
 public abstract class AbstractRecordReaderTest {
@@ -42,6 +43,7 @@ public abstract class AbstractRecordReaderTest {
 
   protected final File _tempDir = new File(FileUtils.getTempDirectory(), "RecordReaderTest");
   protected List<Map<String, Object>> _records;
+  protected List<Object[]> _primaryKeys;
   protected org.apache.pinot.spi.data.Schema _pinotSchema;
   protected Set<String> _sourceFields;
   private RecordReader _recordReader;
@@ -57,6 +59,19 @@ public abstract class AbstractRecordReaderTest {
       records.add(recordMap);
     }
     return records;
+  }
+
+  protected static List<Object[]> generatePrimaryKeys(List<Map<String, Object>> records, List<String> primaryKeyColumns) {
+    List<Object[]> primaryKeys = Lists.newArrayList();
+    for (Map<String, Object> record : records) {
+      Object[] primaryKey = new Object[primaryKeyColumns.size()];
+      for (int i = 0; i < primaryKeyColumns.size(); i++) {
+        String primaryKeyColumn = primaryKeyColumns.get(i);
+        primaryKey[i] = record.get(primaryKeyColumn);
+      }
+      primaryKeys.add(primaryKey);
+    }
+    return primaryKeys;
   }
 
   private static Object generateRandomValue(FieldSpec fieldSpec) {
@@ -88,9 +103,11 @@ public abstract class AbstractRecordReaderTest {
     }
   }
 
-  protected void checkValue(RecordReader recordReader, List<Map<String, Object>> expectedRecordsMap)
+  protected void checkValue(RecordReader recordReader, List<Map<String, Object>> expectedRecordsMap,
+      List<Object[]> expectedPrimaryKeys)
       throws Exception {
-    for (Map<String, Object> expectedRecord : expectedRecordsMap) {
+    for (int i = 0; i < expectedRecordsMap.size(); i++) {
+      Map<String, Object> expectedRecord = expectedRecordsMap.get(i);
       GenericRow actualRecord = recordReader.next();
       for (FieldSpec fieldSpec : _pinotSchema.getAllFieldSpecs()) {
         String fieldSpecName = fieldSpec.getName();
@@ -100,11 +117,13 @@ public abstract class AbstractRecordReaderTest {
           Object[] actualRecords = (Object[]) actualRecord.getValue(fieldSpecName);
           List expectedRecords = (List) expectedRecord.get(fieldSpecName);
           Assert.assertEquals(actualRecords.length, expectedRecords.size());
-          for (int i = 0; i < actualRecords.length; i++) {
-            Assert.assertEquals(actualRecords[i], expectedRecords.get(i));
+          for (int j = 0; j < actualRecords.length; j++) {
+            Assert.assertEquals(actualRecords[j], expectedRecords.get(j));
           }
         }
       }
+      PrimaryKey primaryKey = actualRecord.getPrimaryKey(getPrimaryKeyColumns());
+      Assert.assertEquals(primaryKey.getFields(), expectedPrimaryKeys.get(i));
     }
     Assert.assertFalse(recordReader.hasNext());
   }
@@ -125,6 +144,10 @@ public abstract class AbstractRecordReaderTest {
         .addMetric("met_double", FieldSpec.DataType.DOUBLE).build();
   }
 
+  protected List<String> getPrimaryKeyColumns() {
+    return Lists.newArrayList("dim_sv_int", "dim_sv_string");
+  }
+
   protected Set<String> getSourceFields(Schema schema) {
     return Sets.newHashSet(schema.getColumnNames());
   }
@@ -138,6 +161,7 @@ public abstract class AbstractRecordReaderTest {
     _sourceFields = getSourceFields(_pinotSchema);
     // Generate random records based on Pinot schema
     _records = generateRandomRecords(_pinotSchema);
+    _primaryKeys = generatePrimaryKeys(_records, getPrimaryKeyColumns());
     // Write generated random records to file
     writeRecordsToFile(_records);
     // Create and init RecordReader
@@ -153,9 +177,9 @@ public abstract class AbstractRecordReaderTest {
   @Test
   public void testRecordReader()
       throws Exception {
-    checkValue(_recordReader, _records);
+    checkValue(_recordReader, _records, _primaryKeys);
     _recordReader.rewind();
-    checkValue(_recordReader, _records);
+    checkValue(_recordReader, _records, _primaryKeys);
   }
 
   /**

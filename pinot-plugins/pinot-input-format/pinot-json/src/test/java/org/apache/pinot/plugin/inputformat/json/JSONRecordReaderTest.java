@@ -26,6 +26,7 @@ import java.util.Map;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.AbstractRecordReaderTest;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
@@ -57,9 +58,11 @@ public class JSONRecordReaderTest extends AbstractRecordReaderTest {
   }
 
   @Override
-  protected void checkValue(RecordReader recordReader, List<Map<String, Object>> expectedRecordsMap)
+  protected void checkValue(RecordReader recordReader, List<Map<String, Object>> expectedRecordsMap,
+      List<Object[]> expectedPrimaryKeys)
       throws Exception {
-    for (Map<String, Object> expectedRecord : expectedRecordsMap) {
+    for (int i = 0; i < expectedRecordsMap.size(); i++) {
+      Map<String, Object> expectedRecord = expectedRecordsMap.get(i);
       GenericRow actualRecord = recordReader.next();
       for (FieldSpec fieldSpec : _pinotSchema.getAllFieldSpecs()) {
         String fieldSpecName = fieldSpec.getName();
@@ -70,11 +73,13 @@ public class JSONRecordReaderTest extends AbstractRecordReaderTest {
           Object[] actualRecords = (Object[]) actualRecord.getValue(fieldSpecName);
           List expectedRecords = (List) expectedRecord.get(fieldSpecName);
           Assert.assertEquals(actualRecords.length, expectedRecords.size());
-          for (int i = 0; i < actualRecords.length; i++) {
-            Assert.assertEquals(actualRecords[i].toString(), expectedRecords.get(i).toString());
+          for (int j = 0; j < actualRecords.length; j++) {
+            Assert.assertEquals(actualRecords[j].toString(), expectedRecords.get(j).toString());
           }
         }
       }
+      PrimaryKey primaryKey = actualRecord.getPrimaryKey(getPrimaryKeyColumns());
+      Assert.assertEquals(primaryKey.getFields(), expectedPrimaryKeys.get(i));
     }
     Assert.assertFalse(recordReader.hasNext());
   }
