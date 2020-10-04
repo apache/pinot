@@ -89,7 +89,7 @@ public class SchemaTest {
         .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "time"), null)
         .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
-        .addPrimaryKeyColumns(Lists.newArrayList("svDimension")).build();
+        .setPrimaryKeyColumns(Lists.newArrayList("svDimension")).build();
 
     DimensionFieldSpec dimensionFieldSpec = schema.getDimensionSpec("svDimension");
     Assert.assertNotNull(dimensionFieldSpec);

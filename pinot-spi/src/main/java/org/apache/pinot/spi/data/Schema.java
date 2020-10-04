@@ -67,7 +67,7 @@ public final class Schema {
   private final List<DateTimeFieldSpec> _dateTimeFieldSpecs = new ArrayList<>();
   private final List<ComplexFieldSpec> _complexFieldSpecs = new ArrayList<>();
   // names of the columns that used as primary keys
-  // TODO: add validation checks like duplicate columns and use of time column
+  // TODO(yupeng): add validation checks like duplicate columns and use of time column
   private List<String> _primaryKeyColumns;
 
   // Json ignored fields
@@ -102,12 +102,12 @@ public final class Schema {
     _schemaName = schemaName;
   }
 
-  public void setPrimaryKeyColumns(List<String> primaryKeyColumns) {
-    _primaryKeyColumns = primaryKeyColumns;
-  }
-
   public List<String> getPrimaryKeyColumns() {
     return _primaryKeyColumns;
+  }
+
+  public void setPrimaryKeyColumns(List<String> primaryKeyColumns) {
+    _primaryKeyColumns = primaryKeyColumns;
   }
 
   public List<DimensionFieldSpec> getDimensionFieldSpecs() {
@@ -576,7 +576,7 @@ public final class Schema {
       return this;
     }
 
-    public SchemaBuilder addPrimaryKeyColumns(List<String> primaryKeyColumns) {
+    public SchemaBuilder setPrimaryKeyColumns(List<String> primaryKeyColumns) {
       _schema.setPrimaryKeyColumns(primaryKeyColumns);
       return this;
     }
