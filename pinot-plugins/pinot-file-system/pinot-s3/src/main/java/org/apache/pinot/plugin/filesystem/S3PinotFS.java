@@ -49,6 +49,7 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3ClientBuilder;
 import software.amazon.awssdk.services.s3.model.CopyObjectRequest;
 import software.amazon.awssdk.services.s3.model.CopyObjectResponse;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
@@ -70,6 +71,7 @@ public class S3PinotFS extends PinotFS {
   public static final String ACCESS_KEY = "accessKey";
   public static final String SECRET_KEY = "secretKey";
   public static final String REGION = "region";
+  public static final String ENDPOINT = "endpoint";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(S3PinotFS.class);
   private static final String DELIMITER = "/";
@@ -93,7 +95,16 @@ public class S3PinotFS extends PinotFS {
         awsCredentialsProvider = DefaultCredentialsProvider.create();
       }
 
-      _s3Client = S3Client.builder().region(Region.of(region)).credentialsProvider(awsCredentialsProvider).build();
+      S3ClientBuilder s3ClientBuilder = S3Client.builder().region(Region.of(region)).credentialsProvider(awsCredentialsProvider);
+      if (!isNullOrEmpty(config.getProperty(ENDPOINT))) {
+        String endpoint = config.getProperty(ENDPOINT);
+        try {
+          s3ClientBuilder.endpointOverride(new URI(endpoint));
+        } catch (URISyntaxException e) {
+          throw new RuntimeException(e);
+        }
+      }
+      _s3Client = s3ClientBuilder.build();
     } catch (S3Exception e) {
       throw new RuntimeException("Could not initialize S3PinotFS", e);
     }
