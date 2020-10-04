@@ -26,15 +26,12 @@ import org.apache.pinot.spi.data.readers.PrimaryKey;
 
 
 public class UpsertMetadataTableManager {
-  private final RealtimeTableDataManager _realtimeTableDataManager;
   // TODO(upsert): used for debugging
   private static boolean _upsertInQueryEnabled = true;
 
-
   private final Map<Integer, UpsertMetadataPartitionManager> _partitionMetadataManagerMap = new ConcurrentHashMap();
 
-  public UpsertMetadataTableManager(RealtimeTableDataManager realtimeTableDataManager) {
-    _realtimeTableDataManager = realtimeTableDataManager;
+  public UpsertMetadataTableManager() {
   }
 
   private synchronized UpsertMetadataPartitionManager getOrCreatePartitionManager(int partitionId) {

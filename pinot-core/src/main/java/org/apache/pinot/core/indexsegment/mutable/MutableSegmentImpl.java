@@ -146,8 +146,8 @@ public class MutableSegmentImpl implements MutableSegment {
   private final Map<String, FieldSpec> _newlyAddedPhysicalColumnsFieldMap = new ConcurrentHashMap();
 
   // the primaryKeyIndex for local segment
-  private final int _partitionId;
-  private final UpsertConfig.Mode _mode;
+  private final int _upsertPartitionId;
+  private final UpsertConfig.Mode _upsertMode;
   private final UpsertMetadataTableManager _upsertMetadataTableManager;
   private final Map<PrimaryKey, RecordLocation> _primaryKeyIndex;
   private final ThreadSafeMutableRoaringBitmap _validDocIndex;
@@ -336,11 +336,13 @@ public class MutableSegmentImpl implements MutableSegment {
     // Metric aggregation can be enabled only if config is specified, and all dimensions have dictionary,
     // and no metrics have dictionary. If not enabled, the map returned is null.
     _recordIdMap = enableMetricsAggregationIfPossible(config, noDictionaryColumns);
-    _mode = config.getUpsertMode();
+
+    // init upsert-related data structure
+    _upsertMode = config.getUpsertMode();
     _upsertMetadataTableManager = config.getUpsertMetadataTableManager();
     _primaryKeyIndex = isUpsertEnabled() ? new ConcurrentHashMap() : null;
     _validDocIndex = isUpsertEnabled() ? new ThreadSafeMutableRoaringBitmap() : null;
-    _partitionId = new LLCSegmentName(_segmentName).getPartitionId();
+    _upsertPartitionId = isUpsertEnabled() ? new LLCSegmentName(_segmentName).getPartitionId() : 0;
   }
 
   /**
@@ -464,7 +466,7 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   private boolean isUpsertEnabled() {
-    return _mode != UpsertConfig.Mode.NONE;
+    return _upsertMode != null && _upsertMode != UpsertConfig.Mode.NONE;
   }
 
   private void handleUpsert(GenericRow row, int docId) {
@@ -474,7 +476,7 @@ public class MutableSegmentImpl implements MutableSegment {
     Preconditions.checkArgument(timeValue instanceof Comparable, "time column shall be comparable");
     long timestamp = IngestionUtils.extractTimeValue((Comparable) timeValue);
     UpsertProcessorUtil
-        .handleUpsert(primaryKey, timestamp, _segmentName, docId, _partitionId, _primaryKeyIndex, _validDocIndex,
+        .handleUpsert(primaryKey, timestamp, _segmentName, docId, _upsertPartitionId, _primaryKeyIndex, _validDocIndex,
             _upsertMetadataTableManager);
   }
 

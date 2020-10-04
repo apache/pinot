@@ -114,7 +114,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   public RealtimeTableDataManager(Semaphore segmentBuildSemaphore) {
     _segmentBuildSemaphore = segmentBuildSemaphore;
-    _upsertMetadataTableManager = new UpsertMetadataTableManager(this);
+    _upsertMetadataTableManager = new UpsertMetadataTableManager();
   }
 
   @Override
