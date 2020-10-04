@@ -26,12 +26,15 @@ import org.apache.helix.model.InstanceConfig;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class ClusterInstanceConfigChangeListener implements InstanceConfigChangeListener {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ClusterInstanceConfigChangeListener.class);
   private final HelixManager _helixManager;
   private List<InstanceConfig> _instanceConfigs = new ArrayList<>();
-  private Long _lastEventTimestamp = null;
+  private long _lastEventTimestamp = Long.MIN_VALUE;
   private boolean _listenerInitiated = false;
 
   public ClusterInstanceConfigChangeListener(HelixManager helixManager) {
@@ -44,7 +47,11 @@ public class ClusterInstanceConfigChangeListener implements InstanceConfigChange
       _listenerInitiated = true;
     }
 
-    if (_lastEventTimestamp == null || _lastEventTimestamp <= context.getCreationTime()) {
+    if(_lastEventTimestamp > context.getCreationTime()) {
+      LOGGER.warn("RECEIVED OUT OF ORDER EVENT");
+    }
+
+    if (_lastEventTimestamp <= context.getCreationTime()) {
       _instanceConfigs = instanceConfigs;
       _lastEventTimestamp = context.getCreationTime();
     }

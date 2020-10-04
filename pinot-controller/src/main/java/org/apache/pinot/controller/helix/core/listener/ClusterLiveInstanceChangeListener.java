@@ -26,13 +26,16 @@ import org.apache.helix.model.LiveInstance;
 
 import java.util.List;
 import org.apache.helix.PropertyKey.Builder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class ClusterLiveInstanceChangeListener implements LiveInstanceChangeListener {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ClusterLiveInstanceChangeListener.class);
   private final HelixDataAccessor _helixDataAccessor;
   private Builder _keyBuilder;
   private List<LiveInstance> _liveInstances = new ArrayList<>();
-  private Long _lastEventTimestamp = null;
+  private long _lastEventTimestamp = Long.MIN_VALUE;;
   private boolean _listenerInitiated = false;
 
   public ClusterLiveInstanceChangeListener(HelixDataAccessor helixDataAccessor, Builder keyBuilder) {
@@ -46,7 +49,11 @@ public class ClusterLiveInstanceChangeListener implements LiveInstanceChangeList
       _listenerInitiated = true;
     }
 
-    if (_lastEventTimestamp == null || _lastEventTimestamp <= changeContext.getCreationTime()) {
+    if(_lastEventTimestamp > changeContext.getCreationTime()) {
+      LOGGER.warn("RECEIVED OUT OF ORDER EVENT");
+    }
+
+    if (_lastEventTimestamp <= changeContext.getCreationTime()) {
       _liveInstances = liveInstances;
       _lastEventTimestamp = changeContext.getCreationTime();
     }
