@@ -40,7 +40,7 @@ public class ManagerProvider {
 
   public <T extends AbstractManagerImpl<? extends AbstractDTO>> T getInstance(Class<T> c) {
     T manager = injector.getInstance(c);
-//    manager.setGenericPojoDao(genericPojoDao);
+    manager.setGenericPojoDao(genericPojoDao);
     return manager;
   }
 }
