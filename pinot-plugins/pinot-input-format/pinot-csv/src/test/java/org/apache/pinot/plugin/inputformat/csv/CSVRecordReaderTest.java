@@ -96,8 +96,8 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
           }
         }
         PrimaryKey primaryKey = actualRecord.getPrimaryKey(getPrimaryKeyColumns());
-        for (int j = 0; j < primaryKey.getFields().length; j++) {
-          Assert.assertEquals(primaryKey.getFields()[j].toString(), expectedPrimaryKeys.get(i)[j].toString());
+        for (int j = 0; j < primaryKey.getValues().length; j++) {
+          Assert.assertEquals(primaryKey.getValues()[j].toString(), expectedPrimaryKeys.get(i)[j].toString());
         }
       }
     }

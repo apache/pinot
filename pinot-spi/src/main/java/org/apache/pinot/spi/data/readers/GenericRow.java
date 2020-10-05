@@ -125,11 +125,12 @@ public class GenericRow {
   }
 
   public PrimaryKey getPrimaryKey(List<String> primaryKeyColumns) {
-    Object[] fields = new Object[primaryKeyColumns.size()];
-    for (int i = 0; i < primaryKeyColumns.size(); i++) {
-      fields[i] = getValue(primaryKeyColumns.get(i));
+    Object[] values = new Object[primaryKeyColumns.size()];
+    int size = primaryKeyColumns.size();
+    for (int i = 0; i < size; i++) {
+      values[i] = getValue(primaryKeyColumns.get(i));
     }
-    return new PrimaryKey(fields);
+    return new PrimaryKey(values);
   }
 
   /**

@@ -123,7 +123,7 @@ public abstract class AbstractRecordReaderTest {
         }
       }
       PrimaryKey primaryKey = actualRecord.getPrimaryKey(getPrimaryKeyColumns());
-      Assert.assertEquals(primaryKey.getFields(), expectedPrimaryKeys.get(i));
+      Assert.assertEquals(primaryKey.getValues(), expectedPrimaryKeys.get(i));
     }
     Assert.assertFalse(recordReader.hasNext());
   }

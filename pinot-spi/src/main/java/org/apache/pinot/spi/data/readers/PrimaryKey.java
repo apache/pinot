@@ -22,17 +22,17 @@ import java.util.Arrays;
 
 
 /**
- * The primary key of a record.
+ * The primary key of a record. Note that the value used in the primary key must be single-value.
  */
 public class PrimaryKey {
-  private final Object[] _fields;
+  private final Object[] _values;
 
   public PrimaryKey(Object[] fields) {
-    _fields = fields;
+    _values = fields;
   }
 
-  public Object[] getFields() {
-    return _fields;
+  public Object[] getValues() {
+    return _values;
   }
 
   @Override
@@ -42,18 +42,18 @@ public class PrimaryKey {
     }
     if (obj instanceof PrimaryKey) {
       PrimaryKey that = (PrimaryKey) obj;
-      return Arrays.equals(_fields, that._fields);
+      return Arrays.equals(_values, that._values);
     }
     return false;
   }
 
   @Override
   public int hashCode() {
-    return Arrays.hashCode(_fields);
+    return Arrays.hashCode(_values);
   }
 
   @Override
   public String toString() {
-    return Arrays.toString(_fields);
+    return Arrays.toString(_values);
   }
 }
