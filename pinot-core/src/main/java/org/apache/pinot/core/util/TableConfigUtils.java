@@ -108,11 +108,7 @@ public final class TableConfigUtils {
 
     String segmentPushType = segmentsConfig.getSegmentPushType();
     // segmentPushType is not needed for Realtime table
-    if (tableConfig.getTableType() == TableType.OFFLINE) {
-      if (segmentPushType == null) {
-        throw new IllegalStateException(String.format("Table: %s, null push type", tableName));
-      }
-
+    if (tableConfig.getTableType() == TableType.OFFLINE && segmentPushType != null) {
       if (!segmentPushType.equalsIgnoreCase("REFRESH") && !segmentPushType.equalsIgnoreCase("APPEND")) {
         throw new IllegalStateException(String.format("Table: %s, invalid push type: %s", tableName, segmentPushType));
       }
