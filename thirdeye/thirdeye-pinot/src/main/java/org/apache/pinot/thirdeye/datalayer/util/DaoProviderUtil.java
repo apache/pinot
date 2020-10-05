@@ -19,6 +19,8 @@
 
 package org.apache.pinot.thirdeye.datalayer.util;
 
+import com.google.inject.Guice;
+import com.google.inject.Injector;
 import io.dropwizard.configuration.YamlConfigurationFactory;
 import io.dropwizard.jackson.Jackson;
 import java.io.File;
@@ -27,8 +29,10 @@ import java.io.InputStreamReader;
 import java.sql.Connection;
 import javax.validation.Validation;
 import org.apache.pinot.thirdeye.datalayer.ScriptRunner;
+import org.apache.pinot.thirdeye.datalayer.ThirdEyePersistenceModule;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.AbstractManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.dto.AbstractDTO;
+import org.apache.pinot.thirdeye.datalayer.util.PersistenceConfig.DatabaseConfiguration;
 import org.apache.tomcat.jdbc.pool.DataSource;
 import org.h2.store.fs.FileUtils;
 import org.slf4j.Logger;
@@ -41,21 +45,22 @@ public abstract class DaoProviderUtil {
   private static final String DEFAULT_DATABASE_PATH = "jdbc:h2:./config/h2db";
   private static final String DEFAULT_DATABASE_FILE = "./config/h2db.mv.db";
 
-  private static DataSource dataSource;
-  private static ManagerProvider provider;
+  private static Injector injector;
 
   public static void init(File localConfigFile) {
-    final PersistenceConfig configuration = createConfiguration(localConfigFile);
+    final PersistenceConfig configuration = readPersistenceConfig(localConfigFile);
     final DataSource dataSource = createDataSource(configuration);
 
     // create schema for default database
-    createSchemaIfReqd(configuration);
+    createSchemaIfReqd(dataSource, configuration.getDatabaseConfiguration());
 
     init(dataSource);
   }
 
-  private static void createSchemaIfReqd(final PersistenceConfig configuration) {
-    if (configuration.getDatabaseConfiguration().getUrl().equals(DEFAULT_DATABASE_PATH)
+  private static void createSchemaIfReqd(
+      final DataSource dataSource,
+      final DatabaseConfiguration dbConfig) {
+    if (dbConfig.getUrl().equals(DEFAULT_DATABASE_PATH)
         && !FileUtils.exists(DEFAULT_DATABASE_FILE)) {
       try {
         LOG.info("Creating database schema for default URL '{}'", DEFAULT_DATABASE_PATH);
@@ -70,8 +75,7 @@ public abstract class DaoProviderUtil {
         LOG.error("Could not create database schema. Attempting to use existing.", e);
       }
     } else {
-      LOG.info("Using existing database at '{}'",
-          configuration.getDatabaseConfiguration().getUrl());
+      LOG.info("Using existing database at '{}'", dbConfig.getUrl());
     }
   }
 
@@ -98,26 +102,24 @@ public abstract class DaoProviderUtil {
     return dataSource;
   }
 
-  public static void init(DataSource ds) {
-    dataSource = ds;
-    provider = new ManagerProvider(dataSource);
+  public static void init(DataSource dataSource) {
+    injector = Guice.createInjector(new ThirdEyePersistenceModule(dataSource));
   }
 
-  public static PersistenceConfig createConfiguration(File configFile) {
-    YamlConfigurationFactory<PersistenceConfig> factory =
-        new YamlConfigurationFactory<>(PersistenceConfig.class,
-            Validation.buildDefaultValidatorFactory().getValidator(), Jackson.newObjectMapper(),
-            "");
-    PersistenceConfig configuration;
+  public static PersistenceConfig readPersistenceConfig(File configFile) {
+    YamlConfigurationFactory<PersistenceConfig> factory = new YamlConfigurationFactory<>(
+        PersistenceConfig.class,
+        Validation.buildDefaultValidatorFactory().getValidator(),
+        Jackson.newObjectMapper(),
+        "");
     try {
-      configuration = factory.build(configFile);
+      return factory.build(configFile);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
-    return configuration;
   }
 
   public static <T extends AbstractManagerImpl<? extends AbstractDTO>> T getInstance(Class<T> c) {
-    return provider.getInstance(c);
+    return injector.getInstance(c);
   }
 }

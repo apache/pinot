@@ -16,15 +16,15 @@
 
 package org.apache.pinot.thirdeye.datalayer.bao;
 
-import org.apache.pinot.thirdeye.datalayer.ScriptRunner;
-import org.apache.pinot.thirdeye.datalayer.util.DaoProviderUtil;
-import org.apache.pinot.thirdeye.datalayer.util.PersistenceConfig;
 import java.io.File;
 import java.io.FileReader;
 import java.io.PrintWriter;
 import java.net.URL;
 import java.sql.Connection;
 import org.apache.commons.io.output.NullWriter;
+import org.apache.pinot.thirdeye.datalayer.ScriptRunner;
+import org.apache.pinot.thirdeye.datalayer.util.DaoProviderUtil;
+import org.apache.pinot.thirdeye.datalayer.util.PersistenceConfig;
 import org.apache.tomcat.jdbc.pool.DataSource;
 
 public class DAOTestBase {
@@ -46,7 +46,7 @@ public class DAOTestBase {
     try {
       URL url = DAOTestBase.class.getResource("/persistence-local.yml");
       File configFile = new File(url.toURI());
-      PersistenceConfig configuration = DaoProviderUtil.createConfiguration(configFile);
+      PersistenceConfig configuration = DaoProviderUtil.readPersistenceConfig(configFile);
       initializeDs(configuration);
 
       DaoProviderUtil.init(ds);
