@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.common.base.Preconditions;
@@ -264,5 +265,10 @@ public class TableConfig extends BaseJsonConfig {
 
   public void setTierConfigsList(List<TierConfig> tierConfigsList) {
     _tierConfigsList = tierConfigsList;
+  }
+
+  @JsonIgnore
+  public UpsertConfig.Mode getUpsertMode() {
+    return _upsertConfig == null ? UpsertConfig.Mode.NONE : _upsertConfig.getMode();
   }
 }

@@ -35,6 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+import org.testng.collections.Lists;
 
 
 public class SchemaTest {
@@ -75,7 +76,7 @@ public class SchemaTest {
         + "    \"incomingGranularitySpec\":{\"dataType\":\"LONG\",\"timeType\":\"MILLISECONDS\",\"name\":\"time\"},"
         + "    \"defaultNullValue\":12345" + "  }," + "  \"dateTimeFieldSpecs\":["
         + "    {\"name\":\"Date\", \"dataType\":\"LONG\", \"format\":\"1:MILLISECONDS:EPOCH\", \"granularity\":\"5:MINUTES\", \"dateTimeType\":\"PRIMARY\"}"
-        + "  ]" + "}";
+        + "  ], \"primaryKeyColumns\": [\"d\"]" + "}";
   }
 
   @Test
@@ -87,7 +88,8 @@ public class SchemaTest {
         .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, defaultString)
         .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "time"), null)
-        .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
+        .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
+        .setPrimaryKeyColumns(Lists.newArrayList("svDimension")).build();
 
     DimensionFieldSpec dimensionFieldSpec = schema.getDimensionSpec("svDimension");
     Assert.assertNotNull(dimensionFieldSpec);
@@ -154,6 +156,8 @@ public class SchemaTest {
     Assert.assertEquals(dateTimeFieldSpec.getDefaultNullValue(), Long.MIN_VALUE);
     Assert.assertEquals(dateTimeFieldSpec.getFormat(), "1:HOURS:EPOCH");
     Assert.assertEquals(dateTimeFieldSpec.getGranularity(), "1:HOURS");
+
+    Assert.assertEquals(schema.getPrimaryKeyColumns(), Lists.newArrayList("svDimension"));
   }
 
   @Test
@@ -202,8 +206,8 @@ public class SchemaTest {
     TimeGranularitySpec outgoingTimeGranularitySpec =
         new TimeGranularitySpec(outgoingDataType, outgoingTimeUnitSize, outgoingTimeUnit, outgoingName);
 
-    Schema schema11 = new Schema.SchemaBuilder().setSchemaName("testSchema")
-        .addTime(incomingTimeGranularitySpec, null).build();
+    Schema schema11 =
+        new Schema.SchemaBuilder().setSchemaName("testSchema").addTime(incomingTimeGranularitySpec, null).build();
     Schema schema12 = new Schema.SchemaBuilder().setSchemaName("testSchema").build();
     schema12.addField(new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec));
     Assert.assertNotNull(schema11.getTimeFieldSpec());

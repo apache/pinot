@@ -27,44 +27,22 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
 public class UpsertConfig extends BaseJsonConfig {
-  // names of the columns that used as primary keys of an upsert table
-  private final List<String> _primaryKeyColumns;
-  // name of the column that we are going to store the offset value to
-  private final String _offsetColumn;
-  // name of the virtual column that we are going to store the validFrom value to
-  private final String _validFromColumn;
-  // name of the virtual column that we are going to store the validUntil value to
-  private final String _validUntilColumn;
+  public static final String MODE_KEY = "mode";
+
+  public enum Mode {
+    FULL, PARTIAL, NONE
+  }
+
+  private final Mode _mode;
 
   @JsonCreator
-  public UpsertConfig(@JsonProperty(value = "primaryKeyColumns") List<String> primaryKeyColumns,
-      @JsonProperty(value = "offsetColumn") String offsetColumn,
-      @JsonProperty(value = "validFromColumn") String validFromColumn,
-      @JsonProperty(value = "validUntilColumn") String validUntilColumn) {
-    Preconditions.checkArgument(primaryKeyColumns != null && primaryKeyColumns.size() == 1,
-        "'primaryKeyColumns' must be configured with exact one column");
-    Preconditions.checkArgument(StringUtils.isNotEmpty(offsetColumn), "'offsetColumn' must be configured");
-    Preconditions.checkArgument(StringUtils.isNotEmpty(validFromColumn), "'validFromColumn' must be configured");
-    Preconditions.checkArgument(StringUtils.isNotEmpty(validUntilColumn), "'validUntilColumn' must be configured");
-    _primaryKeyColumns = primaryKeyColumns;
-    _offsetColumn = offsetColumn;
-    _validFromColumn = validFromColumn;
-    _validUntilColumn = validUntilColumn;
+  public UpsertConfig(@JsonProperty(value = "mode") Mode mode) {
+    Preconditions.checkArgument(mode != Mode.PARTIAL, "Partial upsert mode is not supported");
+    _mode = mode;
   }
 
-  public List<String> getPrimaryKeyColumns() {
-    return _primaryKeyColumns;
-  }
-
-  public String getOffsetColumn() {
-    return _offsetColumn;
-  }
-
-  public String getValidFromColumn() {
-    return _validFromColumn;
-  }
-
-  public String getValidUntilColumn() {
-    return _validUntilColumn;
+  @JsonProperty(MODE_KEY)
+  public Mode getMode() {
+    return _mode;
   }
 }
