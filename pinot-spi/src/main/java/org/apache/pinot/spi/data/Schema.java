@@ -500,6 +500,15 @@ public final class Schema {
     }
 
     /**
+     * Add single value dimensionFieldSpec with maxLength and a defaultNullValue
+     */
+    public SchemaBuilder addSingleValueDimension(String dimensionName, DataType dataType, int maxLength,
+                                                 Object defaultNullValue) {
+      _schema.addField(new DimensionFieldSpec(dimensionName, dataType, true, maxLength, defaultNullValue));
+      return this;
+    }
+
+    /**
      * Add multi value dimensionFieldSpec
      */
     public SchemaBuilder addMultiValueDimension(String dimensionName, DataType dataType) {
@@ -508,10 +517,19 @@ public final class Schema {
     }
 
     /**
-     * Add single value dimensionFieldSpec with defaultNullValue
+     * Add multi value dimensionFieldSpec with defaultNullValue
      */
     public SchemaBuilder addMultiValueDimension(String dimensionName, DataType dataType, Object defaultNullValue) {
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, false, defaultNullValue));
+      return this;
+    }
+
+    /**
+     * Add multi value dimensionFieldSpec with maxLength and a defaultNullValue
+     */
+    public SchemaBuilder addMultiValueDimension(String dimensionName, DataType dataType, int maxLength,
+                                                Object defaultNullValue) {
+      _schema.addField(new DimensionFieldSpec(dimensionName, dataType, false, maxLength, defaultNullValue));
       return this;
     }
 
@@ -528,6 +546,14 @@ public final class Schema {
      */
     public SchemaBuilder addMetric(String metricName, DataType dataType, Object defaultNullValue) {
       _schema.addField(new MetricFieldSpec(metricName, dataType, defaultNullValue));
+      return this;
+    }
+
+    /**
+     * Add metricFieldSpec with defaultNullValue
+     */
+    public SchemaBuilder addMetric(String metricName, DataType dataType, int maxLength, Object defaultNullValue) {
+      _schema.addField(new MetricFieldSpec(metricName, dataType, maxLength, defaultNullValue));
       return this;
     }
 

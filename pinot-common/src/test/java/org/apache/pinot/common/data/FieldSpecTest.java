@@ -80,6 +80,18 @@ public class FieldSpecTest {
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
     Assert.assertEquals(fieldSpec1.getDefaultNullValue(), "false");
 
+    // Single-value boolean type dimension field with max length and default null value.
+    fieldSpec1 = new DimensionFieldSpec();
+    fieldSpec1.setName("svDimension");
+    fieldSpec1.setDataType(BOOLEAN);
+    fieldSpec1.setDefaultNullValue(false);
+    fieldSpec1.setMaxLength(20000);
+    fieldSpec2 = new DimensionFieldSpec("svDimension", BOOLEAN, true, 20000, false);
+    Assert.assertEquals(fieldSpec1, fieldSpec2);
+    Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
+    Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
+    Assert.assertEquals(fieldSpec1.getDefaultNullValue(), "false");
+
     // Multi-value dimension field.
     fieldSpec1 = new DimensionFieldSpec();
     fieldSpec1.setName("mvDimension");
@@ -103,12 +115,37 @@ public class FieldSpecTest {
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
     Assert.assertEquals(fieldSpec1.getDefaultNullValue(), -0.1F);
 
+    // Multi-value dimension field with max length and default null value.
+    fieldSpec1 = new DimensionFieldSpec();
+    fieldSpec1.setName("mvDimension");
+    fieldSpec1.setDataType(FLOAT);
+    fieldSpec1.setSingleValueField(false);
+    fieldSpec1.setMaxLength(20000);
+    fieldSpec1.setDefaultNullValue(-0.1);
+    fieldSpec2 = new DimensionFieldSpec("mvDimension", FLOAT, false, 20000, -0.1);
+    Assert.assertEquals(fieldSpec1, fieldSpec2);
+    Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
+    Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
+    Assert.assertEquals(fieldSpec1.getDefaultNullValue(), -0.1F);
+
     // Metric field with default null value.
     fieldSpec1 = new MetricFieldSpec();
     fieldSpec1.setName("metric");
     fieldSpec1.setDataType(LONG);
     fieldSpec1.setDefaultNullValue(1);
     fieldSpec2 = new MetricFieldSpec("metric", LONG, 1);
+    Assert.assertEquals(fieldSpec1, fieldSpec2);
+    Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
+    Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
+    Assert.assertEquals(fieldSpec1.getDefaultNullValue(), 1L);
+
+    // Metric field with max length and default null value.
+    fieldSpec1 = new MetricFieldSpec();
+    fieldSpec1.setName("metric");
+    fieldSpec1.setDataType(LONG);
+    fieldSpec1.setMaxLength(20000);
+    fieldSpec1.setDefaultNullValue(1);
+    fieldSpec2 = new MetricFieldSpec("metric", LONG, 20000, 1);
     Assert.assertEquals(fieldSpec1, fieldSpec2);
     Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());

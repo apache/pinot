@@ -84,9 +84,12 @@ public class SchemaTest {
     String defaultString = "default";
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
         .addSingleValueDimension("svDimensionWithDefault", FieldSpec.DataType.INT, 10)
+        .addSingleValueDimension("svDimensionWithMaxLength", FieldSpec.DataType.INT, 20000, null)
         .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
         .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, defaultString)
+        .addMultiValueDimension("mvDimensionWithMaxLength", FieldSpec.DataType.STRING, 20000, null)
         .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
+        .addMetric("metricWithMaxLength", FieldSpec.DataType.INT, 20000, null)
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "time"), null)
         .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
         .setPrimaryKeyColumns(Lists.newArrayList("svDimension")).build();
@@ -107,6 +110,15 @@ public class SchemaTest {
     Assert.assertTrue(dimensionFieldSpec.isSingleValueField());
     Assert.assertEquals(dimensionFieldSpec.getDefaultNullValue(), 10);
 
+    dimensionFieldSpec = schema.getDimensionSpec("svDimensionWithMaxLength");
+    Assert.assertNotNull(dimensionFieldSpec);
+    Assert.assertEquals(dimensionFieldSpec.getFieldType(), FieldSpec.FieldType.DIMENSION);
+    Assert.assertEquals(dimensionFieldSpec.getName(), "svDimensionWithMaxLength");
+    Assert.assertEquals(dimensionFieldSpec.getDataType(), FieldSpec.DataType.INT);
+    Assert.assertTrue(dimensionFieldSpec.isSingleValueField());
+    Assert.assertEquals(dimensionFieldSpec.getMaxLength(), 20000);
+    Assert.assertEquals(dimensionFieldSpec.getDefaultNullValue(), Integer.MIN_VALUE);
+
     dimensionFieldSpec = schema.getDimensionSpec("mvDimension");
     Assert.assertNotNull(dimensionFieldSpec);
     Assert.assertEquals(dimensionFieldSpec.getFieldType(), FieldSpec.FieldType.DIMENSION);
@@ -123,6 +135,15 @@ public class SchemaTest {
     Assert.assertFalse(dimensionFieldSpec.isSingleValueField());
     Assert.assertEquals(dimensionFieldSpec.getDefaultNullValue(), defaultString);
 
+    dimensionFieldSpec = schema.getDimensionSpec("mvDimensionWithMaxLength");
+    Assert.assertNotNull(dimensionFieldSpec);
+    Assert.assertEquals(dimensionFieldSpec.getFieldType(), FieldSpec.FieldType.DIMENSION);
+    Assert.assertEquals(dimensionFieldSpec.getName(), "mvDimensionWithMaxLength");
+    Assert.assertEquals(dimensionFieldSpec.getDataType(), FieldSpec.DataType.STRING);
+    Assert.assertFalse(dimensionFieldSpec.isSingleValueField());
+    Assert.assertEquals(dimensionFieldSpec.getMaxLength(), 20000);
+    Assert.assertEquals(dimensionFieldSpec.getDefaultNullValue(), "null");
+
     MetricFieldSpec metricFieldSpec = schema.getMetricSpec("metric");
     Assert.assertNotNull(metricFieldSpec);
     Assert.assertEquals(metricFieldSpec.getFieldType(), FieldSpec.FieldType.METRIC);
@@ -138,6 +159,15 @@ public class SchemaTest {
     Assert.assertEquals(metricFieldSpec.getDataType(), FieldSpec.DataType.INT);
     Assert.assertTrue(metricFieldSpec.isSingleValueField());
     Assert.assertEquals(metricFieldSpec.getDefaultNullValue(), 5);
+
+    metricFieldSpec = schema.getMetricSpec("metricWithMaxLength");
+    Assert.assertNotNull(metricFieldSpec);
+    Assert.assertEquals(metricFieldSpec.getFieldType(), FieldSpec.FieldType.METRIC);
+    Assert.assertEquals(metricFieldSpec.getName(), "metricWithMaxLength");
+    Assert.assertEquals(metricFieldSpec.getDataType(), FieldSpec.DataType.INT);
+    Assert.assertTrue(metricFieldSpec.isSingleValueField());
+    Assert.assertEquals(metricFieldSpec.getMaxLength(), 20000);
+    Assert.assertEquals(metricFieldSpec.getDefaultNullValue(), Integer.MIN_VALUE);
 
     TimeFieldSpec timeFieldSpec = schema.getTimeFieldSpec();
     Assert.assertNotNull(timeFieldSpec);
