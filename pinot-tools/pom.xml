@@ -302,6 +302,17 @@
                 </extraArguments>
               </jvmSettings>
             </program>
+            <program>
+              <mainClass>org.apache.pinot.tools.CompatibilityOpsRunner</mainClass>
+              <name>compatibility-tester</name>
+              <jvmSettings>
+                <initialMemorySize>1G</initialMemorySize>
+                <maxMemorySize>1G</maxMemorySize>
+                <extraArguments>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-ingestion-job-log4j2.xml</extraArgument>
+                </extraArguments>
+              </jvmSettings>
+            </program>
           </programs>
           <binFileExtensions>
             <unix>.sh</unix>
