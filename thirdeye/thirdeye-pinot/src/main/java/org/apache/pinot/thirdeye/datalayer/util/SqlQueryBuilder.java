@@ -20,6 +20,8 @@
 package org.apache.pinot.thirdeye.datalayer.util;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.BiMap;
+import com.google.common.collect.Sets;
 import java.lang.reflect.Array;
 import java.sql.Clob;
 import java.sql.Connection;
@@ -35,38 +37,37 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
+import javax.inject.Inject;
+import javax.inject.Singleton;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.thirdeye.datalayer.entity.AbstractEntity;
+import org.apache.pinot.thirdeye.datalayer.entity.AbstractIndexEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.collect.BiMap;
-import com.google.common.collect.Sets;
-import org.apache.pinot.thirdeye.datalayer.entity.AbstractEntity;
-import org.apache.pinot.thirdeye.datalayer.entity.AbstractIndexEntity;
-
+@Singleton
 public class SqlQueryBuilder {
 
   private final static Logger LOG = LoggerFactory.getLogger(SqlQueryBuilder.class);
 
   private static final String BASE_ID = "base_id";
   //insert sql per table
-  Map<String, String> insertSqlMap = new HashMap<>();
+  private final Map<String, String> insertSqlMap = new HashMap<>();
   private static final String NAME_REGEX = "[a-z][_a-z0-9]*";
 
   private static final String PARAM_REGEX = ":(" + NAME_REGEX + ")";
 
   private static final Pattern PARAM_PATTERN =
       Pattern.compile(PARAM_REGEX, Pattern.CASE_INSENSITIVE);
-  private static Set<String> AUTO_UPDATE_COLUMN_SET =
+  private static final Set<String> AUTO_UPDATE_COLUMN_SET =
       Sets.newHashSet("id", "last_modified");
 
-  private EntityMappingHolder entityMappingHolder;;
+  private final EntityMappingHolder entityMappingHolder;;
 
+  @Inject
   public SqlQueryBuilder(EntityMappingHolder entityMappingHolder) {
     this.entityMappingHolder = entityMappingHolder;
-
   }
 
   public static String generateInsertSql(String tableName,
