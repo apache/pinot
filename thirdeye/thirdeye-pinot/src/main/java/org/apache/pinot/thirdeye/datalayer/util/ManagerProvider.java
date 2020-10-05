@@ -23,24 +23,19 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import org.apache.pinot.thirdeye.datalayer.ThirdEyePersistenceModule;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.AbstractManagerImpl;
-import org.apache.pinot.thirdeye.datalayer.dao.GenericPojoDao;
 import org.apache.pinot.thirdeye.datalayer.dto.AbstractDTO;
 import org.apache.tomcat.jdbc.pool.DataSource;
 
 public class ManagerProvider {
 
   private final Injector injector;
-  private final GenericPojoDao genericPojoDao;
 
   public ManagerProvider(DataSource dataSource) {
     final ThirdEyePersistenceModule dataSourceModule = new ThirdEyePersistenceModule(dataSource);
     injector = Guice.createInjector(dataSourceModule);
-    genericPojoDao = injector.getInstance(GenericPojoDao.class);
   }
 
   public <T extends AbstractManagerImpl<? extends AbstractDTO>> T getInstance(Class<T> c) {
-    T manager = injector.getInstance(c);
-    manager.setGenericPojoDao(genericPojoDao);
-    return manager;
+    return injector.getInstance(c);
   }
 }

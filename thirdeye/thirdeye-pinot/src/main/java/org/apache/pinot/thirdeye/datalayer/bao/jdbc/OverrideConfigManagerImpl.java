@@ -19,19 +19,22 @@
 
 package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import java.util.List;
 import org.apache.pinot.thirdeye.datalayer.bao.OverrideConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dao.GenericPojoDao;
 import org.apache.pinot.thirdeye.datalayer.dto.OverrideConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.OverrideConfigBean;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
-import java.util.List;
 
 @Singleton
 public class OverrideConfigManagerImpl extends AbstractManagerImpl<OverrideConfigDTO> implements
     OverrideConfigManager {
 
-  public OverrideConfigManagerImpl() {
-    super(OverrideConfigDTO.class, OverrideConfigBean.class);
+  @Inject
+  public OverrideConfigManagerImpl(GenericPojoDao genericPojoDao) {
+    super(OverrideConfigDTO.class, OverrideConfigBean.class, genericPojoDao);
   }
 
   @Override

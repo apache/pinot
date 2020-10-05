@@ -43,15 +43,13 @@ public abstract class AbstractManagerImpl<E extends AbstractDTO> implements Abst
 
   private final Class<? extends AbstractDTO> dtoClass;
   private final Class<? extends AbstractBean> beanClass;
-  protected GenericPojoDao genericPojoDao;
+  protected final GenericPojoDao genericPojoDao;
 
   protected AbstractManagerImpl(Class<? extends AbstractDTO> dtoClass,
-      Class<? extends AbstractBean> beanClass) {
+      Class<? extends AbstractBean> beanClass,
+      final GenericPojoDao genericPojoDao) {
     this.dtoClass = dtoClass;
     this.beanClass = beanClass;
-  }
-
-  public void setGenericPojoDao(GenericPojoDao genericPojoDao) {
     this.genericPojoDao = genericPojoDao;
   }
 

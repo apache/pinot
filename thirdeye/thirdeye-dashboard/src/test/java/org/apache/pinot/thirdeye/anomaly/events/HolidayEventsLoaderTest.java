@@ -16,8 +16,6 @@
 
 package org.apache.pinot.thirdeye.anomaly.events;
 
-import org.apache.pinot.thirdeye.anomaly.HolidayEventsLoaderConfiguration;
-import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -27,6 +25,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.thirdeye.anomaly.HolidayEventsLoaderConfiguration;
+import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -57,7 +57,7 @@ public class HolidayEventsLoaderTest {
     anotherEventDTO.setTargetDimensionMap(countryCodes);
     eventDTO.setId(0L);
     anotherEventDTO.setId(1L);
-    eventsDAO = new MockEventsManager(new HashSet<>(Arrays.asList(eventDTO, anotherEventDTO)));
+    eventsDAO = new MockEventsManager(new HashSet<>(Arrays.asList(eventDTO, anotherEventDTO)), null);
     holidayEventsLoader = new HolidayEventsLoader(holidayEventsLoaderConfiguration, "path to key", eventsDAO);
   }
 

@@ -19,16 +19,19 @@
 
 package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Inject;
+import java.util.List;
 import org.apache.pinot.thirdeye.datalayer.bao.SessionManager;
+import org.apache.pinot.thirdeye.datalayer.dao.GenericPojoDao;
 import org.apache.pinot.thirdeye.datalayer.dto.SessionDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.SessionBean;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
-import java.util.List;
 
 
 public class SessionManagerImpl extends AbstractManagerImpl<SessionDTO> implements SessionManager {
-  protected SessionManagerImpl() {
-    super(SessionDTO.class, SessionBean.class);
+  @Inject
+  public SessionManagerImpl(GenericPojoDao genericPojoDao) {
+    super(SessionDTO.class, SessionBean.class, genericPojoDao);
   }
 
   @Override
