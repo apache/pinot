@@ -90,6 +90,9 @@ public class CommonConstants {
 
     public static class ZkClient {
       public static final long DEFAULT_CONNECT_TIMEOUT_SEC = 60L;
+      // Retry interval and count for ZK operations where we would rather fail than get an empty (wrong) result back
+      public static final int RETRY_INTERVAL_MS = 50;
+      public static final int RETRY_COUNT = 2;
     }
 
     public static class DataSource {

@@ -28,6 +28,7 @@ import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.kohsuke.args4j.Option;
@@ -133,7 +134,8 @@ public class UpdateSegmentState extends AbstractBaseCommand implements Command {
   public List<String> getAllTenantTables()
       throws Exception {
     String tableConfigPath = "/CONFIGS/TABLE";
-    List<ZNRecord> tableConfigs = _propertyStore.getChildren(tableConfigPath, null, 0);
+    List<ZNRecord> tableConfigs = _propertyStore.getChildren(tableConfigPath, null, 0,
+        CommonConstants.Helix.ZkClient.RETRY_COUNT, CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
     List<String> tables = new ArrayList<>(128);
     for (ZNRecord znRecord : tableConfigs) {
       TableConfig tableConfig = TableConfigUtils.fromZNRecord(znRecord);

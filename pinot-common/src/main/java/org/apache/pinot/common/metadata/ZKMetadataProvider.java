@@ -31,6 +31,7 @@ import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.StringUtil;
@@ -58,9 +59,6 @@ public class ZKMetadataProvider {
   private static final String PROPERTYSTORE_INSTANCE_CONFIGS_PREFIX = "/CONFIGS/INSTANCE";
   private static final String PROPERTYSTORE_CLUSTER_CONFIGS_PREFIX = "/CONFIGS/CLUSTER";
   private static final String PROPERTYSTORE_SEGMENT_LINEAGE = "/SEGMENT_LINEAGE";
-
-  private static final int ZK_OP_RETRY_INTERVAL_MS = 50;
-  private static final int ZK_OP_RETRY_COUNT = 2;
 
   public static void setRealtimeTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String realtimeTableName,
       ZNRecord znRecord) {
@@ -308,7 +306,8 @@ public class ZKMetadataProvider {
       ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     String parentPath = constructPropertyStorePathForResource(offlineTableName);
-    List<ZNRecord> znRecords = propertyStore.getChildren(parentPath, null, AccessOption.PERSISTENT, ZK_OP_RETRY_COUNT, ZK_OP_RETRY_INTERVAL_MS);
+    List<ZNRecord> znRecords = propertyStore.getChildren(parentPath, null, AccessOption.PERSISTENT,
+        CommonConstants.Helix.ZkClient.RETRY_COUNT, CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
     if (znRecords != null) {
       int numZNRecords = znRecords.size();
       List<OfflineSegmentZKMetadata> offlineSegmentZKMetadataList = new ArrayList<>(numZNRecords);
@@ -338,7 +337,8 @@ public class ZKMetadataProvider {
       ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     String parentPath = constructPropertyStorePathForResource(realtimeTableName);
-    List<ZNRecord> znRecords = propertyStore.getChildren(parentPath, null, AccessOption.PERSISTENT, ZK_OP_RETRY_COUNT, ZK_OP_RETRY_INTERVAL_MS);
+    List<ZNRecord> znRecords = propertyStore.getChildren(parentPath, null, AccessOption.PERSISTENT,
+        CommonConstants.Helix.ZkClient.RETRY_COUNT, CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
     if (znRecords != null) {
       int numZNRecords = znRecords.size();
       List<RealtimeSegmentZKMetadata> realtimeSegmentZKMetadataList = new ArrayList<>(numZNRecords);
@@ -368,7 +368,8 @@ public class ZKMetadataProvider {
       ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     String parentPath = constructPropertyStorePathForResource(realtimeTableName);
-    List<ZNRecord> znRecords = propertyStore.getChildren(parentPath, null, AccessOption.PERSISTENT, ZK_OP_RETRY_COUNT, ZK_OP_RETRY_INTERVAL_MS);
+    List<ZNRecord> znRecords = propertyStore.getChildren(parentPath, null, AccessOption.PERSISTENT,
+        CommonConstants.Helix.ZkClient.RETRY_COUNT, CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
     if (znRecords != null) {
       int numZNRecords = znRecords.size();
       List<LLCRealtimeSegmentZKMetadata> llcRealtimeSegmentZKMetadataList = new ArrayList<>(numZNRecords);
