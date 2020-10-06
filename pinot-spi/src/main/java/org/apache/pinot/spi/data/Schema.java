@@ -76,8 +76,6 @@ public final class Schema {
   private transient final List<String> _metricNames = new ArrayList<>();
   private transient final List<String> _dateTimeNames = new ArrayList<>();
 
-
-
   public static Schema fromFile(File schemaFile)
       throws IOException {
     return JsonUtils.fileToObject(schemaFile, Schema.class);
