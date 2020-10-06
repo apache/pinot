@@ -19,19 +19,22 @@
 
 package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Inject;
 import com.google.inject.Singleton;
-import org.apache.pinot.thirdeye.datalayer.bao.EntityToEntityMappingManager;
-import org.apache.pinot.thirdeye.datalayer.dto.EntityToEntityMappingDTO;
-import org.apache.pinot.thirdeye.datalayer.pojo.EntityToEntityMappingBean;
-import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.pinot.thirdeye.datalayer.bao.EntityToEntityMappingManager;
+import org.apache.pinot.thirdeye.datalayer.dao.GenericPojoDao;
+import org.apache.pinot.thirdeye.datalayer.dto.EntityToEntityMappingDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.EntityToEntityMappingBean;
+import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 
 @Singleton
 public class EntityToEntityMappingManagerImpl extends AbstractManagerImpl<EntityToEntityMappingDTO> implements EntityToEntityMappingManager {
-  protected EntityToEntityMappingManagerImpl() {
-    super(EntityToEntityMappingDTO.class, EntityToEntityMappingBean.class);
+  @Inject
+  public EntityToEntityMappingManagerImpl(GenericPojoDao genericPojoDao) {
+    super(EntityToEntityMappingDTO.class, EntityToEntityMappingBean.class, genericPojoDao);
   }
 
   @Override

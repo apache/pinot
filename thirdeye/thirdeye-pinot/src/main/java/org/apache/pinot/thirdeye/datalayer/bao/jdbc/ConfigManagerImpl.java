@@ -19,18 +19,22 @@
 
 package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import java.util.List;
 import org.apache.pinot.thirdeye.datalayer.bao.ConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dao.GenericPojoDao;
 import org.apache.pinot.thirdeye.datalayer.dto.ConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.ConfigBean;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
-import java.util.List;
 
 
 @Singleton
 public class ConfigManagerImpl extends AbstractManagerImpl<ConfigDTO> implements ConfigManager {
-  public ConfigManagerImpl() {
-    super(ConfigDTO.class, ConfigBean.class);
+
+  @Inject
+  public ConfigManagerImpl(GenericPojoDao genericPojoDao) {
+    super(ConfigDTO.class, ConfigBean.class, genericPojoDao);
   }
 
   @Override

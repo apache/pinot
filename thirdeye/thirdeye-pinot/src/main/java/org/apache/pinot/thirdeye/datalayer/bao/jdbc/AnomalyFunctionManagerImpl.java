@@ -19,21 +19,21 @@
 
 package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Inject;
 import com.google.inject.Singleton;
-import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import org.apache.pinot.thirdeye.datalayer.dao.GenericPojoDao;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
 import org.apache.pinot.thirdeye.datalayer.pojo.AnomalyFunctionBean;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
-import org.apache.commons.lang3.StringUtils;
 
 
 @Singleton
@@ -42,8 +42,9 @@ public class AnomalyFunctionManagerImpl extends AbstractManagerImpl<AnomalyFunct
   private static final String FIND_BY_NAME_LIKE = " WHERE functionName like :functionName";
   private static final String FIND_BY_NAME_EQUALS = " WHERE functionName = :functionName";
 
-  public AnomalyFunctionManagerImpl() {
-    super(AnomalyFunctionDTO.class, AnomalyFunctionBean.class);
+  @Inject
+  public AnomalyFunctionManagerImpl(GenericPojoDao genericPojoDao) {
+    super(AnomalyFunctionDTO.class, AnomalyFunctionBean.class, genericPojoDao);
   }
 
   @Override

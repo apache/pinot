@@ -16,12 +16,12 @@
 
 package org.apache.pinot.thirdeye.anomaly.events;
 
-import org.apache.pinot.thirdeye.dashboard.resources.CustomizedEventResource;
-import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
-import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import org.apache.pinot.thirdeye.dashboard.resources.CustomizedEventResource;
+import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
+import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -30,7 +30,7 @@ import org.testng.annotations.Test;
 public class CustomizedEventResourceTest {
 
   private CustomizedEventResource customizedEventResource;
-  private EventManager eventDAO = new MockEventsManager(new HashSet<EventDTO>());
+  private EventManager eventDAO = new MockEventsManager(new HashSet<>(), null);
 
   @BeforeMethod
   public void beforeMethod() {
