@@ -61,6 +61,7 @@ public class MutableSegmentImplTestUtils {
     when(statsHistory.getEstimatedCardinality(anyString())).thenReturn(200);
     when(statsHistory.getEstimatedAvgColSize(anyString())).thenReturn(32);
 
+    UpsertConfig.Mode upsertMode = upsertConfig==null? UpsertConfig.Mode.NONE: upsertConfig.getMode();
     RealtimeSegmentConfig realtimeSegmentConfig =
         new RealtimeSegmentConfig.Builder().setTableNameWithType(TABLE_NAME_WITH_TYPE).setSegmentName(SEGMENT_NAME)
             .setStreamName(STEAM_NAME).setSchema(schema).setCapacity(100000).setAvgNumMultiValues(2)
@@ -68,7 +69,7 @@ public class MutableSegmentImplTestUtils {
             .setInvertedIndexColumns(invertedIndexColumns).setRealtimeSegmentZKMetadata(new RealtimeSegmentZKMetadata())
             .setMemoryManager(new DirectMemoryManager(SEGMENT_NAME)).setStatsHistory(statsHistory)
             .setAggregateMetrics(aggregateMetrics).setNullHandlingEnabled(nullHandlingEnabled)
-            .setUpsertMode(upsertConfig.getMode()).setTimeColumnName(timeColumnName)
+            .setUpsertMode(upsertMode).setTimeColumnName(timeColumnName)
             .setUpsertMetadataTableManager(upsertMetadataTableManager).build();
     return new MutableSegmentImpl(realtimeSegmentConfig, null);
   }

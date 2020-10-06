@@ -61,7 +61,7 @@ public class FilterPlanNode implements PlanNode {
     FilterContext filter = _queryContext.getFilter();
     if (filter != null) {
       BaseFilterOperator filterOperator = constructPhysicalOperator(filter, _queryContext.getDebugOptions());
-      if (UpsertMetadataTableManager.isUpsertInQueryEnabled() && _indexSegment.getValidDocIndex() != null) {
+      if (_indexSegment.getValidDocIndex() != null) {
         BaseFilterOperator validDocFilter =
             new BitmapBasedFilterOperator(_indexSegment.getValidDocIndex().getValidDocBitmap(), false, _numDocs);
         return FilterOperatorUtils.getAndFilterOperator(Lists.newArrayList(filterOperator, validDocFilter), _numDocs,
@@ -69,7 +69,7 @@ public class FilterPlanNode implements PlanNode {
       } else {
         return filterOperator;
       }
-    } else if (UpsertMetadataTableManager.isUpsertInQueryEnabled() && _indexSegment.getValidDocIndex() != null) {
+    } else if (_indexSegment.getValidDocIndex() != null) {
       return new BitmapBasedFilterOperator(_indexSegment.getValidDocIndex().getValidDocBitmap(), false, _numDocs);
     } else {
       return new MatchAllFilterOperator(_numDocs);

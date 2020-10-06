@@ -20,15 +20,16 @@ package org.apache.pinot.core.upsert;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 
-
+/**
+ * The manager of the upsert metadata of a table.
+ */
+@ThreadSafe
 public class UpsertMetadataTableManager {
-  // TODO(upsert): used for debugging
-  private static boolean _upsertInQueryEnabled = true;
-
   private final Map<Integer, UpsertMetadataPartitionManager> _partitionMetadataManagerMap = new ConcurrentHashMap();
 
   public UpsertMetadataTableManager() {
@@ -57,25 +58,17 @@ public class UpsertMetadataTableManager {
     return getOrCreatePartitionManager(partitionId).getRecordLocation(primaryKey);
   }
 
-  public void updateRecordLocation(int partitionId,  PrimaryKey primaryKey, RecordLocation recordLocation) {
-    getOrCreatePartitionManager(partitionId).updateRecordLocation(primaryKey, recordLocation);
-  }
-
   public ThreadSafeMutableRoaringBitmap getValidDocIndex(int partitionId, String segmentName) {
     // TODO(upsert) check existence of the validDocIndex of the given segment, rebuild it if not available
     return getOrCreatePartitionManager(partitionId).getValidDocIndex(segmentName);
   }
 
-  public void putUpsertMetadataOfPartition(int partitionId, String segmentName, Map<PrimaryKey, RecordLocation> primaryKeyIndex,
+  public synchronized void putUpsertMetadataOfPartition(int partitionId, String segmentName, Map<PrimaryKey, RecordLocation> primaryKeyIndex,
       ThreadSafeMutableRoaringBitmap validDocIndex) {
     getOrCreatePartitionManager(partitionId).putUpsertMetadata(segmentName, primaryKeyIndex, validDocIndex);
   }
 
-  public static boolean isUpsertInQueryEnabled() {
-    return _upsertInQueryEnabled;
-  }
-
-  public static void enableUpsertInQuery(boolean enabled) {
-    _upsertInQueryEnabled = enabled;
+  public void removeUpsertMetadataOfSegment(int partitionId, String segmentName) {
+    getOrCreatePartitionManager(partitionId).removeSegment(segmentName);
   }
 }

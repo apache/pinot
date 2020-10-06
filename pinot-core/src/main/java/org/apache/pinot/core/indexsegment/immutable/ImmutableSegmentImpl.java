@@ -139,6 +139,19 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
         LOGGER.error("Failed to close star-tree. Continuing with error.", e);
       }
     }
+    removeUpsertMetadata();
+  }
+
+  private void removeUpsertMetadata() {
+    if (_upsertMetadataTableManager == null) {
+      return;
+    }
+    String segmentName = _segmentMetadata.getName();
+    if (SegmentName.getSegmentType(segmentName) != SegmentName.RealtimeSegmentType.LLC) {
+      return;
+    }
+    int partitionId = new LLCSegmentName(segmentName).getPartitionId();
+    _upsertMetadataTableManager.removeUpsertMetadataOfSegment(partitionId, segmentName);
   }
 
   @Override
