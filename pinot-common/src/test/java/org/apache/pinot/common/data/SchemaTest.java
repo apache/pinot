@@ -167,7 +167,7 @@ public class SchemaTest {
     Assert.assertEquals(metricFieldSpec.getDataType(), FieldSpec.DataType.INT);
     Assert.assertTrue(metricFieldSpec.isSingleValueField());
     Assert.assertEquals(metricFieldSpec.getMaxLength(), 20000);
-    Assert.assertEquals(metricFieldSpec.getDefaultNullValue(), Integer.MIN_VALUE);
+    Assert.assertEquals(metricFieldSpec.getDefaultNullValue(), 0);
 
     TimeFieldSpec timeFieldSpec = schema.getTimeFieldSpec();
     Assert.assertNotNull(timeFieldSpec);
