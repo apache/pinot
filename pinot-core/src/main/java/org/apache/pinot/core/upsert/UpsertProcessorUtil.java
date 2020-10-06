@@ -21,9 +21,13 @@ package org.apache.pinot.core.upsert;
 import java.util.Map;
 import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public final class UpsertProcessorUtil {
+  private static final Logger LOGGER = LoggerFactory.getLogger(UpsertProcessorUtil.class);
+
   private UpsertProcessorUtil() {
   }
 
@@ -39,11 +43,11 @@ public final class UpsertProcessorUtil {
         // update validDocIndex
         validDocIndex.remove(prevLocation.getDocId());
         validDocIndex.checkAndAdd(location.getDocId());
-        System.out.println(String
+        LOGGER.debug(String
             .format("upsert: replace old doc id %d with %d for key: %s, hash: %d", prevLocation.getDocId(),
                 location.getDocId(), primaryKey, primaryKey.hashCode()));
       } else {
-        System.out.println(
+        LOGGER.debug(
             String.format("upsert: ignore a late-arrived record: %s, hash: %d", primaryKey, primaryKey.hashCode()));
       }
     } else if (upsertMetadataTableManager.containsKey(partitionId, primaryKey)) {
