@@ -27,8 +27,8 @@ import java.util.Arrays;
 public class PrimaryKey {
   private final Object[] _values;
 
-  public PrimaryKey(Object[] fields) {
-    _values = fields;
+  public PrimaryKey(Object[] values) {
+    _values = values;
   }
 
   public Object[] getValues() {

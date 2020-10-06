@@ -125,9 +125,9 @@ public class GenericRow {
   }
 
   public PrimaryKey getPrimaryKey(List<String> primaryKeyColumns) {
-    Object[] values = new Object[primaryKeyColumns.size()];
-    int size = primaryKeyColumns.size();
-    for (int i = 0; i < size; i++) {
+    int numPrimaryKeyColumns = primaryKeyColumns.size();
+    Object[] values = new Object[numPrimaryKeyColumns];
+    for (int i = 0; i < numPrimaryKeyColumns; i++) {
       values[i] = getValue(primaryKeyColumns.get(i));
     }
     return new PrimaryKey(values);
