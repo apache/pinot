@@ -30,7 +30,7 @@ echo "Setting Config File : $CONFIG_DIR/data-sources/data-sources-config.yml"
 if [[ "${APP_MODE}" == "stage" ]]; then
 sed -e 's/POSTGRES_HOSTNAME/'"$POSTGRES_HOSTNAME"'/' -e 's/POSTGRES_PORT/'"$POSTGRES_PORT"'/' -e 's/POSTGRES_DATABASE/'"$POSTGRES_DATABASE"'/' -e 's/POSTGRESQL_PASSWORD/'"$POSTGRESQL_PASSWORD"'/' -e 's/DRUID_USERNAME/'""'/' -e 's/DRUID_PASSWORD/'""'/' $CONFIG_DIR/data-sources/data-sources-config.yml.tmpl > $CONFIG_DIR/data-sources/data-sources-config.yml
 elif [[ "${APP_MODE}" == "prod" ]]; then
-sed -e 's/POSTGRES_HOSTNAME/'"$POSTGRES_HOSTNAME"'/' -e 's/POSTGRES_PORT/'"$POSTGRES_PORT"'/' -e 's/POSTGRES_DATABASE/'"$POSTGRES_DATABASE"'/' -e 's/POSTGRESQL_PASSWORD/'"$POSTGRESQL_PASSWORD"'/' -e 's/DRUID_USERNAME/'"$DRUID_USERNAME"'/' -e 's/DRUID_PASSWORD/'"$DRUID_PASSWORD"'/' $CONFIG_DIR/data-sources/data-sources-config.yml.tmpl > $CONFIG_DIR/data-sources/data-sources-config.yml
+sed -e 's/POSTGRES_HOSTNAME/'"$POSTGRES_HOSTNAME"'/' -e 's/POSTGRES_PORT/'"$POSTGRES_PORT"'/' -e 's/POSTGRES_DATABASE/'"$POSTGRES_DATABASE"'/' -e 's/POSTGRESQL_PASSWORD/'"$POSTGRESQL_PASSWORD"'/' -e 's/DRUID_USERNAME/'"$DRUID_USER"'/' -e 's/DRUID_PASSWORD/'"$DRUID_PWD"'/' $CONFIG_DIR/data-sources/data-sources-config.yml.tmpl > $CONFIG_DIR/data-sources/data-sources-config.yml
 fi
 
 app_type=$1

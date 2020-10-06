@@ -3,11 +3,6 @@
 dataSourceConfigs:
   - className: org.apache.pinot.thirdeye.datasource.sql.SqlThirdEyeDataSource
     properties:
-      PostgreSQL:
-        - db:
-            utk_test: jdbc:postgresql://POSTGRES_HOSTNAME:POSTGRES_PORT/POSTGRES_DATABASE
-          user: root
-          password: POSTGRESQL_PASSWORD
       Druid:
         - db:
             druid: jdbc:avatica:remote:url=http://localhost:8082/druid/v2/sql/avatica/
