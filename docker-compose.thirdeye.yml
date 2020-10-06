@@ -48,6 +48,8 @@ services:
       MYSQL_PORT: 3306
       THIRDEYE_DATABASE: thirdeye
       MYSQL_PASSWORD: root
+      DRUID_USERNAME: "aaa"
+      DRUID_PASSWORD: "bbb"
     ports:
       - 1426:1426
       - 1427:1427
@@ -79,6 +81,8 @@ services:
       MYSQL_PORT: 3306
       THIRDEYE_DATABASE: thirdeye
       MYSQL_PASSWORD: root
+      DRUID_USERNAME: "aaa"
+      DRUID_PASSWORD: "bbb"
       #entrypoint: ["/bin/sh", "/opt/thirdeye/bin/entrypoint_dev.sh", "backend"]
     entrypoint: ["/bin/sh", "/opt/thirdeye/bin/entrypoint.sh", "backend"]
     depends_on:

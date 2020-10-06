@@ -27,7 +27,7 @@ echo "Setting Config File : $CONFIG_DIR/persistence.yml"
 sed -e "s/MYSQL_HOSTNAME/$(eval echo $MYSQL_HOSTNAME)/" -e "s/MYSQL_PORT/$(eval echo $MYSQL_PORT)/" -e "s/THIRDEYE_DATABASE/$(eval echo $THIRDEYE_DATABASE)/" -e "s/MYSQL_USERNAME/$(eval echo $MYSQL_USERNAME)/" -e "s/MYSQL_PASSWORD/\"$(eval echo $MYSQL_PASSWORD)\"/" $CONFIG_DIR/persistence.yml.tmpl > $CONFIG_DIR/persistence.yml
 
 echo "Setting Config File : $CONFIG_DIR/data-sources/data-sources-config.yml"
-sed -e 's/POSTGRES_HOSTNAME/'"$POSTGRES_HOSTNAME"'/' -e 's/POSTGRES_PORT/'"$POSTGRES_PORT"'/' -e 's/POSTGRES_DATABASE/'"$POSTGRES_DATABASE"'/' -e 's/POSTGRESQL_PASSWORD/'"$POSTGRESQL_PASSWORD"'/' $CONFIG_DIR/data-sources/data-sources-config.yml.tmpl > $CONFIG_DIR/data-sources/data-sources-config.yml
+sed -e 's/POSTGRES_HOSTNAME/'"$POSTGRES_HOSTNAME"'/' -e 's/POSTGRES_PORT/'"$POSTGRES_PORT"'/' -e 's/POSTGRES_DATABASE/'"$POSTGRES_DATABASE"'/' -e 's/POSTGRESQL_PASSWORD/'"$POSTGRESQL_PASSWORD"'/' -e 's/DRUID_USERNAME/'"$DRUID_USERNAME"'/' -e 's/DRUID_PASSWORD/'"$DRUID_PASSWORD"'/' $CONFIG_DIR/data-sources/data-sources-config.yml.tmpl > $CONFIG_DIR/data-sources/data-sources-config.yml
 
 app_type=$1
 if [[ "${app_type}" == "frontend" ]]; then
