@@ -73,7 +73,7 @@ public interface IndexSegment {
    */
   List<StarTreeV2> getStarTrees();
 
-  // TODO(upsert): solve the coordination problems of getting validDoc across sealed segments and mutable segment for consistency
+  // TODO(upsert): solve the coordination problems of getting validDoc across segments for result consistency
   @Nullable
   ValidDocIndexReader getValidDocIndex();
 

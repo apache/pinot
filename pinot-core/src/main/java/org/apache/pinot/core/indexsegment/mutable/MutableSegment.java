@@ -43,5 +43,9 @@ public interface MutableSegment extends IndexSegment {
    */
   int getNumDocsIndexed();
 
+  /**
+   * Returns the manager for the upsert related metadata
+   * @return the manager for the upsert related metadata
+   */
   UpsertMetadataTableManager getUpsertMetadataTableManager();
 }

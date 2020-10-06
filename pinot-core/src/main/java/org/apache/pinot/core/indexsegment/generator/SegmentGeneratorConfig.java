@@ -36,7 +36,6 @@ import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.segment.name.FixedSegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SimpleSegmentNameGenerator;
-import org.apache.pinot.core.upsert.UpsertMetadataTableManager;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;

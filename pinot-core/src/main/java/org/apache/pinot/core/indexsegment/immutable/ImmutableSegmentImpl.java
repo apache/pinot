@@ -27,6 +27,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
 import org.apache.pinot.core.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
@@ -170,8 +171,11 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
       return null;
     }
     int partitionId = new LLCSegmentName(segmentName).getPartitionId();
-    return _upsertMetadataTableManager.isEmpty() ? null
-        : new ValidDocIndexReaderImpl(_upsertMetadataTableManager.getValidDocIndex(partitionId, segmentName));
+    if (_upsertMetadataTableManager.isEmpty()) {
+      return null;
+    }
+    ThreadSafeMutableRoaringBitmap bitmap = _upsertMetadataTableManager.getValidDocIndex(partitionId, segmentName);
+    return bitmap == null ? null : new ValidDocIndexReaderImpl(bitmap);
   }
 
   @Override

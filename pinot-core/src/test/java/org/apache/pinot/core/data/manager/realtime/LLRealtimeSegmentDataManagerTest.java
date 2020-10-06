@@ -107,14 +107,18 @@ public class LLRealtimeSegmentDataManagerTest {
           + "      \"stream.fakeStream.zk.broker.url\": \"kafka-broker:2181/kafka-queuing\", \n"
           + "      \"streamType\": \"fakeStream\"\n" + "    }\n" + "  }, \n"
           + "  \"tableName\": \"Coffee_REALTIME\", \n" + "  \"tableType\": \"realtime\", \n" + "  \"tenants\": {\n"
-          + "    \"broker\": \"shared\", \n" + "    \"server\": \"server-1\"\n" + "  }\n" + "}";
+          + "    \"broker\": \"shared\", \n" + "    \"server\": \"server-1\"\n" + "  },\n"
+          + " \"upsertConfig\": {\"mode\": \"FULL\" } \n"
+          + "}";
 
   private String makeSchema() {
     return "{" + "  \"schemaName\":\"SchemaTest\"," + "  \"metricFieldSpecs\":[" + "    {\"name\":\"m\",\"dataType\":\""
         + "LONG" + "\"}" + "  ]," + "  \"dimensionFieldSpecs\":[" + "    {\"name\":\"d\",\"dataType\":\"" + "STRING"
         + "\",\"singleValueField\":" + "true" + "}" + "  ]," + "  \"timeFieldSpec\":{"
         + "    \"incomingGranularitySpec\":{\"dataType\":\"LONG\",\"timeType\":\"MILLISECONDS\",\"name\":\"time\"},"
-        + "    \"defaultNullValue\":12345" + "  }" + "}";
+        + "    \"defaultNullValue\":12345" + "  },\n"
+        + "\"primaryKeyColumns\": [\"event_id\"] \n"
+        + "}";
   }
 
   private TableConfig createTableConfig()
