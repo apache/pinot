@@ -32,6 +32,7 @@ public class QueryOptions {
   private final boolean _groupByModeSQL;
   private final boolean _responseFormatSQL;
   private final boolean _preserveType;
+  private final boolean _disableUpsert;
 
   public QueryOptions(@Nullable Map<String, String> queryOptions) {
     if (queryOptions != null) {
@@ -39,11 +40,13 @@ public class QueryOptions {
       _groupByModeSQL = Request.SQL.equalsIgnoreCase(queryOptions.get(Request.QueryOptionKey.GROUP_BY_MODE));
       _responseFormatSQL = Request.SQL.equalsIgnoreCase(queryOptions.get(Request.QueryOptionKey.RESPONSE_FORMAT));
       _preserveType = Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.PRESERVE_TYPE));
+      _disableUpsert = Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.DISABLE_UPSERT));
     } else {
       _timeoutMs = null;
       _groupByModeSQL = false;
       _responseFormatSQL = false;
       _preserveType = false;
+      _disableUpsert = false;
     }
   }
 
@@ -62,6 +65,10 @@ public class QueryOptions {
 
   public boolean isPreserveType() {
     return _preserveType;
+  }
+
+  public boolean isUpsertDisabled() {
+    return _disableUpsert;
   }
 
   @Nullable
