@@ -213,7 +213,8 @@ public class RoutingManager implements ClusterChangeHandler {
     long startTimeMs = System.currentTimeMillis();
 
     List<ZNRecord> instanceConfigZNRecords =
-        _zkDataAccessor.getChildren(_instanceConfigsPath, null, AccessOption.PERSISTENT);
+        _zkDataAccessor.getChildren(_instanceConfigsPath, null, AccessOption.PERSISTENT,
+            CommonConstants.Helix.ZkClient.RETRY_COUNT, CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
     long fetchInstanceConfigsEndTimeMs = System.currentTimeMillis();
 
     // Calculate new enabled and disabled instances

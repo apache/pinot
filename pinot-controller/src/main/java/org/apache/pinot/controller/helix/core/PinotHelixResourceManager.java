@@ -2159,7 +2159,7 @@ public class PinotHelixResourceManager {
         boolean toggleSucceeded = true;
         // Checks all the current states fall into the target states
         PropertyKey instanceCurrentStatesKey = _keyBuilder.currentStates(instanceName, liveInstance.getSessionId());
-        List<CurrentState> instanceCurrentStates = _helixDataAccessor.getChildValues(instanceCurrentStatesKey);
+        List<CurrentState> instanceCurrentStates = _helixDataAccessor.getChildValues(instanceCurrentStatesKey, true);
         if (instanceCurrentStates.isEmpty()) {
           return PinotResourceManagerResponse.SUCCESS;
         } else {

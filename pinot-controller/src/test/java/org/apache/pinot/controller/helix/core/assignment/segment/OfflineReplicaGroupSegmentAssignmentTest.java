@@ -128,7 +128,7 @@ public class OfflineReplicaGroupSegmentAssignmentTest {
     }
     when(propertyStoreWithPartitions
         .getChildren(eq(ZKMetadataProvider.constructPropertyStorePathForResource(OFFLINE_TABLE_NAME_WITH_PARTITION)),
-            any(), anyInt())).thenReturn(segmentZKMetadataZNRecords);
+            any(), anyInt(), anyInt(), anyInt())).thenReturn(segmentZKMetadataZNRecords);
     HelixManager helixManagerWithPartitions = mock(HelixManager.class);
     when(helixManagerWithPartitions.getHelixPropertyStore()).thenReturn(propertyStoreWithPartitions);
 

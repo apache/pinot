@@ -405,7 +405,7 @@ public class HelixHelper {
    */
   public static List<InstanceConfig> getInstanceConfigs(HelixManager helixManager) {
     HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
-    return helixDataAccessor.getChildValues(helixDataAccessor.keyBuilder().instanceConfigs());
+    return helixDataAccessor.getChildValues(helixDataAccessor.keyBuilder().instanceConfigs(), true);
   }
 
   /**
