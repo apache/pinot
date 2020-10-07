@@ -36,6 +36,9 @@
     },
     "referenceLinks": {
       "$ref": "#/definitions/referenceLinks"
+    },
+    "owners": {
+      "$ref": "#/definitions/owners"
     }
   },
 
@@ -107,6 +110,13 @@
         ".*Scheme": {
           "type": "object"
         }
+      }
+    },
+    "owners": {
+      "type": "array",
+      "description": "service owner of this group",
+      "items": {
+        "type": "string"
       }
     }
   }
