@@ -33,7 +33,7 @@ public final class UpsertProcessorUtil {
 
   public static void handleUpsert(PrimaryKey primaryKey, long timestamp, String segmentName, int docId, int partitionId,
       Map<PrimaryKey, RecordLocation> primaryKeyIndex, ThreadSafeMutableRoaringBitmap validDocIndex,
-      UpsertMetadataTableManager upsertMetadataTableManager) {
+      TableUpsertMetadataManager upsertMetadataTableManager) {
     RecordLocation location = new RecordLocation(segmentName, docId, timestamp);
     // check local primary key index first
     if (primaryKeyIndex.containsKey(primaryKey)) {

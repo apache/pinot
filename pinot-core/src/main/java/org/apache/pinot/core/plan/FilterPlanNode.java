@@ -40,7 +40,6 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.predicate.Predicate;
 import org.apache.pinot.core.query.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
-import org.apache.pinot.core.upsert.UpsertMetadataTableManager;
 
 
 public class FilterPlanNode implements PlanNode {

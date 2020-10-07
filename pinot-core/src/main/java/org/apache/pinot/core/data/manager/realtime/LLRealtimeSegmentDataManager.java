@@ -60,7 +60,7 @@ import org.apache.pinot.core.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
-import org.apache.pinot.core.upsert.UpsertMetadataTableManager;
+import org.apache.pinot.core.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
@@ -236,7 +236,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private StreamConsumerFactory _streamConsumerFactory;
   private StreamPartitionMsgOffsetFactory _streamPartitionMsgOffsetFactory;
 
-  private final UpsertMetadataTableManager _upsertMetadataTableManager;
+  private final TableUpsertMetadataManager _upsertMetadataTableManager;
 
   // Segment end criteria
   private volatile long _consumeEndTime = 0;
@@ -1087,7 +1087,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   public LLRealtimeSegmentDataManager(RealtimeSegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
       RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, IndexLoadingConfig indexLoadingConfig,
       Schema schema, LLCSegmentName llcSegmentName, Semaphore partitionConsumerSemaphore, ServerMetrics serverMetrics,
-      UpsertMetadataTableManager upsertMetadataTableManager) {
+      TableUpsertMetadataManager upsertMetadataTableManager) {
     _segBuildSemaphore = realtimeTableDataManager.getSegmentBuildSemaphore();
     _segmentZKMetadata = (LLCRealtimeSegmentZKMetadata) segmentZKMetadata;
     _tableConfig = tableConfig;

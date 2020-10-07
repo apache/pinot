@@ -33,7 +33,7 @@ import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.core.upsert.UpsertMetadataTableManager;
+import org.apache.pinot.core.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -54,7 +54,7 @@ public class RealtimeSegmentConverter {
   private final List<String> _noDictionaryColumns;
   private final List<String> _varLengthDictionaryColumns;
   private final boolean _nullHandlingEnabled;
-  private final UpsertMetadataTableManager _upsertMetadataTableManager;
+  private final TableUpsertMetadataManager _upsertMetadataTableManager;
 
   public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, String outputPath, Schema schema,
       String tableName, TableConfig tableConfig, String segmentName, String sortedColumn,

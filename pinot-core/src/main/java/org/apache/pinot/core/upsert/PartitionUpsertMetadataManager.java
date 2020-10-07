@@ -26,26 +26,26 @@ import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 
 /**
- * Manages the upsert metadata per partition. This shall be accessed from UpsertMetadataTableManager.
+ * Manages the upsert metadata per partition. This shall be accessed from TableUpsertMetadataManager.
  */
 @ThreadSafe
-class UpsertMetadataPartitionManager {
+class PartitionUpsertMetadataManager {
 
   private final int _partitionId;
 
-  private final Map<PrimaryKey, RecordLocation> _primaryKeyIndex = new ConcurrentHashMap();
+  private final Map<PrimaryKey, RecordLocation> _primaryKeyIndex = new ConcurrentHashMap<>();
   // the mapping between the (sealed) segment and its validDocuments
-  private final Map<String, ThreadSafeMutableRoaringBitmap> _segmentToValidDocIndexMap = new ConcurrentHashMap();
+  private final Map<String, ThreadSafeMutableRoaringBitmap> _segmentToValidDocIndexMap = new ConcurrentHashMap<>();
 
-  UpsertMetadataPartitionManager(int partitionId) {
+  PartitionUpsertMetadataManager(int partitionId) {
     _partitionId = partitionId;
   }
 
-  synchronized void removeRecordLocation(PrimaryKey primaryKey) {
+  void removeRecordLocation(PrimaryKey primaryKey) {
     _primaryKeyIndex.remove(primaryKey);
   }
 
-  synchronized boolean containsKey(PrimaryKey primaryKey) {
+  boolean containsKey(PrimaryKey primaryKey) {
     return _primaryKeyIndex.containsKey(primaryKey);
   }
 
@@ -53,11 +53,7 @@ class UpsertMetadataPartitionManager {
     return _primaryKeyIndex.get(primaryKey);
   }
 
-  synchronized void updateRecordLocation(PrimaryKey primaryKey, RecordLocation recordLocation) {
-    _primaryKeyIndex.put(primaryKey, recordLocation);
-  }
-
-  synchronized ThreadSafeMutableRoaringBitmap getValidDocIndex(String segmentName) {
+  ThreadSafeMutableRoaringBitmap getValidDocIndex(String segmentName) {
     return _segmentToValidDocIndexMap.get(segmentName);
   }
 
@@ -68,7 +64,7 @@ class UpsertMetadataPartitionManager {
     _segmentToValidDocIndexMap.put(segmentName, validDocIndex);
   }
 
-  synchronized void removeSegment(String segmentName) {
+  synchronized void removeUpsertMetadata(String segmentName) {
     _segmentToValidDocIndexMap.remove(segmentName);
     for (Map.Entry<PrimaryKey, RecordLocation> entry : new HashSet<>(_primaryKeyIndex.entrySet())) {
       if (entry.getValue().getSegmentName().equals(segmentName)) {

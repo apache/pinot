@@ -40,7 +40,7 @@ import org.apache.pinot.core.segment.index.readers.ValidDocIndexReaderImpl;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
 import org.apache.pinot.core.startree.v2.store.StarTreeIndexContainer;
-import org.apache.pinot.core.upsert.UpsertMetadataTableManager;
+import org.apache.pinot.core.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,12 +53,12 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   private final SegmentMetadataImpl _segmentMetadata;
   private final Map<String, ColumnIndexContainer> _indexContainerMap;
   private final StarTreeIndexContainer _starTreeIndexContainer;
-  private final UpsertMetadataTableManager _upsertMetadataTableManager;
+  private final TableUpsertMetadataManager _upsertMetadataTableManager;
 
   public ImmutableSegmentImpl(SegmentDirectory segmentDirectory, SegmentMetadataImpl segmentMetadata,
       Map<String, ColumnIndexContainer> columnIndexContainerMap,
       @Nullable StarTreeIndexContainer starTreeIndexContainer,
-      @Nullable UpsertMetadataTableManager upsertMetadataTableManager) {
+      @Nullable TableUpsertMetadataManager upsertMetadataTableManager) {
     _segmentDirectory = segmentDirectory;
     _segmentMetadata = segmentMetadata;
     _indexContainerMap = columnIndexContainerMap;

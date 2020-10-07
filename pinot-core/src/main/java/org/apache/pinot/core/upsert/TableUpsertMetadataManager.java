@@ -21,7 +21,6 @@ package org.apache.pinot.core.upsert;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 
@@ -29,15 +28,15 @@ import org.apache.pinot.spi.data.readers.PrimaryKey;
  * The manager of the upsert metadata of a table.
  */
 @ThreadSafe
-public class UpsertMetadataTableManager {
-  private final Map<Integer, UpsertMetadataPartitionManager> _partitionMetadataManagerMap = new ConcurrentHashMap();
+public class TableUpsertMetadataManager {
+  private final Map<Integer, PartitionUpsertMetadataManager> _partitionMetadataManagerMap = new ConcurrentHashMap<>();
 
-  public UpsertMetadataTableManager() {
+  public TableUpsertMetadataManager() {
   }
 
-  private synchronized UpsertMetadataPartitionManager getOrCreatePartitionManager(int partitionId) {
+  private synchronized PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId) {
     if(!_partitionMetadataManagerMap.containsKey(partitionId)) {
-      _partitionMetadataManagerMap.put(partitionId, new UpsertMetadataPartitionManager(partitionId));
+      _partitionMetadataManagerMap.put(partitionId, new PartitionUpsertMetadataManager(partitionId));
     }
     return _partitionMetadataManagerMap.get(partitionId);
   }
@@ -69,6 +68,6 @@ public class UpsertMetadataTableManager {
   }
 
   public void removeUpsertMetadataOfSegment(int partitionId, String segmentName) {
-    getOrCreatePartitionManager(partitionId).removeSegment(segmentName);
+    getOrCreatePartitionManager(partitionId).removeUpsertMetadata(segmentName);
   }
 }

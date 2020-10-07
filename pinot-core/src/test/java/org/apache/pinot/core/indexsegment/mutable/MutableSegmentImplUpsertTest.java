@@ -22,7 +22,7 @@ import java.io.File;
 import java.net.URL;
 import java.util.Collections;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
-import org.apache.pinot.core.upsert.UpsertMetadataTableManager;
+import org.apache.pinot.core.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -45,7 +45,7 @@ public class MutableSegmentImplUpsertTest {
   private static Schema _schema;
   private static TableConfig _tableConfig;
   private static MutableSegmentImpl _mutableSegmentImpl;
-  private static UpsertMetadataTableManager _upsertMetadataTableManager;
+  private static TableUpsertMetadataManager _upsertMetadataTableManager;
 
   @BeforeClass
   public void setup()
@@ -57,7 +57,7 @@ public class MutableSegmentImplUpsertTest {
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).build();
     _recordTransformer = CompositeTransformer.getDefaultTransformer(_tableConfig, _schema);
     File jsonFile = new File(dataResourceUrl.getFile());
-    _upsertMetadataTableManager = new UpsertMetadataTableManager();
+    _upsertMetadataTableManager = new TableUpsertMetadataManager();
     _mutableSegmentImpl = MutableSegmentImplTestUtils
         .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
             false, true, new UpsertConfig(UpsertConfig.Mode.FULL),

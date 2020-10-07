@@ -69,7 +69,7 @@ import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
 import org.apache.pinot.core.upsert.RecordLocation;
-import org.apache.pinot.core.upsert.UpsertMetadataTableManager;
+import org.apache.pinot.core.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.core.upsert.UpsertProcessorUtil;
 import org.apache.pinot.core.util.FixedIntArray;
 import org.apache.pinot.core.util.FixedIntArrayOffHeapIdMap;
@@ -148,7 +148,7 @@ public class MutableSegmentImpl implements MutableSegment {
   // the primaryKeyIndex for local segment
   private final int _upsertPartitionId;
   private final UpsertConfig.Mode _upsertMode;
-  private final UpsertMetadataTableManager _upsertMetadataTableManager;
+  private final TableUpsertMetadataManager _upsertMetadataTableManager;
   private final Map<PrimaryKey, RecordLocation> _primaryKeyIndex;
   private final ThreadSafeMutableRoaringBitmap _validDocIndex;
 
@@ -654,7 +654,7 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   @Override
-  public UpsertMetadataTableManager getUpsertMetadataTableManager() {
+  public TableUpsertMetadataManager getUpsertMetadataTableManager() {
     return _upsertMetadataTableManager;
   }
 

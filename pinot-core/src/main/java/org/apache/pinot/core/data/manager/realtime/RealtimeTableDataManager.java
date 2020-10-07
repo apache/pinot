@@ -59,7 +59,7 @@ import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.loader.LoaderUtils;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.core.upsert.RecordLocation;
-import org.apache.pinot.core.upsert.UpsertMetadataTableManager;
+import org.apache.pinot.core.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.core.upsert.UpsertProcessorUtil;
 import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
@@ -107,14 +107,13 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private static final int MIN_INTERVAL_BETWEEN_STATS_UPDATES_MINUTES = 30;
 
   // TODO(upsert): TableConfig is not available at class init phase, so we have to always create a new upsertMetadataTableManager
-  private UpsertMetadataTableManager _upsertMetadataTableManager;
+  private TableUpsertMetadataManager _upsertMetadataTableManager;
   private UpsertConfig.Mode _upsertMode;
   private List<String> _primaryKeyColumns;
   private String _timeColumnName;
 
   public RealtimeTableDataManager(Semaphore segmentBuildSemaphore) {
     _segmentBuildSemaphore = segmentBuildSemaphore;
-    _upsertMetadataTableManager = new UpsertMetadataTableManager();
   }
 
   @Override
@@ -243,8 +242,13 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
     // TODO(upsert): better checking&hanlding of upsert mode/primary key change
     _upsertMode = tableConfig.getUpsertMode();
-    _primaryKeyColumns = schema.getPrimaryKeyColumns();
-    _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+    if (isUpsertEnabled()) {
+      if (_upsertMetadataTableManager == null) {
+        _upsertMetadataTableManager = new TableUpsertMetadataManager();
+      }
+      _primaryKeyColumns = schema.getPrimaryKeyColumns();
+      _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+    }
 
     File indexDir = new File(_indexDir, segmentName);
     // Restart during segment reload might leave segment in inconsistent state (index directory might not exist but

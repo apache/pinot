@@ -23,7 +23,7 @@ import java.util.Set;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
-import org.apache.pinot.core.upsert.UpsertMetadataTableManager;
+import org.apache.pinot.core.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 
@@ -50,7 +50,7 @@ public class RealtimeSegmentConfig {
   private final boolean _aggregateMetrics;
   private final boolean _nullHandlingEnabled;
   private final UpsertConfig.Mode _upsertMode;
-  private final UpsertMetadataTableManager _upsertMetadataTableManager;
+  private final TableUpsertMetadataManager _upsertMetadataTableManager;
   private final String _consumerDir;
 
   // TODO: Clean up this constructor. Most of these things can be extracted from tableConfig.
@@ -60,7 +60,7 @@ public class RealtimeSegmentConfig {
       RealtimeSegmentZKMetadata realtimeSegmentZKMetadata, boolean offHeap, PinotDataBufferMemoryManager memoryManager,
       RealtimeSegmentStatsHistory statsHistory, String partitionColumn, PartitionFunction partitionFunction,
       int partitionId, boolean aggregateMetrics, boolean nullHandlingEnabled, String consumerDir,
-      UpsertConfig.Mode upsertMode, UpsertMetadataTableManager upsertMetadataTableManager) {
+      UpsertConfig.Mode upsertMode, TableUpsertMetadataManager upsertMetadataTableManager) {
     _tableNameWithType = tableNameWithType;
     _segmentName = segmentName;
     _streamName = streamName;
@@ -179,7 +179,7 @@ public class RealtimeSegmentConfig {
     return _upsertMode;
   }
 
-  public UpsertMetadataTableManager getUpsertMetadataTableManager() {
+  public TableUpsertMetadataManager getUpsertMetadataTableManager() {
     return _upsertMetadataTableManager;
   }
 
@@ -206,7 +206,7 @@ public class RealtimeSegmentConfig {
     private boolean _nullHandlingEnabled = false;
     private String _consumerDir;
     private UpsertConfig.Mode _upsertMode;
-    private UpsertMetadataTableManager _upsertMetadataTableManager;
+    private TableUpsertMetadataManager _upsertMetadataTableManager;
 
     public Builder() {
     }
@@ -329,7 +329,7 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
-    public Builder setUpsertMetadataTableManager(UpsertMetadataTableManager upsertMetadataTableManager) {
+    public Builder setUpsertMetadataTableManager(TableUpsertMetadataManager upsertMetadataTableManager) {
       _upsertMetadataTableManager = upsertMetadataTableManager;
       return this;
     }
