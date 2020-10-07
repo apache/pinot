@@ -394,24 +394,6 @@ const getTableSummaryData = (tableName) => {
   });
 };
 
-const getAllSegmentsList = (tablesList) => {
-  const promiseArr = [];
-  tablesList.map((tableName)=>{
-    promiseArr.push(getIdealState(tableName));
-  });
-  return Promise.all(promiseArr).then(results => {
-    let finalResponse = {
-      columns: ['SegmentName'],
-      records: []
-    };
-    results.map((result)=>{
-      result.data && result.data.OFFLINE && finalResponse.records.push(...Object.keys(result.data.OFFLINE));
-      result.data && result.data.REALTIME && finalResponse.records.push(...Object.keys(result.data.REALTIME));
-    });
-    return finalResponse;
-  })
-};
-
 // This method is used to display segment list of a particular tenant table
 // API: /tables/:tableName/idealstate
 //      /tables/:tableName/externalview
@@ -614,7 +596,6 @@ export default {
   getQueryResults,
   getTenantTableData,
   getTableSummaryData,
-  getAllSegmentsList,
   getSegmentList,
   getTableDetails,
   getSegmentDetails,

@@ -69,7 +69,6 @@ const HomePage = () => {
   const [instances, setInstances] = useState<DataTable>();
   const [clusterName, setClusterName] = useState('');
   const [tables, setTables] = useState([]);
-  const [segments, setSegments] = useState<TableData>({records: [], columns: []});
 
   const fetchData = async () => {
     const tenantsDataResponse = await PinotMethodUtils.getTenantsData();
@@ -79,11 +78,9 @@ const HomePage = () => {
     tablesResponse.records.map((record)=>{
       tablesList.push(...record);
     });
-    const segmentsResponse = await PinotMethodUtils.getAllSegmentsList(tablesList);
     setTenantsData(tenantsDataResponse);
     setInstances(instanceResponse);
     setTables(tablesList);
-    setSegments(segmentsResponse);
     let clusterNameRes = localStorage.getItem('pinot_ui:clusterName');
     if(!clusterNameRes){
       clusterNameRes = await PinotMethodUtils.getClusterName();
@@ -139,12 +136,6 @@ const HomePage = () => {
               <h2>{tables.length}</h2>
             </Paper>
           </Link>
-        </Grid>
-        <Grid item xs={2}>
-          <Paper className={classes.paper}>
-            <h4>Segments</h4>
-            <h2>{segments.records.length}</h2>
-          </Paper>
         </Grid>
       </Grid>
       <TenantsListing tenantsData={tenantsData}/>
