@@ -352,7 +352,7 @@ function Home() {
             >
                 <div className="container">
                     <Link
-                        to="https://docs.pinot.apache.org/releases/0.5.0"
+                        to="https://docs.pinot.apache.org/basics/releases/0.5.0"
                         className={styles.indexAnnouncement}
                     >
                         <span className="badge badge-primary">release</span>
