@@ -34,10 +34,10 @@ const Header = ({ highlightSidebarLink, showHideSideBarHandler, openSidebar, ...
   <AppBar position="static">
     <Box display="flex">
       <Box textAlign="center" marginY="12.5px" width={openSidebar ? 250 : 90} borderRight="1px solid rgba(255,255,255,0.5)">
-        <Link to="/"><Logo onClick={() => highlightSidebarLink(1)} fulllogo={openSidebar.toString()} /></Link>
+        <Link to="/" style={{color: '#ffffff'}}><Logo onClick={() => highlightSidebarLink(1)} fulllogo={openSidebar.toString()} /></Link>
       </Box>
       <Box display="flex" alignItems="center">
-        <Box marginY="auto" padding="0.25rem 0 0.25rem 1.5rem" display="flex">
+        <Box marginY="auto" padding="0.25rem 0 0.25rem 1.5rem" display="flex" style={{cursor: 'pointer'}}>
           <MenuIcon onClick={() => showHideSideBarHandler()} />
         </Box>
         <BreadcrumbsComponent {...props}/>

@@ -17,38 +17,46 @@
  * under the License.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, {useState, useEffect} from 'react';
+import { Grid, makeStyles } from '@material-ui/core';
 import { TableData } from 'Models';
-import AppLoader from '../AppLoader';
-import CustomizedTables from '../Table';
-import PinotMethodUtils from '../../utils/PinotMethodUtils';
+import AppLoader from '../components/AppLoader';
+import PinotMethodUtils from '../utils/PinotMethodUtils';
+import TenantsListing from '../components/Homepage/TenantsListing';
 
-const TenantsTable = () => {
+const useStyles = makeStyles(() => ({
+  gridContainer: {
+    padding: 20,
+    backgroundColor: 'white',
+    maxHeight: 'calc(100vh - 70px)',
+    overflowY: 'auto'
+  },
+
+}));
+
+const TenantsListingPage = () => {
+  const classes = useStyles();
+
   const [fetching, setFetching] = useState(true);
-  const [tableData, setTableData] = useState<TableData>({ records: [], columns: [] });
+  const [tenantsData, setTenantsData] = useState<TableData>({ records: [], columns: [] });
 
   const fetchData = async () => {
-    const result = await PinotMethodUtils.getTenantsData();
-    setTableData(result);
+    const tenantsDataResponse = await PinotMethodUtils.getTenantsData();
+    setTenantsData(tenantsDataResponse);
     setFetching(false);
-  };
+  }
+
   useEffect(() => {
     fetchData();
   }, []);
 
   return fetching ? (
-    <AppLoader />
+    <AppLoader/>
   ) : (
-    <CustomizedTables
-      title="Tenants"
-      data={tableData}
-      addLinks
-      isPagination
-      baseURL="/tenants/"
-      showSearchBox={true}
-      inAccordionFormat={true}
-    />
-  );
+    <Grid item xs className={classes.gridContainer}>
+      <TenantsListing tenantsData={tenantsData}/>
+    </Grid>
+  )
 };
 
-export default TenantsTable;
+export default TenantsListingPage;
