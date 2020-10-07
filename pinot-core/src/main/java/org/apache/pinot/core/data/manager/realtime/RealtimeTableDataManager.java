@@ -300,7 +300,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   private boolean isUpsertEnabled() {
-    return _upsertMode != null && _upsertMode == UpsertConfig.Mode.FULL || _upsertMode == UpsertConfig.Mode.PARTIAL;
+    return _upsertMode != null && (_upsertMode == UpsertConfig.Mode.FULL || _upsertMode == UpsertConfig.Mode.PARTIAL);
   }
 
   @Override
