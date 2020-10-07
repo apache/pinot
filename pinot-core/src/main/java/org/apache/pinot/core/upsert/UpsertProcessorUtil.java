@@ -35,7 +35,7 @@ public final class UpsertProcessorUtil {
       Map<PrimaryKey, RecordLocation> primaryKeyIndex, ThreadSafeMutableRoaringBitmap validDocIndex,
       TableUpsertMetadataManager upsertMetadataTableManager) {
     RecordLocation location = new RecordLocation(segmentName, docId, timestamp);
-    // check local primary key index first
+    // check primary key index for mutable segment first
     if (primaryKeyIndex.containsKey(primaryKey)) {
       RecordLocation prevLocation = primaryKeyIndex.get(primaryKey);
       if (location.getTimestamp() >= prevLocation.getTimestamp()) {
