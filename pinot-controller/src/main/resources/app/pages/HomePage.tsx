@@ -17,17 +17,138 @@
  * under the License.
  */
 
-import * as React from 'react';
-import { Grid } from '@material-ui/core';
-import TenantsTable from '../components/Homepage/TenantsTable';
+import React, {useState, useEffect} from 'react';
+import { Grid, makeStyles, Paper } from '@material-ui/core';
+import { TableData, DataTable } from 'Models';
+import AppLoader from '../components/AppLoader';
+import PinotMethodUtils from '../utils/PinotMethodUtils';
+import TenantsListing from '../components/Homepage/TenantsListing';
 import Instances from '../components/Homepage/InstancesTables';
 import ClusterConfig from '../components/Homepage/ClusterConfig';
+import { Link } from 'react-router-dom';
+
+const useStyles = makeStyles((theme) => ({
+  paper:{
+    padding: '10px 0',
+    color: '#4285f4',
+    borderRadius: 4,
+    marginBottom: 15,
+    textAlign: 'center',
+    backgroundColor: 'rgba(66, 133, 244, 0.1)',
+    borderColor: 'rgba(66, 133, 244, 0.5)',
+    borderStyle: 'solid',
+    borderWidth: '1px',
+    '& h2, h4': {
+      margin: 0,
+    },
+    '& h4':{
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+      fontWeight: 600
+    },
+    '&:hover': {
+      borderColor: '#4285f4'
+    }
+  },
+  gridContainer: {
+    padding: 20,
+    backgroundColor: 'white',
+    maxHeight: 'calc(100vh - 70px)',
+    overflowY: 'auto'
+  },
+  paperLinks: {
+    textDecoration: 'none'
+  }
+}));
 
 const HomePage = () => {
-  return (
-    <Grid item xs style={{ padding: 20, backgroundColor: 'white', maxHeight: 'calc(100vh - 70px)', overflowY: 'auto' }}>
-      <TenantsTable />
-      <Instances />
+  const classes = useStyles();
+
+  const [fetching, setFetching] = useState(true);
+  const [tenantsData, setTenantsData] = useState<TableData>({ records: [], columns: [] });
+  const [instances, setInstances] = useState<DataTable>();
+  const [clusterName, setClusterName] = useState('');
+  const [tables, setTables] = useState([]);
+  const [segments, setSegments] = useState<TableData>({records: [], columns: []});
+
+  const fetchData = async () => {
+    const tenantsDataResponse = await PinotMethodUtils.getTenantsData();
+    const instanceResponse = await PinotMethodUtils.getAllInstances();
+    const tablesResponse = await PinotMethodUtils.getQueryTablesList({bothType: true});
+    const tablesList = [];
+    tablesResponse.records.map((record)=>{
+      tablesList.push(...record);
+    });
+    const segmentsResponse = await PinotMethodUtils.getAllSegmentsList(tablesList);
+    setTenantsData(tenantsDataResponse);
+    setInstances(instanceResponse);
+    setTables(tablesList);
+    setSegments(segmentsResponse);
+    let clusterNameRes = localStorage.getItem('pinot_ui:clusterName');
+    if(!clusterNameRes){
+      clusterNameRes = await PinotMethodUtils.getClusterName();
+    }
+    setClusterName(clusterNameRes);
+    setFetching(false);
+  };
+  useEffect(() => {
+    fetchData();
+  }, []);
+  
+  return fetching ? (
+    <AppLoader />
+  ) : (
+    <Grid item xs className={classes.gridContainer}>
+      <Grid container spacing={3}>
+        <Grid item xs={2}>
+          <Link to="/tenants" className={classes.paperLinks}>
+            <Paper className={classes.paper}>
+              <h4>Tenants</h4>
+              <h2>{tenantsData.records.length}</h2>
+            </Paper>
+          </Link>
+        </Grid>
+        <Grid item xs={2}>
+          <Link to="/controllers" className={classes.paperLinks}>
+            <Paper className={classes.paper}>
+              <h4>Controllers</h4>
+              <h2>{instances.Controller.length}</h2>
+            </Paper>
+          </Link>
+        </Grid>
+        <Grid item xs={2}>
+          <Link to="/brokers" className={classes.paperLinks}>
+            <Paper className={classes.paper}>
+              <h4>Brokers</h4>
+              <h2>{instances.Broker.length}</h2>
+            </Paper>
+          </Link>
+        </Grid>
+        <Grid item xs={2}>
+          <Link to="/servers" className={classes.paperLinks}>
+            <Paper className={classes.paper}>
+              <h4>Servers</h4>
+              <h2>{instances.Server.length}</h2>
+            </Paper>
+          </Link>
+        </Grid>
+        <Grid item xs={2}>
+          <Link to="/tables" className={classes.paperLinks}>
+            <Paper className={classes.paper}>
+              <h4>Tables</h4>
+              <h2>{tables.length}</h2>
+            </Paper>
+          </Link>
+        </Grid>
+        <Grid item xs={2}>
+          <Paper className={classes.paper}>
+            <h4>Segments</h4>
+            <h2>{segments.records.length}</h2>
+          </Paper>
+        </Grid>
+      </Grid>
+      <TenantsListing tenantsData={tenantsData}/>
+      <Instances instances={instances} clusterName={clusterName}/>
       <ClusterConfig />
     </Grid>
   );

@@ -17,20 +17,22 @@
  * under the License.
  */
 
-import React, {  } from 'react';
-import map from 'lodash/map';
-import InstanceTable from './InstanceTable';
+import React from 'react';
+import CustomizedTables from '../Table';
 
-const Instances = ({instances, clusterName}) => {
+const TenantsTable = ({tenantsData}) => {
+  
   return (
-    <>
-      {
-        map(instances, (value, key) => {
-          return <InstanceTable key={key} name={`${key}s`} instances={value} clusterName={clusterName} />;
-        })
-      }
-    </>
+    <CustomizedTables
+      title="Tenants"
+      data={tenantsData}
+      addLinks
+      isPagination
+      baseURL="/tenants/"
+      showSearchBox={true}
+      inAccordionFormat={true}
+    />
   );
 };
 
-export default Instances;
+export default TenantsTable;

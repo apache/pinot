@@ -237,7 +237,7 @@ const QueryPage = () => {
   };
 
   const fetchData = async () => {
-    const result = await PinotMethodUtils.getQueryTablesList();
+    const result = await PinotMethodUtils.getQueryTablesList({bothType: false});
     setTableList(result);
     setFetching(false);
   };

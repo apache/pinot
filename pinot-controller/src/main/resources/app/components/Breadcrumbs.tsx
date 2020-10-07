@@ -47,6 +47,11 @@ const LinkRouter = (props: LinkRouterProps) => (
 
 const breadcrumbNameMap: { [key: string]: string } = {
   '/': 'Home',
+  '/tenants': 'Tenants',
+  '/controllers': 'Controllers',
+  '/brokers': 'Brokers',
+  '/servers': 'Servers',
+  '/tables': 'Tables',
   '/query': 'Query Console',
   '/cluster': 'Cluster Manager',
   '/zookeeper': 'Zookeeper Browser'
