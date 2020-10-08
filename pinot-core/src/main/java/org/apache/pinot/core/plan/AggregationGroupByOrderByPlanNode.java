@@ -19,13 +19,14 @@
 package org.apache.pinot.core.plan;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.core.startree.plan.StarTreeTransformPlanNode;
@@ -59,32 +60,21 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
     _groupByExpressions = groupByExpressions.toArray(new ExpressionContext[0]);
 
     List<StarTreeV2> starTrees = indexSegment.getStarTrees();
-    if (starTrees != null) {
-      if (!StarTreeUtils.isStarTreeDisabled(queryContext)) {
-        int numAggregationFunctions = _aggregationFunctions.length;
-        AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
-            new AggregationFunctionColumnPair[numAggregationFunctions];
-        boolean hasUnsupportedAggregationFunction = false;
-        for (int i = 0; i < numAggregationFunctions; i++) {
-          AggregationFunctionColumnPair aggregationFunctionColumnPair =
-              AggregationFunctionUtils.getAggregationFunctionColumnPair(_aggregationFunctions[i]);
-          if (aggregationFunctionColumnPair != null) {
-            aggregationFunctionColumnPairs[i] = aggregationFunctionColumnPair;
-          } else {
-            hasUnsupportedAggregationFunction = true;
-            break;
-          }
-        }
-        if (!hasUnsupportedAggregationFunction) {
-          FilterContext filter = queryContext.getFilter();
+    if (starTrees != null && !StarTreeUtils.isStarTreeDisabled(queryContext)) {
+      AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
+          StarTreeUtils.extractAggregationFunctionPairs(_aggregationFunctions);
+      if (aggregationFunctionColumnPairs != null) {
+        Map<String, List<PredicateEvaluator>> predicateEvaluatorsMap =
+            StarTreeUtils.extractPredicateEvaluatorsMap(indexSegment, queryContext.getFilter());
+        if (predicateEvaluatorsMap != null) {
           for (StarTreeV2 starTreeV2 : starTrees) {
             if (StarTreeUtils
                 .isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, _groupByExpressions,
-                    filter)) {
+                    predicateEvaluatorsMap.keySet())) {
               _transformPlanNode = null;
               _starTreeTransformPlanNode =
-                  new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs, _groupByExpressions, filter,
-                      queryContext.getDebugOptions());
+                  new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs, _groupByExpressions,
+                      predicateEvaluatorsMap, queryContext.getDebugOptions());
               return;
             }
           }

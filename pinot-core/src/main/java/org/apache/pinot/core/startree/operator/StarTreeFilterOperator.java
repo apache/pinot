@@ -41,9 +41,6 @@ import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
 import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
 import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
-import org.apache.pinot.core.query.request.context.FilterContext;
-import org.apache.pinot.core.query.request.context.predicate.Predicate;
 import org.apache.pinot.core.startree.StarTree;
 import org.apache.pinot.core.startree.StarTreeNode;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
@@ -121,81 +118,27 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
 
   // Star-tree
   private final StarTreeV2 _starTreeV2;
-  // Set of group-by columns
-  private final Set<String> _groupByColumns;
   // Map from column to predicate evaluators
   private final Map<String, List<PredicateEvaluator>> _predicateEvaluatorsMap;
-  // Map from column to matching dictionary ids
-  private final Map<String, IntSet> _matchingDictIdsMap;
+  // Set of group-by columns
+  private final Set<String> _groupByColumns;
 
   private final Map<String, String> _debugOptions;
   boolean _resultEmpty = false;
 
-  public StarTreeFilterOperator(StarTreeV2 starTreeV2, @Nullable FilterContext filter,
-      @Nullable Set<String> groupByColumns, @Nullable Map<String, String> debugOptions) {
+  public StarTreeFilterOperator(StarTreeV2 starTreeV2, Map<String, List<PredicateEvaluator>> predicateEvaluatorsMap,
+      Set<String> groupByColumns, @Nullable Map<String, String> debugOptions) {
     _starTreeV2 = starTreeV2;
-    _groupByColumns = groupByColumns != null ? new HashSet<>(groupByColumns) : Collections.emptySet();
+    _predicateEvaluatorsMap = predicateEvaluatorsMap;
     _debugOptions = debugOptions;
 
-    if (filter != null) {
-      _predicateEvaluatorsMap = new HashMap<>();
-      _matchingDictIdsMap = new HashMap<>();
-
-      // Process the filter tree and get a map from column to a list of predicates applied to it
-      Map<String, List<Predicate>> predicatesMap = getPredicatesMap(filter);
-
-      // Initialize the predicate evaluators map
-      for (Map.Entry<String, List<Predicate>> entry : predicatesMap.entrySet()) {
-        String columnName = entry.getKey();
-        List<Predicate> predicates = entry.getValue();
-        List<PredicateEvaluator> predicateEvaluators = new ArrayList<>();
-
-        DataSource dataSource = starTreeV2.getDataSource(columnName);
-        for (Predicate predicate : predicates) {
-          PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider
-              .getPredicateEvaluator(predicate, dataSource.getDictionary(),
-                  dataSource.getDataSourceMetadata().getDataType());
-          // If predicate is always evaluated false, the result for the filter operator will be empty, early terminate
-          if (predicateEvaluator.isAlwaysFalse()) {
-            _resultEmpty = true;
-            return;
-          } else if (!predicateEvaluator.isAlwaysTrue()) {
-            predicateEvaluators.add(predicateEvaluator);
-          }
-        }
-        if (!predicateEvaluators.isEmpty()) {
-          _predicateEvaluatorsMap.put(columnName, predicateEvaluators);
-        }
-      }
-
+    if (groupByColumns != null) {
+      _groupByColumns = new HashSet<>(groupByColumns);
       // Remove columns with predicates from group-by columns because we won't use star node for that column
       _groupByColumns.removeAll(_predicateEvaluatorsMap.keySet());
     } else {
-      _predicateEvaluatorsMap = Collections.emptyMap();
-      _matchingDictIdsMap = Collections.emptyMap();
+      _groupByColumns = Collections.emptySet();
     }
-  }
-
-  /**
-   * Helper method to process the filter tree and get a map from column to a list of predicates applied to it.
-   */
-  private Map<String, List<Predicate>> getPredicatesMap(FilterContext filter) {
-    Map<String, List<Predicate>> predicatesMap = new HashMap<>();
-    Queue<FilterContext> queue = new LinkedList<>();
-    queue.add(filter);
-
-    while (!queue.isEmpty()) {
-      FilterContext filterNode = queue.remove();
-      if (filterNode.getType() == FilterContext.Type.AND) {
-        queue.addAll(filterNode.getChildren());
-      } else {
-        Predicate predicate = filterNode.getPredicate();
-        String columnName = predicate.getLhs().getIdentifier();
-        predicatesMap.computeIfAbsent(columnName, k -> new ArrayList<>()).add(predicate);
-      }
-    }
-
-    return predicatesMap;
   }
 
   @Override
@@ -252,13 +195,14 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
 
   /**
    * Helper method to traverse the star tree, get matching documents and keep track of all the predicate columns that
-   * are not matched.
-   * <p>Return <code>null</code> if no matching dictionary id found for a column (i.e. the result for the filter
-   * operator is empty).
+   * are not matched. Returns {@code null} if no matching dictionary id found for a column (i.e. the result for the
+   * filter operator is empty).
    */
+  @Nullable
   private StarTreeResult traverseStarTree() {
-    MutableRoaringBitmap matchedDocIds = new MutableRoaringBitmap();
+    MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
     Set<String> remainingPredicateColumns = new HashSet<>();
+    Map<String, IntSet> matchingDictIdsMap = new HashMap<>();
 
     StarTree starTree = _starTreeV2.getStarTree();
     List<String> dimensionNames = starTree.getDimensionNames();
@@ -267,19 +211,19 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
     // Use BFS to traverse the star tree
     Queue<SearchEntry> queue = new LinkedList<>();
     queue.add(new SearchEntry(starTreeRootNode, _predicateEvaluatorsMap.keySet(), _groupByColumns));
-    while (!queue.isEmpty()) {
-      SearchEntry searchEntry = queue.remove();
+    SearchEntry searchEntry;
+    while ((searchEntry = queue.poll()) != null) {
       StarTreeNode starTreeNode = searchEntry._starTreeNode;
 
       // If all predicate columns and group-by columns are matched, we can use aggregated document
       if (searchEntry._remainingPredicateColumns.isEmpty() && searchEntry._remainingGroupByColumns.isEmpty()) {
-        matchedDocIds.add(starTreeNode.getAggregatedDocId());
+        matchingDocIds.add(starTreeNode.getAggregatedDocId());
       } else {
         // For leaf node, because we haven't exhausted all predicate columns and group-by columns, we cannot use
         // the aggregated document. Add the range of documents for this node to the bitmap, and keep track of the
         // remaining predicate columns for this node
         if (starTreeNode.isLeaf()) {
-          matchedDocIds.add(starTreeNode.getStartDocId(), starTreeNode.getEndDocId());
+          matchingDocIds.add((long) starTreeNode.getStartDocId(), starTreeNode.getEndDocId());
           remainingPredicateColumns.addAll(searchEntry._remainingPredicateColumns);
         } else {
           // For non-leaf node, proceed to next level
@@ -290,7 +234,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
             Set<String> newRemainingPredicateColumns = new HashSet<>(searchEntry._remainingPredicateColumns);
             newRemainingPredicateColumns.remove(nextDimension);
 
-            IntSet matchingDictIds = _matchingDictIdsMap.get(nextDimension);
+            IntSet matchingDictIds = matchingDictIdsMap.get(nextDimension);
             if (matchingDictIds == null) {
               matchingDictIds = getMatchingDictIds(_predicateEvaluatorsMap.get(nextDimension));
 
@@ -299,7 +243,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
                 return null;
               }
 
-              _matchingDictIdsMap.put(nextDimension, matchingDictIds);
+              matchingDictIdsMap.put(nextDimension, matchingDictIds);
             }
 
             int numMatchingDictIds = matchingDictIds.size();
@@ -358,7 +302,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
       }
     }
 
-    return new StarTreeResult(matchedDocIds, remainingPredicateColumns);
+    return new StarTreeResult(matchingDocIds, remainingPredicateColumns);
   }
 
   /**

@@ -40,10 +40,10 @@ import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.plan.FilterPlanNode;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -52,6 +52,7 @@ import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
+import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.core.startree.plan.StarTreeFilterPlanNode;
 import org.apache.pinot.core.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.core.startree.v2.builder.MultipleTreesBuilder.BuildMode;
@@ -185,15 +186,11 @@ abstract class BaseStarTreeV2Test<R, A> {
 
     // Aggregations
     AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
-    assert aggregationFunctions != null;
+    assertNotNull(aggregationFunctions);
     int numAggregations = aggregationFunctions.length;
-    List<AggregationFunctionColumnPair> functionColumnPairs = new ArrayList<>(numAggregations);
-    for (AggregationFunction aggregationFunction : aggregationFunctions) {
-      AggregationFunctionColumnPair aggregationFunctionColumnPair =
-          AggregationFunctionUtils.getAggregationFunctionColumnPair(aggregationFunction);
-      assertNotNull(aggregationFunctionColumnPair);
-      functionColumnPairs.add(aggregationFunctionColumnPair);
-    }
+    AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
+        StarTreeUtils.extractAggregationFunctionPairs(aggregationFunctions);
+    assertNotNull(aggregationFunctionColumnPairs);
 
     // Group-by columns
     Set<String> groupByColumnSet = new HashSet<>();
@@ -208,16 +205,15 @@ abstract class BaseStarTreeV2Test<R, A> {
 
     // Filter
     FilterContext filter = queryContext.getFilter();
+    Map<String, List<PredicateEvaluator>> predicateEvaluatorsMap =
+        StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, filter);
+    assertNotNull(predicateEvaluatorsMap);
 
     // Extract values with star-tree
-    PlanNode starTreeFilterPlanNode;
-    if (groupByColumns.isEmpty()) {
-      starTreeFilterPlanNode = new StarTreeFilterPlanNode(_starTreeV2, filter, null, null);
-    } else {
-      starTreeFilterPlanNode = new StarTreeFilterPlanNode(_starTreeV2, filter, groupByColumnSet, null);
-    }
+    PlanNode starTreeFilterPlanNode =
+        new StarTreeFilterPlanNode(_starTreeV2, predicateEvaluatorsMap, groupByColumnSet, null);
     List<ForwardIndexReader> starTreeAggregationColumnReaders = new ArrayList<>(numAggregations);
-    for (AggregationFunctionColumnPair aggregationFunctionColumnPair : functionColumnPairs) {
+    for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
       starTreeAggregationColumnReaders
           .add(_starTreeV2.getDataSource(aggregationFunctionColumnPair.toColumnName()).getForwardIndex());
     }
@@ -232,7 +228,7 @@ abstract class BaseStarTreeV2Test<R, A> {
     PlanNode nonStarTreeFilterPlanNode = new FilterPlanNode(_indexSegment, queryContext);
     List<ForwardIndexReader> nonStarTreeAggregationColumnReaders = new ArrayList<>(numAggregations);
     List<Dictionary> nonStarTreeAggregationColumnDictionaries = new ArrayList<>(numAggregations);
-    for (AggregationFunctionColumnPair aggregationFunctionColumnPair : functionColumnPairs) {
+    for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
       if (aggregationFunctionColumnPair.getFunctionType() == AggregationFunctionType.COUNT) {
         nonStarTreeAggregationColumnReaders.add(null);
         nonStarTreeAggregationColumnDictionaries.add(null);
