@@ -201,6 +201,9 @@
   </dependencies>
   <build>
     <resources>
+<!--      <resource>-->
+<!--        <directory>src/main/resources/api</directory>-->
+<!--      </resource>-->
       <resource>
         <directory>src/main/resources/dist</directory>
       </resource>
