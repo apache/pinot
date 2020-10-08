@@ -43,7 +43,7 @@ import java.util.Set;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.creator.TextIndexType;
-import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.readers.BaseImmutableDictionary;
@@ -51,7 +51,6 @@ import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
 import org.apache.pinot.core.segment.index.readers.StringDictionary;
 import org.apache.pinot.core.segment.index.readers.forward.BaseChunkSVForwardIndexReader.ChunkReaderContext;
-import org.apache.pinot.core.segment.index.readers.forward.FixedBitMVForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.sorted.SortedIndexReaderImpl;
@@ -144,7 +143,8 @@ public class TextIndexHandler {
     }
     int numDocs = columnMetadata.getTotalDocs();
     boolean hasDictionary = columnMetadata.hasDictionary();
-    LOGGER.info("Creating new text index for column: {} in segment: {}, hasDictionary: {}", column, _segmentName, hasDictionary);
+    LOGGER.info("Creating new text index for column: {} in segment: {}, hasDictionary: {}", column, _segmentName,
+        hasDictionary);
     File segmentDirectory = SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, _segmentVersion);
     // The handlers are always invoked by the preprocessor. Before this ImmutableSegmentLoader would have already
     // up-converted the segment from v1/v2 -> v3 (if needed). So based on the segmentVersion, whatever segment
@@ -156,10 +156,10 @@ public class TextIndexHandler {
         LuceneTextIndexCreator textIndexCreator = new LuceneTextIndexCreator(column, segmentDirectory, true)) {
       if (!hasDictionary) {
         // text index on raw column, just read the raw forward index
-        VarByteChunkSVForwardIndexReader rawIndexReader = (VarByteChunkSVForwardIndexReader)forwardIndexReader;
-        ChunkReaderContext chunkReaderContext = (ChunkReaderContext)readerContext;
+        VarByteChunkSVForwardIndexReader rawIndexReader = (VarByteChunkSVForwardIndexReader) forwardIndexReader;
+        ChunkReaderContext chunkReaderContext = (ChunkReaderContext) readerContext;
         for (int docId = 0; docId < numDocs; docId++) {
-          textIndexCreator.addDoc(rawIndexReader.getString(docId, chunkReaderContext), docId);
+          textIndexCreator.add(rawIndexReader.getString(docId, chunkReaderContext));
         }
       } else {
         // text index on dictionary encoded SV column
@@ -168,8 +168,7 @@ public class TextIndexHandler {
         try (BaseImmutableDictionary dictionary = getDictionaryReader(columnMetadata)) {
           for (int docId = 0; docId < numDocs; docId++) {
             int dictId = forwardIndexReader.getDictId(docId, readerContext);
-            String value = dictionary.getStringValue(dictId);
-            textIndexCreator.addDoc(value, docId);
+            textIndexCreator.add(dictionary.getStringValue(dictId));
           }
         }
       }
@@ -186,14 +185,16 @@ public class TextIndexHandler {
       throws IOException {
     if (!columnMetadata.hasDictionary()) {
       // text index on raw column
-      PinotDataBuffer buffer = _segmentWriter.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.FORWARD_INDEX);
+      PinotDataBuffer buffer =
+          _segmentWriter.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.FORWARD_INDEX);
       return new VarByteChunkSVForwardIndexReader(buffer, DataType.STRING);
     } else {
       // text index on dictionary encoded column
       // two cases:
       // 1. column is sorted
       // 2. column is unsorted
-      PinotDataBuffer buffer = _segmentWriter.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.FORWARD_INDEX);
+      PinotDataBuffer buffer =
+          _segmentWriter.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.FORWARD_INDEX);
       int numRows = columnMetadata.getTotalDocs();
       int numBitsPerValue = columnMetadata.getBitsPerElement();
       if (columnMetadata.isSorted()) {

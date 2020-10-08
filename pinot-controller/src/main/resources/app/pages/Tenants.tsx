@@ -38,10 +38,16 @@ const TenantPage = ({ match }: RouteComponentProps<Props>) => {
     columns: columnHeaders,
     records: []
   });
+  const [brokerData, setBrokerData] = useState([]);
+  const [serverData, setServerData] = useState([]);
 
   const fetchData = async () => {
-    const result = await PinotMethodUtils.getTenantTableData(tenantName);
-    setTableData(result);
+    const tenantData = await PinotMethodUtils.getTenantTableData(tenantName);
+    const brokersData = await PinotMethodUtils.getBrokerOfTenant(tenantName);
+    const serversData = await PinotMethodUtils.getServerOfTenant(tenantName);
+    setTableData(tenantData);
+    setBrokerData(brokersData);
+    setServerData(serversData);
     setFetching(false);
   };
   useEffect(() => {
@@ -59,6 +65,36 @@ const TenantPage = ({ match }: RouteComponentProps<Props>) => {
         showSearchBox={true}
         inAccordionFormat={true}
       />
+      <Grid container spacing={2}>
+        <Grid item xs={6}>
+          <CustomizedTables
+            title="Brokers"
+            data={{
+              columns: ['Instance Name'],
+              records: [brokerData]
+            }}
+            isPagination
+            addLinks
+            baseURL={'/instance/'}
+            showSearchBox={true}
+            inAccordionFormat={true}
+          />
+        </Grid>
+        <Grid item xs={6}>
+          <CustomizedTables
+            title="Servers"
+            data={{
+              columns: ['Instance Name'],
+              records: [serverData]
+            }}
+            isPagination
+            addLinks
+            baseURL={'/instance/'}
+            showSearchBox={true}
+            inAccordionFormat={true}
+          />
+        </Grid>
+      </Grid>
     </Grid>
   );
 };

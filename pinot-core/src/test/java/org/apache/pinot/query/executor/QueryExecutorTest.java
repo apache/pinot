@@ -51,6 +51,7 @@ import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.segments.v1.creator.SegmentTestUtils;
+import org.apache.pinot.spi.data.IngestionSchemaValidator;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -91,6 +92,11 @@ public class QueryExecutorTest {
       SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
       driver.init(config);
       driver.build();
+      IngestionSchemaValidator ingestionSchemaValidator = driver.getIngestionSchemaValidator();
+      Assert.assertFalse(ingestionSchemaValidator.getDataTypeMismatchResult().isMismatchDetected());
+      Assert.assertFalse(ingestionSchemaValidator.getSingleValueMultiValueFieldMismatchResult().isMismatchDetected());
+      Assert.assertFalse(ingestionSchemaValidator.getMultiValueStructureMismatchResult().isMismatchDetected());
+      Assert.assertFalse(ingestionSchemaValidator.getMissingPinotColumnResult().isMismatchDetected());
       _indexSegments.add(ImmutableSegmentLoader.load(new File(INDEX_DIR, driver.getSegmentName()), ReadMode.mmap));
       _segmentNames.add(driver.getSegmentName());
     }

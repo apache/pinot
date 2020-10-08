@@ -20,9 +20,11 @@ package org.apache.pinot.server.starter.helix;
 
 import io.swagger.jaxrs.config.BeanConfig;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.net.UnknownHostException;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
@@ -102,6 +104,11 @@ public class AdminApiApplication extends ResourceConfig {
     beanConfig.setBasePath(baseUri.getPath());
     beanConfig.setResourcePackage(RESOURCE_PACKAGE);
     beanConfig.setScan(true);
+    try {
+      beanConfig.setHost(InetAddress.getLocalHost().getHostName());
+    } catch (UnknownHostException e) {
+      throw new RuntimeException("Cannot get localhost name");
+    }
 
     CLStaticHttpHandler staticHttpHandler =
         new CLStaticHttpHandler(AdminApiApplication.class.getClassLoader(), "/api/");
@@ -110,7 +117,7 @@ public class AdminApiApplication extends ResourceConfig {
     httpServer.getServerConfiguration().addHttpHandler(staticHttpHandler, "/help/");
 
     URL swaggerDistLocation =
-        AdminApiApplication.class.getClassLoader().getResource("META-INF/resources/webjars/swagger-ui/2.2.10-1/");
+        AdminApiApplication.class.getClassLoader().getResource("META-INF/resources/webjars/swagger-ui/3.18.2/");
     CLStaticHttpHandler swaggerDist = new CLStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
     httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
   }

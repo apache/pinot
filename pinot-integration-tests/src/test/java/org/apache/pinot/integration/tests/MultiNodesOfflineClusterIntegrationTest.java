@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.integration.tests;
 
+import org.testng.annotations.Test;
+
+
 /**
  * Integration test that extends OfflineClusterIntegrationTest but start multiple brokers and servers.
  */
@@ -33,5 +36,31 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
   @Override
   protected int getNumServers() {
     return NUM_SERVERS;
+  }
+
+  @Override
+  protected void startServers() {
+    startServers(NUM_SERVERS);
+  }
+
+  // Disabled because with multiple servers, there is no guarantee that all servers get all segments reloaded
+  @Test(enabled = false)
+  @Override
+  public void testStarTreeTriggering() {
+    // Ignored
+  }
+
+  // Disabled because with multiple servers, there is no guarantee that all servers get all segments reloaded
+  @Test(enabled = false)
+  @Override
+  public void testDefaultColumns() {
+    // Ignored
+  }
+
+  // Disabled because gRPC query server is not enabled
+  @Test(enabled = false)
+  @Override
+  public void testGrpcQueryServer() {
+    // Ignored
   }
 }

@@ -421,7 +421,7 @@ public class TableRebalancer {
         LOGGER.info("Reassigning {} instances for table: {}", instancePartitionsType, tableNameWithType);
         InstanceAssignmentDriver instanceAssignmentDriver = new InstanceAssignmentDriver(tableConfig);
         InstancePartitions instancePartitions = instanceAssignmentDriver.assignInstances(instancePartitionsType,
-            _helixDataAccessor.getChildValues(_helixDataAccessor.keyBuilder().instanceConfigs()));
+            _helixDataAccessor.getChildValues(_helixDataAccessor.keyBuilder().instanceConfigs(), true));
         if (!dryRun) {
           LOGGER.info("Persisting instance partitions: {} to ZK", instancePartitions);
           InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitions);

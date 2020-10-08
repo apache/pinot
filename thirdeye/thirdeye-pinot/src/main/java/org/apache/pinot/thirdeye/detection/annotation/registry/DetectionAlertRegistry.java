@@ -20,7 +20,6 @@
 package org.apache.pinot.thirdeye.detection.annotation.registry;
 
 import com.google.common.base.Preconditions;
-import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilter;
 import org.apache.pinot.thirdeye.detection.alert.scheme.DetectionAlertScheme;
 import org.apache.pinot.thirdeye.detection.alert.suppress.DetectionAlertSuppressor;

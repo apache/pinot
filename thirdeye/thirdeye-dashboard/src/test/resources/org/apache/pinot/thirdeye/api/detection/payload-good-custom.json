@@ -1,0 +1,4 @@
+{"detection-configuration": "detectionName: name_of_the_detection_test\ndescription: This is the detection used by online service\nrules:\n- detection:\n  - name: detection_rule_1\n    type: PERCENTAGE_RULE\n    params: {offset: wo1w, percentageChange: 0.2}\n  filter:\n  - name: filter_rule_1\n    type: PERCENTAGE_CHANGE_FILTER\n    params: {pattern: UP_OR_DOWN, threshold: 0.05}\n  quality:\n  - name: data_sla_rule_1\n    type: DATA_SLA\n    params: {sla: 3_DAYS}\nmetric: online_metric_admin\ndataset: online_dataset_admin\n",
+  "metric-configuration": "datatype: INT\nmetricColumn: rate",
+  "dataset-configuration": "timeColumn: time\ntimeUnit: DAYS\ntimeDuration: 1\ntimeFormat: SIMPLE_DATE_FORMAT:yyyyMMdd\ntimezone: US/Pacific",
+  "data":{"columns":["time","rate"],"rows":[["20200325","68"],["20200428","67"],["20200422","63"]]}}

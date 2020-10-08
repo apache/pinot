@@ -57,6 +57,9 @@ public class SegmentGenerationTaskRunner implements Serializable {
   public static final String SEGMENT_NAME_PREFIX = "segment.name.prefix";
   public static final String EXCLUDE_SEQUENCE_ID = "exclude.sequence.id";
 
+  // Assign sequence ids to input files based at each local directory level
+  public static final String LOCAL_DIRECTORY_SEQUENCE_ID = "local.directory.sequence.id";
+
   private SegmentGenerationTaskSpec _taskSpec;
 
   public SegmentGenerationTaskRunner(SegmentGenerationTaskSpec taskSpec) {

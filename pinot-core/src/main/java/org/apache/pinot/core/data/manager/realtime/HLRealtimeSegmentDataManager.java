@@ -185,9 +185,9 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _segmentLogger.info("Started {} stream provider", _streamConfig.getType());
     final int capacity = _streamConfig.getFlushThresholdRows();
     RealtimeSegmentConfig realtimeSegmentConfig =
-        new RealtimeSegmentConfig.Builder().setSegmentName(_segmentName).setStreamName(_streamConfig.getTopicName())
-            .setSchema(schema).setTimeColumnName(_timeColumnName).setCapacity(capacity)
-            .setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
+        new RealtimeSegmentConfig.Builder().setTableNameWithType(_tableNameWithType).setSegmentName(_segmentName)
+            .setStreamName(_streamConfig.getTopicName()).setSchema(schema).setTimeColumnName(_timeColumnName)
+            .setCapacity(capacity).setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
             .setNoDictionaryColumns(indexLoadingConfig.getNoDictionaryColumns())
             .setVarLengthDictionaryColumns(indexLoadingConfig.getVarLengthDictionaryColumns())
             .setInvertedIndexColumns(invertedIndexColumns).setRealtimeSegmentZKMetadata(realtimeSegmentZKMetadata)
@@ -197,7 +197,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                 indexLoadingConfig.isDirectRealtimeOffHeapAllocation(), serverMetrics))
             .setStatsHistory(realtimeTableDataManager.getStatsHistory())
             .setNullHandlingEnabled(indexingConfig.isNullHandlingEnabled()).build();
-    _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfig);
+    _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfig, serverMetrics);
 
     _notifier = realtimeTableDataManager;
 

@@ -18,6 +18,9 @@
  */
 
 import HomePage from './pages/HomePage';
+import TenantsListingPage from './pages/TenantsListingPage';
+import InstanceListingPage from './pages/InstanceListingPage';
+import TablesListingPage from './pages/TablesListingPage';
 import TenantsPage from './pages/Tenants';
 import TenantPageDetails from './pages/TenantDetails';
 import QueryPage from './pages/Query';
@@ -28,6 +31,11 @@ import ZookeeperPage from './pages/ZookeeperPage';
 export default [
   { path: "/", Component: HomePage },
   { path: "/query", Component: QueryPage },
+  { path: "/tenants", Component: TenantsListingPage },
+  { path: "/controllers", Component: InstanceListingPage },
+  { path: "/brokers", Component: InstanceListingPage },
+  { path: "/servers", Component: InstanceListingPage },
+  { path: "/tables", Component: TablesListingPage },
   { path: "/tenants/:tenantName", Component: TenantsPage },
   { path: "/tenants/:tenantName/table/:tableName", Component: TenantPageDetails },
   { path: "/tenants/:tenantName/table/:tableName/:segmentName", Component: SegmentDetails },

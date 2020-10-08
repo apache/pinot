@@ -1,0 +1,75 @@
+{
+  "schema":{
+    "schemaName": "tableSchema",
+    "dimensionFieldSpecs": [
+      {
+        "name": "a",
+        "dataType": "STRING",
+        "cardinality":20,
+        "numValuesPerEntry":1
+      },
+      {
+        "name": "b",
+        "dataType": "BYTES",
+        "cardinality":6,
+        "numValuesPerEntry":1
+      },
+      {
+        "name": "c",
+        "dataType": "BYTES",
+        "cardinality":7,
+        "numValuesPerEntry":1
+      },
+      {
+        "name": "d",
+        "dataType": "STRING",
+        "cardinality":41,
+        "numValuesPerEntry":2,
+        "averageLength" : 27
+      },
+      {
+        "name": "e",
+        "dataType": "LONG",
+        "cardinality":18,
+        "numValuesPerEntry":4
+      }
+    ],
+    "metricFieldSpecs": [
+      {
+        "name": "k",
+        "dataType": "DOUBLE",
+        "cardinality":10000,
+        "numValuesPerEntry":2,
+        "averageLength" : 100
+      },
+      {
+        "name": "l",
+        "dataType": "STRING",
+        "cardinality":10000,
+        "numValuesPerEntry":1,
+        "averageLength" : 10
+      },
+      {
+        "name": "m",
+        "dataType": "BYTES",
+        "cardinality":10000,
+        "numValuesPerEntry":1,
+        "averageLength" : 25
+      }
+    ],
+    "timeFieldSpec": {
+      "incomingGranularitySpec": {
+        "dataType": "INT",
+        "name": "t",
+        "timeType": "DAYS",
+        "cardinality":10000,
+        "numValuesPerEntry":1
+      }
+    }
+  },
+  "qps": 250,
+  "numKafkaPartitions": 32,
+  "numRecordsPerPush":10000000,
+  "tableType": "HYBRID",
+  "latencySLA": 500
+}

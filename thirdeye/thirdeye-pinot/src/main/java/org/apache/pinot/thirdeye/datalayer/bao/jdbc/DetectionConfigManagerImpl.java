@@ -19,27 +19,23 @@
 
 package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Inject;
 import com.google.inject.Singleton;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
-import javax.naming.AuthenticationException;
-import javax.ws.rs.NotAuthorizedException;
-import org.apache.pinot.thirdeye.auth.ThirdEyeAuthFilter;
-import org.apache.pinot.thirdeye.auth.ThirdEyePrincipal;
-import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
-import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import org.apache.pinot.thirdeye.datalayer.pojo.DetectionConfigBean;
-import org.apache.pinot.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
 import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dao.GenericPojoDao;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.DetectionConfigBean;
 
 
 @Singleton
 public class DetectionConfigManagerImpl extends AbstractManagerImpl<DetectionConfigDTO> implements DetectionConfigManager {
-  public DetectionConfigManagerImpl() {
-    super(DetectionConfigDTO.class, DetectionConfigBean.class);
+
+  @Inject
+  public DetectionConfigManagerImpl(GenericPojoDao genericPojoDao) {
+    super(DetectionConfigDTO.class, DetectionConfigBean.class, genericPojoDao);
   }
 
   @Override

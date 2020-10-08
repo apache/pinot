@@ -24,14 +24,15 @@ module.exports = {
   favicon: 'img/favicon.ico',
   organizationName: 'apache',
   projectName: 'pinot', 
+  onBrokenLinks: 'ignore',
   themeConfig: {
     navbar: {
       hideOnScroll: true,
       logo: {
         alt: 'Pinot',
-        src: 'img/pinot-navbar-logo.svg',
+        src: 'img/pinot-navbar-logo-722f37.svg',
       },
-      links: [
+      items: [
         {to: 'https://docs.pinot.apache.org/', label: 'Docs', position: 'right'},
         {to: '/download', label: 'Download', position: 'right'},
         {to: 'https://docs.pinot.apache.org/community-1/blogs', label: 'Blog', position: 'right'},
@@ -42,9 +43,24 @@ module.exports = {
         },
       ],
     },
+    colorMode: {
+      defaultMode: "dark",
+      disableSwitch: false,
+      respectPrefersColorScheme: true,
+      switchConfig: {
+        darkIcon: "🌙",
+        darkIconStyle: {
+          marginLeft: "2px",
+        },
+        lightIcon: "☀️",
+        lightIconStyle: {
+          marginLeft: "2px",
+        },
+      },
+    },
     prism: {
-      theme: require('prism-react-renderer/themes/github'),
-      darkTheme: require('prism-react-renderer/themes/dracula'),
+      theme: require("prism-react-renderer/themes/dracula"),
+      darkTheme: require("prism-react-renderer/themes/dracula"),
     },
     footer: {
       style: 'light',

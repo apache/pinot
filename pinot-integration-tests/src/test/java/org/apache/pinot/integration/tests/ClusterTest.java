@@ -22,9 +22,14 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
+import com.google.common.collect.ImmutableList;
 import java.io.File;
+import java.io.IOException;
 import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,8 +47,13 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DecoderFactory;
 import org.apache.commons.io.FileUtils;
+import org.apache.http.Header;
 import org.apache.http.HttpStatus;
+import org.apache.http.NameValuePair;
+import org.apache.http.message.BasicHeader;
+import org.apache.http.message.BasicNameValuePair;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.core.requesthandler.PinotQueryRequest;
 import org.apache.pinot.common.utils.CommonConstants.Broker;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
@@ -253,17 +263,25 @@ public abstract class ClusterTest extends ControllerTest {
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       if (numSegments == 1) {
         File segmentTarFile = segmentTarFiles[0];
-        assertEquals(fileUploadDownloadClient
-                .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, tableName).getStatusCode(),
-            HttpStatus.SC_OK);
+        if (System.currentTimeMillis() % 2 == 0) {
+          assertEquals(fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, tableName).getStatusCode(),
+              HttpStatus.SC_OK);
+        } else {
+          assertEquals(
+              uploadSegmentWithOnlyMetadata(tableName, uploadSegmentHttpURI, fileUploadDownloadClient, segmentTarFile), HttpStatus.SC_OK);
+        }
       } else {
         // Upload all segments in parallel
         ExecutorService executorService = Executors.newFixedThreadPool(numSegments);
         List<Future<Integer>> futures = new ArrayList<>(numSegments);
         for (File segmentTarFile : segmentTarFiles) {
-          futures.add(executorService.submit(() -> fileUploadDownloadClient
-              .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, tableName)
-              .getStatusCode()));
+          futures.add(executorService.submit(() -> {
+            if (System.currentTimeMillis() % 2 == 0) {
+              return fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, tableName).getStatusCode();
+            } else {
+              return uploadSegmentWithOnlyMetadata(tableName, uploadSegmentHttpURI, fileUploadDownloadClient, segmentTarFile);
+            }
+          }));
         }
         executorService.shutdown();
         for (Future<Integer> future : futures) {
@@ -271,6 +289,20 @@ public abstract class ClusterTest extends ControllerTest {
         }
       }
     }
+  }
+
+  private int uploadSegmentWithOnlyMetadata(String tableName, URI uploadSegmentHttpURI,
+      FileUploadDownloadClient fileUploadDownloadClient, File segmentTarFile)
+      throws IOException, HttpErrorStatusException {
+    List<Header> headers = ImmutableList.of(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI,
+            "file://" + segmentTarFile.getParentFile().getAbsolutePath() + "/" + URLEncoder.encode(segmentTarFile.getName(), StandardCharsets.UTF_8.toString())),
+        new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE, FileUploadDownloadClient.FileUploadType.METADATA.toString()));
+    // Add table name as a request parameter
+    NameValuePair
+        tableNameValuePair = new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME, tableName);
+    List<NameValuePair> parameters = Arrays.asList(tableNameValuePair);
+    return fileUploadDownloadClient
+        .uploadSegmentMetadata(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, headers, parameters, fileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS).getStatusCode();
   }
 
   public static class AvroFileSchemaKafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {

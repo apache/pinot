@@ -65,13 +65,11 @@ import org.openjdk.jmh.runner.options.TimeValue;
 @State(Scope.Benchmark)
 @Fork(value = 1, jvmArgs = {"-server", "-Xmx8G", "-XX:MaxDirectMemorySize=16G"})
 public class BenchmarkCombineGroupBy {
-
-  private static final int TOP_N = 500;
   private static final int NUM_SEGMENTS = 4;
   private static final int NUM_RECORDS_PER_SEGMENT = 100_000;
   private static final int CARDINALITY_D1 = 500;
   private static final int CARDINALITY_D2 = 500;
-  private Random _random = new Random();
+  private static final Random RANDOM = new Random();
 
   private QueryContext _queryContext;
   private AggregationFunction[] _aggregationFunctions;
@@ -115,15 +113,15 @@ public class BenchmarkCombineGroupBy {
 
   private Record getRecord() {
     Object[] columns =
-        new Object[]{_d1.get(_random.nextInt(_d1.size())), _d2.get(_random.nextInt(_d2.size())), (double) _random
-            .nextInt(1000), (double) _random.nextInt(1000)};
+        new Object[]{_d1.get(RANDOM.nextInt(_d1.size())), _d2.get(RANDOM.nextInt(_d2.size())), (double) RANDOM
+            .nextInt(1000), (double) RANDOM.nextInt(1000)};
     return new Record(columns);
   }
 
   private Pair<String, Object[]> getOriginalRecord() {
     String stringKey = Joiner.on(GroupKeyGenerator.DELIMITER)
-        .join(_d1.get(_random.nextInt(_d1.size())), _d2.get(_random.nextInt(_d2.size())));
-    Object[] values = new Object[]{(double) _random.nextInt(1000), (double) _random.nextInt(1000)};
+        .join(_d1.get(RANDOM.nextInt(_d1.size())), _d2.get(RANDOM.nextInt(_d2.size())));
+    Object[] values = new Object[]{(double) RANDOM.nextInt(1000), (double) RANDOM.nextInt(1000)};
     return new Pair<>(stringKey, values);
   }
 
@@ -135,8 +133,7 @@ public class BenchmarkCombineGroupBy {
     int capacity = GroupByUtils.getTableCapacity(_queryContext);
 
     // make 1 concurrent table
-    IndexedTable concurrentIndexedTable =
-        new ConcurrentIndexedTable(_dataSchema, _aggregationFunctions, _queryContext.getOrderByExpressions(), capacity);
+    IndexedTable concurrentIndexedTable = new ConcurrentIndexedTable(_dataSchema, _queryContext, capacity);
 
     List<Callable<Void>> innerSegmentCallables = new ArrayList<>(NUM_SEGMENTS);
 
@@ -207,7 +204,7 @@ public class BenchmarkCombineGroupBy {
     }
 
     AggregationGroupByTrimmingService aggregationGroupByTrimmingService =
-        new AggregationGroupByTrimmingService(_aggregationFunctions, TOP_N);
+        new AggregationGroupByTrimmingService(_queryContext);
     List<Map<String, Object>> trimmedResults = aggregationGroupByTrimmingService.trimIntermediateResultsMap(resultsMap);
   }
 

@@ -22,7 +22,6 @@ import java.io.File;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
@@ -36,9 +35,14 @@ import org.apache.pinot.core.segment.index.loader.invertedindex.RangeIndexHandle
 import org.apache.pinot.core.segment.index.loader.invertedindex.TextIndexHandler;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
+import org.apache.pinot.core.startree.StarTreeBuilderUtils;
+import org.apache.pinot.core.startree.StarTreeUtils;
+import org.apache.pinot.core.startree.v2.StarTreeV2Metadata;
 import org.apache.pinot.core.startree.v2.builder.MultipleTreesBuilder;
-import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
+import org.apache.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -51,6 +55,8 @@ import org.apache.pinot.spi.data.Schema;
  * </ul>
  */
 public class SegmentPreProcessor implements AutoCloseable {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPreProcessor.class);
+
   private final File _indexDir;
   private final IndexLoadingConfig _indexLoadingConfig;
   private final Schema _schema;
@@ -119,15 +125,30 @@ public class SegmentPreProcessor implements AutoCloseable {
           new BloomFilterHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
       bloomFilterHandler.createBloomFilters();
 
-      // Create star-tree if required
-      // TODO: Support removing/modifying star-tree when the config changes
-      if (_segmentMetadata.getStarTreeV2MetadataList() == null) {
-        List<StarTreeIndexConfig> starTreeIndexConfigs = _indexLoadingConfig.getStarTreeIndexConfigs();
-        boolean enableDefaultStarTree = _indexLoadingConfig.isEnableDefaultStarTree();
-        if (CollectionUtils.isNotEmpty(starTreeIndexConfigs) || enableDefaultStarTree) {
+      // Create/modify/remove star-trees if required
+      if (_indexLoadingConfig.isEnableDynamicStarTreeCreation()) {
+        List<StarTreeV2BuilderConfig> starTreeBuilderConfigs = StarTreeBuilderUtils
+            .generateBuilderConfigs(_indexLoadingConfig.getStarTreeIndexConfigs(),
+                _indexLoadingConfig.isEnableDefaultStarTree(), _segmentMetadata);
+        boolean shouldGenerateStarTree = !starTreeBuilderConfigs.isEmpty();
+        List<StarTreeV2Metadata> starTreeMetadataList = _segmentMetadata.getStarTreeV2MetadataList();
+        if (starTreeMetadataList != null) {
+          // There are existing star-trees
+          if (StarTreeUtils.shouldRemoveExistingStarTrees(starTreeBuilderConfigs, starTreeMetadataList)) {
+            // Remove the existing star-trees
+            LOGGER.info("Removing star-trees from segment: {}", _segmentMetadata.getName());
+            StarTreeUtils.removeStarTrees(_indexDir);
+            _segmentMetadata = new SegmentMetadataImpl(_indexDir);
+          } else {
+            // Existing star-trees match the builder configs, no need to generate the star-trees
+            shouldGenerateStarTree = false;
+          }
+        }
+        // Generate the star-trees if needed
+        if (shouldGenerateStarTree) {
           // NOTE: Always use OFF_HEAP mode on server side.
-          try (MultipleTreesBuilder builder = new MultipleTreesBuilder(starTreeIndexConfigs, enableDefaultStarTree,
-              _indexDir, MultipleTreesBuilder.BuildMode.OFF_HEAP)) {
+          try (MultipleTreesBuilder builder = new MultipleTreesBuilder(starTreeBuilderConfigs, _indexDir,
+              MultipleTreesBuilder.BuildMode.OFF_HEAP)) {
             builder.build();
           }
           _segmentMetadata = new SegmentMetadataImpl(_indexDir);

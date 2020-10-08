@@ -25,7 +25,7 @@ import PinotMethodUtils from '../../utils/PinotMethodUtils';
 
 type Props = {
   name: string,
-  instances: string[],
+  instances: Array<String>,
   clusterName: string
 };
 

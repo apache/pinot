@@ -31,6 +31,7 @@ import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.StringUtil;
@@ -274,12 +275,21 @@ public class ZKMetadataProvider {
     if (tableType == null || tableType == TableType.REALTIME) {
       TableConfig realtimeTableConfig = getRealtimeTableConfig(propertyStore, tableName);
       if (realtimeTableConfig != null) {
-        schema = getSchema(propertyStore, realtimeTableConfig.getValidationConfig().getSchemaName());
+        String realtimeSchemaNameFromValidationConfig = realtimeTableConfig.getValidationConfig().getSchemaName();
+        if (realtimeSchemaNameFromValidationConfig != null) {
+          schema = getSchema(propertyStore, realtimeSchemaNameFromValidationConfig);
+        }
       }
     }
     // Try to fetch offline schema if realtime schema does not exist
     if (schema == null && (tableType == null || tableType == TableType.OFFLINE)) {
-      schema = getSchema(propertyStore, TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+      TableConfig offlineTableConfig = getOfflineTableConfig(propertyStore, tableName);
+      if (offlineTableConfig != null) {
+        String offlineSchemaNameFromValidationConfig = offlineTableConfig.getValidationConfig().getSchemaName();
+        if (offlineSchemaNameFromValidationConfig != null) {
+          schema = getSchema(propertyStore, offlineSchemaNameFromValidationConfig);
+        }
+      }
     }
     if (schema != null) {
       LOGGER.warn("Schema name does not match raw table name, schema name: {}, raw table name: {}",
@@ -296,7 +306,8 @@ public class ZKMetadataProvider {
       ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     String parentPath = constructPropertyStorePathForResource(offlineTableName);
-    List<ZNRecord> znRecords = propertyStore.getChildren(parentPath, null, AccessOption.PERSISTENT);
+    List<ZNRecord> znRecords = propertyStore.getChildren(parentPath, null, AccessOption.PERSISTENT,
+        CommonConstants.Helix.ZkClient.RETRY_COUNT, CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
     if (znRecords != null) {
       int numZNRecords = znRecords.size();
       List<OfflineSegmentZKMetadata> offlineSegmentZKMetadataList = new ArrayList<>(numZNRecords);
@@ -326,7 +337,8 @@ public class ZKMetadataProvider {
       ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     String parentPath = constructPropertyStorePathForResource(realtimeTableName);
-    List<ZNRecord> znRecords = propertyStore.getChildren(parentPath, null, AccessOption.PERSISTENT);
+    List<ZNRecord> znRecords = propertyStore.getChildren(parentPath, null, AccessOption.PERSISTENT,
+        CommonConstants.Helix.ZkClient.RETRY_COUNT, CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
     if (znRecords != null) {
       int numZNRecords = znRecords.size();
       List<RealtimeSegmentZKMetadata> realtimeSegmentZKMetadataList = new ArrayList<>(numZNRecords);
@@ -356,7 +368,8 @@ public class ZKMetadataProvider {
       ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     String parentPath = constructPropertyStorePathForResource(realtimeTableName);
-    List<ZNRecord> znRecords = propertyStore.getChildren(parentPath, null, AccessOption.PERSISTENT);
+    List<ZNRecord> znRecords = propertyStore.getChildren(parentPath, null, AccessOption.PERSISTENT,
+        CommonConstants.Helix.ZkClient.RETRY_COUNT, CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
     if (znRecords != null) {
       int numZNRecords = znRecords.size();
       List<LLCRealtimeSegmentZKMetadata> llcRealtimeSegmentZKMetadataList = new ArrayList<>(numZNRecords);

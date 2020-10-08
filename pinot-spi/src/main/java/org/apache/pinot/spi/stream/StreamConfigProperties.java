@@ -51,6 +51,8 @@ public class StreamConfigProperties {
   public static final String SEGMENT_FLUSH_THRESHOLD_TIME = "realtime.segment.flush.threshold.time";
 
   /**
+   * @deprecated because the property key is confusing (says size but is actually rows). Use {@link StreamConfigProperties#SEGMENT_FLUSH_THRESHOLD_ROWS}
+   *
    * Row count flush threshold for realtime segments. This behaves in a similar way for HLC and LLC. For HLC,
    * since there is only one consumer per server, this size is used as the size of the consumption buffer and
    * determines after how many rows we flush to disk. For example, if this threshold is set to two million rows,
@@ -69,9 +71,12 @@ public class StreamConfigProperties {
    * the size of the completed segment is the desired size (see REALTIME_DESIRED_SEGMENT_SIZE), unless
    * REALTIME_SEGMENT_FLUSH_TIME is reached first)
    */
-  public static final String SEGMENT_FLUSH_THRESHOLD_ROWS = "realtime.segment.flush.threshold.size";
+  public static final String DEPRECATED_SEGMENT_FLUSH_THRESHOLD_ROWS = "realtime.segment.flush.threshold.size";
+  public static final String SEGMENT_FLUSH_THRESHOLD_ROWS = "realtime.segment.flush.threshold.rows";
 
-  /*
+  /**
+   * @deprecated because the property key is confusing (desired size is not indicative of segment size). Use {@link StreamConfigProperties#SEGMENT_FLUSH_THRESHOLD_SEGMENT_SIZE}
+   *
    * The desired size of a completed realtime segment.
    * This config is used only if REALTIME_SEGMENT_FLUSH_SIZE is set
    * to 0. Default value of REALTIME_SEGMENT_FLUSH_SIZE is "200M". Values are parsed using DataSize class.
@@ -88,13 +93,13 @@ public class StreamConfigProperties {
    *
    * Not included here is any heap memory used (currently inverted index uses heap memory for consuming partitions).
    */
-  public static final String SEGMENT_FLUSH_DESIRED_SIZE = "realtime.segment.flush.desired.size";
+  public static final String DEPRECATED_SEGMENT_FLUSH_DESIRED_SIZE = "realtime.segment.flush.desired.size";
+  public static final String SEGMENT_FLUSH_THRESHOLD_SEGMENT_SIZE = "realtime.segment.flush.threshold.segment.size";
 
   /**
    * The initial num rows to use for segment size auto tuning. By default 100_000 is used.
    */
   public static final String SEGMENT_FLUSH_AUTOTUNE_INITIAL_ROWS = "realtime.segment.flush.autotune.initialRows";
-
   // Time threshold that controller will wait for the segment to be built by the server
   public static final String SEGMENT_COMMIT_TIMEOUT_SECONDS = "realtime.segment.commit.timeoutSeconds";
 

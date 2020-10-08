@@ -20,6 +20,8 @@ package org.apache.pinot.common.function;
 
 import org.testng.Assert;
 import org.testng.annotations.Test;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class AggregationFunctionTypeTest {
@@ -65,5 +67,10 @@ public class AggregationFunctionTypeTest {
         AggregationFunctionType.PERCENTILEESTMV);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLeTdIgEsT95mV"),
         AggregationFunctionType.PERCENTILETDIGESTMV);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testInvalidGetAggregationFunctionType() {
+    AggregationFunctionType.getAggregationFunctionType("PERCENTILEFOO");
   }
 }

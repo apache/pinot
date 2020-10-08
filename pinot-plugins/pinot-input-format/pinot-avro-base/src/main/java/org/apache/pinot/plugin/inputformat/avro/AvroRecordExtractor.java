@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.plugin.inputformat.avro;
 
-import java.util.Map;
+import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
-import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
@@ -46,13 +46,14 @@ public class AvroRecordExtractor implements RecordExtractor<GenericRecord> {
   @Override
   public GenericRow extract(GenericRecord from, GenericRow to) {
     if (_extractAll) {
-      Map<String, Object> jsonMap = JsonUtils.genericRecordToJson(from);
-      jsonMap.forEach((fieldName, value) -> to.putValue(fieldName, AvroUtils.convert(value)));
+      List<Schema.Field> fields = from.getSchema().getFields();
+      for (Schema.Field field : fields) {
+        String fieldName = field.name();
+        to.putValue(fieldName, AvroUtils.convert(from.get(fieldName)));
+      }
     } else {
       for (String fieldName : _fields) {
-        Object value = from.get(fieldName);
-        Object convertedValue = AvroUtils.convert(value);
-        to.putValue(fieldName, convertedValue);
+        to.putValue(fieldName, AvroUtils.convert(from.get(fieldName)));
       }
     }
     return to;

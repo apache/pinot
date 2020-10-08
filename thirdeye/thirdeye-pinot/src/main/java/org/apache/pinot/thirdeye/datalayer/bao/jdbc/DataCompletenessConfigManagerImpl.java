@@ -19,11 +19,12 @@
 
 package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import java.util.List;
 import org.apache.commons.collections4.CollectionUtils;
-
 import org.apache.pinot.thirdeye.datalayer.bao.DataCompletenessConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dao.GenericPojoDao;
 import org.apache.pinot.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.DataCompletenessConfigBean;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
@@ -32,8 +33,9 @@ import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 public class DataCompletenessConfigManagerImpl extends AbstractManagerImpl<DataCompletenessConfigDTO> implements DataCompletenessConfigManager {
 
 
-  public DataCompletenessConfigManagerImpl() {
-    super(DataCompletenessConfigDTO.class, DataCompletenessConfigBean.class);
+  @Inject
+  public DataCompletenessConfigManagerImpl(GenericPojoDao genericPojoDao) {
+    super(DataCompletenessConfigDTO.class, DataCompletenessConfigBean.class, genericPojoDao);
   }
 
   @Override

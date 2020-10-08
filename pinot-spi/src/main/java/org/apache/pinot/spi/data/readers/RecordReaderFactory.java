@@ -41,7 +41,7 @@ public class RecordReaderFactory {
   private static final String DEFAULT_CSV_RECORD_READER_CLASS =
       "org.apache.pinot.plugin.inputformat.csv.CSVRecordReader";
   private static final String DEFAULT_CSV_RECORD_READER_CONFIG_CLASS =
-      "org.apache.pinot.csv.data.readers.CSVRecordReaderConfig";
+      "org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig";
   private static final String DEFAULT_JSON_RECORD_READER_CLASS =
       "org.apache.pinot.plugin.inputformat.json.JSONRecordReader";
   private static final String DEFAULT_THRIFT_RECORD_READER_CLASS =

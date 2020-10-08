@@ -20,22 +20,31 @@ package org.apache.pinot.core.util;
 
 import com.google.common.base.Preconditions;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.core.data.function.FunctionEvaluator;
 import org.apache.pinot.core.data.function.FunctionEvaluatorFactory;
+import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
+import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.IngestionConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.TimeUtils;
 
 
@@ -54,41 +63,105 @@ public final class TableConfigUtils {
    * 1. Validation config
    * 2. IngestionConfig
    * 3. TierConfigs
+   * 4. Indexing config
+   * 5. Field Config List
+   *
+   * TODO: Add more validations for each section (e.g. validate conditions are met for aggregateMetrics)
    */
-  public static void validate(TableConfig tableConfig) {
-    validateValidationConfig(tableConfig);
-    validateIngestionConfig(tableConfig.getIngestionConfig());
+  public static void validate(TableConfig tableConfig, @Nullable Schema schema) {
+    if (tableConfig.getTableType() == TableType.REALTIME) {
+      Preconditions.checkState(schema != null, "Schema should not be null for REALTIME table");
+    }
+    validateValidationConfig(tableConfig, schema);
+    validateIngestionConfig(tableConfig.getIngestionConfig(), schema);
     validateTierConfigList(tableConfig.getTierConfigsList());
+    validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
+    validateFieldConfigList(tableConfig.getFieldConfigList(), schema);
   }
 
   /**
    * Validates the table name with the following rules:
    * <ul>
-   *   <li>Table name shouldn't contain dot in it</li>
+   *   <li>Table name shouldn't contain dot or space in it</li>
    * </ul>
    */
   public static void validateTableName(TableConfig tableConfig) {
     String tableName = tableConfig.getTableName();
-    if (tableName.contains(".")) {
-      throw new IllegalStateException("Table name: '" + tableName + "' containing '.' is not allowed");
+    if (tableName.contains(".") || tableName.contains(" ")) {
+      throw new IllegalStateException("Table name: '" + tableName + "' containing '.' or space is not allowed");
     }
   }
 
-  private static void validateValidationConfig(TableConfig tableConfig) {
-    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-    if (validationConfig != null) {
-      if (tableConfig.getTableType() == TableType.REALTIME && validationConfig.getTimeColumnName() == null) {
-        throw new IllegalStateException("Must provide time column in real-time table config");
-      }
-      String peerSegmentDownloadScheme = validationConfig.getPeerSegmentDownloadScheme();
-      if (peerSegmentDownloadScheme != null) {
-        if (!CommonConstants.HTTP_PROTOCOL.equalsIgnoreCase(peerSegmentDownloadScheme)
-            && !CommonConstants.HTTPS_PROTOCOL.equalsIgnoreCase(peerSegmentDownloadScheme)) {
-          throw new IllegalStateException("Invalid value '" + peerSegmentDownloadScheme
-              + "' for peerSegmentDownloadScheme. Must be one of http nor https");
-        }
+  /**
+   * Validates retention config. Checks for following things:
+   * - Valid segmentPushType
+   * - Valid retentionTimeUnit
+   */
+  public static void validateRetentionConfig(TableConfig tableConfig) {
+    SegmentsValidationAndRetentionConfig segmentsConfig = tableConfig.getValidationConfig();
+    String tableName = tableConfig.getTableName();
+
+    if (segmentsConfig == null) {
+      throw new IllegalStateException(
+          String.format("Table: %s, \"segmentsConfig\" field is missing in table config", tableName));
+    }
+
+    String segmentPushType = segmentsConfig.getSegmentPushType();
+    // segmentPushType is not needed for Realtime table
+    if (tableConfig.getTableType() == TableType.OFFLINE && segmentPushType != null && !segmentPushType.isEmpty()) {
+      if (!segmentPushType.equalsIgnoreCase("REFRESH") && !segmentPushType.equalsIgnoreCase("APPEND")) {
+        throw new IllegalStateException(String.format("Table: %s, invalid push type: %s", tableName, segmentPushType));
       }
     }
+
+    // Retention may not be specified. Ignore validation in that case.
+    String timeUnitString = segmentsConfig.getRetentionTimeUnit();
+    if (timeUnitString == null || timeUnitString.isEmpty()) {
+      return;
+    }
+    try {
+      TimeUnit.valueOf(timeUnitString.toUpperCase());
+    } catch (Exception e) {
+      throw new IllegalStateException(String.format("Table: %s, invalid time unit: %s", tableName, timeUnitString));
+    }
+  }
+
+  /**
+   * Validates the following in the validationConfig of the table
+   * 1. For REALTIME table
+   * - checks for non-null timeColumnName
+   * - checks for valid field spec for timeColumnName in schema
+   * - Validates retention config
+   *
+   * 2. For OFFLINE table
+   * - checks for valid field spec for timeColumnName in schema, if timeColumnName and schema are non-null
+   *
+   * 3. Checks peerDownloadSchema
+   */
+  private static void validateValidationConfig(TableConfig tableConfig, @Nullable Schema schema) {
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+    String timeColumnName = validationConfig.getTimeColumnName();
+    if (tableConfig.getTableType() == TableType.REALTIME) {
+      // For REALTIME table, must have a non-null timeColumnName
+      Preconditions.checkState(timeColumnName != null, "'timeColumnName' cannot be null in REALTIME table config");
+    }
+    // timeColumnName can be null in OFFLINE table
+    if (timeColumnName != null && schema != null) {
+      Preconditions.checkState(schema.getSpecForTimeColumn(timeColumnName) != null,
+          "Cannot find valid fieldSpec for timeColumn: %s from the table config, in the schema: %s", timeColumnName,
+          schema.getSchemaName());
+    }
+
+    String peerSegmentDownloadScheme = validationConfig.getPeerSegmentDownloadScheme();
+    if (peerSegmentDownloadScheme != null) {
+      if (!CommonConstants.HTTP_PROTOCOL.equalsIgnoreCase(peerSegmentDownloadScheme) && !CommonConstants.HTTPS_PROTOCOL
+          .equalsIgnoreCase(peerSegmentDownloadScheme)) {
+        throw new IllegalStateException("Invalid value '" + peerSegmentDownloadScheme
+            + "' for peerSegmentDownloadScheme. Must be one of http or https");
+      }
+    }
+
+    validateRetentionConfig(tableConfig);
   }
 
   /**
@@ -99,8 +172,10 @@ public final class TableConfigUtils {
    * 4. validity of transform function string
    * 5. checks for source fields used in destination columns
    */
-  private static void validateIngestionConfig(@Nullable IngestionConfig ingestionConfig) {
+  private static void validateIngestionConfig(@Nullable IngestionConfig ingestionConfig, @Nullable Schema schema) {
     if (ingestionConfig != null) {
+
+      // Filter config
       FilterConfig filterConfig = ingestionConfig.getFilterConfig();
       if (filterConfig != null) {
         String filterFunction = filterConfig.getFilterFunction();
@@ -112,12 +187,18 @@ public final class TableConfigUtils {
           }
         }
       }
+
+      // Transform configs
       List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
       if (transformConfigs != null) {
         Set<String> transformColumns = new HashSet<>();
         Set<String> argumentColumns = new HashSet<>();
         for (TransformConfig transformConfig : transformConfigs) {
           String columnName = transformConfig.getColumnName();
+          if (schema != null) {
+            Preconditions.checkState(schema.getFieldSpecFor(columnName) != null,
+                "The destination column of the transform function must be present in the schema");
+          }
           String transformFunction = transformConfig.getTransformFunction();
           if (columnName == null || transformFunction == null) {
             throw new IllegalStateException(
@@ -191,6 +272,125 @@ public final class TableConfigUtils {
       } else {
         throw new IllegalStateException("Unsupported storageType: " + storageType + " in tier: " + tierName);
       }
+    }
+  }
+
+  /**
+   * Validates the Indexing Config
+   * Ensures that every referred column name exists in the corresponding schema.
+   * Also ensures proper dependency between index types (eg: Inverted Index columns
+   * cannot be present in no-dictionary columns).
+   */
+  private static void validateIndexingConfig(@Nullable IndexingConfig indexingConfig, @Nullable Schema schema) {
+    if (indexingConfig == null || schema == null) {
+      return;
+    }
+    Map<String, String> columnNameToConfigMap = new HashMap<>();
+    Set<String> noDictionaryColumnsSet = new HashSet<>();
+
+    if (indexingConfig.getNoDictionaryColumns() != null) {
+      for (String columnName : indexingConfig.getNoDictionaryColumns()) {
+        columnNameToConfigMap.put(columnName, "No Dictionary Column Config");
+        noDictionaryColumnsSet.add(columnName);
+      }
+    }
+    if (indexingConfig.getBloomFilterColumns() != null) {
+      for (String columnName : indexingConfig.getBloomFilterColumns()) {
+        if (noDictionaryColumnsSet.contains(columnName)) {
+          throw new IllegalStateException(
+              "Cannot create a Bloom Filter on column " + columnName + " specified in the noDictionaryColumns config");
+        }
+        columnNameToConfigMap.put(columnName, "Bloom Filter Config");
+      }
+    }
+    if (indexingConfig.getInvertedIndexColumns() != null) {
+      for (String columnName : indexingConfig.getInvertedIndexColumns()) {
+        if (noDictionaryColumnsSet.contains(columnName)) {
+          throw new IllegalStateException("Cannot create an Inverted index on column " + columnName
+              + " specified in the noDictionaryColumns config");
+        }
+        columnNameToConfigMap.put(columnName, "Inverted Index Config");
+      }
+    }
+
+    if (indexingConfig.getOnHeapDictionaryColumns() != null) {
+      for (String columnName : indexingConfig.getOnHeapDictionaryColumns()) {
+        columnNameToConfigMap.put(columnName, "On Heap Dictionary Column Config");
+      }
+    }
+    if (indexingConfig.getRangeIndexColumns() != null) {
+      for (String columnName : indexingConfig.getRangeIndexColumns()) {
+        columnNameToConfigMap.put(columnName, "Range Column Config");
+      }
+    }
+    if (indexingConfig.getSortedColumn() != null) {
+      for (String columnName : indexingConfig.getSortedColumn()) {
+        columnNameToConfigMap.put(columnName, "Sorted Column Config");
+      }
+    }
+    if (indexingConfig.getVarLengthDictionaryColumns() != null) {
+      for (String columnName : indexingConfig.getVarLengthDictionaryColumns()) {
+        columnNameToConfigMap.put(columnName, "Var Length Column Config");
+      }
+    }
+    if (indexingConfig.getSegmentPartitionConfig() != null
+        && indexingConfig.getSegmentPartitionConfig().getColumnPartitionMap() != null) {
+      for (String columnName : indexingConfig.getSegmentPartitionConfig().getColumnPartitionMap().keySet()) {
+        columnNameToConfigMap.put(columnName, "Segment Partition Config");
+      }
+    }
+
+    List<StarTreeIndexConfig> starTreeIndexConfigList = indexingConfig.getStarTreeIndexConfigs();
+    if (starTreeIndexConfigList != null) {
+      for (StarTreeIndexConfig starTreeIndexConfig : starTreeIndexConfigList) {
+        // Dimension split order cannot be null
+        for (String columnName : starTreeIndexConfig.getDimensionsSplitOrder()) {
+          columnNameToConfigMap.put(columnName, "StarTreeIndex Config");
+        }
+        // Function column pairs cannot be null
+        for (String functionColumnPair : starTreeIndexConfig.getFunctionColumnPairs()) {
+          AggregationFunctionColumnPair columnPair;
+          try {
+            columnPair = AggregationFunctionColumnPair.fromColumnName(functionColumnPair);
+          } catch (Exception e) {
+            throw new IllegalStateException("Invalid StarTreeIndex config: " + functionColumnPair + ". Must be"
+                + "in the form <Aggregation function>__<Column name>");
+          }
+          String columnName = columnPair.getColumn();
+          if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {
+            columnNameToConfigMap.put(columnName, "StarTreeIndex Config");
+          }
+        }
+        List<String> skipDimensionList = starTreeIndexConfig.getSkipStarNodeCreationForDimensions();
+        if (skipDimensionList != null) {
+          for (String columnName : skipDimensionList) {
+            columnNameToConfigMap.put(columnName, "StarTreeIndex Config");
+          }
+        }
+      }
+    }
+
+    for (Map.Entry<String, String> entry : columnNameToConfigMap.entrySet()) {
+      String columnName = entry.getKey();
+      String configName = entry.getValue();
+      Preconditions.checkState(schema.getFieldSpecFor(columnName) != null,
+          "Column Name " + columnName + " defined in " + configName + " must be a valid column defined in the schema");
+    }
+  }
+
+  /**
+   * Validates the Field Config List in the given TableConfig
+   * Ensures that every referred column name exists in the corresponding schema
+   */
+  private static void validateFieldConfigList(@Nullable List<FieldConfig> fieldConfigList, @Nullable Schema schema) {
+    if (fieldConfigList == null || schema == null) {
+      return;
+    }
+
+    for (FieldConfig fieldConfig : fieldConfigList) {
+      String columnName = fieldConfig.getName();
+      Preconditions.checkState(schema.getFieldSpecFor(columnName) != null,
+          "Column Name " + columnName + " defined in field config list must be a valid column defined in the schema");
     }
   }
 }

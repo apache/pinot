@@ -18,8 +18,13 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
+import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
@@ -30,6 +35,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RoaringBitmap;
 
 
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class DistinctCountMVAggregationFunction extends DistinctCountAggregationFunction {
 
   public DistinctCountMVAggregationFunction(ExpressionContext expression) {
@@ -57,46 +63,53 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
       return;
     }
 
-    // For non-dictionary-encoded expression, store hash code of the values into the value set
-    IntOpenHashSet valueSet = getValueSet(aggregationResultHolder);
+    // For non-dictionary-encoded expression, store values into the value set
     FieldSpec.DataType valueType = blockValSet.getValueType();
+    Set valueSet = getValueSet(aggregationResultHolder, valueType);
     switch (valueType) {
       case INT:
+        IntOpenHashSet intSet = (IntOpenHashSet) valueSet;
         int[][] intValues = blockValSet.getIntValuesMV();
         for (int i = 0; i < length; i++) {
           for (int value : intValues[i]) {
-            valueSet.add(value);
+            intSet.add(value);
           }
         }
         break;
       case LONG:
+        LongOpenHashSet longSet = (LongOpenHashSet) valueSet;
         long[][] longValues = blockValSet.getLongValuesMV();
         for (int i = 0; i < length; i++) {
           for (long value : longValues[i]) {
-            valueSet.add(Long.hashCode(value));
+            longSet.add(value);
           }
         }
         break;
       case FLOAT:
+        FloatOpenHashSet floatSet = (FloatOpenHashSet) valueSet;
         float[][] floatValues = blockValSet.getFloatValuesMV();
         for (int i = 0; i < length; i++) {
           for (float value : floatValues[i]) {
-            valueSet.add(Float.hashCode(value));
+            floatSet.add(value);
           }
         }
       case DOUBLE:
+        DoubleOpenHashSet doubleSet = (DoubleOpenHashSet) valueSet;
         double[][] doubleValues = blockValSet.getDoubleValuesMV();
         for (int i = 0; i < length; i++) {
           for (double value : doubleValues[i]) {
-            valueSet.add(Double.hashCode(value));
+            doubleSet.add(value);
           }
         }
         break;
       case STRING:
+        ObjectOpenHashSet<String> stringSet = (ObjectOpenHashSet<String>) valueSet;
         String[][] stringValues = blockValSet.getStringValuesMV();
         for (int i = 0; i < length; i++) {
+          //noinspection ManualArrayToCollectionCopy
           for (String value : stringValues[i]) {
-            valueSet.add(value.hashCode());
+            //noinspection UseBulkOperation
+            stringSet.add(value);
           }
         }
         break;
@@ -120,51 +133,58 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
       return;
     }
 
-    // For non-dictionary-encoded expression, store hash code of the values into the value set
+    // For non-dictionary-encoded expression, store values into the value set
     FieldSpec.DataType valueType = blockValSet.getValueType();
     switch (valueType) {
       case INT:
         int[][] intValues = blockValSet.getIntValuesMV();
         for (int i = 0; i < length; i++) {
-          IntOpenHashSet valueSet = getValueSet(groupByResultHolder, groupKeyArray[i]);
+          IntOpenHashSet intSet =
+              (IntOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], FieldSpec.DataType.INT);
           for (int value : intValues[i]) {
-            valueSet.add(value);
+            intSet.add(value);
           }
         }
         break;
       case LONG:
         long[][] longValues = blockValSet.getLongValuesMV();
         for (int i = 0; i < length; i++) {
-          IntOpenHashSet valueSet = getValueSet(groupByResultHolder, groupKeyArray[i]);
+          LongOpenHashSet longSet =
+              (LongOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], FieldSpec.DataType.LONG);
           for (long value : longValues[i]) {
-            valueSet.add(Long.hashCode(value));
+            longSet.add(value);
           }
         }
         break;
       case FLOAT:
         float[][] floatValues = blockValSet.getFloatValuesMV();
         for (int i = 0; i < length; i++) {
-          IntOpenHashSet valueSet = getValueSet(groupByResultHolder, groupKeyArray[i]);
+          FloatOpenHashSet floatSet =
+              (FloatOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], FieldSpec.DataType.FLOAT);
           for (float value : floatValues[i]) {
-            valueSet.add(Float.hashCode(value));
+            floatSet.add(value);
           }
         }
         break;
       case DOUBLE:
         double[][] doubleValues = blockValSet.getDoubleValuesMV();
         for (int i = 0; i < length; i++) {
-          IntOpenHashSet valueSet = getValueSet(groupByResultHolder, groupKeyArray[i]);
+          DoubleOpenHashSet doubleSet =
+              (DoubleOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], FieldSpec.DataType.DOUBLE);
           for (double value : doubleValues[i]) {
-            valueSet.add(Double.hashCode(value));
+            doubleSet.add(value);
           }
         }
         break;
       case STRING:
         String[][] stringValues = blockValSet.getStringValuesMV();
         for (int i = 0; i < length; i++) {
-          IntOpenHashSet valueSet = getValueSet(groupByResultHolder, groupKeyArray[i]);
+          ObjectOpenHashSet<String> stringSet =
+              (ObjectOpenHashSet<String>) getValueSet(groupByResultHolder, groupKeyArray[i], FieldSpec.DataType.STRING);
+          //noinspection ManualArrayToCollectionCopy
           for (String value : stringValues[i]) {
-            valueSet.add(value.hashCode());
+            //noinspection UseBulkOperation
+            stringSet.add(value);
           }
         }
         break;
@@ -197,9 +217,9 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
         int[][] intValues = blockValSet.getIntValuesMV();
         for (int i = 0; i < length; i++) {
           for (int groupKey : groupKeysArray[i]) {
-            IntOpenHashSet valueSet = getValueSet(groupByResultHolder, groupKey);
+            IntOpenHashSet intSet = (IntOpenHashSet) getValueSet(groupByResultHolder, groupKey, FieldSpec.DataType.INT);
             for (int value : intValues[i]) {
-              valueSet.add(value);
+              intSet.add(value);
             }
           }
         }
@@ -208,9 +228,10 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
         long[][] longValues = blockValSet.getLongValuesMV();
         for (int i = 0; i < length; i++) {
           for (int groupKey : groupKeysArray[i]) {
-            IntOpenHashSet valueSet = getValueSet(groupByResultHolder, groupKey);
+            LongOpenHashSet longSet =
+                (LongOpenHashSet) getValueSet(groupByResultHolder, groupKey, FieldSpec.DataType.LONG);
             for (long value : longValues[i]) {
-              valueSet.add(Long.hashCode(value));
+              longSet.add(value);
             }
           }
         }
@@ -219,9 +240,10 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
         float[][] floatValues = blockValSet.getFloatValuesMV();
         for (int i = 0; i < length; i++) {
           for (int groupKey : groupKeysArray[i]) {
-            IntOpenHashSet valueSet = getValueSet(groupByResultHolder, groupKey);
+            FloatOpenHashSet floatSet =
+                (FloatOpenHashSet) getValueSet(groupByResultHolder, groupKey, FieldSpec.DataType.FLOAT);
             for (float value : floatValues[i]) {
-              valueSet.add(Float.hashCode(value));
+              floatSet.add(value);
             }
           }
         }
@@ -230,9 +252,10 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
         double[][] doubleValues = blockValSet.getDoubleValuesMV();
         for (int i = 0; i < length; i++) {
           for (int groupKey : groupKeysArray[i]) {
-            IntOpenHashSet valueSet = getValueSet(groupByResultHolder, groupKey);
+            DoubleOpenHashSet doubleSet =
+                (DoubleOpenHashSet) getValueSet(groupByResultHolder, groupKey, FieldSpec.DataType.DOUBLE);
             for (double value : doubleValues[i]) {
-              valueSet.add(Double.hashCode(value));
+              doubleSet.add(value);
             }
           }
         }
@@ -241,9 +264,12 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
         String[][] stringValues = blockValSet.getStringValuesMV();
         for (int i = 0; i < length; i++) {
           for (int groupKey : groupKeysArray[i]) {
-            IntOpenHashSet valueSet = getValueSet(groupByResultHolder, groupKey);
+            ObjectOpenHashSet<String> stringSet =
+                (ObjectOpenHashSet<String>) getValueSet(groupByResultHolder, groupKey, FieldSpec.DataType.STRING);
+            //noinspection ManualArrayToCollectionCopy
             for (String value : stringValues[i]) {
-              valueSet.add(value.hashCode());
+              //noinspection UseBulkOperation
+              stringSet.add(value);
             }
           }
         }

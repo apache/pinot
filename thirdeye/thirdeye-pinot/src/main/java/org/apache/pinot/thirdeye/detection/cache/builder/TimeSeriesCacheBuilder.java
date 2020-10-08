@@ -38,14 +38,10 @@ import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
-import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
 import org.apache.pinot.thirdeye.detection.cache.CacheConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-
 
 /**
  *  A fetcher for fetching time-series from cache/datasource.
@@ -132,10 +128,10 @@ public class TimeSeriesCacheBuilder {
             // current slice potentially contained in cache
             if (entry.getKey().containSlice(slice)) {
               DataFrame df = entry.getValue()
-                  .filter(entry.getValue().getLongs(COL_TIME).between(slice.getStart(), slice.getEnd()))
-                  .dropNull(COL_TIME);
+                  .filter(entry.getValue().getLongs(DataFrame.COL_TIME).between(slice.getStart(), slice.getEnd()))
+                  .dropNull(DataFrame.COL_TIME);
               // double check if it is cache hit
-              if (df.getLongs(COL_TIME).size() > 0) {
+              if (df.getLongs(DataFrame.COL_TIME).size() > 0) {
                 output.put(slice, df);
                 break;
               }

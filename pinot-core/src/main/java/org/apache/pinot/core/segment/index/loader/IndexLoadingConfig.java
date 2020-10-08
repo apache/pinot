@@ -53,6 +53,7 @@ public class IndexLoadingConfig {
   private Set<String> _varLengthDictionaryColumns = new HashSet<>();
   private Set<String> _onHeapDictionaryColumns = new HashSet<>();
   private Set<String> _bloomFilterColumns = new HashSet<>();
+  private boolean _enableDynamicStarTreeCreation;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private boolean _enableDefaultStarTree;
 
@@ -129,10 +130,9 @@ public class IndexLoadingConfig {
       _onHeapDictionaryColumns.addAll(onHeapDictionaryColumns);
     }
 
-    if (indexingConfig.isEnableDynamicStarTreeCreation()) {
-      _starTreeIndexConfigs = indexingConfig.getStarTreeIndexConfigs();
-      _enableDefaultStarTree = indexingConfig.isEnableDefaultStarTree();
-    }
+    _enableDynamicStarTreeCreation = indexingConfig.isEnableDynamicStarTreeCreation();
+    _starTreeIndexConfigs = indexingConfig.getStarTreeIndexConfigs();
+    _enableDefaultStarTree = indexingConfig.isEnableDefaultStarTree();
 
     String tableSegmentVersion = indexingConfig.getSegmentFormatVersion();
     if (tableSegmentVersion != null) {
@@ -294,6 +294,10 @@ public class IndexLoadingConfig {
     return _bloomFilterColumns;
   }
 
+  public boolean isEnableDynamicStarTreeCreation() {
+    return _enableDynamicStarTreeCreation;
+  }
+
   @Nullable
   public List<StarTreeIndexConfig> getStarTreeIndexConfigs() {
     return _starTreeIndexConfigs;
@@ -335,9 +339,9 @@ public class IndexLoadingConfig {
     return _columnMinMaxValueGeneratorMode;
   }
 
-
-  public String getSegmentStoreURI() { return _segmentStoreURI; }
-
+  public String getSegmentStoreURI() {
+    return _segmentStoreURI;
+  }
 
   /**
    * For tests only.

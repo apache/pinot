@@ -35,6 +35,7 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.helix.model.InstanceConfig;
@@ -195,5 +196,27 @@ public class PinotInstanceRestletResource {
           Response.Status.INTERNAL_SERVER_ERROR);
     }
     return new SuccessResponse("Instance successfully updated");
+  }
+
+  @PUT
+  @Path("/instances/{instanceName}/updateTags")
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Update the tags of the specified instance", consumes = MediaType.APPLICATION_JSON, notes = "Update the tags of the specified instance")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal error")})
+  public SuccessResponse updateInstanceTags(
+      @ApiParam(value = "Instance name", required = true, example = "Server_a.b.com_20000 | Broker_my.broker.com_30000") @PathParam("instanceName") String instanceName,
+      @ApiParam(value = "Comma separated tags list", required = true) @QueryParam("tags") String tags) {
+    LOGGER.info("Instance update request received for instance: {} and tags: {}", instanceName, tags);
+    if (tags == null) {
+      throw new ControllerApplicationException(LOGGER, "Must provide tags to update", Response.Status.BAD_REQUEST);
+    }
+    PinotResourceManagerResponse response = pinotHelixResourceManager.updateInstanceTags(instanceName, tags);
+    if (!response.isSuccessful()) {
+      throw new ControllerApplicationException(LOGGER,
+          "Failure to update instance: " + instanceName + " with tags: " + tags + ". Reason: " + response.getMessage(),
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    return new SuccessResponse("Successfully updated tags for instance: " + instanceName + " tags: " + tags);
   }
 }

@@ -89,6 +89,9 @@ public class DataAvailabilityTaskScheduler implements Runnable {
     this.datasetConfigDAO = DAORegistry.getInstance().getDatasetConfigDAO();
   }
 
+  /**
+   * Runs every @{link DataAvailabilitySchedulingConfiguration.scheduleDelayInSec}
+   */
   @Override
   public void run() {
     Map<DetectionConfigDTO, Set<String>> detection2DatasetMap = new HashMap<>();

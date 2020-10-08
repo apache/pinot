@@ -241,8 +241,7 @@ public class TableConfigSerDeTest {
     }
     {
       // with upsert config
-      UpsertConfig upsertConfig =
-          new UpsertConfig(Collections.singletonList("pk"), "offset", "$validFrom", "$validUntil");
+      UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
 
       TableConfig tableConfig = tableConfigBuilder.setUpsertConfig(upsertConfig).build();
 
@@ -472,9 +471,6 @@ public class TableConfigSerDeTest {
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
     assertNotNull(upsertConfig);
 
-    assertEquals(upsertConfig.getPrimaryKeyColumns(), Collections.singletonList("pk"));
-    assertEquals(upsertConfig.getOffsetColumn(), "offset");
-    assertEquals(upsertConfig.getValidFromColumn(), "$validFrom");
-    assertEquals(upsertConfig.getValidUntilColumn(), "$validUntil");
+    assertEquals(upsertConfig.getMode(), UpsertConfig.Mode.FULL);
   }
 }

@@ -19,18 +19,20 @@
 
 package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Inject;
 import com.google.inject.Singleton;
-import org.apache.pinot.thirdeye.datalayer.bao.RootcauseSessionManager;
-import org.apache.pinot.thirdeye.datalayer.dto.RootcauseSessionDTO;
-import org.apache.pinot.thirdeye.datalayer.pojo.AbstractBean;
-import org.apache.pinot.thirdeye.datalayer.pojo.RootcauseSessionBean;
-import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.thirdeye.datalayer.bao.RootcauseSessionManager;
+import org.apache.pinot.thirdeye.datalayer.dao.GenericPojoDao;
+import org.apache.pinot.thirdeye.datalayer.dto.RootcauseSessionDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.AbstractBean;
+import org.apache.pinot.thirdeye.datalayer.pojo.RootcauseSessionBean;
+import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 
 
 @Singleton
@@ -42,8 +44,9 @@ public class RootcauseSessionManagerImpl extends AbstractManagerImpl<RootcauseSe
   private static final String FIND_BY_NAME_LIKE_TEMPLATE = "name LIKE :name__%d";
   private static final String FIND_BY_NAME_LIKE_KEY = "name__%d";
 
-  public RootcauseSessionManagerImpl() {
-    super(RootcauseSessionDTO.class, RootcauseSessionBean.class);
+  @Inject
+  public RootcauseSessionManagerImpl(GenericPojoDao genericPojoDao) {
+    super(RootcauseSessionDTO.class, RootcauseSessionBean.class, genericPojoDao);
   }
 
   @Override

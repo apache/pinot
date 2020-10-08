@@ -111,7 +111,16 @@ public class TestConfigEngine {
         RulesToExecute.RuleFactory.getRule(RulesToExecute.Rule.InvertedSortedIndexJointRule, _input, output);
     abstractRule.run();
     Assert.assertEquals(output.getIndexConfig().getInvertedIndexColumns().toString(), "[e, f, j]");
-    Assert.assertEquals(output.getIndexConfig().getSortedColumn().toString(), "[c]");
+    Assert.assertEquals(output.getIndexConfig().getSortedColumn(), "c");
+  }
+
+  @Test
+  void testEngineEmptyQueries()
+      throws InvalidInputException, IOException {
+    URL resourceUrl = getClass().getClassLoader().getResource("recommenderInput/EmptyQueriesInput.json");
+    File file = new File(resourceUrl.getFile());
+    String input = FileUtils.readFileToString(file, StandardCharsets.UTF_8);
+    RecommenderDriver.run(input);
   }
 
   @Test

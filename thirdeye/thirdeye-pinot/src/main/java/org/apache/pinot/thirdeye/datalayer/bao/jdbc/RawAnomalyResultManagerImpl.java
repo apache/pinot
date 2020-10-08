@@ -19,8 +19,10 @@
 
 package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import org.apache.pinot.thirdeye.datalayer.bao.RawAnomalyResultManager;
+import org.apache.pinot.thirdeye.datalayer.dao.GenericPojoDao;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.RawAnomalyResultDTO;
@@ -35,8 +37,9 @@ import org.slf4j.LoggerFactory;
 public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyResultDTO> implements RawAnomalyResultManager {
   private static final Logger LOG = LoggerFactory.getLogger(RawAnomalyResultManagerImpl.class);
 
-  public RawAnomalyResultManagerImpl() {
-    super(RawAnomalyResultDTO.class, RawAnomalyResultBean.class);
+  @Inject
+  public RawAnomalyResultManagerImpl(GenericPojoDao genericPojoDao) {
+    super(RawAnomalyResultDTO.class, RawAnomalyResultBean.class, genericPojoDao);
   }
 
   public Long save(RawAnomalyResultDTO entity) {

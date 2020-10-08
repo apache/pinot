@@ -30,15 +30,21 @@ import java.util.concurrent.atomic.AtomicLongArray;
  * of hits within the last 100 time buckets.
  */
 public class HitCounter {
-  private static int BUCKET_COUNT = 100;
-  private final int _timeBucketWidthMs;
-  private final AtomicLongArray _bucketStartTime;
-  private final AtomicIntegerArray _bucketHitCount;
+  private static int DEFAULT_BUCKET_COUNT = 100;
+  final int _timeBucketWidthMs;
+  final int _bucketCount;
+  final AtomicLongArray _bucketStartTime;
+  final AtomicIntegerArray _bucketHitCount;
 
   public HitCounter(int timeRangeInSeconds) {
-    _timeBucketWidthMs = timeRangeInSeconds * 1000 / BUCKET_COUNT;
-    _bucketStartTime = new AtomicLongArray(BUCKET_COUNT);
-    _bucketHitCount = new AtomicIntegerArray(BUCKET_COUNT);
+    this(timeRangeInSeconds, DEFAULT_BUCKET_COUNT);
+  }
+
+  public HitCounter(int timeRangeInSeconds, int bucketCount) {
+    _bucketCount = bucketCount;
+    _timeBucketWidthMs = timeRangeInSeconds * 1000 / _bucketCount;
+    _bucketStartTime = new AtomicLongArray(_bucketCount);
+    _bucketHitCount = new AtomicIntegerArray(_bucketCount);
   }
 
   /**
@@ -51,7 +57,7 @@ public class HitCounter {
   @VisibleForTesting
   void hit(long timestamp) {
     long numTimeUnits = timestamp / _timeBucketWidthMs;
-    int index = (int) (numTimeUnits % BUCKET_COUNT);
+    int index = (int) (numTimeUnits % _bucketCount);
     if (_bucketStartTime.get(index) == numTimeUnits) {
       _bucketHitCount.incrementAndGet(index);
     } else {
@@ -77,8 +83,8 @@ public class HitCounter {
   int getHitCount(long timestamp) {
     long numTimeUnits = timestamp / _timeBucketWidthMs;
     int count = 0;
-    for (int i = 0; i < BUCKET_COUNT; i++) {
-      if (numTimeUnits - _bucketStartTime.get(i) < BUCKET_COUNT) {
+    for (int i = 0; i < _bucketCount; i++) {
+      if (numTimeUnits - _bucketStartTime.get(i) < _bucketCount) {
         count += _bucketHitCount.get(i);
       }
     }

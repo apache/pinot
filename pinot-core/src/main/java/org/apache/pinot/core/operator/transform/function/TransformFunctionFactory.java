@@ -90,6 +90,13 @@ public class TransformFunctionFactory {
           put(TransformFunctionType.ARRAYLENGTH.getName().toLowerCase(), ArrayLengthTransformFunction.class);
           put(TransformFunctionType.VALUEIN.getName().toLowerCase(), ValueInTransformFunction.class);
           put(TransformFunctionType.MAPVALUE.getName().toLowerCase(), MapValueTransformFunction.class);
+          put(TransformFunctionType.INIDSET.getName().toLowerCase(), InIdSetTransformFunction.class);
+
+          // Array functions
+          put(TransformFunctionType.ARRAYAVERAGE.getName().toLowerCase(), ArrayAverageTransformFunction.class);
+          put(TransformFunctionType.ARRAYMAX.getName().toLowerCase(), ArrayMaxTransformFunction.class);
+          put(TransformFunctionType.ARRAYMIN.getName().toLowerCase(), ArrayMinTransformFunction.class);
+          put(TransformFunctionType.ARRAYSUM.getName().toLowerCase(), ArraySumTransformFunction.class);
 
           put(TransformFunctionType.GROOVY.getName().toLowerCase(), GroovyTransformFunction.class);
           put(TransformFunctionType.CASE.getName().toLowerCase(), CaseTransformFunction.class);

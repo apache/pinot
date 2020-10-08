@@ -92,8 +92,10 @@ public class SparkSegmentUriPushJobRunner implements IngestionJobRunner, Seriali
     for (String file : files) {
       URI uri = URI.create(file);
       if (uri.getPath().endsWith(Constants.TAR_GZ_FILE_EXT)) {
-        segmentUris.add(_spec.getPushJobSpec().getSegmentUriPrefix() + uri.getRawPath() + _spec.getPushJobSpec()
-            .getSegmentUriSuffix());
+        URI updatedURI = SegmentPushUtils
+            .generateSegmentTarURI(outputDirURI, uri, _spec.getPushJobSpec().getSegmentUriPrefix(),
+                _spec.getPushJobSpec().getSegmentUriSuffix());
+        segmentUris.add(updatedURI.toString());
       }
     }
 

@@ -26,5 +26,6 @@ Data Sources Setup
     pinot
     mysql
     presto
+    bigquery
     import_sql_metric
     contribute_datasource

@@ -1,0 +1,34 @@
+subscriptionGroupName: "Subscription Group Name"
+cron: "0 0/5 * 1/1 * ? *"
+application: "test_application"
+active: true
+subscribedDetections:
+  - test_detection_2
+
+type: DEFAULT_ALERTER_PIPELINE
+
+alertSchemes:
+- type: EMAIL
+  params:
+    template: ENTITY_GROUPBY_REPORT
+    subject: METRICS
+    recipients:
+      to:
+        - "thirdeye@thirdeye.com"
+      cc:
+        - "thirdeye-developers@thirdeye.com"
+- type: IRIS
+  params:
+    plan: thirdye_test_plan
+
+alertSuppressors:
+- type: TIME_WINDOW
+  params:
+    windowStartTime: 1542888000000
+    windowEndTime: 1543215600000
+    isThresholdApplied: true
+    expectedChange: -0.25
+    acceptableDeviation: 0.35
+
+referenceLinks:
+ "Oncall Runbook": "test_url"

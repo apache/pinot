@@ -24,7 +24,6 @@ import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
 import org.apache.pinot.thirdeye.dataframe.LongSeries;
 import org.apache.pinot.thirdeye.dataframe.Series;
-import org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -45,8 +44,8 @@ public class AlgorithmUtils {
   private static final int FAST_SPLINE_ITERATIONS = 4;
   private static final long MIN_WINDOW_SIZE = TimeUnit.DAYS.toMillis(1);
 
-  private static final String COL_TIME = DataFrameUtils.COL_TIME;
-  private static final String COL_VALUE = DataFrameUtils.COL_VALUE;
+  private static final String COL_TIME = DataFrame.COL_TIME;
+  private static final String COL_VALUE = DataFrame.COL_VALUE;
 
   private AlgorithmUtils() {
     // left blank

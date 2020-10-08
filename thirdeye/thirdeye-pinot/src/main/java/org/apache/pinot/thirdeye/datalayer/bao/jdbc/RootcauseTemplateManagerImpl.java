@@ -19,9 +19,11 @@
 
 package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import java.util.List;
 import org.apache.pinot.thirdeye.datalayer.bao.RootcauseTemplateManager;
+import org.apache.pinot.thirdeye.datalayer.dao.GenericPojoDao;
 import org.apache.pinot.thirdeye.datalayer.dto.RootcauseTemplateDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.RootcauseTemplateBean;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
@@ -29,9 +31,9 @@ import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 @Singleton
 public class RootcauseTemplateManagerImpl extends AbstractManagerImpl<RootcauseTemplateDTO> implements
                                                                                             RootcauseTemplateManager {
-
-  protected RootcauseTemplateManagerImpl() {
-    super(RootcauseTemplateDTO.class, RootcauseTemplateBean.class);
+  @Inject
+  public RootcauseTemplateManagerImpl(GenericPojoDao genericPojoDao) {
+    super(RootcauseTemplateDTO.class, RootcauseTemplateBean.class, genericPojoDao);
   }
 
   @Override

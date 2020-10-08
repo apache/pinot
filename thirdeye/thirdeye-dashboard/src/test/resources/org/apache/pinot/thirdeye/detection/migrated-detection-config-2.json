@@ -1,0 +1,44 @@
+{
+  "cron":"0 0 14 * * ? *",
+  "name":"test_function",
+  "description":"Please update description - If this alert fires then it means so-and-so and check so-and-so for irregularities",
+  "lastTimestamp":1547772179159,
+  "properties":{
+    "className":"org.apache.pinot.thirdeye.detection.wrapper.ChildKeepingMergeWrapper",
+    "nested":[
+      {
+        "nestedMetricUrns":[
+          "thirdeye:metric:1:score_challenge_type%3DCaptcha%20Challenge"
+        ],
+        "className":"org.apache.pinot.thirdeye.detection.algorithm.DimensionWrapper",
+        "nested":[
+          {
+            "baselineValueProvider":"$detection_rule1:RULE_BASELINE",
+            "className":"org.apache.pinot.thirdeye.detection.wrapper.BaselineFillingMergeWrapper",
+            "nested":[
+              {
+                "className":"org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper"
+              }
+            ],
+            "detector":"$detection_rule1:THRESHOLD"
+          }
+        ]
+      }
+    ]
+  },
+  "active":true,
+  "yaml":"detectionName: test_function\ndescription: Please update description - If this alert fires then it means so-and-so and check so-and-so for irregularities\nmetric: test_metric\nactive: true\ndataset: test_collection\ntype: COMPOSITE_ALERT\nfilters:\n  score_challenge_type:\n  - Captcha Challenge\nrules:\n- detection:\n  - name: detection_rule1\n    type: THRESHOLD\n    params:\n      min: '0.70'\n",
+  "componentSpecs":{
+    "detection_rule1:THRESHOLD":{
+      "min":"0.70",
+      "className":"org.apache.pinot.thirdeye.detection.components.ThresholdRuleDetector"
+    },
+    "detection_rule1:RULE_BASELINE":{
+      "min":"0.70",
+      "className":"org.apache.pinot.thirdeye.detection.components.RuleBaselineProvider"
+    }
+  },
+  "components":{
+
+  }
+}

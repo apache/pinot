@@ -19,7 +19,6 @@
 
 package org.apache.pinot.thirdeye.detection.components;
 
-import com.google.common.collect.Multimap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -41,7 +40,6 @@ import org.apache.pinot.thirdeye.detection.annotation.Param;
 import org.apache.pinot.thirdeye.detection.spec.MeanVarianceRuleDetectorSpec;
 import org.apache.pinot.thirdeye.detection.spi.components.AnomalyDetector;
 import org.apache.pinot.thirdeye.detection.spi.components.BaselineProvider;
-import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.apache.pinot.thirdeye.detection.spi.model.DetectionResult;
 import org.apache.pinot.thirdeye.detection.spi.model.InputData;
 import org.apache.pinot.thirdeye.detection.spi.model.InputDataSpec;
@@ -52,7 +50,6 @@ import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import static org.apache.pinot.thirdeye.dataframe.DoubleSeries.*;
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 @Components(title = "History mean and standard deviation based forecasting and detection.",
     type = "MEAN_VARIANCE_RULE",
@@ -122,7 +119,8 @@ public class MeanVarianceRuleDetector implements AnomalyDetector<MeanVarianceRul
         .get(metricEntity.getId());
     DataFrame inputDf = fetchData(metricEntity, trainStart.getMillis(), window.getEndMillis());
     DataFrame resultDF = computePredictionInterval(inputDf, window.getStartMillis(), datasetConfig.getTimezone());
-    resultDF = resultDF.joinLeft(inputDf.renameSeries(COL_VALUE, COL_CURR), COL_TIME);
+    resultDF = resultDF.joinLeft(inputDf.renameSeries(
+        DataFrame.COL_VALUE, COL_CURR), DataFrame.COL_TIME);
 
     // Exclude the end because baseline calculation should not contain the end
     if (resultDF.size() > 1) {
@@ -152,10 +150,10 @@ public class MeanVarianceRuleDetector implements AnomalyDetector<MeanVarianceRul
     // getting data (window + earliest lookback) all at once.
     LOG.info("Getting data for" + slice.toString());
     DataFrame dfInput = fetchData(me, fetchStart.getMillis(), window.getEndMillis());
-    DataFrame dfCurr = new DataFrame(dfInput).renameSeries(COL_VALUE, COL_CURR);
+    DataFrame dfCurr = new DataFrame(dfInput).renameSeries(DataFrame.COL_VALUE, COL_CURR);
     DataFrame dfBase = computePredictionInterval(dfInput, window.getStartMillis(), datasetConfig.getTimezone());
-    DataFrame df = new DataFrame(dfCurr).addSeries(dfBase, COL_VALUE, COL_ERROR);
-    df.addSeries(COL_DIFF, df.getDoubles(COL_CURR).subtract(df.get(COL_VALUE)));
+    DataFrame df = new DataFrame(dfCurr).addSeries(dfBase, DataFrame.COL_VALUE, COL_ERROR);
+    df.addSeries(COL_DIFF, df.getDoubles(COL_CURR).subtract(df.get(DataFrame.COL_VALUE)));
     df.addSeries(COL_ANOMALY, BooleanSeries.fillValues(df.size(), false));
 
     // Filter pattern
@@ -170,10 +168,9 @@ public class MeanVarianceRuleDetector implements AnomalyDetector<MeanVarianceRul
 
     // Anomalies
     List<MergedAnomalyResultDTO> anomalyResults = DetectionUtils.makeAnomalies(slice, df, COL_ANOMALY,
-        window.getEndMillis(),
         DetectionUtils.getMonitoringGranularityPeriod(timeGranularity.toAggregationGranularityString(),
             datasetConfig), datasetConfig);
-    dfBase = dfBase.joinRight(df.retainSeries(COL_TIME, COL_CURR), COL_TIME);
+    dfBase = dfBase.joinRight(df.retainSeries(DataFrame.COL_TIME, COL_CURR), DataFrame.COL_TIME);
     return DetectionResult.from(anomalyResults, TimeSeries.fromDataFrame(dfBase));
   }
 
@@ -186,7 +183,7 @@ public class MeanVarianceRuleDetector implements AnomalyDetector<MeanVarianceRul
       public boolean apply(long... values) {
         return values[0] >= windowStartTime;
       }
-    }, COL_TIME).dropNull();
+    }, DataFrame.COL_TIME).dropNull();
 
     int size = forecastDF.size();
     double[] baselineArray = new double[size];
@@ -200,23 +197,24 @@ public class MeanVarianceRuleDetector implements AnomalyDetector<MeanVarianceRul
     //get the trainingDF for each week, which is the number of lookback to 1 week before the each week predict start time
     for (int k = 0; k < size; k++) {
       DataFrame trainingDF;
-      trainingDF = getLookbackDF(inputDF, forecastDF.getLong(COL_TIME, k));
+      trainingDF = getLookbackDF(inputDF, forecastDF.getLong(DataFrame.COL_TIME, k));
       //the get historical WoW mean and std.
       std[k]= trainingDF.getDoubles(COL_CHANGE).std().value();
       mean[k] = trainingDF.getDoubles(COL_CHANGE).mean().value();
 
       //calculate baseline, error , upper and lower bound for prediction window.
-      resultTimeArray[k] = forecastDF.getLong(COL_TIME, k);
-      baselineArray[k] = trainingDF.getDouble(COL_VALUE,trainingDF.size()-1) * (1 + mean[k]);
-      errorArray[k] = trainingDF.getDouble(COL_VALUE,trainingDF.size()-1) * sensitivityToSigma(this.sensitivity) * std[k];
+      resultTimeArray[k] = forecastDF.getLong(DataFrame.COL_TIME, k);
+      baselineArray[k] = trainingDF.getDouble(DataFrame.COL_VALUE,trainingDF.size()-1) * (1 + mean[k]);
+      errorArray[k] = trainingDF.getDouble(DataFrame.COL_VALUE,trainingDF.size()-1) * sensitivityToSigma(this.sensitivity) * std[k];
       upperBoundArray[k] = baselineArray[k] + errorArray[k];
       lowerBoundArray[k] = baselineArray[k] - errorArray[k];
     }
     //Construct the dataframe.
-    resultDF.addSeries(COL_TIME, LongSeries.buildFrom(resultTimeArray)).setIndex(COL_TIME);
-    resultDF.addSeries(COL_VALUE, DoubleSeries.buildFrom(baselineArray));
-    resultDF.addSeries(COL_UPPER_BOUND, DoubleSeries.buildFrom(upperBoundArray));
-    resultDF.addSeries(COL_LOWER_BOUND, DoubleSeries.buildFrom(lowerBoundArray));
+    resultDF.addSeries(DataFrame.COL_TIME, LongSeries.buildFrom(resultTimeArray)).setIndex(
+        DataFrame.COL_TIME);
+    resultDF.addSeries(DataFrame.COL_VALUE, DoubleSeries.buildFrom(baselineArray));
+    resultDF.addSeries(DataFrame.COL_UPPER_BOUND, DoubleSeries.buildFrom(upperBoundArray));
+    resultDF.addSeries(DataFrame.COL_LOWER_BOUND, DoubleSeries.buildFrom(lowerBoundArray));
     resultDF.addSeries(COL_ERROR, DoubleSeries.buildFrom(errorArray));
     return resultDF;
   }
@@ -246,23 +244,23 @@ public class MeanVarianceRuleDetector implements AnomalyDetector<MeanVarianceRul
    * @return DataFrame containing lookback number of data
    */
   private DataFrame getLookbackDF(DataFrame originalDF, Long time) {
-    LongSeries longSeries = (LongSeries) originalDF.get(COL_TIME);
+    LongSeries longSeries = (LongSeries) originalDF.get(DataFrame.COL_TIME);
     int indexEnd = longSeries.find(time);
-    DataFrame df = DataFrame.builder(COL_TIME, COL_VALUE).build();
+    DataFrame df = DataFrame.builder(DataFrame.COL_TIME, DataFrame.COL_VALUE).build();
 
     if (indexEnd != -1) {
       int indexStart = Math.max(0, indexEnd - lookback);
       df = df.append(originalDF.slice(indexStart, indexEnd));
     }
     // calculate percentage change
-    df.addSeries(COL_CURR,df.getDoubles(COL_VALUE).shift(-1));
+    df.addSeries(COL_CURR,df.getDoubles(DataFrame.COL_VALUE).shift(-1));
     df.addSeries(COL_CHANGE, map((DoubleFunction) values -> {
       if (Double.compare(values[1], 0.0) == 0) {
         // divide by zero handling
         return 0.0;
       }
       return (values[0] - values[1]) / values[1];
-    }, df.getDoubles(COL_CURR), df.get(COL_VALUE)));
+    }, df.getDoubles(COL_CURR), df.get(DataFrame.COL_VALUE)));
     return df;
   }
 

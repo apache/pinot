@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.segment.index.datasource;
 
-import java.util.Collections;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.DataSourceMetadata;
@@ -28,22 +27,24 @@ import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
+import org.apache.pinot.core.segment.index.readers.TextIndexReader;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
  * The {@code MutableDataSource} class is the data source for a column in the mutable segment.
  */
+@SuppressWarnings("rawtypes")
 public class MutableDataSource extends BaseDataSource {
 
   public MutableDataSource(FieldSpec fieldSpec, int numDocs, int numValues, int maxNumValuesPerMVEntry,
-      @Nullable PartitionFunction partitionFunction, int partitionId, @Nullable Comparable minValue,
+      @Nullable PartitionFunction partitionFunction, @Nullable Set<Integer> partitions, @Nullable Comparable minValue,
       @Nullable Comparable maxValue, ForwardIndexReader forwardIndex, @Nullable Dictionary dictionary,
       @Nullable InvertedIndexReader invertedIndex, @Nullable InvertedIndexReader rangeIndex,
-      @Nullable InvertedIndexReader textIndex, @Nullable BloomFilterReader bloomFilter,
+      @Nullable TextIndexReader textIndex, @Nullable BloomFilterReader bloomFilter,
       @Nullable NullValueVectorReader nullValueVector) {
     super(new MutableDataSourceMetadata(fieldSpec, numDocs, numValues, maxNumValuesPerMVEntry, partitionFunction,
-            partitionId, minValue, maxValue), forwardIndex, dictionary, invertedIndex, rangeIndex, textIndex, bloomFilter,
+            partitions, minValue, maxValue), forwardIndex, dictionary, invertedIndex, rangeIndex, textIndex, bloomFilter,
         nullValueVector);
   }
 
@@ -58,7 +59,7 @@ public class MutableDataSource extends BaseDataSource {
     final Comparable _maxValue;
 
     MutableDataSourceMetadata(FieldSpec fieldSpec, int numDocs, int numValues, int maxNumValuesPerMVEntry,
-        @Nullable PartitionFunction partitionFunction, int partitionId, @Nullable Comparable minValue,
+        @Nullable PartitionFunction partitionFunction, @Nullable Set<Integer> partitions, @Nullable Comparable minValue,
         @Nullable Comparable maxValue) {
       _fieldSpec = fieldSpec;
       _numDocs = numDocs;
@@ -66,7 +67,7 @@ public class MutableDataSource extends BaseDataSource {
       _maxNumValuesPerMVEntry = maxNumValuesPerMVEntry;
       if (partitionFunction != null) {
         _partitionFunction = partitionFunction;
-        _partitions = Collections.singleton(partitionId);
+        _partitions = partitions;
       } else {
         _partitionFunction = null;
         _partitions = null;

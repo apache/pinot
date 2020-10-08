@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.store;
 
+import com.google.common.base.Preconditions;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -31,18 +32,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
-
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.base.Preconditions;
 
 
 // There are a couple of un-addressed issues right now
@@ -200,7 +198,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
 
     PropertiesConfiguration mapConfig = CommonsConfigurationUtils.fromFile(mapFile);
 
-    for (String key: CommonsConfigurationUtils.getKeys(mapConfig)) {
+    for (String key : CommonsConfigurationUtils.getKeys(mapConfig)) {
       // column names can have '.' in it hence scan from backwards
       // parsing names like "column.name.dictionary.startOffset"
       // or, "column.name.dictionary.endOffset" where column.name is the key

@@ -19,20 +19,23 @@
 
 package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import java.util.List;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dao.GenericPojoDao;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.DatasetConfigBean;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
-import java.util.List;
-import org.apache.commons.collections4.CollectionUtils;
 
 @Singleton
 public class DatasetConfigManagerImpl extends AbstractManagerImpl<DatasetConfigDTO>
     implements DatasetConfigManager {
 
-  public DatasetConfigManagerImpl() {
-    super(DatasetConfigDTO.class, DatasetConfigBean.class);
+  @Inject
+  public DatasetConfigManagerImpl(GenericPojoDao genericPojoDao) {
+    super(DatasetConfigDTO.class, DatasetConfigBean.class, genericPojoDao);
   }
 
 

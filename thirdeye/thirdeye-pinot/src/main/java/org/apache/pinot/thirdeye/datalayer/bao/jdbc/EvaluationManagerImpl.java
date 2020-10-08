@@ -22,15 +22,18 @@
 
 package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import org.apache.pinot.thirdeye.datalayer.bao.EvaluationManager;
+import org.apache.pinot.thirdeye.datalayer.dao.GenericPojoDao;
 import org.apache.pinot.thirdeye.datalayer.dto.EvaluationDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.EvaluationBean;
 
 
 @Singleton
 public class EvaluationManagerImpl extends AbstractManagerImpl<EvaluationDTO> implements EvaluationManager {
-  public EvaluationManagerImpl() {
-    super(EvaluationDTO.class, EvaluationBean.class);
+  @Inject
+  public EvaluationManagerImpl(GenericPojoDao genericPojoDao) {
+    super(EvaluationDTO.class, EvaluationBean.class, genericPojoDao);
   }
 }

@@ -34,7 +34,9 @@ import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.core.query.scheduler.QuerySchedulerFactory;
 import org.apache.pinot.core.transport.QueryServer;
+import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.server.conf.ServerConf;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,7 +53,8 @@ public class ServerInstance {
   private final QueryExecutor _queryExecutor;
   private final LongAccumulator _latestQueryTime;
   private final QueryScheduler _queryScheduler;
-  private final QueryServer _queryServer;
+  private final QueryServer _nettyQueryServer;
+  private final GrpcQueryServer _grpcQueryServer;
 
   private boolean _started = false;
 
@@ -64,7 +67,8 @@ public class ServerInstance {
     MetricsRegistry metricsRegistry = new MetricsRegistry();
     MetricsHelper.registerMetricsRegistry(metricsRegistry);
     _serverMetrics =
-        new ServerMetrics(serverConf.getMetricsPrefix(), metricsRegistry, !serverConf.emitTableLevelMetrics());
+        new ServerMetrics(serverConf.getMetricsPrefix(), metricsRegistry, serverConf.emitTableLevelMetrics(),
+            serverConf.getAllowedTablesForEmittingMetrics());
     _serverMetrics.initializeGlobalMeters();
 
     String instanceDataManagerClassName = serverConf.getInstanceDataManagerClassName();
@@ -77,16 +81,25 @@ public class ServerInstance {
     String queryExecutorClassName = serverConf.getQueryExecutorClassName();
     LOGGER.info("Initializing query executor of class: {}", queryExecutorClassName);
     _queryExecutor = (QueryExecutor) Class.forName(queryExecutorClassName).newInstance();
-    _queryExecutor.init(serverConf.getQueryExecutorConfig(), _instanceDataManager, _serverMetrics);
+    PinotConfiguration queryExecutorConfig = serverConf.getQueryExecutorConfig();
+    _queryExecutor.init(queryExecutorConfig, _instanceDataManager, _serverMetrics);
 
     LOGGER.info("Initializing query scheduler");
     _latestQueryTime = new LongAccumulator(Long::max, 0);
     _queryScheduler =
         QuerySchedulerFactory.create(serverConf.getSchedulerConfig(), _queryExecutor, _serverMetrics, _latestQueryTime);
 
-    int queryServerPort = serverConf.getNettyConfig().getPort();
-    LOGGER.info("Initializing query server on port: {}", queryServerPort);
-    _queryServer = new QueryServer(queryServerPort, _queryScheduler, _serverMetrics);
+    int nettyPort = serverConf.getNettyPort();
+    LOGGER.info("Initializing Netty query server on port: {}", nettyPort);
+    _nettyQueryServer = new QueryServer(nettyPort, _queryScheduler, _serverMetrics);
+
+    if (serverConf.isEnableGrpcServer()) {
+      int grpcPort = serverConf.getGrpcPort();
+      LOGGER.info("Initializing gRPC query server on port: {}", grpcPort);
+      _grpcQueryServer = new GrpcQueryServer(grpcPort, _queryExecutor, _serverMetrics);
+    } else {
+      _grpcQueryServer = null;
+    }
 
     LOGGER.info("Initializing transform functions");
     Set<Class<TransformFunction>> transformFunctionClasses = new HashSet<>();
@@ -119,8 +132,12 @@ public class ServerInstance {
     _queryExecutor.start();
     LOGGER.info("Starting query scheduler");
     _queryScheduler.start();
-    LOGGER.info("Starting query server");
-    _queryServer.start();
+    LOGGER.info("Starting Netty query server");
+    _nettyQueryServer.start();
+    if (_grpcQueryServer != null) {
+      LOGGER.info("Starting gRPC query server");
+      _grpcQueryServer.start();
+    }
 
     _started = true;
     LOGGER.info("Finish starting server instance");
@@ -130,8 +147,12 @@ public class ServerInstance {
     Preconditions.checkState(_started, "Server instance is not running");
     LOGGER.info("Shutting down server instance");
 
-    LOGGER.info("Shutting down query server");
-    _queryServer.shutDown();
+    if (_grpcQueryServer != null) {
+      LOGGER.info("Shutting down gRPC query server");
+      _grpcQueryServer.shutdown();
+    }
+    LOGGER.info("Shutting down Netty query server");
+    _nettyQueryServer.shutDown();
     LOGGER.info("Shutting down query scheduler");
     _queryScheduler.stop();
     LOGGER.info("Shutting down query executor");

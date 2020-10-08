@@ -42,8 +42,8 @@ public class SelectionOnlyCombineOperator extends BaseCombineOperator {
   private final int _numRowsToKeep;
 
   public SelectionOnlyCombineOperator(List<Operator> operators, QueryContext queryContext,
-      ExecutorService executorService, long timeOutMs) {
-    super(operators, queryContext, executorService, timeOutMs);
+      ExecutorService executorService, long endTimeMs) {
+    super(operators, queryContext, executorService, endTimeMs);
     _numRowsToKeep = queryContext.getLimit();
   }
 

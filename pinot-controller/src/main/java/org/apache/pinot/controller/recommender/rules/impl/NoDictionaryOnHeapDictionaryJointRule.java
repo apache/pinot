@@ -19,10 +19,6 @@
 package org.apache.pinot.controller.recommender.rules.impl;
 
 import com.google.common.util.concurrent.AtomicDouble;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
 import org.apache.pinot.controller.recommender.exceptions.InvalidInputException;
 import org.apache.pinot.controller.recommender.io.ConfigManager;
 import org.apache.pinot.controller.recommender.io.InputManager;
@@ -36,6 +32,11 @@ import org.apache.pinot.core.query.request.context.predicate.Predicate;
 import org.apache.pinot.core.requesthandler.BrokerRequestOptimizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.REALTIME;
 
@@ -85,7 +86,7 @@ public class NoDictionaryOnHeapDictionaryJointRule extends AbstractRule {
 
     // Exclude cols already having index
     noDictCols.removeAll(_output.getIndexConfig().getInvertedIndexColumns());
-    noDictCols.removeAll(_output.getIndexConfig().getSortedColumn());
+    noDictCols.remove(_output.getIndexConfig().getSortedColumn());
     noDictCols.removeAll(_output.getIndexConfig()
         .getRangeIndexColumns()); // TODO: Remove this after range index is implemented for no-dictionary
     LOGGER.debug("noDictCols {}", noDictCols);
@@ -139,7 +140,7 @@ public class NoDictionaryOnHeapDictionaryJointRule extends AbstractRule {
 
       if (_input.getTableType().equalsIgnoreCase(REALTIME)) {
         //TODO: improve this estimation
-        numRecordsPerPush = _input.getNumMessagesPerSecInKafKaTopic() * _input.getSegmentFlushTime();
+        numRecordsPerPush = _input.getNumMessagesPerSecInKafkaTopic() * _input.getSegmentFlushTime();
       } else { // For hybrid or offline table, nodictionary follows the offline side
         numRecordsPerPush = _input.getNumRecordsPerPush();
       }

@@ -19,20 +19,22 @@
 
 package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import java.util.List;
 import org.apache.pinot.thirdeye.datalayer.bao.OnboardDatasetMetricManager;
+import org.apache.pinot.thirdeye.datalayer.dao.GenericPojoDao;
 import org.apache.pinot.thirdeye.datalayer.dto.OnboardDatasetMetricDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.OnboardDatasetMetricBean;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
-
-import java.util.List;
 
 @Singleton
 public class OnboardDatasetMetricManagerImpl extends AbstractManagerImpl<OnboardDatasetMetricDTO>
     implements OnboardDatasetMetricManager {
 
-  public OnboardDatasetMetricManagerImpl() {
-    super(OnboardDatasetMetricDTO.class, OnboardDatasetMetricBean.class);
+  @Inject
+  public OnboardDatasetMetricManagerImpl(GenericPojoDao genericPojoDao) {
+    super(OnboardDatasetMetricDTO.class, OnboardDatasetMetricBean.class, genericPojoDao);
   }
 
   @Override

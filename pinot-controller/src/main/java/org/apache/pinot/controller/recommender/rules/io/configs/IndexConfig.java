@@ -31,12 +31,14 @@ import java.util.Set;
 public class IndexConfig {
     Set<String> _invertedIndexColumns = new HashSet<>();
     Set<String> _rangeIndexColumns = new HashSet<>();
-    Set<String> _sortedColumn = new HashSet<>();
+    String _sortedColumn = "";
     Set<String> _bloomFilterColumns = new HashSet<>();
 
     Set<String> _noDictionaryColumns = new HashSet<>();
     Set<String> _onHeapDictionaryColumns = new HashSet<>();
     Set<String> _variedLengthDictionaryColumns = new HashSet<>();
+
+    boolean _isSortedColumnOverwritten = false;
 
     @JsonSetter(nulls = Nulls.SKIP)
     public void setVariedLengthDictionaryColumns(Set<String> variedLengthDictionaryColumns) {
@@ -64,8 +66,9 @@ public class IndexConfig {
     }
 
     @JsonSetter(nulls = Nulls.SKIP)
-    public void setSortedColumn(Set<String> sortedColumn) {
+    public void setSortedColumn(String sortedColumn) {
         this._sortedColumn = sortedColumn;
+        this._isSortedColumnOverwritten = true;
     }
 
     @JsonSetter(nulls = Nulls.SKIP)
@@ -73,6 +76,9 @@ public class IndexConfig {
         this._rangeIndexColumns = rangeIndexColumns;
     }
 
+    public boolean isSortedColumnOverwritten() {
+        return _isSortedColumnOverwritten;
+    }
 
     public Set<String> getVariedLengthDictionaryColumns() {
         return _variedLengthDictionaryColumns;
@@ -94,7 +100,7 @@ public class IndexConfig {
         return _invertedIndexColumns;
     }
 
-    public Set<String> getSortedColumn() {
+    public String getSortedColumn() {
         return _sortedColumn;
     }
 
@@ -107,7 +113,7 @@ public class IndexConfig {
     }
 
     public boolean hasSortedIndex(String colName){
-        return _sortedColumn.contains(colName);
+        return _sortedColumn.equals(colName);
     };
 
     public boolean hasRangeIndex(String colName){

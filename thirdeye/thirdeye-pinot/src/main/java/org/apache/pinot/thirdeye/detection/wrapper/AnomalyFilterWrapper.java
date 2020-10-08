@@ -46,7 +46,6 @@ import org.apache.commons.collections4.MapUtils;
  */
 public class AnomalyFilterWrapper extends DetectionPipeline {
   private static final String PROP_NESTED = "nested";
-  private static final String PROP_CLASS_NAME = "className";
   private static final String PROP_METRIC_URN = "metricUrn";
   private static final String PROP_FILTER = "filter";
 
@@ -81,21 +80,10 @@ public class AnomalyFilterWrapper extends DetectionPipeline {
 
     Set<Long> lastTimeStamps = new HashSet<>();
     for (Map<String, Object> properties : this.nestedProperties) {
-      DetectionConfigDTO nestedConfig = new DetectionConfigDTO();
-
-      Preconditions.checkArgument(properties.containsKey(PROP_CLASS_NAME), "Nested missing " + PROP_CLASS_NAME);
-      HashMap<String, Object> nestedProp = new HashMap<>(properties);
       if (this.metricUrn != null){
-        nestedProp.put(PROP_METRIC_URN, this.metricUrn);
+        properties.put(PROP_METRIC_URN, this.metricUrn);
       }
-      nestedConfig.setId(this.config.getId());
-      nestedConfig.setName(this.config.getName());
-      nestedConfig.setDescription(this.config.getDescription());
-      nestedConfig.setProperties(nestedProp);
-      nestedConfig.setComponents(this.config.getComponents());
-      DetectionPipeline pipeline = this.provider.loadPipeline(nestedConfig, this.startTime, this.endTime);
-
-      DetectionPipelineResult intermediate = pipeline.run();
+      DetectionPipelineResult intermediate = this.runNested(properties, this.startTime, this.endTime);
       lastTimeStamps.add(intermediate.getLastTimestamp());
       diagnostics.putAll(intermediate.getDiagnostics());
       evaluations.addAll(intermediate.getEvaluations());

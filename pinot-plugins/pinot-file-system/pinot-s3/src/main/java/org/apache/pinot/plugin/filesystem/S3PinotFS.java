@@ -29,8 +29,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.slf4j.Logger;
@@ -47,6 +49,7 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3ClientBuilder;
 import software.amazon.awssdk.services.s3.model.CopyObjectRequest;
 import software.amazon.awssdk.services.s3.model.CopyObjectResponse;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
@@ -68,6 +71,7 @@ public class S3PinotFS extends PinotFS {
   public static final String ACCESS_KEY = "accessKey";
   public static final String SECRET_KEY = "secretKey";
   public static final String REGION = "region";
+  public static final String ENDPOINT = "endpoint";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(S3PinotFS.class);
   private static final String DELIMITER = "/";
@@ -91,7 +95,16 @@ public class S3PinotFS extends PinotFS {
         awsCredentialsProvider = DefaultCredentialsProvider.create();
       }
 
-      _s3Client = S3Client.builder().region(Region.of(region)).credentialsProvider(awsCredentialsProvider).build();
+      S3ClientBuilder s3ClientBuilder = S3Client.builder().region(Region.of(region)).credentialsProvider(awsCredentialsProvider);
+      if (!isNullOrEmpty(config.getProperty(ENDPOINT))) {
+        String endpoint = config.getProperty(ENDPOINT);
+        try {
+          s3ClientBuilder.endpointOverride(new URI(endpoint));
+        } catch (URISyntaxException e) {
+          throw new RuntimeException(e);
+        }
+      }
+      _s3Client = s3ClientBuilder.build();
     } catch (S3Exception e) {
       throw new RuntimeException("Could not initialize S3PinotFS", e);
     }
@@ -373,34 +386,42 @@ public class S3PinotFS extends PinotFS {
       throws IOException {
     try {
       ImmutableList.Builder<String> builder = ImmutableList.builder();
+      String continuationToken = null;
+      boolean isDone = false;
       String prefix = normalizeToDirectoryPrefix(fileUri);
-
-      ListObjectsV2Response listObjectsV2Response;
-      ListObjectsV2Request.Builder listObjectsV2RequestBuilder =
-          ListObjectsV2Request.builder().bucket(fileUri.getHost());
-
-      if (!prefix.equals(DELIMITER)) {
-        listObjectsV2RequestBuilder = listObjectsV2RequestBuilder.prefix(prefix);
-      }
-
-      if (!recursive) {
-        listObjectsV2RequestBuilder = listObjectsV2RequestBuilder.delimiter(DELIMITER);
-      }
-
-      ListObjectsV2Request listObjectsV2Request = listObjectsV2RequestBuilder.build();
-      listObjectsV2Response = _s3Client.listObjectsV2(listObjectsV2Request);
-
-      listObjectsV2Response.contents().stream().forEach(object -> {
-        //Only add files and not directories
-        if (!object.key().equals(fileUri.getPath()) && !object.key().endsWith(DELIMITER)) {
-          String fileKey = object.key();
-          if (fileKey.startsWith(DELIMITER)) {
-            fileKey = fileKey.substring(1);
-          }
-          builder.add(S3_SCHEME + fileUri.getHost() + DELIMITER + fileKey);
+      while(!isDone) {
+        ListObjectsV2Request.Builder listObjectsV2RequestBuilder =
+            ListObjectsV2Request.builder().bucket(fileUri.getHost());
+        if (!prefix.equals(DELIMITER)) {
+          listObjectsV2RequestBuilder = listObjectsV2RequestBuilder.prefix(prefix);
         }
-      });
-      return builder.build().toArray(new String[0]);
+        if (!recursive) {
+          listObjectsV2RequestBuilder = listObjectsV2RequestBuilder.delimiter(DELIMITER);
+        }
+        if (continuationToken != null) {
+          listObjectsV2RequestBuilder.continuationToken(continuationToken);
+        }
+        ListObjectsV2Request listObjectsV2Request = listObjectsV2RequestBuilder.build();
+        LOGGER.debug("Trying to send ListObjectsV2Request {}", listObjectsV2Request);
+        ListObjectsV2Response listObjectsV2Response = _s3Client.listObjectsV2(listObjectsV2Request);
+        LOGGER.debug("Getting ListObjectsV2Response: {}", listObjectsV2Response);
+        List<S3Object> filesReturned = listObjectsV2Response.contents();
+        filesReturned.stream().forEach(object -> {
+          //Only add files and not directories
+          if (!object.key().equals(fileUri.getPath()) && !object.key().endsWith(DELIMITER)) {
+            String fileKey = object.key();
+            if (fileKey.startsWith(DELIMITER)) {
+              fileKey = fileKey.substring(1);
+            }
+            builder.add(S3_SCHEME + fileUri.getHost() + DELIMITER + fileKey);
+          }
+        });
+        isDone = !listObjectsV2Response.isTruncated();
+        continuationToken = listObjectsV2Response.nextContinuationToken();
+      }
+      String[] listedFiles = builder.build().toArray(new String[0]);
+      LOGGER.info("Listed {} files from URI: {}, is recursive: {}", listedFiles.length, fileUri, recursive);
+      return listedFiles;
     } catch (Throwable t) {
       throw new IOException(t);
     }
@@ -411,6 +432,7 @@ public class S3PinotFS extends PinotFS {
       throws Exception {
     LOGGER.info("Copy {} to local {}", srcUri, dstFile.getAbsolutePath());
     URI base = getBase(srcUri);
+    FileUtils.forceMkdir(dstFile.getParentFile());
     String prefix = sanitizePath(base.relativize(srcUri).getPath());
     GetObjectRequest getObjectRequest = GetObjectRequest.builder().bucket(srcUri.getHost()).key(prefix).build();
 

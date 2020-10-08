@@ -54,7 +54,7 @@ Pinot was originally built at LinkedIn to power rich interactive real-time analy
 
 * **Column-oriented**: a column-oriented database with various compression schemes such as Run Length, Fixed Bit Length.
 
-* [**Pluggable indexing**](https://docs.pinot.apache.org/basics/features/indexing): pluggable indexing technologies Sorted Index, Bitmap Index, Inverted Index.
+* [**Pluggable indexing**](https://docs.pinot.apache.org/basics/indexing): pluggable indexing technologies Sorted Index, Bitmap Index, Inverted Index.
 
 * **Query optimization**: ability to optimize query/execution plan based on query and segment metadata.
 

@@ -27,10 +27,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,24 +39,16 @@ import org.slf4j.LoggerFactory;
 public class ConcurrentIndexedTable extends IndexedTable {
   private static final Logger LOGGER = LoggerFactory.getLogger(ConcurrentIndexedTable.class);
 
-  private ConcurrentMap<Key, Record> _lookupMap;
-  private ReentrantReadWriteLock _readWriteLock;
+  private final ConcurrentMap<Key, Record> _lookupMap;
+  private final ReentrantReadWriteLock _readWriteLock;
   private Iterator<Record> _iterator;
 
-  private AtomicBoolean _noMoreNewRecords = new AtomicBoolean();
+  private final AtomicBoolean _noMoreNewRecords = new AtomicBoolean();
   private final AtomicInteger _numResizes = new AtomicInteger();
   private final AtomicLong _resizeTime = new AtomicLong();
 
-  /**
-   * Initializes the data structures needed for this Table
-   * @param dataSchema data schema of the record's keys and values
-   * @param aggregationFunctions aggregation functions for the record's values
-   * @param orderByExpressions list of {@link OrderByExpressionContext} defining the order by
-   * @param capacity the capacity of the table
-   */
-  public ConcurrentIndexedTable(DataSchema dataSchema, AggregationFunction[] aggregationFunctions,
-      @Nullable List<OrderByExpressionContext> orderByExpressions, int capacity) {
-    super(dataSchema, aggregationFunctions, orderByExpressions, capacity);
+  public ConcurrentIndexedTable(DataSchema dataSchema, QueryContext queryContext, int capacity) {
+    super(dataSchema, queryContext, capacity);
 
     _lookupMap = new ConcurrentHashMap<>();
     _readWriteLock = new ReentrantReadWriteLock();
@@ -105,7 +95,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
 
       // resize if exceeds max capacity
       if (_lookupMap.size() >= _maxCapacity) {
-        if (_isOrderBy) {
+        if (_hasOrderBy) {
           // reached capacity, resize
           _readWriteLock.writeLock().lock();
           try {
@@ -165,7 +155,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
   @Override
   public void finish(boolean sort) {
 
-    if (_isOrderBy) {
+    if (_hasOrderBy) {
 
       if (sort) {
         List<Record> sortedRecords = resizeAndSort(_capacity);

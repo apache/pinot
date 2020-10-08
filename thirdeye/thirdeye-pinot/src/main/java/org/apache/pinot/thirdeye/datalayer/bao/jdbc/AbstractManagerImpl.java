@@ -20,16 +20,16 @@
 package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
 import com.google.inject.persist.Transactional;
-import org.apache.pinot.thirdeye.datalayer.bao.AbstractManager;
-import org.apache.pinot.thirdeye.datalayer.dao.GenericPojoDao;
-import org.apache.pinot.thirdeye.datalayer.dto.AbstractDTO;
-import org.apache.pinot.thirdeye.datalayer.pojo.AbstractBean;
-import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.pinot.thirdeye.datalayer.bao.AbstractManager;
+import org.apache.pinot.thirdeye.datalayer.dao.GenericPojoDao;
+import org.apache.pinot.thirdeye.datalayer.dto.AbstractDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.AbstractBean;
+import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.joda.time.DateTime;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.convention.MatchingStrategies;
@@ -41,17 +41,15 @@ public abstract class AbstractManagerImpl<E extends AbstractDTO> implements Abst
     MODEL_MAPPER.getConfiguration().setMatchingStrategy(MatchingStrategies.STRICT);
   }
 
-  private Class<? extends AbstractDTO> dtoClass;
-  private Class<? extends AbstractBean> beanClass;
-  protected GenericPojoDao genericPojoDao;
+  private final Class<? extends AbstractDTO> dtoClass;
+  private final Class<? extends AbstractBean> beanClass;
+  protected final GenericPojoDao genericPojoDao;
 
   protected AbstractManagerImpl(Class<? extends AbstractDTO> dtoClass,
-      Class<? extends AbstractBean> beanClass) {
+      Class<? extends AbstractBean> beanClass,
+      final GenericPojoDao genericPojoDao) {
     this.dtoClass = dtoClass;
     this.beanClass = beanClass;
-  }
-
-  public void setGenericPojoDao(GenericPojoDao genericPojoDao) {
     this.genericPojoDao = genericPojoDao;
   }
 

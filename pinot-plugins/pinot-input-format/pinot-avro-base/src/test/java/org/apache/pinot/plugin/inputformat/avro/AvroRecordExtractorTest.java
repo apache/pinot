@@ -18,9 +18,13 @@
  */
 package org.apache.pinot.plugin.inputformat.avro;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -29,8 +33,13 @@ import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.AbstractRecordExtractorTest;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
 import static org.apache.avro.Schema.*;
 
@@ -39,7 +48,7 @@ import static org.apache.avro.Schema.*;
  * Tests the {@link AvroRecordExtractor} using a schema containing groovy transform functions
  */
 public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
-
+  private static final ObjectMapper DEFAULT_MAPPER = new ObjectMapper();
   private final File _dataFile = new File(_tempDir, "events.avro");
 
   /**
@@ -86,5 +95,31 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
   @Override
   protected boolean testExtractAll() {
     return true;
+  }
+
+  @Test
+  public void testDataTypeReturnFromAvroRecordExtractor()
+      throws IOException {
+    String testColumnName = "column1";
+    long columnValue = 999999999L;
+    AvroRecordExtractor avroRecordExtractor = new AvroRecordExtractor();
+    avroRecordExtractor.init(null, null);
+
+    org.apache.pinot.spi.data.Schema pinotSchema = new org.apache.pinot.spi.data.Schema.SchemaBuilder()
+        .addSingleValueDimension(testColumnName, FieldSpec.DataType.LONG).build();
+    Schema schema = AvroUtils.getAvroSchemaFromPinotSchema(pinotSchema);
+    GenericRecord genericRecord = new GenericData.Record(schema);
+    genericRecord.put(testColumnName, columnValue);
+    GenericRow genericRow = new GenericRow();
+
+    avroRecordExtractor.extract(genericRecord, genericRow);
+    Assert.assertEquals(columnValue, genericRow.getValue(testColumnName));
+    Assert.assertEquals("Long", genericRow.getValue(testColumnName).getClass().getSimpleName());
+
+    String jsonString = genericRecord.toString();
+    Map<String, Object> jsonMap = DEFAULT_MAPPER.readValue(jsonString, new TypeReference<Map<String, Object>>() {
+    });
+    // The data type got changed to Integer, which will then have to trigger the convert method in DataTypeTransformer class.
+    Assert.assertEquals("Integer", jsonMap.get(testColumnName).getClass().getSimpleName());
   }
 }

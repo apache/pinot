@@ -18,17 +18,19 @@
  */
 package org.apache.pinot.core.query.executor;
 
-import com.google.common.base.Preconditions;
+import io.grpc.stub.StreamObserver;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
+import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableImplV2;
@@ -59,9 +61,9 @@ import org.slf4j.LoggerFactory;
 public class ServerQueryExecutorV1Impl implements QueryExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerQueryExecutorV1Impl.class);
 
-  private InstanceDataManager _instanceDataManager = null;
-  private SegmentPrunerService _segmentPrunerService = null;
-  private PlanMaker _planMaker = null;
+  private InstanceDataManager _instanceDataManager;
+  private SegmentPrunerService _segmentPrunerService;
+  private PlanMaker _planMaker;
   private long _defaultTimeOutMs = CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS;
   private ServerMetrics _serverMetrics;
 
@@ -94,13 +96,15 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   }
 
   @Override
-  public DataTable processQuery(ServerQueryRequest queryRequest, ExecutorService executorService) {
+  public DataTable processQuery(ServerQueryRequest queryRequest, ExecutorService executorService,
+      @Nullable StreamObserver<Server.ServerResponse> responseObserver) {
     TimerContext timerContext = queryRequest.getTimerContext();
     TimerContext.Timer schedulerWaitTimer = timerContext.getPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
     if (schedulerWaitTimer != null) {
       schedulerWaitTimer.stopAndRecord();
     }
-    long querySchedulingTimeMs = System.currentTimeMillis() - timerContext.getQueryArrivalTimeMs();
+    long queryArrivalTimeMs = timerContext.getQueryArrivalTimeMs();
+    long querySchedulingTimeMs = System.currentTimeMillis() - queryArrivalTimeMs;
     TimerContext.Timer queryProcessingTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PROCESSING);
 
     long requestId = queryRequest.getRequestId();
@@ -116,10 +120,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         queryTimeoutMs = timeoutFromQueryOptions;
       }
     }
-    long remainingTimeMs = queryTimeoutMs - querySchedulingTimeMs;
 
     // Query scheduler wait time already exceeds query timeout, directly return
-    if (remainingTimeMs <= 0) {
+    if (querySchedulingTimeMs >= queryTimeoutMs) {
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.SCHEDULING_TIMEOUT_EXCEPTIONS, 1);
       String errorMessage = String
           .format("Query scheduling took %dms (longer than query timeout of %dms)", querySchedulingTimeMs,
@@ -131,7 +134,13 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
 
     TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableNameWithType);
-    Preconditions.checkState(tableDataManager != null, "Failed to find data manager for table: " + tableNameWithType);
+    if (tableDataManager == null) {
+      String errorMessage = "Failed to find table: " + tableNameWithType;
+      DataTable dataTable = new DataTableImplV2();
+      dataTable.addException(QueryException.getException(QueryException.SERVER_TABLE_MISSING_ERROR, errorMessage));
+      LOGGER.error("{} while processing requestId: {}", errorMessage, requestId);
+      return dataTable;
+    }
 
     List<String> segmentsToQuery = queryRequest.getSegmentsToQuery();
     List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireSegments(segmentsToQuery);
@@ -199,7 +208,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       int numSegmentsMatchedAfterPruning = segmentDataManagers.size();
       LOGGER.debug("Matched {} segments after pruning", numSegmentsMatchedAfterPruning);
       if (numSegmentsMatchedAfterPruning == 0) {
-        dataTable = DataTableUtils.buildEmptyDataTable(queryContext);
+        // Only return metadata for streaming query
+        dataTable =
+            queryRequest.isEnableStreaming() ? new DataTableImplV2() : DataTableUtils.buildEmptyDataTable(queryContext);
         Map<String, String> metadata = dataTable.getMetadata();
         metadata.put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(numTotalDocs));
         metadata.put(DataTable.NUM_DOCS_SCANNED_METADATA_KEY, "0");
@@ -213,8 +224,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         for (SegmentDataManager segmentDataManager : segmentDataManagers) {
           indexSegments.add(segmentDataManager.getSegment());
         }
-        Plan globalQueryPlan =
-            _planMaker.makeInstancePlan(indexSegments, queryContext, executorService, remainingTimeMs);
+        long endTimeMs = queryArrivalTimeMs + queryTimeoutMs;
+        Plan globalQueryPlan = queryRequest.isEnableStreaming() ? _planMaker
+            .makeStreamingInstancePlan(indexSegments, queryContext, executorService, responseObserver, endTimeMs)
+            : _planMaker.makeInstancePlan(indexSegments, queryContext, executorService, endTimeMs);
         planBuildTimer.stopAndRecord();
 
         TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);

@@ -21,7 +21,7 @@
 </div>
 {{#if previewError}}
   <div class="col-xs-12">
-      <div class="detection-yaml-msg-preview">
+      <div class="detection-yaml-msg-preview" id="preview-error">
         <p>{{material-design-icon
           name='error-outline'
         }} {{previewErrorMsg}}
@@ -49,7 +49,7 @@
 {{/if}}
 {{#if detectionError}}
   <div class="col-xs-12">
-      <div class="detection-yaml-msg">
+      <div class="detection-yaml-msg" id="detection-error">
         <p><i class="detection-yaml-msg__icon--error glyphicon glyphicon-remove-circle"></i>{{detectionErrorMsg}}
           {{#if detectionErrorInfo}}
             <span class="detection-yaml-msg__tooltip-link" onclick={{action "toggleDetectionModal"}}>
@@ -91,7 +91,7 @@
     </label>
   {{/unless}}
   {{#if isEditMode}}
-    {{bs-button
+    {{#bs-button
       defaultText="Update Alert"
       type="primary"
       buttonType="submit"
@@ -99,5 +99,11 @@
       onClick=(action "submitAlertEdit")
       class="te-button te-button--submit"
     }}
+      {{#if _updateDetection.isRunning}}
+        <span class="loading-spinner">
+          {{ember-spinner position='relative' right='20px' top='-10px' scale=0.5 color='#ffffff'}}
+        </span>
+      {{/if}}
+    {{/bs-button}}
   {{/if}}
 </div>

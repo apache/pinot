@@ -25,7 +25,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.anomaly.detection.DetectionJobSchedulerUtils;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
@@ -58,7 +57,6 @@ import org.joda.time.Period;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 import static org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTranslator.*;
 
 
@@ -69,8 +67,9 @@ import static org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfi
  */
 public class AnomalyDetectorWrapper extends DetectionPipeline {
   private static final String PROP_METRIC_URN = "metricUrn";
+  private static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
 
-  // moving window detection properties
+  // moving window detection properties (configurable in yaml)
   private static final String PROP_MOVING_WINDOW_DETECTION = "isMovingWindowDetection";
   private static final String PROP_WINDOW_DELAY = "windowDelay";
   private static final String PROP_WINDOW_DELAY_UNIT = "windowDelayUnit";
@@ -78,15 +77,15 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   private static final String PROP_WINDOW_UNIT = "windowUnit";
   private static final String PROP_FREQUENCY = "frequency";
   private static final String PROP_DETECTOR = "detector";
-  private static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
   private static final String PROP_TIMEZONE = "timezone";
   private static final String PROP_BUCKET_PERIOD = "bucketPeriod";
   private static final String PROP_CACHE_PERIOD_LOOKBACK = "cachingPeriodLookback";
+
   // fail detection job if it failed successively for the first 5 windows
   private static final long EARLY_TERMINATE_WINDOW = 5;
   // expression to consolidate the time series
   private static final String[] TIMESERIES_AGGREGATION_EXPRESSIONS =
-      {COL_VALUE + ":last", COL_CURRENT + ":last", COL_LOWER_BOUND + ":last", COL_UPPER_BOUND + ":last"};
+      {DataFrame.COL_VALUE + ":last", DataFrame.COL_CURRENT + ":last", DataFrame.COL_LOWER_BOUND + ":last", DataFrame.COL_UPPER_BOUND + ":last"};
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyDetectorWrapper.class);
 
   private final String metricUrn;
@@ -227,7 +226,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     DataFrame df1 = leftTimeSeries.getDataFrame();
     DataFrame df2 = rightTimeSeries.getDataFrame();
     DataFrame consolidatedDf = df1.append(df2)
-        .groupByValue(COL_TIME)
+        .groupByValue(DataFrame.COL_TIME)
         .aggregate(TIMESERIES_AGGREGATION_EXPRESSIONS);
     return TimeSeries.fromDataFrame(consolidatedDf);
   }
@@ -260,7 +259,8 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
           this.startTime,
           this.endTime,
           this.metricEntity.getFilters());
-      DoubleSeries timestamps = this.provider.fetchTimeseries(Collections.singleton(metricSlice)).get(metricSlice).getDoubles(COL_TIME);
+      DoubleSeries timestamps = this.provider.fetchTimeseries(Collections.singleton(metricSlice)).get(metricSlice).getDoubles(
+          DataFrame.COL_TIME);
       if (timestamps.size() == 0) {
         // no data available, don't update time stamp
         return -1;

@@ -54,7 +54,7 @@ public class KafkaPartitionRule extends AbstractRule {
         LOGGER.info("Recommending kafka partition configurations");
         LOGGER.info("*No kafka partition number found, recommending kafka partition number");
         _output.getPartitionConfig().setNumKafkaPartitions((int) Math
-            .ceil((double) _input._numMessagesPerSecInKafKaTopic / _params.KAFKA_NUM_MESSAGES_PER_SEC_PER_PARTITION));
+            .ceil((double) _input.getNumMessagesPerSecInKafkaTopic() / _params.KAFKA_NUM_MESSAGES_PER_SEC_PER_PARTITION));
         //Divide the messages/sec (total aggregate in the topic) by 250 to get an optimal value of the number of kafka partitions.
       }
       else{

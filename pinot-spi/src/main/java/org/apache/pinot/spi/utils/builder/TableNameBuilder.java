@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.spi.utils.builder;
 
+import com.google.common.collect.ImmutableSet;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.TableType;
 
@@ -126,5 +128,12 @@ public class TableNameBuilder {
    */
   public static boolean isRealtimeTableResource(String resourceName) {
     return REALTIME.tableHasTypeSuffix(resourceName);
+  }
+
+  public static Set<String> getTableNameVariations(String tableName) {
+    String rawTableName = extractRawTableName(tableName);
+    String offlineTableName = OFFLINE.tableNameWithType(rawTableName);
+    String realtimeTableName = REALTIME.tableNameWithType(rawTableName);
+    return ImmutableSet.of(rawTableName, offlineTableName, realtimeTableName);
   }
 }

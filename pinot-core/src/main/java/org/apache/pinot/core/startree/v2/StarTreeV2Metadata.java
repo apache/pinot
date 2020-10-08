@@ -18,19 +18,12 @@
  */
 package org.apache.pinot.core.startree.v2;
 
-import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.MetadataKey.DIMENSIONS_SPLIT_ORDER;
-import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.MetadataKey.FUNCTION_COLUMN_PAIRS;
-import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.MetadataKey.MAX_LEAF_RECORDS;
-import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS;
-import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.MetadataKey.TOTAL_DOCS;
-
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
-
 import org.apache.commons.configuration.Configuration;
+import org.apache.pinot.core.startree.v2.StarTreeV2Constants.MetadataKey;
 
 
 /**
@@ -45,28 +38,16 @@ public class StarTreeV2Metadata {
   private final int _maxLeafRecords;
   private final Set<String> _skipStarNodeCreationForDimensions;
 
-  public StarTreeV2Metadata(int numDocs, List<String> dimensionsSplitOrder,
-      Set<AggregationFunctionColumnPair> functionColumnPairs, int maxLeafRecords,
-      Set<String> skipStarNodeCreationForDimensions) {
-    _numDocs = numDocs;
-    _dimensionsSplitOrder = dimensionsSplitOrder;
-    _functionColumnPairs = functionColumnPairs;
-    _maxLeafRecords = maxLeafRecords;
-    _skipStarNodeCreationForDimensions = skipStarNodeCreationForDimensions;
-  }
-
-  @SuppressWarnings("unchecked")
   public StarTreeV2Metadata(Configuration metadataProperties) {
-    _numDocs = metadataProperties.getInt(TOTAL_DOCS);
-    _dimensionsSplitOrder = Arrays.stream(metadataProperties.getStringArray(DIMENSIONS_SPLIT_ORDER)).collect(Collectors.toList());
+    _numDocs = metadataProperties.getInt(MetadataKey.TOTAL_DOCS);
+    _dimensionsSplitOrder = Arrays.asList(metadataProperties.getStringArray(MetadataKey.DIMENSIONS_SPLIT_ORDER));
     _functionColumnPairs = new HashSet<>();
-    for (Object functionColumnPair : metadataProperties.getList(FUNCTION_COLUMN_PAIRS)) {
-      _functionColumnPairs.add(AggregationFunctionColumnPair.fromColumnName((String) functionColumnPair));
+    for (String functionColumnPair : metadataProperties.getStringArray(MetadataKey.FUNCTION_COLUMN_PAIRS)) {
+      _functionColumnPairs.add(AggregationFunctionColumnPair.fromColumnName(functionColumnPair));
     }
-    _maxLeafRecords = metadataProperties.getInt(MAX_LEAF_RECORDS);
-    _skipStarNodeCreationForDimensions =
-        new HashSet<>(Arrays.stream(metadataProperties.getStringArray(SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS))
-            .collect(Collectors.toList()));
+    _maxLeafRecords = metadataProperties.getInt(MetadataKey.MAX_LEAF_RECORDS);
+    _skipStarNodeCreationForDimensions = new HashSet<>(
+        Arrays.asList(metadataProperties.getStringArray(MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS)));
   }
 
   public int getNumDocs() {

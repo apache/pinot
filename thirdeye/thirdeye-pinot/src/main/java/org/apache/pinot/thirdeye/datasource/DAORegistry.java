@@ -22,6 +22,7 @@ package org.apache.pinot.thirdeye.datasource;
 import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.AlertSnapshotManager;
 import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import org.apache.pinot.thirdeye.datalayer.bao.AnomalySubscriptionGroupNotificationManager;
 import org.apache.pinot.thirdeye.datalayer.bao.ApplicationManager;
 import org.apache.pinot.thirdeye.datalayer.bao.ClassificationConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.ConfigManager;
@@ -38,6 +39,7 @@ import org.apache.pinot.thirdeye.datalayer.bao.JobManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.OnboardDatasetMetricManager;
+import org.apache.pinot.thirdeye.datalayer.bao.OnlineDetectionDataManager;
 import org.apache.pinot.thirdeye.datalayer.bao.OverrideConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.RootcauseSessionManager;
@@ -47,6 +49,7 @@ import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.AlertConfigManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.AlertSnapshotManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl;
+import org.apache.pinot.thirdeye.datalayer.bao.jdbc.AnomalySubscriptionGroupNotificationManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.ApplicationManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.ClassificationConfigManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.ConfigManagerImpl;
@@ -63,6 +66,7 @@ import org.apache.pinot.thirdeye.datalayer.bao.jdbc.JobManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.OnboardDatasetMetricManagerImpl;
+import org.apache.pinot.thirdeye.datalayer.bao.jdbc.OnlineDetectionDataManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.OverrideConfigManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.RawAnomalyResultManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.RootcauseSessionManagerImpl;
@@ -197,4 +201,11 @@ public class DAORegistry {
     return DaoProviderUtil.getInstance(EvaluationManagerImpl.class);
   }
 
+  public OnlineDetectionDataManager getOnlineDetectionDataManager() {
+    return DaoProviderUtil.getInstance(OnlineDetectionDataManagerImpl.class);
+  }
+
+  public AnomalySubscriptionGroupNotificationManager getAnomalySubscriptionGroupNotificationManager() {
+    return DaoProviderUtil.getInstance(AnomalySubscriptionGroupNotificationManagerImpl.class);
+  }
 }

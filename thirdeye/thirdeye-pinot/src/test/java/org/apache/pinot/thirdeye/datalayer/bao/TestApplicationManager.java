@@ -16,6 +16,8 @@
 
 package org.apache.pinot.thirdeye.datalayer.bao;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import org.apache.pinot.thirdeye.datalayer.TestDatabase;
 import org.apache.pinot.thirdeye.datalayer.dto.ApplicationDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.testng.Assert;
@@ -25,43 +27,50 @@ import org.testng.annotations.Test;
 
 public class TestApplicationManager {
 
-  Long applicationId;
+  public static final String APPLICATION_NAME = "MY_APP";
+  public static final String APPLICATION_EMAIL = "abc@abc.in";
+  private Long applicationId;
 
-  private DAOTestBase testDAOProvider;
-  private ApplicationManager applicationDAO;
+  private TestDatabase db;
+  private ApplicationManager applicationManager;
   @BeforeClass
   void beforeClass() {
-    testDAOProvider = DAOTestBase.getInstance();
+    db = new TestDatabase();
     DAORegistry daoRegistry = DAORegistry.getInstance();
-    applicationDAO = daoRegistry.getApplicationDAO();
+    applicationManager = daoRegistry.getApplicationDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    testDAOProvider.cleanup();
+    db.cleanup();
   }
 
   @Test
   public void testCreateApplication() {
     ApplicationDTO request = new ApplicationDTO();
-    request.setApplication("MY_APP");
-    request.setRecipients("abc@abc.in");
-    applicationId = applicationDAO.save(request);
-    Assert.assertTrue(applicationId > 0);
+    request.setApplication(APPLICATION_NAME);
+    request.setRecipients(APPLICATION_EMAIL);
+    applicationId = applicationManager.save(request);
+    assertThat(applicationId).isGreaterThan(0);
   }
 
   @Test(dependsOnMethods = { "testCreateApplication" })
   public void testFetchApplication() {
     // find by id
-    ApplicationDTO response = applicationDAO.findById(applicationId);
-    Assert.assertNotNull(response);
-    Assert.assertEquals(response.getId(), applicationId);
-    Assert.assertEquals(applicationDAO.findAll().size(), 1);
+    ApplicationDTO response = applicationManager.findById(applicationId);
+
+    assertThat(response).isNotNull();
+    assertThat(response.getId()).isEqualTo(applicationId);
+    assertThat(response.getApplication()).isEqualTo(APPLICATION_NAME);
+    assertThat(response.getRecipients()).isEqualTo(APPLICATION_EMAIL);
+
+    assertThat(applicationManager.findAll().size()).isEqualTo(1);
   }
 
   @Test(dependsOnMethods = { "testFetchApplication" })
   public void testDeleteApplication() {
-    applicationDAO.deleteById(applicationId);
-    Assert.assertEquals(applicationDAO.findAll().size(), 0);
+    assertThat(applicationManager.findAll().size()).isEqualTo(1);
+    applicationManager.deleteById(applicationId);
+    Assert.assertEquals(applicationManager.findAll().size(), 0);
   }
 }

@@ -97,7 +97,7 @@ public class ThirdEyeAnomalyApplication
   }
 
   @Override
-  public void run(final ThirdEyeAnomalyConfiguration config, final Environment environment)
+  public void run(final ThirdEyeAnomalyConfiguration config, final Environment env)
       throws Exception {
     LOG.info("Starting ThirdeyeAnomalyApplication : Scheduler {} Worker {}", config.isScheduler(), config.isWorker());
     super.initDAOs();
@@ -107,10 +107,14 @@ public class ThirdEyeAnomalyApplication
       LOG.error("Exception while loading caches", e);
     }
 
-    environment.getObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
-    environment.getObjectMapper().registerModule(makeMapperModule());
+    env.getObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+    env.getObjectMapper().registerModule(makeMapperModule());
 
-    environment.lifecycle().manage(new Managed() {
+    env.lifecycle().manage(lifecycleManager(config, env));
+  }
+
+  private Managed lifecycleManager(ThirdEyeAnomalyConfiguration config, Environment env) {
+    return new Managed() {
       @Override
       public void start() throws Exception {
 
@@ -140,14 +144,14 @@ public class ThirdEyeAnomalyApplication
               new HolidayEventsLoader(config.getHolidayEventsLoaderConfiguration(), config.getCalendarApiKeyPath(),
                   DAORegistry.getInstance().getEventDAO());
           holidayEventsLoader.start();
-          environment.jersey().register(new HolidayEventResource(holidayEventsLoader));
+          env.jersey().register(new HolidayEventResource(holidayEventsLoader));
         }
         if (config.isMockEventsLoader()) {
           mockEventsLoader = new MockEventsLoader(config.getMockEventsLoaderConfiguration(), DAORegistry.getInstance().getEventDAO());
           mockEventsLoader.run();
         }
         if (config.isPinotProxy()) {
-          environment.jersey().register(new PinotDataSourceResource());
+          env.jersey().register(new PinotDataSourceResource());
         }
         if (config.isDetectionPipeline()) {
           detectionScheduler = new DetectionCronScheduler(DAORegistry.getInstance().getDetectionConfigManager());
@@ -206,7 +210,7 @@ public class ThirdEyeAnomalyApplication
           modelDownloaderManager.shutdown();
         }
       }
-    });
+    };
   }
 
   private void updateAdminSession(String adminUser, String sessionKey) {

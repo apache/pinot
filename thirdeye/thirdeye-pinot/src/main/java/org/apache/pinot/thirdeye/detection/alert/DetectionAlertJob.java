@@ -24,9 +24,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
+import org.apache.pinot.thirdeye.datalayer.bao.AnomalySubscriptionGroupNotificationManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalySubscriptionGroupNotificationDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
@@ -48,12 +50,14 @@ public class DetectionAlertJob implements Job {
   private DetectionAlertConfigManager alertConfigDAO;
   private TaskManager taskDAO;
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-  private MergedAnomalyResultManager anomalyDAO;
+  private final MergedAnomalyResultManager anomalyDAO;
+  private final AnomalySubscriptionGroupNotificationManager anomalySubscriptionGroupNotificationDAO;
 
   public DetectionAlertJob() {
     this.alertConfigDAO = DAORegistry.getInstance().getDetectionAlertConfigManager();
     this.taskDAO = DAORegistry.getInstance().getTaskDAO();
     this.anomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
+    this.anomalySubscriptionGroupNotificationDAO = DAORegistry.getInstance().getAnomalySubscriptionGroupNotificationManager();
   }
 
   @Override
@@ -110,6 +114,8 @@ public class DetectionAlertJob implements Job {
    * For example, if previous anomaly is from t1 to t2 generated at t3, then the timestamp in vectorLock is t3.
    * If there is a new anomaly from t2 to t4 generated at t5, then we can still get this anomaly as t5 > t3.
    *
+   * Also, check if there is any anomaly that needs re-notifying
+   *
    * @param configDTO The Subscription Configuration.
    * @return true if it needs notification task. false otherwise.
    */
@@ -123,6 +129,10 @@ public class DetectionAlertJob implements Job {
         return true;
       }
     }
-    return false;
+    // in addition to checking the watermarks, check if any anomalies need to be re-notified by querying the anomaly subscription group notification table
+    List<AnomalySubscriptionGroupNotificationDTO> anomalySubscriptionGroupNotifications =
+        this.anomalySubscriptionGroupNotificationDAO.findByPredicate(
+            Predicate.IN("detectionConfigId", vectorLocks.keySet().toArray()));
+    return !anomalySubscriptionGroupNotifications.isEmpty();
   }
 }

@@ -60,14 +60,14 @@ public class PinotFSSegmentUploaderTest {
   public void testSuccessfulUpload() {
     SegmentUploader segmentUploader = new PinotFSSegmentUploader("hdfs://root", TIMEOUT_IN_MS);
     URI segmentURI = segmentUploader.uploadSegment(_file, _llcSegmentName);
-    Assert.assertEquals(segmentURI.toString(), StringUtil.join(File.separator,"hdfs://root", _llcSegmentName.getTableName(), _llcSegmentName.getSegmentName()));
+    Assert.assertTrue(segmentURI.toString().startsWith(StringUtil.join(File.separator,"hdfs://root", _llcSegmentName.getTableName(), _llcSegmentName.getSegmentName())));
   }
 
   @Test
   public void testSegmentAlreadyExist() {
     SegmentUploader segmentUploader = new PinotFSSegmentUploader("existing://root", TIMEOUT_IN_MS);
     URI segmentURI = segmentUploader.uploadSegment(_file, _llcSegmentName);
-    Assert.assertEquals(segmentURI.toString(), StringUtil.join(File.separator,"existing://root", _llcSegmentName.getTableName(), _llcSegmentName.getSegmentName()));
+    Assert.assertTrue(segmentURI.toString().startsWith(StringUtil.join(File.separator,"existing://root", _llcSegmentName.getTableName(), _llcSegmentName.getSegmentName())));
   }
 
   @Test

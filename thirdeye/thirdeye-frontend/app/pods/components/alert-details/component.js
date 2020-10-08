@@ -646,6 +646,7 @@ export default Component.extend({
           set(a, 'start', a.startTime);
           set(a, 'end', a.endTime);
           set(a, 'feedback', a.feedback ? a.feedback.feedbackType : a.statusClassification);
+          set(a, 'severityLabel', a.severityLabel);
           if (a.feedback === 'NONE') {
             set(a, 'feedback', 'NO_FEEDBACK');
           }
@@ -674,6 +675,8 @@ export default Component.extend({
           set(a, 'start', a.startTime);
           set(a, 'end', a.endTime);
           set(a, 'feedback', a.feedback ? a.feedback.feedbackType : a.statusClassification);
+          set(a, 'severityLabel', a.severityLabel);
+
           if (a.feedback === 'NONE') {
             set(a, 'feedback', 'NO_FEEDBACK');
           }
@@ -747,6 +750,10 @@ export default Component.extend({
         component: 'custom/anomalies-table/rule',
         propertyName: 'rule',
         title: 'Rule'
+      }, {
+        component: 'custom/anomalies-table/severity-level',
+        propertyName: 'severityLabel',
+        title: 'Severity Level'
       }];
       const rightmostColumns = isPreviewMode ? [] : [{
         component: 'custom/anomalies-table/resolution',
@@ -865,9 +872,9 @@ export default Component.extend({
       };
       if (selectedRule.type === FORECAST_STRING) {
         const futureRanges = {
-          'Next 48 Hours': [moment().add(48, 'hour').startOf('hour'), moment().startOf('hour')],
-          'Next Week': [moment().add(1, 'week').startOf('day'), moment().startOf('day')],
-          'Next 30 Days': [moment().add(1, 'month').startOf('day'), moment().startOf('day')]
+          'Next 48 Hours': [moment().startOf('hour'), moment().add(48, 'hour').startOf('hour')],
+          'Next Week': [moment().startOf('day'), moment().add(1, 'week').startOf('day')],
+          'Next 30 Days': [moment().startOf('day'), moment().add(1, 'month').startOf('day')]
         };
         Object.assign(predefinedRanges, futureRanges);
       }
@@ -1166,7 +1173,6 @@ export default Component.extend({
         })
         .catch(error => {
           if (error.name !== 'TaskCancelation') {
-            this.get('notifications').error(error, 'Error', toastOptions);
             set(this, 'getAnomaliesError', true);
             if (this.get('isPreviewMode')) {
               this.get('sendPreviewError')({
@@ -1174,6 +1180,8 @@ export default Component.extend({
                 previewErrorMsg: 'There was an error generating the preview.',
                 previewErrorInfo: error
               });
+            } else {
+              this.get('notifications').error(error, 'Error', toastOptions);
             }
           }
         });

@@ -44,9 +44,6 @@ import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.joda.time.Interval;
 
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-
-
 @Components(title = "Threshold", type = "THRESHOLD", tags = {
     DetectionTag.RULE_DETECTION}, description = "Simple threshold rule algorithm with (optional) upper and lower bounds on a metric value.", presentation = {
     @PresentationOption(name = "absolute value", template = "is lower than ${min} or higher than ${max}")}, params = {
@@ -71,7 +68,8 @@ public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetec
     InputData data = this.dataFetcher.fetchData(
         new InputDataSpec().withTimeseriesSlices(Collections.singletonList(slice))
             .withMetricIdsForDataset(Collections.singletonList(me.getId())));
-    DataFrame df = data.getTimeseries().get(slice).renameSeries(COL_VALUE, COL_CURRENT);
+    DataFrame df = data.getTimeseries().get(slice).renameSeries(
+        DataFrame.COL_VALUE, DataFrame.COL_CURRENT);
 
     // defaults
     df.addSeries(COL_TOO_HIGH, BooleanSeries.fillValues(df.size(), false));
@@ -79,16 +77,16 @@ public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetec
 
     // max
     if (!Double.isNaN(this.max)) {
-      df.addSeries(COL_TOO_HIGH, df.getDoubles(COL_CURRENT).gt(this.max));
+      df.addSeries(COL_TOO_HIGH, df.getDoubles(DataFrame.COL_CURRENT).gt(this.max));
     }
 
     // min
     if (!Double.isNaN(this.min)) {
-      df.addSeries(COL_TOO_LOW, df.getDoubles(COL_CURRENT).lt(this.min));
+      df.addSeries(COL_TOO_LOW, df.getDoubles(DataFrame.COL_CURRENT).lt(this.min));
     }
     df.mapInPlace(BooleanSeries.HAS_TRUE, COL_ANOMALY, COL_TOO_HIGH, COL_TOO_LOW);
     DatasetConfigDTO datasetConfig = data.getDatasetForMetricId().get(me.getId());
-    List<MergedAnomalyResultDTO> anomalies = DetectionUtils.makeAnomalies(slice, df, COL_ANOMALY, endTime,
+    List<MergedAnomalyResultDTO> anomalies = DetectionUtils.makeAnomalies(slice, df, COL_ANOMALY,
         DetectionUtils.getMonitoringGranularityPeriod(monitoringGranularity, datasetConfig), datasetConfig);
     DataFrame baselineWithBoundaries = constructBaselineAndBoundaries(df);
 
@@ -108,16 +106,16 @@ public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetec
    */
   private DataFrame constructBaselineAndBoundaries(DataFrame df) {
     // Set default baseline as the actual value
-    df.addSeries(COL_VALUE, df.get(COL_CURRENT));
+    df.addSeries(DataFrame.COL_VALUE, df.get(DataFrame.COL_CURRENT));
     if (!Double.isNaN(this.min)) {
-      df.addSeries(COL_LOWER_BOUND, DoubleSeries.fillValues(df.size(), this.min));
+      df.addSeries(DataFrame.COL_LOWER_BOUND, DoubleSeries.fillValues(df.size(), this.min));
       // set baseline value as the lower bound when actual value across below the mark
-      df.mapInPlace(DoubleSeries.MAX, COL_VALUE, COL_LOWER_BOUND, COL_VALUE);
+      df.mapInPlace(DoubleSeries.MAX, DataFrame.COL_VALUE, DataFrame.COL_LOWER_BOUND, DataFrame.COL_VALUE);
     }
     if (!Double.isNaN(this.max)) {
-      df.addSeries(COL_UPPER_BOUND, DoubleSeries.fillValues(df.size(), this.max));
+      df.addSeries(DataFrame.COL_UPPER_BOUND, DoubleSeries.fillValues(df.size(), this.max));
       // set baseline value as the upper bound when actual value across above the mark
-      df.mapInPlace(DoubleSeries.MIN, COL_VALUE, COL_UPPER_BOUND, COL_VALUE);
+      df.mapInPlace(DoubleSeries.MIN, DataFrame.COL_VALUE, DataFrame.COL_UPPER_BOUND, DataFrame.COL_VALUE);
     }
     return df;
   }

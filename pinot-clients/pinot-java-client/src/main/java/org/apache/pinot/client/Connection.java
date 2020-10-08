@@ -33,7 +33,7 @@ import org.slf4j.LoggerFactory;
 public class Connection {
   private static final Logger LOGGER = LoggerFactory.getLogger(Connection.class);
   private final PinotClientTransport _transport;
-  private BrokerSelector _brokerSelector;
+  private final BrokerSelector _brokerSelector;
   private List<String> _brokerList;
 
   Connection(List<String> brokerList, PinotClientTransport transport) {

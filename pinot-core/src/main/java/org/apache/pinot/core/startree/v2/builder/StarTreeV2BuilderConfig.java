@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
@@ -51,22 +52,30 @@ public class StarTreeV2BuilderConfig {
   private final int _maxLeafRecords;
 
   public static StarTreeV2BuilderConfig fromIndexConfig(StarTreeIndexConfig indexConfig) {
-    Builder builder = new Builder();
-    builder.setDimensionsSplitOrder(indexConfig.getDimensionsSplitOrder());
-    List<String> skipStarNodeCreationForDimensions = indexConfig.getSkipStarNodeCreationForDimensions();
-    if (skipStarNodeCreationForDimensions != null && !skipStarNodeCreationForDimensions.isEmpty()) {
-      builder.setSkipStarNodeCreationForDimensions(new HashSet<>(skipStarNodeCreationForDimensions));
+    List<String> dimensionsSplitOrder = indexConfig.getDimensionsSplitOrder();
+
+    Set<String> skipStarNodeCreationForDimensions;
+    if (indexConfig.getSkipStarNodeCreationForDimensions() != null) {
+      skipStarNodeCreationForDimensions = new HashSet<>(indexConfig.getSkipStarNodeCreationForDimensions());
+      Preconditions.checkArgument(dimensionsSplitOrder.containsAll(skipStarNodeCreationForDimensions),
+          "Can not skip star-node creation for dimensions not in the split order, dimensionsSplitOrder: %s, skipStarNodeCreationForDimensions: %s",
+          dimensionsSplitOrder, skipStarNodeCreationForDimensions);
+    } else {
+      skipStarNodeCreationForDimensions = Collections.emptySet();
     }
+
     Set<AggregationFunctionColumnPair> functionColumnPairs = new HashSet<>();
     for (String functionColumnPair : indexConfig.getFunctionColumnPairs()) {
       functionColumnPairs.add(AggregationFunctionColumnPair.fromColumnName(functionColumnPair));
     }
-    builder.setFunctionColumnPairs(functionColumnPairs);
+
     int maxLeafRecords = indexConfig.getMaxLeafRecords();
-    if (maxLeafRecords > 0) {
-      builder.setMaxLeafRecords(maxLeafRecords);
+    if (maxLeafRecords <= 0) {
+      maxLeafRecords = DEFAULT_MAX_LEAF_RECORDS;
     }
-    return builder.build();
+
+    return new StarTreeV2BuilderConfig(dimensionsSplitOrder, skipStarNodeCreationForDimensions, functionColumnPairs,
+        maxLeafRecords);
   }
 
   /**
@@ -167,58 +176,29 @@ public class StarTreeV2BuilderConfig {
   }
 
   @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof StarTreeV2BuilderConfig)) {
+      return false;
+    }
+    StarTreeV2BuilderConfig that = (StarTreeV2BuilderConfig) o;
+    return _maxLeafRecords == that._maxLeafRecords && Objects.equals(_dimensionsSplitOrder, that._dimensionsSplitOrder)
+        && Objects.equals(_skipStarNodeCreationForDimensions, that._skipStarNodeCreationForDimensions) && Objects
+        .equals(_functionColumnPairs, that._functionColumnPairs);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects
+        .hash(_dimensionsSplitOrder, _skipStarNodeCreationForDimensions, _functionColumnPairs, _maxLeafRecords);
+  }
+
+  @Override
   public String toString() {
     return new ToStringBuilder(this, ToStringStyle.SHORT_PREFIX_STYLE).append("splitOrder", _dimensionsSplitOrder)
         .append("skipStarNodeCreation", _skipStarNodeCreationForDimensions)
         .append("functionColumnPairs", _functionColumnPairs).append("maxLeafRecords", _maxLeafRecords).toString();
-  }
-
-  public static class Builder {
-    private List<String> _dimensionsSplitOrder;
-    private Set<String> _skipStarNodeCreationForDimensions;
-    private Set<AggregationFunctionColumnPair> _functionColumnPairs;
-    private int _maxLeafRecords = DEFAULT_MAX_LEAF_RECORDS;
-
-    public Builder setDimensionsSplitOrder(List<String> dimensionsSplitOrder) {
-      _dimensionsSplitOrder = dimensionsSplitOrder;
-      return this;
-    }
-
-    public Builder setSkipStarNodeCreationForDimensions(Set<String> skipStarNodeCreationForDimensions) {
-      _skipStarNodeCreationForDimensions = skipStarNodeCreationForDimensions;
-      return this;
-    }
-
-    public Builder setFunctionColumnPairs(Set<AggregationFunctionColumnPair> functionColumnPairs) {
-      _functionColumnPairs = functionColumnPairs;
-      return this;
-    }
-
-    public Builder setMaxLeafRecords(int maxLeafRecords) {
-      _maxLeafRecords = maxLeafRecords;
-      return this;
-    }
-
-    public StarTreeV2BuilderConfig build() {
-      if (_dimensionsSplitOrder == null || _dimensionsSplitOrder.isEmpty()) {
-        throw new IllegalStateException("Illegal dimensions split order: " + _dimensionsSplitOrder);
-      }
-      if (_skipStarNodeCreationForDimensions == null) {
-        _skipStarNodeCreationForDimensions = Collections.emptySet();
-      }
-      if (!_dimensionsSplitOrder.containsAll(_skipStarNodeCreationForDimensions)) {
-        throw new IllegalStateException(
-            "Can not skip star-node creation for dimension not in the split order, dimensionsSplitOrder: "
-                + _dimensionsSplitOrder + ", skipStarNodeCreationForDimensions: " + _skipStarNodeCreationForDimensions);
-      }
-      if (_functionColumnPairs == null || _functionColumnPairs.isEmpty()) {
-        throw new IllegalStateException("Illegal function-column pairs: " + _functionColumnPairs);
-      }
-      if (_maxLeafRecords <= 0) {
-        throw new IllegalStateException("Illegal maximum number of leaf records: " + _maxLeafRecords);
-      }
-      return new StarTreeV2BuilderConfig(_dimensionsSplitOrder, _skipStarNodeCreationForDimensions,
-          _functionColumnPairs, _maxLeafRecords);
-    }
   }
 }

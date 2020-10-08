@@ -21,6 +21,7 @@ package org.apache.pinot.thirdeye.detection.wrapper;
 
 import com.google.common.collect.Collections2;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -45,6 +46,7 @@ import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
  */
 public class ChildKeepingMergeWrapper extends BaselineFillingMergeWrapper {
   private static final String PROP_GROUP_KEY = "groupKey";
+  private static final String PROP_PATTERN_KEY = "pattern";
 
   public ChildKeepingMergeWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
     super(provider, config, startTime, endTime);
@@ -91,10 +93,15 @@ public class ChildKeepingMergeWrapper extends BaselineFillingMergeWrapper {
       if (anomaly.getProperties().containsKey(PROP_GROUP_KEY)) {
         groupKey = anomaly.getProperties().get(PROP_GROUP_KEY);
       }
-
+      String patternKey = "";
+      if (anomaly.getProperties().containsKey(PROP_PATTERN_KEY)) {
+        patternKey = anomaly.getProperties().get(PROP_PATTERN_KEY);
+      } else if (!Double.isNaN(anomaly.getAvgBaselineVal()) && !Double.isNaN(anomaly.getAvgCurrentVal())) {
+        patternKey = (anomaly.getAvgCurrentVal() > anomaly.getAvgBaselineVal()) ? "UP" : "DOWN";
+      }
       MergeWrapper.AnomalyKey key =
-          new MergeWrapper.AnomalyKey(anomaly.getMetric(), anomaly.getCollection(), anomaly.getDimensions(), groupKey, "",
-              anomaly.getType());
+          new MergeWrapper.AnomalyKey(anomaly.getMetric(), anomaly.getCollection(), anomaly.getDimensions(),
+              StringUtils.join(Arrays.asList(groupKey, patternKey), ","), "", anomaly.getType());
       MergedAnomalyResultDTO parent = parents.get(key);
 
       if (parent == null || anomaly.getStartTime() - parent.getEndTime() > this.maxGap) {
@@ -111,7 +118,11 @@ public class ChildKeepingMergeWrapper extends BaselineFillingMergeWrapper {
 
         // merge the anomaly's properties into parent
         ThirdEyeUtils.mergeAnomalyProperties(parent.getProperties(), anomaly.getProperties());
-
+        // merge the anomaly severity
+        if (parent.getSeverityLabel().compareTo(anomaly.getSeverityLabel()) > 0) {
+          // set the highest severity
+          parent.setSeverityLabel(anomaly.getSeverityLabel());
+        }
         if (anomaly.getChildren().isEmpty()) {
           parent.getChildren().add(anomaly);
         } else {

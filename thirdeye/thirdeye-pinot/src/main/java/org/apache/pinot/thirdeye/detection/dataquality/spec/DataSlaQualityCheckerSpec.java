@@ -20,16 +20,17 @@
 package org.apache.pinot.thirdeye.detection.dataquality.spec;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.detection.spec.AbstractSpec;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class DataSlaQualityCheckerSpec extends AbstractSpec {
-  private String sla = "3_DAYS";
+  public static final String DEFAULT_DATA_SLA = "3_DAYS";
+  private String sla;
 
   public String getSla() {
-    return sla;
+    return StringUtils.isNotEmpty(this.sla) ? this.sla : DEFAULT_DATA_SLA;
   }
 
   public void setSla(String sla) {

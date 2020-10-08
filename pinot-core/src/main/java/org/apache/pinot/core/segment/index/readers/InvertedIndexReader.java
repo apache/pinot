@@ -27,11 +27,4 @@ public interface InvertedIndexReader<T> extends Closeable {
    * Returns the document ids for the given dictionary id.
    */
   T getDocIds(int dictId);
-
-  /**
-   * Returns the document ids for the given string representation of the value.
-   */
-  default T getDocIds(String value) {
-    throw new UnsupportedOperationException();
-  }
 }

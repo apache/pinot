@@ -27,6 +27,7 @@ import {
 } from 'thirdeye-frontend/utils/api/self-serve';
 import {inject as service} from '@ember/service';
 import config from 'thirdeye-frontend/config/environment';
+import { task } from 'ember-concurrency';
 
 export default Component.extend({
   classNames: ['detection-yaml'],
@@ -46,6 +47,7 @@ export default Component.extend({
   detectionError: false,
   detectionErrorMsg: null,
   detectionErrorInfo: null,
+  detectionErrorScroll: false,
 
 
   init() {
@@ -58,6 +60,67 @@ export default Component.extend({
       set(this, 'detectionYaml', currentYamlAlertOriginal);
     }
   },
+
+  didRender() {
+    this._super(...arguments);
+    if (this.get('detectionErrorScroll')) {
+      document.getElementById("detection-error").scrollIntoView();
+      const parentResetScroll = this.get('resetScroll');
+      // reset detectionErrorScroll in parent if present, then set in component
+      parentResetScroll ? parentResetScroll('detectionErrorScroll') : null;
+      set(this, 'detectionErrorScroll', false);
+    }
+    if (this.get('previewErrorScroll')) {
+      document.getElementById("preview-error").scrollIntoView();
+      const parentResetScroll = this.get('resetScroll');
+      // reset previewErrorScroll in parent if present, then set in component
+      parentResetScroll ? parentResetScroll('previewErrorScroll') : null;
+      set(this, 'previewErrorScroll', false);
+    }
+  },
+
+  /**
+   * Handler for detection update - using ember concurrency (task)
+   * @method _updateDetection
+   * @param {detectionYaml} String - Yaml config for detection
+   * @param {notifications} Service - toast service for notifying user of errors
+   * @param {alertId} Number - id number of detection
+   * @return {Promise}
+   */
+  _updateDetection: task(function* (detectionYaml, notifications, alertId) {
+    //PUT alert
+    const alert_url = `/yaml/${alertId}`;
+    const alertPostProps = {
+      method: 'PUT',
+      body: detectionYaml,
+      headers: { 'content-type': 'text/plain' }
+    };
+    try {
+      const alert_result = yield fetch(alert_url, alertPostProps);
+      const alert_status  = get(alert_result, 'status');
+      const alert_json = yield alert_result.json();
+      if (alert_status !== 200) {
+        set(this, 'errorMsg', get(alert_json, 'message'));
+        notifications.error(`Failed to save the detection configuration due to: ${alert_json.message}.`, 'Error', toastOptions);
+        this.setProperties({
+          detectionError: true,
+          detectionErrorMsg: alert_json.message,
+          detectionErrorInfo: alert_json["more-info"],
+          detectionErrorScroll: true
+        });
+      } else {
+        notifications.success('Detection configuration saved successfully', 'Done', toastOptions);
+      }
+    } catch (error) {
+      notifications.error('Error while saving detection config.', error, toastOptions);
+      this.setProperties({
+        detectionError: true,
+        detectionErrorMsg: 'Error while saving detection config.',
+        detectionErrorInfo: error,
+        detectionErrorScroll: true
+      });
+    }
+  }).drop(),
 
   /**
    * Calls api's for specific metric's autocomplete
@@ -263,7 +326,7 @@ export default Component.extend({
      * Fired by alert button in YAML UI in edit mode
      * Grabs alert yaml and puts it to the backend.
      */
-    async submitAlertEdit() {
+    submitAlertEdit() {
       set(this, 'detectionError', false);
       const {
         detectionYaml,
@@ -271,36 +334,7 @@ export default Component.extend({
         alertId
       } = getProperties(this, 'detectionYaml', 'notifications', 'alertId');
 
-      //PUT alert
-      const alert_url = `/yaml/${alertId}`;
-      const alertPostProps = {
-        method: 'PUT',
-        body: detectionYaml,
-        headers: { 'content-type': 'text/plain' }
-      };
-      try {
-        const alert_result = await fetch(alert_url, alertPostProps);
-        const alert_status  = get(alert_result, 'status');
-        const alert_json = await alert_result.json();
-        if (alert_status !== 200) {
-          set(this, 'errorMsg', get(alert_json, 'message'));
-          notifications.error(`Failed to save the detection configuration due to: ${alert_json.message}.`, 'Error', toastOptions);
-          this.setProperties({
-            detectionError: true,
-            detectionErrorMsg: alert_json.message,
-            detectionErrorInfo: alert_json["more-info"]
-          });
-        } else {
-          notifications.success('Detection configuration saved successfully', 'Done', toastOptions);
-        }
-      } catch (error) {
-        notifications.error('Error while saving detection config.', error, toastOptions);
-        this.setProperties({
-          detectionError: true,
-          detectionErrorMsg: 'Error while saving detection config.',
-          detectionErrorInfo: error
-        });
-      }
+      this.get('_updateDetection').perform(detectionYaml, notifications, alertId);
     }
   }
 });

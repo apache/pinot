@@ -43,6 +43,7 @@ import org.apache.pinot.core.segment.index.readers.OnHeapStringDictionary;
 import org.apache.pinot.core.segment.index.readers.RangeIndexReader;
 import org.apache.pinot.core.segment.index.readers.SortedIndexReader;
 import org.apache.pinot.core.segment.index.readers.StringDictionary;
+import org.apache.pinot.core.segment.index.readers.TextIndexReader;
 import org.apache.pinot.core.segment.index.readers.forward.FixedBitMVForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
@@ -63,7 +64,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   private final ForwardIndexReader<?> _forwardIndex;
   private final InvertedIndexReader<?> _invertedIndex;
   private final InvertedIndexReader<?> _rangeIndex;
-  private final InvertedIndexReader<?> _textIndex;
+  private final TextIndexReader _textIndex;
   private final BaseImmutableDictionary _dictionary;
   private final BloomFilterReader _bloomFilterReader;
   private final NullValueVectorReaderImpl _nullValueVectorReader;
@@ -171,7 +172,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   }
 
   @Override
-  public InvertedIndexReader<?> getTextIndex() {
+  public TextIndexReader getTextIndex() {
     return _textIndex;
   }
 

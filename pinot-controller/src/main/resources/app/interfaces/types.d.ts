@@ -20,7 +20,7 @@
 declare module 'Models' {
   export type TableData = {
     records: Array<Array<string | number | boolean>>;
-    columns: string[];
+    columns: Array<string>;
   };
 
   export type Tenants = {
@@ -116,4 +116,16 @@ declare module 'Models' {
   export type ZKGetList = Array<string>
 
   export type ZKConfig = Object;
+  export type ZKOperationResponsne = any;
+
+  export type DataTable = {
+    [name: string]: Array<string>
+  };
+
+  export type BrokerList = Array<string>;
+
+  export type ServerList = {
+    ServerInstances: Array<string>,
+    tenantName: string
+  }
 }

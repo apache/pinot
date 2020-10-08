@@ -21,6 +21,7 @@ package org.apache.pinot.thirdeye.detection;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
@@ -39,9 +40,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTimeZone;
-
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-
 
 /**
  * The Current and baseline loader.
@@ -125,7 +123,8 @@ public class CurrentAndBaselineLoader {
 
   private double getAggregate(MetricSlice slice) {
     try {
-      return this.aggregationLoader.loadAggregate(slice, Collections.<String>emptyList(), -1).getDouble(COL_VALUE, 0);
+      return this.aggregationLoader.loadAggregate(slice, Collections.<String>emptyList(), -1).getDouble(
+          DataFrame.COL_VALUE, 0);
     } catch (Exception e) {
       return Double.NaN;
     }

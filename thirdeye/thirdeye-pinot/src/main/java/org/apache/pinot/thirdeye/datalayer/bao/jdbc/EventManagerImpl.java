@@ -19,17 +19,21 @@
 
 package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import java.util.List;
 import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
+import org.apache.pinot.thirdeye.datalayer.dao.GenericPojoDao;
 import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.EventBean;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
-import java.util.List;
 
 @Singleton
 public class EventManagerImpl extends AbstractManagerImpl<EventDTO> implements EventManager {
-  protected EventManagerImpl() {
-    super(EventDTO.class, EventBean.class);
+
+  @Inject
+  public EventManagerImpl(GenericPojoDao genericPojoDao) {
+    super(EventDTO.class, EventBean.class, genericPojoDao);
   }
 
   public List<EventDTO> findByEventType(String eventType) {

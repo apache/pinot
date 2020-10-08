@@ -27,35 +27,25 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-public class ArrayLengthTransformFunctionTest extends BaseTransformFunctionTest {
+public class ArrayLengthTransformFunctionTest extends ArrayBaseTransformFunctionTest {
 
-  @Test
-  public void testLengthTransformFunction() {
-    ExpressionContext expression =
-        QueryContextConverterUtils.getExpression(String.format("arrayLength(%s)", INT_MV_COLUMN));
-    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof ArrayLengthTransformFunction);
-    Assert.assertEquals(transformFunction.getName(), ArrayLengthTransformFunction.FUNCTION_NAME);
-    Assert.assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.INT);
-    Assert.assertTrue(transformFunction.getResultMetadata().isSingleValue());
-    Assert.assertFalse(transformFunction.getResultMetadata().hasDictionary());
-
-    int[] results = transformFunction.transformToIntValuesSV(_projectionBlock);
-    for (int i = 0; i < NUM_ROWS; i++) {
-      Assert.assertEquals(results[i], _intMVValues[i].length);
-    }
+  @Override
+  String getFunctionName() {
+    return ArrayLengthTransformFunction.FUNCTION_NAME;
   }
 
-  @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
-  public void testIllegalArguments(String expressionStr) {
-    ExpressionContext expression = QueryContextConverterUtils.getExpression(expressionStr);
-    TransformFunctionFactory.get(expression, _dataSourceMap);
+  @Override
+  Object getExpectResult(int[] intArrary) {
+    return intArrary.length;
   }
 
-  @DataProvider(name = "testIllegalArguments")
-  public Object[][] testIllegalArguments() {
-    return new Object[][]{new Object[]{String.format("arrayLength(%s,1)",
-        INT_MV_COLUMN)}, new Object[]{"arrayLength(2)"}, new Object[]{String.format("arrayLength(%s)",
-        LONG_SV_COLUMN)}};
+  @Override
+  Class getArrayFunctionClass() {
+    return ArrayLengthTransformFunction.class;
+  }
+
+  @Override
+  FieldSpec.DataType getResultDataType(FieldSpec.DataType inputDataType) {
+    return FieldSpec.DataType.INT;
   }
 }

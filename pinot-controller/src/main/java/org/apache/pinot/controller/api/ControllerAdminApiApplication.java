@@ -19,9 +19,12 @@
 package org.apache.pinot.controller.api;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.net.UnknownHostException;
+import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -156,7 +159,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     httpServer.getServerConfiguration().addHttpHandler(apiStaticHttpHandler, "/api/");
     httpServer.getServerConfiguration().addHttpHandler(apiStaticHttpHandler, "/help/");
 
-    URL swaggerDistLocation = loader.getResource("META-INF/resources/webjars/swagger-ui/2.2.10-1/");
+    URL swaggerDistLocation = loader.getResource("META-INF/resources/webjars/swagger-ui/3.18.2/");
     CLStaticHttpHandler swaggerDist = new CLStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
     httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
   }

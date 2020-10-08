@@ -112,15 +112,10 @@ public class ImmutableSegmentLoader {
           new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig, indexDir));
     }
 
-    if (schema == null) {
-      schema = segmentMetadata.getSchema();
-    }
-
-    // Ensure that the schema has the virtual columns added
-    VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(schema, segmentName);
-
     // Instantiate virtual columns
-    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+    Schema segmentSchema = segmentMetadata.getSchema();
+    VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(segmentSchema, segmentName);
+    for (FieldSpec fieldSpec : segmentSchema.getAllFieldSpecs()) {
       if (fieldSpec.isVirtualColumn()) {
         String columnName = fieldSpec.getName();
         VirtualColumnContext context = new VirtualColumnContext(fieldSpec, segmentMetadata.getTotalDocs());

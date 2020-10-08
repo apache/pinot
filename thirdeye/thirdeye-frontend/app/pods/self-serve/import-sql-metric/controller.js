@@ -20,7 +20,7 @@ export default Controller.extend({
   init() {
     this._super(...arguments);
     this.aggregationOptions = ['SUM', 'AVG', 'COUNT', 'MAX' ];
-    this.timeFormatOptions = ['EPOCH', 'yyyyMMdd', 'yyyy-MM-dd', 'yyyy-MM-dd-HH', 'yyyy-MM-dd HH:mm:ss', 'yyyy-MM-dd HH:mm:ss.S', 'yyyyMMddHHmmss'];
+    this.timeFormatOptions = ['EPOCH', 'yyyyMMdd', 'yyyy-MM-dd', 'yyyy-MM-dd-HH', 'yyyy-MM-dd HH:mm:ss', 'yyyy-MM-dd HH:mm:ss.S', 'yyyyMMddHHmmss', 'yyyy-MM-dd HH:mm:ss.SSS'];
     this.timeGranularityOptions = ['1MILLISECONDS', '1SECONDS', '1MINUTES', '1HOURS', '1DAYS', '1WEEKs', '1MONTHS', '1YEARS'];
     this.timezoneOptions = ["UTC", "Pacific/Midway", "US/Hawaii", "US/Alaska", "US/Pacific", "US/Arizona", "US/Mountain", "US/Central",
       "US/Eastern", "America/Caracas", "America/Manaus", "America/Santiago", "Canada/Newfoundland", "Brazil/East", "America/Buenos_Aires",

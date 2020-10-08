@@ -198,8 +198,8 @@ public abstract class BaseQueriesTest {
    */
   private BrokerResponseNative getBrokerResponse(QueryContext queryContext, PlanMaker planMaker) {
     // Server side.
-    Plan plan = planMaker
-        .makeInstancePlan(getIndexSegments(), queryContext, EXECUTOR_SERVICE, Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    Plan plan = planMaker.makeInstancePlan(getIndexSegments(), queryContext, EXECUTOR_SERVICE,
+        System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
     DataTable instanceResponse = plan.execute();
 
     // Broker side.

@@ -30,21 +30,31 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.proto.Server;
+import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.common.utils.grpc.GrpcQueryClient;
+import org.apache.pinot.common.utils.grpc.GrpcRequestBuilder;
+import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
+import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -84,10 +94,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private static final String TEST_UPDATED_BLOOM_FILTER_QUERY = "SELECT COUNT(*) FROM mytable WHERE Carrier = 'CA'";
 
   // For star-tree triggering test
-  private static final StarTreeIndexConfig STAR_TREE_INDEX_CONFIG =
+  private static final StarTreeIndexConfig STAR_TREE_INDEX_CONFIG_1 =
       new StarTreeIndexConfig(Collections.singletonList("Carrier"), null,
           Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), 100);
-  private static final String TEST_STAR_TREE_QUERY = "SELECT COUNT(*) FROM mytable WHERE Carrier = 'UA'";
+  private static final String TEST_STAR_TREE_QUERY_1 = "SELECT COUNT(*) FROM mytable WHERE Carrier = 'UA'";
+  private static final StarTreeIndexConfig STAR_TREE_INDEX_CONFIG_2 =
+      new StarTreeIndexConfig(Collections.singletonList("DestState"), null,
+          Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), 100);
+  private static final String TEST_STAR_TREE_QUERY_2 = "SELECT COUNT(*) FROM mytable WHERE DestState = 'CA'";
 
   // For default columns test
   private static final String SCHEMA_FILE_NAME_WITH_EXTRA_COLUMNS =
@@ -130,7 +144,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     startZk();
     startController();
     startBrokers(getNumBrokers());
-    startServers(getNumServers());
+    startServers();
 
     // Create and upload the schema and table config
     Schema schema = createSchema();
@@ -158,6 +172,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
+  }
+
+  protected void startServers() {
+    // Enable gRPC server
+    PinotConfiguration serverConfig = getDefaultServerConfiguration();
+    serverConfig.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_GRPC_SERVER, true);
+    startServer(serverConfig);
   }
 
   private void registerCallbackHandlers() {
@@ -420,39 +441,128 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     long numTotalDocs = getCountStarResult();
 
-    JsonNode queryResponse = postQuery(TEST_STAR_TREE_QUERY);
-    int result = queryResponse.get("aggregationResults").get(0).get("value").asInt();
+    // Test the first query
+    JsonNode firstQueryResponse = postQuery(TEST_STAR_TREE_QUERY_1);
+    int firstQueryResult = firstQueryResponse.get("aggregationResults").get(0).get("value").asInt();
+    assertEquals(firstQueryResponse.get("totalDocs").asLong(), numTotalDocs);
     // Initially 'numDocsScanned' should be the same as 'COUNT(*)' result
-    assertEquals(queryResponse.get("numDocsScanned").asInt(), result);
+    assertEquals(firstQueryResponse.get("numDocsScanned").asInt(), firstQueryResult);
 
     // Update table config and trigger reload
     TableConfig tableConfig = getOfflineTableConfig();
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-    indexingConfig.setStarTreeIndexConfigs(Collections.singletonList(STAR_TREE_INDEX_CONFIG));
+    indexingConfig.setStarTreeIndexConfigs(Collections.singletonList(STAR_TREE_INDEX_CONFIG_1));
     indexingConfig.setEnableDynamicStarTreeCreation(true);
     updateTableConfig(tableConfig);
     reloadOfflineTable(getTableName());
 
     TestUtils.waitForCondition(aVoid -> {
       try {
-        JsonNode queryResponse1 = postQuery(TEST_STAR_TREE_QUERY);
+        JsonNode queryResponse = postQuery(TEST_STAR_TREE_QUERY_1);
         // Result should not change during reload
-        assertEquals(queryResponse1.get("aggregationResults").get(0).get("value").asInt(), result);
+        assertEquals(queryResponse.get("aggregationResults").get(0).get("value").asInt(), firstQueryResult);
         // Total docs should not change during reload
-        assertEquals(queryResponse1.get("totalDocs").asLong(), numTotalDocs);
+        assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
         // With star-tree, 'numDocsScanned' should be the same as number of segments (1 per segment)
-        return queryResponse1.get("numDocsScanned").asInt() == NUM_SEGMENTS;
+        return queryResponse.get("numDocsScanned").asInt() == NUM_SEGMENTS;
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
-    }, 600_000L, "Failed to generate bloom filter");
+    }, 600_000L, "Failed to star-tree index");
 
     // Reload again should have no effect
     reloadOfflineTable(getTableName());
-    JsonNode queryResponse1 = postQuery(TEST_STAR_TREE_QUERY);
-    assertEquals(queryResponse1.get("aggregationResults").get(0).get("value").asInt(), result);
-    assertEquals(queryResponse1.get("totalDocs").asLong(), numTotalDocs);
-    assertEquals(queryResponse1.get("numDocsScanned").asInt(), NUM_SEGMENTS);
+    firstQueryResponse = postQuery(TEST_STAR_TREE_QUERY_1);
+    assertEquals(firstQueryResponse.get("aggregationResults").get(0).get("value").asInt(), firstQueryResult);
+    assertEquals(firstQueryResponse.get("totalDocs").asLong(), numTotalDocs);
+    assertEquals(firstQueryResponse.get("numDocsScanned").asInt(), NUM_SEGMENTS);
+
+    // Should be able to use the star-tree with an additional match-all predicate on another dimension
+    firstQueryResponse = postQuery(TEST_STAR_TREE_QUERY_1 + " AND DaysSinceEpoch > 16070");
+    assertEquals(firstQueryResponse.get("aggregationResults").get(0).get("value").asInt(), firstQueryResult);
+    assertEquals(firstQueryResponse.get("totalDocs").asLong(), numTotalDocs);
+    assertEquals(firstQueryResponse.get("numDocsScanned").asInt(), NUM_SEGMENTS);
+
+    // Test the second query
+    JsonNode secondQueryResponse = postQuery(TEST_STAR_TREE_QUERY_2);
+    int secondQueryResult = secondQueryResponse.get("aggregationResults").get(0).get("value").asInt();
+    assertEquals(secondQueryResponse.get("totalDocs").asLong(), numTotalDocs);
+    // Initially 'numDocsScanned' should be the same as 'COUNT(*)' result
+    assertEquals(secondQueryResponse.get("numDocsScanned").asInt(), secondQueryResult);
+
+    // Update table config with a different star-tree index config and trigger reload
+    indexingConfig.setStarTreeIndexConfigs(Collections.singletonList(STAR_TREE_INDEX_CONFIG_2));
+    updateTableConfig(tableConfig);
+    reloadOfflineTable(getTableName());
+
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode queryResponse = postQuery(TEST_STAR_TREE_QUERY_2);
+        // Result should not change during reload
+        assertEquals(queryResponse.get("aggregationResults").get(0).get("value").asInt(), secondQueryResult);
+        // Total docs should not change during reload
+        assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
+        // With star-tree, 'numDocsScanned' should be the same as number of segments (1 per segment)
+        return queryResponse.get("numDocsScanned").asInt() == NUM_SEGMENTS;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Failed to star-tree index");
+
+    // First query should not be able to use the star-tree
+    firstQueryResponse = postQuery(TEST_STAR_TREE_QUERY_1);
+    assertEquals(firstQueryResponse.get("numDocsScanned").asInt(), firstQueryResult);
+
+    // Reload again should have no effect
+    reloadOfflineTable(getTableName());
+    firstQueryResponse = postQuery(TEST_STAR_TREE_QUERY_1);
+    assertEquals(firstQueryResponse.get("aggregationResults").get(0).get("value").asInt(), firstQueryResult);
+    assertEquals(firstQueryResponse.get("totalDocs").asLong(), numTotalDocs);
+    assertEquals(firstQueryResponse.get("numDocsScanned").asInt(), firstQueryResult);
+    secondQueryResponse = postQuery(TEST_STAR_TREE_QUERY_2);
+    assertEquals(secondQueryResponse.get("aggregationResults").get(0).get("value").asInt(), secondQueryResult);
+    assertEquals(secondQueryResponse.get("totalDocs").asLong(), numTotalDocs);
+    assertEquals(secondQueryResponse.get("numDocsScanned").asInt(), NUM_SEGMENTS);
+
+    // Should be able to use the star-tree with an additional match-all predicate on another dimension
+    secondQueryResponse = postQuery(TEST_STAR_TREE_QUERY_2 + " AND DaysSinceEpoch > 16070");
+    assertEquals(secondQueryResponse.get("aggregationResults").get(0).get("value").asInt(), secondQueryResult);
+    assertEquals(secondQueryResponse.get("totalDocs").asLong(), numTotalDocs);
+    assertEquals(secondQueryResponse.get("numDocsScanned").asInt(), NUM_SEGMENTS);
+
+    // Remove the star-tree index config and trigger reload
+    indexingConfig.setStarTreeIndexConfigs(null);
+    updateTableConfig(tableConfig);
+    reloadOfflineTable(getTableName());
+
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode queryResponse = postQuery(TEST_STAR_TREE_QUERY_2);
+        // Result should not change during reload
+        assertEquals(queryResponse.get("aggregationResults").get(0).get("value").asInt(), secondQueryResult);
+        // Total docs should not change during reload
+        assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
+        // Without star-tree, 'numDocsScanned' should be the same as the 'COUNT(*)' result
+        return queryResponse.get("numDocsScanned").asInt() == secondQueryResult;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Failed to star-tree index");
+
+    // First query should not be able to use the star-tree
+    firstQueryResponse = postQuery(TEST_STAR_TREE_QUERY_1);
+    assertEquals(firstQueryResponse.get("numDocsScanned").asInt(), firstQueryResult);
+
+    // Reload again should have no effect
+    reloadOfflineTable(getTableName());
+    firstQueryResponse = postQuery(TEST_STAR_TREE_QUERY_1);
+    assertEquals(firstQueryResponse.get("aggregationResults").get(0).get("value").asInt(), firstQueryResult);
+    assertEquals(firstQueryResponse.get("totalDocs").asLong(), numTotalDocs);
+    assertEquals(firstQueryResponse.get("numDocsScanned").asInt(), firstQueryResult);
+    secondQueryResponse = postQuery(TEST_STAR_TREE_QUERY_2);
+    assertEquals(secondQueryResponse.get("aggregationResults").get(0).get("value").asInt(), secondQueryResult);
+    assertEquals(secondQueryResponse.get("totalDocs").asLong(), numTotalDocs);
+    assertEquals(secondQueryResponse.get("numDocsScanned").asInt(), secondQueryResult);
   }
 
   /**
@@ -495,11 +605,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     if (withExtraColumns) {
       _schemaFileName = SCHEMA_FILE_NAME_WITH_EXTRA_COLUMNS;
-      addSchema(createSchema());
     } else {
       _schemaFileName = SCHEMA_FILE_NAME_WITH_MISSING_COLUMNS;
-      addSchema(createSchema());
     }
+    addSchema(createSchema());
 
     // Trigger reload
     reloadOfflineTable(getTableName());
@@ -973,15 +1082,18 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testQueryWithSameAlias()
       throws Exception {
     //test repeated columns in selection query
-    String query = "SELECT ArrTime AS ArrTime, Carrier AS Carrier, DaysSinceEpoch AS DaysSinceEpoch FROM mytable ORDER BY DaysSinceEpoch DESC";
+    String query =
+        "SELECT ArrTime AS ArrTime, Carrier AS Carrier, DaysSinceEpoch AS DaysSinceEpoch FROM mytable ORDER BY DaysSinceEpoch DESC";
     testQuery(query, Collections.singletonList(query));
 
     //test repeated columns in selection query
-    query = "SELECT ArrTime AS ArrTime, DaysSinceEpoch AS DaysSinceEpoch, Carrier AS Carrier FROM mytable ORDER BY Carrier DESC";
+    query =
+        "SELECT ArrTime AS ArrTime, DaysSinceEpoch AS DaysSinceEpoch, Carrier AS Carrier FROM mytable ORDER BY Carrier DESC";
     testQuery(query, Collections.singletonList(query));
 
     //test repeated columns in selection query
-    query = "SELECT ArrTime AS ArrTime, DaysSinceEpoch AS DaysSinceEpoch, Carrier AS Carrier FROM mytable ORDER BY Carrier DESC, ArrTime DESC";
+    query =
+        "SELECT ArrTime AS ArrTime, DaysSinceEpoch AS DaysSinceEpoch, Carrier AS Carrier FROM mytable ORDER BY Carrier DESC, ArrTime DESC";
     testQuery(query, Collections.singletonList(query));
   }
 
@@ -1124,11 +1236,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     sql = "SELECT Carrier, DestAirportID FROM mytable GROUP BY Carrier, DestAirportID";
     testSqlQuery(pql, Collections.singletonList(sql));
 
-    pql = "SELECT Carrier, DestAirportID, DestStateName FROM mytable GROUP BY Carrier, DestAirportID, DestStateName LIMIT 1000000";
+    pql =
+        "SELECT Carrier, DestAirportID, DestStateName FROM mytable GROUP BY Carrier, DestAirportID, DestStateName LIMIT 1000000";
     sql = "SELECT Carrier, DestAirportID, DestStateName FROM mytable GROUP BY Carrier, DestAirportID, DestStateName";
     testSqlQuery(pql, Collections.singletonList(sql));
 
-    pql = "SELECT Carrier, DestAirportID, DestCityName FROM mytable GROUP BY Carrier, DestAirportID, DestCityName LIMIT 1000000";
+    pql =
+        "SELECT Carrier, DestAirportID, DestCityName FROM mytable GROUP BY Carrier, DestAirportID, DestCityName LIMIT 1000000";
     sql = "SELECT Carrier, DestAirportID, DestCityName FROM mytable GROUP BY Carrier, DestAirportID, DestCityName";
     testSqlQuery(pql, Collections.singletonList(sql));
 
@@ -1160,7 +1274,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')");
     List<String> queries = new ArrayList<>();
     baseQueries.forEach(q -> queries.add(q.replace("mytable", "MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch")));
-    baseQueries.forEach(q -> queries.add(q.replace("mytable", "MYDB.MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch")));
+    baseQueries
+        .forEach(q -> queries.add(q.replace("mytable", "MYDB.MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch")));
 
     for (String query : queries) {
       try {
@@ -1213,8 +1328,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "SELECT MAX(timeConvert(DaysSinceEpoch,'DAYS','SECONDS')) FROM mytable",
         "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')");
     List<String> queries = new ArrayList<>();
-    baseQueries.forEach(q -> queries.add(q.replace("mytable", "MYTABLE").replace("DaysSinceEpoch", "MYTABLE.DAYSSinceEpOch")));
-    baseQueries.forEach(q -> queries.add(q.replace("mytable", "MYDB.MYTABLE").replace("DaysSinceEpoch", "MYTABLE.DAYSSinceEpOch")));
+    baseQueries
+        .forEach(q -> queries.add(q.replace("mytable", "MYTABLE").replace("DaysSinceEpoch", "MYTABLE.DAYSSinceEpOch")));
+    baseQueries.forEach(
+        q -> queries.add(q.replace("mytable", "MYDB.MYTABLE").replace("DaysSinceEpoch", "MYTABLE.DAYSSinceEpOch")));
 
     for (String query : queries) {
       try {
@@ -1279,6 +1396,61 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     query = "SELECT c_o_u_n_t(FlightNum) FROM mytable ";
     assertEquals(postQuery(query).get("aggregationResults").get(0).get("value").asLong(), 115545);
     assertEquals(postSqlQuery(query, _brokerBaseApiUrl).get("resultTable").get("rows").get(0).get(0).asLong(), 115545);
+  }
 
+  @Test
+  public void testGrpcQueryServer()
+      throws Exception {
+    GrpcQueryClient queryClient = new GrpcQueryClient("localhost", CommonConstants.Server.DEFAULT_GRPC_PORT);
+    String sql = "SELECT * FROM mytable_OFFLINE LIMIT 1000000";
+    BrokerRequest brokerRequest = new Pql2Compiler().compileToBrokerRequest(sql);
+    List<String> segments = _helixResourceManager.getSegmentsFor("mytable_OFFLINE");
+
+    GrpcRequestBuilder requestBuilder = new GrpcRequestBuilder().setSegments(segments);
+    testNonStreamingRequest(queryClient.submit(requestBuilder.setSql(sql).build()));
+    testNonStreamingRequest(queryClient.submit(requestBuilder.setBrokerRequest(brokerRequest).build()));
+
+    requestBuilder.setEnableStreaming(true);
+    testStreamingRequest(queryClient.submit(requestBuilder.setSql(sql).build()));
+    testStreamingRequest(queryClient.submit(requestBuilder.setBrokerRequest(brokerRequest).build()));
+  }
+
+  private void testNonStreamingRequest(Iterator<Server.ServerResponse> nonStreamingResponses)
+      throws Exception {
+    int expectedNumDocs = (int) getCountStarResult();
+    assertTrue(nonStreamingResponses.hasNext());
+    Server.ServerResponse nonStreamingResponse = nonStreamingResponses.next();
+    assertEquals(nonStreamingResponse.getMetadataMap().get(CommonConstants.Query.Response.MetadataKeys.RESPONSE_TYPE),
+        CommonConstants.Query.Response.ResponseType.NON_STREAMING);
+    DataTable dataTable = DataTableFactory.getDataTable(nonStreamingResponse.getPayload().asReadOnlyByteBuffer());
+    assertNotNull(dataTable.getDataSchema());
+    assertEquals(dataTable.getNumberOfRows(), expectedNumDocs);
+    Map<String, String> metadata = dataTable.getMetadata();
+    assertEquals(metadata.get(DataTable.NUM_DOCS_SCANNED_METADATA_KEY), Integer.toString(expectedNumDocs));
+  }
+
+  private void testStreamingRequest(Iterator<Server.ServerResponse> streamingResponses)
+      throws Exception {
+    int expectedNumDocs = (int) getCountStarResult();
+    int numTotalDocs = 0;
+    while (streamingResponses.hasNext()) {
+      Server.ServerResponse streamingResponse = streamingResponses.next();
+      DataTable dataTable = DataTableFactory.getDataTable(streamingResponse.getPayload().asReadOnlyByteBuffer());
+      String responseType =
+          streamingResponse.getMetadataMap().get(CommonConstants.Query.Response.MetadataKeys.RESPONSE_TYPE);
+      if (responseType.equals(CommonConstants.Query.Response.ResponseType.DATA)) {
+        assertTrue(dataTable.getMetadata().isEmpty());
+        assertNotNull(dataTable.getDataSchema());
+        numTotalDocs += dataTable.getNumberOfRows();
+      } else {
+        assertEquals(responseType, CommonConstants.Query.Response.ResponseType.METADATA);
+        assertFalse(streamingResponses.hasNext());
+        assertEquals(numTotalDocs, expectedNumDocs);
+        assertNull(dataTable.getDataSchema());
+        assertEquals(dataTable.getNumberOfRows(), 0);
+        Map<String, String> metadata = dataTable.getMetadata();
+        assertEquals(metadata.get(DataTable.NUM_DOCS_SCANNED_METADATA_KEY), Integer.toString(expectedNumDocs));
+      }
+    }
   }
 }

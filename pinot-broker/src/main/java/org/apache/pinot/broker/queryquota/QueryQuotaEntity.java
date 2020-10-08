@@ -24,15 +24,17 @@ import com.google.common.util.concurrent.RateLimiter;
 public class QueryQuotaEntity {
 
   private RateLimiter _rateLimiter;
-  private HitCounter _hitCounter;
+  private HitCounter _qpsTracker;
+  private MaxHitRateTracker _maxQpsTracker;
   private int _numOnlineBrokers;
   private double _overallRate;
   private int _tableConfigStatVersion;
 
-  public QueryQuotaEntity(RateLimiter rateLimiter, HitCounter hitCounter, int numOnlineBrokers, double overallRate,
-      int tableConfigStatVersion) {
+  public QueryQuotaEntity(RateLimiter rateLimiter, HitCounter qpsTracker, MaxHitRateTracker maxQpsTracker,
+      int numOnlineBrokers, double overallRate, int tableConfigStatVersion) {
     _rateLimiter = rateLimiter;
-    _hitCounter = hitCounter;
+    _qpsTracker = qpsTracker;
+    _maxQpsTracker = maxQpsTracker;
     _numOnlineBrokers = numOnlineBrokers;
     _overallRate = overallRate;
     _tableConfigStatVersion = tableConfigStatVersion;
@@ -42,8 +44,12 @@ public class QueryQuotaEntity {
     return _rateLimiter;
   }
 
-  public HitCounter getHitCounter() {
-    return _hitCounter;
+  public HitCounter getQpsTracker() {
+    return _qpsTracker;
+  }
+
+  public MaxHitRateTracker getMaxQpsTracker() {
+    return _maxQpsTracker;
   }
 
   public int getNumOnlineBrokers() {

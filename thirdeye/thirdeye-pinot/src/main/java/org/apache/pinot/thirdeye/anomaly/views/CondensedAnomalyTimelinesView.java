@@ -29,6 +29,8 @@ import java.util.List;
 import java.util.Map;
 import org.joda.time.Minutes;
 
+import static org.apache.pinot.thirdeye.util.ThirdEyeUtils.*;
+
 
 /**
  * We face a problem that if we store the timelines view using AnomalyTimelinesView. The DB has overflow exception when
@@ -42,6 +44,7 @@ import org.joda.time.Minutes;
  */
 public class CondensedAnomalyTimelinesView {
   public static final int DEFAULT_MAX_LENGTH = 1024 * 10; // 10 kilobytes
+  public static final int DEFAULT_DECIMAL_DIGITS = 3; // only keep 3 decimal digits
   private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   public static final Long DEFAULT_MIN_BUCKET_UNIT = Minutes.ONE.toStandardDuration().getMillis();
 
@@ -186,6 +189,22 @@ public class CondensedAnomalyTimelinesView {
   }
 
   /**
+   * Round up timelines view to save space in storage.
+   * */
+  private void roundUp() {
+    List<Double> roundedObservedValues = new ArrayList<>();
+    List<Double> roundedExpectedValues = new ArrayList<>();
+    for (int i = 0; i < timeStamps.size(); i++) {
+      Double roundedObservedValue = getRoundedDouble(currentValues.get(i));
+      Double roundedExpectedValue = getRoundedDouble(baselineValues.get(i));
+      roundedObservedValues.add(roundedObservedValue);
+      roundedExpectedValues.add(roundedExpectedValue);
+    }
+    this.currentValues = roundedObservedValues;
+    this.baselineValues = roundedExpectedValues;
+  }
+
+  /**
    * Compress this instance of timelines view to under ${maxLength} bytes
    * The concept of the time series compression is to enlarge the bucket size; from 5 min to 10 min for example.
    * @param maxLength customized maximum length
@@ -198,11 +217,16 @@ public class CondensedAnomalyTimelinesView {
     try {
       if (this.toJsonString().length() < maxLength) {
         return this;
+      } else {
+        // First try rounding up
+        roundUp();
+        if (this.toJsonString().length() < maxLength) {
+          return this;
+        }
       }
     } catch (JsonProcessingException e) {
       throw new IllegalStateException("Unable to parse view to json string", e);
     }
-
     List<Long> aggregatedTimestamps = new ArrayList<>();
     List<Double> aggregatedObservedValues = new ArrayList<>();
     List<Double> aggregatedExpectedValues = new ArrayList<>();
@@ -210,7 +234,6 @@ public class CondensedAnomalyTimelinesView {
     long lastTimestampEnd = this.timeStamps.get(this.timeStamps.size() - 1) + this.bucketMillis;
 
     for (int i = 0; i < timeStamps.size(); i++) {
-      int count = 1;
       long timestamp = this.timeStamps.get(i);
       double observedValue = this.currentValues.get(i);
       double expectedValue = this.baselineValues.get(i);
@@ -219,15 +242,12 @@ public class CondensedAnomalyTimelinesView {
        */
       if ((lastTimestampEnd - timestamp) >= maxBucketMills) {
         while (i + 1 < this.timeStamps.size() && (this.timeStamps.get(i + 1) - timestamp) < maxBucketMills) {
-          observedValue += this.currentValues.get(i + 1);
-          expectedValue += this.baselineValues.get(i + 1);
           i++;
-          count++;
         }
       }
       aggregatedTimestamps.add(timestamp * DEFAULT_MIN_BUCKET_UNIT + timestampOffset);
-      aggregatedObservedValues.add(observedValue/((double)count));
-      aggregatedExpectedValues.add(expectedValue/((double)count));
+      aggregatedObservedValues.add(getRoundedDouble(observedValue));
+      aggregatedExpectedValues.add(getRoundedDouble(expectedValue));
     }
 
 

@@ -19,7 +19,7 @@
 
 -->
 
-# docker-pinot
+# docker-pinot-thirdeye
 This is a docker image of [Apache Thirdeye](https://github.com/apache/incubator-pinot/tree/master/thirdeye).
 
 ## How to build a docker image

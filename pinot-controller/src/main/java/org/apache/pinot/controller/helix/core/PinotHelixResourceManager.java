@@ -44,6 +44,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
@@ -397,6 +398,23 @@ public class PinotHelixResourceManager {
       }
       return PinotResourceManagerResponse.SUCCESS;
     }
+  }
+
+  /**
+   * Updates the tags of the specified instance ID
+   */
+  public synchronized PinotResourceManagerResponse updateInstanceTags(String instanceIdToUpdate, String tags) {
+    InstanceConfig instanceConfig = getHelixInstanceConfig(instanceIdToUpdate);
+    if (instanceConfig == null) {
+      return PinotResourceManagerResponse.failure("Instance " + instanceIdToUpdate + " does not exists");
+    }
+    List<String> tagList = Arrays.asList(StringUtils.split(tags, ','));
+    instanceConfig.getRecord().setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), tagList);
+    if (!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceIdToUpdate), instanceConfig)) {
+      return PinotResourceManagerResponse
+          .failure("Unable to update instance: " + instanceIdToUpdate + " to tags: " + tags);
+    }
+    return PinotResourceManagerResponse.SUCCESS;
   }
 
   /**
@@ -1048,6 +1066,22 @@ public class PinotHelixResourceManager {
     return ZKMetadataProvider.getTableSchema(_propertyStore, tableName);
   }
 
+  /**
+   * Find schema with same name as rawTableName. If not found, find schema using schemaName in validationConfig.
+   * For OFFLINE table, it is possible that schema was not uploaded before creating the table. Hence for OFFLINE, this method can return null.
+   */
+  @Nullable
+  public Schema getSchemaForTableConfig(TableConfig tableConfig) {
+    Schema schema = getSchema(TableNameBuilder.extractRawTableName(tableConfig.getTableName()));
+    if (schema == null) {
+      String schemaName = tableConfig.getValidationConfig().getSchemaName();
+      if (schemaName != null) {
+        schema = getSchema(schemaName);
+      }
+    }
+    return schema;
+  }
+
   public List<String> getSchemaNames() {
     return _propertyStore
         .getChildNames(PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore).getRelativePath(),
@@ -1061,16 +1095,7 @@ public class PinotHelixResourceManager {
    */
   public void addTable(TableConfig tableConfig)
       throws IOException {
-    TenantConfig tenantConfig = tableConfig.getTenantConfig();
-    String brokerTag = tenantConfig.getBroker();
-    String serverTag = tenantConfig.getServer();
-    if (brokerTag == null || serverTag == null) {
-      String newBrokerTag = brokerTag == null ? TagNameUtils.DEFAULT_TENANT_NAME : brokerTag;
-      String newServerTag = serverTag == null ? TagNameUtils.DEFAULT_TENANT_NAME : serverTag;
-      tableConfig.setTenantConfig(new TenantConfig(newBrokerTag, newServerTag, tenantConfig.getTagOverrideConfig()));
-    }
     validateTableTenantConfig(tableConfig);
-
     String tableNameWithType = tableConfig.getTableName();
     SegmentsValidationAndRetentionConfig segmentsConfig = tableConfig.getValidationConfig();
 
@@ -1157,12 +1182,27 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Validates the tenant config for the table
+   * Validates the tenant config for the table. In case of a single tenant cluster,
+   * if the server and broker tenants are not specified in the config, they're
+   * auto-populated with the default tenant name. In case of a multi-tenant cluster,
+   * these parameters must be specified in the table config.
    */
   @VisibleForTesting
   void validateTableTenantConfig(TableConfig tableConfig) {
-    String tableNameWithType = tableConfig.getTableName();
     TenantConfig tenantConfig = tableConfig.getTenantConfig();
+    String tableNameWithType = tableConfig.getTableName();
+    String brokerTag = tenantConfig.getBroker();
+    String serverTag = tenantConfig.getServer();
+    if (brokerTag == null || serverTag == null) {
+      if (!_isSingleTenantCluster) {
+        throw new InvalidTableConfigException(
+            "server and broker tenants must be specified for multi-tenant cluster for table: " + tableNameWithType);
+      }
+
+      String newBrokerTag = brokerTag == null ? TagNameUtils.DEFAULT_TENANT_NAME : brokerTag;
+      String newServerTag = serverTag == null ? TagNameUtils.DEFAULT_TENANT_NAME : serverTag;
+      tableConfig.setTenantConfig(new TenantConfig(newBrokerTag, newServerTag, tenantConfig.getTagOverrideConfig()));
+    }
 
     // Check if tenant exists before creating the table
     Set<String> tagsToCheck = new TreeSet<>();
@@ -1189,6 +1229,14 @@ public class PinotHelixResourceManager {
             "Failed to find instances with tag: " + tag + " for table: " + tableNameWithType);
       }
     }
+  }
+
+  public boolean setZKData(String path, ZNRecord record, int expectedVersion, int accessOption) {
+    return _helixDataAccessor.getBaseDataAccessor().set(path, record, expectedVersion, accessOption);
+  }
+
+  public boolean deleteZKPath(String path) {
+    return _helixDataAccessor.getBaseDataAccessor().remove(path, -1);
   }
 
   public ZNRecord readZKData(String path) {
@@ -1650,7 +1698,7 @@ public class PinotHelixResourceManager {
     LOGGER.info("Updated segment: {} of table: {} to property store", segmentName, offlineTableName);
 
     // Send a message to servers and brokers hosting the table to refresh the segment
-    sendSegmentRefreshMessage(offlineTableName, segmentName);
+    sendSegmentRefreshMessage(offlineTableName, segmentName, true, true);
   }
 
   public int reloadAllSegments(String tableNameWithType) {
@@ -1701,45 +1749,55 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Attempt to send a message to refresh the new segment. We do not wait for any acknowledgements.
-   * The message is sent as session-specific, so if a new zk session is created (e.g. server restarts)
+   * Sends a segment refresh message to:
+   * <ul>
+   *   <li>Server: Refresh (replace) the segment by downloading a new one based on the segment ZK metadata</li>
+   *   <li>Broker: Refresh the routing for the segment based on the segment ZK metadata</li>
+   * </ul>
+   * This method can be used to refresh the segment when segment ZK metadata changed. It does not wait for any
+   * acknowledgements. The message is sent as session-specific, so if a new zk session is created (e.g. server restarts)
    * it will not get the message.
    */
-  private void sendSegmentRefreshMessage(String offlineTableName, String segmentName) {
-    SegmentRefreshMessage segmentRefreshMessage = new SegmentRefreshMessage(offlineTableName, segmentName);
+  public void sendSegmentRefreshMessage(String tableNameWithType, String segmentName, boolean refreshServerSegment,
+      boolean refreshBrokerRouting) {
+    SegmentRefreshMessage segmentRefreshMessage = new SegmentRefreshMessage(tableNameWithType, segmentName);
 
     // Send segment refresh message to servers
     Criteria recipientCriteria = new Criteria();
     recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
     recipientCriteria.setInstanceName("%");
-    recipientCriteria.setResource(offlineTableName);
-    recipientCriteria.setPartition(segmentName);
     recipientCriteria.setSessionSpecific(true);
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
-    // Send message with no callback and infinite timeout on the recipient
-    int numMessagesSent = messagingService.send(recipientCriteria, segmentRefreshMessage, null, -1);
-    if (numMessagesSent > 0) {
-      // TODO: Would be nice if we can get the name of the instances to which messages were sent
-      LOGGER.info("Sent {} segment refresh messages to servers for segment: {} of table: {}", numMessagesSent,
-          segmentName, offlineTableName);
-    } else {
-      // May be the case when none of the servers are up yet. That is OK, because when they come up they will get the
-      // new version of the segment.
-      LOGGER.warn("No segment refresh message sent to servers for segment: {} of table: {}", segmentName,
-          offlineTableName);
+
+    if (refreshServerSegment) {
+      // Send segment refresh message to servers
+      recipientCriteria.setResource(tableNameWithType);
+      recipientCriteria.setPartition(segmentName);
+      // Send message with no callback and infinite timeout on the recipient
+      int numMessagesSent = messagingService.send(recipientCriteria, segmentRefreshMessage, null, -1);
+      if (numMessagesSent > 0) {
+        // TODO: Would be nice if we can get the name of the instances to which messages were sent
+        LOGGER.info("Sent {} segment refresh messages to servers for segment: {} of table: {}", numMessagesSent,
+            segmentName, tableNameWithType);
+      } else {
+        LOGGER.warn("No segment refresh message sent to servers for segment: {} of table: {}", segmentName,
+            tableNameWithType);
+      }
     }
 
-    // Send segment refresh message to brokers
-    recipientCriteria.setResource(Helix.BROKER_RESOURCE_INSTANCE);
-    recipientCriteria.setPartition(offlineTableName);
-    numMessagesSent = messagingService.send(recipientCriteria, segmentRefreshMessage, null, -1);
-    if (numMessagesSent > 0) {
-      // TODO: Would be nice if we can get the name of the instances to which messages were sent
-      LOGGER.info("Sent {} segment refresh messages to brokers for segment: {} of table: {}", numMessagesSent,
-          segmentName, offlineTableName);
-    } else {
-      LOGGER.warn("No segment refresh message sent to brokers for segment: {} of table: {}", segmentName,
-          offlineTableName);
+    if (refreshBrokerRouting) {
+      // Send segment refresh message to brokers
+      recipientCriteria.setResource(Helix.BROKER_RESOURCE_INSTANCE);
+      recipientCriteria.setPartition(tableNameWithType);
+      int numMessagesSent = messagingService.send(recipientCriteria, segmentRefreshMessage, null, -1);
+      if (numMessagesSent > 0) {
+        // TODO: Would be nice if we can get the name of the instances to which messages were sent
+        LOGGER.info("Sent {} segment refresh messages to brokers for segment: {} of table: {}", numMessagesSent,
+            segmentName, tableNameWithType);
+      } else {
+        LOGGER.warn("No segment refresh message sent to brokers for segment: {} of table: {}", segmentName,
+            tableNameWithType);
+      }
     }
   }
 
@@ -1779,7 +1837,8 @@ public class PinotHelixResourceManager {
         _helixZkManager.getMessagingService().send(recipientCriteria, routingTableRebuildMessage, null, -1);
     if (numMessagesSent > 0) {
       // TODO: Would be nice if we can get the name of the instances to which messages were sent
-      LOGGER.info("Sent {} routing table rebuild messages to brokers for table: {}", numMessagesSent, tableNameWithType);
+      LOGGER
+          .info("Sent {} routing table rebuild messages to brokers for table: {}", numMessagesSent, tableNameWithType);
     } else {
       LOGGER.warn("No routing table rebuild message sent to brokers for table: {}", tableNameWithType);
     }
@@ -1970,6 +2029,27 @@ public class PinotHelixResourceManager {
     }
   }
 
+  /**
+   * Get all tableConfigs (offline and realtime) using this schema.
+   * If tables have not been created, this will return empty list.
+   * If table config raw name doesn't match schema, they will not be fetched.
+   *
+   * @param schemaName Schema name
+   * @return list of table configs using this schema.
+   */
+  public List<TableConfig> getTableConfigsForSchema(String schemaName) {
+    List<TableConfig> tableConfigs = new ArrayList<>();
+    TableConfig offlineTableConfig = getOfflineTableConfig(schemaName);
+    if (offlineTableConfig != null) {
+      tableConfigs.add(offlineTableConfig);
+    }
+    TableConfig realtimeTableConfig = getRealtimeTableConfig(schemaName);
+    if (realtimeTableConfig != null) {
+      tableConfigs.add(realtimeTableConfig);
+    }
+    return tableConfigs;
+  }
+
   public List<String> getServerInstancesForTable(String tableName, TableType tableType) {
     TableConfig tableConfig = getTableConfig(tableName, tableType);
     Preconditions.checkNotNull(tableConfig);
@@ -2079,7 +2159,7 @@ public class PinotHelixResourceManager {
         boolean toggleSucceeded = true;
         // Checks all the current states fall into the target states
         PropertyKey instanceCurrentStatesKey = _keyBuilder.currentStates(instanceName, liveInstance.getSessionId());
-        List<CurrentState> instanceCurrentStates = _helixDataAccessor.getChildValues(instanceCurrentStatesKey);
+        List<CurrentState> instanceCurrentStates = _helixDataAccessor.getChildValues(instanceCurrentStatesKey, true);
         if (instanceCurrentStates.isEmpty()) {
           return PinotResourceManagerResponse.SUCCESS;
         } else {
@@ -2418,9 +2498,9 @@ public class PinotHelixResourceManager {
       }
       Thread.sleep(EXTERNAL_VIEW_CHECK_INTERVAL_MS);
     } while (System.currentTimeMillis() < endTimeMs);
-    throw new TimeoutException(String.format(
-        "Time out while waiting segments become ONLINE. (tableNameWithType = %s, segmentsToCheck = %s)",
-        tableNameWithType, segmentsToCheck));
+    throw new TimeoutException(String
+        .format("Time out while waiting segments become ONLINE. (tableNameWithType = %s, segmentsToCheck = %s)",
+            tableNameWithType, segmentsToCheck));
   }
 
   private Set<String> getOnlineSegmentsFromExternalView(String tableNameWithType) {
