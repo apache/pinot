@@ -87,13 +87,10 @@ public class PinotBrokerRestletResource {
   public List<String> getBrokersForTenant(
       @ApiParam(value = "Name of the tenant", required = true) @PathParam("tenantName") String tenantName,
       @ApiParam(value = "ONLINE|OFFLINE") @QueryParam("state") String state) {
-    if (!_pinotHelixResourceManager.getAllBrokerTenantNames().contains(tenantName)) {
-      throw new ControllerApplicationException(LOGGER, String.format("Tenant '%s' not found.", tenantName),
-          Response.Status.NOT_FOUND);
-    }
-    Set<String> tenantBrokers = new HashSet<>(_pinotHelixResourceManager.getAllInstancesForBrokerTenant(tenantName));
-    applyStateChanges(tenantBrokers, state);
-    return ImmutableList.copyOf(tenantBrokers);
+    List<ControllerBrokerResponse> controllerBrokerResponseList = getBrokersForTenantV2(tenantName, state);
+    List<String> tenantBrokers = controllerBrokerResponseList.stream().map(ControllerBrokerResponse::getInstanceName)
+        .collect(Collectors.toList());
+    return tenantBrokers;
   }
 
   @GET
@@ -116,23 +113,9 @@ public class PinotBrokerRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "ONLINE|OFFLINE") @QueryParam("state") String state) {
-    try {
-      List<String> tableNamesWithType = _pinotHelixResourceManager
-          .getExistingTableNamesWithType(tableName, Constants.validateTableType(tableTypeStr));
-      if (tableNamesWithType.isEmpty()) {
-        throw new ControllerApplicationException(LOGGER, String.format("Table '%s' not found.", tableName),
-            Response.Status.NOT_FOUND);
-      }
-      Set<String> tableBrokers =
-          new HashSet<>(_pinotHelixResourceManager.getBrokerInstancesFor(tableNamesWithType.get(0)));
-      applyStateChanges(tableBrokers, state);
-      return ImmutableList.copyOf(tableBrokers);
-    } catch (TableNotFoundException e) {
-      throw new ControllerApplicationException(LOGGER, String.format("Table '%s' not found.", tableName),
-          Response.Status.NOT_FOUND);
-    } catch (IllegalArgumentException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.FORBIDDEN);
-    }
+    List<ControllerBrokerResponse> controllerBrokerResponseList = getBrokersForTableV2(tableName, tableTypeStr, state);
+    return controllerBrokerResponseList.stream().map(ControllerBrokerResponse::getInstanceName)
+        .collect(Collectors.toList());
   }
 
   @GET
@@ -175,7 +158,7 @@ public class PinotBrokerRestletResource {
     Set<ControllerBrokerResponse> controllerBrokerResponses = tenantBrokers.stream()
         .map(x -> new ControllerBrokerResponse(x.getInstanceName(), x.getHostName(), Integer.parseInt(x.getPort())))
         .collect(Collectors.toSet());
-    applyStateChangesV2(controllerBrokerResponses, state);
+    applyStateChanges(controllerBrokerResponses, state);
     return ImmutableList.copyOf(controllerBrokerResponses);
   }
 
@@ -211,7 +194,7 @@ public class PinotBrokerRestletResource {
       Set<ControllerBrokerResponse> controllerBrokerResponses = tenantBrokers.stream()
           .map(x -> new ControllerBrokerResponse(x.getInstanceName(), x.getHostName(), Integer.parseInt(x.getPort())))
           .collect(Collectors.toSet());
-      applyStateChangesV2(controllerBrokerResponses, state);
+      applyStateChanges(controllerBrokerResponses, state);
       return ImmutableList.copyOf(controllerBrokerResponses);
     } catch (TableNotFoundException e) {
       throw new ControllerApplicationException(LOGGER, String.format("Table '%s' not found.", tableName),
@@ -221,7 +204,6 @@ public class PinotBrokerRestletResource {
     }
   }
 
-
   @POST
   @Path("/brokers/instances/{instanceName}/qps")
   @Produces(MediaType.APPLICATION_JSON)
@@ -230,7 +212,7 @@ public class PinotBrokerRestletResource {
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 400, message = "Bad Request"), @ApiResponse(code = 404, message = "Instance not found"), @ApiResponse(code = 500, message = "Internal error")})
   public SuccessResponse toggleQueryRateLimiting(
       @ApiParam(value = "Broker instance name", required = true, example = "Broker_my.broker.com_30000") @PathParam("instanceName") String brokerInstanceName,
-      @ApiParam(value = "ENABLE|DISABLE", allowableValues = "ENABLE, DISABLE", required = true)  @QueryParam("state") String state) {
+      @ApiParam(value = "ENABLE|DISABLE", allowableValues = "ENABLE, DISABLE", required = true) @QueryParam("state") String state) {
     if (brokerInstanceName == null || !brokerInstanceName.startsWith("Broker_")) {
       throw new ControllerApplicationException(LOGGER,
           String.format("'%s' is not a valid broker instance name.", brokerInstanceName), Response.Status.BAD_REQUEST);
@@ -242,32 +224,20 @@ public class PinotBrokerRestletResource {
           Response.Status.NOT_FOUND);
     }
     _pinotHelixResourceManager.toggleQueryQuotaStateForBroker(brokerInstanceName, state);
-    String msg = String.format("Set query rate limiting to: %s for all tables in broker: %s", state, brokerInstanceName);
+    String msg =
+        String.format("Set query rate limiting to: %s for all tables in broker: %s", state, brokerInstanceName);
     LOGGER.info(msg);
     return new SuccessResponse(msg);
   }
 
   private void validateQueryQuotaStateChange(String state) {
     if (!"ENABLE".equalsIgnoreCase(state) && !"DISABLE".equalsIgnoreCase(state)) {
-      throw new ControllerApplicationException(LOGGER, "Invalid query quota state: " + state, Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, "Invalid query quota state: " + state,
+          Response.Status.BAD_REQUEST);
     }
   }
 
-  private void applyStateChanges(Set<String> brokers, String state) {
-    if (state == null) {
-      return;
-    }
-    switch (state) {
-      case CommonConstants.Helix.StateModel.BrokerResourceStateModel.ONLINE:
-        brokers.retainAll(_pinotHelixResourceManager.getOnlineInstanceList());
-        break;
-      case CommonConstants.Helix.StateModel.BrokerResourceStateModel.OFFLINE:
-        brokers.removeAll(_pinotHelixResourceManager.getOnlineInstanceList());
-        break;
-    }
-  }
-
-  private void applyStateChangesV2(Set<ControllerBrokerResponse> brokers, String state) {
+  private void applyStateChanges(Set<ControllerBrokerResponse> brokers, String state) {
     if (state == null) {
       return;
     }
