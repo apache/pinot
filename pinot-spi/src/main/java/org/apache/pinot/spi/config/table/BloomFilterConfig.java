@@ -16,25 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.index.readers;
+package org.apache.pinot.spi.config.table;
 
-import java.io.Closeable;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Preconditions;
+import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
-/**
- * Interface for bloom filter reader.
- */
-public interface BloomFilterReader extends Closeable {
+public class BloomFilterConfig extends BaseJsonConfig {
+  public static final double DEFAULT_FPP = 0.05;
 
-  /**
-   * Returns {@code true} if the given value might have been put in this bloom filer, {@code false} otherwise.
-   */
-  boolean mightContain(String value);
+  private final double _fpp;
 
-  /**
-   * Returns {@code true} if the value with the given hash might have been put in this bloom filer, {@code false}
-   * otherwise.
-   * <p>This method is provided to prevent hashing the same value multiple times.
-   */
-  boolean mightContain(byte[] hash);
+  @JsonCreator
+  public BloomFilterConfig(@JsonProperty(value = "fpp", required = true) double fpp) {
+    Preconditions.checkArgument(fpp > 0.0 && fpp < 1.0, "Invalid fpp (false positive probability): %s", fpp);
+    _fpp = fpp;
+  }
+
+  public double getFpp() {
+    return _fpp;
+  }
 }

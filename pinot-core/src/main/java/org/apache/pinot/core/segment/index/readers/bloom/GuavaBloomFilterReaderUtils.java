@@ -16,38 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.bloom;
+package org.apache.pinot.core.segment.index.readers.bloom;
 
-import java.util.HashMap;
-import java.util.Map;
+import com.google.common.hash.HashFunction;
+import com.google.common.hash.Hashing;
+import org.apache.pinot.spi.utils.StringUtils;
 
 
-/**
- * Enum for bloom filter type
- */
-public enum BloomFilterType {
-  // NOTE: Do not change the value of bloom filter type when adding a new type since we are writing/checking type value
-  // when serializing/deserializing a bloom filter
-  GUAVA_ON_HEAP(1);
-
-  private int _value;
-  private static Map<Integer, BloomFilterType> _bloomFilterTypeMap = new HashMap<>();
-
-  BloomFilterType(int value) {
-    _value = value;
+@SuppressWarnings("UnstableApiUsage")
+public class GuavaBloomFilterReaderUtils {
+  private GuavaBloomFilterReaderUtils() {
   }
 
-  static {
-    for (BloomFilterType pageType : BloomFilterType.values()) {
-      _bloomFilterTypeMap.put(pageType._value, pageType);
-    }
-  }
+  // DO NOT change the hash function. It has to be aligned with the bloom filter creator.
+  private static final HashFunction HASH_FUNCTION = Hashing.murmur3_128();
 
-  public static BloomFilterType valueOf(int pageType) {
-    return _bloomFilterTypeMap.get(pageType);
-  }
-
-  public int getValue() {
-    return _value;
+  /**
+   * Returns the hash of the given value as a byte array.
+   */
+  public static byte[] hash(String value) {
+    return HASH_FUNCTION.hashBytes(StringUtils.encodeUtf8(value)).asBytes();
   }
 }

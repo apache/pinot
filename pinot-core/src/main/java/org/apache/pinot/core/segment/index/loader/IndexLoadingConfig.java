@@ -30,6 +30,7 @@ import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
+import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
@@ -52,7 +53,7 @@ public class IndexLoadingConfig {
   private Map<String, String> _noDictionaryConfig = new HashMap<>();
   private Set<String> _varLengthDictionaryColumns = new HashSet<>();
   private Set<String> _onHeapDictionaryColumns = new HashSet<>();
-  private Set<String> _bloomFilterColumns = new HashSet<>();
+  private Map<String, BloomFilterConfig> _bloomFilterConfigs = new HashMap<>();
   private boolean _enableDynamicStarTreeCreation;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private boolean _enableDefaultStarTree;
@@ -98,7 +99,13 @@ public class IndexLoadingConfig {
 
     List<String> bloomFilterColumns = indexingConfig.getBloomFilterColumns();
     if (bloomFilterColumns != null) {
-      _bloomFilterColumns.addAll(bloomFilterColumns);
+      for (String bloomFilterColumn : bloomFilterColumns) {
+        _bloomFilterConfigs.put(bloomFilterColumn, new BloomFilterConfig(BloomFilterConfig.DEFAULT_FPP));
+      }
+    }
+    Map<String, BloomFilterConfig> bloomFilterConfigs = indexingConfig.getBloomFilterConfigs();
+    if (bloomFilterConfigs != null) {
+      _bloomFilterConfigs.putAll(bloomFilterConfigs);
     }
 
     List<String> noDictionaryColumns = indexingConfig.getNoDictionaryColumns();
@@ -265,8 +272,8 @@ public class IndexLoadingConfig {
   }
 
   @VisibleForTesting
-  public void setBloomFilterColumns(Set<String> bloomFilterColumns) {
-    _bloomFilterColumns = bloomFilterColumns;
+  public void setBloomFilterConfigs(Map<String, BloomFilterConfig> bloomFilterConfigs) {
+    _bloomFilterConfigs = bloomFilterConfigs;
   }
 
   @VisibleForTesting
@@ -290,8 +297,8 @@ public class IndexLoadingConfig {
     return _onHeapDictionaryColumns;
   }
 
-  public Set<String> getBloomFilterColumns() {
-    return _bloomFilterColumns;
+  public Map<String, BloomFilterConfig> getBloomFilterConfigs() {
+    return _bloomFilterConfigs;
   }
 
   public boolean isEnableDynamicStarTreeCreation() {

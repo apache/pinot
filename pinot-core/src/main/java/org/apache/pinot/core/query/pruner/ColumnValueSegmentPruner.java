@@ -155,7 +155,7 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
     // Check bloom filter
     BloomFilterReader bloomFilter = dataSource.getBloomFilter();
     if (bloomFilter != null) {
-      if (!bloomFilter.mightContain(value)) {
+      if (!bloomFilter.mightContain(value.toString())) {
         return true;
       }
     }

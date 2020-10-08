@@ -44,6 +44,7 @@ import org.apache.pinot.core.segment.index.readers.RangeIndexReader;
 import org.apache.pinot.core.segment.index.readers.SortedIndexReader;
 import org.apache.pinot.core.segment.index.readers.StringDictionary;
 import org.apache.pinot.core.segment.index.readers.TextIndexReader;
+import org.apache.pinot.core.segment.index.readers.bloom.BloomFilterReaderFactory;
 import org.apache.pinot.core.segment.index.readers.forward.FixedBitMVForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
@@ -66,7 +67,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   private final InvertedIndexReader<?> _rangeIndex;
   private final TextIndexReader _textIndex;
   private final BaseImmutableDictionary _dictionary;
-  private final BloomFilterReader _bloomFilterReader;
+  private final BloomFilterReader _bloomFilter;
   private final NullValueVectorReaderImpl _nullValueVectorReader;
 
   public PhysicalColumnIndexContainer(SegmentDirectory.Reader segmentReader, ColumnMetadata metadata,
@@ -82,7 +83,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       loadInvertedIndex = indexLoadingConfig.getInvertedIndexColumns().contains(columnName);
       loadRangeIndex = indexLoadingConfig.getRangeIndexColumns().contains(columnName);
       loadOnHeapDictionary = indexLoadingConfig.getOnHeapDictionaryColumns().contains(columnName);
-      loadBloomFilter = indexLoadingConfig.getBloomFilterColumns().contains(columnName);
+      loadBloomFilter = indexLoadingConfig.getBloomFilterConfigs().containsKey(columnName);
       loadTextIndex = indexLoadingConfig.getTextIndexColumns().contains(columnName);
     }
 
@@ -108,9 +109,9 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       //bloom filter
       if (loadBloomFilter) {
         PinotDataBuffer bloomFilterBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.BLOOM_FILTER);
-        _bloomFilterReader = new BloomFilterReader(bloomFilterBuffer);
+        _bloomFilter = BloomFilterReaderFactory.getBloomFilterReader(bloomFilterBuffer);
       } else {
-        _bloomFilterReader = null;
+        _bloomFilter = null;
       }
       // Dictionary-based index
       _dictionary = loadDictionary(segmentReader.getIndexFor(columnName, ColumnIndexType.DICTIONARY), metadata,
@@ -150,7 +151,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       // Raw index
       _forwardIndex = loadRawForwardIndex(fwdIndexBuffer, metadata.getDataType());
       _dictionary = null;
-      _bloomFilterReader = null;
+      _bloomFilter = null;
       _rangeIndex = null;
       _invertedIndex = null;
     }
@@ -183,7 +184,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
 
   @Override
   public BloomFilterReader getBloomFilter() {
-    return _bloomFilterReader;
+    return _bloomFilter;
   }
 
   @Override
@@ -264,6 +265,9 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     }
     if (_textIndex != null) {
       _textIndex.close();
+    }
+    if (_bloomFilter != null) {
+      _bloomFilter.close();
     }
   }
 }

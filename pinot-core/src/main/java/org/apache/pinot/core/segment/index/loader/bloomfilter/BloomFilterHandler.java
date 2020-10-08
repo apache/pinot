@@ -21,17 +21,20 @@ package org.apache.pinot.core.segment.index.loader.bloomfilter;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nonnull;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.core.segment.creator.BloomFilterCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
-import org.apache.pinot.core.segment.creator.impl.bloom.BloomFilterCreator;
+import org.apache.pinot.core.segment.creator.impl.bloom.OnHeapGuavaBloomFilterCreator;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.loader.LoaderUtils;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.readers.BaseImmutableDictionary;
+import org.apache.pinot.core.segment.index.readers.BytesDictionary;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.DoubleDictionary;
 import org.apache.pinot.core.segment.index.readers.FloatDictionary;
 import org.apache.pinot.core.segment.index.readers.IntDictionary;
@@ -40,6 +43,7 @@ import org.apache.pinot.core.segment.index.readers.StringDictionary;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,16 +56,18 @@ public class BloomFilterHandler {
   private final SegmentDirectory.Writer _segmentWriter;
   private final String _segmentName;
   private final SegmentVersion _segmentVersion;
+  private final Map<String, BloomFilterConfig> _bloomFilterConfigs;
   private final Set<ColumnMetadata> _bloomFilterColumns = new HashSet<>();
 
-  public BloomFilterHandler(@Nonnull File indexDir, @Nonnull SegmentMetadataImpl segmentMetadata,
-      @Nonnull IndexLoadingConfig indexLoadingConfig, @Nonnull SegmentDirectory.Writer segmentWriter) {
+  public BloomFilterHandler(File indexDir, SegmentMetadataImpl segmentMetadata, IndexLoadingConfig indexLoadingConfig,
+      SegmentDirectory.Writer segmentWriter) {
     _indexDir = indexDir;
     _segmentWriter = segmentWriter;
     _segmentName = segmentMetadata.getName();
     _segmentVersion = SegmentVersion.valueOf(segmentMetadata.getVersion());
+    _bloomFilterConfigs = indexLoadingConfig.getBloomFilterConfigs();
 
-    for (String column : indexLoadingConfig.getBloomFilterColumns()) {
+    for (String column : _bloomFilterConfigs.keySet()) {
       ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
       if (columnMetadata != null) {
         _bloomFilterColumns.add(columnMetadata);
@@ -75,6 +81,7 @@ public class BloomFilterHandler {
       if (columnMetadata.hasDictionary()) {
         createBloomFilterForColumn(columnMetadata);
       }
+      // TODO: Support raw index
     }
   }
 
@@ -102,19 +109,17 @@ public class BloomFilterHandler {
     }
 
     // Create new bloom filter for the column.
-    LOGGER.info("Creating new bloom filter for segment: {}, column: {}", _segmentName, columnName);
-    try (BloomFilterCreator creator = new BloomFilterCreator(_indexDir, columnName, columnMetadata.getCardinality())) {
-      if (columnMetadata.hasDictionary()) {
-        // Read dictionary
-        try (BaseImmutableDictionary dictionaryReader = getDictionaryReader(columnMetadata, _segmentWriter)) {
-          for (int i = 0; i < dictionaryReader.length(); i++) {
-            creator.add(dictionaryReader.get(i));
-          }
-        }
-      } else {
-        // Read the forward index
-        throw new UnsupportedOperationException("Bloom filters not supported for no dictionary columns");
+    BloomFilterConfig bloomFilterConfig = _bloomFilterConfigs.get(columnName);
+    LOGGER.info("Creating new bloom filter for segment: {}, column: {} with config: {}", _segmentName, columnName,
+        bloomFilterConfig);
+    try (BloomFilterCreator bloomFilterCreator = new OnHeapGuavaBloomFilterCreator(_indexDir, columnName,
+        columnMetadata.getCardinality(), bloomFilterConfig);
+        Dictionary dictionary = getDictionaryReader(columnMetadata, _segmentWriter)) {
+      int length = dictionary.length();
+      for (int i = 0; i < length; i++) {
+        bloomFilterCreator.add(dictionary.getStringValue(i));
       }
+      bloomFilterCreator.seal();
     }
 
     // For v3, write the generated bloom filter file into the single file and remove it.
@@ -133,29 +138,24 @@ public class BloomFilterHandler {
     PinotDataBuffer dictionaryBuffer =
         segmentWriter.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.DICTIONARY);
     int cardinality = columnMetadata.getCardinality();
-    BaseImmutableDictionary dictionaryReader;
     DataType dataType = columnMetadata.getDataType();
     switch (dataType) {
       case INT:
-        dictionaryReader = new IntDictionary(dictionaryBuffer, cardinality);
-        break;
+        return new IntDictionary(dictionaryBuffer, cardinality);
       case LONG:
-        dictionaryReader = new LongDictionary(dictionaryBuffer, cardinality);
-        break;
+        return new LongDictionary(dictionaryBuffer, cardinality);
       case FLOAT:
-        dictionaryReader = new FloatDictionary(dictionaryBuffer, cardinality);
-        break;
+        return new FloatDictionary(dictionaryBuffer, cardinality);
       case DOUBLE:
-        dictionaryReader = new DoubleDictionary(dictionaryBuffer, cardinality);
-        break;
+        return new DoubleDictionary(dictionaryBuffer, cardinality);
       case STRING:
-        dictionaryReader = new StringDictionary(dictionaryBuffer, cardinality, columnMetadata.getColumnMaxLength(),
+        return new StringDictionary(dictionaryBuffer, cardinality, columnMetadata.getColumnMaxLength(),
             (byte) columnMetadata.getPaddingCharacter());
-        break;
+      case BYTES:
+        return new BytesDictionary(dictionaryBuffer, cardinality, columnMetadata.getColumnMaxLength());
       default:
         throw new IllegalStateException(
             "Unsupported data type: " + dataType + " for column: " + columnMetadata.getColumnName());
     }
-    return dictionaryReader;
   }
 }

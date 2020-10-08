@@ -1067,6 +1067,13 @@ public class MutableSegmentImpl implements MutableSegment {
           _logger.error("Caught exception while closing text index for column: {}, continuing with error", column, e);
         }
       }
+      if (_bloomFilter != null) {
+        try {
+          _bloomFilter.close();
+        } catch (Exception e) {
+          _logger.error("Caught exception while closing bloom filter for column: {}, continuing with error", column, e);
+        }
+      }
     }
   }
 }
