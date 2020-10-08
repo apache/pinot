@@ -23,6 +23,7 @@ import java.util.Set;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
+import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.core.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -50,7 +51,7 @@ public class RealtimeSegmentConfig {
   private final boolean _aggregateMetrics;
   private final boolean _nullHandlingEnabled;
   private final UpsertConfig.Mode _upsertMode;
-  private final TableUpsertMetadataManager _upsertMetadataTableManager;
+  private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private final String _consumerDir;
 
   // TODO: Clean up this constructor. Most of these things can be extracted from tableConfig.
@@ -60,7 +61,7 @@ public class RealtimeSegmentConfig {
       RealtimeSegmentZKMetadata realtimeSegmentZKMetadata, boolean offHeap, PinotDataBufferMemoryManager memoryManager,
       RealtimeSegmentStatsHistory statsHistory, String partitionColumn, PartitionFunction partitionFunction,
       int partitionId, boolean aggregateMetrics, boolean nullHandlingEnabled, String consumerDir,
-      UpsertConfig.Mode upsertMode, TableUpsertMetadataManager upsertMetadataTableManager) {
+      UpsertConfig.Mode upsertMode, PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
     _tableNameWithType = tableNameWithType;
     _segmentName = segmentName;
     _streamName = streamName;
@@ -83,7 +84,7 @@ public class RealtimeSegmentConfig {
     _nullHandlingEnabled = nullHandlingEnabled;
     _consumerDir = consumerDir;
     _upsertMode = upsertMode;
-    _upsertMetadataTableManager = upsertMetadataTableManager;
+    _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
   }
 
   public String getTableNameWithType() {
@@ -179,8 +180,8 @@ public class RealtimeSegmentConfig {
     return _upsertMode;
   }
 
-  public TableUpsertMetadataManager getUpsertMetadataTableManager() {
-    return _upsertMetadataTableManager;
+  public PartitionUpsertMetadataManager getPartitionUpsertMetadataManager() {
+    return _partitionUpsertMetadataManager;
   }
 
   public static class Builder {
@@ -206,7 +207,7 @@ public class RealtimeSegmentConfig {
     private boolean _nullHandlingEnabled = false;
     private String _consumerDir;
     private UpsertConfig.Mode _upsertMode;
-    private TableUpsertMetadataManager _upsertMetadataTableManager;
+    private PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
 
     public Builder() {
     }
@@ -329,8 +330,8 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
-    public Builder setUpsertMetadataTableManager(TableUpsertMetadataManager upsertMetadataTableManager) {
-      _upsertMetadataTableManager = upsertMetadataTableManager;
+    public Builder setPartitionUpsertMetadataManager(PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
+      _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
       return this;
     }
 
@@ -339,7 +340,7 @@ public class RealtimeSegmentConfig {
           _capacity, _avgNumMultiValues, _noDictionaryColumns, _varLengthDictionaryColumns, _invertedIndexColumns,
           _textIndexColumns, _realtimeSegmentZKMetadata, _offHeap, _memoryManager, _statsHistory, _partitionColumn,
           _partitionFunction, _partitionId, _aggregateMetrics, _nullHandlingEnabled, _consumerDir, _upsertMode,
-          _upsertMetadataTableManager);
+          _partitionUpsertMetadataManager);
     }
   }
 }

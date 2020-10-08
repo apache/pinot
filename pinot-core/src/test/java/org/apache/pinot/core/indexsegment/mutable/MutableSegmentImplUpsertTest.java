@@ -22,6 +22,7 @@ import java.io.File;
 import java.net.URL;
 import java.util.Collections;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
+import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.core.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -45,7 +46,7 @@ public class MutableSegmentImplUpsertTest {
   private static Schema _schema;
   private static TableConfig _tableConfig;
   private static MutableSegmentImpl _mutableSegmentImpl;
-  private static TableUpsertMetadataManager _upsertMetadataTableManager;
+  private static PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
 
   @BeforeClass
   public void setup()
@@ -57,11 +58,11 @@ public class MutableSegmentImplUpsertTest {
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).build();
     _recordTransformer = CompositeTransformer.getDefaultTransformer(_tableConfig, _schema);
     File jsonFile = new File(dataResourceUrl.getFile());
-    _upsertMetadataTableManager = new TableUpsertMetadataManager();
+    _partitionUpsertMetadataManager = new TableUpsertMetadataManager().getOrCreatePartitionManager(0);
     _mutableSegmentImpl = MutableSegmentImplTestUtils
         .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
             false, true, new UpsertConfig(UpsertConfig.Mode.FULL),
-            "secondsSinceEpoch", _upsertMetadataTableManager);
+            "secondsSinceEpoch", _partitionUpsertMetadataManager);
     GenericRow reuse = new GenericRow();
     try (RecordReader recordReader = RecordReaderFactory
         .getRecordReader(FileFormat.JSON, jsonFile, _schema.getColumnNames(), null)) {

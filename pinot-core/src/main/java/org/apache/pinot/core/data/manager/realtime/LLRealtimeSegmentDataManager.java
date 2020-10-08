@@ -60,6 +60,7 @@ import org.apache.pinot.core.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
+import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.core.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
@@ -1173,6 +1174,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     UpsertConfig.Mode upsertMode = _tableConfig.getUpsertMode();
 
+    int partitionId = new LLCSegmentName(_segmentNameStr).getPartitionId();
+    PartitionUpsertMetadataManager partitionUpsertMetadataManager =
+        _upsertMetadataTableManager.getOrCreatePartitionManager(partitionId);
+
     // Start new realtime segment
     String consumerDir = realtimeTableDataManager.getConsumerDir();
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
@@ -1186,7 +1191,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setStatsHistory(realtimeTableDataManager.getStatsHistory())
             .setAggregateMetrics(indexingConfig.isAggregateMetrics()).setNullHandlingEnabled(_nullHandlingEnabled)
             .setConsumerDir(consumerDir).setUpsertMode(upsertMode)
-            .setUpsertMetadataTableManager(_upsertMetadataTableManager);
+            .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager);
 
     // Create message decoder
     Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig.getIngestionConfig(), _schema);

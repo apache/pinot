@@ -24,8 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
@@ -40,7 +38,7 @@ import org.apache.pinot.core.segment.index.readers.ValidDocIndexReaderImpl;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
 import org.apache.pinot.core.startree.v2.store.StarTreeIndexContainer;
-import org.apache.pinot.core.upsert.TableUpsertMetadataManager;
+import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,17 +51,17 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   private final SegmentMetadataImpl _segmentMetadata;
   private final Map<String, ColumnIndexContainer> _indexContainerMap;
   private final StarTreeIndexContainer _starTreeIndexContainer;
-  private final TableUpsertMetadataManager _upsertMetadataTableManager;
+  private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
 
   public ImmutableSegmentImpl(SegmentDirectory segmentDirectory, SegmentMetadataImpl segmentMetadata,
       Map<String, ColumnIndexContainer> columnIndexContainerMap,
       @Nullable StarTreeIndexContainer starTreeIndexContainer,
-      @Nullable TableUpsertMetadataManager upsertMetadataTableManager) {
+      @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
     _segmentDirectory = segmentDirectory;
     _segmentMetadata = segmentMetadata;
     _indexContainerMap = columnIndexContainerMap;
     _starTreeIndexContainer = starTreeIndexContainer;
-    _upsertMetadataTableManager = upsertMetadataTableManager;
+    _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
   }
 
   @Override
@@ -144,15 +142,10 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   }
 
   private void removeUpsertMetadata() {
-    if (_upsertMetadataTableManager == null) {
+    if (_partitionUpsertMetadataManager == null) {
       return;
     }
-    String segmentName = _segmentMetadata.getName();
-    if (SegmentName.getSegmentType(segmentName) != SegmentName.RealtimeSegmentType.LLC) {
-      return;
-    }
-    int partitionId = new LLCSegmentName(segmentName).getPartitionId();
-    _upsertMetadataTableManager.removeUpsertMetadataOfSegment(partitionId, segmentName);
+    _partitionUpsertMetadataManager.removeUpsertMetadata(getSegmentName());
   }
 
   @Override
@@ -163,18 +156,11 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   @Nullable
   @Override
   public ValidDocIndexReader getValidDocIndex() {
-    if (_upsertMetadataTableManager == null) {
+    if (_partitionUpsertMetadataManager == null) {
       return null;
     }
     String segmentName = _segmentMetadata.getName();
-    if (SegmentName.getSegmentType(segmentName) != SegmentName.RealtimeSegmentType.LLC) {
-      return null;
-    }
-    int partitionId = new LLCSegmentName(segmentName).getPartitionId();
-    if (_upsertMetadataTableManager.isEmpty()) {
-      return null;
-    }
-    ThreadSafeMutableRoaringBitmap bitmap = _upsertMetadataTableManager.getValidDocIndex(partitionId, segmentName);
+    ThreadSafeMutableRoaringBitmap bitmap = _partitionUpsertMetadataManager.getValidDocIndex(segmentName);
     return bitmap == null ? null : new ValidDocIndexReaderImpl(bitmap);
   }
 

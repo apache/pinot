@@ -21,8 +21,6 @@ package org.apache.pinot.core.upsert;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
-import org.apache.pinot.spi.data.readers.PrimaryKey;
 
 /**
  * The manager of the upsert metadata of a table.
@@ -34,7 +32,7 @@ public class TableUpsertMetadataManager {
   public TableUpsertMetadataManager() {
   }
 
-  private synchronized PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId) {
+  public synchronized PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId) {
     if(!_partitionMetadataManagerMap.containsKey(partitionId)) {
       _partitionMetadataManagerMap.put(partitionId, new PartitionUpsertMetadataManager(partitionId));
     }
@@ -43,31 +41,5 @@ public class TableUpsertMetadataManager {
 
   public boolean isEmpty() {
     return _partitionMetadataManagerMap.isEmpty();
-  }
-
-  public void removeRecordLocation(int partitionId, PrimaryKey primaryKey) {
-    getOrCreatePartitionManager(partitionId).removeRecordLocation(primaryKey);
-  }
-
-  public boolean containsKey(int partitionId, PrimaryKey primaryKey) {
-    return getOrCreatePartitionManager(partitionId).containsKey(primaryKey);
-  }
-
-  public RecordLocation getRecordLocation(int partitionId, PrimaryKey primaryKey) {
-    return getOrCreatePartitionManager(partitionId).getRecordLocation(primaryKey);
-  }
-
-  public ThreadSafeMutableRoaringBitmap getValidDocIndex(int partitionId, String segmentName) {
-    // TODO(upsert) check existence of the validDocIndex of the given segment, rebuild it if not available
-    return getOrCreatePartitionManager(partitionId).getValidDocIndex(segmentName);
-  }
-
-  public synchronized void putUpsertMetadataOfPartition(int partitionId, String segmentName, Map<PrimaryKey, RecordLocation> primaryKeyIndex,
-      ThreadSafeMutableRoaringBitmap validDocIndex) {
-    getOrCreatePartitionManager(partitionId).putUpsertMetadata(segmentName, primaryKeyIndex, validDocIndex);
-  }
-
-  public void removeUpsertMetadataOfSegment(int partitionId, String segmentName) {
-    getOrCreatePartitionManager(partitionId).removeUpsertMetadata(segmentName);
   }
 }

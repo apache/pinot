@@ -23,7 +23,7 @@ import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
-import org.apache.pinot.core.upsert.TableUpsertMetadataManager;
+import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 
@@ -56,7 +56,7 @@ public class MutableSegmentImplTestUtils {
   public static MutableSegmentImpl createMutableSegmentImpl(Schema schema, Set<String> noDictionaryColumns,
       Set<String> varLengthDictionaryColumns, Set<String> invertedIndexColumns, boolean aggregateMetrics,
       boolean nullHandlingEnabled, UpsertConfig upsertConfig, String timeColumnName,
-      TableUpsertMetadataManager upsertMetadataTableManager) {
+      PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
     RealtimeSegmentStatsHistory statsHistory = mock(RealtimeSegmentStatsHistory.class);
     when(statsHistory.getEstimatedCardinality(anyString())).thenReturn(200);
     when(statsHistory.getEstimatedAvgColSize(anyString())).thenReturn(32);
@@ -70,7 +70,7 @@ public class MutableSegmentImplTestUtils {
             .setMemoryManager(new DirectMemoryManager(SEGMENT_NAME)).setStatsHistory(statsHistory)
             .setAggregateMetrics(aggregateMetrics).setNullHandlingEnabled(nullHandlingEnabled)
             .setUpsertMode(upsertMode).setTimeColumnName(timeColumnName)
-            .setUpsertMetadataTableManager(upsertMetadataTableManager).build();
+            .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager).build();
     return new MutableSegmentImpl(realtimeSegmentConfig, null);
   }
 }

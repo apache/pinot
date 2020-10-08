@@ -68,9 +68,8 @@ import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
+import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.core.upsert.RecordLocation;
-import org.apache.pinot.core.upsert.TableUpsertMetadataManager;
-import org.apache.pinot.core.upsert.UpsertProcessorUtil;
 import org.apache.pinot.core.util.FixedIntArray;
 import org.apache.pinot.core.util.FixedIntArrayOffHeapIdMap;
 import org.apache.pinot.core.util.IdMap;
@@ -94,6 +93,7 @@ import org.slf4j.LoggerFactory;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class MutableSegmentImpl implements MutableSegment {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MutableSegmentImpl.class);
   // For multi-valued column, forward-index.
   // Maximum number of multi-values per row. We assert on this.
   private static final int MAX_MULTI_VALUES_PER_ROW = 1000;
@@ -148,7 +148,7 @@ public class MutableSegmentImpl implements MutableSegment {
   // the primaryKeyIndex for local segment
   private final int _upsertPartitionId;
   private final UpsertConfig.Mode _upsertMode;
-  private final TableUpsertMetadataManager _upsertMetadataTableManager;
+  private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private final Map<PrimaryKey, RecordLocation> _primaryKeyIndex;
   private final ThreadSafeMutableRoaringBitmap _validDocIndex;
 
@@ -339,7 +339,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
     // init upsert-related data structure
     _upsertMode = config.getUpsertMode();
-    _upsertMetadataTableManager = config.getUpsertMetadataTableManager();
+    _partitionUpsertMetadataManager = config.getPartitionUpsertMetadataManager();
     _primaryKeyIndex = isUpsertEnabled() ? new ConcurrentHashMap() : null;
     _validDocIndex = isUpsertEnabled() ? new ThreadSafeMutableRoaringBitmap() : null;
     _upsertPartitionId = isUpsertEnabled() ? new LLCSegmentName(_segmentName).getPartitionId() : 0;
@@ -475,9 +475,37 @@ public class MutableSegmentImpl implements MutableSegment {
     Object timeValue = row.getValue(_timeColumnName);
     Preconditions.checkArgument(timeValue instanceof Comparable, "time column shall be comparable");
     long timestamp = IngestionUtils.extractTimeValue((Comparable) timeValue);
-    UpsertProcessorUtil
-        .handleUpsert(primaryKey, timestamp, _segmentName, docId, _upsertPartitionId, _primaryKeyIndex, _validDocIndex,
-            _upsertMetadataTableManager);
+    RecordLocation location = new RecordLocation(_segmentName, docId, timestamp);
+    // check local primary key index first
+    if (_primaryKeyIndex.containsKey(primaryKey)) {
+      RecordLocation prevLocation = _primaryKeyIndex.get(primaryKey);
+      if (location.getTimestamp() >= prevLocation.getTimestamp()) {
+        _primaryKeyIndex.put(primaryKey, location);
+        // update validDocIndex
+        _validDocIndex.remove(prevLocation.getDocId());
+        _validDocIndex.checkAndAdd(location.getDocId());
+        LOGGER.debug(String
+            .format("upsert: replace old doc id %d with %d for key: %s, hash: %d", prevLocation.getDocId(),
+                location.getDocId(), primaryKey, primaryKey.hashCode()));
+      } else {
+        LOGGER.debug(
+            String.format("upsert: ignore a late-arrived record: %s, hash: %d", primaryKey, primaryKey.hashCode()));
+      }
+    } else if (_partitionUpsertMetadataManager.containsKey(primaryKey)) {
+      RecordLocation prevLocation = _partitionUpsertMetadataManager.getRecordLocation(primaryKey);
+      if (location.getTimestamp() >= prevLocation.getTimestamp()) {
+        _partitionUpsertMetadataManager.removeRecordLocation(primaryKey);
+        _primaryKeyIndex.put(primaryKey, location);
+
+        // update validDocIndex
+        _partitionUpsertMetadataManager.getValidDocIndex(prevLocation.getSegmentName())
+            .remove(prevLocation.getDocId());
+        _validDocIndex.checkAndAdd(location.getDocId());
+      }
+    } else {
+      _primaryKeyIndex.put(primaryKey, location);
+      _validDocIndex.checkAndAdd(location.getDocId());
+    }
   }
 
   private void updateDictionary(GenericRow row) {
@@ -651,11 +679,6 @@ public class MutableSegmentImpl implements MutableSegment {
   @Override
   public int getNumDocsIndexed() {
     return _numDocsIndexed;
-  }
-
-  @Override
-  public TableUpsertMetadataManager getUpsertMetadataTableManager() {
-    return _upsertMetadataTableManager;
   }
 
   @Override

@@ -26,45 +26,46 @@ import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 
 /**
- * Manages the upsert metadata per partition. This shall be accessed from TableUpsertMetadataManager.
+ * Manages the upsert metadata per partition.
  */
 @ThreadSafe
-class PartitionUpsertMetadataManager {
+public class PartitionUpsertMetadataManager {
 
   private final int _partitionId;
 
-  private final Map<PrimaryKey, RecordLocation> _primaryKeyIndex = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<PrimaryKey, RecordLocation> _primaryKeyIndex = new ConcurrentHashMap<>();
   // the mapping between the (sealed) segment and its validDocuments
-  private final Map<String, ThreadSafeMutableRoaringBitmap> _segmentToValidDocIndexMap = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, ThreadSafeMutableRoaringBitmap> _segmentToValidDocIndexMap = new ConcurrentHashMap<>();
 
-  PartitionUpsertMetadataManager(int partitionId) {
+  public PartitionUpsertMetadataManager(int partitionId) {
     _partitionId = partitionId;
   }
 
-  void removeRecordLocation(PrimaryKey primaryKey) {
+  public void removeRecordLocation(PrimaryKey primaryKey) {
     _primaryKeyIndex.remove(primaryKey);
   }
 
-  boolean containsKey(PrimaryKey primaryKey) {
+  public boolean containsKey(PrimaryKey primaryKey) {
     return _primaryKeyIndex.containsKey(primaryKey);
   }
 
-  RecordLocation getRecordLocation(PrimaryKey primaryKey) {
+  public RecordLocation getRecordLocation(PrimaryKey primaryKey) {
     return _primaryKeyIndex.get(primaryKey);
   }
 
-  ThreadSafeMutableRoaringBitmap getValidDocIndex(String segmentName) {
+  public ThreadSafeMutableRoaringBitmap getValidDocIndex(String segmentName) {
     return _segmentToValidDocIndexMap.get(segmentName);
   }
 
-  synchronized void putUpsertMetadata(String segmentName, Map<PrimaryKey, RecordLocation> primaryKeyIndex,
-      ThreadSafeMutableRoaringBitmap validDocIndex) {
-    //TODO(upsert) do we need to make a backup before update?
-    _primaryKeyIndex.putAll(primaryKeyIndex);
-    _segmentToValidDocIndexMap.put(segmentName, validDocIndex);
+  public synchronized ThreadSafeMutableRoaringBitmap getOrCreateValidDocIndex(String segmentName) {
+    return _segmentToValidDocIndexMap.computeIfAbsent(segmentName, k->new ThreadSafeMutableRoaringBitmap());
   }
 
-  synchronized void removeUpsertMetadata(String segmentName) {
+  public synchronized void putRecordLocation(PrimaryKey primaryKey, RecordLocation recordLocation) {
+    _primaryKeyIndex.put(primaryKey, recordLocation);
+  }
+
+  public synchronized void removeUpsertMetadata(String segmentName) {
     _segmentToValidDocIndexMap.remove(segmentName);
     for (Map.Entry<PrimaryKey, RecordLocation> entry : new HashSet<>(_primaryKeyIndex.entrySet())) {
       if (entry.getValue().getSegmentName().equals(segmentName)) {
