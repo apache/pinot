@@ -40,17 +40,14 @@ services:
       - ./dockerconf/entrypoint.sh:/opt/thirdeye/bin/entrypoint.sh
     environment:
       CONFIG_DIR: /opt/thirdeye/config/default
-      POSTGRES_HOSTNAME: localhost
-      POSTGRES_PORT: "5432"
-      POSTGRES_DATABASE: thirdeye
-      POSTGRESQL_PASSWORD: root
       MYSQL_HOSTNAME: thirdeye_mysql
       MYSQL_PORT: 3306
       THIRDEYE_DATABASE: thirdeye
       MYSQL_PASSWORD: root
-      DRUID_USERNAME: aaa
-      DRUID_PASSWORD: bbb
+      DRUID_USER: admin
+      DRUID_PWD: pooghe6phee5wohVoo8eeBei
       APP_MODE: prod
+      JMX_CONFIG: "-Xms1G -Xmx3G"
     ports:
       - 1426:1426
       - 1427:1427
@@ -74,17 +71,14 @@ services:
       - 8081:8080
     environment:
       CONFIG_DIR: /opt/thirdeye/config/default
-      POSTGRES_HOSTNAME: localhost
-      POSTGRES_PORT: "5432"
-      POSTGRES_DATABASE: thirdeye
-      POSTGRESQL_PASSWORD: root
       MYSQL_HOSTNAME: thirdeye_mysql
       MYSQL_PORT: 3306
       THIRDEYE_DATABASE: thirdeye
       MYSQL_PASSWORD: root
-      DRUID_USERNAME: aaa
-      DRUID_PASSWORD: bbb
+      DRUID_USER: admin
+      DRUID_PWD: pooghe6phee5wohVoo8eeBei
       APP_MODE: prod
+      JMX_CONFIG: "-Xms1G -Xmx3G"
       #entrypoint: ["/bin/sh", "/opt/thirdeye/bin/entrypoint_dev.sh", "backend"]
     entrypoint: ["/bin/sh", "/opt/thirdeye/bin/entrypoint.sh", "backend"]
     depends_on:
