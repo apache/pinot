@@ -1172,11 +1172,13 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     Set<String> textIndexColumns = indexLoadingConfig.getTextIndexColumns();
     _textIndexColumns = new ArrayList<>(textIndexColumns);
 
+    PartitionUpsertMetadataManager partitionUpsertMetadataManager = null;
     UpsertConfig.Mode upsertMode = _tableConfig.getUpsertMode();
+    if (_upsertMetadataTableManager != null && upsertMode != UpsertConfig.Mode.NONE) {
+      int partitionId = new LLCSegmentName(_segmentNameStr).getPartitionId();
+      partitionUpsertMetadataManager = _upsertMetadataTableManager.getOrCreatePartitionManager(partitionId);
+    }
 
-    int partitionId = new LLCSegmentName(_segmentNameStr).getPartitionId();
-    PartitionUpsertMetadataManager partitionUpsertMetadataManager =
-        _upsertMetadataTableManager.getOrCreatePartitionManager(partitionId);
 
     // Start new realtime segment
     String consumerDir = realtimeTableDataManager.getConsumerDir();
