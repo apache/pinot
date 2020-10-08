@@ -31,6 +31,7 @@ public class IndexingConfig extends BaseJsonConfig {
   private boolean _createInvertedIndexDuringSegmentGeneration;
   private List<String> _sortedColumn;
   private List<String> _bloomFilterColumns;
+  private Map<String, BloomFilterConfig> _bloomFilterConfigs;
   private String _loadMode;
   private Map<String, String> _streamConfigs;
   private String _segmentFormatVersion;
@@ -102,6 +103,15 @@ public class IndexingConfig extends BaseJsonConfig {
 
   public void setBloomFilterColumns(List<String> bloomFilterColumns) {
     _bloomFilterColumns = bloomFilterColumns;
+  }
+
+  @Nullable
+  public Map<String, BloomFilterConfig> getBloomFilterConfigs() {
+    return _bloomFilterConfigs;
+  }
+
+  public void setBloomFilterConfigs(Map<String, BloomFilterConfig> bloomFilterConfigs) {
+    _bloomFilterConfigs = bloomFilterConfigs;
   }
 
   @Nullable

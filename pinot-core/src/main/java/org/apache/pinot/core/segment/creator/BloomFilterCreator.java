@@ -16,25 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.index.readers;
+package org.apache.pinot.core.segment.creator;
 
 import java.io.Closeable;
+import java.io.IOException;
 
 
-/**
- * Interface for bloom filter reader.
- */
-public interface BloomFilterReader extends Closeable {
+public interface BloomFilterCreator extends Closeable {
 
   /**
-   * Returns {@code true} if the given value might have been put in this bloom filer, {@code false} otherwise.
+   * Adds a value to the bloom filter.
    */
-  boolean mightContain(String value);
+  void add(String value);
 
   /**
-   * Returns {@code true} if the value with the given hash might have been put in this bloom filer, {@code false}
-   * otherwise.
-   * <p>This method is provided to prevent hashing the same value multiple times.
+   * Seals the index and flushes it to disk.
    */
-  boolean mightContain(byte[] hash);
+  void seal()
+      throws IOException;
 }

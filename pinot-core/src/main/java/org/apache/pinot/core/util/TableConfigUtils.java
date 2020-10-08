@@ -40,7 +40,6 @@ import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
@@ -294,14 +293,19 @@ public final class TableConfigUtils {
         noDictionaryColumnsSet.add(columnName);
       }
     }
+    Set<String> bloomFilterColumns = new HashSet<>();
     if (indexingConfig.getBloomFilterColumns() != null) {
-      for (String columnName : indexingConfig.getBloomFilterColumns()) {
-        if (noDictionaryColumnsSet.contains(columnName)) {
-          throw new IllegalStateException(
-              "Cannot create a Bloom Filter on column " + columnName + " specified in the noDictionaryColumns config");
-        }
-        columnNameToConfigMap.put(columnName, "Bloom Filter Config");
+      bloomFilterColumns.addAll(indexingConfig.getBloomFilterColumns());
+    }
+    if (indexingConfig.getBloomFilterConfigs() != null) {
+      bloomFilterColumns.addAll(indexingConfig.getBloomFilterConfigs().keySet());
+    }
+    for (String bloomFilterColumn : bloomFilterColumns) {
+      if (noDictionaryColumnsSet.contains(bloomFilterColumn)) {
+        throw new IllegalStateException("Cannot create a Bloom Filter on column " + bloomFilterColumn
+            + " specified in the noDictionaryColumns config");
       }
+      columnNameToConfigMap.put(bloomFilterColumn, "Bloom Filter Config");
     }
     if (indexingConfig.getInvertedIndexColumns() != null) {
       for (String columnName : indexingConfig.getInvertedIndexColumns()) {
