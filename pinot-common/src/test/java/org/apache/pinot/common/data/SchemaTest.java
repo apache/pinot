@@ -84,7 +84,7 @@ public class SchemaTest {
     String defaultString = "default";
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
         .addSingleValueDimension("svDimensionWithDefault", FieldSpec.DataType.INT, 10)
-        .addSingleValueDimension("svDimensionWithMaxLength", FieldSpec.DataType.INT, 20000, null)
+        .addSingleValueDimension("svDimensionWithMaxLength", FieldSpec.DataType.STRING, 20000, null)
         .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
         .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, defaultString)
         .addMultiValueDimension("mvDimensionWithMaxLength", FieldSpec.DataType.STRING, 20000, null)
@@ -114,10 +114,10 @@ public class SchemaTest {
     Assert.assertNotNull(dimensionFieldSpec);
     Assert.assertEquals(dimensionFieldSpec.getFieldType(), FieldSpec.FieldType.DIMENSION);
     Assert.assertEquals(dimensionFieldSpec.getName(), "svDimensionWithMaxLength");
-    Assert.assertEquals(dimensionFieldSpec.getDataType(), FieldSpec.DataType.INT);
+    Assert.assertEquals(dimensionFieldSpec.getDataType(), FieldSpec.DataType.STRING);
     Assert.assertTrue(dimensionFieldSpec.isSingleValueField());
     Assert.assertEquals(dimensionFieldSpec.getMaxLength(), 20000);
-    Assert.assertEquals(dimensionFieldSpec.getDefaultNullValue(), Integer.MIN_VALUE);
+    Assert.assertEquals(dimensionFieldSpec.getDefaultNullValue(), "null");
 
     dimensionFieldSpec = schema.getDimensionSpec("mvDimension");
     Assert.assertNotNull(dimensionFieldSpec);

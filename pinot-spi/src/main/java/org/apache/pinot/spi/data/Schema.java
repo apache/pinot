@@ -503,7 +503,7 @@ public final class Schema {
      * Add single value dimensionFieldSpec with maxLength and a defaultNullValue
      */
     public SchemaBuilder addSingleValueDimension(String dimensionName, DataType dataType, int maxLength,
-                                                 Object defaultNullValue) {
+        Object defaultNullValue) {
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, true, maxLength, defaultNullValue));
       return this;
     }
@@ -528,7 +528,7 @@ public final class Schema {
      * Add multi value dimensionFieldSpec with maxLength and a defaultNullValue
      */
     public SchemaBuilder addMultiValueDimension(String dimensionName, DataType dataType, int maxLength,
-                                                Object defaultNullValue) {
+        Object defaultNullValue) {
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, false, maxLength, defaultNullValue));
       return this;
     }
