@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-public class ControllerBrokerResponse {
-  private String _instanceName;
-  private String _host;
-  private Integer _port;
+public class InstanceInfo {
+  private final String _instanceName;
+  private final String _host;
+  private final Integer _port;
 
-  public ControllerBrokerResponse(String instanceName, String host, Integer port) {
+  public InstanceInfo(String instanceName, String host, Integer port) {
     _instanceName = instanceName;
     _host = host;
     _port = port;
@@ -33,23 +33,11 @@ public class ControllerBrokerResponse {
     return _instanceName;
   }
 
-  public void setInstanceName(String instanceName) {
-    _instanceName = instanceName;
-  }
-
   public String getHost() {
     return _host;
   }
 
-  public void setHost(String host) {
-    _host = host;
-  }
-
   public Integer getPort() {
     return _port;
-  }
-
-  public void setPort(Integer port) {
-    _port = port;
   }
 }

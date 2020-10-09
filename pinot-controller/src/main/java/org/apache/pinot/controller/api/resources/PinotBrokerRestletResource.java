@@ -87,8 +87,8 @@ public class PinotBrokerRestletResource {
   public List<String> getBrokersForTenant(
       @ApiParam(value = "Name of the tenant", required = true) @PathParam("tenantName") String tenantName,
       @ApiParam(value = "ONLINE|OFFLINE") @QueryParam("state") String state) {
-    List<ControllerBrokerResponse> controllerBrokerResponseList = getBrokersForTenantV2(tenantName, state);
-    List<String> tenantBrokers = controllerBrokerResponseList.stream().map(ControllerBrokerResponse::getInstanceName)
+    List<InstanceInfo> instanceInfoList = getBrokersForTenantV2(tenantName, state);
+    List<String> tenantBrokers = instanceInfoList.stream().map(InstanceInfo::getInstanceName)
         .collect(Collectors.toList());
     return tenantBrokers;
   }
@@ -113,8 +113,8 @@ public class PinotBrokerRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "ONLINE|OFFLINE") @QueryParam("state") String state) {
-    List<ControllerBrokerResponse> controllerBrokerResponseList = getBrokersForTableV2(tableName, tableTypeStr, state);
-    return controllerBrokerResponseList.stream().map(ControllerBrokerResponse::getInstanceName)
+    List<InstanceInfo> instanceInfoList = getBrokersForTableV2(tableName, tableTypeStr, state);
+    return instanceInfoList.stream().map(InstanceInfo::getInstanceName)
         .collect(Collectors.toList());
   }
 
@@ -122,9 +122,9 @@ public class PinotBrokerRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/v2/brokers")
   @ApiOperation(value = "List tenants and tables to brokers mappings", notes = "List tenants and tables to brokers mappings")
-  public Map<String, Map<String, List<ControllerBrokerResponse>>> listBrokersMappingV2(
+  public Map<String, Map<String, List<InstanceInfo>>> listBrokersMappingV2(
       @ApiParam(value = "ONLINE|OFFLINE") @QueryParam("state") String state) {
-    Map<String, Map<String, List<ControllerBrokerResponse>>> resultMap = new HashMap<>();
+    Map<String, Map<String, List<InstanceInfo>>> resultMap = new HashMap<>();
     resultMap.put("tenants", getTenantsToBrokersMappingV2(state));
     resultMap.put("tables", getTablesToBrokersMappingV2(state));
     return resultMap;
@@ -134,9 +134,9 @@ public class PinotBrokerRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/v2/brokers/tenants")
   @ApiOperation(value = "List tenants to brokers mappings", notes = "List tenants to brokers mappings")
-  public Map<String, List<ControllerBrokerResponse>> getTenantsToBrokersMappingV2(
+  public Map<String, List<InstanceInfo>> getTenantsToBrokersMappingV2(
       @ApiParam(value = "ONLINE|OFFLINE") @QueryParam("state") String state) {
-    Map<String, List<ControllerBrokerResponse>> resultMap = new HashMap<>();
+    Map<String, List<InstanceInfo>> resultMap = new HashMap<>();
     _pinotHelixResourceManager.getAllBrokerTenantNames().stream()
         .forEach(tenant -> resultMap.put(tenant, getBrokersForTenantV2(tenant, state)));
     return resultMap;
@@ -146,7 +146,7 @@ public class PinotBrokerRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/v2/brokers/tenants/{tenantName}")
   @ApiOperation(value = "List brokers for a given tenant", notes = "List brokers for a given tenant")
-  public List<ControllerBrokerResponse> getBrokersForTenantV2(
+  public List<InstanceInfo> getBrokersForTenantV2(
       @ApiParam(value = "Name of the tenant", required = true) @PathParam("tenantName") String tenantName,
       @ApiParam(value = "ONLINE|OFFLINE") @QueryParam("state") String state) {
     if (!_pinotHelixResourceManager.getAllBrokerTenantNames().contains(tenantName)) {
@@ -155,20 +155,20 @@ public class PinotBrokerRestletResource {
     }
     Set<InstanceConfig> tenantBrokers =
         new HashSet<>(_pinotHelixResourceManager.getAllInstancesConfigsForBrokerTenant(tenantName));
-    Set<ControllerBrokerResponse> controllerBrokerResponses = tenantBrokers.stream()
-        .map(x -> new ControllerBrokerResponse(x.getInstanceName(), x.getHostName(), Integer.parseInt(x.getPort())))
+    Set<InstanceInfo> instanceInfoSet = tenantBrokers.stream()
+        .map(x -> new InstanceInfo(x.getInstanceName(), x.getHostName(), Integer.parseInt(x.getPort())))
         .collect(Collectors.toSet());
-    applyStateChanges(controllerBrokerResponses, state);
-    return ImmutableList.copyOf(controllerBrokerResponses);
+    applyStateChanges(instanceInfoSet, state);
+    return ImmutableList.copyOf(instanceInfoSet);
   }
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/v2/brokers/tables")
   @ApiOperation(value = "List tables to brokers mappings", notes = "List tables to brokers mappings")
-  public Map<String, List<ControllerBrokerResponse>> getTablesToBrokersMappingV2(
+  public Map<String, List<InstanceInfo>> getTablesToBrokersMappingV2(
       @ApiParam(value = "ONLINE|OFFLINE") @QueryParam("state") String state) {
-    Map<String, List<ControllerBrokerResponse>> resultMap = new HashMap<>();
+    Map<String, List<InstanceInfo>> resultMap = new HashMap<>();
     _pinotHelixResourceManager.getAllRawTables().stream()
         .forEach(table -> resultMap.put(table, getBrokersForTableV2(table, null, state)));
     return resultMap;
@@ -178,7 +178,7 @@ public class PinotBrokerRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/v2/brokers/tables/{tableName}")
   @ApiOperation(value = "List brokers for a given table", notes = "List brokers for a given table")
-  public List<ControllerBrokerResponse> getBrokersForTableV2(
+  public List<InstanceInfo> getBrokersForTableV2(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "ONLINE|OFFLINE") @QueryParam("state") String state) {
@@ -191,11 +191,11 @@ public class PinotBrokerRestletResource {
       }
       Set<InstanceConfig> tenantBrokers =
           new HashSet<>(_pinotHelixResourceManager.getBrokerInstancesConfigsFor(tableNamesWithType.get(0)));
-      Set<ControllerBrokerResponse> controllerBrokerResponses = tenantBrokers.stream()
-          .map(x -> new ControllerBrokerResponse(x.getInstanceName(), x.getHostName(), Integer.parseInt(x.getPort())))
+      Set<InstanceInfo> instanceInfoSet = tenantBrokers.stream()
+          .map(x -> new InstanceInfo(x.getInstanceName(), x.getHostName(), Integer.parseInt(x.getPort())))
           .collect(Collectors.toSet());
-      applyStateChanges(controllerBrokerResponses, state);
-      return ImmutableList.copyOf(controllerBrokerResponses);
+      applyStateChanges(instanceInfoSet, state);
+      return ImmutableList.copyOf(instanceInfoSet);
     } catch (TableNotFoundException e) {
       throw new ControllerApplicationException(LOGGER, String.format("Table '%s' not found.", tableName),
           Response.Status.NOT_FOUND);
@@ -237,13 +237,13 @@ public class PinotBrokerRestletResource {
     }
   }
 
-  private void applyStateChanges(Set<ControllerBrokerResponse> brokers, String state) {
+  private void applyStateChanges(Set<InstanceInfo> brokers, String state) {
     if (state == null) {
       return;
     }
 
     List<String> onlineInstanceList = _pinotHelixResourceManager.getOnlineInstanceList();
-    Set<ControllerBrokerResponse> onlineBrokers =
+    Set<InstanceInfo> onlineBrokers =
         brokers.stream().filter(x -> onlineInstanceList.contains(x.getInstanceName())).collect(Collectors.toSet());
 
     switch (state) {
