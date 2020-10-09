@@ -480,12 +480,12 @@ public class HelixHelper {
    * TODO: refactor code to use this method if applicable to reuse instance configs in order to reduce ZK accesses
    */
   public static Set<String> getBrokerInstancesForTenant(List<InstanceConfig> instanceConfigs, String tenant) {
-    return getBrokerInstanceConfigsForTenant(instanceConfigs, tenant).stream().map(InstanceConfig::getInstanceName).collect(
-        Collectors.toSet());
+    return new HashSet<>(getInstancesWithTag(instanceConfigs, TagNameUtils.getBrokerTagForTenant(tenant)));
   }
 
-  public static Set<InstanceConfig> getBrokerInstanceConfigsForTenant(List<InstanceConfig> instanceConfigs, String tenant) {
-    return new HashSet<>(HelixHelper.getInstancesConfigsWithTag(instanceConfigs, TagNameUtils.getBrokerTagForTenant(tenant)));
+  public static Set<InstanceConfig> getBrokerInstanceConfigsForTenant(List<InstanceConfig> instanceConfigs,
+      String tenant) {
+    return new HashSet<>(
+        HelixHelper.getInstancesConfigsWithTag(instanceConfigs, TagNameUtils.getBrokerTagForTenant(tenant)));
   }
-
 }
