@@ -422,7 +422,9 @@ public class CalciteSqlParser {
     Function functionCall = expression.getFunctionCall();
     switch (canonicalize(functionCall.getOperator())) {
       case "sum":
-        Preconditions.checkState(functionCall.getOperands().size() == 1, "Expected 1 argument in SUM function");
+        if (functionCall.getOperands().size() != 1) {
+          return;
+        }
         if (functionCall.getOperands().get(0).isSetFunctionCall()) {
           Function innerFunction = functionCall.getOperands().get(0).getFunctionCall();
           if (isSameFunction(innerFunction.getOperator(), TransformFunctionType.ARRAYSUM.getName())) {
@@ -433,7 +435,9 @@ public class CalciteSqlParser {
         }
         return;
       case "min":
-        Preconditions.checkState(functionCall.getOperands().size() == 1, "Expected 1 argument in MIN function");
+        if (functionCall.getOperands().size() != 1) {
+          return;
+        }
         if (functionCall.getOperands().get(0).isSetFunctionCall()) {
           Function innerFunction = functionCall.getOperands().get(0).getFunctionCall();
           if (isSameFunction(innerFunction.getOperator(), TransformFunctionType.ARRAYMIN.getName())) {
@@ -444,7 +448,9 @@ public class CalciteSqlParser {
         }
         return;
       case "max":
-        Preconditions.checkState(functionCall.getOperands().size() == 1, "Expected 1 argument in MAX function");
+        if (functionCall.getOperands().size() != 1) {
+          return;
+        }
         if (functionCall.getOperands().get(0).isSetFunctionCall()) {
           Function innerFunction = functionCall.getOperands().get(0).getFunctionCall();
           if (isSameFunction(innerFunction.getOperator(), TransformFunctionType.ARRAYMAX.getName())) {
