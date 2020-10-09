@@ -69,15 +69,12 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.common.utils.CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD;
 
 
 @ThreadSafe
 public class RealtimeTableDataManager extends BaseTableDataManager {
-  private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeTableDataManager.class);
   private final ExecutorService _segmentAsyncExecutorService =
       Executors.newSingleThreadExecutor(new NamedThreadFactory("SegmentAsyncExecutorService"));
   private SegmentBuildTimeLeaseExtender _leaseExtender;
@@ -108,7 +105,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   // likely that we get fresh data each time instead of multiple copies of roughly same data.
   private static final int MIN_INTERVAL_BETWEEN_STATS_UPDATES_MINUTES = 30;
 
-  // TODO(upsert): TableConfig is not available at class init phase, so we have to always create a new upsertMetadataTableManager
   private TableUpsertMetadataManager _tableUpsertMetadataManager;
   private UpsertConfig.Mode _upsertMode;
   private List<String> _primaryKeyColumns;
@@ -149,6 +145,17 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
     String consumerDirPath = getConsumerDir();
     File consumerDir = new File(consumerDirPath);
+
+    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, _tableNameWithType);
+    _upsertMode = tableConfig.getUpsertMode();
+    if (isUpsertEnabled()) {
+      if (_tableUpsertMetadataManager == null) {
+        _tableUpsertMetadataManager = new TableUpsertMetadataManager();
+      }
+      Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
+      _primaryKeyColumns = schema.getPrimaryKeyColumns();
+      _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+    }
 
     if (consumerDir.exists()) {
       File[] segmentFiles = consumerDir.listFiles(new FilenameFilter() {
@@ -242,16 +249,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
     Preconditions.checkNotNull(schema);
 
-    // TODO(upsert): better checking&hanlding of upsert mode/primary key change
-    _upsertMode = tableConfig.getUpsertMode();
-    if (isUpsertEnabled()) {
-      if (_tableUpsertMetadataManager == null) {
-        _tableUpsertMetadataManager = new TableUpsertMetadataManager();
-      }
-      _primaryKeyColumns = schema.getPrimaryKeyColumns();
-      _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
-    }
-
     File indexDir = new File(_indexDir, segmentName);
     // Restart during segment reload might leave segment in inconsistent state (index directory might not exist but
     // segment backup directory existed), need to first try to recover from reload failure before checking the existence
@@ -302,7 +299,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   private boolean isUpsertEnabled() {
-    return _upsertMode != null && (_upsertMode == UpsertConfig.Mode.FULL || _upsertMode == UpsertConfig.Mode.PARTIAL);
+    return _upsertMode == UpsertConfig.Mode.FULL || _upsertMode == UpsertConfig.Mode.PARTIAL;
   }
 
   @Override
@@ -335,26 +332,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       Preconditions.checkArgument(timeValue instanceof Comparable, "time column shall be comparable");
       long timestamp = IngestionUtils.extractTimeValue((Comparable) timeValue);
       RecordLocation location = new RecordLocation(segmentName, docId, timestamp);
-      if (partitionUpsertMetadataManager.containsKey(primaryKey)) {
-        RecordLocation prevLocation = partitionUpsertMetadataManager.getRecordLocation(primaryKey);
-        // upsert
-        if (location.getTimestamp() >= prevLocation.getTimestamp()) {
-          partitionUpsertMetadataManager.removeRecordLocation(primaryKey);
-          partitionUpsertMetadataManager.putRecordLocation(primaryKey, location);
-          partitionUpsertMetadataManager.getValidDocIndex(prevLocation.getSegmentName())
-              .remove(prevLocation.getDocId());
-          partitionUpsertMetadataManager.getOrCreateValidDocIndex(segmentName).checkAndAdd(location.getDocId());
-          LOGGER.debug(String
-              .format("upsert: replace old doc id %d with %d for key: %s, hash: %d", prevLocation.getDocId(),
-                  location.getDocId(), primaryKey, primaryKey.hashCode()));
-        } else {
-          LOGGER.debug(
-              String.format("upsert: ignore a late-arrived record: %s, hash: %d", primaryKey, primaryKey.hashCode()));
-        }
-      } else { // append
-        partitionUpsertMetadataManager.putRecordLocation(primaryKey, location);
-        partitionUpsertMetadataManager.getOrCreateValidDocIndex(segmentName).checkAndAdd(location.getDocId());
-      }
+      partitionUpsertMetadataManager.handUpsert(primaryKey, location, segmentName);
     }
   }
 

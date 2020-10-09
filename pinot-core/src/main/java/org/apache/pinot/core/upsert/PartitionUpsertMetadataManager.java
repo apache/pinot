@@ -24,12 +24,16 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 /**
  * Manages the upsert metadata per partition.
  */
 @ThreadSafe
 public class PartitionUpsertMetadataManager {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PartitionUpsertMetadataManager.class);
 
   private final int _partitionId;
 
@@ -57,12 +61,8 @@ public class PartitionUpsertMetadataManager {
     return _segmentToValidDocIndexMap.get(segmentName);
   }
 
-  public synchronized ThreadSafeMutableRoaringBitmap getOrCreateValidDocIndex(String segmentName) {
+  private ThreadSafeMutableRoaringBitmap getOrCreateValidDocIndex(String segmentName) {
     return _segmentToValidDocIndexMap.computeIfAbsent(segmentName, k->new ThreadSafeMutableRoaringBitmap());
-  }
-
-  public synchronized void putRecordLocation(PrimaryKey primaryKey, RecordLocation recordLocation) {
-    _primaryKeyIndex.put(primaryKey, recordLocation);
   }
 
   public synchronized void removeUpsertMetadata(String segmentName) {
@@ -76,5 +76,28 @@ public class PartitionUpsertMetadataManager {
 
   int getPartitionId() {
     return _partitionId;
+  }
+
+  public synchronized void handUpsert(PrimaryKey primaryKey, RecordLocation location, String segmentName) {
+    if (containsKey(primaryKey)) {
+      RecordLocation prevLocation = getRecordLocation(primaryKey);
+      // upsert
+      if (location.getTimestamp() >= prevLocation.getTimestamp()) {
+        removeRecordLocation(primaryKey);
+        _primaryKeyIndex.put(primaryKey, location);
+        getValidDocIndex(prevLocation.getSegmentName())
+            .remove(prevLocation.getDocId());
+        getOrCreateValidDocIndex(segmentName).checkAndAdd(location.getDocId());
+        LOGGER.debug(String
+            .format("upsert: replace old doc id %d with %d for key: %s, hash: %d", prevLocation.getDocId(),
+                location.getDocId(), primaryKey, primaryKey.hashCode()));
+      } else {
+        LOGGER.debug(
+            String.format("upsert: ignore a late-arrived record: %s, hash: %d", primaryKey, primaryKey.hashCode()));
+      }
+    } else { // append
+      _primaryKeyIndex.put(primaryKey, location);
+      getOrCreateValidDocIndex(segmentName).checkAndAdd(location.getDocId());
+    }
   }
 }

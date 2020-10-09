@@ -32,14 +32,7 @@ public class TableUpsertMetadataManager {
   public TableUpsertMetadataManager() {
   }
 
-  public synchronized PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId) {
-    if(!_partitionMetadataManagerMap.containsKey(partitionId)) {
-      _partitionMetadataManagerMap.put(partitionId, new PartitionUpsertMetadataManager(partitionId));
-    }
-    return _partitionMetadataManagerMap.get(partitionId);
-  }
-
-  public boolean isEmpty() {
-    return _partitionMetadataManagerMap.isEmpty();
+  public PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId) {
+    return _partitionMetadataManagerMap.computeIfAbsent(partitionId, PartitionUpsertMetadataManager::new);
   }
 }

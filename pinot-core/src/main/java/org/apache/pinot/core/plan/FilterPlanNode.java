@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.plan;
 
-import com.google.common.collect.Lists;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -40,6 +40,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.predicate.Predicate;
 import org.apache.pinot.core.query.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
+import org.apache.pinot.core.segment.index.readers.ValidDocIndexReader;
 
 
 public class FilterPlanNode implements PlanNode {
@@ -58,18 +59,19 @@ public class FilterPlanNode implements PlanNode {
   @Override
   public BaseFilterOperator run() {
     FilterContext filter = _queryContext.getFilter();
+    ValidDocIndexReader validDocIndexReader = _indexSegment.getValidDocIndex();
     if (filter != null) {
       BaseFilterOperator filterOperator = constructPhysicalOperator(filter, _queryContext.getDebugOptions());
-      if (_indexSegment.getValidDocIndex() != null) {
+      if (validDocIndexReader != null) {
         BaseFilterOperator validDocFilter =
-            new BitmapBasedFilterOperator(_indexSegment.getValidDocIndex().getValidDocBitmap(), false, _numDocs);
-        return FilterOperatorUtils.getAndFilterOperator(Lists.newArrayList(filterOperator, validDocFilter), _numDocs,
+            new BitmapBasedFilterOperator(validDocIndexReader.getValidDocBitmap(), false, _numDocs);
+        return FilterOperatorUtils.getAndFilterOperator(Arrays.asList(filterOperator, validDocFilter), _numDocs,
             _queryContext.getDebugOptions());
       } else {
         return filterOperator;
       }
-    } else if (_indexSegment.getValidDocIndex() != null) {
-      return new BitmapBasedFilterOperator(_indexSegment.getValidDocIndex().getValidDocBitmap(), false, _numDocs);
+    } else if (validDocIndexReader != null) {
+      return new BitmapBasedFilterOperator(validDocIndexReader.getValidDocBitmap(), false, _numDocs);
     } else {
       return new MatchAllFilterOperator(_numDocs);
     }
