@@ -485,7 +485,6 @@ public class HelixHelper {
 
   public static Set<InstanceConfig> getBrokerInstanceConfigsForTenant(List<InstanceConfig> instanceConfigs,
       String tenant) {
-    return new HashSet<>(
-        HelixHelper.getInstancesConfigsWithTag(instanceConfigs, TagNameUtils.getBrokerTagForTenant(tenant)));
+    return new HashSet<>(getInstancesConfigsWithTag(instanceConfigs, TagNameUtils.getBrokerTagForTenant(tenant)));
   }
 }
