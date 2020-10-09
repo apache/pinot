@@ -31,13 +31,13 @@ import org.apache.pinot.core.common.MinionConstants;
 public class TaskExecutorFactoryRegistry {
   private final Map<String, PinotTaskExecutorFactory> _taskExecutorFactoryRegistry = new HashMap<>();
 
-  public TaskExecutorFactoryRegistry() {
+  public TaskExecutorFactoryRegistry(MinionTaskZkMetadataManager minionTaskZkMetadataManager) {
     registerTaskExecutorFactory(MinionConstants.ConvertToRawIndexTask.TASK_TYPE,
         new ConvertToRawIndexTaskExecutorFactory());
     registerTaskExecutorFactory(MinionConstants.PurgeTask.TASK_TYPE, new PurgeTaskExecutorFactory());
     registerTaskExecutorFactory(MinionConstants.MergeRollupTask.TASK_TYPE, new MergeRollupTaskExecutorFactory());
     registerTaskExecutorFactory(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE,
-        new RealtimeToOfflineSegmentsTaskExecutorFactory());
+        new RealtimeToOfflineSegmentsTaskExecutorFactory(minionTaskZkMetadataManager));
   }
 
   /**

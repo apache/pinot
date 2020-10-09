@@ -65,6 +65,8 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
   @Override
   public SegmentConversionResult executeTask(PinotTaskConfig pinotTaskConfig)
       throws Exception {
+    preProcess(pinotTaskConfig);
+
     String taskType = pinotTaskConfig.getTaskType();
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
@@ -135,6 +137,8 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
           convertedSegmentTarFile);
 
       LOGGER.info("Done executing {} on table: {}, segment: {}", taskType, tableNameWithType, segmentName);
+      postProcess(pinotTaskConfig);
+
       return segmentConversionResult;
     } finally {
       FileUtils.deleteQuietly(tempDataDir);

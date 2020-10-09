@@ -27,6 +27,12 @@ import org.apache.pinot.core.minion.PinotTaskConfig;
 public interface PinotTaskExecutor {
 
   /**
+   * Pre processing operations to be done at the beginning of task execution
+   */
+  default void preProcess(PinotTaskConfig pinotTaskConfig) {
+  }
+
+  /**
    * Executes the task based on the given task config and returns the execution result.
    */
   Object executeTask(PinotTaskConfig pinotTaskConfig)
@@ -36,4 +42,10 @@ public interface PinotTaskExecutor {
    * Tries to cancel the task.
    */
   void cancel();
+
+  /**
+   * Post processing operations to be done before exiting a successful task execution
+   */
+  default void postProcess(PinotTaskConfig pinotTaskConfig) {
+  }
 }

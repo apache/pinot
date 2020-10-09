@@ -67,6 +67,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
   @Override
   public List<SegmentConversionResult> executeTask(PinotTaskConfig pinotTaskConfig)
       throws Exception {
+    preProcess(pinotTaskConfig);
+
     String taskType = pinotTaskConfig.getTaskType();
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
@@ -144,6 +146,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       LOGGER
           .info("Done executing {} on table: {}, input segments: {}, output segments: {}", taskType, tableNameWithType,
               inputSegmentNames, outputSegmentNames);
+
+      postProcess(pinotTaskConfig);
 
       return segmentConversionResults;
     } finally {

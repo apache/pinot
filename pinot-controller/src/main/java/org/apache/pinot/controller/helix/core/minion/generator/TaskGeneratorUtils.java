@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.minion.generator;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -67,5 +68,27 @@ public class TaskGeneratorUtils {
       }
     }
     return runningSegments;
+  }
+
+  /**
+   * Gets all the tasks for the provided task type and tableName, which do not have TaskState COMPLETED
+   * @return map containing task name to task state for non-completed tasks
+   */
+  public static Map<String, TaskState> getNonCompletedTasks(String taskType, String tableNameWithType,
+      ClusterInfoProvider clusterInfoProvider) {
+
+    Map<String, TaskState> nonCompletedTasks = new HashMap<>();
+    Map<String, TaskState> taskStates = clusterInfoProvider.getTaskStates(taskType);
+    for (Map.Entry<String, TaskState> entry : taskStates.entrySet()) {
+      if (entry.getValue() == TaskState.COMPLETED) {
+        continue;
+      }
+      for (PinotTaskConfig pinotTaskConfig : clusterInfoProvider.getTaskConfigs(entry.getKey())) {
+        if (tableNameWithType.equals(pinotTaskConfig.getConfigs().get(MinionConstants.TABLE_NAME_KEY))) {
+          nonCompletedTasks.put(entry.getKey(), entry.getValue());
+        }
+      }
+    }
+    return nonCompletedTasks;
   }
 }
