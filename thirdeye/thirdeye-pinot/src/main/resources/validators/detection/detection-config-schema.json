@@ -54,6 +54,9 @@
     },
     "lastTimestamp": {
       "type": "number"
+    },
+    "owners": {
+      "$ref": "#/definitions/owners"
     }
   },
 
@@ -254,6 +257,14 @@
 
     "grouper": {
       "$ref": "#/definitions/genericComponent"
+    },
+
+    "owners": {
+      "type": "array",
+      "description": "service owner of this group",
+      "items": {
+        "type": "string"
+      }
     }
   },
 
