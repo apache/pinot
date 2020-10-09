@@ -425,7 +425,7 @@ public class IdSetQueriesTest extends BaseQueriesTest {
     }
 
     {
-      String query = "SELECT COUNT(*) FROM testTable where INIDSET(intColumn, '" + serializedIdSet + "') = 0";
+      String query = "SELECT COUNT(*) FROM testTable where IN_ID_SET(intColumn, '" + serializedIdSet + "') = 0";
       AggregationOperator aggregationOperator = getOperatorForPqlQuery(query);
       IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
       QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(),

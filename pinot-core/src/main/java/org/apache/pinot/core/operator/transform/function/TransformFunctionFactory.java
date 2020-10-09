@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.TransformFunctionType;
@@ -62,73 +63,73 @@ public class TransformFunctionFactory {
       new HashMap<String, Class<? extends TransformFunction>>() {
         {
           // NOTE: add all built-in transform functions here
-          put(TransformFunctionType.ADD.getName().toLowerCase(), AdditionTransformFunction.class);
-          put(TransformFunctionType.SUB.getName().toLowerCase(), SubtractionTransformFunction.class);
-          put(TransformFunctionType.MULT.getName().toLowerCase(), MultiplicationTransformFunction.class);
-          put(TransformFunctionType.DIV.getName().toLowerCase(), DivisionTransformFunction.class);
-          put(TransformFunctionType.MOD.getName().toLowerCase(), ModuloTransformFunction.class);
+          put(canonicalize(TransformFunctionType.ADD.getName().toLowerCase()), AdditionTransformFunction.class);
+          put(canonicalize(TransformFunctionType.SUB.getName().toLowerCase()), SubtractionTransformFunction.class);
+          put(canonicalize(TransformFunctionType.MULT.getName().toLowerCase()), MultiplicationTransformFunction.class);
+          put(canonicalize(TransformFunctionType.DIV.getName().toLowerCase()), DivisionTransformFunction.class);
+          put(canonicalize(TransformFunctionType.MOD.getName().toLowerCase()), ModuloTransformFunction.class);
 
-          put(TransformFunctionType.PLUS.getName().toLowerCase(), AdditionTransformFunction.class);
-          put(TransformFunctionType.MINUS.getName().toLowerCase(), SubtractionTransformFunction.class);
-          put(TransformFunctionType.TIMES.getName().toLowerCase(), MultiplicationTransformFunction.class);
-          put(TransformFunctionType.DIVIDE.getName().toLowerCase(), DivisionTransformFunction.class);
+          put(canonicalize(TransformFunctionType.PLUS.getName().toLowerCase()), AdditionTransformFunction.class);
+          put(canonicalize(TransformFunctionType.MINUS.getName().toLowerCase()), SubtractionTransformFunction.class);
+          put(canonicalize(TransformFunctionType.TIMES.getName().toLowerCase()), MultiplicationTransformFunction.class);
+          put(canonicalize(TransformFunctionType.DIVIDE.getName().toLowerCase()), DivisionTransformFunction.class);
 
-          put(TransformFunctionType.ABS.getName().toLowerCase(), AbsTransformFunction.class);
-          put(TransformFunctionType.CEIL.getName().toLowerCase(), CeilTransformFunction.class);
-          put(TransformFunctionType.EXP.getName().toLowerCase(), ExpTransformFunction.class);
-          put(TransformFunctionType.FLOOR.getName().toLowerCase(), FloorTransformFunction.class);
-          put(TransformFunctionType.LN.getName().toLowerCase(), LnTransformFunction.class);
-          put(TransformFunctionType.SQRT.getName().toLowerCase(), SqrtTransformFunction.class);
+          put(canonicalize(TransformFunctionType.ABS.getName().toLowerCase()), AbsTransformFunction.class);
+          put(canonicalize(TransformFunctionType.CEIL.getName().toLowerCase()), CeilTransformFunction.class);
+          put(canonicalize(TransformFunctionType.EXP.getName().toLowerCase()), ExpTransformFunction.class);
+          put(canonicalize(TransformFunctionType.FLOOR.getName().toLowerCase()), FloorTransformFunction.class);
+          put(canonicalize(TransformFunctionType.LN.getName().toLowerCase()), LnTransformFunction.class);
+          put(canonicalize(TransformFunctionType.SQRT.getName().toLowerCase()), SqrtTransformFunction.class);
 
-          put(TransformFunctionType.CAST.getName().toLowerCase(), CastTransformFunction.class);
-          put(TransformFunctionType.JSONEXTRACTSCALAR.getName().toLowerCase(),
+          put(canonicalize(TransformFunctionType.CAST.getName().toLowerCase()), CastTransformFunction.class);
+          put(canonicalize(TransformFunctionType.JSONEXTRACTSCALAR.getName().toLowerCase()),
               JsonExtractScalarTransformFunction.class);
-          put(TransformFunctionType.JSONEXTRACTKEY.getName().toLowerCase(), JsonExtractKeyTransformFunction.class);
-          put(TransformFunctionType.TIMECONVERT.getName().toLowerCase(), TimeConversionTransformFunction.class);
-          put(TransformFunctionType.DATETIMECONVERT.getName().toLowerCase(), DateTimeConversionTransformFunction.class);
-          put(TransformFunctionType.DATETRUNC.getName().toLowerCase(), DateTruncTransformFunction.class);
-          put(TransformFunctionType.ARRAYLENGTH.getName().toLowerCase(), ArrayLengthTransformFunction.class);
-          put(TransformFunctionType.VALUEIN.getName().toLowerCase(), ValueInTransformFunction.class);
-          put(TransformFunctionType.MAPVALUE.getName().toLowerCase(), MapValueTransformFunction.class);
-          put(TransformFunctionType.INIDSET.getName().toLowerCase(), InIdSetTransformFunction.class);
+          put(canonicalize(TransformFunctionType.JSONEXTRACTKEY.getName().toLowerCase()), JsonExtractKeyTransformFunction.class);
+          put(canonicalize(TransformFunctionType.TIMECONVERT.getName().toLowerCase()), TimeConversionTransformFunction.class);
+          put(canonicalize(TransformFunctionType.DATETIMECONVERT.getName().toLowerCase()), DateTimeConversionTransformFunction.class);
+          put(canonicalize(TransformFunctionType.DATETRUNC.getName().toLowerCase()), DateTruncTransformFunction.class);
+          put(canonicalize(TransformFunctionType.ARRAYLENGTH.getName().toLowerCase()), ArrayLengthTransformFunction.class);
+          put(canonicalize(TransformFunctionType.VALUEIN.getName().toLowerCase()), ValueInTransformFunction.class);
+          put(canonicalize(TransformFunctionType.MAPVALUE.getName().toLowerCase()), MapValueTransformFunction.class);
+          put(canonicalize(TransformFunctionType.INIDSET.getName().toLowerCase()), InIdSetTransformFunction.class);
 
           // Array functions
-          put(TransformFunctionType.ARRAYAVERAGE.getName().toLowerCase(), ArrayAverageTransformFunction.class);
-          put(TransformFunctionType.ARRAYMAX.getName().toLowerCase(), ArrayMaxTransformFunction.class);
-          put(TransformFunctionType.ARRAYMIN.getName().toLowerCase(), ArrayMinTransformFunction.class);
-          put(TransformFunctionType.ARRAYSUM.getName().toLowerCase(), ArraySumTransformFunction.class);
+          put(canonicalize(TransformFunctionType.ARRAYAVERAGE.getName().toLowerCase()), ArrayAverageTransformFunction.class);
+          put(canonicalize(TransformFunctionType.ARRAYMAX.getName().toLowerCase()), ArrayMaxTransformFunction.class);
+          put(canonicalize(TransformFunctionType.ARRAYMIN.getName().toLowerCase()), ArrayMinTransformFunction.class);
+          put(canonicalize(TransformFunctionType.ARRAYSUM.getName().toLowerCase()), ArraySumTransformFunction.class);
 
-          put(TransformFunctionType.GROOVY.getName().toLowerCase(), GroovyTransformFunction.class);
-          put(TransformFunctionType.CASE.getName().toLowerCase(), CaseTransformFunction.class);
+          put(canonicalize(TransformFunctionType.GROOVY.getName().toLowerCase()), GroovyTransformFunction.class);
+          put(canonicalize(TransformFunctionType.CASE.getName().toLowerCase()), CaseTransformFunction.class);
 
-          put(TransformFunctionType.EQUALS.getName().toLowerCase(), EqualsTransformFunction.class);
-          put(TransformFunctionType.NOT_EQUALS.getName().toLowerCase(), NotEqualsTransformFunction.class);
-          put(TransformFunctionType.GREATER_THAN.getName().toLowerCase(), GreaterThanTransformFunction.class);
-          put(TransformFunctionType.GREATER_THAN_OR_EQUAL.getName().toLowerCase(),
+          put(canonicalize(TransformFunctionType.EQUALS.getName().toLowerCase()), EqualsTransformFunction.class);
+          put(canonicalize(TransformFunctionType.NOT_EQUALS.getName().toLowerCase()), NotEqualsTransformFunction.class);
+          put(canonicalize(TransformFunctionType.GREATER_THAN.getName().toLowerCase()), GreaterThanTransformFunction.class);
+          put(canonicalize(TransformFunctionType.GREATER_THAN_OR_EQUAL.getName().toLowerCase()),
               GreaterThanOrEqualTransformFunction.class);
-          put(TransformFunctionType.LESS_THAN.getName().toLowerCase(), LessThanTransformFunction.class);
-          put(TransformFunctionType.LESS_THAN_OR_EQUAL.getName().toLowerCase(), LessThanOrEqualTransformFunction.class);
+          put(canonicalize(TransformFunctionType.LESS_THAN.getName().toLowerCase()), LessThanTransformFunction.class);
+          put(canonicalize(TransformFunctionType.LESS_THAN_OR_EQUAL.getName().toLowerCase()), LessThanOrEqualTransformFunction.class);
           // geo functions
           // geo constructors
-          put(TransformFunctionType.ST_GEOG_FROM_TEXT.getName().toLowerCase(), StGeogFromTextFunction.class);
-          put(TransformFunctionType.ST_GEOG_FROM_WKB.getName().toLowerCase(), StGeogFromWKBFunction.class);
-          put(TransformFunctionType.ST_GEOM_FROM_TEXT.getName().toLowerCase(), StGeomFromTextFunction.class);
-          put(TransformFunctionType.ST_GEOM_FROM_WKB.getName().toLowerCase(), StGeomFromWKBFunction.class);
-          put(TransformFunctionType.ST_POINT.getName().toLowerCase(), StPointFunction.class);
-          put(TransformFunctionType.ST_POLYGON.getName().toLowerCase(), StPolygonFunction.class);
+          put(canonicalize(TransformFunctionType.ST_GEOG_FROM_TEXT.getName().toLowerCase()), StGeogFromTextFunction.class);
+          put(canonicalize(TransformFunctionType.ST_GEOG_FROM_WKB.getName().toLowerCase()), StGeogFromWKBFunction.class);
+          put(canonicalize(TransformFunctionType.ST_GEOM_FROM_TEXT.getName().toLowerCase()), StGeomFromTextFunction.class);
+          put(canonicalize(TransformFunctionType.ST_GEOM_FROM_WKB.getName().toLowerCase()), StGeomFromWKBFunction.class);
+          put(canonicalize(TransformFunctionType.ST_POINT.getName().toLowerCase()), StPointFunction.class);
+          put(canonicalize(TransformFunctionType.ST_POLYGON.getName().toLowerCase()), StPolygonFunction.class);
 
           // geo measurements
-          put(TransformFunctionType.ST_AREA.getName().toLowerCase(), StAreaFunction.class);
-          put(TransformFunctionType.ST_DISTANCE.getName().toLowerCase(), StDistanceFunction.class);
-          put(TransformFunctionType.ST_GEOMETRY_TYPE.getName().toLowerCase(), StGeometryTypeFunction.class);
+          put(canonicalize(TransformFunctionType.ST_AREA.getName().toLowerCase()), StAreaFunction.class);
+          put(canonicalize(TransformFunctionType.ST_DISTANCE.getName().toLowerCase()), StDistanceFunction.class);
+          put(canonicalize(TransformFunctionType.ST_GEOMETRY_TYPE.getName().toLowerCase()), StGeometryTypeFunction.class);
 
           // geo outputs
-          put(TransformFunctionType.ST_AS_BINARY.getName().toLowerCase(), StAsBinaryFunction.class);
-          put(TransformFunctionType.ST_AS_TEXT.getName().toLowerCase(), StAsTextFunction.class);
+          put(canonicalize(TransformFunctionType.ST_AS_BINARY.getName().toLowerCase()), StAsBinaryFunction.class);
+          put(canonicalize(TransformFunctionType.ST_AS_TEXT.getName().toLowerCase()), StAsTextFunction.class);
 
           // geo relationship
-          put(TransformFunctionType.ST_CONTAINS.getName().toLowerCase(), StContainsFunction.class);
-          put(TransformFunctionType.ST_EQUALS.getName().toLowerCase(), StEqualsFunction.class);
+          put(canonicalize(TransformFunctionType.ST_CONTAINS.getName().toLowerCase()), StContainsFunction.class);
+          put(canonicalize(TransformFunctionType.ST_EQUALS.getName().toLowerCase()), StEqualsFunction.class);
         }
       };
 
@@ -148,7 +149,7 @@ public class TransformFunctionFactory {
             "Caught exception while instantiating transform function from class: " + transformFunctionClass.toString(),
             e);
       }
-      String transformFunctionName = transformFunction.getName().toLowerCase();
+      String transformFunctionName = canonicalize(transformFunction.getName());
       if (TRANSFORM_FUNCTION_MAP.containsKey(transformFunctionName)) {
         throw new IllegalArgumentException("Transform function: " + transformFunctionName + " already exists");
       }
@@ -167,7 +168,7 @@ public class TransformFunctionFactory {
     switch (expression.getType()) {
       case FUNCTION:
         FunctionContext function = expression.getFunction();
-        String functionName = function.getFunctionName();
+        String functionName = canonicalize(function.getFunctionName());
         List<ExpressionContext> arguments = function.getArguments();
         int numArguments = arguments.size();
 
@@ -209,5 +210,9 @@ public class TransformFunctionFactory {
       default:
         throw new IllegalStateException();
     }
+  }
+
+  private static String canonicalize(String functionName) {
+    return StringUtils.remove(functionName, '_').toLowerCase();
   }
 }
