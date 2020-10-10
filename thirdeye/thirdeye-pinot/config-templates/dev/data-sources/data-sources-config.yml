@@ -1,0 +1,15 @@
+
+# Please put the mock data source as the first in this configuration.
+dataSourceConfigs:
+  - className: org.apache.pinot.thirdeye.datasource.sql.SqlThirdEyeDataSource
+    properties:
+      PostgreSQL:
+        - db:
+            utk_test: jdbc:postgresql://POSTGRES_HOSTNAME:POSTGRES_PORT/POSTGRES_DATABASE
+          user: root
+          password: root
+      Druid:
+        - db:
+            druid_test: jdbc:avatica:remote:url=http://localhost:8082/druid/v2/sql/avatica/
+          user: ""
+          password: ""

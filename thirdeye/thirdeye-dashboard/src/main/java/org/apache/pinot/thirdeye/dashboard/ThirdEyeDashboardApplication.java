@@ -52,6 +52,17 @@ import org.apache.pinot.thirdeye.dashboard.resources.v2.RootCauseResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.RootCauseSessionResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.RootCauseTemplateResource;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
+import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
+import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
+import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
+import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
+import org.apache.pinot.thirdeye.datasource.sql.resources.SqlDataSourceResource;
+import org.apache.pinot.thirdeye.detection.DetectionResource;
+import org.apache.pinot.thirdeye.detection.DetectionConfigurationResource;
+import org.apache.pinot.thirdeye.detection.yaml.YamlResource;
+import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
+import org.apache.pinot.thirdeye.detector.function.AnomalyFunctionFactory;
+
 import org.apache.pinot.thirdeye.model.download.ModelDownloaderManager;
 import org.apache.pinot.thirdeye.tracking.RequestStatisticsLogger;
 import org.eclipse.jetty.servlets.CrossOriginFilter;
@@ -110,7 +121,6 @@ public class ThirdEyeDashboardApplication
     } catch (Exception e) {
       LOG.error("Exception while loading caches", e);
     }
-
 
     final JerseyEnvironment jersey = env.jersey();
     injector = Guice.createInjector(new ThirdEyeDashboardModule(config, env, DAO_REGISTRY));

@@ -18,7 +18,6 @@ package org.apache.pinot.thirdeye.datasource.sql;
 
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.HashMultimap;
-import java.util.concurrent.TimeUnit;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.constant.MetricAggFunction;
@@ -39,6 +38,8 @@ import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
+
+import java.util.concurrent.TimeUnit;
 
 
 public class TestSqlUtils {
@@ -99,7 +100,7 @@ public class TestSqlUtils {
     String timeFormat = TimeSpec.SINCE_EPOCH_FORMAT;
     TimeSpec timeSpec = new TimeSpec("date", timeGranularity, timeFormat);
     String actualSql = SqlUtils.getSql(request, this.metricFunction, HashMultimap.create(), timeSpec, this.dataset);
-    String expected = "SELECT date, country, SUM(metric) FROM table WHERE  date = 18383 GROUP BY date, country ORDER BY SUM(metric) DESC LIMIT 100";
+    String expected = "SELECT date, country, SUM(metric) AS SUM_metric FROM table WHERE  date = 18383 GROUP BY date, country ORDER BY SUM_metric DESC LIMIT 100";
     Assert.assertEquals(actualSql, expected);
   }
 
@@ -118,7 +119,7 @@ public class TestSqlUtils {
     String timeFormat = TimeSpec.SINCE_EPOCH_FORMAT;
     TimeSpec timeSpec = new TimeSpec("date", timeGranularity, timeFormat);
     String actual = SqlUtils.getSql(request, this.metricFunction, HashMultimap.create(), timeSpec, this.dataset);
-    String expected = "SELECT date, country, SUM(metric) FROM table WHERE  date = 18383 GROUP BY date, country LIMIT 100000";
+    String expected = "SELECT date, country, SUM(metric) AS SUM_metric FROM table WHERE  date = 18383 GROUP BY date, country LIMIT 100000";
     Assert.assertEquals(actual, expected);
   }
 }

@@ -1,6 +1,12 @@
 -- create alias if not exists TO_UNIXTIME as $$ long unix_timestamp(java.sql.Timestamp timestamp) { return
 -- (long) (timestamp.getTime() / 1000L); } $$;
 
+create database if not exists thirdeye;
+grant all privileges on thirdeye.* to 'thirdeye'@'%';
+flush privileges;
+
+use thirdeye;
+
 create table if not exists generic_json_entity (
     id bigint(20) primary key auto_increment,
     json_val text,
@@ -269,8 +275,8 @@ create index classification_config_name_index on classification_config_index(nam
 create index classification_config_base_id_idx ON classification_config_index(base_id);
 
 create table if not exists entity_to_entity_mapping_index (
-    from_urn varchar(256) not null,
-    to_urn varchar(256) not null,
+    from_urn varchar(500) not null,
+    to_urn varchar(500) not null,
     mapping_type varchar(500) not null,
     base_id bigint(20) not null,
     create_time timestamp,
@@ -437,27 +443,3 @@ create index rootcause_template_id_idx ON rootcause_template_index(base_id);
 create index rootcause_template_owner_idx ON rootcause_template_index(owner);
 create index rootcause_template_metric_idx on rootcause_template_index(metric_id);
 create index rootcause_template_config_application_idx ON rootcause_template_index(`application`);
-
-create table if not exists online_detection_data_index (
-    base_id bigint(20) not null,
-    dataset varchar(200),
-    metric varchar(200),
-    create_time timestamp default 0,
-    update_time timestamp default current_timestamp,
-    version int(10)
-) ENGINE=InnoDB;
-create index online_detection_data_id_idx ON online_detection_data_index(base_id);
-create index online_detection_data_dataset_idx ON online_detection_data_index(dataset);
-create index online_detection_data_metric_idx ON online_detection_data_index(metric);
-
-create table if not exists anomaly_subscription_group_notification_index (
-    base_id bigint(20) not null,
-    anomaly_id bigint(20) not null,
-    detection_config_id bigint(20) not null,
-    create_time timestamp default 0,
-    update_time timestamp default current_timestamp,
-    version int(10)
-) ENGINE=InnoDB;
-ALTER TABLE `anomaly_subscription_group_notification_index` ADD UNIQUE `anomaly_subscription_group_notification_index`(anomaly_id);
-create index anomaly_subscription_group_anomaly_idx ON anomaly_subscription_group_notification_index(anomaly_id);
-create index anomaly_subscription_group_detection_config_idx ON anomaly_subscription_group_notification_index(anomaly_id)

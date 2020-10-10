@@ -228,11 +228,12 @@ dataSourceConfigs:
             dataFile: "hourly.csv"
       PostgreSQL:
         - db:
-            utk_test: jdbc:postgresql://thirdeye_postgres:5432/thirdeye
+            utk_test: jdbc:postgresql://127.0.0.1:5432/thirdeye
           user: root
           password: root
       Druid:
         - db:
-            druid_test: jdbc:avatica:remote:url=http://localhost:8082/druid/v2/sql/avatica/
+                #druid_test: jdbc:avatica:remote:url=http://localhost:8082/druid/v2/sql/avatica/
+            druid_test: jdbc:avatica:remote:url=https://druid-router.concierge.stage.razorpay.in/druid/v2/sql/avatica/
           user: ""
           password: ""

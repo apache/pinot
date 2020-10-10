@@ -69,7 +69,7 @@ public class DetectionAlertRegistry {
    */
   private static void init() {
     try {
-      Reflections reflections = new Reflections();
+      Reflections reflections = new Reflections("org.apache.pinot.thirdeye.detection");
 
       // register alert filters
       Set<Class<? extends DetectionAlertFilter>> alertFilterClasses =

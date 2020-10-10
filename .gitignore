@@ -52,3 +52,9 @@ yarn-error.log*
 #quickstart files
 examples/
 quickstart*
+
+#Local DBs
+*.h2db.*
+thirdeye/thirdeye-pinot/config/*.h2db.*
+thirdeye/thirdeye-pinot/config/h2db.trace.db
+thirdeye/thirdeye-pinot/config/h2db.mv.db

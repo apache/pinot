@@ -27,6 +27,7 @@ import java.io.File;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.sql.Connection;
+import java.sql.SQLException;
 import javax.validation.Validation;
 import org.apache.pinot.thirdeye.datalayer.ScriptRunner;
 import org.apache.pinot.thirdeye.datalayer.ThirdEyePersistenceModule;
