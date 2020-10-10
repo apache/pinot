@@ -21,23 +21,23 @@
 
 # Superset
 
-Docker image for [Superset](https://github.com/ApacheInfra/superset) with Pinot integration.
+Docker image for [Superset](https://github.com/apache/incubator-superset) with Pinot integration.
 
 
 ## How to build
 
-Below command will build docker image and tag it as `apachepinot/pinot-superset:0.36.0`.
+Pinot Superset image is built on top of [preset/superset](https://hub.docker.com/r/preset/superset) with Pinotdb driver.
 
-You can also build directly with `docker build` command by setting arguments:
+Below command will build Superset image based on `preset/superset:0.37` then tag it as `apachepinot/pinot-superset:0.37`.
 
 ```bash
-docker build --build-arg SUPERSET_VERSION=0.36.0 --tag apachepinot/pinot-superset:0.36.0 .
+docker build --build-arg PRESET_SUPERSET_IMAGE_TAG=0.37 --tag apachepinot/pinot-superset:0.37 .
 ```
 
 ## How to push
 
 ```bash
-docker push apachepinot/pinot-superset:0.36.0
+docker push apachepinot/pinot-superset:0.37
 ```
 
 ## Configuration
