@@ -147,14 +147,16 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     File consumerDir = new File(consumerDirPath);
 
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, _tableNameWithType);
-    _upsertMode = tableConfig.getUpsertMode();
-    if (isUpsertEnabled()) {
-      if (_tableUpsertMetadataManager == null) {
-        _tableUpsertMetadataManager = new TableUpsertMetadataManager();
+    if (tableConfig != null) {
+      _upsertMode = tableConfig.getUpsertMode();
+      if (isUpsertEnabled()) {
+        if (_tableUpsertMetadataManager == null) {
+          _tableUpsertMetadataManager = new TableUpsertMetadataManager();
+        }
+        Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
+        _primaryKeyColumns = schema.getPrimaryKeyColumns();
+        _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
       }
-      Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
-      _primaryKeyColumns = schema.getPrimaryKeyColumns();
-      _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     }
 
     if (consumerDir.exists()) {
