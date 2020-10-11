@@ -89,7 +89,7 @@ public class LLRealtimeSegmentDataManagerTest {
           + "    \"schemaName\": \"UnknownSchema\", \n"
           + "    \"segmentAssignmentStrategy\": \"BalanceNumSegmentAssignmentStrategy\", \n"
           + "    \"segmentPushFrequency\": \"daily\", \n" + "    \"segmentPushType\": \"APPEND\", \n"
-          + "    \"timeColumnName\": \"minutesSinceEpoch\", \n" + "    \"timeType\": \"MINUTES\"\nSegmentPartitionLLCRealtimeClusterIntegrationTest" + "  }, \n"
+          + "    \"timeColumnName\": \"minutesSinceEpoch\", \n" + "    \"timeType\": \"MINUTES\"\n" + "  }, \n"
           + "  \"tableIndexConfig\": {\n" + "    \"invertedIndexColumns\": [" + "    ], \n"
           + "    \"lazyLoad\": \"false\", \n" + "    \"loadMode\": \"HEAP\", \n"
           + "    \"segmentFormatVersion\": null, \n" + "    \"sortedColumn\": [], \n" + "    \"streamConfigs\": {\n"
