@@ -42,10 +42,6 @@ public final class MetricFieldSpec extends FieldSpec {
     super(name, dataType, true, defaultNullValue);
   }
 
-  public MetricFieldSpec(String name, DataType dataType, int maxLength, Object defaultNullValue) {
-    super(name, dataType, true, maxLength, defaultNullValue);
-  }
-
   @JsonIgnore
   @Override
   public FieldType getFieldType() {

@@ -137,17 +137,6 @@ public class FieldSpecTest {
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
     Assert.assertEquals(fieldSpec1.getDefaultNullValue(), 1L);
 
-    // Metric field with max length and default null value.
-    fieldSpec1 = new MetricFieldSpec();
-    fieldSpec1.setName("metric");
-    fieldSpec1.setDataType(STRING);
-    fieldSpec1.setMaxLength(20000);
-    fieldSpec2 = new MetricFieldSpec("metric", STRING, 20000, null);
-    Assert.assertEquals(fieldSpec1, fieldSpec2);
-    Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
-    Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
-    Assert.assertEquals(fieldSpec1.getDefaultNullValue(), "null");
-
     // Metric field with default null value for byte column.
     fieldSpec1 = new MetricFieldSpec();
     fieldSpec1.setName("byteMetric");
