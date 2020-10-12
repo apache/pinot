@@ -14,8 +14,6 @@ jobs:
           architecture: x64
       - name: Install Base Packages
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends vim wget curl git automake bison flex g++ libboost-all-dev libevent-dev libssl-dev libtool make pkg-config nodejs 
-      - name: Install NPM
-        run: sudo npm install -g phantomjs --unsafe-perm --ignore-scripts
       - name: Build Thirdeye
         run: cd thirdeye && mvn -DskipTests -T 1C clean compile package
 
