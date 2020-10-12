@@ -40,10 +40,11 @@ RUN apt-get update \
 RUN npm install -g phantomjs --unsafe-perm --ignore-scripts
 
 RUN cd ${TE_BUILD_DIR}/thirdeye  \
-    && cd thirdeye-frontend \
-    && mvn clean install -X -DskipTests || exit 1 \
-    && cd .. \
-    && mvn clean install -X -DskipTests || exit 1 \
+    && mvn clean install -X -DskipTests -pl "\!thirdeye-dist" || exit 1 \
+    #&& cd thirdeye-frontend \
+    #&& mvn clean install -X -DskipTests || exit 1 \
+    #&& cd .. \
+    #&& mvn clean install -X -DskipTests || exit 1 \
     && mkdir -p ${TE_HOME}/config/default \
     && mkdir -p ${TE_HOME}/bin \
     && cp -rp ${TE_BUILD_DIR}/thirdeye/thirdeye-pinot/config/* ${TE_HOME}/config/default/. \
