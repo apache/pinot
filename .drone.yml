@@ -23,7 +23,7 @@ pipeline:
     image: plugins/docker
     registry: c.rzp.io
     repo: c.rzp.io/razorpay/thirdeye
-    dockerfile: Dockerfile.thirdeye_rzp
+    dockerfile: Dockerfile.jdk14
     build_args:
       - GIT_COMMIT_HASH=${DRONE_COMMIT_SHA}
       - GIT_TOKEN
