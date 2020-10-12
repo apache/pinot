@@ -334,7 +334,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       Preconditions.checkArgument(timeValue instanceof Comparable, "time column shall be comparable");
       long timestamp = IngestionUtils.extractTimeValue((Comparable) timeValue);
       RecordLocation location = new RecordLocation(segmentName, docId, timestamp);
-      partitionUpsertMetadataManager.handUpsert(primaryKey, location, segmentName);
+      partitionUpsertMetadataManager.handleUpsert(primaryKey, location, segmentName);
     }
   }
 

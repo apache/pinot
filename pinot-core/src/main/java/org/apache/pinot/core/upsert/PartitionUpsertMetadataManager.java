@@ -37,6 +37,7 @@ public class PartitionUpsertMetadataManager {
 
   private final int _partitionId;
 
+  // TODO(upset): consider an off-heap KV store to persist this index to improve the recovery speed.
   private final ConcurrentHashMap<PrimaryKey, RecordLocation> _primaryKeyIndex = new ConcurrentHashMap<>();
   // the mapping between the (sealed) segment and its validDocuments
   private final ConcurrentHashMap<String, ThreadSafeMutableRoaringBitmap> _segmentToValidDocIndexMap = new ConcurrentHashMap<>();
@@ -78,22 +79,22 @@ public class PartitionUpsertMetadataManager {
     return _partitionId;
   }
 
-  public synchronized void handUpsert(PrimaryKey primaryKey, RecordLocation location, String segmentName) {
+  public synchronized void handleUpsert(PrimaryKey primaryKey, RecordLocation location, String segmentName) {
     if (containsKey(primaryKey)) {
       RecordLocation prevLocation = getRecordLocation(primaryKey);
       // upsert
       if (location.getTimestamp() >= prevLocation.getTimestamp()) {
         removeRecordLocation(primaryKey);
         _primaryKeyIndex.put(primaryKey, location);
-        getValidDocIndex(prevLocation.getSegmentName())
-            .remove(prevLocation.getDocId());
+        ThreadSafeMutableRoaringBitmap validDocIndex = getValidDocIndex(prevLocation.getSegmentName());
+        if (validDocIndex != null) {
+          validDocIndex.remove(prevLocation.getDocId());
+        }
         getOrCreateValidDocIndex(segmentName).checkAndAdd(location.getDocId());
-        LOGGER.debug(String
-            .format("upsert: replace old doc id %d with %d for key: %s, hash: %d", prevLocation.getDocId(),
-                location.getDocId(), primaryKey, primaryKey.hashCode()));
+        LOGGER.debug("upsert: replace old doc id {} with %d for key: {}, hash: {}", prevLocation.getDocId(),
+            location.getDocId(), primaryKey, primaryKey.hashCode());
       } else {
-        LOGGER.debug(
-            String.format("upsert: ignore a late-arrived record: %s, hash: %d", primaryKey, primaryKey.hashCode()));
+        LOGGER.debug("upsert: ignore a late-arrived record: {}, hash: {}", primaryKey, primaryKey.hashCode());
       }
     } else { // append
       _primaryKeyIndex.put(primaryKey, location);
