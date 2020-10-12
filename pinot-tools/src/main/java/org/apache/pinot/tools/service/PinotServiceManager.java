@@ -54,18 +54,19 @@ public class PinotServiceManager {
   private final String _clusterName;
   private final int _port;
   private final String _instanceId;
+  private final boolean _healthCheckAllComponents;
   private PinotServiceManagerAdminApiApplication _pinotServiceManagerAdminApplication;
   private boolean _isStarted = false;
 
   public PinotServiceManager(String zkAddress, String clusterName) {
-    this(zkAddress, clusterName, 0);
+    this(zkAddress, clusterName, 0, false);
   }
 
-  public PinotServiceManager(String zkAddress, String clusterName, int port) {
-    this(zkAddress, clusterName, null, port);
+  public PinotServiceManager(String zkAddress, String clusterName, int port, boolean healthCheckAllComponents) {
+    this(zkAddress, clusterName, null, port, healthCheckAllComponents);
   }
 
-  public PinotServiceManager(String zkAddress, String clusterName, String hostname, int port) {
+  public PinotServiceManager(String zkAddress, String clusterName, String hostname, int port, boolean healthCheckAllComponents) {
     _zkAddress = zkAddress;
     _clusterName = clusterName;
     if (port == 0) {
@@ -76,10 +77,11 @@ public class PinotServiceManager {
       hostname = NetUtil.getHostnameOrAddress();
     }
     _instanceId = String.format("ServiceManager_%s_%d", hostname, port);
+    _healthCheckAllComponents = healthCheckAllComponents;
   }
 
   public static void main(String[] args) {
-    PinotServiceManager pinotServiceManager = new PinotServiceManager("localhost:2181", "pinot-demo", 8085);
+    PinotServiceManager pinotServiceManager = new PinotServiceManager("localhost:2181", "pinot-demo", 8085, false);
     pinotServiceManager.start();
   }
 
@@ -227,5 +229,9 @@ public class PinotServiceManager {
 
   public boolean stopPinotInstanceById(String instanceName) {
     return stopPinotInstance(_runningInstanceMap.get(instanceName));
+  }
+
+  public boolean isHealthCheckAllComponents() {
+    return _healthCheckAllComponents;
   }
 }

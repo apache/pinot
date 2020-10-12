@@ -25,6 +25,7 @@ import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import java.util.Map;
+import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -33,11 +34,15 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.tools.service.PinotServiceManager;
 
 
 @Api(tags = "Health")
 @Path("/")
 public class PinotServiceManagerHealthCheck {
+
+  @Inject
+  private PinotServiceManager _pinotServiceManager;
 
   @GET
   @Produces(MediaType.TEXT_PLAIN)
@@ -45,6 +50,16 @@ public class PinotServiceManagerHealthCheck {
   @ApiOperation(value = "Checking Pinot Service health")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Pinot Starter is healthy"), @ApiResponse(code = 503, message = "Pinot Starter is not healthy")})
   public String getStarterHealth() {
+    if (_pinotServiceManager.isHealthCheckAllComponents()) {
+      Map<String, Map<String, String>> serviceStatusMap = ServiceStatus.getServiceStatusMap();
+      for (String instanceName : serviceStatusMap.keySet()) {
+        ServiceStatus.Status status = ServiceStatus.getServiceStatus(instanceName);
+        if (status != ServiceStatus.Status.GOOD) {
+          throw new WebApplicationException(String.format("Pinot instance [ %s ] status is [ %s ]", instanceName, status),
+              Response.Status.SERVICE_UNAVAILABLE);
+        }
+      }
+    }
     ServiceStatus.Status status = ServiceStatus.getServiceStatus();
     if (status == ServiceStatus.Status.GOOD) {
       return "OK";

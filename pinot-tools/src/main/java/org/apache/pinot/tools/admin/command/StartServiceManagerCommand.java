@@ -69,6 +69,8 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
   private String _clusterName = DEFAULT_CLUSTER_NAME;
   @Option(name = "-port", required = true, metaVar = "<int>", usage = "Pinot service manager admin port, -1 means disable, 0 means a random available port.")
   private int _port;
+  @Option(name = "-healthCheckAllComponents", metaVar = "<boolean>", usage = "Pinot service manager health check returns the all components health check. The health check returns OK when all the components are returning OK.")
+  private boolean _healthCheckAllComponents;
   @Option(name = "-bootstrapConfigPaths", handler = StringArrayOptionHandler.class, required = false, usage = "A list of Pinot service config file paths. Each config file requires an extra config: 'pinot.service.role' to indicate which service to start.", forbids = {"-bootstrapServices"})
   private String[] _bootstrapConfigPaths;
   @Option(name = "-bootstrapServices", handler = StringArrayOptionHandler.class, required = false, usage = "A list of Pinot service roles to start with default config. E.g. CONTROLLER/BROKER/SERVER", forbids = {"-bootstrapConfigPaths"})
@@ -195,7 +197,7 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
   }
 
   private String startServiceManager() {
-    _pinotServiceManager = new PinotServiceManager(_zkAddress, _clusterName, _port);
+    _pinotServiceManager = new PinotServiceManager(_zkAddress, _clusterName, _port, _healthCheckAllComponents);
     _pinotServiceManager.start();
     return _pinotServiceManager.getInstanceId();
   }
@@ -302,5 +304,13 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
     config.put(PINOT_SERVICE_ROLE, role.toString()); // Ensure config has role key
     _bootstrapConfigurations.add(new SimpleImmutableEntry<>(role, config));
     return this;
+  }
+
+  public boolean isHealthCheckAllComponents() {
+    return _healthCheckAllComponents;
+  }
+
+  public void setHealthCheckAllComponents(boolean healthCheckAllComponents) {
+    _healthCheckAllComponents = healthCheckAllComponents;
   }
 }
