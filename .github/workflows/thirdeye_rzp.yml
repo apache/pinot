@@ -1,0 +1,21 @@
+name: Thirdeye RZP Builder
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up JDK 1.14
+        uses: actions/setup-java@v1
+        with:
+          java-version: '14.0.2'
+          architecture: x64
+      - name: Install Base Packages
+        run: apt-get update && apt-get install -y --no-install-recommends vim wget curl git automake bison flex g++ libboost-all-dev libevent-dev libssl-dev libtool make pkg-config nodejs 
+      - name: Install NPM
+        run: npm install -g phantomjs --unsafe-perm --ignore-scripts
+      - name: Build Thirdeye
+        run: cd thirdeye && mvn -DskipTests -T 1C clean compile package
+
