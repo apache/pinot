@@ -73,12 +73,15 @@ public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
    * Returns whether the object is an Avro GenericRecord.
    */
   @Override
-  protected boolean isInstanceOfRecord(Object value) {
+  protected boolean isRecord(Object value) {
     return value instanceof GenericRecord;
   }
 
   /**
    * Handles the conversion of every field of the Avro GenericRecord.
+   *
+   * @param value should be verified to be a GenericRecord type prior to calling this method as it will be casted
+   *              without checking
    */
   @Override
   @Nullable

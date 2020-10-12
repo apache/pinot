@@ -43,11 +43,11 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
   @Nullable
   public Object convert(Object value) {
     Object convertedValue;
-    if (isInstanceOfMultiValue(value)) {
+    if (isMultiValue(value)) {
       convertedValue = convertMultiValue(value);
-    } else if (isInstanceOfMap(value)) {
+    } else if (isMap(value)) {
       convertedValue = convertMap(value);
-    } else if (isInstanceOfRecord(value)) {
+    } else if (isRecord(value)) {
       convertedValue = convertRecord(value);
     } else {
       convertedValue = convertSingleValue(value);
@@ -56,10 +56,10 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
   }
 
   /**
-   * Returns whether the object is an instance of the data format's base type. Override this method if the extractor
+   * Returns whether the object is of the data format's base type. Override this method if the extractor
    * can handle the conversion of nested record types.
    */
-  protected boolean isInstanceOfRecord(Object value) {
+  protected boolean isRecord(Object value) {
     return false;
   }
 
@@ -67,7 +67,7 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
    * Returns whether the object is of a multi-value type. Override this method if the data format represents
    * multi-value objects differently.
    */
-  protected boolean isInstanceOfMultiValue(Object value) {
+  protected boolean isMultiValue(Object value) {
     return value instanceof Collection;
   }
 
@@ -75,13 +75,16 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
    * Returns whether the object is of a map type. Override this method if the data format represents map objects
    * differently.
    */
-  protected boolean isInstanceOfMap(Object value) {
+  protected boolean isMap(Object value) {
     return value instanceof Map;
   }
 
   /**
    * Handles the conversion of every field of the object for the particular data format. Override this method if the
    * extractor can convert nested record types.
+   *
+   * @param value should be verified to be a record type prior to calling this method as it will be handled with this
+   *              assumption
    */
   @Nullable
   protected Object convertRecord(Object value) {
@@ -94,6 +97,9 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
    *
    * This implementation converts the Collection to an Object array. Override this method if the data format
    * requires a different conversion for its multi-value objects.
+   *
+   * @param value should be verified to be a Collection type prior to calling this method as it will be casted
+   *              to a Collection without checking
    */
   @Nullable
   protected Object convertMultiValue(Object value) {
@@ -128,35 +134,45 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
    * Handles the conversion of every value of the map. Note that map keys will be handled as a single-value type.
    * Returns {@code null} if the field value is {@code null}. This should be overridden if the data format requires
    * a different conversion for map values.
+   *
+   * @param value should be verified to be a Map type prior to calling this method as it will be casted to a Map
+   *              without checking
    */
   @Nullable
   protected Object convertMap(Object value) {
-    Map map = (Map) value;
+    Map<Object, Object> map = (Map) value;
     if (map.isEmpty()) {
       return null;
     }
 
     Map<Object, Object> convertedMap = new HashMap<>();
-    for (Object key : map.keySet()) {
-      Object convertedValue = null;
-      if (key != null) {
-        convertedValue = convert(map.get(key));
+    for (Map.Entry<Object, Object> entry : map.entrySet()) {
+      Object mapKey = entry.getKey();
+      Object mapValue = entry.getValue();
+      if (mapKey != null) {
+        Object convertedMapValue = null;
+        if (mapValue != null) {
+          convertedMapValue = convert(mapValue);
+        }
+
+        if (convertedMapValue != null) {
+          convertedMap.put(convertSingleValue(entry.getKey()), convertedMapValue);
+        }
       }
-      convertedMap.put(convertSingleValue(key), convertedValue);
     }
+
+    if (convertedMap.isEmpty()) {
+      return null;
+    }
+
     return convertedMap;
   }
 
   /**
    * Converts single value types. This should be overridden if the data format requires
-   * a different conversion for its single values. Returns {@code null} for {@code null} input values.
+   * a different conversion for its single values.
    */
-  @Nullable
-  protected Object convertSingleValue(@Nullable Object value) {
-    if (value == null) {
-      return null;
-    }
-
+  protected Object convertSingleValue(Object value) {
     if (value instanceof ByteBuffer) {
       ByteBuffer byteBufferValue = (ByteBuffer) value;
 

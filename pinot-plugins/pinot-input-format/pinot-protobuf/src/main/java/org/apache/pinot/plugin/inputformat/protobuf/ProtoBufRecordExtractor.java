@@ -77,7 +77,7 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
    * Returns whether the object is a ProtoBuf Message.
    */
   @Override
-  protected boolean isInstanceOfRecord(Object value) {
+  protected boolean isRecord(Object value) {
     return ((ProtoBufFieldInfo) value).getFieldValue() instanceof Message;
   }
 
@@ -85,7 +85,7 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
    * Returns whether the field is a multi-value type.
    */
   @Override
-  protected boolean isInstanceOfMultiValue(Object value) {
+  protected boolean isMultiValue(Object value) {
     ProtoBufFieldInfo protoBufFieldInfo = (ProtoBufFieldInfo) value;
     return protoBufFieldInfo.getFieldValue() instanceof Collection
         && !protoBufFieldInfo.getFieldDescriptor().isMapField();
@@ -95,7 +95,7 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
    * Returns whether the field is a map type.
    */
   @Override
-  protected boolean isInstanceOfMap(Object value) {
+  protected boolean isMap(Object value) {
     ProtoBufFieldInfo protoBufFieldInfo = (ProtoBufFieldInfo) value;
     return protoBufFieldInfo.getFieldValue() instanceof Collection
         && protoBufFieldInfo.getFieldDescriptor().isMapField();
@@ -103,6 +103,9 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
 
   /**
    * Handles the conversion of every value in the ProtoBuf map.
+   *
+   * @param value should be verified to contain a ProtoBuf map prior to calling this method as it will be handled
+   *              as a map field without checking
    */
   @Override
   @Nullable
@@ -121,20 +124,30 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
     Descriptors.FieldDescriptor valueFieldDescriptor = fieldDescriptors.get(1);
     Map<Object, Object> convertedMap = new HashMap<>();
     for (Message message : messages) {
+      Object fieldKey = message.getField(keyFieldDescriptor);
       Object fieldValue = message.getField(valueFieldDescriptor);
-      if (fieldValue != null) {
-        fieldValue = convert(new ProtoBufFieldInfo(fieldValue, valueFieldDescriptor));
+      if (fieldKey != null) {
+        Object convertedFieldValue = null;
+        if (fieldValue != null) {
+          convertedFieldValue = convert(new ProtoBufFieldInfo(fieldValue, valueFieldDescriptor));
+        }
+
+        if (convertedFieldValue != null) {
+          convertedMap.put(
+              convertSingleValue(new ProtoBufFieldInfo(fieldKey, keyFieldDescriptor)),
+              convertedFieldValue
+          );
+        }
       }
-      convertedMap.put(
-          convertSingleValue(new ProtoBufFieldInfo(message.getField(keyFieldDescriptor), keyFieldDescriptor)),
-          fieldValue
-      );
     }
     return convertedMap;
   }
 
   /**
    * Handles the conversion of each value of the Protobuf collection. Converts the Collection to an Object array.
+   *
+   * @param value should be verified to contain a ProtoBuf collection prior to calling this method as it will
+   *              be handled as a collection field without checking
    */
   @Override
   @Nullable
@@ -172,12 +185,8 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
    * Handles conversion of ProtoBuf single values.
    */
   @Override
-  @Nullable
   protected Object convertSingleValue(Object value) {
     Object fieldValue = ((ProtoBufFieldInfo) value).getFieldValue();
-    if (fieldValue == null) {
-      return null;
-    }
 
     if (fieldValue instanceof ByteString) {
       return ((ByteString) fieldValue).toByteArray();
@@ -189,6 +198,9 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
 
   /**
    * Handles conversion of ProtoBuf {@link Message} types
+   *
+   * @param value should be verified to contain a ProtoBuf Message prior to calling this method as it will be
+   *              handled as a Message without checking
    */
   @Override
   @Nullable

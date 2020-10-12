@@ -79,12 +79,15 @@ public class ThriftRecordExtractor extends BaseRecordExtractor<TBase> {
    * Returns whether the object is a Thrift object.
    */
   @Override
-  protected boolean isInstanceOfRecord(Object value) {
+  protected boolean isRecord(Object value) {
     return value instanceof TBase;
   }
 
   /**
    * Handles the conversion of each field of a Thrift object.
+   *
+   * @param value should be verified to be a Thrift TBase type prior to calling this method as it will be casted
+   *              without checking
    */
   @Override
   protected Object convertRecord(Object value) {

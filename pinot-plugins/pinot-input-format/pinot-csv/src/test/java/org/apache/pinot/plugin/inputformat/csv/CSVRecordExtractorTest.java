@@ -101,9 +101,4 @@ public class CSVRecordExtractorTest extends AbstractRecordExtractorTest {
       }
     }
   }
-
-  @Override
-  protected boolean testExtractAll() {
-    return true;
-  }
 }

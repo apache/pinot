@@ -90,11 +90,6 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
     }
   }
 
-  @Override
-  protected boolean testExtractAll() {
-    return true;
-  }
-
   @Test
   public void testDataTypeReturnFromAvroRecordExtractor()
       throws IOException {

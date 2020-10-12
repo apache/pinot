@@ -370,9 +370,4 @@ public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
     struct.put(fieldName3, value3);
     return struct;
   }
-
-  @Override
-  protected boolean testExtractAll() {
-    return true;
-  }
 }

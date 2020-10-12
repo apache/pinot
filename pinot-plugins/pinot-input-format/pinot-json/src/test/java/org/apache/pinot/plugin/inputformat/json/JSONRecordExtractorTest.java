@@ -93,11 +93,6 @@ public class JSONRecordExtractorTest extends AbstractRecordExtractorTest {
     }
   }
 
-  @Override
-  protected boolean testExtractAll() {
-    return true;
-  }
-
   private Map<String, Object> createRecord1() {
     Map<String, Object> record = new HashMap<>();
     record.put(NULL_FIELD, null);

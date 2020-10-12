@@ -200,9 +200,4 @@ public class ProtoBufRecordExtractorTest extends AbstractRecordExtractorTest {
     config.setDescriptorFile(descriptorFile);
     return config;
   }
-
-  @Override
-  protected boolean testExtractAll() {
-    return true;
-  }
 }

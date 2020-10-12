@@ -212,9 +212,4 @@ public class ThriftRecordExtractorTest extends AbstractRecordExtractorTest {
     nestedRecord.setNestedIntField(intField);
     return nestedRecord;
   }
-
-  @Override
-  protected boolean testExtractAll() {
-    return true;
-  }
 }
