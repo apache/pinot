@@ -47,16 +47,20 @@ jobs:
         with:
           java-version: '14.0.2'
           architecture: x64
+      - name: Cache Maven packages
+        uses: actions/cache@v2
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
       - name: Install Base Packages
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends vim wget curl git automake bison flex g++ libboost-all-dev libevent-dev libssl-dev libtool make pkg-config nodejs 
       - name: Build Thirdeye
         run: cd thirdeye && mvn -DskipTests -T 1C clean compile package || exit 1 && cd ..
-      - name: List Files
-        run: ls -lR thirdeye/thirdeye-pinot/target/ && ls -lR thirdeye/thirdeye-pinot/ && ls -lR dockerconf/
       - name: Docker Push
         uses: docker/build-push-action@v1
         with:
-          dockerfile: Dockerfile.github_actions
+          dockerfile: docker/images/pinot-thirdeye/Dockerfile.java14
           registry: c.rzp.io
           repository: razorpay/thirdeye
           username: ${{ secrets.HARBOR_DOCKER_USERNAME }}
