@@ -51,12 +51,15 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends vim wget curl git automake bison flex g++ libboost-all-dev libevent-dev libssl-dev libtool make pkg-config nodejs 
       - name: Build Thirdeye
         run: cd thirdeye && mvn -DskipTests -T 1C clean compile package || exit 1 && cd ..
+      - name: List Files
+        run: ls -lR thirdeye/thirdeye-pinot/target/ && ls -lR thirdeye/thirdeye-pinot/ && ls -lR dockerconf/
       - name: Docker Push
         uses: docker/build-push-action@v1
-        dockerfile: Dockerfile.github_actions
-        registry: c.rzp.io
-        repository: razorpay/thirdeye
-        username: ${{ secrets.HARBOR_DOCKER_USERNAME }}
-        password: ${{ secrets.HARBOR_DOCKER_PASSWORD }}
-        tags: ${{ github.sha }}
+        with:
+          dockerfile: Dockerfile.github_actions
+          registry: c.rzp.io
+          repository: razorpay/thirdeye
+          username: ${{ secrets.HARBOR_DOCKER_USERNAME }}
+          password: ${{ secrets.HARBOR_DOCKER_PASSWORD }}
+          tags: ${{ github.sha }}
 

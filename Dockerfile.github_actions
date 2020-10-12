@@ -21,18 +21,15 @@ FROM openjdk:14-alpine
 
 LABEL MAINTAINER=observability@razorpay.com
 
-ENV TE_GITHUB_SRC_DIR=/home/runner/work/incubator-pinot/incubator-pinot
+ENV TE_GITHUB_SRC_DIR=.
 
 ENV TE_HOME=/opt/thirdeye
 
 RUN mkdir -p ${TE_HOME}/bin && mkdir -p ${TE_HOME}/config/default
 
-COPY ${TE_GITHUB_SRC_DIR}/thirdeye/thirdeye-pinot/target/thirdeye-pinot-*SNAPSHOT.jar ${TE_HOME}/bin/
+COPY ${TE_GITHUB_SRC_DIR}/thirdeye/thirdeye-pinot/target/thirdeye-pinot-1.0.0-SNAPSHOT.jar ${TE_HOME}/bin/thirdeye-pinot-1.0.0-SNAPSHOT.jar
 COPY ${TE_GITHUB_SRC_DIR}/thirdeye/thirdeye-pinot/jmx_prometheus_javaagent-0.13.0.jar ${TE_HOME}/bin/jmx_prometheus_javaagent-0.13.0.jar
-COPY ${TE_GITHUB_SRC_DIR}/dockerconf/entrypoint.sh ${TE_HOME}/bin
-
-## Remove below after testing
-RUN ls -lR ${TE_HOME}/
+COPY ${TE_GITHUB_SRC_DIR}/dockerconf/entrypoint.sh ${TE_HOME}/bin/entrypoint.sh
 
 EXPOSE 1426 1427
 WORKDIR ${TE_HOME}
