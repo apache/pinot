@@ -29,6 +29,7 @@ import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.server.starter.helix.HelixServerStarter;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.services.ServiceRole;
@@ -56,6 +57,11 @@ public class PinotServiceManager {
   private final String _instanceId;
   private PinotServiceManagerAdminApiApplication _pinotServiceManagerAdminApplication;
   private boolean _isStarted = false;
+  /**
+   * {@code null} if a {@link ServiceRole#CONTROLLER} was not started or {@link
+   * ControllerConf.ControllerMode#HELIX_ONLY}
+   */
+  private PinotHelixResourceManager _helixResourceManager;
 
   public PinotServiceManager(String zkAddress, String clusterName) {
     this(zkAddress, clusterName, 0);
@@ -113,6 +119,7 @@ public class PinotServiceManager {
     }
     ControllerStarter controllerStarter = new ControllerStarter(controllerConf);
     controllerStarter.start();
+    _helixResourceManager = controllerStarter.getHelixResourceManager();
     String instanceId = controllerStarter.getInstanceId();
     _runningInstanceMap.put(instanceId, controllerStarter);
     LOGGER.info("Pinot Controller instance [{}] is Started...", instanceId);
@@ -144,7 +151,11 @@ public class PinotServiceManager {
 
   public String addTable(PinotConfiguration addTableConf)
       throws Exception {
-    AddTableStarter addTableStarter = new AddTableStarter(addTableConf);
+    if (_helixResourceManager == null) {
+      throw new RuntimeException("Cannot add a table without a reference to Helix.\n"
+          + "This is typically present when a CONTROLLER role is started.");
+    }
+    AddTableStarter addTableStarter = new AddTableStarter(addTableConf, _helixResourceManager);
     addTableStarter.start();
 
     String instanceId = addTableStarter.getInstanceId();

@@ -34,15 +34,16 @@ class AddTableStarter implements ServiceStartable {
   private static final Logger LOGGER = LoggerFactory.getLogger(AddTableStarter.class);
 
   private final PinotConfiguration _config;
+  private final PinotHelixResourceManager _helixResourceManager;
   private final String _instanceId;
   private final Schema _schema;
   private final TableConfig _tableConfig;
   private final String _tableNameWithType;
 
-  PinotHelixResourceManager _helixResourceManager; // TODO: how to get this?
-
-  public AddTableStarter(PinotConfiguration config) throws Exception {
+  public AddTableStarter(PinotConfiguration config, PinotHelixResourceManager helixResourceManager)
+      throws Exception {
     _config = config;
+    _helixResourceManager = helixResourceManager;
 
     _schema = readJsonFromFileProperty(config, "addTable.schemaFile", Schema.class);
     _tableConfig = readJsonFromFileProperty(config, "addTable.tableConfigFile", TableConfig.class);
