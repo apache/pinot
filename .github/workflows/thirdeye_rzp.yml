@@ -13,9 +13,9 @@ jobs:
           java-version: '14.0.2'
           architecture: x64
       - name: Install Base Packages
-        run: apt-get update && apt-get install -y --no-install-recommends vim wget curl git automake bison flex g++ libboost-all-dev libevent-dev libssl-dev libtool make pkg-config nodejs 
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends vim wget curl git automake bison flex g++ libboost-all-dev libevent-dev libssl-dev libtool make pkg-config nodejs 
       - name: Install NPM
-        run: npm install -g phantomjs --unsafe-perm --ignore-scripts
+        run: sudo npm install -g phantomjs --unsafe-perm --ignore-scripts
       - name: Build Thirdeye
         run: cd thirdeye && mvn -DskipTests -T 1C clean compile package
 
