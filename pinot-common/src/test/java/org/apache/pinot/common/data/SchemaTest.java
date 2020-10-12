@@ -89,7 +89,6 @@ public class SchemaTest {
         .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, defaultString)
         .addMultiValueDimension("mvDimensionWithMaxLength", FieldSpec.DataType.STRING, 20000, null)
         .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
-        .addMetric("metricWithMaxLength", FieldSpec.DataType.INT, 20000, null)
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "time"), null)
         .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
         .setPrimaryKeyColumns(Lists.newArrayList("svDimension")).build();
@@ -159,15 +158,6 @@ public class SchemaTest {
     Assert.assertEquals(metricFieldSpec.getDataType(), FieldSpec.DataType.INT);
     Assert.assertTrue(metricFieldSpec.isSingleValueField());
     Assert.assertEquals(metricFieldSpec.getDefaultNullValue(), 5);
-
-    metricFieldSpec = schema.getMetricSpec("metricWithMaxLength");
-    Assert.assertNotNull(metricFieldSpec);
-    Assert.assertEquals(metricFieldSpec.getFieldType(), FieldSpec.FieldType.METRIC);
-    Assert.assertEquals(metricFieldSpec.getName(), "metricWithMaxLength");
-    Assert.assertEquals(metricFieldSpec.getDataType(), FieldSpec.DataType.INT);
-    Assert.assertTrue(metricFieldSpec.isSingleValueField());
-    Assert.assertEquals(metricFieldSpec.getMaxLength(), 20000);
-    Assert.assertEquals(metricFieldSpec.getDefaultNullValue(), 0);
 
     TimeFieldSpec timeFieldSpec = schema.getTimeFieldSpec();
     Assert.assertNotNull(timeFieldSpec);

@@ -44,6 +44,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.data.FieldSpec.DataType.STRING;
+
 
 /**
  * The <code>Schema</code> class is defined for each table to describe the details of the table's fields (columns).
@@ -504,6 +506,7 @@ public final class Schema {
      */
     public SchemaBuilder addSingleValueDimension(String dimensionName, DataType dataType, int maxLength,
         Object defaultNullValue) {
+      Preconditions.checkArgument(dataType == STRING, "The maxLength field only applies to STRING field right now");
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, true, maxLength, defaultNullValue));
       return this;
     }
@@ -520,6 +523,7 @@ public final class Schema {
      * Add multi value dimensionFieldSpec with defaultNullValue
      */
     public SchemaBuilder addMultiValueDimension(String dimensionName, DataType dataType, Object defaultNullValue) {
+      Preconditions.checkArgument(dataType == STRING, "The maxLength field only applies to STRING field right now");
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, false, defaultNullValue));
       return this;
     }
@@ -553,6 +557,7 @@ public final class Schema {
      * Add metricFieldSpec with defaultNullValue
      */
     public SchemaBuilder addMetric(String metricName, DataType dataType, int maxLength, Object defaultNullValue) {
+      Preconditions.checkArgument(dataType == STRING, "The maxLength field only applies to STRING field right now");
       _schema.addField(new MetricFieldSpec(metricName, dataType, maxLength, defaultNullValue));
       return this;
     }

@@ -89,6 +89,7 @@ public class FieldSpecTest {
     Assert.assertEquals(fieldSpec1, fieldSpec2);
     Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
+    Assert.assertEquals(fieldSpec1.getDefaultNullValue(), "null");
 
     // Multi-value dimension field.
     fieldSpec1 = new DimensionFieldSpec();
@@ -116,15 +117,14 @@ public class FieldSpecTest {
     // Multi-value dimension field with max length and default null value.
     fieldSpec1 = new DimensionFieldSpec();
     fieldSpec1.setName("mvDimension");
-    fieldSpec1.setDataType(FLOAT);
+    fieldSpec1.setDataType(STRING);
     fieldSpec1.setSingleValueField(false);
     fieldSpec1.setMaxLength(20000);
-    fieldSpec1.setDefaultNullValue(-0.1);
-    fieldSpec2 = new DimensionFieldSpec("mvDimension", FLOAT, false, 20000, -0.1);
+    fieldSpec2 = new DimensionFieldSpec("mvDimension", STRING, false, 20000, null);
     Assert.assertEquals(fieldSpec1, fieldSpec2);
     Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
-    Assert.assertEquals(fieldSpec1.getDefaultNullValue(), -0.1F);
+    Assert.assertEquals(fieldSpec1.getDefaultNullValue(), "null");
 
     // Metric field with default null value.
     fieldSpec1 = new MetricFieldSpec();
@@ -140,14 +140,13 @@ public class FieldSpecTest {
     // Metric field with max length and default null value.
     fieldSpec1 = new MetricFieldSpec();
     fieldSpec1.setName("metric");
-    fieldSpec1.setDataType(LONG);
+    fieldSpec1.setDataType(STRING);
     fieldSpec1.setMaxLength(20000);
-    fieldSpec1.setDefaultNullValue(1);
-    fieldSpec2 = new MetricFieldSpec("metric", LONG, 20000, 1);
+    fieldSpec2 = new MetricFieldSpec("metric", STRING, 20000, null);
     Assert.assertEquals(fieldSpec1, fieldSpec2);
     Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
-    Assert.assertEquals(fieldSpec1.getDefaultNullValue(), 1L);
+    Assert.assertEquals(fieldSpec1.getDefaultNullValue(), "null");
 
     // Metric field with default null value for byte column.
     fieldSpec1 = new MetricFieldSpec();
