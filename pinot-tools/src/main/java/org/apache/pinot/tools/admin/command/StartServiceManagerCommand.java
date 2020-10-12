@@ -222,7 +222,8 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
   private boolean startBootstrapServices() {
     if (_bootstrapConfigurations.isEmpty()) return true;
 
-    List<Entry<ServiceRole, Map<String, Object>>> parallelConfigs = new ArrayList<>();
+    List<Entry<ServiceRole, Map<String, Object>>> parallelServices = new ArrayList<>();
+    List<Entry<ServiceRole, Map<String, Object>>> parallelAddTables = new ArrayList<>();
 
     // Start controller(s) synchronously so that other services don't fail
     //
@@ -234,12 +235,21 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
             () -> _pinotServiceManager.startRole(ServiceRole.CONTROLLER, roleToConfig.getValue()))) {
           return false;
         }
-      } else {
-        parallelConfigs.add(roleToConfig);
+      } else if (roleToConfig.getKey() == ServiceRole.ADD_TABLE) {
+        parallelAddTables.add(roleToConfig);
+      }else {
+        parallelServices.add(roleToConfig);
       }
     }
 
-    return startBootstrapServicesInParallel(_pinotServiceManager, parallelConfigs);
+    return startBootstrapServicesInParallel(_pinotServiceManager, parallelServices) &&
+        // To add a table, we have to wait until the broker registered with the controller else
+        // InvalidTableConfigException: Failed to find instances with tag: DefaultTenant_BROKER
+        //
+        // This attempts simply to block until the service startup succeeds. If this doesn't work
+        // we may need another blocking loop to do the equivalent of:
+        // wget -qO- http://${IP}:9000/brokers/tenants 2>&-| grep -q DefaultTenant
+        startBootstrapServicesInParallel(_pinotServiceManager, parallelAddTables);
   }
 
   static boolean startBootstrapServicesInParallel(
