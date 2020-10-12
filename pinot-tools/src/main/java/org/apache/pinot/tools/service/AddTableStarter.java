@@ -49,8 +49,9 @@ class AddTableStarter implements ServiceStartable {
     _config = config;
     _helixResourceManager = helixResourceManager;
 
-    _schema = readJsonFromFileProperty(config, "addTable.schemaFile", Schema.class);
-    _tableConfig = readJsonFromFileProperty(config, "addTable.tableConfigFile", TableConfig.class);
+    _schema = readJsonFromFileProperty(config, "pinot.addTable.schemaFile", Schema.class);
+    _tableConfig =
+        readJsonFromFileProperty(config, "pinot.addTable.tableConfigFile", TableConfig.class);
     _tableNameWithType = TableNameBuilder
         .forType(_tableConfig.getTableType())
         .tableNameWithType(_tableConfig.getTableName());
