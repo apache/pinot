@@ -84,7 +84,12 @@ class AddTableStarter implements ServiceStartable {
     ServiceStatus.setServiceStatusCallback(_instanceId, new ServiceStatus.ServiceStatusCallback() {
       @Override
       public ServiceStatus.Status getServiceStatus() {
-        if (_helixResourceManager.hasTable(_tableNameWithType)) return ServiceStatus.Status.GOOD;
+        if (_helixResourceManager.hasTable(_tableNameWithType) &&
+            // Check table is loaded
+            !_helixResourceManager.getBrokerInstancesFor(_tableNameWithType).isEmpty()
+        ) {
+          return ServiceStatus.Status.GOOD;
+        }
         return ServiceStatus.Status.STARTING;
       }
 
