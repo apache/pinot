@@ -3,5 +3,7 @@ schema:
   version: 1
 ---
 reviewers:
+  users:
+    - tingchen
   groups:
     - streaming_pinot
