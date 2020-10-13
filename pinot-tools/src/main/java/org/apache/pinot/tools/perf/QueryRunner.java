@@ -53,8 +53,8 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
   private String _mode;
   @Option(name = "-queryFile", required = true, metaVar = "<String>", usage = "Path to query file.")
   private String _queryFile;
-  @Option(name = "-queryMode", required = false, metaVar = "<String>", usage = "Mode of query generator (list|sample).")
-  private String _queryMode = QueryMode.LIST.toString();
+  @Option(name = "-queryMode", required = false, metaVar = "<String>", usage = "Mode of query generator (full|resample).")
+  private String _queryMode = QueryMode.FULL.toString();
   @Option(name = "-queryCount", required = false, metaVar = "<int>", usage = "Number of queries to run (default 0 = all).")
   private int _queryCount = 0;
   @Option(name = "-numTimesToRunQueries", required = false, metaVar = "<int>", usage = "Number of times to run all queries in the query file, 0 means infinite times (default 1).")
@@ -81,8 +81,8 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
   private boolean _help;
 
   private enum QueryMode {
-    LIST,
-    SAMPLE
+    FULL,
+    RESAMPLE
   }
 
   @Override
@@ -636,11 +636,11 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     queryCount = queryCount > 0 ? queryCount : inputs.size();
 
     switch (queryMode) {
-      case LIST:
+      case FULL:
         return inputs.stream().limit(queryCount);
 
-      case SAMPLE:
-        Random r = new Random(inputs.hashCode()); // anything deterministic will do
+      case RESAMPLE:
+        Random r = new Random(0); // anything deterministic will do
         return r.ints(queryCount, 0, inputs.size()).boxed().map(inputs::get);
 
       default:
