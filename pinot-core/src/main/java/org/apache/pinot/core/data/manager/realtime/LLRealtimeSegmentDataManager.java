@@ -1175,8 +1175,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     PartitionUpsertMetadataManager partitionUpsertMetadataManager = null;
     UpsertConfig.Mode upsertMode = _tableConfig.getUpsertMode();
     if (_upsertMetadataTableManager != null && upsertMode != UpsertConfig.Mode.NONE) {
-      int partitionId = new LLCSegmentName(_segmentNameStr).getPartitionId();
-      partitionUpsertMetadataManager = _upsertMetadataTableManager.getOrCreatePartitionManager(partitionId);
+      partitionUpsertMetadataManager = _upsertMetadataTableManager.getOrCreatePartitionManager(_streamPartitionId);
     }
 
 
