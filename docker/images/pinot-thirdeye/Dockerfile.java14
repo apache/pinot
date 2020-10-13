@@ -37,7 +37,7 @@ COPY ${TE_GITHUB_SRC_DIR}/thirdeye/thirdeye-dashboard/config/detector-config/ano
 COPY ${TE_GITHUB_SRC_DIR}/thirdeye/thirdeye-dashboard/config/data/* ${TE_HOME}/config/default/data/
 
 ## Remove the h2db.mv.db
-RUN rm ${TE_HOME}/config/default/h2db.mv.db && ls -lR ${TE_HOME}/config/default
+RUN rm ${TE_HOME}/config/default/h2db.mv.db 
 
 EXPOSE 1426 1427
 WORKDIR ${TE_HOME}
