@@ -54,11 +54,10 @@ public class ControllerTenantBrokerResponse {
     List<String> brokerList = new ArrayList<>();
 
     for (JsonNode broker : _brokers) {
-      String[] brokerPath = broker.textValue().split("_");
-      if(brokerPath.length < 3){
-        throw new RuntimeException("Invalid Broker Name found in controller: " + broker.textValue());
-      }
-      String brokerHostPort = String.format("%s:%s", brokerPath[1], brokerPath[2]);
+      String hostName = broker.get("host").textValue();
+      Integer port = broker.get("port").intValue();
+
+      String brokerHostPort = String.format("%s:%d", hostName, port);
       brokerList.add(brokerHostPort);
     }
 

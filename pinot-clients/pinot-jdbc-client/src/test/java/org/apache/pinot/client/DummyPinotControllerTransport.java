@@ -29,7 +29,7 @@ public class DummyPinotControllerTransport extends PinotControllerTransport {
   @Override
   public ControllerTenantBrokerResponse getBrokersFromController(String controllerAddress, String tenant) {
     try {
-      String jsonString = "[\"dummy\"]";
+      String jsonString = "[{\"instanceName\": \"dummy\", \"host\" : \"dummy\", \"port\" : 8000}]";
       ObjectMapper objectMapper = new ObjectMapper();
       JsonNode dummyBrokerJsonResponse = objectMapper.readTree(jsonString);
       return ControllerTenantBrokerResponse.fromJson(dummyBrokerJsonResponse);
