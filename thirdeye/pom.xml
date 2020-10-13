@@ -181,6 +181,11 @@
         <artifactId>thirdeye-coordinator</artifactId>
         <version>${project.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.apache.pinot.thirdeye</groupId>
+        <artifactId>thirdeye-dashboard</artifactId>
+        <version>${project.version}</version>
+      </dependency>
 
       <!-- project dependencies -->
       <dependency>
