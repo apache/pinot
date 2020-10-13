@@ -59,7 +59,6 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -625,9 +624,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       try {
         JsonNode queryResponse = postQuery(TEST_DEFAULT_COLUMNS_QUERY);
         // Total docs should not change during reload
-        if (queryResponse.get("totalDocs").asLong() == 0) {
-          return false;
-        }
         assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
         long count = queryResponse.get("aggregationResults").get(0).get("value").asLong();
         if (withExtraColumns) {
@@ -961,7 +957,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       caseStatementBuilder.append(String.format("WHEN origin = '%s' THEN %d ", origins.get(i), i + 1));
     }
     caseStatementBuilder.append("ELSE 0 END");
-    String sqlQuery = "SELECT origin, " + caseStatementBuilder + " as origin_code, AirlineID as aID FROM mytable LIMIT 1000";
+    String sqlQuery = "SELECT origin, " + caseStatementBuilder + " AS origin_code FROM mytable LIMIT 1000";
     JsonNode response = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
     JsonNode rows = response.get("resultTable").get("rows");
     assertEquals(response.get("exceptions").size(), 0);
