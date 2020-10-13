@@ -56,7 +56,8 @@ jobs:
       - name: Install Base Packages
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends vim wget curl git automake bison flex g++ libboost-all-dev libevent-dev libssl-dev libtool make pkg-config nodejs 
       - name: Build Thirdeye
-        run: cd thirdeye && mvn -DskipTests -T 1C clean compile package && cd .. || exit 1
+        #run: cd thirdeye && mvn -DskipTests -T 1C clean compile package && cd .. || exit 1
+        run: cd thirdeye && ./install.sh && cd ..|| exit 1
       - name: Docker Push
         uses: docker/build-push-action@v1
         with:
