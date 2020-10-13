@@ -348,6 +348,11 @@ public class PinotHelixResourceManager {
    * @return List of broker instance Ids
    */
   public List<String> getBrokerInstancesFor(String tableName) {
+    List<InstanceConfig> instanceConfigList = getBrokerInstancesConfigsFor(tableName);
+    return instanceConfigList.stream().map(InstanceConfig::getInstanceName).collect(Collectors.toList());
+  }
+
+  public List<InstanceConfig> getBrokerInstancesConfigsFor(String tableName) {
     String brokerTenantName = null;
     TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
     if (offlineTableConfig != null) {
@@ -358,7 +363,7 @@ public class PinotHelixResourceManager {
         brokerTenantName = realtimeTableConfig.getTenantConfig().getBroker();
       }
     }
-    return HelixHelper.getInstancesWithTag(_helixZkManager, TagNameUtils.getBrokerTagForTenant(brokerTenantName));
+    return HelixHelper.getInstancesConfigsWithTag(HelixHelper.getInstanceConfigs(_helixZkManager), TagNameUtils.getBrokerTagForTenant(brokerTenantName));
   }
 
   /**
@@ -981,6 +986,10 @@ public class PinotHelixResourceManager {
 
   public Set<String> getAllInstancesForBrokerTenant(String tenantName) {
     return getAllInstancesForBrokerTenant(HelixHelper.getInstanceConfigs(_helixZkManager), tenantName);
+  }
+
+  public Set<InstanceConfig> getAllInstancesConfigsForBrokerTenant(String tenantName) {
+    return HelixHelper.getBrokerInstanceConfigsForTenant(HelixHelper.getInstanceConfigs(_helixZkManager), tenantName);
   }
 
   /**

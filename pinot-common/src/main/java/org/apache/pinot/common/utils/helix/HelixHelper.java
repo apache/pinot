@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.I0Itec.zkclient.exception.ZkBadVersionException;
 import org.apache.helix.AccessOption;
@@ -422,10 +423,15 @@ public class HelixHelper {
    * reuse instance configs in order to reduce ZK accesses
    */
   public static List<String> getInstancesWithTag(List<InstanceConfig> instanceConfigs, String tag) {
-    List<String> instancesWithTag = new ArrayList<>();
+    List<InstanceConfig> instancesWithTag = getInstancesConfigsWithTag(instanceConfigs, tag);
+    return instancesWithTag.stream().map(InstanceConfig::getInstanceName).collect(Collectors.toList());
+  }
+
+  public static List<InstanceConfig> getInstancesConfigsWithTag(List<InstanceConfig> instanceConfigs, String tag) {
+    List<InstanceConfig> instancesWithTag = new ArrayList<>();
     for (InstanceConfig instanceConfig : instanceConfigs) {
       if (instanceConfig.containsTag(tag)) {
-        instancesWithTag.add(instanceConfig.getInstanceName());
+        instancesWithTag.add(instanceConfig);
       }
     }
     return instancesWithTag;
@@ -474,6 +480,11 @@ public class HelixHelper {
    * TODO: refactor code to use this method if applicable to reuse instance configs in order to reduce ZK accesses
    */
   public static Set<String> getBrokerInstancesForTenant(List<InstanceConfig> instanceConfigs, String tenant) {
-    return new HashSet<>(HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.getBrokerTagForTenant(tenant)));
+    return new HashSet<>(getInstancesWithTag(instanceConfigs, TagNameUtils.getBrokerTagForTenant(tenant)));
+  }
+
+  public static Set<InstanceConfig> getBrokerInstanceConfigsForTenant(List<InstanceConfig> instanceConfigs,
+      String tenant) {
+    return new HashSet<>(getInstancesConfigsWithTag(instanceConfigs, TagNameUtils.getBrokerTagForTenant(tenant)));
   }
 }
