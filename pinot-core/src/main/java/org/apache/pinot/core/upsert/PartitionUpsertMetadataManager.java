@@ -44,6 +44,7 @@ public class PartitionUpsertMetadataManager {
    * Creates the valid doc ids for the given (immutable) segment.
    */
   public ThreadSafeMutableRoaringBitmap createValidDocIds(String segmentName) {
+    LOGGER.info("Creating valid doc ids for segment: {}", segmentName);
     ThreadSafeMutableRoaringBitmap validDocIds = new ThreadSafeMutableRoaringBitmap();
     if (_segmentToValidDocIdsMap.put(segmentName, validDocIds) != null) {
       LOGGER.warn("Valid doc ids exist for segment: {}, replacing it", segmentName);
@@ -82,7 +83,13 @@ public class PartitionUpsertMetadataManager {
               validDocIds.remove(v.getDocId());
             }
           } else {
-            _segmentToValidDocIdsMap.get(v.getSegmentName()).remove(v.getDocId());
+            ThreadSafeMutableRoaringBitmap validDocIdsForPreviousLocation =
+                _segmentToValidDocIdsMap.get(v.getSegmentName());
+            if (validDocIdsForPreviousLocation != null) {
+              validDocIdsForPreviousLocation.remove(v.getDocId());
+            } else {
+              LOGGER.warn("Failed to find valid doc ids for previous location: {}", v.getSegmentName());
+            }
           }
 
           validDocIds.checkAndAdd(recordLocation.getDocId());
@@ -103,6 +110,7 @@ public class PartitionUpsertMetadataManager {
    * Removes the upsert metadata for the given segment.
    */
   public void removeSegment(String segmentName) {
+    LOGGER.info("Removing upsert metadata for segment: {}", segmentName);
     _primaryKeyToRecordLocationMap.forEach((k, v) -> {
       if (v.getSegmentName().equals(segmentName)) {
         // NOTE: Check and remove to prevent removing the key that is just updated.
