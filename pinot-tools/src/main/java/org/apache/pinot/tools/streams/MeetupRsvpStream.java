@@ -113,7 +113,7 @@ public class MeetupRsvpStream {
             LOGGER.error("found an event where data did not have all the fields, don't care about for quickstart", e);
           }
         }
-      }, cec, new URI("ws://stream.meetup.com/2/rsvps"));
+      }, cec, new URI("wss://stream.meetup.com/2/rsvps"));
     } catch (Exception e) {
       LOGGER.error("encountered an error running the meetupRSVPEvents stream", e);
     }
