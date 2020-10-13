@@ -157,7 +157,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       _tableUpsertMetadataManager = new TableUpsertMetadataManager();
       _primaryKeyColumns = schema.getPrimaryKeyColumns();
       Preconditions
-          .checkState(CollectionUtils.isEmpty(_primaryKeyColumns), "Primary key columns must be configured for upsert");
+          .checkState(!CollectionUtils.isEmpty(_primaryKeyColumns), "Primary key columns must be configured for upsert");
       _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     }
 
