@@ -42,7 +42,7 @@ import org.apache.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConsumerFactory;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMessageDecoder;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.core.upsert.TableUpsertMetadataManager;
+import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -61,6 +61,7 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+
 
 // TODO Re-write this test using the stream abstraction
 public class LLRealtimeSegmentDataManagerTest {
@@ -176,7 +177,8 @@ public class LLRealtimeSegmentDataManagerTest {
   }
 
   @Test
-  public void testOffsetParsing() throws Exception {
+  public void testOffsetParsing()
+      throws Exception {
     final String offset = "34";
     FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
     {
@@ -798,7 +800,7 @@ public class LLRealtimeSegmentDataManagerTest {
         throws Exception {
       super(segmentZKMetadata, tableConfig, realtimeTableDataManager, resourceDataDir,
           new IndexLoadingConfig(makeInstanceDataManagerConfig(), tableConfig), schema, llcSegmentName,
-          semaphoreMap.get(llcSegmentName.getPartitionId()), serverMetrics, new TableUpsertMetadataManager());
+          semaphoreMap.get(llcSegmentName.getPartitionId()), serverMetrics, new PartitionUpsertMetadataManager());
       _state = LLRealtimeSegmentDataManager.class.getDeclaredField("_state");
       _state.setAccessible(true);
       _shouldStop = LLRealtimeSegmentDataManager.class.getDeclaredField("_shouldStop");

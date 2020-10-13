@@ -61,8 +61,8 @@ public class MutableSegmentImplUpsertTest {
     _partitionUpsertMetadataManager = new TableUpsertMetadataManager().getOrCreatePartitionManager(0);
     _mutableSegmentImpl = MutableSegmentImplTestUtils
         .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
-            false, true, new UpsertConfig(UpsertConfig.Mode.FULL),
-            "secondsSinceEpoch", _partitionUpsertMetadataManager);
+            false, true, new UpsertConfig(UpsertConfig.Mode.FULL), "secondsSinceEpoch",
+            _partitionUpsertMetadataManager);
     GenericRow reuse = new GenericRow();
     try (RecordReader recordReader = RecordReaderFactory
         .getRecordReader(FileFormat.JSON, jsonFile, _schema.getColumnNames(), null)) {

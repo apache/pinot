@@ -21,13 +21,10 @@ package org.apache.pinot.spi.config.table;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import java.util.List;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
 public class UpsertConfig extends BaseJsonConfig {
-  public static final String MODE_KEY = "mode";
 
   public enum Mode {
     FULL, PARTIAL, NONE
@@ -36,12 +33,12 @@ public class UpsertConfig extends BaseJsonConfig {
   private final Mode _mode;
 
   @JsonCreator
-  public UpsertConfig(@JsonProperty(value = "mode") Mode mode) {
+  public UpsertConfig(@JsonProperty(value = "mode", required = true) Mode mode) {
+    Preconditions.checkArgument(mode != null, "Upsert mode must be configured");
     Preconditions.checkArgument(mode != Mode.PARTIAL, "Partial upsert mode is not supported");
     _mode = mode;
   }
 
-  @JsonProperty(MODE_KEY)
   public Mode getMode() {
     return _mode;
   }

@@ -61,7 +61,6 @@ import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
 import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager;
-import org.apache.pinot.core.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
@@ -69,7 +68,6 @@ import org.apache.pinot.spi.config.table.CompletionConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.MessageBatch;
@@ -236,8 +234,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private SegmentBuildDescriptor _segmentBuildDescriptor;
   private StreamConsumerFactory _streamConsumerFactory;
   private StreamPartitionMsgOffsetFactory _streamPartitionMsgOffsetFactory;
-
-  private final TableUpsertMetadataManager _upsertMetadataTableManager;
 
   // Segment end criteria
   private volatile long _consumeEndTime = 0;
@@ -1088,7 +1084,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   public LLRealtimeSegmentDataManager(RealtimeSegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
       RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, IndexLoadingConfig indexLoadingConfig,
       Schema schema, LLCSegmentName llcSegmentName, Semaphore partitionConsumerSemaphore, ServerMetrics serverMetrics,
-      TableUpsertMetadataManager upsertMetadataTableManager) {
+      @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
     _segBuildSemaphore = realtimeTableDataManager.getSegmentBuildSemaphore();
     _segmentZKMetadata = (LLCRealtimeSegmentZKMetadata) segmentZKMetadata;
     _tableConfig = tableConfig;
@@ -1122,7 +1118,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _memoryManager = getMemoryManager(realtimeTableDataManager.getConsumerDir(), _segmentNameStr,
         indexLoadingConfig.isRealtimeOffHeapAllocation(), indexLoadingConfig.isDirectRealtimeOffHeapAllocation(),
         serverMetrics);
-    _upsertMetadataTableManager = upsertMetadataTableManager;
 
     List<String> sortedColumns = indexLoadingConfig.getSortedColumns();
     if (sortedColumns.isEmpty()) {
@@ -1172,13 +1167,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     Set<String> textIndexColumns = indexLoadingConfig.getTextIndexColumns();
     _textIndexColumns = new ArrayList<>(textIndexColumns);
 
-    PartitionUpsertMetadataManager partitionUpsertMetadataManager = null;
-    UpsertConfig.Mode upsertMode = _tableConfig.getUpsertMode();
-    if (_upsertMetadataTableManager != null && upsertMode != UpsertConfig.Mode.NONE) {
-      partitionUpsertMetadataManager = _upsertMetadataTableManager.getOrCreatePartitionManager(_streamPartitionId);
-    }
-
-
     // Start new realtime segment
     String consumerDir = realtimeTableDataManager.getConsumerDir();
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
@@ -1191,7 +1179,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setRealtimeSegmentZKMetadata(segmentZKMetadata).setOffHeap(_isOffHeap).setMemoryManager(_memoryManager)
             .setStatsHistory(realtimeTableDataManager.getStatsHistory())
             .setAggregateMetrics(indexingConfig.isAggregateMetrics()).setNullHandlingEnabled(_nullHandlingEnabled)
-            .setConsumerDir(consumerDir).setUpsertMode(upsertMode)
+            .setConsumerDir(consumerDir).setUpsertMode(tableConfig.getUpsertMode())
             .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager);
 
     // Create message decoder

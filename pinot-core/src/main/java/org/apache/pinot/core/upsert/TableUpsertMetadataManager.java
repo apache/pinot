@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.concurrent.ThreadSafe;
 
+
 /**
  * The manager of the upsert metadata of a table.
  */
@@ -29,10 +30,7 @@ import javax.annotation.concurrent.ThreadSafe;
 public class TableUpsertMetadataManager {
   private final Map<Integer, PartitionUpsertMetadataManager> _partitionMetadataManagerMap = new ConcurrentHashMap<>();
 
-  public TableUpsertMetadataManager() {
-  }
-
   public PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId) {
-    return _partitionMetadataManagerMap.computeIfAbsent(partitionId, PartitionUpsertMetadataManager::new);
+    return _partitionMetadataManagerMap.computeIfAbsent(partitionId, k -> new PartitionUpsertMetadataManager());
   }
 }

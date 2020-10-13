@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.core.upsert;
 
-import java.util.HashSet;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
@@ -35,70 +33,82 @@ import org.slf4j.LoggerFactory;
 public class PartitionUpsertMetadataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PartitionUpsertMetadataManager.class);
 
-  private final int _partitionId;
-
   // TODO(upset): consider an off-heap KV store to persist this index to improve the recovery speed.
-  private final ConcurrentHashMap<PrimaryKey, RecordLocation> _primaryKeyIndex = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<PrimaryKey, RecordLocation> _primaryKeyToRecordLocationMap =
+      new ConcurrentHashMap<>();
   // the mapping between the (sealed) segment and its validDocuments
-  private final ConcurrentHashMap<String, ThreadSafeMutableRoaringBitmap> _segmentToValidDocIndexMap = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, ThreadSafeMutableRoaringBitmap> _segmentToValidDocIdsMap =
+      new ConcurrentHashMap<>();
 
-  public PartitionUpsertMetadataManager(int partitionId) {
-    _partitionId = partitionId;
-  }
-
-  public void removeRecordLocation(PrimaryKey primaryKey) {
-    _primaryKeyIndex.remove(primaryKey);
-  }
-
-  public boolean containsKey(PrimaryKey primaryKey) {
-    return _primaryKeyIndex.containsKey(primaryKey);
-  }
-
-  public RecordLocation getRecordLocation(PrimaryKey primaryKey) {
-    return _primaryKeyIndex.get(primaryKey);
-  }
-
-  public ThreadSafeMutableRoaringBitmap getValidDocIndex(String segmentName) {
-    return _segmentToValidDocIndexMap.get(segmentName);
-  }
-
-  private ThreadSafeMutableRoaringBitmap getOrCreateValidDocIndex(String segmentName) {
-    return _segmentToValidDocIndexMap.computeIfAbsent(segmentName, k->new ThreadSafeMutableRoaringBitmap());
-  }
-
-  public synchronized void removeUpsertMetadata(String segmentName) {
-    _segmentToValidDocIndexMap.remove(segmentName);
-    for (Map.Entry<PrimaryKey, RecordLocation> entry : new HashSet<>(_primaryKeyIndex.entrySet())) {
-      if (entry.getValue().getSegmentName().equals(segmentName)) {
-        _primaryKeyIndex.remove(entry.getKey());
-      }
+  /**
+   * Creates the valid doc ids for the given (immutable) segment.
+   */
+  public ThreadSafeMutableRoaringBitmap createValidDocIds(String segmentName) {
+    ThreadSafeMutableRoaringBitmap validDocIds = new ThreadSafeMutableRoaringBitmap();
+    if (_segmentToValidDocIdsMap.put(segmentName, validDocIds) != null) {
+      LOGGER.warn("Valid doc ids exist for segment: {}, replacing it", segmentName);
     }
+    return validDocIds;
   }
 
-  int getPartitionId() {
-    return _partitionId;
+  /**
+   * Returns the valid doc ids for the given (immutable) segment.
+   */
+  public ThreadSafeMutableRoaringBitmap getValidDocIds(String segmentName) {
+    return _segmentToValidDocIdsMap.computeIfAbsent(segmentName, k -> new ThreadSafeMutableRoaringBitmap());
   }
 
-  public synchronized void handleUpsert(PrimaryKey primaryKey, RecordLocation location, String segmentName) {
-    if (containsKey(primaryKey)) {
-      RecordLocation prevLocation = getRecordLocation(primaryKey);
-      // upsert
-      if (location.getTimestamp() >= prevLocation.getTimestamp()) {
-        removeRecordLocation(primaryKey);
-        _primaryKeyIndex.put(primaryKey, location);
-        ThreadSafeMutableRoaringBitmap validDocIndex = getValidDocIndex(prevLocation.getSegmentName());
-        if (validDocIndex != null) {
-          validDocIndex.remove(prevLocation.getDocId());
+  /**
+   * Updates the record location of the given primary key if the given record location is newer than the current record
+   * location. Also updates the valid doc ids accordingly if the record location is updated.
+   */
+  public void updateRecordLocation(PrimaryKey primaryKey, RecordLocation recordLocation,
+      ThreadSafeMutableRoaringBitmap validDocIds) {
+    _primaryKeyToRecordLocationMap.compute(primaryKey, (k, v) -> {
+      if (v != null) {
+        // Existing primary key
+
+        if (recordLocation.getTimestamp() >= v.getTimestamp()) {
+          // Update the record location
+          // NOTE: Update the record location when there is a tie on the timestamp because during the segment
+          //       commitment, when loading the committed segment, it should replace the old record locations in case
+          //       the order of records changed.
+
+          // Remove the doc from the valid doc ids of the previous location
+          if (v.isConsuming()) {
+            // Previous location is a consuming segment, whose valid doc ids are maintained locally. Only update the
+            // valid doc ids when the update is from the same segment.
+            if (recordLocation.isConsuming() && recordLocation.getSegmentName().equals(v.getSegmentName())) {
+              validDocIds.remove(v.getDocId());
+            }
+          } else {
+            _segmentToValidDocIdsMap.get(v.getSegmentName()).remove(v.getDocId());
+          }
+
+          validDocIds.checkAndAdd(recordLocation.getDocId());
+          return recordLocation;
+        } else {
+          // No need to update
+          return v;
         }
-        getOrCreateValidDocIndex(segmentName).checkAndAdd(location.getDocId());
-        LOGGER.debug("upsert: replace old doc id {} with %d for key: {}, hash: {}", prevLocation.getDocId(),
-            location.getDocId(), primaryKey, primaryKey.hashCode());
       } else {
-        LOGGER.debug("upsert: ignore a late-arrived record: {}, hash: {}", primaryKey, primaryKey.hashCode());
+        // New primary key
+        validDocIds.checkAndAdd(recordLocation.getDocId());
+        return recordLocation;
       }
-    } else { // append
-      _primaryKeyIndex.put(primaryKey, location);
-      getOrCreateValidDocIndex(segmentName).checkAndAdd(location.getDocId());
-    }
+    });
+  }
+
+  /**
+   * Removes the upsert metadata for the given segment.
+   */
+  public void removeSegment(String segmentName) {
+    _primaryKeyToRecordLocationMap.forEach((k, v) -> {
+      if (v.getSegmentName().equals(segmentName)) {
+        // NOTE: Check and remove to prevent removing the key that is just updated.
+        _primaryKeyToRecordLocationMap.remove(k, v);
+      }
+    });
+    _segmentToValidDocIdsMap.remove(segmentName);
   }
 }

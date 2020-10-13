@@ -18,21 +18,23 @@
  */
 package org.apache.pinot.core.upsert;
 
-import com.google.common.base.Objects;
+import java.util.Objects;
 
 
 /**
  * Indicate a record's location on the local host.
  */
 public class RecordLocation {
-  private String _segmentName;
-  private int _docId;
-  private long _timestamp;
+  private final String _segmentName;
+  private final int _docId;
+  private final long _timestamp;
+  private final boolean _isConsuming;
 
-  public RecordLocation(String segmentName, int docId, long timestamp) {
+  public RecordLocation(String segmentName, int docId, long timestamp, boolean isConsuming) {
     _segmentName = segmentName;
     _docId = docId;
     _timestamp = timestamp;
+    _isConsuming = isConsuming;
   }
 
   public String getSegmentName() {
@@ -47,21 +49,25 @@ public class RecordLocation {
     return _timestamp;
   }
 
+  public boolean isConsuming() {
+    return _isConsuming;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;
     }
-    if (o == null || getClass() != o.getClass()) {
+    if (!(o instanceof RecordLocation)) {
       return false;
     }
     RecordLocation that = (RecordLocation) o;
-    return Objects.equal(_segmentName, that._segmentName) && Objects.equal(_docId, that._docId) && Objects
-        .equal(_timestamp, that._timestamp);
+    return _docId == that._docId && _timestamp == that._timestamp && _isConsuming == that._isConsuming && Objects
+        .equals(_segmentName, that._segmentName);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(_segmentName, _docId, _timestamp);
+    return Objects.hash(_segmentName, _docId, _timestamp, _isConsuming);
   }
 }

@@ -36,7 +36,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
@@ -145,12 +144,18 @@ public class MutableSegmentImpl implements MutableSegment {
   private final Map<String, FieldSpec> _newlyAddedColumnsFieldMap = new ConcurrentHashMap();
   private final Map<String, FieldSpec> _newlyAddedPhysicalColumnsFieldMap = new ConcurrentHashMap();
 
-  // the primaryKeyIndex for local segment
-  private final int _upsertPartitionId;
   private final UpsertConfig.Mode _upsertMode;
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
-  private final Map<PrimaryKey, RecordLocation> _primaryKeyIndex;
-  private final ThreadSafeMutableRoaringBitmap _validDocIndex;
+  // The valid doc ids are maintained locally instead of in the upsert metadata manager because:
+  // 1. There is only one consuming segment per partition, the committed segments do not need to modify the valid doc
+  //    ids for the consuming segment.
+  // 2. During the segment commitment, when loading the immutable version of this segment, in order to keep the result
+  //    correct, the valid doc ids should not be changed, only the record location should be changed.
+  // FIXME: There is a corner case for this approach which could cause inconsistency. When there is segment load during
+  //        consumption with newer timestamp (late event in consuming segment), the record location will be updated, but
+  //        the valid doc ids won't be updated.
+  private final ThreadSafeMutableRoaringBitmap _validDocIds;
+  private final ValidDocIndexReader _validDocIndex;
 
   public MutableSegmentImpl(RealtimeSegmentConfig config, @Nullable ServerMetrics serverMetrics) {
     _serverMetrics = serverMetrics;
@@ -339,10 +344,15 @@ public class MutableSegmentImpl implements MutableSegment {
 
     // init upsert-related data structure
     _upsertMode = config.getUpsertMode();
-    _partitionUpsertMetadataManager = config.getPartitionUpsertMetadataManager();
-    _primaryKeyIndex = isUpsertEnabled() ? new ConcurrentHashMap() : null;
-    _validDocIndex = isUpsertEnabled() ? new ThreadSafeMutableRoaringBitmap() : null;
-    _upsertPartitionId = isUpsertEnabled() ? new LLCSegmentName(_segmentName).getPartitionId() : 0;
+    if (isUpsertEnabled()) {
+      _partitionUpsertMetadataManager = config.getPartitionUpsertMetadataManager();
+      _validDocIds = new ThreadSafeMutableRoaringBitmap();
+      _validDocIndex = new ValidDocIndexReaderImpl(_validDocIds);
+    } else {
+      _partitionUpsertMetadataManager = null;
+      _validDocIds = null;
+      _validDocIndex = null;
+    }
   }
 
   /**
@@ -466,46 +476,16 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   private boolean isUpsertEnabled() {
-    return _upsertMode != null && _upsertMode != UpsertConfig.Mode.NONE;
+    return _upsertMode != UpsertConfig.Mode.NONE;
   }
 
   private void handleUpsert(GenericRow row, int docId) {
-    // below are upsert operations
     PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
     Object timeValue = row.getValue(_timeColumnName);
     Preconditions.checkArgument(timeValue instanceof Comparable, "time column shall be comparable");
     long timestamp = IngestionUtils.extractTimeValue((Comparable) timeValue);
-    RecordLocation location = new RecordLocation(_segmentName, docId, timestamp);
-    // check local primary key index first
-    if (_primaryKeyIndex.containsKey(primaryKey)) {
-      RecordLocation prevLocation = _primaryKeyIndex.get(primaryKey);
-      if (location.getTimestamp() >= prevLocation.getTimestamp()) {
-        _primaryKeyIndex.put(primaryKey, location);
-        // update validDocIndex
-        _validDocIndex.remove(prevLocation.getDocId());
-        _validDocIndex.checkAndAdd(location.getDocId());
-        LOGGER.debug(String
-            .format("upsert: replace old doc id %d with %d for key: %s, hash: %d", prevLocation.getDocId(),
-                location.getDocId(), primaryKey, primaryKey.hashCode()));
-      } else {
-        LOGGER.debug(
-            String.format("upsert: ignore a late-arrived record: %s, hash: %d", primaryKey, primaryKey.hashCode()));
-      }
-    } else if (_partitionUpsertMetadataManager.containsKey(primaryKey)) {
-      RecordLocation prevLocation = _partitionUpsertMetadataManager.getRecordLocation(primaryKey);
-      if (location.getTimestamp() >= prevLocation.getTimestamp()) {
-        _partitionUpsertMetadataManager.removeRecordLocation(primaryKey);
-        _primaryKeyIndex.put(primaryKey, location);
-
-        // update validDocIndex
-        _partitionUpsertMetadataManager.getValidDocIndex(prevLocation.getSegmentName())
-            .remove(prevLocation.getDocId());
-        _validDocIndex.checkAndAdd(location.getDocId());
-      }
-    } else {
-      _primaryKeyIndex.put(primaryKey, location);
-      _validDocIndex.checkAndAdd(location.getDocId());
-    }
+    RecordLocation recordLocation = new RecordLocation(_segmentName, docId, timestamp, true);
+    _partitionUpsertMetadataManager.updateRecordLocation(primaryKey, recordLocation, _validDocIds);
   }
 
   private void updateDictionary(GenericRow row) {
@@ -737,7 +717,7 @@ public class MutableSegmentImpl implements MutableSegment {
   @Nullable
   @Override
   public ValidDocIndexReader getValidDocIndex() {
-    return _validDocIndex == null ? null : new ValidDocIndexReaderImpl(_validDocIndex);
+    return _validDocIndex;
   }
 
   /**

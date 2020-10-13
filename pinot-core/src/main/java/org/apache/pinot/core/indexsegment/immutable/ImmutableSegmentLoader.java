@@ -24,8 +24,6 @@ import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
 import org.apache.pinot.core.segment.index.column.PhysicalColumnIndexContainer;
@@ -42,7 +40,6 @@ import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.core.startree.v2.store.StarTreeIndexContainer;
 import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager;
-import org.apache.pinot.core.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
@@ -79,7 +76,7 @@ public class ImmutableSegmentLoader {
   }
 
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema,
-      @Nullable TableUpsertMetadataManager upsertMetadataTableManager)
+      @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager)
       throws Exception {
     Preconditions
         .checkArgument(indexDir.isDirectory(), "Index directory: %s does not exist or is not a directory", indexDir);
@@ -141,14 +138,6 @@ public class ImmutableSegmentLoader {
       starTreeIndexContainer =
           new StarTreeIndexContainer(SegmentDirectoryPaths.findSegmentDirectory(indexDir), segmentMetadata,
               indexContainerMap, readMode);
-    }
-
-    // Prepare upsert metadata manager
-    PartitionUpsertMetadataManager partitionUpsertMetadataManager = null;
-    if (upsertMetadataTableManager != null
-        && SegmentName.getSegmentType(segmentName) == SegmentName.RealtimeSegmentType.LLC) {
-      int partitionId = new LLCSegmentName(segmentName).getPartitionId();
-      partitionUpsertMetadataManager = upsertMetadataTableManager.getOrCreatePartitionManager(partitionId);
     }
 
     ImmutableSegmentImpl segment =

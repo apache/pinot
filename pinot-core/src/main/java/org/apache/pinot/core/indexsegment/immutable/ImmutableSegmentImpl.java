@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
 import org.apache.pinot.core.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
@@ -52,6 +51,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   private final Map<String, ColumnIndexContainer> _indexContainerMap;
   private final StarTreeIndexContainer _starTreeIndexContainer;
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
+  private final ValidDocIndexReader _validDocIndex;
 
   public ImmutableSegmentImpl(SegmentDirectory segmentDirectory, SegmentMetadataImpl segmentMetadata,
       Map<String, ColumnIndexContainer> columnIndexContainerMap,
@@ -61,7 +61,14 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     _segmentMetadata = segmentMetadata;
     _indexContainerMap = columnIndexContainerMap;
     _starTreeIndexContainer = starTreeIndexContainer;
-    _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
+    if (partitionUpsertMetadataManager != null) {
+      _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
+      _validDocIndex =
+          new ValidDocIndexReaderImpl(partitionUpsertMetadataManager.createValidDocIds(getSegmentName()));
+    } else {
+      _partitionUpsertMetadataManager = null;
+      _validDocIndex = null;
+    }
   }
 
   @Override
@@ -118,7 +125,8 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
 
   @Override
   public void destroy() {
-    LOGGER.info("Trying to destroy segment : {}", getSegmentName());
+    String segmentName = getSegmentName();
+    LOGGER.info("Trying to destroy segment : {}", segmentName);
     for (Map.Entry<String, ColumnIndexContainer> entry : _indexContainerMap.entrySet()) {
       try {
         entry.getValue().close();
@@ -138,14 +146,9 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
         LOGGER.error("Failed to close star-tree. Continuing with error.", e);
       }
     }
-    removeUpsertMetadata();
-  }
-
-  private void removeUpsertMetadata() {
-    if (_partitionUpsertMetadataManager == null) {
-      return;
+    if (_partitionUpsertMetadataManager != null) {
+      _partitionUpsertMetadataManager.removeSegment(segmentName);
     }
-    _partitionUpsertMetadataManager.removeUpsertMetadata(getSegmentName());
   }
 
   @Override
@@ -156,12 +159,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   @Nullable
   @Override
   public ValidDocIndexReader getValidDocIndex() {
-    if (_partitionUpsertMetadataManager == null) {
-      return null;
-    }
-    String segmentName = _segmentMetadata.getName();
-    ThreadSafeMutableRoaringBitmap bitmap = _partitionUpsertMetadataManager.getValidDocIndex(segmentName);
-    return bitmap == null ? null : new ValidDocIndexReaderImpl(bitmap);
+    return _validDocIndex;
   }
 
   @Override

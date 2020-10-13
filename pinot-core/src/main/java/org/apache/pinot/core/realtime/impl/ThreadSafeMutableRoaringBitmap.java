@@ -25,7 +25,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  * Helper wrapper class for {@link MutableRoaringBitmap} to make it thread-safe.
  */
 public class ThreadSafeMutableRoaringBitmap {
-  private MutableRoaringBitmap _mutableRoaringBitmap;
+  private final MutableRoaringBitmap _mutableRoaringBitmap;
 
   public ThreadSafeMutableRoaringBitmap() {
     _mutableRoaringBitmap = new MutableRoaringBitmap();
@@ -45,7 +45,7 @@ public class ThreadSafeMutableRoaringBitmap {
   }
 
   public void remove(int docId) {
-    if(contains(docId)) {
+    if (contains(docId)) {
       synchronized (this) {
         _mutableRoaringBitmap.remove(docId);
       }
