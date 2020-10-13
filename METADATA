@@ -1,0 +1,7 @@
+---
+schema:
+  version: 1
+---
+reviewers:
+  groups:
+    - streaming_pinot
