@@ -156,8 +156,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
       _tableUpsertMetadataManager = new TableUpsertMetadataManager();
       _primaryKeyColumns = schema.getPrimaryKeyColumns();
-      Preconditions
-          .checkState(!CollectionUtils.isEmpty(_primaryKeyColumns), "Primary key columns must be configured for upsert");
+      Preconditions.checkState(!CollectionUtils.isEmpty(_primaryKeyColumns),
+          "Primary key columns must be configured for upsert");
       _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     }
 
@@ -335,7 +335,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     int partitionId = new LLCSegmentName(immutableSegment.getSegmentName()).getPartitionId();
     PartitionUpsertMetadataManager partitionUpsertMetadataManager =
         _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionId);
-    ThreadSafeMutableRoaringBitmap validDocIds = partitionUpsertMetadataManager.createValidDocIds(segmentName);
+    ThreadSafeMutableRoaringBitmap validDocIds = partitionUpsertMetadataManager.getValidDocIds(segmentName);
     int numPrimaryKeyColumns = _primaryKeyColumns.size();
     for (int docId = 0; docId < numTotalDocs; docId++) {
       Object[] values = new Object[numPrimaryKeyColumns];

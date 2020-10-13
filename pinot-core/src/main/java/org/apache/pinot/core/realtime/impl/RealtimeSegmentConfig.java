@@ -24,7 +24,6 @@ import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager;
-import org.apache.pinot.core.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 
@@ -83,7 +82,7 @@ public class RealtimeSegmentConfig {
     _aggregateMetrics = aggregateMetrics;
     _nullHandlingEnabled = nullHandlingEnabled;
     _consumerDir = consumerDir;
-    _upsertMode = upsertMode;
+    _upsertMode = upsertMode != null ? upsertMode : UpsertConfig.Mode.NONE;
     _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
   }
 

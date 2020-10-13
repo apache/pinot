@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.upsert;
 
+import com.google.common.base.Preconditions;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
@@ -56,7 +57,9 @@ public class PartitionUpsertMetadataManager {
    * Returns the valid doc ids for the given (immutable) segment.
    */
   public ThreadSafeMutableRoaringBitmap getValidDocIds(String segmentName) {
-    return _segmentToValidDocIdsMap.computeIfAbsent(segmentName, k -> new ThreadSafeMutableRoaringBitmap());
+    return Preconditions
+        .checkNotNull(_segmentToValidDocIdsMap.get(segmentName), "Failed to find valid doc ids for segment: %s",
+            segmentName);
   }
 
   /**
