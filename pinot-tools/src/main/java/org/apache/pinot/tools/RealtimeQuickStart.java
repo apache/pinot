@@ -38,6 +38,7 @@ import static org.apache.pinot.tools.Quickstart.printStatus;
 
 public class RealtimeQuickStart {
   private StreamDataServerStartable _kafkaStarter;
+  private File _dataFile;
 
   public static void main(String[] args)
       throws Exception {
@@ -64,6 +65,12 @@ public class RealtimeQuickStart {
     com.google.common.base.Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, tableConfigFile);
 
+    _dataFile = new File(configDir, "meetupRsvp_data.json");
+    resource = Quickstart.class.getClassLoader()
+        .getResource("examples/stream/meetupRsvp/sample_data/meetupRsvp_data.json");
+    Preconditions.checkNotNull(resource);
+    FileUtils.copyURLToFile(resource, _dataFile);
+
     QuickstartTableRequest request = new QuickstartTableRequest("meetupRsvp", schemaFile, tableConfigFile);
     final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, dataDir);
 
@@ -77,7 +84,7 @@ public class RealtimeQuickStart {
     _kafkaStarter.start();
     _kafkaStarter.createTopic("meetupRSVPEvents", KafkaStarterUtils.getTopicCreationProps(10));
     printStatus(Color.CYAN, "***** Starting meetup data stream and publishing to Kafka *****");
-    MeetupRsvpStream meetupRSVPProvider = new MeetupRsvpStream();
+    MeetupRsvpStream meetupRSVPProvider = new MeetupRsvpStream(_dataFile);
     meetupRSVPProvider.run();
     printStatus(Color.CYAN, "***** Starting Zookeeper, controller, server and broker *****");
     runner.startAll();

@@ -20,114 +20,120 @@ package org.apache.pinot.tools.streams;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import java.io.IOException;
-import java.net.URI;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.Properties;
-import javax.websocket.ClientEndpointConfig;
-import javax.websocket.Endpoint;
-import javax.websocket.EndpointConfig;
-import javax.websocket.MessageHandler;
-import javax.websocket.Session;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
-import org.glassfish.tyrus.client.ClientManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class MeetupRsvpStream {
   private static final Logger LOGGER = LoggerFactory.getLogger(MeetupRsvpStream.class);
-  private StreamDataProducer producer;
-  private boolean keepPublishing = true;
-  private boolean _partitionByKey;
-  private ClientManager client;
 
-  public MeetupRsvpStream() throws Exception {
-    this(false);
+  private StreamDataProducer _producer;
+  private boolean _partitionByKey;
+  private boolean _keepPublishing = true;
+  private ExecutorService _service;
+  private File _dataFile;
+
+  public MeetupRsvpStream(File dataFile) throws Exception {
+    this(dataFile, false);
   }
 
-  public MeetupRsvpStream(boolean partitionByKey)
+  public MeetupRsvpStream(File dataFile, boolean partitionByKey)
       throws Exception {
     Properties properties = new Properties();
     properties.put("metadata.broker.list", KafkaStarterUtils.DEFAULT_KAFKA_BROKER);
     properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
     properties.put("request.required.acks", "1");
     _partitionByKey = partitionByKey;
-    producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
+    _producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
+    _dataFile = dataFile;
+    _service = Executors.newFixedThreadPool(1);
   }
 
-  public void stopPublishing() {
-    keepPublishing = false;
-    producer.close();
-    client.shutdown();
-  }
+  public void publishStream() {
+    String jsonString;
+    try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(new FileInputStream(_dataFile), "UTF8"))) {
+      while ((jsonString = bufferedReader.readLine()) != null) {
+        if (!_keepPublishing) {
+          return;
+        }
+        if (jsonString.isEmpty()) {
+          LOGGER.error("Json string is empty");
+          continue;
+        }
+        JsonNode messageJSON = JsonUtils.stringToJsonNode(jsonString);
+        ObjectNode extracted = JsonUtils.newObjectNode();
 
-  public void run() {
-    try {
-      ClientEndpointConfig cec = ClientEndpointConfig.Builder.create().build();
-      client = ClientManager.createClient();
-      client.connectToServer(new Endpoint() {
+        JsonNode venue = messageJSON.get("venue");
+        if (venue != null) {
+          extracted.set("venue_name", venue.get("venue_name"));
+        }
 
-        @Override
-        public void onOpen(Session session, EndpointConfig config) {
-          try {
-            session.addMessageHandler(new MessageHandler.Whole<String>() {
+        JsonNode event = messageJSON.get("event");
+        if (event != null) {
+          extracted.set("event_name", event.get("event_name"));
+          extracted.set("event_id", event.get("event_id"));
+          extracted.set("event_time", event.get("time"));
+        }
 
-              @Override
-              public void onMessage(String message) {
-                try {
-                  JsonNode messageJSON = JsonUtils.stringToJsonNode(message);
-                  ObjectNode extracted = JsonUtils.newObjectNode();
+        JsonNode group = messageJSON.get("group");
+        if (group != null) {
+          extracted.set("group_city", group.get("group_city"));
+          extracted.set("group_country", group.get("group_country"));
+          extracted.set("group_id", group.get("group_id"));
+          extracted.set("group_name", group.get("group_name"));
+          extracted.set("group_lat", group.get("group_lat"));
+          extracted.set("group_lon", group.get("group_lon"));
+        }
 
-                  JsonNode venue = messageJSON.get("venue");
-                  if (venue != null) {
-                    extracted.set("venue_name", venue.get("venue_name"));
-                  }
+        extracted.set("mtime", messageJSON.get("mtime"));
+        extracted.put("rsvp_count", 1);
 
-                  JsonNode event = messageJSON.get("event");
-                  if (event != null) {
-                    extracted.set("event_name", event.get("event_name"));
-                    extracted.set("event_id", event.get("event_id"));
-                    extracted.set("event_time", event.get("time"));
-                  }
-
-                  JsonNode group = messageJSON.get("group");
-                  if (group != null) {
-                    extracted.set("group_city", group.get("group_city"));
-                    extracted.set("group_country", group.get("group_country"));
-                    extracted.set("group_id", group.get("group_id"));
-                    extracted.set("group_name", group.get("group_name"));
-                    extracted.set("group_lat", group.get("group_lat"));
-                    extracted.set("group_lon", group.get("group_lon"));
-                  }
-
-                  extracted.set("mtime", messageJSON.get("mtime"));
-                  extracted.put("rsvp_count", 1);
-
-                  if (keepPublishing) {
-                    if(_partitionByKey) {
-                      producer.produce("meetupRSVPEvents",
-                          event.get("event_id").toString().getBytes(StandardCharsets.UTF_8),
-                          extracted.toString().getBytes(StandardCharsets.UTF_8));
-                    } else {
-                      producer.produce("meetupRSVPEvents", extracted.toString().getBytes(StandardCharsets.UTF_8));
-                    }
-                  }
-                } catch (Exception e) {
-                  LOGGER.error("error processing raw event ", e);
-                }
-              }
-            });
-            session.getBasicRemote().sendText("");
-          } catch (IOException e) {
-            LOGGER.error("found an event where data did not have all the fields, don't care about for quickstart", e);
+        if (_keepPublishing) {
+          if(_partitionByKey) {
+            _producer.produce("meetupRSVPEvents",
+                event.get("event_id").toString().getBytes(StandardCharsets.UTF_8),
+                extracted.toString().getBytes(StandardCharsets.UTF_8));
+          } else {
+            _producer.produce("meetupRSVPEvents", extracted.toString().getBytes(StandardCharsets.UTF_8));
           }
         }
-      }, cec, new URI("wss://stream.meetup.com/2/rsvps"));
+      }
     } catch (Exception e) {
       LOGGER.error("encountered an error running the meetupRSVPEvents stream", e);
     }
+  }
+
+  public void stopPublishing() {
+    _keepPublishing = false;
+    _service.shutdown();
+    _producer.close();
+  }
+
+  public void run() {
+    _service.submit((Runnable) () -> {
+      while (true) {
+        try {
+          if (!_keepPublishing) {
+            break;
+          }
+          publishStream();
+          Thread.sleep(1_000L);
+        } catch (Exception e) {
+          LOGGER.error(e.getMessage());
+          break;
+        }
+      }
+    });
   }
 }

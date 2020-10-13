@@ -111,10 +111,6 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.glassfish.tyrus.bundles</groupId>
-      <artifactId>tyrus-standalone-client</artifactId>
-    </dependency>
-    <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
     </dependency>
