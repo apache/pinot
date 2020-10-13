@@ -1,4 +1,8 @@
 databaseConfiguration:
+  #url: jdbc:h2:./config/h2db
+  #user: sa
+  #password: sa
+  #driver: org.h2.Driver
   url: jdbc:mysql://127.0.0.1:23306/thirdeye2?allowPublicKeyRetrieval=true&useSSL=false
   user: root
   password: root

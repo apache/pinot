@@ -37,10 +37,10 @@ app_type=$1
 if [[ "${app_type}" == "frontend" ]]; then
 echo "Starting TE Frontend"
 sleep 15
-java $JMX_CONFIG -javaagent:/opt/thirdeye/bin/jmx_prometheus_javaagent-0.13.0.jar=8080:/opt/thirdeye/config/default/jmx_config.yml -Dlog4j.configurationFile=log4j2.xml -cp "/opt/thirdeye/bin/thirdeye-pinot.jar" org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardApplication /opt/thirdeye/config/default
+java $JMX_CONFIG -javaagent:/opt/thirdeye/bin/jmx_prometheus_javaagent-0.13.0.jar=8080:/opt/thirdeye/config/default/jmx_config.yml -Dlog4j.configurationFile=log4j2.xml -cp "/opt/thirdeye/bin/thirdeye-dashboard-1.0.0-SNAPSHOT.jar" org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardApplication /opt/thirdeye/config/default
 elif [[ "${app_type}" == "backend" ]]; then
 echo "Starting TE Backend"
 sleep 15
-java $JMX_CONFIG -javaagent:/opt/thirdeye/bin/jmx_prometheus_javaagent-0.13.0.jar=8080:/opt/thirdeye/config/default/jmx_config.yml -Dlog4j.configurationFile=log4j2.xml -cp "/opt/thirdeye/bin/thirdeye-pinot.jar" org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyApplication /opt/thirdeye/config/default
+java $JMX_CONFIG -javaagent:/opt/thirdeye/bin/jmx_prometheus_javaagent-0.13.0.jar=8080:/opt/thirdeye/config/default/jmx_config.yml -Dlog4j.configurationFile=log4j2.xml -cp "/opt/thirdeye/bin/thirdeye-dashboard-1.0.0-SNAPSHOT.jar" org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyApplication /opt/thirdeye/config/default
 fi
 

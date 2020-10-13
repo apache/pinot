@@ -1,0 +1,16 @@
+
+# Please put the mock data source as the first in this configuration.
+dataSourceConfigs:
+  - className: org.apache.pinot.thirdeye.datasource.sql.SqlThirdEyeDataSource
+    properties:
+      MySQL:
+        - db:
+            mysql: jdbc:mysql://127.0.0.1:23306/te_metrics?allowPublicKeyRetrieval=true&useSSL=false
+          user: root
+          password: root
+          driver: com.mysql.cj.jdbc.Driver
+      PostgreSQL:
+        - db:
+            postgres: jdbc:postgresql://127.0.0.1:5432/thirdeye
+          user: root
+          password: root

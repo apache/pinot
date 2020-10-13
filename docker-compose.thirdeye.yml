@@ -34,6 +34,7 @@ services:
     volumes:
       - ./thirdeye/thirdeye-pinot/config-templates/cloud/persistence.yml.tmpl:/opt/thirdeye/config/default/persistence.yml.tmpl
       - ./thirdeye/thirdeye-pinot/config-templates/cloud/data-sources/data-sources-config.yml.tmpl:/opt/thirdeye/config/default/data-sources/data-sources-config.yml.tmpl
+      - ./thirdeye/thirdeye-pinot/jmx_config.yml:/opt/thirdeye/config/default/jmx_config.yml
         #- ./thirdeye/thirdeye-pinot/config-templates/dev/persistence.yml:/opt/thirdeye/config/default/persistence.yml
         #- ./thirdeye/thirdeye-pinot/config-templates/dev/data-sources/data-sources-config.yml:/opt/thirdeye/config/default/data-sources/data-sources-config.yml
       - ./dockerconf/entrypoint_dev.sh:/opt/thirdeye/bin/entrypoint_dev.sh
@@ -53,7 +54,8 @@ services:
       - 1427:1427
       - 8080:8080
         #entrypoint: ["/bin/sh", "/opt/thirdeye/bin/entrypoint_dev.sh", "frontend"]
-    entrypoint: ["/bin/sh", "/opt/thirdeye/bin/entrypoint.sh", "frontend"]
+    #entrypoint: ["/bin/sh", "/opt/thirdeye/bin/entrypoint.sh", "frontend"]
+    entrypoint: ["sleep", "3600"]
     depends_on:
       - thirdeye_mysql
     links:
@@ -63,6 +65,7 @@ services:
     volumes:
       - ./thirdeye/thirdeye-pinot/config-templates/cloud/persistence.yml.tmpl:/opt/thirdeye/config/default/persistence.yml.tmpl
       - ./thirdeye/thirdeye-pinot/config-templates/cloud/data-sources/data-sources-config.yml.tmpl:/opt/thirdeye/config/default/data-sources/data-sources-config.yml.tmpl
+      - ./thirdeye/thirdeye-pinot/jmx_config.yml:/opt/thirdeye/config/default/jmx_config.yml
         #- ./thirdeye/thirdeye-pinot/config-templates/dev/persistence.yml:/opt/thirdeye/config/default/persistence.yml
         #- ./thirdeye/thirdeye-pinot/config-templates/dev/data-sources/data-sources-config.yml:/opt/thirdeye/config/default/data-sources/data-sources-config.yml
       - ./dockerconf/entrypoint_dev.sh:/opt/thirdeye/bin/entrypoint_dev.sh
@@ -80,7 +83,8 @@ services:
       APP_MODE: prod
       JMX_CONFIG: "-Xms1G -Xmx3G"
       #entrypoint: ["/bin/sh", "/opt/thirdeye/bin/entrypoint_dev.sh", "backend"]
-    entrypoint: ["/bin/sh", "/opt/thirdeye/bin/entrypoint.sh", "backend"]
+    #entrypoint: ["/bin/sh", "/opt/thirdeye/bin/entrypoint.sh", "backend"]
+    entrypoint: ["sleep", "3600"]
     depends_on:
       - thirdeye_mysql
     links:

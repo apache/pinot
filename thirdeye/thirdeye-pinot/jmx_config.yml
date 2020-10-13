@@ -1,83 +1,68 @@
-#
-# Licensed to the Apache Software Foundation (ASF) under one
-# or more contributor license agreements.  See the NOTICE file
-# distributed with this work for additional information
-# regarding copyright ownership.  The ASF licenses this file
-# to you under the Apache License, Version 2.0 (the
-# "License"); you may not use this file except in compliance
-# with the License.  You may obtain a copy of the License at
-#
-#   http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing,
-# software distributed under the License is distributed on an
-# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-# KIND, either express or implied.  See the License for the
-# specific language governing permissions and limitations
-# under the License.
-#
-
-startDelaySeconds: 0
-ssl: false
-lowercaseOutputLabelNames: true
-lowercaseOutputName: true
-#whitelistObjectNames:
-#  - '_org_apache_pinot_thirdeye_anomaly_utils_thirdeyemetricsutil_count'
-#  - 'org.apache.pinot.thirdeye.anomaly.utils'
-#  - ' _org_apache_pinot_thirdeye_anomaly_utils_thirdeyemetricsutil_value'
-
-rules:
-  - pattern: 'metrics<name=io.dropwizard.jetty.MutableServletContextHandler.(\S*)><>(\w+)'
-    name: thirdeye_$1
-    attrNameSnakeCase: true
-    type: GAUGE
-    labels:
-      metric: $2
-  - pattern: 'metrics<name=org.eclipse.jetty.server.HttpConnectionFactory.1426.(\S*)><>(\w+)'
-    name: thirdeye_$1
-    attrNameSnakeCase: true
-    type: GAUGE
-    labels:
-      metric: $2
-  - pattern: 'metrics<name=org.eclipse.jetty.server.HttpConnectionFactory.1427.(\S*)><>(\w+)'
-    name: thirdeye_admin_$1
-    attrNameSnakeCase: true
-    type: GAUGE
-    labels:
-      metric: $2
-  - pattern: 'metrics<name=org.eclipse.jetty.util.thread.QueuedThreadPool.dw-admin.(\S*)><>(\w+)'
-    name: thirdeye_dropwizard_admin_$1
-    attrNameSnakeCase: true
-    type: GAUGE
-    labels:
-      metric: $2
-  - pattern: 'metrics<name=org.eclipse.jetty.util.thread.QueuedThreadPool.dw.(\S*)><>(\w+)'
-    name: thirdeye_dropwizard_$1
-    attrNameSnakeCase: true
-    type: GAUGE
-    labels:
-      metric: $2
-  - pattern: '"org.apache.pinot.thirdeye.anomaly.utils"<type="(\S*)", name="(\S*)"><>(\w+)'
-    name: thirdeye_$1_$2
-    attrNameSnakeCase: true
-    type: GAUGE
-    labels:
-      metric: $3
-  - pattern: 'java.lang<type=OperatingSystem><>(committed_virtual_memory|free_physical_memory|free_swap_space|total_physical_memory|total_swap_space)_size:'
-    name: os_$1_bytes
-    type: GAUGE
-    attrNameSnakeCase: true
-  - pattern: 'java.lang<type=OperatingSystem><>((?!process_cpu_time)\w+):'
-    name: os_$1
-    type: GAUGE
-    attrNameSnakeCase: true
-#rules:
-#  - pattern: 'java.lang<type=OperatingSystem><>(committed_virtual_memory|free_physical_memory|free_swap_space|total_physical_memory|total_swap_space)_size:'
-#    name: os_$1_bytes
-#    type: GAUGE
-#    attrNameSnakeCase: true
-#  - pattern: 'java.lang<type=OperatingSystem><>((?!process_cpu_time)\w+):'
-#    name: os_$1
-#    type: GAUGE
-#    attrNameSnakeCase: true
+    #
+    # Licensed to the Apache Software Foundation (ASF) under one
+    # or more contributor license agreements.  See the NOTICE file
+    # distributed with this work for additional information
+    # regarding copyright ownership.  The ASF licenses this file
+    # to you under the Apache License, Version 2.0 (the
+    # "License"); you may not use this file except in compliance
+    # with the License.  You may obtain a copy of the License at
+    #
+    #   http://www.apache.org/licenses/LICENSE-2.0
+    #
+    # Unless required by applicable law or agreed to in writing,
+    # software distributed under the License is distributed on an
+    # "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+    # KIND, either express or implied.  See the License for the
+    # specific language governing permissions and limitations
+    # under the License.
+    #
+    startDelaySeconds: 0
+    ssl: false
+    lowercaseOutputLabelNames: true
+    lowercaseOutputName: true
+    rules:
+      - pattern: 'metrics<name=io.dropwizard.jetty.MutableServletContextHandler.(\S*)><>(\w+)'
+        name: thirdeye_$1
+        attrNameSnakeCase: true
+        type: GAUGE
+        labels:
+          metric: $2
+      - pattern: 'metrics<name=org.eclipse.jetty.server.HttpConnectionFactory.1426.(\S*)><>(\w+)'
+        name: thirdeye_$1
+        attrNameSnakeCase: true
+        type: GAUGE
+        labels:
+          metric: $2
+      - pattern: 'metrics<name=org.eclipse.jetty.server.HttpConnectionFactory.1427.(\S*)><>(\w+)'
+        name: thirdeye_admin_$1
+        attrNameSnakeCase: true
+        type: GAUGE
+        labels:
+          metric: $2
+      - pattern: 'metrics<name=org.eclipse.jetty.util.thread.QueuedThreadPool.dw-admin.(\S*)><>(\w+)'
+        name: thirdeye_dropwizard_admin_$1
+        attrNameSnakeCase: true
+        type: GAUGE
+        labels:
+          metric: $2
+      - pattern: 'metrics<name=org.eclipse.jetty.util.thread.QueuedThreadPool.dw.(\S*)><>(\w+)'
+        name: thirdeye_dropwizard_$1
+        attrNameSnakeCase: true
+        type: GAUGE
+        labels:
+          metric: $2
+      - pattern: '"org.apache.pinot.thirdeye.anomaly.utils"<type="(\S*)", name="(\S*)"><>(\w+)'
+        name: thirdeye_$1_$2
+        attrNameSnakeCase: true
+        type: GAUGE
+        labels:
+          metric: $3
+      - pattern: 'java.lang<type=OperatingSystem><>(committed_virtual_memory|free_physical_memory|free_swap_space|total_physical_memory|total_swap_space)_size:'
+        name: os_$1_bytes
+        type: GAUGE
+        attrNameSnakeCase: true
+      - pattern: 'java.lang<type=OperatingSystem><>((?!process_cpu_time)\w+):'
+        name: os_$1
+        type: GAUGE
+        attrNameSnakeCase: true
 

@@ -27,7 +27,7 @@ ENV TE_HOME=/opt/thirdeye
 
 RUN mkdir -p ${TE_HOME}/bin && mkdir -p ${TE_HOME}/config/default/data-sources && mkdir -p ${TE_HOME}/config/default/detector-config/anomaly-functions && mkdir -p ${TE_HOME}/config/default/data
 
-COPY ${TE_GITHUB_SRC_DIR}/thirdeye/thirdeye-pinot/target/thirdeye-pinot-1.0.0-SNAPSHOT.jar ${TE_HOME}/bin/thirdeye-pinot-1.0.0-SNAPSHOT.jar
+COPY ${TE_GITHUB_SRC_DIR}/thirdeye/thirdeye-dashboard/target/thirdeye-dashboard-1.0.0-SNAPSHOT.jar ${TE_HOME}/bin/
 COPY ${TE_GITHUB_SRC_DIR}/thirdeye/thirdeye-pinot/jmx_prometheus_javaagent-0.13.0.jar ${TE_HOME}/bin/jmx_prometheus_javaagent-0.13.0.jar
 COPY ${TE_GITHUB_SRC_DIR}/dockerconf/entrypoint.sh ${TE_HOME}/bin/entrypoint.sh
 COPY ${TE_GITHUB_SRC_DIR}/thirdeye/thirdeye-dashboard/config/* ${TE_HOME}/config/default/
