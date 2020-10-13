@@ -35,7 +35,7 @@ import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.TableDataManager;
 import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
-import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
+import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
@@ -86,7 +86,8 @@ public abstract class BaseResourceTest {
     // Mock the server instance
     ServerInstance serverInstance = mock(ServerInstance.class);
     when(serverInstance.getInstanceDataManager()).thenReturn(instanceDataManager);
-    when(serverInstance.getInstanceDataManager().getSegmentFileDirectory()).thenReturn(FileUtils.getTempDirectoryPath());
+    when(serverInstance.getInstanceDataManager().getSegmentFileDirectory())
+        .thenReturn(FileUtils.getTempDirectoryPath());
     // Add the default tables and segments.
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME);
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
@@ -113,7 +114,8 @@ public abstract class BaseResourceTest {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
-  protected List<ImmutableSegment> setUpSegments(String tableNameWithType, int numSegments, List<ImmutableSegment> segments)
+  protected List<ImmutableSegment> setUpSegments(String tableNameWithType, int numSegments,
+      List<ImmutableSegment> segments)
       throws Exception {
     List<ImmutableSegment> immutableSegments = new ArrayList<>();
     for (int i = 0; i < numSegments; i++) {
@@ -122,7 +124,8 @@ public abstract class BaseResourceTest {
     return immutableSegments;
   }
 
-  protected ImmutableSegment setUpSegment(String tableNameWithType, String segmentNamePostfix, List<ImmutableSegment> segments)
+  protected ImmutableSegment setUpSegment(String tableNameWithType, String segmentNamePostfix,
+      List<ImmutableSegment> segments)
       throws Exception {
     SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(_avroFile, INDEX_DIR, tableNameWithType);
@@ -140,13 +143,14 @@ public abstract class BaseResourceTest {
   @SuppressWarnings("unchecked")
   protected void addTable(String tableNameWithType) {
     TableDataManagerConfig tableDataManagerConfig = mock(TableDataManagerConfig.class);
-    when(tableDataManagerConfig.getTableDataManagerType())
-        .thenReturn(TableNameBuilder.getTableTypeFromTableName(tableNameWithType).name());
     when(tableDataManagerConfig.getTableName()).thenReturn(tableNameWithType);
     when(tableDataManagerConfig.getDataDir()).thenReturn(INDEX_DIR.getAbsolutePath());
-    TableDataManager tableDataManager = TableDataManagerProvider
-        .getTableDataManager(tableDataManagerConfig, "testInstance", mock(ZkHelixPropertyStore.class),
-            mock(ServerMetrics.class), mock(HelixManager.class));
+    // NOTE: Use OfflineTableDataManager for both OFFLINE and REALTIME table because RealtimeTableDataManager requires
+    //       table config.
+    TableDataManager tableDataManager = new OfflineTableDataManager();
+    tableDataManager
+        .init(tableDataManagerConfig, "testInstance", mock(ZkHelixPropertyStore.class), mock(ServerMetrics.class),
+            mock(HelixManager.class));
     tableDataManager.start();
     _tableDataManagerMap.put(tableNameWithType, tableDataManager);
   }
