@@ -1,0 +1,10 @@
+
+# Please put the mock data source as the first in this configuration.
+dataSourceConfigs:
+  - className: org.apache.pinot.thirdeye.datasource.sql.SqlThirdEyeDataSource
+    properties:
+      PostgreSQL:
+        - db:
+            postgres: jdbc:postgresql://POSTGRES_HOSTNAME:POSTGRES_PORT/POSTGRES_DATABASE
+          user: root
+          password: root
