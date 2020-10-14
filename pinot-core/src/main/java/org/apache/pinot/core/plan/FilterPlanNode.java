@@ -61,13 +61,13 @@ public class FilterPlanNode implements PlanNode {
   public BaseFilterOperator run() {
     FilterContext filter = _queryContext.getFilter();
     ValidDocIndexReader validDocIndexReader = _indexSegment.getValidDocIndex();
-    boolean upsertDisabled = false;
+    boolean upsertSkipped = false;
     if (_queryContext.getQueryOptions() != null) {
-      upsertDisabled = new QueryOptions(_queryContext.getQueryOptions()).isUpsertDisabled();
+      upsertSkipped = new QueryOptions(_queryContext.getQueryOptions()).isUpsertSkipped();
     }
     if (filter != null) {
       BaseFilterOperator filterOperator = constructPhysicalOperator(filter, _queryContext.getDebugOptions());
-      if (validDocIndexReader != null && !upsertDisabled) {
+      if (validDocIndexReader != null && !upsertSkipped) {
         BaseFilterOperator validDocFilter =
             new BitmapBasedFilterOperator(validDocIndexReader.getValidDocBitmap(), false, _numDocs);
         return FilterOperatorUtils.getAndFilterOperator(Arrays.asList(filterOperator, validDocFilter), _numDocs,
@@ -75,7 +75,7 @@ public class FilterPlanNode implements PlanNode {
       } else {
         return filterOperator;
       }
-    } else if (validDocIndexReader != null && !upsertDisabled) {
+    } else if (validDocIndexReader != null && !upsertSkipped) {
       return new BitmapBasedFilterOperator(validDocIndexReader.getValidDocBitmap(), false, _numDocs);
     } else {
       return new MatchAllFilterOperator(_numDocs);
