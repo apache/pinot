@@ -93,14 +93,12 @@ public class CSVRecordReader implements RecordReader {
       multiValueDelimiter = config.getMultiValueDelimiter();
     }
     _recordExtractor = new CSVRecordExtractor();
-    CSVRecordExtractorConfig recordExtractorConfig = new CSVRecordExtractorConfig();
-    recordExtractorConfig.setMultiValueDelimiter(multiValueDelimiter);
 
     init();
 
-    if (fieldsToRead == null || fieldsToRead.isEmpty()) {
-      fieldsToRead = _parser.getHeaderMap().keySet();
-    }
+    CSVRecordExtractorConfig recordExtractorConfig = new CSVRecordExtractorConfig();
+    recordExtractorConfig.setMultiValueDelimiter(multiValueDelimiter);
+    recordExtractorConfig.setColumnNames(_parser.getHeaderMap().keySet());
     _recordExtractor.init(fieldsToRead, recordExtractorConfig);
   }
 

@@ -22,23 +22,28 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.spi.data.readers.BaseRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 
 
 /**
  * Extractor for CSV records
  */
-public class CSVRecordExtractor implements RecordExtractor<CSVRecord> {
+public class CSVRecordExtractor extends BaseRecordExtractor<CSVRecord> {
 
   private char _multiValueDelimiter;
   private Set<String> _fields;
 
   @Override
   public void init(Set<String> fields, RecordExtractorConfig recordExtractorConfig) {
-    _fields = fields;
-    _multiValueDelimiter = ((CSVRecordExtractorConfig) recordExtractorConfig).getMultiValueDelimiter();
+    CSVRecordExtractorConfig csvRecordExtractorConfig = (CSVRecordExtractorConfig) recordExtractorConfig;
+    if (fields == null || fields.isEmpty()) {
+      _fields = csvRecordExtractorConfig.getColumnNames();
+    } else {
+      _fields = fields;
+    }
+    _multiValueDelimiter = csvRecordExtractorConfig.getMultiValueDelimiter();
   }
 
   @Override
