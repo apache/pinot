@@ -21,6 +21,7 @@ package org.apache.pinot.broker.requesthandler;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.broker.api.RequestStatistics;
@@ -69,6 +70,7 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
   @Override
   public synchronized void shutDown() {
     _queryRouter.shutDown();
+    _brokerReduceService.shutDown();
   }
 
   @Override
@@ -104,8 +106,9 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
     int numServersResponded = dataTableMap.size();
 
     long reduceStartTimeNs = System.nanoTime();
+    long reduceTimeOutMs = timeoutMs - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - scatterGatherStartTimeNs);
     BrokerResponseNative brokerResponse =
-        _brokerReduceService.reduceOnDataTable(originalBrokerRequest, dataTableMap, _brokerMetrics);
+        _brokerReduceService.reduceOnDataTable(originalBrokerRequest, dataTableMap, reduceTimeOutMs, _brokerMetrics);
     final long reduceTimeNanos = System.nanoTime() - reduceStartTimeNs;
     requestStatistics.setReduceTimeNanos(reduceTimeNanos);
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REDUCE, reduceTimeNanos);

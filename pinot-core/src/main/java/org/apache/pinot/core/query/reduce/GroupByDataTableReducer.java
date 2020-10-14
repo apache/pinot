@@ -25,16 +25,23 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.GroupByResult;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.SimpleIndexedTable;
@@ -48,6 +55,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.QueryOptions;
+import org.apache.pinot.core.util.trace.TraceRunnable;
 
 
 /**
@@ -55,6 +63,8 @@ import org.apache.pinot.core.util.QueryOptions;
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class GroupByDataTableReducer implements DataTableReducer {
+  private static final int MIN_DATA_TABLES_FOR_CONCURRENT_REDUCE = 2; // TBD, find a better value.
+
   private final QueryContext _queryContext;
   private final AggregationFunction[] _aggregationFunctions;
   private final int _numAggregationFunctions;
@@ -89,7 +99,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
   @Override
   public void reduceAndSetResults(String tableName, DataSchema dataSchema,
       Map<ServerRoutingInstance, DataTable> dataTableMap, BrokerResponseNative brokerResponseNative,
-      BrokerMetrics brokerMetrics) {
+      DataTableReducerContext reducerContext, BrokerMetrics brokerMetrics) {
     assert dataSchema != null;
     int resultSize = 0;
     Collection<DataTable> dataTables = dataTableMap.values();
@@ -113,7 +123,12 @@ public class GroupByDataTableReducer implements DataTableReducer {
         // 1. groupByMode = sql, responseFormat = sql
         // This is the primary SQL compliant group by
 
-        setSQLGroupByInResultTable(brokerResponseNative, dataSchema, dataTables);
+        try {
+          setSQLGroupByInResultTable(brokerResponseNative, dataSchema, dataTables, reducerContext);
+        } catch (TimeoutException e) {
+          brokerResponseNative.getProcessingExceptions()
+              .add(new QueryProcessingException(QueryException.BROKER_TIMEOUT_ERROR_CODE, e.getMessage()));
+        }
         resultSize = brokerResponseNative.getResultTable().getRows().size();
       } else {
         // 2. groupByMode = sql, responseFormat = pql
@@ -121,7 +136,13 @@ public class GroupByDataTableReducer implements DataTableReducer {
         // This mode is useful for users who want to avail of SQL compliant group by behavior,
         // w/o having to forcefully move to a new result type
 
-        setSQLGroupByInAggregationResults(brokerResponseNative, dataSchema, dataTables);
+        try {
+          setSQLGroupByInAggregationResults(brokerResponseNative, dataSchema, dataTables, reducerContext);
+        } catch (TimeoutException e) {
+          brokerResponseNative.getProcessingExceptions()
+              .add(new QueryProcessingException(QueryException.BROKER_TIMEOUT_ERROR_CODE, e.getMessage()));
+        }
+
         if (!brokerResponseNative.getAggregationResults().isEmpty()) {
           resultSize = brokerResponseNative.getAggregationResults().get(0).getGroupByResult().size();
         }
@@ -159,10 +180,13 @@ public class GroupByDataTableReducer implements DataTableReducer {
    * @param brokerResponseNative broker response
    * @param dataSchema data schema
    * @param dataTables Collection of data tables
+   * @param reducerContext DataTableReducer context
+   * @throws TimeoutException If unable complete within timeout.
    */
   private void setSQLGroupByInResultTable(BrokerResponseNative brokerResponseNative, DataSchema dataSchema,
-      Collection<DataTable> dataTables) {
-    IndexedTable indexedTable = getIndexedTable(dataSchema, dataTables);
+      Collection<DataTable> dataTables, DataTableReducerContext reducerContext)
+      throws TimeoutException {
+    IndexedTable indexedTable = getIndexedTable(dataSchema, dataTables, reducerContext);
     Iterator<Record> sortedIterator = indexedTable.iterator();
     DataSchema prePostAggregationDataSchema = getPrePostAggregationDataSchema(dataSchema);
     int limit = _queryContext.getLimit();
@@ -231,47 +255,120 @@ public class GroupByDataTableReducer implements DataTableReducer {
     return new DataSchema(columnNames, columnDataTypes);
   }
 
-  private IndexedTable getIndexedTable(DataSchema dataSchema, Collection<DataTable> dataTables) {
+  private IndexedTable getIndexedTable(DataSchema dataSchema, Collection<DataTable> dataTablesToReduce,
+      DataTableReducerContext reducerContext)
+      throws TimeoutException {
+    long start = System.currentTimeMillis();
+    int numDataTables = dataTablesToReduce.size();
+
+    // Get the number of threads to use for reducing.
+    int numReduceThreadsToUse = getNumReduceThreadsToUse(numDataTables, reducerContext.getMaxReduceThreadsPerQuery());
+
+    // In case of single reduce thread, fall back to SimpleIndexedTable to avoid redundant locking/unlocking calls.
     int capacity = GroupByUtils.getTableCapacity(_queryContext);
-    IndexedTable indexedTable = new SimpleIndexedTable(dataSchema, _queryContext, capacity);
+    IndexedTable indexedTable =
+        (numReduceThreadsToUse > 1) ? new ConcurrentIndexedTable(dataSchema, _queryContext, capacity)
+            : new SimpleIndexedTable(dataSchema, _queryContext, capacity);
+
+    Future[] futures = new Future[numDataTables];
+    CountDownLatch countDownLatch = new CountDownLatch(numDataTables);
+
+    // Create groups of data tables that each thread can process concurrently.
+    // Given that numReduceThreads is <= numDataTables, each group will have at least one data table.
+    ArrayList<DataTable> dataTables = new ArrayList<>(dataTablesToReduce);
+    List<List<DataTable>> reduceGroups = new ArrayList<>(numReduceThreadsToUse);
+
+    for (int i = 0; i < numReduceThreadsToUse; i++) {
+      reduceGroups.add(new ArrayList<>());
+    }
+    for (int i = 0; i < numDataTables; i++) {
+      reduceGroups.get(i % numReduceThreadsToUse).add(dataTables.get(i));
+    }
+
+    int cnt = 0;
     ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
-    for (DataTable dataTable : dataTables) {
-      int numRows = dataTable.getNumberOfRows();
-      for (int rowId = 0; rowId < numRows; rowId++) {
-        Object[] values = new Object[_numColumns];
-        for (int colId = 0; colId < _numColumns; colId++) {
-          switch (columnDataTypes[colId]) {
-            case INT:
-              values[colId] = dataTable.getInt(rowId, colId);
-              break;
-            case LONG:
-              values[colId] = dataTable.getLong(rowId, colId);
-              break;
-            case FLOAT:
-              values[colId] = dataTable.getFloat(rowId, colId);
-              break;
-            case DOUBLE:
-              values[colId] = dataTable.getDouble(rowId, colId);
-              break;
-            case STRING:
-              values[colId] = dataTable.getString(rowId, colId);
-              break;
-            case BYTES:
-              values[colId] = dataTable.getBytes(rowId, colId);
-              break;
-            case OBJECT:
-              values[colId] = dataTable.getObject(rowId, colId);
-              break;
-            // Add other aggregation intermediate result / group-by column type supports here
-            default:
-              throw new IllegalStateException();
+    for (List<DataTable> reduceGroup : reduceGroups) {
+      futures[cnt++] = reducerContext.getExecutorService().submit(new TraceRunnable() {
+        @Override
+        public void runJob() {
+          for (DataTable dataTable : reduceGroup) {
+            int numRows = dataTable.getNumberOfRows();
+
+            try {
+              for (int rowId = 0; rowId < numRows; rowId++) {
+                Object[] values = new Object[_numColumns];
+                for (int colId = 0; colId < _numColumns; colId++) {
+                  switch (columnDataTypes[colId]) {
+                    case INT:
+                      values[colId] = dataTable.getInt(rowId, colId);
+                      break;
+                    case LONG:
+                      values[colId] = dataTable.getLong(rowId, colId);
+                      break;
+                    case FLOAT:
+                      values[colId] = dataTable.getFloat(rowId, colId);
+                      break;
+                    case DOUBLE:
+                      values[colId] = dataTable.getDouble(rowId, colId);
+                      break;
+                    case STRING:
+                      values[colId] = dataTable.getString(rowId, colId);
+                      break;
+                    case BYTES:
+                      values[colId] = dataTable.getBytes(rowId, colId);
+                      break;
+                    case OBJECT:
+                      values[colId] = dataTable.getObject(rowId, colId);
+                      break;
+                    // Add other aggregation intermediate result / group-by column type supports here
+                    default:
+                      throw new IllegalStateException();
+                  }
+                }
+                indexedTable.upsert(new Record(values));
+              }
+            } finally {
+              countDownLatch.countDown();
+            }
           }
         }
-        indexedTable.upsert(new Record(values));
-      }
+      });
     }
+
+    try {
+      long timeOutMs = reducerContext.getReduceTimeOutMs() - (System.currentTimeMillis() - start);
+      countDownLatch.await(timeOutMs, TimeUnit.MILLISECONDS);
+    } catch (InterruptedException e) {
+      for (Future future : futures) {
+        if (!future.isDone()) {
+          future.cancel(true);
+        }
+      }
+      throw new TimeoutException("Timed out in broker reduce phase.");
+    }
+
     indexedTable.finish(true);
     return indexedTable;
+  }
+
+  /**
+   * Computes the number of reduce threads to use per query.
+   * <ul>
+   *   <li> Use single thread if number of data tables to reduce is less than {@value #MIN_DATA_TABLES_FOR_CONCURRENT_REDUCE}.</li>
+   *   <li> Else, use min of max allowed reduce threads per query, and number of data tables.</li>
+   * </ul>
+   *
+   * @param numDataTables Number of data tables to reduce
+   * @param maxReduceThreadsPerQuery Max allowed reduce threads per query
+   * @return Number of reduce threads to use for the query
+   */
+  private int getNumReduceThreadsToUse(int numDataTables, int maxReduceThreadsPerQuery) {
+    // Use single thread if number of data tables < MIN_DATA_TABLES_FOR_CONCURRENT_REDUCE.
+    if (numDataTables < MIN_DATA_TABLES_FOR_CONCURRENT_REDUCE) {
+      return Math.min(1, numDataTables); // Number of data tables can be zero.
+    }
+
+    return Math.min(maxReduceThreadsPerQuery, numDataTables);
   }
 
   /**
@@ -280,9 +377,12 @@ public class GroupByDataTableReducer implements DataTableReducer {
    * @param brokerResponseNative broker response
    * @param dataSchema data schema
    * @param dataTables Collection of data tables
+   * @param reducerContext DataTableReducer context
+   * @throws TimeoutException If unable to complete within the timeout.
    */
   private void setSQLGroupByInAggregationResults(BrokerResponseNative brokerResponseNative, DataSchema dataSchema,
-      Collection<DataTable> dataTables) {
+      Collection<DataTable> dataTables, DataTableReducerContext reducerContext)
+      throws TimeoutException {
 
     List<String> groupByColumns = new ArrayList<>(_numGroupByExpressions);
     int idx = 0;
@@ -300,7 +400,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     }
 
     if (!dataTables.isEmpty()) {
-      IndexedTable indexedTable = getIndexedTable(dataSchema, dataTables);
+      IndexedTable indexedTable = getIndexedTable(dataSchema, dataTables, reducerContext);
 
       int limit = _queryContext.getLimit();
       Iterator<Record> sortedIterator = indexedTable.iterator();

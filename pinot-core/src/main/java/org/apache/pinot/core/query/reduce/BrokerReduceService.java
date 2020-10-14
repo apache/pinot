@@ -18,9 +18,13 @@
  */
 package org.apache.pinot.core.query.reduce;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -31,13 +35,17 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -47,8 +55,36 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 @ThreadSafe
 public class BrokerReduceService {
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(BrokerReduceService.class);
+
+  // brw -> Shorthand for broker reduce worker threads.
+  private static final String REDUCE_THREAD_NAME_FORMAT = "brw-%d";
+
+  // Set the reducer priority higher than NORM but lower than MAX, because if a query is complete
+  // we want to deserialize and return response as soon. This is the same as server side 'pqr' threads.
+  protected static final int QUERY_RUNNER_THREAD_PRIORITY = 7;
+
+  private final ExecutorService _reduceExecutorService;
+  private final int _maxReduceThreadsPerQuery;
+
+  public BrokerReduceService(PinotConfiguration config) {
+    _maxReduceThreadsPerQuery = config.getProperty(CommonConstants.Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY,
+        CommonConstants.Broker.DEFAULT_MAX_REDUCE_THREADS_PER_QUERY);
+
+    int numThreadsInExecutorService = Runtime.getRuntime().availableProcessors();
+    LOGGER.info("Initializing BrokerReduceService with {} threads, and {} max reduce threads.",
+        numThreadsInExecutorService, _maxReduceThreadsPerQuery);
+
+    ThreadFactory reduceThreadFactory =
+        new ThreadFactoryBuilder().setDaemon(false).setPriority(QUERY_RUNNER_THREAD_PRIORITY)
+            .setNameFormat(REDUCE_THREAD_NAME_FORMAT).build();
+
+    // ExecutorService is initialized with numThreads same as availableProcessors.
+    _reduceExecutorService = Executors.newFixedThreadPool(numThreadsInExecutorService, reduceThreadFactory);
+  }
+
   public BrokerResponseNative reduceOnDataTable(BrokerRequest brokerRequest,
-      Map<ServerRoutingInstance, DataTable> dataTableMap, @Nullable BrokerMetrics brokerMetrics) {
+      Map<ServerRoutingInstance, DataTable> dataTableMap, long reduceTimeOutMs, @Nullable BrokerMetrics brokerMetrics) {
     if (dataTableMap.size() == 0) {
       // Empty response.
       return BrokerResponseNative.empty();
@@ -189,8 +225,8 @@ public class BrokerReduceService {
 
     QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
     DataTableReducer dataTableReducer = ResultReducerFactory.getResultReducer(queryContext);
-    dataTableReducer
-        .reduceAndSetResults(tableName, cachedDataSchema, dataTableMap, brokerResponseNative, brokerMetrics);
+    dataTableReducer.reduceAndSetResults(tableName, cachedDataSchema, dataTableMap, brokerResponseNative,
+        new DataTableReducerContext(_reduceExecutorService, _maxReduceThreadsPerQuery, reduceTimeOutMs), brokerMetrics);
     updateAlias(queryContext, brokerResponseNative);
     return brokerResponseNative;
   }
@@ -218,5 +254,9 @@ public class BrokerReduceService {
         columnNames[i] = alias;
       }
     }
+  }
+
+  public void shutDown() {
+    _reduceExecutorService.shutdownNow();
   }
 }

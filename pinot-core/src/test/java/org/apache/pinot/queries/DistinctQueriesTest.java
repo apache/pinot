@@ -35,6 +35,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Server;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -59,6 +60,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -319,6 +321,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
   @Test
   public void testDistinctInnerSegment()
       throws Exception {
+    //@formatter:off
     testDistinctInnerSegmentHelper(new String[]{
         "SELECT DISTINCT(intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn) FROM testTable LIMIT 10000",
         "SELECT DISTINCT(stringColumn, bytesColumn, floatColumn) FROM testTable WHERE intColumn >= 60 LIMIT 10000",
@@ -326,6 +329,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         "SELECT DISTINCT(ADD ( intColumn,  floatColumn  ), stringColumn) FROM testTable WHERE longColumn < 60 ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10",
         "SELECT DISTINCT(floatColumn, longColumn) FROM testTable WHERE stringColumn = 'a' ORDER BY longColumn LIMIT 10"
     }, true);
+    //@formatter:on
   }
 
   /**
@@ -342,6 +346,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
   @Test
   public void testNonAggGroupByRewriteToDistinctInnerSegment()
       throws Exception {
+    //@formatter:off
     testDistinctInnerSegmentHelper(new String[]{
         "SELECT intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn FROM testTable GROUP BY intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn LIMIT 10000",
         "SELECT stringColumn, bytesColumn, floatColumn FROM testTable WHERE intColumn >= 60 GROUP BY stringColumn, bytesColumn, floatColumn LIMIT 10000",
@@ -349,6 +354,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         "SELECT ADD ( intColumn,  floatColumn  ), stringColumn FROM testTable WHERE longColumn < 60 GROUP BY ADD ( intColumn,  floatColumn  ), stringColumn ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10",
         "SELECT floatColumn, longColumn FROM testTable WHERE stringColumn = 'a' GROUP BY floatColumn, longColumn ORDER BY longColumn LIMIT 10"
     }, false);
+    //@formatter:on
   }
 
   /**
@@ -694,6 +700,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
   @Test
   public void testDistinctInterSegment()
       throws Exception {
+    //@formatter:off
     String[] pqlQueries = new String[] {
         "SELECT DISTINCT(intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn) FROM testTable LIMIT 10000",
         "SELECT DISTINCT(stringColumn, bytesColumn, floatColumn) FROM testTable WHERE intColumn >= 60 LIMIT 10000",
@@ -712,6 +719,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         "SELECT DISTINCT intColumn FROM testTable WHERE floatColumn > 200 ORDER BY intColumn ASC LIMIT 5",
         "SELECT DISTINCT longColumn FROM testTable WHERE doubleColumn < 200 ORDER BY longColumn DESC LIMIT 5",
     };
+    //@formatter:on
     testDistinctInterSegmentHelper(pqlQueries, sqlQueries);
   }
 
@@ -738,6 +746,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
   @Test
   public void testNonAggGroupByRewriteToDistinctInterSegment()
       throws Exception {
+    //@formatter:off
     String[] pqlQueries = new String[] {
         "SELECT DISTINCT(intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn) FROM testTable LIMIT 10000",
         "SELECT DISTINCT(stringColumn, bytesColumn, floatColumn) FROM testTable WHERE intColumn >= 60 LIMIT 10000",
@@ -756,6 +765,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         "SELECT intColumn FROM testTable WHERE floatColumn > 200 GROUP BY intColumn ORDER BY intColumn ASC LIMIT 5",
         "SELECT longColumn FROM testTable WHERE doubleColumn < 200 GROUP BY longColumn ORDER BY longColumn DESC LIMIT 5",
     };
+    //@formatter:on
     testDistinctInterSegmentHelper(pqlQueries, sqlQueries);
   }
 
@@ -774,10 +784,16 @@ public class DistinctQueriesTest extends BaseQueriesTest {
             System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS).execute();
 
     // Broker side
-    BrokerReduceService brokerReduceService = new BrokerReduceService();
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY, 2); // 2 Threads for 2 data-tables.
+    BrokerReduceService brokerReduceService = new BrokerReduceService(new PinotConfiguration(properties));
     Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
     dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.OFFLINE), instanceResponse0);
     dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.REALTIME), instanceResponse1);
-    return brokerReduceService.reduceOnDataTable(queryContext.getBrokerRequest(), dataTableMap, null);
+    BrokerResponseNative brokerResponse = brokerReduceService
+        .reduceOnDataTable(queryContext.getBrokerRequest(), dataTableMap,
+            CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS, null);
+    brokerReduceService.shutDown();
+    return brokerResponse;
   }
 }

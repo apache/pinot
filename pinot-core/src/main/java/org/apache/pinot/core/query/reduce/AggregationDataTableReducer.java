@@ -63,7 +63,7 @@ public class AggregationDataTableReducer implements DataTableReducer {
   @Override
   public void reduceAndSetResults(String tableName, DataSchema dataSchema,
       Map<ServerRoutingInstance, DataTable> dataTableMap, BrokerResponseNative brokerResponseNative,
-      BrokerMetrics brokerMetrics) {
+      DataTableReducerContext reducerContext, BrokerMetrics brokerMetrics) {
     if (dataTableMap.isEmpty()) {
       if (_responseFormatSql) {
         DataSchema resultTableSchema =
