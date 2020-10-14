@@ -95,7 +95,7 @@ public class PartitionUpsertMetadataManager {
             }
           }
 
-          validDocIds.checkAndAdd(recordLocation.getDocId());
+          validDocIds.add(recordLocation.getDocId());
           return recordLocation;
         } else {
           // No need to update
@@ -103,7 +103,7 @@ public class PartitionUpsertMetadataManager {
         }
       } else {
         // New primary key
-        validDocIds.checkAndAdd(recordLocation.getDocId());
+        validDocIds.add(recordLocation.getDocId());
         return recordLocation;
       }
     });

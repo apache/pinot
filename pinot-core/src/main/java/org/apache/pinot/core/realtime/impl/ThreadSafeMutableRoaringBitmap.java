@@ -36,24 +36,16 @@ public class ThreadSafeMutableRoaringBitmap {
     _mutableRoaringBitmap.add(firstDocId);
   }
 
-  public void checkAndAdd(int docId) {
-    if (!_mutableRoaringBitmap.contains(docId)) {
-      synchronized (this) {
-        _mutableRoaringBitmap.add(docId);
-      }
-    }
+  public synchronized void add(int docId) {
+    _mutableRoaringBitmap.add(docId);
   }
 
-  public void remove(int docId) {
-    if (contains(docId)) {
-      synchronized (this) {
-        _mutableRoaringBitmap.remove(docId);
-      }
-    }
-  }
-
-  public boolean contains(int docId) {
+  public synchronized boolean contains(int docId) {
     return _mutableRoaringBitmap.contains(docId);
+  }
+
+  public synchronized void remove(int docId) {
+    _mutableRoaringBitmap.remove(docId);
   }
 
   public synchronized MutableRoaringBitmap getMutableRoaringBitmap() {

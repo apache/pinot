@@ -148,6 +148,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     String consumerDirPath = getConsumerDir();
     File consumerDir = new File(consumerDirPath);
 
+    // NOTE: Upsert has to be set up when starting the server. Changing the table config without restarting the server
+    //       won't enable/disable the upsert on the fly.
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, _tableNameWithType);
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", _tableNameWithType);
     _upsertMode = tableConfig.getUpsertMode();
