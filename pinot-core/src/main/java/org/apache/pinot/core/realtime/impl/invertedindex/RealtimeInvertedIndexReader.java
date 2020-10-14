@@ -56,7 +56,7 @@ public class RealtimeInvertedIndexReader implements InvertedIndexReader<MutableR
       }
     } else {
       // Bitmap for the dictionary id already exists, check and add document id into the bitmap
-      _bitmaps.get(dictId).checkAndAdd(docId);
+      _bitmaps.get(dictId).add(docId);
     }
   }
 

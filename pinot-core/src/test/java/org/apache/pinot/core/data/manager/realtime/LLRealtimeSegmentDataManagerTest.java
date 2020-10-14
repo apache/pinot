@@ -42,6 +42,7 @@ import org.apache.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConsumerFactory;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMessageDecoder;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -60,6 +61,7 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+
 
 // TODO Re-write this test using the stream abstraction
 public class LLRealtimeSegmentDataManagerTest {
@@ -107,14 +109,18 @@ public class LLRealtimeSegmentDataManagerTest {
           + "      \"stream.fakeStream.zk.broker.url\": \"kafka-broker:2181/kafka-queuing\", \n"
           + "      \"streamType\": \"fakeStream\"\n" + "    }\n" + "  }, \n"
           + "  \"tableName\": \"Coffee_REALTIME\", \n" + "  \"tableType\": \"realtime\", \n" + "  \"tenants\": {\n"
-          + "    \"broker\": \"shared\", \n" + "    \"server\": \"server-1\"\n" + "  }\n" + "}";
+          + "    \"broker\": \"shared\", \n" + "    \"server\": \"server-1\"\n" + "  },\n"
+          + " \"upsertConfig\": {\"mode\": \"FULL\" } \n"
+          + "}";
 
   private String makeSchema() {
     return "{" + "  \"schemaName\":\"SchemaTest\"," + "  \"metricFieldSpecs\":[" + "    {\"name\":\"m\",\"dataType\":\""
         + "LONG" + "\"}" + "  ]," + "  \"dimensionFieldSpecs\":[" + "    {\"name\":\"d\",\"dataType\":\"" + "STRING"
         + "\",\"singleValueField\":" + "true" + "}" + "  ]," + "  \"timeFieldSpec\":{"
         + "    \"incomingGranularitySpec\":{\"dataType\":\"LONG\",\"timeType\":\"MILLISECONDS\",\"name\":\"time\"},"
-        + "    \"defaultNullValue\":12345" + "  }" + "}";
+        + "    \"defaultNullValue\":12345" + "  },\n"
+        + "\"primaryKeyColumns\": [\"event_id\"] \n"
+        + "}";
   }
 
   private TableConfig createTableConfig()
@@ -171,7 +177,8 @@ public class LLRealtimeSegmentDataManagerTest {
   }
 
   @Test
-  public void testOffsetParsing() throws Exception {
+  public void testOffsetParsing()
+      throws Exception {
     final String offset = "34";
     FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
     {
@@ -793,7 +800,7 @@ public class LLRealtimeSegmentDataManagerTest {
         throws Exception {
       super(segmentZKMetadata, tableConfig, realtimeTableDataManager, resourceDataDir,
           new IndexLoadingConfig(makeInstanceDataManagerConfig(), tableConfig), schema, llcSegmentName,
-          semaphoreMap.get(llcSegmentName.getPartitionId()), serverMetrics);
+          semaphoreMap.get(llcSegmentName.getPartitionId()), serverMetrics, new PartitionUpsertMetadataManager());
       _state = LLRealtimeSegmentDataManager.class.getDeclaredField("_state");
       _state.setAccessible(true);
       _shouldStop = LLRealtimeSegmentDataManager.class.getDeclaredField("_shouldStop");

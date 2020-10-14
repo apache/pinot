@@ -16,30 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.config.table;
+package org.apache.pinot.spi.data.readers;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.Preconditions;
-import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotEquals;
 
 
-public class UpsertConfig extends BaseJsonConfig {
+public class PrimaryKeyTest {
 
-  public enum Mode {
-    FULL, PARTIAL, NONE
-  }
+  @Test
+  public void testPrimaryKeyComparison() {
+    PrimaryKey left = new PrimaryKey(new Object[]{"111", 2});
+    PrimaryKey right = new PrimaryKey(new Object[]{"111", 2});
+    assertEquals(left, right);
+    assertEquals(left.hashCode(), right.hashCode());
 
-  private final Mode _mode;
-
-  @JsonCreator
-  public UpsertConfig(@JsonProperty(value = "mode", required = true) Mode mode) {
-    Preconditions.checkArgument(mode != null, "Upsert mode must be configured");
-    Preconditions.checkArgument(mode != Mode.PARTIAL, "Partial upsert mode is not supported");
-    _mode = mode;
-  }
-
-  public Mode getMode() {
-    return _mode;
+    right = new PrimaryKey(new Object[]{"222", 2});
+    assertNotEquals(left, right);
+    assertNotEquals(left.hashCode(), right.hashCode());
   }
 }

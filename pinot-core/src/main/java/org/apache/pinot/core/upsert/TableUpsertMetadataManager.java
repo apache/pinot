@@ -16,30 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.config.table;
+package org.apache.pinot.core.upsert;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.Preconditions;
-import org.apache.pinot.spi.config.BaseJsonConfig;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import javax.annotation.concurrent.ThreadSafe;
 
 
-public class UpsertConfig extends BaseJsonConfig {
+/**
+ * The manager of the upsert metadata of a table.
+ */
+@ThreadSafe
+public class TableUpsertMetadataManager {
+  private final Map<Integer, PartitionUpsertMetadataManager> _partitionMetadataManagerMap = new ConcurrentHashMap<>();
 
-  public enum Mode {
-    FULL, PARTIAL, NONE
-  }
-
-  private final Mode _mode;
-
-  @JsonCreator
-  public UpsertConfig(@JsonProperty(value = "mode", required = true) Mode mode) {
-    Preconditions.checkArgument(mode != null, "Upsert mode must be configured");
-    Preconditions.checkArgument(mode != Mode.PARTIAL, "Partial upsert mode is not supported");
-    _mode = mode;
-  }
-
-  public Mode getMode() {
-    return _mode;
+  public PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId) {
+    return _partitionMetadataManagerMap.computeIfAbsent(partitionId, k -> new PartitionUpsertMetadataManager());
   }
 }

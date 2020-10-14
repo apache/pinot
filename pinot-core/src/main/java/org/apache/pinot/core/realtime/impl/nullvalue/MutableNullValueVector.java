@@ -34,7 +34,7 @@ public class MutableNullValueVector implements NullValueVectorReader {
   }
 
   public void setNull(int docId) {
-    _nullBitmap.checkAndAdd(docId);
+    _nullBitmap.add(docId);
   }
 
   public boolean isNull(int docId) {

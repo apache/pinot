@@ -20,6 +20,8 @@ package org.apache.pinot.core.indexsegment.mutable;
 
 import javax.annotation.Nullable;
 import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.core.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.RowMetadata;
 

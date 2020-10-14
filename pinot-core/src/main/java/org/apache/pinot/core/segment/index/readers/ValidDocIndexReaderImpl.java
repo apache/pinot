@@ -16,30 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.config.table;
+package org.apache.pinot.core.segment.index.readers;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.Preconditions;
-import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-public class UpsertConfig extends BaseJsonConfig {
+public class ValidDocIndexReaderImpl implements ValidDocIndexReader {
+  private final ThreadSafeMutableRoaringBitmap _validDocBitmap;
 
-  public enum Mode {
-    FULL, PARTIAL, NONE
+  public ValidDocIndexReaderImpl(ThreadSafeMutableRoaringBitmap validDocBitmap) {
+    _validDocBitmap = validDocBitmap;
   }
 
-  private final Mode _mode;
-
-  @JsonCreator
-  public UpsertConfig(@JsonProperty(value = "mode", required = true) Mode mode) {
-    Preconditions.checkArgument(mode != null, "Upsert mode must be configured");
-    Preconditions.checkArgument(mode != Mode.PARTIAL, "Partial upsert mode is not supported");
-    _mode = mode;
-  }
-
-  public Mode getMode() {
-    return _mode;
+  @Override
+  public ImmutableRoaringBitmap getValidDocBitmap() {
+    return _validDocBitmap.getMutableRoaringBitmap();
   }
 }
