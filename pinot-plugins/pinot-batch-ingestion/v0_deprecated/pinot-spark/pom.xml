@@ -130,6 +130,10 @@
           <groupId>com.thoughtworks.paranamer</groupId>
           <artifactId>paranamer</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>org.apache.hadoop</groupId>
+          <artifactId>hadoop-common</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
@@ -158,6 +162,10 @@
         <exclusion>
           <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-hdfs</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.hadoop</groupId>
+          <artifactId>hadoop-common</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
