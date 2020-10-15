@@ -32,13 +32,9 @@ import Confirm from '../Confirm';
 import CustomCodemirror from '../CustomCodemirror';
 import PinotMethodUtils from '../../utils/PinotMethodUtils';
 import Utils from '../../utils/Utils';
-import MuiAlert from '@material-ui/lab/Alert';
+import CustomNotification from '../CustomNotification';
 
 const drawerWidth = 400;
-
-const Alert = (props) => {
-  return <MuiAlert elevation={6} variant="filled" {...props} />;
-}
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -137,14 +133,14 @@ const TreeDirectory = ({
     if(!isLeafNodeSelected){
       return;
     }
-    setDialogTitle("Update Node Data");
+    setDialogTitle('Update Node Data');
     setDialogContent(<CustomCodemirror
       data={currentNodeData}
       isEditable={true}
       returnCodemirrorValue={(val)=>{ newCodeMirrorData = val;}}
-    />)
-    setDialogYesLabel("Update");
-    setDialogNoLabel("Cancel");
+    />);
+    setDialogYesLabel('Update');
+    setDialogNoLabel('Cancel');
     setDialogSuccessCb(() => confirmUpdate);
     setConfirmDialog(true);
   };
@@ -153,17 +149,17 @@ const TreeDirectory = ({
     if(!isLeafNodeSelected){
       return;
     }
-    setDialogContent("Delete this node?");
+    setDialogContent('Delete this node?');
     setDialogSuccessCb(() => deleteNode);
     setConfirmDialog(true);
   };
 
   const confirmUpdate = () => {
-    setDialogYesLabel("Yes");
-    setDialogNoLabel("No");
-    setDialogContent("Are you sure want to update this node?");
+    setDialogYesLabel('Yes');
+    setDialogNoLabel('No');
+    setDialogContent('Are you sure want to update this node?');
     setDialogSuccessCb(() => updateNode);
-  }
+  };
 
   const updateNode = async () => {
     const nodeData = {
@@ -171,32 +167,32 @@ const TreeDirectory = ({
       data: newCodeMirrorData.trim(),
       expectedVersion: currentNodeMetadata.version,
       accessOption: currentNodeMetadata.ephemeralOwner === 0 ? 1 : 10
-    }
+    };
     const result = await PinotMethodUtils.putNodeData(nodeData);
     if(result.data.status){
-      setNotificationData({type: 'success', message: result.data.status})
+      setNotificationData({type: 'success', message: result.data.status});
       showInfoEvent(selectedNode);
     } else {
-      setNotificationData({type: 'error', message: result.data.error})
+      setNotificationData({type: 'error', message: result.data.error});
     }
     setShowNotification(true);
     closeDialog();
-  }
+  };
 
   const deleteNode = async () => {
     const parentPath = selectedNode.split('/').slice(0, selectedNode.split('/').length-1).join('/');
     const treeObj = Utils.findNestedObj(treeData, 'fullPath', parentPath);
     const result = await PinotMethodUtils.deleteNode(selectedNode);
     if(result.data.status){
-      setNotificationData({type: 'success', message: result.data.status})
+      setNotificationData({type: 'success', message: result.data.status});
       showInfoEvent(selectedNode);
       fetchInnerPath(treeObj);
     } else {
-      setNotificationData({type: 'error', message: result.data.error})
+      setNotificationData({type: 'error', message: result.data.error});
     }
     setShowNotification(true);
     closeDialog();
-  }
+  };
 
   const closeDialog = () => {
     setConfirmDialog(false);
@@ -205,10 +201,6 @@ const TreeDirectory = ({
     setDialogYesLabel(null);
     setDialogNoLabel(null);
   };
-
-  const hideNotification = () => {
-    setShowNotification(false);
-  }
 
   const open = Boolean(anchorEl);
   const id = open ? 'simple-popover' : undefined;
@@ -229,16 +221,16 @@ const TreeDirectory = ({
             <div className={classes.buttonGrpDiv}>
               <ButtonGroup color="primary" aria-label="outlined primary button group" className={classes.btnGroup}>
                 <Tooltip title="Refresh">
-                  <Button onClick={(e)=>{showInfoEvent(selectedNode);}}><RefreshOutlinedIcon/></Button>
+                  <Button onClick={(e)=>{showInfoEvent(selectedNode);}}><RefreshOutlinedIcon /></Button>
                 </Tooltip>
                 <Tooltip title="Add">
-                  <Button onClick={handleClick}><NoteAddOutlinedIcon/></Button>
+                  <Button onClick={handleClick}><NoteAddOutlinedIcon /></Button>
                 </Tooltip>
                 <Tooltip title="Delete" open={false}>
-                  <Button onClick={handleDeleteClick} disabled={!isLeafNodeSelected}><DeleteOutlineOutlinedIcon/></Button>
+                  <Button onClick={handleDeleteClick} disabled={!isLeafNodeSelected}><DeleteOutlineOutlinedIcon /></Button>
                 </Tooltip>
                 <Tooltip title="Edit" open={false}>
-                  <Button onClick={handleEditClick} disabled={!isLeafNodeSelected}><EditOutlinedIcon/></Button>
+                  <Button onClick={handleEditClick} disabled={!isLeafNodeSelected}><EditOutlinedIcon /></Button>
                 </Tooltip>
               </ButtonGroup>
             </div>
@@ -279,15 +271,12 @@ const TreeDirectory = ({
         dialogYesLabel={dialogYesLabel}
         dialogNoLabel={dialogNoLabel}
       />
-      <Snackbar
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-        open={showNotification}
-        onClose={hideNotification}
-        key="notification"
-        autoHideDuration={3000}
-      >
-        <Alert severity={notificationData.type}>{notificationData.message}</Alert>
-      </Snackbar>
+      <CustomNotification
+        type={notificationData.type}
+        message={notificationData.message}
+        show={showNotification}
+        hide={()=>{setShowNotification(false)}}
+      />
     </>
   );
 };

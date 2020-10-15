@@ -39,7 +39,7 @@ const useStyles = makeStyles((theme: Theme) =>
 const AppLoader = () => {
   const classes = useStyles();
   return (
-    <CircularProgress className={classes.root}/>
+    <CircularProgress className={classes.root} />
   );
 };
 

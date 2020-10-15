@@ -17,33 +17,36 @@
  * under the License.
  */
 
-import React, {  } from 'react';
-import { Box } from '@material-ui/core';
+import React from 'react';
+import { Button, makeStyles } from '@material-ui/core';
 
-interface TabPanelProps {
-  children?: React.ReactNode;
-  dir?: string;
-  index: any;
-  value: any;
-}
+const useStyles = makeStyles((theme) => ({
+  button: {
+    margin: theme.spacing(1),
+    textTransform: 'none'
+  }
+}));
 
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
+type Props = {
+  children: any;
+  onClick: (event: React.MouseEvent<HTMLElement, MouseEvent>) => void
+};
+
+export default function CustomButton({
+  children,
+  onClick
+}: Props) {
+  const classes = useStyles();
 
   return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`full-width-tabpanel-${index}`}
-      aria-labelledby={`full-width-tab-${index}`}
-      {...other}
+    <Button
+      variant="contained"
+      color="primary"
+      className={classes.button}
+      size="small"
+      onClick={onClick}
     >
-      {value === index && (
-        <Box style={{padding: '24px 0'}}>
-          {children}
-        </Box>
-      )}
-    </div>
+      {children}
+    </Button>
   );
 }
-export default TabPanel;

@@ -69,7 +69,7 @@ const Confirm = ({openDialog, dialogTitle, dialogContent, successCallback, close
 
   useEffect(()=>{
     setOpen(openDialog);
-  }, [openDialog])
+  }, [openDialog]);
 
   const isStringDialog = typeof dialogContent === 'string';
 
@@ -83,19 +83,19 @@ const Confirm = ({openDialog, dialogTitle, dialogContent, successCallback, close
         maxWidth={false}
       >
         {dialogTitle && <DialogTitle id="alert-dialog-title">{dialogTitle}</DialogTitle>}
-        <DialogContent className={`${!isStringDialog ? classes.dialogContent : ""}`}>
+        <DialogContent className={`${!isStringDialog ? classes.dialogContent : ''}`}>
           {isStringDialog ?
             <DialogContentText id="alert-dialog-description" className={classes.dialogTextContent}>
               {dialogContent}
             </DialogContentText>
-          : dialogContent}
+            : dialogContent}
         </DialogContent>
-        <DialogActions style={{paddingBottom: 20}} className={`${isStringDialog ? classes.dialogActions : ""}`}>
+        <DialogActions style={{paddingBottom: 20}} className={`${isStringDialog ? classes.dialogActions : ''}`}>
           <Button variant="outlined" onClick={closeDialog} color="secondary" className={classes.red}>
-            {dialogNoLabel || "No"}
+            {dialogNoLabel || 'No'}
           </Button>
           <Button variant="outlined" onClick={successCallback} color="primary" autoFocus className={classes.green}>
-            {dialogYesLabel || "Yes"}
+            {dialogYesLabel || 'Yes'}
           </Button>
         </DialogActions>
       </Dialog>

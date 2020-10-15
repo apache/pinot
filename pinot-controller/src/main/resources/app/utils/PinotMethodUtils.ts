@@ -24,6 +24,10 @@ import {
   getTenants,
   getInstances,
   getInstance,
+  putInstance,
+  setInstanceState,
+  dropInstance,
+  updateInstanceTags,
   getClusterConfig,
   getQueryTables,
   getTableSchema,
@@ -34,6 +38,7 @@ import {
   getExternalView,
   getTenantTableDetails,
   getSegmentMetadata,
+  reloadSegment,
   getClusterInfo,
   zookeeperGetList,
   zookeeperGetData,
@@ -42,7 +47,8 @@ import {
   zookeeperPutData,
   zookeeperDeleteNode,
   getBrokerListOfTenant,
-  getServerListOfTenant
+  getServerListOfTenant,
+  deleteSegment
 } from '../requests';
 import Utils from './Utils';
 
@@ -52,8 +58,8 @@ import Utils from './Utils';
 const getTenantsData = () => {
   return getTenants().then(({ data }) => {
     const records = _.union(data.SERVER_TENANTS, data.BROKER_TENANTS);
-    let promiseArr = [];
-    let finalResponse = {
+    const promiseArr = [];
+    const finalResponse = {
       columns: ['Tenant Name', 'Server', 'Broker', 'Tables'],
       records: []
     };
@@ -88,7 +94,7 @@ const getAllInstances = () => {
       r[key] = [...(r[key] || []), a];
       return r;
     }, initialVal);
-    return {"Controller": groupedData.Controller, ...groupedData};
+    return {'Controller': groupedData.Controller, ...groupedData};
   });
 };
 
@@ -127,7 +133,7 @@ const getClusterName = () => {
 // API: /zk/ls?path=:ClusterName/LIVEINSTANCES
 // Expected Output: []
 const getLiveInstance = (clusterName) => {
-  const params = encodeURIComponent(`/${clusterName}/LIVEINSTANCES`)
+  const params = encodeURIComponent(`/${clusterName}/LIVEINSTANCES`);
   return zookeeperGetList(params).then((data) => {
     return data;
   });
@@ -149,13 +155,13 @@ const getClusterConfigData = () => {
 // API: /tables
 // Expected Output: {columns: [], records: []}
 const getQueryTablesList = ({bothType = false}) => {
-  let promiseArr = bothType ? [getQueryTables('realtime'), getQueryTables('offline')] : [getQueryTables()];
+  const promiseArr = bothType ? [getQueryTables('realtime'), getQueryTables('offline')] : [getQueryTables()];
   
   return Promise.all(promiseArr).then((results) => {
-    let responseObj = {
+    const responseObj = {
       columns: ['Tables'],
       records:  []
-    }
+    };
     results.map((result)=>{
       result.data.tables.map((table)=>{
         responseObj.records.push([table]);
@@ -329,7 +335,7 @@ const getTenantTableData = (tenantName) => {
       });
 
       return Promise.all(promiseArr).then((results) => {
-        let finalRecordsArr = [];
+        const finalRecordsArr = [];
         let singleTableData = [];
         let idealStateObj = null;
         let externalViewObj = null;
@@ -442,7 +448,7 @@ const getSegmentDetails = (tableName, segmentName) => {
     const obj = results[0].data.OFFLINE || results[0].data.REALTIME;
     const segmentMetaData = results[1].data;
 
-    let result = [];
+    const result = [];
     for (const prop in obj[segmentName]) {
       if (obj[segmentName]) {
         result.push([prop, obj[segmentName][prop]]);
@@ -473,7 +479,7 @@ const getLiveInstanceConfig = (clusterName, instanceName) => {
   const params = encodeURIComponent(`/${clusterName}/LIVEINSTANCES/${instanceName}`);
   return zookeeperGetData(params).then((res) => {
     return res.data;
-  })
+  });
 };
 
 // This method is used to fetch the instance config
@@ -483,24 +489,20 @@ const getInstanceConfig = (clusterName, instanceName) => {
   const params = encodeURIComponent(`/${clusterName}/CONFIGS/PARTICIPANT/${instanceName}`);
   return zookeeperGetData(params).then((res) => {
     return res.data;
-  })
+  });
 };
 
-// This method is used to get tenants from tags using instance info
+// This method is used to get instance info
 // API: /instances/:instanceName
-// Expected Output: Unique array of tenants names
-const getTenantsFromInstance = (instanceName) => {
+const getInstanceDetails = (instanceName) => {
   return getInstance(instanceName).then((res)=>{
-    const tenantsList = [];
-    res.data.tags.forEach((tag) => {
-      if(tag.search('_BROKER') !== -1 ||
-        tag.search('_REALTIME') !== -1 ||
-        tag.search('_OFFLINE') !== -1
-      ){
-        tenantsList.push(tag.split('_')[0]);
-      }
-    });
-    return _.uniq(tenantsList);
+    return res.data;
+  });
+};
+
+const updateInstanceDetails = (instanceName, instanceDetails) => {
+  return putInstance(instanceName, instanceDetails).then((res)=>{
+    return res.data;
   })
 };
 
@@ -509,20 +511,20 @@ const getTenantsFromInstance = (instanceName) => {
 const getZookeeperData = (path, count) => {
   let counter = count;
   const newTreeData = [{
-    nodeId: ''+counter++,
+    nodeId: `${counter++}`,
     label: path,
     child: [],
     isLeafNode: false,
     hasChildRendered: true
-  }]
+  }];
   return getNodeData(path).then((obj)=>{
     const { currentNodeData, currentNodeMetadata, currentNodeListStat } = obj;
-    let pathNames = Object.keys(currentNodeListStat);
+    const pathNames = Object.keys(currentNodeListStat);
     pathNames.map((pathName)=>{
       newTreeData[0].child.push({
-        nodeId: ''+counter++,
+        nodeId: `${counter++}`,
         label: pathName,
-        fullPath: path === '/' ? path+pathName : path+'/'+pathName,
+        fullPath: path === '/' ? path+pathName : `${path}/${pathName}`,
         child: [],
         isLeafNode: currentNodeListStat[pathName].numChildren === 0,
         hasChildRendered: false
@@ -538,7 +540,7 @@ const getZookeeperData = (path, count) => {
 // API: /zk/get => Get node stats
 const getNodeData = (path) => {
   const params = encodeURIComponent(path);
-  let promiseArr = [
+  const promiseArr = [
     zookeeperGetData(params),
     zookeeperGetListWithStat(params),
     zookeeperGetStat(params)
@@ -548,11 +550,11 @@ const getNodeData = (path) => {
     const currentNodeListStat = results[1].data;
     const currentNodeMetadata = results[2].data;
 
-    if(currentNodeMetadata['ctime'] || currentNodeMetadata['mtime']){
-      currentNodeMetadata['ctime'] = moment(+currentNodeMetadata['ctime']).format(
+    if(currentNodeMetadata.ctime || currentNodeMetadata.mtime){
+      currentNodeMetadata.ctime = moment(+currentNodeMetadata.ctime).format(
         'MMMM Do YYYY, h:mm:ss'
       );
-      currentNodeMetadata['mtime'] = moment(+currentNodeMetadata['mtime']).format(
+      currentNodeMetadata.mtime = moment(+currentNodeMetadata.mtime).format(
         'MMMM Do YYYY, h:mm:ss'
       );
     }
@@ -586,6 +588,36 @@ const getServerOfTenant = (tenantName) => {
   });
 };
 
+const updateTags = (instanceName, tagsList) => {
+  return updateInstanceTags(instanceName, tagsList.toString()).then((response)=>{
+    return response.data;
+  });
+};
+
+const toggleInstanceState = (instanceName, state) => {
+  return setInstanceState(instanceName, state).then((response)=>{
+    return response.data;
+  });
+};
+
+const deleteInstance = (instanceName) => {
+  return dropInstance(instanceName).then((response)=>{
+    return response.data;
+  });
+};
+
+const reloadSegmentOp = (tableName, segmentName) => {
+  return reloadSegment(tableName, segmentName).then((response)=>{
+    return response.data;
+  });
+};
+
+const deleteSegmentOp = (tableName, segmentName) => {
+  return deleteSegment(tableName, segmentName).then((response)=>{
+    return response.data;
+  });
+};
+
 export default {
   getTenantsData,
   getAllInstances,
@@ -603,11 +635,17 @@ export default {
   getLiveInstance,
   getLiveInstanceConfig,
   getInstanceConfig,
-  getTenantsFromInstance,
+  getInstanceDetails,
+  updateInstanceDetails,
   getZookeeperData,
   getNodeData,
   putNodeData,
   deleteNode,
   getBrokerOfTenant,
-  getServerOfTenant
+  getServerOfTenant,
+  updateTags,
+  toggleInstanceState,
+  deleteInstance,
+  deleteSegmentOp,
+  reloadSegmentOp
 };

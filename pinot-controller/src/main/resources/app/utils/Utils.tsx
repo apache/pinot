@@ -82,7 +82,7 @@ const getSegmentStatus = (idealStateObj, externalViewObj) => {
 
 const findNestedObj = (entireObj, keyToFind, valToFind) => {
   let foundObj;
-  JSON.stringify(entireObj, (_, nestedValue) => {
+  JSON.stringify(entireObj, (a, nestedValue) => {
     if (nestedValue && nestedValue[keyToFind] === valToFind) {
       foundObj = nestedValue;
     }
@@ -231,7 +231,7 @@ const codeMirrorOptionsTemplate = (el, data) => {
 const serialize = (obj: any, prefix?: any) => {
   let str = [], p;
   for (p in obj) {
-    if (obj.hasOwnProperty(p)) {
+    if (Object.prototype.hasOwnProperty.call(obj, p)) {
       var k = prefix ? prefix + "[" + p + "]" : p,
         v = obj[p];
       str.push((v !== null && typeof v === "object") ?
@@ -240,7 +240,7 @@ const serialize = (obj: any, prefix?: any) => {
     }
   }
   return str.join("&");
-}
+};
 
 export default {
   sortArray,

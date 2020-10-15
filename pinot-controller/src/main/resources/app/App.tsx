@@ -57,7 +57,7 @@ const App = () => {
         </Switch>
       </Router>
     </MuiThemeProvider>
-  )
+  );
 };
 
 ReactDOM.render(<App />, document.getElementById('app'));

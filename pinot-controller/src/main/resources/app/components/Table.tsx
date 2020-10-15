@@ -387,8 +387,8 @@ export default function CustomizedTables({
                       {Object.values(row).map((cell, idx) =>{
                         let url = baseURL;
                         if(regexReplace){
-                          let regex = /\:.*?:/;
-                          let matches = baseURL.match(regex);
+                          const regex = /\:.*?:/;
+                          const matches = baseURL.match(regex);
                           url = baseURL.replace(matches[0], row[matches[0].replace(/:/g, '')]);
                         }
                         return addLinks && !idx ? (
@@ -408,7 +408,7 @@ export default function CustomizedTables({
                           >
                             {styleCell(cell.toString())}
                           </StyledTableCell>
-                        )
+                        );
                       })}
                     </StyledTableRow>
                   ))
@@ -462,15 +462,14 @@ export default function CustomizedTables({
         </SimpleAccordion>
       </>
     );
-  }
+  };
 
   return (
     <div className={highlightBackground ? classes.highlightBackground : classes.root}>
       {inAccordionFormat ?
         renderTableInAccordion()
-      :
-        renderTable()
-      }
+        :
+        renderTable()}
     </div>
   );
 }

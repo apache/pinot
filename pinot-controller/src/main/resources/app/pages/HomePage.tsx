@@ -20,12 +20,12 @@
 import React, {useState, useEffect} from 'react';
 import { Grid, makeStyles, Paper } from '@material-ui/core';
 import { TableData, DataTable } from 'Models';
+import { Link } from 'react-router-dom';
 import AppLoader from '../components/AppLoader';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 import TenantsListing from '../components/Homepage/TenantsListing';
 import Instances from '../components/Homepage/InstancesTables';
 import ClusterConfig from '../components/Homepage/ClusterConfig';
-import { Link } from 'react-router-dom';
 
 const useStyles = makeStyles((theme) => ({
   paper:{
@@ -138,8 +138,8 @@ const HomePage = () => {
           </Link>
         </Grid>
       </Grid>
-      <TenantsListing tenantsData={tenantsData}/>
-      <Instances instances={instances} clusterName={clusterName}/>
+      <TenantsListing tenantsData={tenantsData} />
+      <Instances instances={instances} clusterName={clusterName} />
       <ClusterConfig />
     </Grid>
   );

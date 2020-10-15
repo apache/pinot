@@ -19,9 +19,15 @@
 
 import { AxiosResponse } from 'axios';
 import { TableData, Instances, Instance, Tenants, ClusterConfig, TableName, TableSize,
-  IdealState, QueryTables, TableSchema, SQLResult, ClusterName, ZKGetList, ZKConfig, ZKOperationResponsne,
+  IdealState, QueryTables, TableSchema, SQLResult, ClusterName, ZKGetList, ZKConfig, OperationResponse,
   BrokerList, ServerList
 } from 'Models';
+
+const headers = {
+  'Content-Type': 'application/json; charset=UTF-8',
+  'Accept': 'text/plain, */*; q=0.01'
+};
+
 import { baseApi } from '../utils/axios-config';
 
 export const getTenants = (): Promise<AxiosResponse<Tenants>> =>
@@ -54,17 +60,29 @@ export const getInstances = (): Promise<AxiosResponse<Instances>> =>
 export const getInstance = (name: string): Promise<AxiosResponse<Instance>> =>
   baseApi.get(`/instances/${name}`);
 
+export const putInstance = (name: string, params: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.put(`/instances/${name}`, params, { headers });
+
+export const updateInstanceTags = (name: string, params: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.put(`/instances/${name}/updateTags?tags=${params}`, null, { headers });
+
+export const setInstanceState = (name: string, stateName: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.post(`/instances/${name}/state`, stateName, { headers: {'Content-Type': 'text/plain', 'Accept': 'application/json'} });
+
+export const dropInstance = (name: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.delete(`instances/${name}`, { headers });
+
 export const getClusterConfig = (): Promise<AxiosResponse<ClusterConfig>> =>
   baseApi.get('/cluster/configs');
 
 export const getQueryTables = (type?: string): Promise<AxiosResponse<QueryTables>> =>
-  baseApi.get(`/tables${type ? "?type="+type: ""}`);
+  baseApi.get(`/tables${type ? `?type=${type}`: ''}`);
 
 export const getTableSchema = (name: string): Promise<AxiosResponse<TableSchema>> =>
   baseApi.get(`/tables/${name}/schema`);
 
 export const getQueryResult = (params: Object, url: string): Promise<AxiosResponse<SQLResult>> =>
-  baseApi.post(`/${url}`, params, { headers: { 'Content-Type': 'application/json; charset=UTF-8', 'Accept': 'text/plain, */*; q=0.01' } });
+  baseApi.post(`/${url}`, params, {headers});
 
 export const getClusterInfo = (): Promise<AxiosResponse<ClusterName>> =>
   baseApi.get('/cluster/info');
@@ -81,10 +99,10 @@ export const zookeeperGetStat = (params: string): Promise<AxiosResponse<ZKConfig
 export const zookeeperGetListWithStat = (params: string): Promise<AxiosResponse<ZKConfig>> =>
   baseApi.get(`/zk/lsl?path=${params}`);
 
-export const zookeeperPutData = (params: string): Promise<AxiosResponse<ZKOperationResponsne>> =>
-  baseApi.put(`/zk/put?${params}`, null, { headers: { 'Content-Type': 'application/json; charset=UTF-8', 'Accept': 'text/plain, */*; q=0.01' } });
+export const zookeeperPutData = (params: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.put(`/zk/put?${params}`, null, { headers });
 
-export const zookeeperDeleteNode = (params: string): Promise<AxiosResponse<ZKOperationResponsne>> =>
+export const zookeeperDeleteNode = (params: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.delete(`/zk/delete?path=${params}`);
 
 export const getBrokerListOfTenant = (name: string): Promise<AxiosResponse<BrokerList>> =>
@@ -92,3 +110,9 @@ export const getBrokerListOfTenant = (name: string): Promise<AxiosResponse<Broke
 
 export const getServerListOfTenant = (name: string): Promise<AxiosResponse<ServerList>> =>
   baseApi.get(`/tenants/${name}?type=server`);
+
+export const reloadSegment = (tableName: string, instanceName: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.post(`/segments/${tableName}/${instanceName}/reload`, null, {headers});
+
+export const deleteSegment = (tableName: string, instanceName: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.delete(`/segments/${tableName}/${instanceName}`, {headers});

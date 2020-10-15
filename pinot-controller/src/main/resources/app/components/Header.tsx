@@ -40,7 +40,7 @@ const Header = ({ highlightSidebarLink, showHideSideBarHandler, openSidebar, ...
         <Box marginY="auto" padding="0.25rem 0 0.25rem 1.5rem" display="flex" style={{cursor: 'pointer'}}>
           <MenuIcon onClick={() => showHideSideBarHandler()} />
         </Box>
-        <BreadcrumbsComponent {...props}/>
+        <BreadcrumbsComponent {...props} />
       </Box>
     </Box>
   </AppBar>

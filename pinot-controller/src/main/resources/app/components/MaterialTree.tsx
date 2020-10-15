@@ -71,16 +71,16 @@ type Props = {
   selected: any;
   handleToggle: any;
   handleSelect: any;
-}
+};
 
 type CustomTreeProps = {
   itemObj: any;
   showChildEvent: (event: React.MouseEvent<HTMLLIElement, MouseEvent>) => void;
-}
+};
 
 const CustomTreeItem = ({ itemObj, showChildEvent }: CustomTreeProps) => {
   const nestedComments = (itemObj.child || []).map(item => {
-    return <CustomTreeItem key={item.nodeId} itemObj={item} showChildEvent={showChildEvent}/>
+    return <CustomTreeItem key={item.nodeId} itemObj={item} showChildEvent={showChildEvent} />;
   });
 
   return (
@@ -94,7 +94,7 @@ const CustomTreeItem = ({ itemObj, showChildEvent }: CustomTreeProps) => {
     >
       {nestedComments}
     </StyledTreeItem>
-  )
+  );
 };
 
 export default function CustomizedTreeView({treeData, showChildEvent, expanded, selected, handleToggle, handleSelect}: Props) {
@@ -103,7 +103,7 @@ export default function CustomizedTreeView({treeData, showChildEvent, expanded, 
   return (
     <TreeView
       className={classes.root}
-      defaultExpanded={["1"]}
+      defaultExpanded={['1']}
       expanded={expanded}
       selected={selected}
       onNodeToggle={handleToggle}
@@ -114,8 +114,8 @@ export default function CustomizedTreeView({treeData, showChildEvent, expanded, 
     >
       {treeData.map((itemObj) => {
         return (
-          <CustomTreeItem key={"parent_"+itemObj.nodeId} itemObj={itemObj} showChildEvent={showChildEvent} />
-        )
+          <CustomTreeItem key={`parent_${itemObj.nodeId}`} itemObj={itemObj} showChildEvent={showChildEvent} />
+        );
       })}
     </TreeView>
   );

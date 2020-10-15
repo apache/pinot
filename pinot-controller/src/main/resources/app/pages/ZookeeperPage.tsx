@@ -63,8 +63,8 @@ const ZookeeperPage = () => {
   const [leafNode, setLeafNode] = useState(false);
 
   // states and handlers for toggle and select of tree
-  const [expanded, setExpanded] = React.useState<string[]>(["1"]);
-  const [selected, setSelected] = React.useState<string[]>(["1"]);
+  const [expanded, setExpanded] = React.useState<string[]>(['1']);
+  const [selected, setSelected] = React.useState<string[]>(['1']);
   const [lastRefresh, setLastRefresh] = React.useState(null);
 
   const handleToggle = (event: React.ChangeEvent<{}>, nodeIds: string[]) => {
@@ -85,11 +85,11 @@ const ZookeeperPage = () => {
 
   // on select, show node data and node metadata
   const showInfoEvent = async (fullPath) => {
-    const { currentNodeData, currentNodeMetadata } = await PinotMethodUtils.getNodeData(fullPath);
-    setCurrentNodeData(currentNodeData);
-    setCurrentNodeMetadata(currentNodeMetadata);
+    const nodeDataObj = await PinotMethodUtils.getNodeData(fullPath);
+    setCurrentNodeData(nodeDataObj.currentNodeData);
+    setCurrentNodeMetadata(nodeDataObj.currentNodeMetadata);
     setLastRefresh(new Date());
-  }
+  };
 
   // handlers for Tabs
   const [value, setValue] = React.useState(0);
@@ -102,33 +102,33 @@ const ZookeeperPage = () => {
     if(!pathObj.hasChildRendered){
       fetchInnerPath(pathObj);
     }
-  }
+  };
 
   const fetchInnerPath = async (pathObj) => {
-    const {newTreeData, currentNodeData, currentNodeMetadata, counter } = await PinotMethodUtils.getZookeeperData(pathObj.fullPath, count);
-    pathObj.child = newTreeData[0].child;
-    pathObj.isLeafNode = newTreeData[0].child.length === 0;
+    const ZKDataObj = await PinotMethodUtils.getZookeeperData(pathObj.fullPath, count);
+    pathObj.child = ZKDataObj.newTreeData[0].child;
+    pathObj.isLeafNode = ZKDataObj.newTreeData[0].child.length === 0;
     pathObj.hasChildRendered = true;
     // setting the old treeData again here since pathObj has the reference of old treeData
     // and newTreeData is not useful here.
     setTreeData(treeData);
-    setCurrentNodeData(currentNodeData);
-    setCurrentNodeMetadata(currentNodeMetadata);
-    setCount(counter);
+    setCurrentNodeData(ZKDataObj.currentNodeData);
+    setCurrentNodeMetadata(ZKDataObj.currentNodeMetadata);
+    setCount(ZKDataObj.counter);
     setExpanded([...expanded, pathObj.nodeId]);
   };
 
   const fetchData = async () => {
     setFetching(true);
     const path = '/';
-    const {newTreeData, currentNodeData, currentNodeMetadata, counter } = await PinotMethodUtils.getZookeeperData(path, 1);
-    setTreeData(newTreeData);
+    const ZKDataObj = await PinotMethodUtils.getZookeeperData(path, 1);
+    setTreeData(ZKDataObj.newTreeData);
     setSelectedNode(path);
-    setCurrentNodeData(currentNodeData || {});
-    setCurrentNodeMetadata(currentNodeMetadata);
-    setCount(counter);
-    setExpanded(["1"]);
-    setSelected(["1"]);
+    setCurrentNodeData(ZKDataObj.currentNodeData || {});
+    setCurrentNodeMetadata(ZKDataObj.currentNodeMetadata);
+    setCount(ZKDataObj.counter);
+    setExpanded(['1']);
+    setSelected(['1']);
     setLastRefresh(new Date());
     setFetching(false);
   };
@@ -140,16 +140,16 @@ const ZookeeperPage = () => {
   const renderLastRefresh = () => (
     <div className={classes.lastRefreshDiv}>
       <p>
-        {`Last Refreshed: ${lastRefresh.toLocaleTimeString("en-US",{
-            hour12: true,
-            hour: 'numeric',
-            minute: '2-digit',
-            second: '2-digit'
-          })}
+        {`Last Refreshed: ${lastRefresh.toLocaleTimeString('en-US', {
+          hour12: true,
+          hour: 'numeric',
+          minute: '2-digit',
+          second: '2-digit'
+        })}
         `}
       </p>
     </div>
-  )
+  );
 
   return fetching ? (
     <AppLoader />
@@ -193,13 +193,13 @@ const ZookeeperPage = () => {
             >
               {lastRefresh && renderLastRefresh()}
               <div className={classes.codeMirrorDiv}>
-                <CustomCodemirror data={currentNodeData}/>
+                <CustomCodemirror data={currentNodeData} />
               </div>
             </TabPanel>
             <TabPanel value={value} index={1} dir={theme.direction}>
               {lastRefresh && renderLastRefresh()}
               <div className={classes.codeMirrorDiv}>
-                <CustomCodemirror data={currentNodeMetadata}/>
+                <CustomCodemirror data={currentNodeMetadata} />
               </div>
             </TabPanel>
           </Grid>

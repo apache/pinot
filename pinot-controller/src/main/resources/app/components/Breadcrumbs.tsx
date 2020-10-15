@@ -87,33 +87,33 @@ const BreadcrumbsComponent = ({ ...props }) => {
   const generateBreadcrumb = () => {
     if(!pathNames.length){
       return getLabel(breadcrumbNameMap['/']);
-    } else {
-      const breadcrumbs = [getClickableLabel(breadcrumbNameMap['/'], '/')];
-      const paramsKeys = _.keys(props.match.params);
-      if(paramsKeys.length){
-        const {tenantName, tableName, segmentName, instanceName} = props.match.params;
-        if((tenantName || instanceName) && tableName){
-          breadcrumbs.push(
-            getClickableLabel(
-              tenantName || instanceName,
-              (tenantName ? `/tenants/${tenantName}` : `/instance/${instanceName}`)
-            )
-          );
-        }
-        if((tenantName || instanceName) && tableName && segmentName){
-          breadcrumbs.push(
-            getClickableLabel(
-              tableName || instanceName,
-              (tenantName ? `/tenants/${tenantName}/table/${tableName}` : `/instance/${instanceName}/table/${tableName}`)
-            )
-          );
-        }
-        breadcrumbs.push(getLabel(segmentName || tableName || tenantName || instanceName));
-      } else {
-        breadcrumbs.push(getLabel(breadcrumbNameMap[location.pathname]));
-      }
-      return breadcrumbs;
     }
+    const breadcrumbs = [getClickableLabel(breadcrumbNameMap['/'], '/')];
+    const paramsKeys = _.keys(props.match.params);
+    if(paramsKeys.length){
+      const {tenantName, tableName, segmentName, instanceName} = props.match.params;
+      if((tenantName || instanceName) && tableName){
+        breadcrumbs.push(
+          getClickableLabel(
+            tenantName || instanceName,
+            (tenantName ? `/tenants/${tenantName}` : `/instance/${instanceName}`)
+          )
+        );
+      }
+      if((tenantName || instanceName) && tableName && segmentName){
+        breadcrumbs.push(
+          getClickableLabel(
+            tableName || instanceName,
+            (tenantName ? `/tenants/${tenantName}/table/${tableName}` : `/instance/${instanceName}/table/${tableName}`)
+          )
+        );
+      }
+      breadcrumbs.push(getLabel(segmentName || tableName || tenantName || instanceName));
+    } else {
+      breadcrumbs.push(getLabel(breadcrumbNameMap[location.pathname]));
+    }
+    return breadcrumbs;
+
   };
 
   return (
@@ -126,6 +126,6 @@ const BreadcrumbsComponent = ({ ...props }) => {
       </Breadcrumbs>
     </Box>
   );
-}
+};
 
 export default BreadcrumbsComponent;

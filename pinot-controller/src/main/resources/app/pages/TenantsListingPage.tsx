@@ -44,19 +44,19 @@ const TenantsListingPage = () => {
     const tenantsDataResponse = await PinotMethodUtils.getTenantsData();
     setTenantsData(tenantsDataResponse);
     setFetching(false);
-  }
+  };
 
   useEffect(() => {
     fetchData();
   }, []);
 
   return fetching ? (
-    <AppLoader/>
+    <AppLoader />
   ) : (
     <Grid item xs className={classes.gridContainer}>
-      <TenantsListing tenantsData={tenantsData}/>
+      <TenantsListing tenantsData={tenantsData} />
     </Grid>
-  )
+  );
 };
 
 export default TenantsListingPage;
