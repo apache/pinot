@@ -31,13 +31,10 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.concurrent.ThreadSafe;
 import java.io.File;
 import java.io.FileInputStream;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Random;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
@@ -47,6 +44,7 @@ import java.util.stream.Stream;
 public class QueryRunner extends AbstractBaseCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryRunner.class);
   private static final int MILLIS_PER_SECOND = 1000;
+  private static final long NANO_DELTA = (long) 5E5;
   private static final String CLIENT_TIME_STATISTICS = "CLIENT TIME STATISTICS";
 
   @Option(name = "-mode", required = true, metaVar = "<String>", usage = "Mode of query runner (singleThread|multiThreads|targetQPS|increasingQPS).")
@@ -77,6 +75,8 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
   private String _brokerHost = "localhost";
   @Option(name = "-brokerPort", required = false, metaVar = "<int>", usage = "Broker port number (default 8099).")
   private int _brokerPort = 8099;
+  @Option(name = "-queueDepth", required = false, metaVar = "<int>", usage = "Queue size limit for multi-threaded execution (default 64).")
+  private int _queueDepth = 64;
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help;
 
@@ -127,6 +127,11 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
       printUsage();
       return false;
     }
+    if (_queueDepth <= 0) {
+      LOGGER.error("Argument queueDepth should be a positive number.");
+      printUsage();
+      return false;
+    }
 
     LOGGER.info("Start query runner targeting broker: {}:{}", _brokerHost, _brokerPort);
     PerfBenchmarkDriverConf conf = new PerfBenchmarkDriverConf();
@@ -158,9 +163,10 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
           break;
         }
         LOGGER.info("MODE multiThreads with queryFile: {}, numTimesToRunQueries: {}, numThreads: {}, "
-                + "reportIntervalMs: {}, numIntervalsToReportAndClearStatistics: {}", _queryFile, _numTimesToRunQueries,
-            _numThreads, _reportIntervalMs, _numIntervalsToReportAndClearStatistics);
-        multiThreadedQueryRunner(conf, queries, _numTimesToRunQueries, _numThreads, _reportIntervalMs,
+                + "reportIntervalMs: {}, numIntervalsToReportAndClearStatistics: {}, queueDepth: {}", _queryFile,
+            _numTimesToRunQueries, _numThreads, _reportIntervalMs, _numIntervalsToReportAndClearStatistics,
+            _queueDepth);
+        multiThreadedQueryRunner(conf, queries, _numTimesToRunQueries, _numThreads, _queueDepth, _reportIntervalMs,
             _numIntervalsToReportAndClearStatistics);
         break;
       case "targetQPS":
@@ -169,16 +175,17 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
           printUsage();
           break;
         }
-        if (_startQPS <= 0 || _startQPS > 1000.0) {
-          LOGGER.error("For targetQPS mode, argument startQPS should be a positive number that less or equal to 1000.");
+        if (_startQPS <= 0 || _startQPS > 1000000.0) {
+          LOGGER.error("For targetQPS mode, argument startQPS should be a positive number that less or equal to 1000000.");
           printUsage();
           break;
         }
         LOGGER.info("MODE targetQPS with queryFile: {}, numTimesToRunQueries: {}, numThreads: {}, startQPS: {}, "
-                + "reportIntervalMs: {}, numIntervalsToReportAndClearStatistics: {}", _queryFile, _numTimesToRunQueries,
-            _numThreads, _startQPS, _reportIntervalMs, _numIntervalsToReportAndClearStatistics);
-        targetQPSQueryRunner(conf, queries, _numTimesToRunQueries, _numThreads, _startQPS, _reportIntervalMs,
-            _numIntervalsToReportAndClearStatistics);
+                + "reportIntervalMs: {}, numIntervalsToReportAndClearStatistics: {}, queueDepth: {}", _queryFile,
+            _numTimesToRunQueries, _numThreads, _startQPS, _reportIntervalMs, _numIntervalsToReportAndClearStatistics,
+            _queueDepth);
+        targetQPSQueryRunner(conf, queries, _numTimesToRunQueries, _numThreads, _queueDepth, _startQPS,
+            _reportIntervalMs, _numIntervalsToReportAndClearStatistics);
         break;
       case "increasingQPS":
         if (_numThreads <= 0) {
@@ -186,9 +193,9 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
           printUsage();
           break;
         }
-        if (_startQPS <= 0 || _startQPS > 1000.0) {
+        if (_startQPS <= 0 || _startQPS > 1000000.0) {
           LOGGER.error(
-              "For increasingQPS mode, argument startQPS should be a positive number that less or equal to 1000.");
+              "For increasingQPS mode, argument startQPS should be a positive number that less or equal to 1000000.");
           printUsage();
           break;
         }
@@ -204,9 +211,10 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         }
         LOGGER.info("MODE increasingQPS with queryFile: {}, numTimesToRunQueries: {}, numThreads: {}, startQPS: {}, "
                 + "deltaQPS: {}, reportIntervalMs: {}, numIntervalsToReportAndClearStatistics: {}, "
-                + "numIntervalsToIncreaseQPS: {}", _queryFile, _numTimesToRunQueries, _numThreads, _startQPS, _deltaQPS,
-            _reportIntervalMs, _numIntervalsToReportAndClearStatistics, _numIntervalsToIncreaseQPS);
-        increasingQPSQueryRunner(conf, queries, _numTimesToRunQueries, _numThreads, _startQPS, _deltaQPS,
+                + "numIntervalsToIncreaseQPS: {}, queueDepth: {}", _queryFile, _numTimesToRunQueries, _numThreads,
+            _startQPS, _deltaQPS, _reportIntervalMs, _numIntervalsToReportAndClearStatistics,
+            _numIntervalsToIncreaseQPS, _queueDepth);
+        increasingQPSQueryRunner(conf, queries, _numTimesToRunQueries, _numThreads, _queueDepth, _startQPS, _deltaQPS,
             _reportIntervalMs, _numIntervalsToReportAndClearStatistics, _numIntervalsToIncreaseQPS);
         break;
       default:
@@ -313,16 +321,17 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
    * @param queries query stream.
    * @param numTimesToRunQueries number of times to run all queries in the query file, 0 means infinite times.
    * @param numThreads number of threads sending queries.
+   * @param queueDepth queue size limit for query generator
    * @param reportIntervalMs report interval in milliseconds.
    * @param numIntervalsToReportAndClearStatistics number of report intervals to report detailed statistics and clear
    *                                               them, 0 means never.
    * @throws Exception
    */
   public static void multiThreadedQueryRunner(PerfBenchmarkDriverConf conf, Stream<String> queries, int numTimesToRunQueries,
-      int numThreads, int reportIntervalMs, int numIntervalsToReportAndClearStatistics)
+      int numThreads, int queueDepth, int reportIntervalMs, int numIntervalsToReportAndClearStatistics)
       throws Exception {
     PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
-    ConcurrentLinkedQueue<String> queryQueue = new ConcurrentLinkedQueue<>();
+    Queue<String> queryQueue = new LinkedBlockingDeque<>(queueDepth);
     AtomicInteger numQueriesExecuted = new AtomicInteger(0);
     AtomicInteger numExceptions = new AtomicInteger(0);
     AtomicLong totalBrokerTime = new AtomicLong(0L);
@@ -351,31 +360,28 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
       while (itQuery.hasNext()) {
         String query = itQuery.next();
 
-        queryQueue.add(query);
-
-        // Keep 20 queries inside the query queue.
-        while (queryQueue.size() == 20) {
+        while (!queryQueue.offer(query)) {
           Thread.sleep(1);
+        }
 
-          long currentTime = System.currentTimeMillis();
-          if (currentTime - reportStartTime >= reportIntervalMs) {
-            long timePassed = currentTime - startTime;
-            int numQueriesExecutedInt = numQueriesExecuted.get();
-            LOGGER.info("Time Passed: {}ms, Queries Executed: {}, Exceptions: {}, Average QPS: {}, " +
-                    "Average Broker Time: {}ms, Average Client Time: {}ms.", timePassed, numQueriesExecutedInt,
-                numExceptions.get(),
-                numQueriesExecutedInt / ((double) timePassed / MILLIS_PER_SECOND),
-                totalBrokerTime.get() / (double) numQueriesExecutedInt,
-                totalClientTime.get() / (double) numQueriesExecutedInt);
-            reportStartTime = currentTime;
-            numReportIntervals++;
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - reportStartTime >= reportIntervalMs) {
+          long timePassed = currentTime - startTime;
+          int numQueriesExecutedInt = numQueriesExecuted.get();
+          LOGGER.info("Time Passed: {}ms, Queries Executed: {}, Exceptions: {}, Average QPS: {}, " +
+                  "Average Broker Time: {}ms, Average Client Time: {}ms.", timePassed, numQueriesExecutedInt,
+              numExceptions.get(),
+              numQueriesExecutedInt / ((double) timePassed / MILLIS_PER_SECOND),
+              totalBrokerTime.get() / (double) numQueriesExecutedInt,
+              totalClientTime.get() / (double) numQueriesExecutedInt);
+          reportStartTime = currentTime;
+          numReportIntervals++;
 
-            if ((numIntervalsToReportAndClearStatistics != 0) && (numReportIntervals
-                == numIntervalsToReportAndClearStatistics)) {
-              numReportIntervals = 0;
-              startTime = currentTime;
-              reportAndClearStatistics(numQueriesExecuted, totalBrokerTime, totalClientTime, statisticsList);
-            }
+          if ((numIntervalsToReportAndClearStatistics != 0) && (numReportIntervals
+              == numIntervalsToReportAndClearStatistics)) {
+            numReportIntervals = 0;
+            startTime = currentTime;
+            reportAndClearStatistics(numQueriesExecuted, totalBrokerTime, totalClientTime, statisticsList);
           }
         }
       }
@@ -383,7 +389,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     }
 
     // Wait for all queries getting executed.
-    while (queryQueue.size() != 0) {
+    while (!queryQueue.isEmpty()) {
       Thread.sleep(1);
     }
     executorService.shutdownNow();
@@ -417,6 +423,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
    * @param queries query stream.
    * @param numTimesToRunQueries number of times to run all queries in the query file, 0 means infinite times.
    * @param numThreads number of threads sending queries.
+   * @param queueDepth queue size limit for query generator
    * @param startQPS start QPS (target QPS).
    * @param reportIntervalMs report interval in milliseconds.
    * @param numIntervalsToReportAndClearStatistics number of report intervals to report detailed statistics and clear
@@ -424,10 +431,11 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
    * @throws Exception
    */
   public static void targetQPSQueryRunner(PerfBenchmarkDriverConf conf, Stream<String> queries, int numTimesToRunQueries,
-      int numThreads, double startQPS, int reportIntervalMs, int numIntervalsToReportAndClearStatistics)
+      int numThreads, int queueDepth, double startQPS, int reportIntervalMs,
+      int numIntervalsToReportAndClearStatistics)
       throws Exception {
     PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
-    ConcurrentLinkedQueue<String> queryQueue = new ConcurrentLinkedQueue<>();
+    Queue<String> queryQueue = new LinkedBlockingDeque<>(queueDepth);
     AtomicInteger numQueriesExecuted = new AtomicInteger(0);
     AtomicInteger numExceptions = new AtomicInteger(0);
     AtomicLong totalBrokerTime = new AtomicLong(0L);
@@ -442,7 +450,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     }
     executorService.shutdown();
 
-    int queryIntervalMs = (int) (MILLIS_PER_SECOND / startQPS);
+    final int queryIntervalNanos = (int) (1E9 / startQPS);
     long startTime = System.currentTimeMillis();
     long reportStartTime = startTime;
     int numReportIntervals = 0;
@@ -453,12 +461,22 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         return;
       }
 
+      long nextQueryNanos = System.nanoTime();
       Iterator<String> itQuery = queries.iterator();
       while (itQuery.hasNext()) {
         String query = itQuery.next();
 
-        queryQueue.add(query);
-        Thread.sleep(queryIntervalMs);
+        long nanoTime = System.nanoTime();
+        while (nextQueryNanos > nanoTime - NANO_DELTA) {
+          Thread.sleep(Math.max((int) ((nextQueryNanos - nanoTime) / 1E6), 1));
+          nanoTime = System.nanoTime();
+        }
+
+        while (!queryQueue.offer(query)) {
+          Thread.sleep(1);
+        }
+
+        nextQueryNanos += queryIntervalNanos;
 
         long currentTime = System.currentTimeMillis();
         if (currentTime - reportStartTime >= reportIntervalMs) {
@@ -485,7 +503,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     }
 
     // Wait for all queries getting executed.
-    while (queryQueue.size() != 0) {
+    while (!queryQueue.isEmpty()) {
       Thread.sleep(1);
     }
     executorService.shutdownNow();
@@ -520,6 +538,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
    * @param queries query stream.
    * @param numTimesToRunQueries number of times to run all queries in the query file, 0 means infinite times.
    * @param numThreads number of threads sending queries.
+   * @param queueDepth queue size limit for query generator
    * @param startQPS start QPS.
    * @param deltaQPS delta QPS.
    * @param reportIntervalMs report interval in milliseconds.
@@ -530,11 +549,11 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
    */
 
   public static void increasingQPSQueryRunner(PerfBenchmarkDriverConf conf, Stream<String> queries, int numTimesToRunQueries,
-      int numThreads, double startQPS, double deltaQPS, int reportIntervalMs,
+      int numThreads, int queueDepth, double startQPS, double deltaQPS, int reportIntervalMs,
       int numIntervalsToReportAndClearStatistics, int numIntervalsToIncreaseQPS)
       throws Exception {
     PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
-    ConcurrentLinkedQueue<String> queryQueue = new ConcurrentLinkedQueue<>();
+    Queue<String> queryQueue = new LinkedBlockingDeque<>(queueDepth);
     AtomicInteger numQueriesExecuted = new AtomicInteger(0);
     AtomicInteger numExceptions = new AtomicInteger(0);
     AtomicLong totalBrokerTime = new AtomicLong(0L);
@@ -554,19 +573,29 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     int numReportIntervals = 0;
     int numTimesExecuted = 0;
     double currentQPS = startQPS;
-    int queryIntervalMs = (int) (MILLIS_PER_SECOND / currentQPS);
+    long queryIntervalNanos = (long) (1E9 / currentQPS);
     while (numTimesToRunQueries == 0 || numTimesExecuted < numTimesToRunQueries) {
       if (executorService.isTerminated()) {
         LOGGER.error("All threads got exception and already dead.");
         return;
       }
 
+      long nextQueryNanos = System.nanoTime();
       Iterator<String> itQuery = queries.iterator();
       while (itQuery.hasNext()) {
         String query = itQuery.next();
 
-        queryQueue.add(query);
-        Thread.sleep(queryIntervalMs);
+        long nanoTime = System.nanoTime();
+        while (nextQueryNanos > nanoTime - NANO_DELTA) {
+          Thread.sleep(Math.max((int) ((nextQueryNanos - nanoTime) / 1E6), 1));
+          nanoTime = System.nanoTime();
+        }
+
+        while (!queryQueue.offer(query)) {
+          Thread.sleep(1);
+        }
+
+        nextQueryNanos += queryIntervalNanos;
 
         long currentTime = System.currentTimeMillis();
         if (currentTime - reportStartTime >= reportIntervalMs) {
@@ -575,36 +604,25 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
           numReportIntervals++;
 
           if (numReportIntervals == numIntervalsToIncreaseQPS) {
-            // Try to find the next interval.
-            double newQPS = currentQPS + deltaQPS;
-            int newQueryIntervalMs;
-            // Skip the target QPS with the same interval as the previous one.
-            while ((newQueryIntervalMs = (int) (MILLIS_PER_SECOND / newQPS)) == queryIntervalMs) {
-              newQPS += deltaQPS;
-            }
-            if (newQueryIntervalMs == 0) {
-              LOGGER.warn("Due to sleep granularity of millisecond, cannot further increase QPS.");
-            } else {
-              // Find the next interval.
-              LOGGER.info("--------------------------------------------------------------------------------");
-              LOGGER.info("REPORT FOR TARGET QPS: {}", currentQPS);
-              int numQueriesExecutedInt = numQueriesExecuted.get();
-              LOGGER.info("Current Target QPS: {}, Time Passed: {}ms, Queries Executed: {}, Exceptions: {}, " +
-                          "Average QPS: {}, Average Broker Time: {}ms, Average Client Time: {}ms, Queries Queued: {}.",
-                      currentQPS, timePassed, numQueriesExecutedInt, numExceptions.get(),
-                      numQueriesExecutedInt / ((double) timePassed / MILLIS_PER_SECOND),
-                  totalBrokerTime.get() / (double) numQueriesExecutedInt,
-                  totalClientTime.get() / (double) numQueriesExecutedInt, queryQueue.size());
-              numReportIntervals = 0;
-              startTime = currentTime;
-              reportAndClearStatistics(numQueriesExecuted, totalBrokerTime, totalClientTime, statisticsList);
+            // Find the next interval.
+            LOGGER.info("--------------------------------------------------------------------------------");
+            LOGGER.info("REPORT FOR TARGET QPS: {}", currentQPS);
+            int numQueriesExecutedInt = numQueriesExecuted.get();
+            LOGGER.info("Current Target QPS: {}, Time Passed: {}ms, Queries Executed: {}, Exceptions: {}, " +
+                        "Average QPS: {}, Average Broker Time: {}ms, Average Client Time: {}ms, Queries Queued: {}.",
+                    currentQPS, timePassed, numQueriesExecutedInt, numExceptions.get(),
+                    numQueriesExecutedInt / ((double) timePassed / MILLIS_PER_SECOND),
+                totalBrokerTime.get() / (double) numQueriesExecutedInt,
+                totalClientTime.get() / (double) numQueriesExecutedInt, queryQueue.size());
+            numReportIntervals = 0;
+            startTime = currentTime;
+            reportAndClearStatistics(numQueriesExecuted, totalBrokerTime, totalClientTime, statisticsList);
 
-              currentQPS = newQPS;
-              queryIntervalMs = newQueryIntervalMs;
-              LOGGER
-                  .info("Increase target QPS to: {}, the following statistics are for the new target QPS.", currentQPS);
-            }
-          } else {
+            currentQPS += deltaQPS;
+            queryIntervalNanos = (long) (1E9 / currentQPS);
+            LOGGER.info("Increase target QPS to: {}, the following statistics are for the new target QPS.", currentQPS);
+
+        } else {
             int numQueriesExecutedInt = numQueriesExecuted.get();
             LOGGER.info("Current Target QPS: {}, Time Passed: {}ms, Queries Executed: {}, Average QPS: {}, "
                     + "Average Broker Time: {}ms, Average Client Time: {}ms, Queries Queued: {}.", currentQPS, timePassed,
@@ -624,7 +642,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     }
 
     // Wait for all queries getting executed.
-    while (queryQueue.size() != 0) {
+    while (!queryQueue.isEmpty()) {
       Thread.sleep(1);
     }
     executorService.shutdownNow();
@@ -690,14 +708,14 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
 
   private static class Worker implements Runnable {
     private final PerfBenchmarkDriver _driver;
-    private final ConcurrentLinkedQueue<String> _queryQueue;
+    private final Queue<String> _queryQueue;
     private final AtomicInteger _numQueriesExecuted;
     private final AtomicLong _totalBrokerTime;
     private final AtomicLong _totalClientTime;
     private final AtomicInteger _numExceptions;
     private final List<Statistics> _statisticsList;
 
-    private Worker(PerfBenchmarkDriver driver, ConcurrentLinkedQueue<String> queryQueue,
+    private Worker(PerfBenchmarkDriver driver, Queue<String> queryQueue,
         AtomicInteger numQueriesExecuted, AtomicLong totalBrokerTime, AtomicLong totalClientTime,
         AtomicInteger numExceptions, List<Statistics> statisticsList) {
       _driver = driver;
