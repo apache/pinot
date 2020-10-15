@@ -28,14 +28,32 @@ public class BloomFilterConfig extends BaseJsonConfig {
   public static final double DEFAULT_FPP = 0.05;
 
   private final double _fpp;
+  private final int _maxSizeInBytes;
+  private final boolean _loadOnHeap;
 
   @JsonCreator
-  public BloomFilterConfig(@JsonProperty(value = "fpp", required = true) double fpp) {
-    Preconditions.checkArgument(fpp > 0.0 && fpp < 1.0, "Invalid fpp (false positive probability): %s", fpp);
-    _fpp = fpp;
+  public BloomFilterConfig(@JsonProperty(value = "fpp") double fpp,
+      @JsonProperty(value = "maxSizeInBytes") int maxSizeInBytes,
+      @JsonProperty(value = "loadOnHeap") boolean loadOnHeap) {
+    if (fpp != 0.0) {
+      Preconditions.checkArgument(fpp > 0.0 && fpp < 1.0, "Invalid fpp (false positive probability): %s", fpp);
+      _fpp = fpp;
+    } else {
+      _fpp = DEFAULT_FPP;
+    }
+    _maxSizeInBytes = maxSizeInBytes;
+    _loadOnHeap = loadOnHeap;
   }
 
   public double getFpp() {
     return _fpp;
+  }
+
+  public int getMaxSizeInBytes() {
+    return _maxSizeInBytes;
+  }
+
+  public boolean isLoadOnHeap() {
+    return _loadOnHeap;
   }
 }

@@ -22,12 +22,19 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
 /**
- * Off-heap reader for guava bloom filter.
+ * On-heap reader for guava bloom filter.
  */
-public class OffHeapGuavaBloomFilterReader extends BaseGuavaBloomFilterReader {
+public class OnHeapGuavaBloomFilterReader extends BaseGuavaBloomFilterReader {
+  private final long[] _data;
 
-  public OffHeapGuavaBloomFilterReader(PinotDataBuffer dataBuffer) {
+  public OnHeapGuavaBloomFilterReader(PinotDataBuffer dataBuffer) {
     super(dataBuffer);
+
+    int numLongs = (int) (_numBits / Long.SIZE);
+    _data = new long[numLongs];
+    for (int i = 0; i < numLongs; i++) {
+      _data[i] = _valueBuffer.getLong(i * Long.BYTES);
+    }
   }
 
   @Override
@@ -37,10 +44,7 @@ public class OffHeapGuavaBloomFilterReader extends BaseGuavaBloomFilterReader {
       long bitIndex = (combinedHash & Long.MAX_VALUE) % _numBits;
       // NOTE: Guava bloom filter stores bits in a long array. Inside each long value, the bits are stored in the
       //       reverse order (the first bit is stored as the right most bit of the long).
-      int longIndex = (int) (bitIndex >>> 6);
-      int bitIndexInLong = (int) (bitIndex & 0x3F);
-      int byteIndex = (longIndex << 3) | (7 - (bitIndexInLong >>> 3));
-      if ((_valueBuffer.getByte(byteIndex) & (1 << (bitIndexInLong & 7))) == 0) {
+      if ((_data[(int) (bitIndex >>> 6)] & (1L << bitIndex)) == 0) {
         return false;
       }
       combinedHash += hash2;

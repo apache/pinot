@@ -27,7 +27,10 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import org.apache.pinot.core.segment.creator.BloomFilterCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.core.segment.index.readers.bloom.GuavaBloomFilterReaderUtils;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -37,6 +40,8 @@ import org.apache.pinot.spi.config.table.BloomFilterConfig;
  */
 @SuppressWarnings("UnstableApiUsage")
 public class OnHeapGuavaBloomFilterCreator implements BloomFilterCreator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(OnHeapGuavaBloomFilterCreator.class);
+
   public static final int TYPE_VALUE = 1;
   public static final int VERSION = 1;
 
@@ -46,8 +51,15 @@ public class OnHeapGuavaBloomFilterCreator implements BloomFilterCreator {
   public OnHeapGuavaBloomFilterCreator(File indexDir, String columnName, int cardinality,
       BloomFilterConfig bloomFilterConfig) {
     _bloomFilterFile = new File(indexDir, columnName + V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION);
-    _bloomFilter =
-        BloomFilter.create(Funnels.stringFunnel(StandardCharsets.UTF_8), cardinality, bloomFilterConfig.getFpp());
+    // Calculate the actual fpp with regards to the max size for the bloom filter
+    double fpp = bloomFilterConfig.getFpp();
+    int maxSizeInBytes = bloomFilterConfig.getMaxSizeInBytes();
+    if (maxSizeInBytes > 0) {
+      double minFpp = GuavaBloomFilterReaderUtils.computeFPP(maxSizeInBytes, cardinality);
+      fpp = Math.max(fpp, minFpp);
+    }
+    LOGGER.info("Creating bloom filter with cardinality: {}, fpp: {}", cardinality, fpp);
+    _bloomFilter = BloomFilter.create(Funnels.stringFunnel(StandardCharsets.UTF_8), cardinality, fpp);
   }
 
   @Override

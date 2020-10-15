@@ -54,6 +54,7 @@ import org.apache.pinot.core.segment.index.readers.text.LuceneTextIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,18 +75,11 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       IndexLoadingConfig indexLoadingConfig, File segmentIndexDir)
       throws IOException {
     String columnName = metadata.getColumnName();
-    boolean loadInvertedIndex = false;
-    boolean loadRangeIndex = false;
-    boolean loadTextIndex = false;
-    boolean loadOnHeapDictionary = false;
-    boolean loadBloomFilter = false;
-    if (indexLoadingConfig != null) {
-      loadInvertedIndex = indexLoadingConfig.getInvertedIndexColumns().contains(columnName);
-      loadRangeIndex = indexLoadingConfig.getRangeIndexColumns().contains(columnName);
-      loadOnHeapDictionary = indexLoadingConfig.getOnHeapDictionaryColumns().contains(columnName);
-      loadBloomFilter = indexLoadingConfig.getBloomFilterConfigs().containsKey(columnName);
-      loadTextIndex = indexLoadingConfig.getTextIndexColumns().contains(columnName);
-    }
+    boolean loadInvertedIndex = indexLoadingConfig.getInvertedIndexColumns().contains(columnName);
+    boolean loadRangeIndex = indexLoadingConfig.getRangeIndexColumns().contains(columnName);
+    boolean loadTextIndex = indexLoadingConfig.getTextIndexColumns().contains(columnName);
+    boolean loadOnHeapDictionary = indexLoadingConfig.getOnHeapDictionaryColumns().contains(columnName);
+    BloomFilterConfig bloomFilterConfig = indexLoadingConfig.getBloomFilterConfigs().get(columnName);
 
     if (segmentReader.hasIndexFor(columnName, ColumnIndexType.NULLVALUE_VECTOR)) {
       PinotDataBuffer nullValueVectorBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.NULLVALUE_VECTOR);
@@ -107,9 +101,10 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
 
     if (metadata.hasDictionary()) {
       //bloom filter
-      if (loadBloomFilter) {
+      if (bloomFilterConfig != null) {
         PinotDataBuffer bloomFilterBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.BLOOM_FILTER);
-        _bloomFilter = BloomFilterReaderFactory.getBloomFilterReader(bloomFilterBuffer);
+        _bloomFilter =
+            BloomFilterReaderFactory.getBloomFilterReader(bloomFilterBuffer, bloomFilterConfig.isLoadOnHeap());
       } else {
         _bloomFilter = null;
       }

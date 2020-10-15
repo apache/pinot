@@ -32,12 +32,14 @@ public class BloomFilterReaderFactory {
   private static final int VERSION_OFFSET = 4;
   private static final int HEADER_SIZE = 8;
 
-  public static BloomFilterReader getBloomFilterReader(PinotDataBuffer dataBuffer) {
+  public static BloomFilterReader getBloomFilterReader(PinotDataBuffer dataBuffer, boolean onHeap) {
     int typeValue = dataBuffer.getInt(TYPE_VALUE_OFFSET);
     int version = dataBuffer.getInt(VERSION_OFFSET);
     Preconditions.checkState(
         typeValue == OnHeapGuavaBloomFilterCreator.TYPE_VALUE && version == OnHeapGuavaBloomFilterCreator.VERSION,
         "Unsupported bloom filter type value: %s and version: %s", typeValue, version);
-    return new OffHeapGuavaBloomFilterReader(dataBuffer.view(HEADER_SIZE, dataBuffer.size()));
+    PinotDataBuffer bloomFilterDataBuffer = dataBuffer.view(HEADER_SIZE, dataBuffer.size());
+    return onHeap ? new OnHeapGuavaBloomFilterReader(bloomFilterDataBuffer)
+        : new OffHeapGuavaBloomFilterReader(bloomFilterDataBuffer);
   }
 }
