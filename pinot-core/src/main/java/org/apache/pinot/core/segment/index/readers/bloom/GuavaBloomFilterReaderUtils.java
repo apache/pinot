@@ -37,4 +37,29 @@ public class GuavaBloomFilterReaderUtils {
   public static byte[] hash(String value) {
     return HASH_FUNCTION.hashBytes(StringUtils.encodeUtf8(value)).asBytes();
   }
+
+  /* Cheat sheet:
+
+     m: total bits
+     n: expected insertions
+     b: m/n, bits per insertion
+     p: expected false positive probability
+     k: number of hash functions
+
+     1) Optimal k = b * ln2
+     2) p = (1 - e ^ (-kn/m)) ^ k
+     3) For optimal k: p = 2 ^ (-k) ~= 0.6185^b
+     4) For optimal k: m = -nlnp / ((ln2) ^ 2)
+
+     See http://en.wikipedia.org/wiki/Bloom_filter#Probability_of_false_positives for the formula.
+   */
+
+  /**
+   * Calculates the fpp (false positive probability) based on the given bloom filter size and number of insertions.
+   */
+  public static double computeFPP(int sizeInBytes, int numInsertions) {
+    double b = (double) sizeInBytes * Byte.SIZE / numInsertions;
+    double k = b * Math.log(2);
+    return Math.pow(2, -k);
+  }
 }

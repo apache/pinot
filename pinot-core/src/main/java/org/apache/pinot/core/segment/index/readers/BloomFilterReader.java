@@ -36,5 +36,5 @@ public interface BloomFilterReader extends Closeable {
    * otherwise.
    * <p>This method is provided to prevent hashing the same value multiple times.
    */
-  boolean mightContain(byte[] hash);
+  boolean mightContain(long hash1, long hash2);
 }

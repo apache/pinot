@@ -50,7 +50,7 @@ public class BloomFilterCreatorTest {
     int cardinality = 10000;
     String columnName = "testColumn";
     try (BloomFilterCreator bloomFilterCreator = new OnHeapGuavaBloomFilterCreator(TEMP_DIR, columnName, cardinality,
-        new BloomFilterConfig(BloomFilterConfig.DEFAULT_FPP))) {
+        new BloomFilterConfig(BloomFilterConfig.DEFAULT_FPP, 0, false))) {
       for (int i = 0; i < 5; i++) {
         bloomFilterCreator.add(Integer.toString(i));
       }
@@ -60,12 +60,15 @@ public class BloomFilterCreatorTest {
     // Read the bloom filter
     File bloomFilterFile = new File(TEMP_DIR, columnName + V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION);
     try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(bloomFilterFile);
-        BloomFilterReader bloomFilterReader = BloomFilterReaderFactory.getBloomFilterReader(dataBuffer)) {
+        BloomFilterReader onHeapBloomFilter = BloomFilterReaderFactory.getBloomFilterReader(dataBuffer, true);
+        BloomFilterReader offHeapBloomFilter = BloomFilterReaderFactory.getBloomFilterReader(dataBuffer, false);) {
       for (int i = 0; i < 5; i++) {
-        Assert.assertTrue(bloomFilterReader.mightContain(Integer.toString(i)));
+        Assert.assertTrue(onHeapBloomFilter.mightContain(Integer.toString(i)));
+        Assert.assertTrue(offHeapBloomFilter.mightContain(Integer.toString(i)));
       }
       for (int i = 5; i < 10; i++) {
-        Assert.assertFalse(bloomFilterReader.mightContain(Integer.toString(i)));
+        Assert.assertFalse(onHeapBloomFilter.mightContain(Integer.toString(i)));
+        Assert.assertFalse(offHeapBloomFilter.mightContain(Integer.toString(i)));
       }
     }
   }
