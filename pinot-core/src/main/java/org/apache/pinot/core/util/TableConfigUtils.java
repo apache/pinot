@@ -36,14 +36,17 @@ import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.IngestionConfig;
+import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.TimeUtils;
 
 
@@ -76,6 +79,7 @@ public final class TableConfigUtils {
     validateTierConfigList(tableConfig.getTierConfigsList());
     validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
     validateFieldConfigList(tableConfig.getFieldConfigList(), schema);
+    validateUpsertConfig(tableConfig, schema);
   }
 
   /**
@@ -227,6 +231,38 @@ public final class TableConfigUtils {
               "Derived columns not supported yet. Cannot use a transform column as argument to another transform functions");
         }
       }
+    }
+  }
+
+  /**
+   * Validates the upsert-related configurations
+   *
+   */
+  private static void validateUpsertConfig(TableConfig tableConfig, Schema schema) {
+    if (tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE) {
+      return;
+    }
+    // primary key exists
+    if (schema.getPrimaryKeyColumns() == null || schema.getPrimaryKeyColumns().isEmpty()) {
+      throw new IllegalStateException("Upsert table must have primary key columns in the schema.");
+    }
+    // replica group is configured for routing
+    if (tableConfig.getRoutingConfig() == null || !tableConfig.getRoutingConfig().getInstanceSelectorType()
+        .equalsIgnoreCase(RoutingConfig.REPLICA_GROUP_INSTANCE_SELECTOR_TYPE)) {
+      throw new IllegalStateException("Upsert table must use replicaGroup as the routing config.");
+    }
+    // consumer type must be low-level
+    if (tableConfig.getIndexingConfig() != null && tableConfig.getIndexingConfig().getStreamConfigs() != null) {
+      StreamConfig streamConfig =
+          new StreamConfig(tableConfig.getTableName(), tableConfig.getIndexingConfig().getStreamConfigs());
+      if (streamConfig.getConsumerTypes().size() != 1
+          || streamConfig.getConsumerTypes().get(0) != StreamConfig.ConsumerType.LOWLEVEL) {
+        throw new IllegalStateException("Upsert table must use low-level streaming consumer type.");
+      }
+    }
+    // check type type is realtime
+    if (tableConfig.getTableType() != TableType.REALTIME) {
+      throw new IllegalStateException("Upsert table is for realtime table only.");
     }
   }
 
