@@ -67,7 +67,7 @@ public class QueryOptions {
     return _preserveType;
   }
 
-  public boolean isUpsertSkipped() {
+  public boolean isSkipUpsert() {
     return _skipUpsert;
   }
 

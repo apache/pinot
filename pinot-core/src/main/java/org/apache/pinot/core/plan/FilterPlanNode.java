@@ -63,7 +63,7 @@ public class FilterPlanNode implements PlanNode {
     ValidDocIndexReader validDocIndexReader = _indexSegment.getValidDocIndex();
     boolean upsertSkipped = false;
     if (_queryContext.getQueryOptions() != null) {
-      upsertSkipped = new QueryOptions(_queryContext.getQueryOptions()).isUpsertSkipped();
+      upsertSkipped = new QueryOptions(_queryContext.getQueryOptions()).isSkipUpsert();
     }
     if (filter != null) {
       BaseFilterOperator filterOperator = constructPhysicalOperator(filter, _queryContext.getDebugOptions());
