@@ -85,7 +85,7 @@ public class PinotControllerTransport {
 
   public ControllerTenantBrokerResponse getBrokersFromController(String controllerAddress, String tenant) {
     try {
-      String url = "http://" + controllerAddress + "/brokers/tenants/" + tenant;
+      String url = "http://" + controllerAddress + "/v2/brokers/tenants/" + tenant;
       AsyncHttpClient.BoundRequestBuilder requestBuilder = _httpClient.prepareGet(url);
       if (_headers != null) {
         _headers.forEach((k, v) -> requestBuilder.addHeader(k, v));

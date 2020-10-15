@@ -56,9 +56,13 @@ public class ControllerTenantBrokerResponse {
     for (JsonNode broker : _brokers) {
       String hostName = broker.get("host").textValue();
       Integer port = broker.get("port").intValue();
-
-      String brokerHostPort = String.format("%s:%d", hostName, port);
-      brokerList.add(brokerHostPort);
+      String brokerIP = hostName;
+      if(hostName.contains("_")) {
+        String[] hostNamePart = hostName.split("_");
+        brokerIP = hostNamePart[hostNamePart.length - 1];
+      }
+      String brokerIPPort = String.format("%s:%d", brokerIP, port);
+      brokerList.add(brokerIPPort);
     }
 
     return brokerList;
