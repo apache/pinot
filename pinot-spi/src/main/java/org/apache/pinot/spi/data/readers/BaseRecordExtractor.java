@@ -95,8 +95,10 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
    * Handles the conversion of each element of a multi-value object. Returns {@code null} if the field value is
    * {@code null}.
    *
-   * This implementation converts the Collection to an Object array. Override this method if the data format
-   * requires a different conversion for its multi-value objects.
+   * This implementation converts the Collection to an Object array. Any elements of the Collection that are
+   * {@code null} or an empty string will be excluded from the returned multi-value object.
+   *
+   * Override this method if the data format requires a different conversion for its multi-value objects.
    *
    * @param value should be verified to be a Collection type prior to calling this method as it will be casted
    *              to a Collection without checking
@@ -182,7 +184,7 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
       byteBufferValue.get(bytesValue);
       return bytesValue;
     }
-    if (value instanceof Number) {
+    if (value instanceof Number || value instanceof byte[]) {
       return value;
     }
     return value.toString();
