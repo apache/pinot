@@ -101,7 +101,7 @@ public class MinionTasksIntegrationTest extends HybridClusterIntegrationTest {
     _taskManager = _controllerStarter.getTaskManager();
   }
 
-  @Test
+  @Test(priority = 1)
   public void testConvertToRawIndexTask()
       throws Exception {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
@@ -182,7 +182,7 @@ public class MinionTasksIntegrationTest extends HybridClusterIntegrationTest {
     }, 600_000L, "Failed to get all tasks COMPLETED and new segments refreshed");
   }
 
-  @Test
+  @Test(priority = 1)
   public void testPinotHelixResourceManagerAPIs() {
     // Instance APIs
     Assert.assertEquals(_helixResourceManager.getAllInstances().size(), 5);
@@ -206,7 +206,7 @@ public class MinionTasksIntegrationTest extends HybridClusterIntegrationTest {
     Assert.assertEquals(_helixResourceManager.getAllServerTenantNames(), Collections.singleton("TestTenant"));
   }
 
-  @Test
+  @Test(priority = 2)
   public void testMergeRollup()
       throws Exception {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
@@ -220,8 +220,8 @@ public class MinionTasksIntegrationTest extends HybridClusterIntegrationTest {
     waitForMergeTaskToComplete(offlineTableName);
 
     // Check with the queries
-    testHardcodedSqlQueries();
-    testQueriesFromQueryFile();
+    super.testHardcodedSqlQueries();
+    super.testQueriesFromQueryFile();
   }
 
   private void waitForMergeTaskToComplete(String offlineTableName) {
@@ -244,6 +244,66 @@ public class MinionTasksIntegrationTest extends HybridClusterIntegrationTest {
       }
       return true;
     }, 600_000L, "Failed to get all tasks COMPLETED and new segments refreshed");
+  }
+
+  @Test(enabled = false)
+  public void testSegmentListApi() {
+  }
+
+  @Test(enabled = false)
+  public void testBrokerDebugOutput() {
+  }
+
+  @Test(enabled = false)
+  public void testBrokerDebugRoutingTableSQL() {
+  }
+
+  @Test(enabled = false)
+  public void testBrokerResponseMetadata() {
+  }
+
+  @Test(enabled = false)
+  public void testDictionaryBasedQueries() {
+  }
+
+  @Test(enabled = false)
+  public void testGeneratedQueriesWithMultiValues() {
+  }
+
+  @Test(enabled = false)
+  public void testGeneratedQueriesWithoutMultiValues() {
+  }
+
+  @Test(enabled = false)
+  public void testHardcodedQueries() {
+  }
+
+  @Test(enabled = false)
+  public void testHardcodedSqlQueries() {
+  }
+
+  @Test(enabled = false)
+  public void testInstanceShutdown() {
+  }
+
+  @Test(enabled = false)
+  public void testQueriesFromQueryFile() {
+  }
+
+  @Test(enabled = false)
+  public void testQueryExceptions() {
+  }
+
+  @Test(enabled = false)
+  public void testReload() {
+  }
+
+  @Test(enabled = false)
+  public void testSqlQueriesFromQueryFile() {
+  }
+
+  @Test(enabled = false)
+  public void testVirtualColumnQueries() {
   }
 
   @AfterClass

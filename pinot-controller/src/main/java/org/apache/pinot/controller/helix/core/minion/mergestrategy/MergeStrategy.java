@@ -22,7 +22,22 @@ import java.util.List;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 
 
+/**
+ * Merge strategy interface
+ */
 public interface MergeStrategy {
-  List<List<SegmentZKMetadata>> computeSegmentsToMerge(List<SegmentZKMetadata> segmentsToMerge,
+
+  /**
+   * Generate the merge task candidates. Given the list of segments to merge and the max number of segments per task
+   * configuration, this function computes the list of merge task candidates that are satisfying the conditions.
+   *
+   * The first level list represents each task and the second list represents the list of segments that will be
+   * merged together.
+   *
+   * @param segmentsToMerge
+   * @param maxNumSegmentsPerTask
+   * @return A list of a set of segments that needs to be scheduled
+   */
+  List<List<SegmentZKMetadata>> generateMergeTaskCandidates(List<SegmentZKMetadata> segmentsToMerge,
       int maxNumSegmentsPerTask);
 }

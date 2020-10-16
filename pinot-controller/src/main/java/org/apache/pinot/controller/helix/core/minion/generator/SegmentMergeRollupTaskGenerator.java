@@ -97,16 +97,15 @@ public class SegmentMergeRollupTaskGenerator implements PinotTaskGenerator {
           readIntConfigWithDefaultValue(taskConfigs, MinionConstants.MergeRollupTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY,
               DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT);
 
-      String bufferTimePeriodStr =
+      String bufferTimePeriod =
           taskConfigs.getOrDefault(MinionConstants.MergeRollupTask.BUFFER_TIME_PERIOD_KEY, DEFAULT_BUFFER_TIME_PERIOD);
-      long bufferTimePeriodInMillis;
+      long bufferTimePeriodMs;
       try {
-        bufferTimePeriodInMillis = TimeUtils.convertPeriodToMillis(bufferTimePeriodStr);
+        bufferTimePeriodMs= TimeUtils.convertPeriodToMillis(bufferTimePeriod);
       } catch (IllegalArgumentException e) {
-        LOGGER.warn(
-            "Buffer time period ('{}') for table '{}' is not configured correctly. Falling back to default behavior ('{}')",
-            bufferTimePeriodStr, offlineTableName, DEFAULT_BUFFER_TIME_PERIOD);
-        bufferTimePeriodInMillis = TimeUtils.convertPeriodToMillis(DEFAULT_BUFFER_TIME_PERIOD);
+        LOGGER.error("Buffer time period ('{}') for table '{}' is not configured correctly.", bufferTimePeriod,
+            offlineTableName, e);
+        throw e;
       }
 
       // Generate tasks
@@ -144,7 +143,7 @@ public class SegmentMergeRollupTaskGenerator implements PinotTaskGenerator {
         }
 
         // The segments that are newer than the buffer time period should not be be merged
-        if (System.currentTimeMillis() - offlineSegmentZKMetadata.getEndTime() < bufferTimePeriodInMillis) {
+        if (System.currentTimeMillis() - offlineSegmentZKMetadata.getEndTime() < bufferTimePeriodMs) {
           continue;
         }
         segmentsToMergeForTable.add(offlineSegmentZKMetadata);
@@ -152,7 +151,7 @@ public class SegmentMergeRollupTaskGenerator implements PinotTaskGenerator {
 
       // Compute Merge Strategy
       List<List<SegmentZKMetadata>> segmentsToSchedule = MergeStrategyFactory.getMergeStrategy(taskConfigs)
-          .computeSegmentsToMerge(segmentsToMergeForTable, maxNumSegmentsPerTask);
+          .generateMergeTaskCandidates(segmentsToMergeForTable, maxNumSegmentsPerTask);
 
       // Generate tasks
       for (List<SegmentZKMetadata> segments : segmentsToSchedule) {

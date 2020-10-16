@@ -98,7 +98,7 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
       return JOINER.join(_segmentNamePrefix, getNormalizedDate(Preconditions.checkNotNull(minTimeValue)),
           getNormalizedDate(Preconditions.checkNotNull(maxTimeValue)), _segmentNamePostfix, sequenceIdInSegmentName);
     } else {
-        return JOINER.join(_segmentNamePrefix, _segmentNamePostfix, sequenceIdInSegmentName);
+      return JOINER.join(_segmentNamePrefix, _segmentNamePostfix, sequenceIdInSegmentName);
     }
   }
 

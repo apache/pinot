@@ -65,7 +65,7 @@ public class TimeBasedMergeStrategy implements MergeStrategy {
   }
 
   @Override
-  public List<List<SegmentZKMetadata>> computeSegmentsToMerge(List<SegmentZKMetadata> segmentsToMerge,
+  public List<List<SegmentZKMetadata>> generateMergeTaskCandidates(List<SegmentZKMetadata> segmentsToMerge,
       int maxNumSegmentsPerTask) {
     Map<Long, List<SegmentZKMetadata>> bucketedSegments = new TreeMap<>();
 
@@ -128,7 +128,6 @@ public class TimeBasedMergeStrategy implements MergeStrategy {
         result.add(segmentListToMerge);
       }
     }
-
     return result;
   }
 }

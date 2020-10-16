@@ -53,13 +53,13 @@ public class TimeBasedMergeStrategyTest {
     TimeBasedMergeStrategy timeBasedMergeStrategy = new TimeBasedMergeStrategy(configs);
 
     List<List<SegmentZKMetadata>> scheduledSegments =
-        timeBasedMergeStrategy.computeSegmentsToMerge(segmentZKMetadataList, 5);
+        timeBasedMergeStrategy.generateMergeTaskCandidates(segmentZKMetadataList, 5);
 
     Assert.assertEquals(scheduledSegments.size(), 2);
     Assert.assertEquals(scheduledSegments.get(0).size(), 5);
     Assert.assertEquals(scheduledSegments.get(1).size(), 5);
 
-    scheduledSegments = timeBasedMergeStrategy.computeSegmentsToMerge(segmentZKMetadataList, 2);
+    scheduledSegments = timeBasedMergeStrategy.generateMergeTaskCandidates(segmentZKMetadataList, 2);
     Assert.assertEquals(scheduledSegments.size(), 5);
     for (int i = 0; i < 5; i++) {
       Assert.assertEquals(scheduledSegments.get(i).size(), 2);
@@ -85,7 +85,7 @@ public class TimeBasedMergeStrategyTest {
     TimeBasedMergeStrategy timeBasedMergeStrategy = new TimeBasedMergeStrategy(configs);
 
     List<List<SegmentZKMetadata>> scheduledSegments =
-        timeBasedMergeStrategy.computeSegmentsToMerge(segmentZKMetadataList, 6);
+        timeBasedMergeStrategy.generateMergeTaskCandidates(segmentZKMetadataList, 6);
 
     Assert.assertEquals(scheduledSegments.size(), 5);
     for (int i = 0; i < 5; i++) {
@@ -100,7 +100,7 @@ public class TimeBasedMergeStrategyTest {
       }
     }
 
-    scheduledSegments = timeBasedMergeStrategy.computeSegmentsToMerge(segmentZKMetadataList, 3);
+    scheduledSegments = timeBasedMergeStrategy.generateMergeTaskCandidates(segmentZKMetadataList, 3);
 
     Assert.assertEquals(scheduledSegments.size(), 10);
     for (int i = 0; i < 10; i++) {
@@ -134,7 +134,7 @@ public class TimeBasedMergeStrategyTest {
     TimeBasedMergeStrategy timeBasedMergeStrategy = new TimeBasedMergeStrategy(configs);
 
     List<List<SegmentZKMetadata>> scheduledSegments =
-        timeBasedMergeStrategy.computeSegmentsToMerge(segmentZKMetadataList, 31);
+        timeBasedMergeStrategy.generateMergeTaskCandidates(segmentZKMetadataList, 31);
 
     Assert.assertEquals(scheduledSegments.size(), 5);
     for (int i = 0; i < 5; i++) {
