@@ -31,6 +31,7 @@ public class InstanceUtils {
   }
 
   public static final String POOL_KEY = "pool";
+  public static final String GRPC_PORT_KEY = "grpcPort";
 
   /**
    * Returns the Helix instance id (e.g. {@code Server_localhost_1234}) for the given instance.
@@ -75,6 +76,7 @@ public class InstanceUtils {
       }
       instanceConfig.getRecord().setMapField(POOL_KEY, mapValue);
     }
+    instanceConfig.getRecord().setSimpleField(GRPC_PORT_KEY, Integer.toString(instance.getGrpcPort()));
     return instanceConfig;
   }
 }

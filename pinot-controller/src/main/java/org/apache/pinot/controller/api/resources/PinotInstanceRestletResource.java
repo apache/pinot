@@ -101,6 +101,7 @@ public class PinotInstanceRestletResource {
     response.put("port", instanceConfig.getPort());
     response.set("tags", JsonUtils.objectToJsonNode(instanceConfig.getTags()));
     response.set("pools", JsonUtils.objectToJsonNode(instanceConfig.getRecord().getMapField(InstanceUtils.POOL_KEY)));
+    response.put("grpcPort", instanceConfig.getRecord().getSimpleField(InstanceUtils.GRPC_PORT_KEY));
     return response.toString();
   }
 
