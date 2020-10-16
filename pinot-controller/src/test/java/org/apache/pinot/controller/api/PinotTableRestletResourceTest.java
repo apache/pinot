@@ -284,6 +284,33 @@ public class PinotTableRestletResourceTest extends ControllerTest {
         RebalanceResult.class);
     Assert.assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
   }
+  
+  @Test
+  public void testTruncateTable() throws IOException {
+    // Case 1: Create a REALTIME and OFFLINE table and truncate it directly
+    String tableName = "truncateTable0";
+    TableConfig realtimeTableConfig = _realtimeBuilder.setTableName(tableName).build();
+    String creationResponse = sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
+    Assert.assertEquals(creationResponse, "{\"status\":\"Table truncateTable0_REALTIME succesfully added\"}");
+
+    TableConfig offlineTableConfig = _offlineBuilder.setTableName(tableName).build();
+    String offlineCreationResponse = sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
+    Assert.assertEquals(offlineCreationResponse, "{\"status\":\"Table truncateTable0_OFFLINE succesfully added\"}");
+
+    // truncate request
+    String tableType = TableType.REALTIME.toString();
+    String truncateResponse =
+        sendPostRequest(_controllerRequestURLBuilder.forTruncateTable(tableName, tableType), null);
+
+    Assert.assertEquals(truncateResponse, "{\"status\":\"Table " + tableName + " successfully truncated\"}");
+    
+    tableType = TableType.OFFLINE.toString();
+    truncateResponse =
+        sendPostRequest(_controllerRequestURLBuilder.forTruncateTable(tableName, tableType), null);
+
+    Assert.assertEquals(truncateResponse, "{\"status\":\"Table " + tableName + " successfully truncated\"}");
+
+  }
 
   @Test
   public void testDeleteTable()

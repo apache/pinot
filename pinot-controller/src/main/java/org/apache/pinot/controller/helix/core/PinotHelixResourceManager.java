@@ -1309,7 +1309,7 @@ public class PinotHelixResourceManager {
     }
   }
 
-  private void ensureRealtimeClusterIsSetUp(TableConfig realtimeTableConfig) {
+  public void ensureRealtimeClusterIsSetUp(TableConfig realtimeTableConfig) {
     String realtimeTableName = realtimeTableConfig.getTableName();
     StreamConfig streamConfig = new StreamConfig(realtimeTableConfig.getTableName(),
         realtimeTableConfig.getIndexingConfig().getStreamConfigs());

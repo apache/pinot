@@ -25,6 +25,7 @@ import com.google.common.base.Preconditions;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -43,6 +44,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.exception.TableNotFoundException;
@@ -50,6 +52,7 @@ import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.recommender.RecommenderDriver;
@@ -361,6 +364,68 @@ public class PinotTableRestletResource {
 
     return new SuccessResponse("Table config updated for " + tableName);
   }
+  
+  /**
+   * Truncate table, delete all contents of table without removing table configuration and schema. 
+   * 
+   * @param tableName , name of the table to truncate
+   * @param tableTypeStr, type of the table i.e 'offline|realtime'
+   * @return response of truncate operation.
+   * @throws Exception
+   */
+  @POST
+  @Path("/tables/{tableName}/truncate")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Truncate table")
+  public SuccessResponse truncateTable(
+      @ApiParam(value = "Name of the table to update", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) throws Exception {
+
+    TableType tableType = Constants.validateTableType(tableTypeStr);
+    if (tableType == null) {
+      throw new ControllerApplicationException(LOGGER, "Table type must not be null", Response.Status.BAD_REQUEST);
+    }
+
+    // Disable table by tableType
+    toggleTableState(tableName, tableType, StateType.DISABLE);
+
+    // Get all segment names for table and delete all segments
+    String tableNameWithType = getExistingTableNamesWithType(tableName, tableType).get(0);
+    List<String> segmentNames = _pinotHelixResourceManager.getSegmentsFor(tableNameWithType);
+    PinotResourceManagerResponse response = _pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentNames);
+
+    // Enable table by tableType
+    toggleTableState(tableName, tableType, StateType.ENABLE);
+
+    // Setup table for real-time : (ensureRealtimeClusterIsSetUp)
+    if (tableType != TableType.OFFLINE && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
+      String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+      TableConfig realtimeTableConfig = _pinotHelixResourceManager.getTableConfig(realtimeTableName);
+      _pinotHelixResourceManager.ensureRealtimeClusterIsSetUp(realtimeTableConfig);
+    }
+
+    if (!response.isSuccessful()) {
+      throw new ControllerApplicationException(LOGGER,
+          "Failed to delete segments from table: " + tableNameWithType + ", error message: " + response.getMessage(),
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+
+    return new SuccessResponse("Table " + tableName + " successfully truncated");
+  }
+  
+  private void toggleTableState(String tableName, TableType tableType, StateType status) {
+    if (tableType != TableType.REALTIME && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
+      String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+      // toggle offline table status
+      _pinotHelixResourceManager.toggleTableState(tableNameWithType, status);
+    }
+    if (tableType != TableType.OFFLINE && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
+      String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+      // toggle real-time table status
+      _pinotHelixResourceManager.toggleTableState(tableNameWithType, status);
+    }
+  }
+  
 
   @POST
   @Path("/tables/validate")
@@ -382,6 +447,16 @@ public class PinotTableRestletResource {
       return tableConfigValidateStr.toString();
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Invalid table config", Response.Status.BAD_REQUEST, e);
+    }
+  }
+  
+  private List<String> getExistingTableNamesWithType(String tableName, @Nullable TableType tableType) {
+    try {
+      return _pinotHelixResourceManager.getExistingTableNamesWithType(tableName, tableType);
+    } catch (TableNotFoundException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
+    } catch (IllegalArgumentException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.FORBIDDEN);
     }
   }
 

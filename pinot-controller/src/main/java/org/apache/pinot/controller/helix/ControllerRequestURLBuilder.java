@@ -190,6 +190,10 @@ public class ControllerRequestURLBuilder {
   public String forTableGetBrokerInstances(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "instances?type=broker");
   }
+  
+  public String forTruncateTable(String tableName, String tableType) {
+    return String.join("/", _baseUrl, "tables", tableName, "truncate?type=" + tableType);
+  }
 
   public String forTableGet(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName);
