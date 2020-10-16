@@ -186,7 +186,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
 
     // Add new instance.
     Instance instance = new Instance("localhost", biggerRandomNumber, InstanceType.SERVER,
-        Collections.singletonList(UNTAGGED_SERVER_INSTANCE), null);
+        Collections.singletonList(UNTAGGED_SERVER_INSTANCE), null, 0);
     _helixResourceManager.addInstance(instance);
 
     List<String> allInstances = _helixResourceManager.getAllInstances();

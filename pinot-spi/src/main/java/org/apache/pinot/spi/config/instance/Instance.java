@@ -53,11 +53,6 @@ public class Instance extends BaseJsonConfig {
   private final Map<String, Integer> _pools;
   private final int _grpcPort;
 
-
-  public Instance(String host, int port, InstanceType type, List<String> tags, Map<String, Integer> pools) {
-    this(host, port, type, tags, pools, NOT_SET_GRPC_PORT_VALUE);
-  }
-
   @JsonCreator
   public Instance(@JsonProperty(value = "host", required = true) String host,
       @JsonProperty(value = "port", required = true) int port,
@@ -71,7 +66,11 @@ public class Instance extends BaseJsonConfig {
     _type = type;
     _tags = tags;
     _pools = pools;
-    _grpcPort = grpcPort;
+    if (grpcPort == 0) {
+      _grpcPort = NOT_SET_GRPC_PORT_VALUE;
+    } else {
+      _grpcPort = grpcPort;
+    }
   }
 
   public String getHost() {

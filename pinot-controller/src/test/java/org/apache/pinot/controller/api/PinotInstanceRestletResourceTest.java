@@ -37,7 +37,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.spi.config.instance.Instance.NOT_SET_GRPC_PORT_VALUE;
 import static org.testng.Assert.fail;
 
 
@@ -73,7 +72,7 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
 
     // Create untagged broker and server instances
     String createInstanceUrl = _controllerRequestURLBuilder.forInstanceCreate();
-    Instance brokerInstance = new Instance("1.2.3.4", 1234, InstanceType.BROKER, null, null);
+    Instance brokerInstance = new Instance("1.2.3.4", 1234, InstanceType.BROKER, null, null, 0);
     sendPostRequest(createInstanceUrl, brokerInstance.toJsonString());
 
     Instance serverInstance = new Instance("1.2.3.4", 2345, InstanceType.SERVER, null, null, 8090);
@@ -83,7 +82,7 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
     checkNumInstances(listInstancesUrl, 3);
 
     // Create broker and server instances with tags and pools
-    brokerInstance = new Instance("2.3.4.5", 1234, InstanceType.BROKER, Collections.singletonList("tag_BROKER"), null);
+    brokerInstance = new Instance("2.3.4.5", 1234, InstanceType.BROKER, Collections.singletonList("tag_BROKER"), null, 0);
     sendPostRequest(createInstanceUrl, brokerInstance.toJsonString());
 
     Map<String, Integer> serverPools = new TreeMap<>();
@@ -126,7 +125,7 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
     // Test PUT Instance API
     String newBrokerTag = "new-broker-tag";
     Instance newBrokerInstance =
-        new Instance("1.2.3.4", 1234, InstanceType.BROKER, Collections.singletonList(newBrokerTag), null);
+        new Instance("1.2.3.4", 1234, InstanceType.BROKER, Collections.singletonList(newBrokerTag), null, 0);
     String brokerInstanceId = "Broker_1.2.3.4_1234";
     String brokerInstanceUrl = _controllerRequestURLBuilder.forInstance(brokerInstanceId);
     sendPutRequest(brokerInstanceUrl, newBrokerInstance.toJsonString());
@@ -155,7 +154,7 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
 
   private void checkInstanceInfo(String instanceName, String hostName, int port, String[] tags, String[] pools,
       int[] poolValues) {
-    checkInstanceInfo(instanceName, hostName, port, tags, pools, poolValues, NOT_SET_GRPC_PORT_VALUE);
+    checkInstanceInfo(instanceName, hostName, port, tags, pools, poolValues, Instance.NOT_SET_GRPC_PORT_VALUE);
   }
 
   private void checkInstanceInfo(String instanceName, String hostName, int port, String[] tags, String[] pools,
