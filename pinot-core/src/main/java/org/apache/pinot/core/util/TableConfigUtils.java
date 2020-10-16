@@ -247,9 +247,8 @@ public final class TableConfigUtils {
       return;
     }
     // check table type is realtime
-    if (tableConfig.getTableType() != TableType.REALTIME) {
-      throw new IllegalStateException("Upsert table is for realtime table only.");
-    }
+    Preconditions
+        .checkState(tableConfig.getTableType() == TableType.REALTIME, "Upsert table is for realtime table only.");
     // primary key exists
     Preconditions.checkState(CollectionUtils.isNotEmpty(schema.getPrimaryKeyColumns()),
         "Upsert table must have primary key columns in the schema");
