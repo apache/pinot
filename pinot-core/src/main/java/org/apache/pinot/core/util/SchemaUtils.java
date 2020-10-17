@@ -75,6 +75,7 @@ public class SchemaUtils {
 
     Set<String> transformedColumns = new HashSet<>();
     Set<String> argumentColumns = new HashSet<>();
+    Set<String> primaryKeyColumnCandidates = new HashSet<>();
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn()) {
         String column = fieldSpec.getName();
@@ -92,6 +93,9 @@ public class SchemaUtils {
                 "Exception in getting arguments for transform function '" + transformFunction + "' for column '"
                     + column + "'", e);
           }
+        } else if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.TIME) && fieldSpec.getFieldType()
+            .equals(FieldSpec.FieldType.DATE_TIME)) {
+          primaryKeyColumnCandidates.add(column);
         }
         if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.TIME)) {
           validateTimeFieldSpec(fieldSpec);
@@ -104,6 +108,10 @@ public class SchemaUtils {
     Preconditions.checkState(Collections.disjoint(transformedColumns, argumentColumns),
         "Columns: %s are a result of transformations, and cannot be used as arguments to other transform functions",
         transformedColumns.retainAll(argumentColumns));
+    for (String primaryKeyColumn : schema.getPrimaryKeyColumns()) {
+      Preconditions.checkState(primaryKeyColumnCandidates.contains(primaryKeyColumn),
+          "The primary key column must exist and cannot be a time column");
+    }
   }
 
   /**

@@ -25,7 +25,9 @@ import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.tier.TierFactory;
+import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IngestionConfig;
@@ -719,6 +721,17 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateUpsertConfig(tableConfig, schema);
     } catch (Exception e) {
       Assert.fail("Should not fail upsert validation");
+    }
+    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Lists.newArrayList("myCol"), null, Collections
+        .singletonList(new AggregationFunctionColumnPair(AggregationFunctionType.COUNT, "myCol").toColumnName()), 10);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
+        .setRoutingConfig(new RoutingConfig(null, null, "replicaGroup"))
+        .setStarTreeIndexConfigs(Lists.newArrayList(starTreeIndexConfig)).setStreamConfigs(streamConfigs).build();
+    try {
+      TableConfigUtils.validateUpsertConfig(tableConfig, schema);
+    } catch (Exception e) {
+      Assert.assertEquals(e.getMessage(), "The upsert table cannot have star-tree index.");
     }
   }
 }
