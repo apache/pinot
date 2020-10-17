@@ -20,6 +20,7 @@ package org.apache.pinot.minion.executor;
 
 import com.google.common.base.Preconditions;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -43,9 +44,20 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
   }
 
   protected Schema getSchema(String tableName) {
-    Schema schema =
-        ZKMetadataProvider.getTableSchema(MINION_CONTEXT.getHelixPropertyStore(), tableName);
+    Schema schema = ZKMetadataProvider.getTableSchema(MINION_CONTEXT.getHelixPropertyStore(), tableName);
     Preconditions.checkState(schema != null, "Failed to find schema for table: %s", tableName);
     return schema;
+  }
+
+  /**
+   * Pre processing operations to be done at the beginning of task execution
+   */
+  protected void preProcess(PinotTaskConfig pinotTaskConfig) {
+  }
+
+  /**
+   * Post processing operations to be done before exiting a successful task execution
+   */
+  protected void postProcess(PinotTaskConfig pinotTaskConfig) {
   }
 }

@@ -55,9 +55,7 @@ public class TaskGeneratorUtils {
 
       // Skip tasks scheduled for more than one day
       String taskName = entry.getKey();
-      long scheduleTimeMs = Long.parseLong(
-          taskName.substring(taskName.lastIndexOf(PinotHelixTaskResourceManager.TASK_NAME_SEPARATOR) + 1));
-      if (System.currentTimeMillis() - scheduleTimeMs > ONE_DAY_IN_MILLIS) {
+      if (isTaskOlderThanOneDay(taskName)) {
         continue;
       }
 
@@ -73,14 +71,20 @@ public class TaskGeneratorUtils {
   /**
    * Gets all the tasks for the provided task type and tableName, which do not have TaskState COMPLETED
    * @return map containing task name to task state for non-completed tasks
+   *
+   * NOTE: we consider tasks not finished in one day as stuck and don't count them
    */
-  public static Map<String, TaskState> getNonCompletedTasks(String taskType, String tableNameWithType,
+  public static Map<String, TaskState> getIncompleteTasks(String taskType, String tableNameWithType,
       ClusterInfoProvider clusterInfoProvider) {
 
     Map<String, TaskState> nonCompletedTasks = new HashMap<>();
     Map<String, TaskState> taskStates = clusterInfoProvider.getTaskStates(taskType);
     for (Map.Entry<String, TaskState> entry : taskStates.entrySet()) {
       if (entry.getValue() == TaskState.COMPLETED) {
+        continue;
+      }
+      String taskName = entry.getKey();
+      if (isTaskOlderThanOneDay(taskName)) {
         continue;
       }
       for (PinotTaskConfig pinotTaskConfig : clusterInfoProvider.getTaskConfigs(entry.getKey())) {
@@ -90,5 +94,14 @@ public class TaskGeneratorUtils {
       }
     }
     return nonCompletedTasks;
+  }
+
+  /**
+   * Returns true if task's schedule time is older than 1d
+   */
+  private static boolean isTaskOlderThanOneDay(String taskName) {
+    long scheduleTimeMs =
+        Long.parseLong(taskName.substring(taskName.lastIndexOf(PinotHelixTaskResourceManager.TASK_NAME_SEPARATOR) + 1));
+    return System.currentTimeMillis() - scheduleTimeMs > ONE_DAY_IN_MILLIS;
   }
 }

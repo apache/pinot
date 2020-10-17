@@ -34,14 +34,15 @@ import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.common.utils.CommonConstants.Segment;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoProvider;
+import org.apache.pinot.controller.helix.core.minion.ClusterUpdater;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.RealtimeToOfflineSegmentsTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.TimeUtils;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,14 +54,24 @@ import org.slf4j.LoggerFactory;
  * At any given time, only 1 task of this type should be generated for a table.
  *
  * Steps:
- *  - The watermarkMillis is read from the {@link RealtimeToOfflineSegmentsTaskMetadata} ZNode found at MINION_TASK_METADATA/realtimeToOfflineSegmentsTask/tableNameWithType
- *      In case of cold-start, no ZNode will exist.
- *      A new ZNode will be created, with watermarkMillis as the smallest time found in the COMPLETED segments (or using start time config)
- *  - The execution window for the task is calculated as, windowStartMillis = waterMarkMillis, windowEndMillis = windowStartMillis + bucketTimeMillis,
- *      where bucketTime can be provided in the taskConfigs (default 1d)
- *  - If the execution window is not older than bufferTimeMillis, no task will be generated,
- *      where bufferTime can be provided in the taskConfigs (default 2d)
- *  - Segment metadata is scanned for all COMPLETED segments, to pick those containing data in window [windowStartMillis, windowEndMillis)
+ *  - The watermarkMs is read from the {@link RealtimeToOfflineSegmentsTaskMetadata} ZNode
+ *  found at MINION_TASK_METADATA/RealtimeToOfflineSegmentsTask/tableNameWithType
+ *  In case of cold-start, no ZNode will exist.
+ *  A new ZNode will be created, with watermarkMs as the smallest time found in the COMPLETED segments
+ *
+ *  - The execution window for the task is calculated as,
+ *  windowStartMs = watermarkMs, windowEndMs = windowStartMs + bucketTimeMs,
+ *  where bucketTime can be provided in the taskConfigs (default 1d)
+ *
+ *  - If the execution window is not older than bufferTimeMs, no task will be generated,
+ *  where bufferTime can be provided in the taskConfigs (default 2d)
+ *
+ *  - Segment metadata is scanned for all COMPLETED segments,
+ *  to pick those containing data in window [windowStartMs, windowEndMs)
+ *
+ *  - There are some special considerations for using last completed segment of a partition.
+ *  Such segments will be checked for segment endTime, to ensure there's no overflow into CONSUMING segments
+ *
  *  - A PinotTaskConfig is created, with segment information, execution window, and any config specific to the task
  */
 public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerator {
@@ -70,9 +81,12 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
   private static final String DEFAULT_BUFFER_PERIOD = "2d";
 
   private final ClusterInfoProvider _clusterInfoProvider;
+  private final ClusterUpdater _clusterUpdater;
 
-  public RealtimeToOfflineSegmentsTaskGenerator(ClusterInfoProvider clusterInfoProvider) {
+  public RealtimeToOfflineSegmentsTaskGenerator(ClusterInfoProvider clusterInfoProvider,
+      ClusterUpdater clusterUpdater) {
     _clusterInfoProvider = clusterInfoProvider;
+    _clusterUpdater = clusterUpdater;
   }
 
   @Override
@@ -86,27 +100,30 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
     List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
 
     for (TableConfig tableConfig : tableConfigs) {
-      String tableName = tableConfig.getTableName();
+      String realtimeTableName = tableConfig.getTableName();
 
       if (tableConfig.getTableType() != TableType.REALTIME) {
-        LOGGER.warn("Skip generating task: {} for non-REALTIME table: {}", taskType, tableName);
+        LOGGER.warn("Skip generating task: {} for non-REALTIME table: {}", taskType, realtimeTableName);
         continue;
       }
-      LOGGER.info("Start generating task configs for table: {} for task: {}", tableName, taskType);
-
-      String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-      String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
+      if (new StreamConfig(realtimeTableName, tableConfig.getIndexingConfig().getStreamConfigs())
+          .hasHighLevelConsumerType()) {
+        LOGGER.warn("Skip generating task: {} for HLC REALTIME table: {}", taskType, realtimeTableName);
+        continue;
+      }
+      LOGGER.info("Start generating task configs for table: {} for task: {}", realtimeTableName, taskType);
 
       // Only schedule 1 task of this type, per table
-      Map<String, TaskState> nonCompletedTasks =
-          TaskGeneratorUtils.getNonCompletedTasks(taskType, realtimeTableName, _clusterInfoProvider);
-      if (!nonCompletedTasks.isEmpty()) {
-        LOGGER.warn("Found non-completed tasks: {} for same table: {}. Skipping task generation.",
-            nonCompletedTasks.keySet(), realtimeTableName);
+      Map<String, TaskState> incompleteTasks =
+          TaskGeneratorUtils.getIncompleteTasks(taskType, realtimeTableName, _clusterInfoProvider);
+      if (!incompleteTasks.isEmpty()) {
+        LOGGER
+            .warn("Found incomplete tasks: {} for same table: {}. Skipping task generation.", incompleteTasks.keySet(),
+                realtimeTableName);
         continue;
       }
 
-      // Get all completed segment metadata.
+      // Get all segment metadata for completed segments (DONE status).
       List<LLCRealtimeSegmentZKMetadata> completedSegmentsMetadata = new ArrayList<>();
       Map<Integer, String> partitionToLatestCompletedSegmentName = new HashMap<>();
       Set<Integer> allPartitions = new HashSet<>();
@@ -114,7 +131,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
           allPartitions);
       if (completedSegmentsMetadata.isEmpty()) {
         LOGGER
-            .info("No realtime completed segments found for table: {}, skipping task generation: {}", realtimeTableName,
+            .info("No realtime-completed segments found for table: {}, skipping task generation: {}", realtimeTableName,
                 taskType);
         continue;
       }
@@ -129,27 +146,25 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
       TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
       Preconditions.checkState(tableTaskConfig != null);
       Map<String, String> taskConfigs = tableTaskConfig.getConfigsForTaskType(taskType);
-      Preconditions.checkState(taskConfigs != null, "Task config shouldn't be null for table: {}", tableName);
+      Preconditions.checkState(taskConfigs != null, "Task config shouldn't be null for table: {}", realtimeTableName);
 
       // Get the bucket size and buffer
-      String bucketTimeStr =
+      String bucketTimePeriod =
           taskConfigs.getOrDefault(RealtimeToOfflineSegmentsTask.BUCKET_TIME_PERIOD_KEY, DEFAULT_BUCKET_PERIOD);
-      String bufferTimeStr =
+      String bufferTimePeriod =
           taskConfigs.getOrDefault(RealtimeToOfflineSegmentsTask.BUFFER_TIME_PERIOD_KEY, DEFAULT_BUFFER_PERIOD);
-      String startTimeStr = taskConfigs.get(RealtimeToOfflineSegmentsTask.START_TIME_MILLIS_KEY);
-      long bucketMillis = TimeUtils.convertPeriodToMillis(bucketTimeStr);
-      long bufferMillis = TimeUtils.convertPeriodToMillis(bufferTimeStr);
+      long bucketMs = TimeUtils.convertPeriodToMillis(bucketTimePeriod);
+      long bufferMs = TimeUtils.convertPeriodToMillis(bufferTimePeriod);
 
       // Get watermark from RealtimeToOfflineSegmentsTaskMetadata ZNode. WindowStart = watermark. WindowEnd = windowStart + bucket.
-      long windowStartMillis =
-          getWatermarkMillis(realtimeTableName, completedSegmentsMetadata, startTimeStr, bucketMillis);
-      long windowEndMillis = windowStartMillis + bucketMillis;
+      long windowStartMs = getWatermarkMs(realtimeTableName, completedSegmentsMetadata, bucketMs);
+      long windowEndMs = windowStartMs + bucketMs;
 
       // Check that execution window is older than bufferTime
-      if (windowEndMillis > System.currentTimeMillis() - bufferMillis) {
+      if (windowEndMs > System.currentTimeMillis() - bufferMs) {
         LOGGER.info(
             "Window with start: {} and end: {} is not older than buffer time: {} configured as {} ago. Skipping task generation: {}",
-            windowStartMillis, windowEndMillis, bufferMillis, bufferTimeStr, taskType);
+            windowStartMs, windowEndMs, bufferMs, bufferTimePeriod, taskType);
         continue;
       }
 
@@ -161,14 +176,14 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
       for (LLCRealtimeSegmentZKMetadata realtimeSegmentZKMetadata : completedSegmentsMetadata) {
         String segmentName = realtimeSegmentZKMetadata.getSegmentName();
         TimeUnit timeUnit = realtimeSegmentZKMetadata.getTimeUnit();
-        long segmentStartTimeMillis = timeUnit.toMillis(realtimeSegmentZKMetadata.getStartTime());
-        long segmentEndTimeMillis = timeUnit.toMillis(realtimeSegmentZKMetadata.getEndTime());
+        long segmentStartTimeMs = timeUnit.toMillis(realtimeSegmentZKMetadata.getStartTime());
+        long segmentEndTimeMs = timeUnit.toMillis(realtimeSegmentZKMetadata.getEndTime());
 
         // Check overlap with window
-        if (windowStartMillis <= segmentEndTimeMillis && segmentStartTimeMillis < windowEndMillis) {
+        if (windowStartMs <= segmentEndTimeMs && segmentStartTimeMs < windowEndMs) {
           // If last completed segment is being used, make sure that segment crosses over end of window.
           // In the absence of this check, CONSUMING segments could contain some portion of the window. That data would be skipped forever.
-          if (lastCompletedSegmentPerPartition.contains(segmentName) && segmentEndTimeMillis < windowEndMillis) {
+          if (lastCompletedSegmentPerPartition.contains(segmentName) && segmentEndTimeMs < windowEndMs) {
             LOGGER.info(
                 "Window data overflows into CONSUMING segments for partition of segment: {}. Skipping task generation: {}",
                 segmentName, taskType);
@@ -182,7 +197,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
 
       if (segmentNames.isEmpty() || skipGenerate) {
         LOGGER.info("Found no eligible segments for task: {} with window [{} - {}). Skipping task generation", taskType,
-            windowStartMillis, windowEndMillis);
+            windowStartMs, windowEndMs);
         continue;
       }
 
@@ -193,8 +208,8 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
       configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoProvider.getVipUrl() + "/segments");
 
       // Execution window
-      configs.put(RealtimeToOfflineSegmentsTask.WINDOW_START_MILLIS_KEY, String.valueOf(windowStartMillis));
-      configs.put(RealtimeToOfflineSegmentsTask.WINDOW_END_MILLIS_KEY, String.valueOf(windowEndMillis));
+      configs.put(RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY, String.valueOf(windowStartMs));
+      configs.put(RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY, String.valueOf(windowEndMs));
 
       // Segment processor configs
       String timeColumnTransformationConfig =
@@ -218,13 +233,13 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
       }
 
       pinotTaskConfigs.add(new PinotTaskConfig(taskType, configs));
-      LOGGER.info("Finished generating task configs for table: {} for task: {}", tableName, taskType);
+      LOGGER.info("Finished generating task configs for table: {} for task: {}", realtimeTableName, taskType);
     }
     return pinotTaskConfigs;
   }
 
   /**
-   * Fetch completed segment and partition information
+   * Fetch completed (non-consuming) segment and partition information
    * @param realtimeTableName the realtime table name
    * @param completedSegmentsMetadataList list for collecting the completed segments metadata
    * @param partitionToLatestCompletedSegmentName map for collecting the partitionId to the latest completed segment name
@@ -266,43 +281,36 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
    * Get the watermark from the RealtimeToOfflineSegmentsMetadata ZNode.
    * If the znode is null, computes the watermark using either the start time config or the start time from segment metadata
    */
-  private long getWatermarkMillis(String realtimeTableName,
-      List<LLCRealtimeSegmentZKMetadata> completedSegmentsMetadata, String startTimeStr, long bucketMillis) {
+  private long getWatermarkMs(String realtimeTableName, List<LLCRealtimeSegmentZKMetadata> completedSegmentsMetadata,
+      long bucketMs) {
     RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
         _clusterInfoProvider.getMinionRealtimeToOfflineSegmentsTaskMetadata(realtimeTableName);
 
     if (realtimeToOfflineSegmentsTaskMetadata == null) {
       // No ZNode exists. Cold-start.
-      long watermarkMillis;
+      long watermarkMs;
 
-      if (startTimeStr != null) {
-        // Use startTime config if provided in taskConfigs
-        watermarkMillis = Long.parseLong(startTimeStr);
-      } else {
-        // Find the smallest time from all segments
-        RealtimeSegmentZKMetadata minSegmentZkMetadata = null;
-        for (LLCRealtimeSegmentZKMetadata realtimeSegmentZKMetadata : completedSegmentsMetadata) {
-          if (minSegmentZkMetadata == null || realtimeSegmentZKMetadata.getStartTime() < minSegmentZkMetadata
-              .getStartTime()) {
-            minSegmentZkMetadata = realtimeSegmentZKMetadata;
-          }
+      // Find the smallest time from all segments
+      RealtimeSegmentZKMetadata minSegmentZkMetadata = null;
+      for (LLCRealtimeSegmentZKMetadata realtimeSegmentZKMetadata : completedSegmentsMetadata) {
+        if (minSegmentZkMetadata == null || realtimeSegmentZKMetadata.getStartTime() < minSegmentZkMetadata
+            .getStartTime()) {
+          minSegmentZkMetadata = realtimeSegmentZKMetadata;
         }
-        Preconditions.checkState(minSegmentZkMetadata != null);
-
-        // Convert the segment minTime to millis
-        long minSegmentStartTimeMillis =
-            minSegmentZkMetadata.getTimeUnit().toMillis(minSegmentZkMetadata.getStartTime());
-
-        // Round off according to the bucket. This ensures we align the offline segments to proper time boundaries
-        // For example, if start time millis is 20200813T12:34:59, we want to create the first segment for window [20200813, 20200814)
-        watermarkMillis = (minSegmentStartTimeMillis / bucketMillis) * bucketMillis;
       }
+      Preconditions.checkState(minSegmentZkMetadata != null);
+
+      // Convert the segment minTime to millis
+      long minSegmentStartTimeMs = minSegmentZkMetadata.getTimeUnit().toMillis(minSegmentZkMetadata.getStartTime());
+
+      // Round off according to the bucket. This ensures we align the offline segments to proper time boundaries
+      // For example, if start time millis is 20200813T12:34:59, we want to create the first segment for window [20200813, 20200814)
+      watermarkMs = (minSegmentStartTimeMs / bucketMs) * bucketMs;
 
       // Create RealtimeToOfflineSegmentsTaskMetadata ZNode using watermark calculated above
-      realtimeToOfflineSegmentsTaskMetadata =
-          new RealtimeToOfflineSegmentsTaskMetadata(realtimeTableName, watermarkMillis);
-      _clusterInfoProvider.setRealtimeToOfflineSegmentsTaskMetadata(realtimeToOfflineSegmentsTaskMetadata);
+      realtimeToOfflineSegmentsTaskMetadata = new RealtimeToOfflineSegmentsTaskMetadata(realtimeTableName, watermarkMs);
+      _clusterUpdater.setRealtimeToOfflineSegmentsTaskMetadata(realtimeToOfflineSegmentsTaskMetadata);
     }
-    return realtimeToOfflineSegmentsTaskMetadata.getWatermarkMillis();
+    return realtimeToOfflineSegmentsTaskMetadata.getWatermarkMs();
   }
 }

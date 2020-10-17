@@ -49,6 +49,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
 
   private final PinotHelixTaskResourceManager _helixTaskResourceManager;
   private final ClusterInfoProvider _clusterInfoProvider;
+  private final ClusterUpdater _clusterUpdater;
   private final TaskGeneratorRegistry _taskGeneratorRegistry;
 
   public PinotTaskManager(PinotHelixTaskResourceManager helixTaskResourceManager,
@@ -59,7 +60,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
         controllerMetrics);
     _helixTaskResourceManager = helixTaskResourceManager;
     _clusterInfoProvider = new ClusterInfoProvider(helixResourceManager, helixTaskResourceManager, controllerConf);
-    _taskGeneratorRegistry = new TaskGeneratorRegistry(_clusterInfoProvider);
+    _clusterUpdater = new ClusterUpdater(helixResourceManager);
+    _taskGeneratorRegistry = new TaskGeneratorRegistry(_clusterInfoProvider, _clusterUpdater);
   }
 
   /**

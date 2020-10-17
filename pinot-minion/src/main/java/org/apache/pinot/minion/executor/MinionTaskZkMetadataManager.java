@@ -36,7 +36,7 @@ public class MinionTaskZkMetadataManager {
   }
 
   /**
-   * Fetch the ZNRecord under MINION_TASK_METADATA/realtimeToOfflineSegmentsTask for the given tableNameWithType
+   * Fetch the ZNRecord under MINION_TASK_METADATA/RealtimeToOfflineSegmentsTask for the given tableNameWithType
    */
   public ZNRecord getRealtimeToOfflineSegmentsTaskZNRecord(String tableNameWithType) {
     return MinionTaskMetadataUtils
@@ -45,7 +45,7 @@ public class MinionTaskZkMetadataManager {
   }
 
   /**
-   * Sets the {@link RealtimeToOfflineSegmentsTaskMetadata} into the ZNode at MINION_TASK_METADATA/realtimeToOfflineSegmentsTask
+   * Sets the {@link RealtimeToOfflineSegmentsTaskMetadata} into the ZNode at MINION_TASK_METADATA/RealtimeToOfflineSegmentsTask
    * for the corresponding tableNameWithType
    * @param expectedVersion Version expected to be updating, failing the call if there's a mismatch
    */

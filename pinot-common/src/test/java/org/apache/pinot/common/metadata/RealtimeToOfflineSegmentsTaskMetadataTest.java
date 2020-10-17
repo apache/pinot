@@ -32,16 +32,15 @@ public class RealtimeToOfflineSegmentsTaskMetadataTest {
 
   @Test
   public void testToFromZNRecord() {
-
-    RealtimeToOfflineSegmentsTaskMetadata
-        metadata = new RealtimeToOfflineSegmentsTaskMetadata("testTable_REALTIME", 1000);
+    RealtimeToOfflineSegmentsTaskMetadata metadata =
+        new RealtimeToOfflineSegmentsTaskMetadata("testTable_REALTIME", 1000);
     ZNRecord znRecord = metadata.toZNRecord();
     assertEquals(znRecord.getId(), "testTable_REALTIME");
-    assertEquals(znRecord.getSimpleField("watermarkMillis"), "1000");
+    assertEquals(znRecord.getSimpleField("watermarkMs"), "1000");
 
     RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
         RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(znRecord);
     assertEquals(realtimeToOfflineSegmentsTaskMetadata.getTableNameWithType(), "testTable_REALTIME");
-    assertEquals(realtimeToOfflineSegmentsTaskMetadata.getWatermarkMillis(), 1000);
+    assertEquals(realtimeToOfflineSegmentsTaskMetadata.getWatermarkMs(), 1000);
   }
 }

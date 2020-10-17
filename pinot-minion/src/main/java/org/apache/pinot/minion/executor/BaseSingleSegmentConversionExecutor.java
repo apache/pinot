@@ -136,9 +136,8 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       SegmentConversionUtils.uploadSegment(configs, httpHeaders, parameters, tableNameWithType, segmentName, uploadURL,
           convertedSegmentTarFile);
 
-      LOGGER.info("Done executing {} on table: {}, segment: {}", taskType, tableNameWithType, segmentName);
       postProcess(pinotTaskConfig);
-
+      LOGGER.info("Done executing {} on table: {}, segment: {}", taskType, tableNameWithType, segmentName);
       return segmentConversionResult;
     } finally {
       FileUtils.deleteQuietly(tempDataDir);

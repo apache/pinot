@@ -66,7 +66,7 @@ public class MinionConstants {
    * Creates segments for the OFFLINE table, using completed segments from the corresponding REALTIME table
    */
   public static class RealtimeToOfflineSegmentsTask {
-    public static final String TASK_TYPE = "realtimeToOfflineSegmentsTask";
+    public static final String TASK_TYPE = "RealtimeToOfflineSegmentsTask";
 
     /**
      * The time window size for the task.
@@ -78,15 +78,10 @@ public class MinionConstants {
      * e.g. if set to "2d", no task will be scheduled for a time window younger than 2 days
      */
     public static final String BUFFER_TIME_PERIOD_KEY = "bufferTimePeriod";
-    /**
-     * Config to manually provide start time for the very first task scheduled.
-     * In the absence of this config, the very first window start is calculated as min(start time of all completed segments)
-     */
-    public static final String START_TIME_MILLIS_KEY = "startTimeMillis";
 
     // Window start and window end set by task generator
-    public static final String WINDOW_START_MILLIS_KEY = "windowStartMillis";
-    public static final String WINDOW_END_MILLIS_KEY = "windowEndMillis";
+    public static final String WINDOW_START_MS_KEY = "windowStartMs";
+    public static final String WINDOW_END_MS_KEY = "windowEndMs";
     // Segment processing related configs
     public static final String TIME_COLUMN_TRANSFORM_FUNCTION_KEY = "timeColumnTransformFunction";
     public static final String COLLECTOR_TYPE_KEY = "collectorType";

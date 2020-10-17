@@ -143,11 +143,10 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
 
       String outputSegmentNames = segmentConversionResults.stream().map(SegmentConversionResult::getSegmentName)
           .collect(Collectors.joining(","));
+      postProcess(pinotTaskConfig);
       LOGGER
           .info("Done executing {} on table: {}, input segments: {}, output segments: {}", taskType, tableNameWithType,
               inputSegmentNames, outputSegmentNames);
-
-      postProcess(pinotTaskConfig);
 
       return segmentConversionResults;
     } finally {

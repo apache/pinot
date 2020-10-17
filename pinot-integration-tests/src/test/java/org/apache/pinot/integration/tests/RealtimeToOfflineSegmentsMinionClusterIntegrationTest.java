@@ -40,7 +40,7 @@ import org.testng.annotations.Test;
 
 
 /**
- * Integration test for minion task of type "realtimeToOfflineSegmentsTask"
+ * Integration test for minion task of type "RealtimeToOfflineSegmentsTask"
  * With every task run, a new segment is created in the offline table for 1 day. Watermark also keeps progressing accordingly.
  */
 public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends RealtimeClusterIntegrationTest {
@@ -104,15 +104,15 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
     long expectedWatermark = _dataSmallestTimeMillis;
     int numOfflineSegments = 0;
     long offlineSegmentTime = _dateSmallestDays;
-    for (int i = 0; i < 3; i ++) {
+    for (int i = 0; i < 3; i++) {
       // Schedule task
-      Assert
-          .assertTrue(_taskManager.scheduleTasks().containsKey(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
+      Assert.assertTrue(
+          _taskManager.scheduleTasks().containsKey(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
       Assert.assertTrue(_helixTaskResourceManager.getTaskQueues().contains(
           PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE)));
       // Should not generate more tasks
-      Assert
-          .assertFalse(_taskManager.scheduleTasks().containsKey(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
+      Assert.assertFalse(
+          _taskManager.scheduleTasks().containsKey(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
 
       expectedWatermark = expectedWatermark + 86400000;
       // Wait at most 600 seconds for all tasks COMPLETED
@@ -122,7 +122,7 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
       Assert.assertEquals(offlineSegmentMetadata.size(), ++numOfflineSegments);
       Assert.assertEquals(offlineSegmentMetadata.get(i).getStartTime(), offlineSegmentTime);
       Assert.assertEquals(offlineSegmentMetadata.get(i).getEndTime(), offlineSegmentTime);
-      offlineSegmentTime ++;
+      offlineSegmentTime++;
     }
     testHardcodedSqlQueries();
   }
@@ -143,7 +143,7 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
     RealtimeToOfflineSegmentsTaskMetadata minionTaskMetadata =
         _taskManager.getClusterInfoProvider().getMinionRealtimeToOfflineSegmentsTaskMetadata(_realtimeTableName);
     Assert.assertNotNull(minionTaskMetadata);
-    Assert.assertEquals(minionTaskMetadata.getWatermarkMillis(), expectedWatermark);
+    Assert.assertEquals(minionTaskMetadata.getWatermarkMs(), expectedWatermark);
   }
 
   @Test(enabled = false)

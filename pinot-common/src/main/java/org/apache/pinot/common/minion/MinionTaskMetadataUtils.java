@@ -52,7 +52,7 @@ public final class MinionTaskMetadataUtils {
   }
 
   /**
-   * Fetches the ZNRecord for realtimeToOfflineSegmentsTask for given tableNameWithType from MINION_TASK_METADATA/realtimeToOfflineSegmentsTask/tableNameWthType
+   * Fetches the ZNRecord for RealtimeToOfflineSegmentsTask for given tableNameWithType from MINION_TASK_METADATA/RealtimeToOfflineSegmentsTask/tableNameWthType
    * and converts it to a {@link RealtimeToOfflineSegmentsTaskMetadata} object
    */
   @Nullable
@@ -63,7 +63,7 @@ public final class MinionTaskMetadataUtils {
   }
 
   /**
-   * Persists the provided {@link RealtimeToOfflineSegmentsTaskMetadata} to MINION_TASK_METADATA/realtimeToOfflineSegmentsTask/tableNameWthType.
+   * Persists the provided {@link RealtimeToOfflineSegmentsTaskMetadata} to MINION_TASK_METADATA/RealtimeToOfflineSegmentsTask/tableNameWthType.
    * Will fail if expectedVersion does not match.
    * Set expectedVersion -1 to override version check.
    */
@@ -75,7 +75,7 @@ public final class MinionTaskMetadataUtils {
     if (!propertyStore
         .set(path, realtimeToOfflineSegmentsTaskMetadata.toZNRecord(), expectedVersion, AccessOption.PERSISTENT)) {
       throw new ZkException(
-          "Failed to persist minion realtimeToOfflineSegmentsTask metadata: " + realtimeToOfflineSegmentsTaskMetadata);
+          "Failed to persist minion RealtimeToOfflineSegmentsTask metadata: " + realtimeToOfflineSegmentsTaskMetadata);
     }
   }
 }

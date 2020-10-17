@@ -19,47 +19,41 @@
 package org.apache.pinot.common.minion;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import java.io.IOException;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
 import org.apache.helix.ZNRecord;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
- * Metadata for the minion task of type <code>realtimeToOfflineSegmentsTask</code>.
- * The <code>watermarkMillis</code> denotes the time (exclusive) upto which tasks have been executed.
+ * Metadata for the minion task of type <code>RealtimeToOfflineSegmentsTask</code>.
+ * The <code>watermarkMs</code> denotes the time (exclusive) upto which tasks have been executed.
  *
- * This gets serialized and stored in zookeeper under the path MINION_TASK_METADATA/realtimeToOfflineSegmentsTask/tableNameWithType
+ * This gets serialized and stored in zookeeper under the path MINION_TASK_METADATA/RealtimeToOfflineSegmentsTask/tableNameWithType
  *
  * PinotTaskGenerator:
- * The <code>watermarkMillis</code>> is used by the <code>RealtimeToOfflineSegmentsTaskGenerator</code>,
+ * The <code>watermarkMs</code>> is used by the <code>RealtimeToOfflineSegmentsTaskGenerator</code>,
  * to determine the window of execution for the task it is generating.
- * The window of execution will be [watermarkMillis, watermarkMillis + bucketSize)
+ * The window of execution will be [watermarkMs, watermarkMs + bucketSize)
  *
  * PinotTaskExecutor:
  * The same watermark is used by the <code>RealtimeToOfflineSegmentsTaskExecutor</code>, to:
  * - Verify that is is running the latest task scheduled by the task generator
  * - Update the watermark as the end of the window that it executed for
  */
-@JsonIgnoreProperties(ignoreUnknown = true)
 public class RealtimeToOfflineSegmentsTaskMetadata {
 
-  private static final String WATERMARK_KEY = "watermarkMillis";
+  private static final String WATERMARK_KEY = "watermarkMs";
 
   private final String _tableNameWithType;
-  private long _watermarkMillis;
+  private final long _watermarkMs;
 
   @JsonCreator
-  public RealtimeToOfflineSegmentsTaskMetadata(@JsonProperty(value = "tableNameWithType", required = true) String tableNameWithType,
-      @JsonProperty(value = "watermarkMillis", required = true) long watermarkMillis) {
+  public RealtimeToOfflineSegmentsTaskMetadata(
+      @JsonProperty(value = "tableNameWithType", required = true) String tableNameWithType,
+      @JsonProperty(value = "watermarkMs", required = true) long watermarkMs) {
     _tableNameWithType = tableNameWithType;
-    _watermarkMillis = watermarkMillis;
+    _watermarkMs = watermarkMs;
   }
 
   @JsonProperty
@@ -71,12 +65,8 @@ public class RealtimeToOfflineSegmentsTaskMetadata {
    * Get the watermark in millis
    */
   @JsonProperty
-  public long getWatermarkMillis() {
-    return _watermarkMillis;
-  }
-
-  public void setWatermarkMillis(long watermarkMillis) {
-    _watermarkMillis = watermarkMillis;
+  public long getWatermarkMs() {
+    return _watermarkMs;
   }
 
   public static RealtimeToOfflineSegmentsTaskMetadata fromZNRecord(ZNRecord znRecord) {
@@ -86,10 +76,9 @@ public class RealtimeToOfflineSegmentsTaskMetadata {
 
   public ZNRecord toZNRecord() {
     ZNRecord znRecord = new ZNRecord(_tableNameWithType);
-    znRecord.setLongField(WATERMARK_KEY, _watermarkMillis);
+    znRecord.setLongField(WATERMARK_KEY, _watermarkMs);
     return znRecord;
   }
-
 
   public String toJsonString() {
     try {

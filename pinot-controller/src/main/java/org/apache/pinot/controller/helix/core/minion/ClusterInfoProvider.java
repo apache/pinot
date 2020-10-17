@@ -120,16 +120,6 @@ public class ClusterInfoProvider {
   }
 
   /**
-   * Sets the {@link RealtimeToOfflineSegmentsTaskMetadata} into MINION_TASK_METADATA
-   * This call will override any previous metadata node
-   */
-  public void setRealtimeToOfflineSegmentsTaskMetadata(
-      RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata) {
-    MinionTaskMetadataUtils.persistRealtimeToOfflineSegmentsTaskMetadata(_pinotHelixResourceManager.getPropertyStore(),
-        MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, realtimeToOfflineSegmentsTaskMetadata, -1);
-  }
-
-  /**
    * Get all tasks' state for the given task type.
    *
    * @param taskType Task type

@@ -55,7 +55,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * A task to convert segments from a REALTIME table to segments for its corresponding OFFLINE table.
- * The realtime segments could span across multiple time windows. This task extracts data and creates segments for a configured time range.
+ * The realtime segments could span across multiple time windows.
+ * This task extracts data and creates segments for a configured time range.
  * The {@link SegmentProcessorFramework} is used for the segment conversion, which also does
  * 1. time window extraction using filter function
  * 2. time column rollup
@@ -63,12 +64,14 @@ import org.slf4j.LoggerFactory;
  * 4. aggregations and rollup
  * 5. data sorting
  *
- * Before beginning the task, the <code>watermarkMillis</code> is checked in the minion task metadata ZNode, located at MINION_TASK_METADATA/realtimeToOfflineSegmentsTask/<tableNameWithType>
- * It should match the <code>windowStartMillis</code>.
+ * Before beginning the task, the <code>watermarkMs</code> is checked in the minion task metadata ZNode,
+ * located at MINION_TASK_METADATA/RealtimeToOfflineSegmentsTask/<tableNameWithType>
+ * It should match the <code>windowStartMs</code>.
  * The version of the znode is cached.
  *
- * After the segments are uploaded, this task updates the <code>watermarkMillis</code> in the minion task metadata ZNode.
- * The znode version is checked during update, and update only succeeds if version matches with the previously cached version
+ * After the segments are uploaded, this task updates the <code>watermarkMs</code> in the minion task metadata ZNode.
+ * The znode version is checked during update,
+ * and update only succeeds if version matches with the previously cached version
  */
 public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsConversionExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeToOfflineSegmentsTaskExecutor.class);
@@ -76,7 +79,7 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
   private static final String OUTPUT_SEGMENTS_DIR = "output_segments";
 
   private final MinionTaskZkMetadataManager _minionTaskZkMetadataManager;
-  private int _expectedVersion = -1;
+  private int _expectedVersion = Integer.MIN_VALUE;
   private long _nextWatermark;
 
   public RealtimeToOfflineSegmentsTaskExecutor(MinionTaskZkMetadataManager minionTaskZkMetadataManager) {
@@ -84,8 +87,8 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
   }
 
   /**
-   * Fetches the realtimeToOfflineSegmentsTask metadata ZNode for the realtime table.
-   * Checks that the <code>watermarkMillis</code> from the ZNode matches the windowStartMillis in the task configs.
+   * Fetches the RealtimeToOfflineSegmentsTask metadata ZNode for the realtime table.
+   * Checks that the <code>watermarkMs</code> from the ZNode matches the windowStartMs in the task configs.
    * If yes, caches the ZNode version to check during update.
    */
   @Override
@@ -96,15 +99,14 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     ZNRecord realtimeToOfflineSegmentsTaskZNRecord =
         _minionTaskZkMetadataManager.getRealtimeToOfflineSegmentsTaskZNRecord(realtimeTableName);
     Preconditions.checkState(realtimeToOfflineSegmentsTaskZNRecord != null,
-        "realtimeToOfflineSegmentsTaskMetadata ZNRecord for table: %s should not be null. Exiting task.",
+        "RealtimeToOfflineSegmentsTaskMetadata ZNRecord for table: %s should not be null. Exiting task.",
         realtimeTableName);
 
     RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
         RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(realtimeToOfflineSegmentsTaskZNRecord);
-    long windowStartMs =
-        Long.parseLong(configs.get(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MILLIS_KEY));
-    Preconditions.checkState(realtimeToOfflineSegmentsTaskMetadata.getWatermarkMillis() == windowStartMs,
-        "watermarkMillis in realtimeToOfflineSegmentsTask metadata: %s does not match windowStartMillis: %d in task configs for table: %s. "
+    long windowStartMs = Long.parseLong(configs.get(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY));
+    Preconditions.checkState(realtimeToOfflineSegmentsTaskMetadata.getWatermarkMs() == windowStartMs,
+        "watermarkMs in RealtimeToOfflineSegmentsTask metadata: %s does not match windowStartMs: %d in task configs for table: %s. "
             + "ZNode may have been modified by another task", realtimeToOfflineSegmentsTaskMetadata, windowStartMs,
         realtimeTableName);
 
@@ -132,9 +134,8 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
         .checkState(dateTimeFieldSpec != null, "No valid spec found for time column: %s in schema for table: %s",
             timeColumn, offlineTableName);
 
-    long windowStartMs =
-        Long.parseLong(configs.get(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MILLIS_KEY));
-    long windowEndMs = Long.parseLong(configs.get(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_END_MILLIS_KEY));
+    long windowStartMs = Long.parseLong(configs.get(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY));
+    long windowEndMs = Long.parseLong(configs.get(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY));
     _nextWatermark = windowEndMs;
 
     String timeColumnTransformFunction =
@@ -218,26 +219,16 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
   }
 
   /**
-   * Fetches the realtimeToOfflineSegmentsTask metadata ZNode for the realtime table.
+   * Fetches the RealtimeToOfflineSegmentsTask metadata ZNode for the realtime table.
    * Checks that the version of the ZNode matches with the version cached earlier. If yes, proceeds to update watermark in the ZNode
-   * TODO: Making the minion task update the ZK metadata is an anti-pattern, however cannot another way to do it
+   * TODO: Making the minion task update the ZK metadata is an anti-pattern, however cannot see another way to do it
    */
   @Override
   public void postProcess(PinotTaskConfig pinotTaskConfig) {
     String realtimeTableName = pinotTaskConfig.getConfigs().get(MinionConstants.TABLE_NAME_KEY);
-
-    ZNRecord realtimeToOfflineSegmentsTaskRecord =
-        _minionTaskZkMetadataManager.getRealtimeToOfflineSegmentsTaskZNRecord(realtimeTableName);
-    Preconditions.checkState(realtimeToOfflineSegmentsTaskRecord.getVersion() == _expectedVersion,
-        "Version mismatch for realtimeToOfflineSegmentsTask ZNode: %s, expected: %d, but found: %d. "
-            + "ZNode may have been modified by another task.", realtimeToOfflineSegmentsTaskRecord, _expectedVersion,
-        realtimeToOfflineSegmentsTaskRecord.getVersion());
-
-    RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
-        RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(realtimeToOfflineSegmentsTaskRecord);
-    realtimeToOfflineSegmentsTaskMetadata.setWatermarkMillis(_nextWatermark);
-    _minionTaskZkMetadataManager
-        .setRealtimeToOfflineSegmentsTaskMetadata(realtimeToOfflineSegmentsTaskMetadata, _expectedVersion);
+    RealtimeToOfflineSegmentsTaskMetadata newMinionMetadata =
+        new RealtimeToOfflineSegmentsTaskMetadata(realtimeTableName, _nextWatermark);
+    _minionTaskZkMetadataManager.setRealtimeToOfflineSegmentsTaskMetadata(newMinionMetadata, _expectedVersion);
   }
 
   /**
