@@ -38,22 +38,27 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
  *   "tags": ["example_OFFLINE"],
  *   "pools": {
  *     "example_OFFLINE": 0
- *   }
+ *   },
+ *   "grpcPort": 8090
  * }
  * </pre>
  */
 public class Instance extends BaseJsonConfig {
+  public static int NOT_SET_GRPC_PORT_VALUE = -1;
+
   private final String _host;
   private final int _port;
   private final InstanceType _type;
   private final List<String> _tags;
   private final Map<String, Integer> _pools;
+  private final int _grpcPort;
 
   @JsonCreator
   public Instance(@JsonProperty(value = "host", required = true) String host,
       @JsonProperty(value = "port", required = true) int port,
       @JsonProperty(value = "type", required = true) InstanceType type,
-      @JsonProperty("tags") @Nullable List<String> tags, @JsonProperty("pools") @Nullable Map<String, Integer> pools) {
+      @JsonProperty("tags") @Nullable List<String> tags, @JsonProperty("pools") @Nullable Map<String, Integer> pools,
+      @JsonProperty("grpcPort") int grpcPort) {
     Preconditions.checkArgument(host != null, "'host' must be configured");
     Preconditions.checkArgument(type != null, "'type' must be configured");
     _host = host;
@@ -61,6 +66,11 @@ public class Instance extends BaseJsonConfig {
     _type = type;
     _tags = tags;
     _pools = pools;
+    if (grpcPort == 0) {
+      _grpcPort = NOT_SET_GRPC_PORT_VALUE;
+    } else {
+      _grpcPort = grpcPort;
+    }
   }
 
   public String getHost() {
@@ -83,5 +93,9 @@ public class Instance extends BaseJsonConfig {
   @Nullable
   public Map<String, Integer> getPools() {
     return _pools;
+  }
+
+  public int getGrpcPort() {
+    return _grpcPort;
   }
 }
