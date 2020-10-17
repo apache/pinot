@@ -356,12 +356,50 @@ public class CalciteSqlParser {
     // Rewrite GroupBy to Distinct
     rewriteNonAggregationGroupByToDistinct(pinotQuery);
 
+    // Update Ordinals
+    applyOrdinals(pinotQuery);
+
     // Update alias
     Map<Identifier, Expression> aliasMap = extractAlias(pinotQuery.getSelectList());
     applyAlias(aliasMap, pinotQuery);
 
     // Validate
     validate(aliasMap, pinotQuery);
+  }
+
+  private static void applyOrdinals(PinotQuery pinotQuery) {
+    // handle GROUP BY clause
+    for (int i = 0; i < pinotQuery.getGroupByListSize(); i++) {
+      final Expression groupByExpr = pinotQuery.getGroupByList().get(i);
+      if (groupByExpr.isSetLiteral() && groupByExpr.getLiteral().isSetLongValue()) {
+        final int ordinal = (int) groupByExpr.getLiteral().getLongValue();
+        pinotQuery.getGroupByList().set(i, getExpressionFromOrdinal(pinotQuery.getSelectList(), ordinal));
+      }
+    }
+
+    // handle ORDER BY clause
+    for (int i = 0; i < pinotQuery.getOrderByListSize(); i++) {
+      final Expression orderByExpr = pinotQuery.getOrderByList().get(i).getFunctionCall().getOperands().get(0);
+      if (orderByExpr.isSetLiteral() && orderByExpr.getLiteral().isSetLongValue()) {
+        final int ordinal = (int) orderByExpr.getLiteral().getLongValue();
+        pinotQuery.getOrderByList().get(i).getFunctionCall()
+            .setOperands(Arrays.asList(getExpressionFromOrdinal(pinotQuery.getSelectList(), ordinal)));
+      }
+    }
+  }
+
+  private static Expression getExpressionFromOrdinal(List<Expression> selectList, int ordinal) {
+    if (ordinal > 0 && ordinal <= selectList.size()) {
+      final Expression expression = selectList.get(ordinal - 1);
+      // If the expression has AS, return the left operand.
+      if (expression.isSetFunctionCall() && expression.getFunctionCall().getOperator().equals(SqlKind.AS.name())) {
+        return expression.getFunctionCall().getOperands().get(0);
+      }
+      return expression;
+    } else {
+      throw new SqlCompilationException(
+          String.format("Expected Ordinal value to be between 1 and %d.", selectList.size()));
+    }
   }
 
   /**
@@ -412,10 +450,7 @@ public class CalciteSqlParser {
   }
 
   private static boolean isAsFunction(Expression expression) {
-    if (expression.getFunctionCall() != null && expression.getFunctionCall().getOperator().equalsIgnoreCase("AS")) {
-      return true;
-    }
-    return false;
+    return expression.getFunctionCall() != null && expression.getFunctionCall().getOperator().equalsIgnoreCase("AS");
   }
 
   private static void invokeCompileTimeFunctions(PinotQuery pinotQuery) {
