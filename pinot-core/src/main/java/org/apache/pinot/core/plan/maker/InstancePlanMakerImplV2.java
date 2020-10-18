@@ -126,8 +126,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         return new AggregationGroupByPlanNode(indexSegment, queryContext, _maxInitialResultHolderCapacity,
             _numGroupsLimit);
       } else {
-        // Aggregation only query
-        if (queryContext.getFilter() == null) {
+        // Aggregation only query, does not apply to upsert table
+        if (queryContext.getFilter() == null && indexSegment.getValidDocIndex() == null) {
           if (isFitForMetadataBasedPlan(queryContext)) {
             return new MetadataBasedAggregationPlanNode(indexSegment, queryContext);
           } else if (isFitForDictionaryBasedPlan(queryContext, indexSegment)) {

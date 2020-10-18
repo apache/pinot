@@ -39,6 +39,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -66,6 +67,7 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
 
   private static final InstancePlanMakerImplV2 PLAN_MAKER = new InstancePlanMakerImplV2();
   private IndexSegment _indexSegment = null;
+  private IndexSegment _indexSegmentUpsert = null;
 
   @BeforeTest
   public void buildSegment()
@@ -115,6 +117,8 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
   public void loadSegment()
       throws Exception {
     _indexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
+    _indexSegmentUpsert = ImmutableSegmentLoader
+        .load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap, new PartitionUpsertMetadataManager());
   }
 
   @AfterClass
@@ -132,6 +136,29 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromPQL(query);
     PlanNode plan = PLAN_MAKER.makeSegmentPlanNode(_indexSegment, queryContext);
     assertTrue(planNodeClass.isInstance(plan));
+  }
+
+  @Test(dataProvider = "testUpsertPlanNodeMakerDataProvider")
+  public void testInstancePlanMakerDisableMetadataAndDictionaryPlan(String query,
+      Class<? extends PlanNode> planNodeClass) {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromPQL(query);
+    PlanNode plan = PLAN_MAKER.makeSegmentPlanNode(_indexSegmentUpsert, queryContext);
+    assertTrue(planNodeClass.isInstance(plan));
+  }
+
+  @DataProvider(name = "testUpsertPlanNodeMakerDataProvider")
+  public Object[][] provideTestUpsertPlanNodeMakerData() {
+    List<Object[]> entries = new ArrayList<>();
+    entries.add(new Object[]{"select count(*) from testTable", /*count(*) from metadata*/
+        AggregationPlanNode.class});
+    entries
+        .add(new Object[]{"select max(daysSinceEpoch),min(daysSinceEpoch) from testTable", /*min max from dictionary*/
+            AggregationPlanNode.class});
+    entries.add(new Object[]{"select max(column17),min(column17) from testTable", /* minmax from dictionary*/
+        AggregationPlanNode.class});
+    entries.add(new Object[]{"select minmaxrange(column17) from testTable", /*no minmax metadata, go to dictionary*/
+        AggregationPlanNode.class});
+    return entries.toArray(new Object[entries.size()][]);
   }
 
   @DataProvider(name = "testPlanNodeMakerDataProvider")
