@@ -22,9 +22,27 @@
 # from one version to the other given 2 commit hashes. It first builds  
 # Pinot in the 2 given directories and then upgrades in the following order:
 # Controller -> Broker -> Server
+#
+# TODO Some ideas to explore:
+#  It will be nice to have the script take arguments about what is to be done.
+#  For example, we may want to verify the upgrade path in a different order.
+#  Better yet, test all orders to decide that the upgrade can be done in any order.
+#  Or, we may want to test upgrade of a specific component only.
+#
+#  For now, this script runs specific yaml files as a part of testing between
+#  component upgrades/rollbacks. Perhaps we can change it to take a directory name
+#  and run all the scripts in the directory in alpha order, one script at each
+#  "stage" of upgrade.
+#
+#  We may modify to choose a minimal run in which the same set of operatons are run 
+#  between any two component upgrades/rollbacks -- this may consist of adding
+#  one more segment to table, adding some more rows to the stream topic, and
+#  running some queries with the new data.
 
 # get a temporary directory in case the workingDir is not provided by user   
 TMP_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')
+
+COMPAT_TESTER_PATH="pinot-integration-tests/target/pinot-integration-tests-pkg/bin/pinot-compat-test-runner.sh"
 
 # get usage of the script 
 function usage() {
@@ -107,8 +125,14 @@ function stopServices() {
   echo "Cluster stopped."
 } 
 
+#
+# Main
+#
+
 # cleanp the temporary directory when the bash script exits 
 trap cleanup EXIT
+
+COMPAT_TESTER="$(dirname $0)/../${COMPAT_TESTER_PATH}"
 
 if [ $# -lt 2 ] || [ $# -gt 3 ] ; then
   usage compCheck
@@ -157,21 +181,27 @@ fi
 
 # Setup initial cluster with olderCommit and do rolling upgrade
 startServices "$oldTargetDir"
-sleep 20
+#$COMPAT_TESTER pre-controller-upgrade.yaml; if [ $? -ne 0 ]; then exit 1; fi
 stopService controller "$oldTargetDir"
 startService controller "$newTargetDir"
+#$COMPAT_TESTER pre-broker-upgrade.yaml; if [ $? -ne 0 ]; then exit 1; fi
 stopService broker "$oldTargetDir"
 startService broker "$newTargetDir"
+#$COMPAT_TESTER pre-server-upgrade.yaml; if [ $? -ne 0 ]; then exit 1; fi
 stopService server "$oldTargetDir"
 startService server "$newTargetDir"
-sleep 20
+#$COMPAT_TESTER post-server-upgrade.yaml; if [ $? -ne 0 ]; then exit 1; fi
+
+# Upgrade complated, now do a rollback
 stopService controller "$newTargetDir"
 startService controller "$oldTargetDir"
+#$COMPAT_TESTER post-server-rollback.yaml; if [ $? -ne 0 ]; then exit 1; fi
 stopService broker "$newTargetDir"
 startService broker "$oldTargetDir"
+#$COMPAT_TESTER post-broker-rollback.yaml; if [ $? -ne 0 ]; then exit 1; fi
 stopService server "$newTargetDir"
 startService server "$oldTargetDir"
-sleep 20
+#$COMPAT_TESTER post-controller-rollback.yaml; if [ $? -ne 0 ]; then exit 1; fi
 stopServices "$oldTargetDir"
 
 exit 0
