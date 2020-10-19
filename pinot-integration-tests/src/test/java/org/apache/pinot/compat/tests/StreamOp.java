@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.tools.compat;
+package org.apache.pinot.compat.tests;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.List;

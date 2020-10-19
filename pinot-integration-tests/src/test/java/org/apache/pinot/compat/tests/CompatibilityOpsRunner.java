@@ -16,21 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.tools;
+package org.apache.pinot.compat.tests;
 
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URL;
-import org.apache.pinot.tools.compat.BaseOp;
-import org.apache.pinot.tools.compat.CompatTestOperation;
+import org.apache.pinot.compat.tests.BaseOp;
+import org.apache.pinot.compat.tests.CompatTestOperation;
 
 public class CompatibilityOpsRunner {
-  private static final String ROOT_DIR = "compat-testing";
+  private static final String ROOT_DIR = "compat-tests";
 
   private final String _configFileName;
 

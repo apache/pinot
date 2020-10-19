@@ -52,6 +52,14 @@
         <configuration>
           <programs>
             <program>
+              <mainClass>org.apache.pinot.compat.tests.CompatibilityOpsRunner</mainClass>
+              <name>pinot-compat-test-runner</name>
+              <jvmSettings>
+                <initialMemorySize>2G</initialMemorySize>
+                <maxMemorySize>2G</maxMemorySize>
+              </jvmSettings>
+            </program>
+            <program>
               <mainClass>org.apache.pinot.integration.tests.HybridClusterIntegrationTestCommandLineRunner</mainClass>
               <name>pinot-hybrid-cluster-test</name>
               <jvmSettings>

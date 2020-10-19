@@ -42,7 +42,7 @@
 # get a temporary directory in case the workingDir is not provided by user   
 TMP_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')
 
-COMPAT_TESTER_PATH="pinot-tools/target/pinot-tools-pkg/bin/compatibility-tester.sh"
+COMPAT_TESTER_PATH="pinot-integration-tests/target/pinot-integration-tests-pkg/bin/pinot-compat-test-runner.sh"
 
 # get usage of the script 
 function usage() {
@@ -181,28 +181,27 @@ fi
 
 # Setup initial cluster with olderCommit and do rolling upgrade
 startServices "$oldTargetDir"
-#$COMPAT_TESTER pre-controller-upgrade.yaml
+#$COMPAT_TESTER pre-controller-upgrade.yaml; if [ $? -ne 0 ]; then exit 1; fi
 stopService controller "$oldTargetDir"
 startService controller "$newTargetDir"
-#$COMPAT_TESTER pre-broker-upgrade.yaml
+#$COMPAT_TESTER pre-broker-upgrade.yaml; if [ $? -ne 0 ]; then exit 1; fi
 stopService broker "$oldTargetDir"
 startService broker "$newTargetDir"
-#$COMPAT_TESTER pre-server-upgrade.yaml
+#$COMPAT_TESTER pre-server-upgrade.yaml; if [ $? -ne 0 ]; then exit 1; fi
 stopService server "$oldTargetDir"
 startService server "$newTargetDir"
-#$COMPAT_TESTER post-server-upgrade.yaml
+#$COMPAT_TESTER post-server-upgrade.yaml; if [ $? -ne 0 ]; then exit 1; fi
 
 # Upgrade complated, now do a rollback
 stopService controller "$newTargetDir"
 startService controller "$oldTargetDir"
-#$COMPAT_TESTER post-server-rollback.yaml
+#$COMPAT_TESTER post-server-rollback.yaml; if [ $? -ne 0 ]; then exit 1; fi
 stopService broker "$newTargetDir"
 startService broker "$oldTargetDir"
-#$COMPAT_TESTER post-broker-rollback.yaml
+#$COMPAT_TESTER post-broker-rollback.yaml; if [ $? -ne 0 ]; then exit 1; fi
 stopService server "$newTargetDir"
 startService server "$oldTargetDir"
-#$COMPAT_TESTER post-controller-rollback.yaml
-sleep 20
+#$COMPAT_TESTER post-controller-rollback.yaml; if [ $? -ne 0 ]; then exit 1; fi
 stopServices "$oldTargetDir"
 
 exit 0
