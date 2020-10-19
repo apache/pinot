@@ -93,8 +93,8 @@ public class SchemaUtils {
                 "Exception in getting arguments for transform function '" + transformFunction + "' for column '"
                     + column + "'", e);
           }
-        } else if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.TIME) && fieldSpec.getFieldType()
-            .equals(FieldSpec.FieldType.DATE_TIME)) {
+        } else if (!(fieldSpec.getFieldType().equals(FieldSpec.FieldType.TIME) && fieldSpec.getFieldType()
+            .equals(FieldSpec.FieldType.DATE_TIME))) {
           primaryKeyColumnCandidates.add(column);
         }
         if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.TIME)) {

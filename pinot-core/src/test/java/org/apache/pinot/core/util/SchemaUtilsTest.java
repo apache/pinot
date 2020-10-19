@@ -226,23 +226,23 @@ public class SchemaUtilsTest {
     Schema pinotSchema;
     // non-existing column used as primary key
     pinotSchema = new Schema.SchemaBuilder()
-        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "time"),
-            new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, "time")).addSingleValueDimension("col", DataType.INT)
+        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
+            new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, "outgoing")).addSingleValueDimension("col", DataType.INT)
         .setPrimaryKeyColumns(Lists.newArrayList("test")).build();
     checkValidationFails(pinotSchema);
     // time column used as primary key
     pinotSchema = new Schema.SchemaBuilder()
-        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "time"),
-            new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, "time")).addSingleValueDimension("col", DataType.INT)
+        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
+            new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, "outgoing")).addSingleValueDimension("col", DataType.INT)
         .setPrimaryKeyColumns(Lists.newArrayList("time")).build();
     checkValidationFails(pinotSchema);
 
     // valid primary key
     pinotSchema = new Schema.SchemaBuilder()
-        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "time"),
-            new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, "time")).addSingleValueDimension("col", DataType.INT)
+        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
+            new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, "outgoing")).addSingleValueDimension("col", DataType.INT)
         .setPrimaryKeyColumns(Lists.newArrayList("col")).build();
-    checkValidationFails(pinotSchema);
+    SchemaUtils.validate(pinotSchema);
   }
 
   @Test
