@@ -39,6 +39,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -63,9 +64,10 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
   private static final String SEGMENT_NAME = "testTable_201711219_20171120";
   private static final File INDEX_DIR =
       new File(FileUtils.getTempDirectory(), "MetadataAndDictionaryAggregationPlanMakerTest");
-
   private static final InstancePlanMakerImplV2 PLAN_MAKER = new InstancePlanMakerImplV2();
-  private IndexSegment _indexSegment = null;
+
+  private IndexSegment _indexSegment;
+  private IndexSegment _upsertIndexSegment;
 
   @BeforeTest
   public void buildSegment()
@@ -115,6 +117,8 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
   public void loadSegment()
       throws Exception {
     _indexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
+    _upsertIndexSegment = ImmutableSegmentLoader
+        .load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap, new PartitionUpsertMetadataManager());
   }
 
   @AfterClass
@@ -127,44 +131,47 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
-  @Test(dataProvider = "testPlanNodeMakerDataProvider")
-  public void testInstancePlanMakerForMetadataAndDictionaryPlan(String query, Class<? extends PlanNode> planNodeClass) {
+  @Test(dataProvider = "testPlanMakerDataProvider")
+  public void testPlanMaker(String query, Class<? extends PlanNode> planNodeClass,
+      Class<? extends PlanNode> upsertPlanNodeClass) {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromPQL(query);
-    PlanNode plan = PLAN_MAKER.makeSegmentPlanNode(_indexSegment, queryContext);
-    assertTrue(planNodeClass.isInstance(plan));
+    PlanNode planNode = PLAN_MAKER.makeSegmentPlanNode(_indexSegment, queryContext);
+    assertTrue(planNodeClass.isInstance(planNode));
+    PlanNode upsertPlanNode = PLAN_MAKER.makeSegmentPlanNode(_upsertIndexSegment, queryContext);
+    assertTrue(upsertPlanNodeClass.isInstance(upsertPlanNode));
   }
 
-  @DataProvider(name = "testPlanNodeMakerDataProvider")
-  public Object[][] provideTestPlanNodeMakerData() {
+  @DataProvider(name = "testPlanMakerDataProvider")
+  public Object[][] testPlanMakerDataProvider() {
     List<Object[]> entries = new ArrayList<>();
     entries.add(new Object[]{"select * from testTable", /*selection query*/
-        SelectionPlanNode.class});
+        SelectionPlanNode.class, SelectionPlanNode.class});
     entries.add(new Object[]{"select column1,column5 from testTable", /*selection query*/
-        SelectionPlanNode.class});
+        SelectionPlanNode.class, SelectionPlanNode.class});
     entries.add(new Object[]{"select * from testTable where daysSinceEpoch > 100", /*selection query with filters*/
-        SelectionPlanNode.class});
+        SelectionPlanNode.class, SelectionPlanNode.class});
     entries.add(new Object[]{"select count(*) from testTable", /*count(*) from metadata*/
-        MetadataBasedAggregationPlanNode.class});
+        MetadataBasedAggregationPlanNode.class, AggregationPlanNode.class});
     entries
         .add(new Object[]{"select max(daysSinceEpoch),min(daysSinceEpoch) from testTable", /*min max from dictionary*/
-            DictionaryBasedAggregationPlanNode.class});
+            DictionaryBasedAggregationPlanNode.class, AggregationPlanNode.class});
     entries.add(new Object[]{"select minmaxrange(daysSinceEpoch) from testTable", /*min max from dictionary*/
-        DictionaryBasedAggregationPlanNode.class});
+        DictionaryBasedAggregationPlanNode.class, AggregationPlanNode.class});
     entries.add(new Object[]{"select max(column17),min(column17) from testTable", /* minmax from dictionary*/
-        DictionaryBasedAggregationPlanNode.class});
+        DictionaryBasedAggregationPlanNode.class, AggregationPlanNode.class});
     entries.add(new Object[]{"select minmaxrange(column17) from testTable", /*no minmax metadata, go to dictionary*/
-        DictionaryBasedAggregationPlanNode.class});
+        DictionaryBasedAggregationPlanNode.class, AggregationPlanNode.class});
     entries.add(new Object[]{"select sum(column1) from testTable", /*aggregation query*/
-        AggregationPlanNode.class});
+        AggregationPlanNode.class, AggregationPlanNode.class});
     entries.add(
         new Object[]{"select sum(column1) from testTable group by daysSinceEpoch", /*aggregation with group by query*/
-            AggregationGroupByPlanNode.class});
+            AggregationGroupByPlanNode.class, AggregationGroupByPlanNode.class});
     entries.add(
         new Object[]{"select count(*),min(column17) from testTable", /*multiple aggregations query, one from metadata, one from dictionary*/
-            AggregationPlanNode.class});
+            AggregationPlanNode.class, AggregationPlanNode.class});
     entries.add(
         new Object[]{"select count(*),min(daysSinceEpoch) from testTable group by daysSinceEpoch", /*multiple aggregations with group by*/
-            AggregationGroupByPlanNode.class});
+            AggregationGroupByPlanNode.class, AggregationGroupByPlanNode.class});
 
     return entries.toArray(new Object[entries.size()][]);
   }
