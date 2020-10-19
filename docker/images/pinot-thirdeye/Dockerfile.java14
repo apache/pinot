@@ -1,0 +1,46 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+FROM openjdk:14-alpine
+
+LABEL MAINTAINER=observability@razorpay.com
+
+ENV TE_GITHUB_SRC_DIR=.
+
+ENV TE_HOME=/opt/thirdeye
+
+RUN mkdir -p ${TE_HOME}/bin && mkdir -p ${TE_HOME}/config/default/data-sources && mkdir -p ${TE_HOME}/config/default/detector-config/anomaly-functions && mkdir -p ${TE_HOME}/config/default/data
+
+COPY ${TE_GITHUB_SRC_DIR}/thirdeye/thirdeye-dashboard/target/thirdeye-dashboard-1.0.0-SNAPSHOT.jar ${TE_HOME}/bin/
+COPY ${TE_GITHUB_SRC_DIR}/thirdeye/thirdeye-pinot/jmx_prometheus_javaagent-0.13.0.jar ${TE_HOME}/bin/jmx_prometheus_javaagent-0.13.0.jar
+COPY ${TE_GITHUB_SRC_DIR}/dockerconf/entrypoint.sh ${TE_HOME}/bin/entrypoint.sh
+COPY ${TE_GITHUB_SRC_DIR}/thirdeye/thirdeye-dashboard/config/* ${TE_HOME}/config/default/
+COPY ${TE_GITHUB_SRC_DIR}/thirdeye/thirdeye-dashboard/config/data-sources/* ${TE_HOME}/config/default/data-sources/
+COPY ${TE_GITHUB_SRC_DIR}/thirdeye/thirdeye-dashboard/config/detector-config/* ${TE_HOME}/config/default/detector-config/
+COPY ${TE_GITHUB_SRC_DIR}/thirdeye/thirdeye-dashboard/config/detector-config/anomaly-functions/* ${TE_HOME}/config/default/detector-config/anomaly-functions/
+COPY ${TE_GITHUB_SRC_DIR}/thirdeye/thirdeye-dashboard/config/data/* ${TE_HOME}/config/default/data/
+
+## Remove the h2db.mv.db
+RUN rm ${TE_HOME}/config/default/h2db.mv.db 
+
+EXPOSE 1426 1427
+WORKDIR ${TE_HOME}
+
+ENTRYPOINT ["./bin/entrypoint.sh"]
+

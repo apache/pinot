@@ -65,6 +65,13 @@ public class AggregationFunctionFactoryTest {
     assertEquals(aggregationFunction.getColumnName(), "sum_column");
     assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
+    function = getFunction("SuMPreCIsiON");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof SumPrecisionAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.SUMPRECISION);
+    assertEquals(aggregationFunction.getColumnName(), "sumPrecision_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
     function = getFunction("AvG");
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
     assertTrue(aggregationFunction instanceof AvgAggregationFunction);

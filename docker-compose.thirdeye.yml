@@ -1,0 +1,94 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+version: '3'
+services:
+  thirdeye_mysql:
+    image: mysql:5.7
+    ports:
+      - 33306:3306
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: thirdeye
+      MYSQL_PASSWORD: thirdeye
+    volumes:
+      - ./thirdeye/configs/schema/create-schema.sql:/docker-entrypoint-initdb.d/init.sql
+  thirdeye_frontend:
+    image: razorpay/thirdeye
+    volumes:
+      - ./thirdeye/thirdeye-dashboard/config/persistence.yml:/opt/thirdeye/config/default/persistence.yml
+      - ./thirdeye/thirdeye-dashboard/config/data-sources/data-sources-config.yml:/opt/thirdeye/config/default/data-sources/data-sources-config.yml
+      #- ./thirdeye/thirdeye-pinot/config-templates/cloud/persistence.yml.tmpl:/opt/thirdeye/config/default/persistence.yml.tmpl
+      #- ./thirdeye/thirdeye-pinot/config-templates/cloud/data-sources/data-sources-config.yml.tmpl:/opt/thirdeye/config/default/data-sources/data-sources-config.yml.tmpl
+      - ./thirdeye/configs/others/jmx_config.yml:/opt/thirdeye/config/default/jmx_config.yml
+        #- ./thirdeye/thirdeye-pinot/config-templates/dev/persistence.yml:/opt/thirdeye/config/default/persistence.yml
+        #- ./thirdeye/thirdeye-pinot/config-templates/dev/data-sources/data-sources-config.yml:/opt/thirdeye/config/default/data-sources/data-sources-config.yml
+      - ./dockerconf/entrypoint_dev.sh:/opt/thirdeye/bin/entrypoint_dev.sh
+      #- ./dockerconf/entrypoint.sh:/opt/thirdeye/bin/entrypoint.sh
+    environment:
+      CONFIG_DIR: /opt/thirdeye/config/default
+      MYSQL_HOSTNAME: thirdeye_mysql
+      MYSQL_PORT: 3306
+      THIRDEYE_DATABASE: thirdeye
+      MYSQL_PASSWORD: root
+      DRUID_USER: admin
+      DRUID_PWD: pooghe6phee5wohVoo8eeBei
+      APP_MODE: prod
+      JMX_CONFIG: "-Xms1G -Xmx3G"
+    ports:
+      - 1426:1426
+      - 1427:1427
+      - 8080:8080
+    entrypoint: ["/bin/sh", "/opt/thirdeye/bin/entrypoint_dev.sh", "frontend"]
+    #entrypoint: ["/bin/sh", "/opt/thirdeye/bin/entrypoint.sh", "frontend"]
+    #entrypoint: ["sleep", "3600"]
+    depends_on:
+      - thirdeye_mysql
+    links:
+      - thirdeye_mysql
+  thirdeye_backend:
+    image: razorpay/thirdeye
+    volumes:
+      - ./thirdeye/thirdeye-dashboard/config/persistence.yml:/opt/thirdeye/config/default/persistence.yml
+      - ./thirdeye/thirdeye-dashboard/config/data-sources/data-sources-config.yml:/opt/thirdeye/config/default/data-sources/data-sources-config.yml
+      #- ./thirdeye/thirdeye-pinot/config-templates/cloud/persistence.yml.tmpl:/opt/thirdeye/config/default/persistence.yml.tmpl
+      #- ./thirdeye/thirdeye-pinot/config-templates/cloud/data-sources/data-sources-config.yml.tmpl:/opt/thirdeye/config/default/data-sources/data-sources-config.yml.tmpl
+      - ./thirdeye/configs/jmx_config.yml:/opt/thirdeye/config/default/jmx_config.yml
+        #- ./thirdeye/thirdeye-pinot/config-templates/dev/persistence.yml:/opt/thirdeye/config/default/persistence.yml
+        #- ./thirdeye/thirdeye-pinot/config-templates/dev/data-sources/data-sources-config.yml:/opt/thirdeye/config/default/data-sources/data-sources-config.yml
+      - ./dockerconf/entrypoint_dev.sh:/opt/thirdeye/bin/entrypoint_dev.sh
+      #- ./dockerconf/entrypoint.sh:/opt/thirdeye/bin/entrypoint.sh
+    ports:
+      - 8081:8080
+    environment:
+      CONFIG_DIR: /opt/thirdeye/config/default
+      MYSQL_HOSTNAME: thirdeye_mysql
+      MYSQL_PORT: 3306
+      THIRDEYE_DATABASE: thirdeye
+      MYSQL_PASSWORD: root
+      DRUID_USER: admin
+      DRUID_PWD: pooghe6phee5wohVoo8eeBei
+      APP_MODE: prod
+      JMX_CONFIG: "-Xms1G -Xmx3G"
+    entrypoint: ["/bin/sh", "/opt/thirdeye/bin/entrypoint_dev.sh", "backend"]
+    #entrypoint: ["/bin/sh", "/opt/thirdeye/bin/entrypoint.sh", "backend"]
+    depends_on:
+      - thirdeye_mysql
+    links:
+      - thirdeye_mysql

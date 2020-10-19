@@ -32,7 +32,6 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Time;
 import java.sql.Timestamp;
-import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Map;
@@ -51,6 +50,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
   private int _currentRow;
   private int _totalColumns;
   private Map<String, Integer> _columns = new HashMap<>();
+  private Map<Integer, String> _columnDataTypes = new HashMap<>();
   private boolean _closed;
   private boolean _wasNull = false;
 
@@ -62,6 +62,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
     _closed = false;
     for (int i = 0; i < _totalColumns; i++) {
       _columns.put(_resultSet.getColumnName(i), i + 1);
+      _columnDataTypes.put(i + 1, _resultSet.getColumnDataType(i));
     }
   }
 
@@ -167,7 +168,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
   public ResultSetMetaData getMetaData()
       throws SQLException {
     validateState();
-    return new PinotResultMetadata(_totalColumns, _columns);
+    return new PinotResultMetadata(_totalColumns, _columns, _columnDataTypes);
   }
 
   @Override

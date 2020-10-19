@@ -21,11 +21,12 @@ package org.apache.pinot.core.segment.index.datasource;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.common.DataSourceMetadata;
-import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
+import org.apache.pinot.core.segment.index.readers.TextIndexReader;
 
 
 public abstract class BaseDataSource implements DataSource {
@@ -34,15 +35,14 @@ public abstract class BaseDataSource implements DataSource {
   private final Dictionary _dictionary;
   private final InvertedIndexReader<?> _invertedIndex;
   private final InvertedIndexReader<?> _rangeIndex;
-  private final InvertedIndexReader<?> _textIndex;
+  private final TextIndexReader _textIndex;
   private final BloomFilterReader _bloomFilter;
   private final NullValueVectorReader _nullValueVector;
 
   public BaseDataSource(DataSourceMetadata dataSourceMetadata, ForwardIndexReader<?> forwardIndex,
       @Nullable Dictionary dictionary, @Nullable InvertedIndexReader<?> invertedIndex,
-      @Nullable InvertedIndexReader<?> rangeIndex, @Nullable InvertedIndexReader<?> textIndex,
-      @Nullable BloomFilterReader bloomFilter,
-      @Nullable NullValueVectorReader nullValueVector) {
+      @Nullable InvertedIndexReader<?> rangeIndex, @Nullable TextIndexReader textIndex,
+      @Nullable BloomFilterReader bloomFilter, @Nullable NullValueVectorReader nullValueVector) {
     _dataSourceMetadata = dataSourceMetadata;
     _forwardIndex = forwardIndex;
     _dictionary = dictionary;
@@ -83,7 +83,7 @@ public abstract class BaseDataSource implements DataSource {
 
   @Nullable
   @Override
-  public InvertedIndexReader<?> getTextIndex() {
+  public TextIndexReader getTextIndex() {
     return _textIndex;
   }
 

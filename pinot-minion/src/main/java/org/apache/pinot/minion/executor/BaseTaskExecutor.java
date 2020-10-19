@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
 
 
 public abstract class BaseTaskExecutor implements PinotTaskExecutor {
@@ -39,5 +40,12 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
         ZKMetadataProvider.getTableConfig(MINION_CONTEXT.getHelixPropertyStore(), tableNameWithType);
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
     return tableConfig;
+  }
+
+  protected Schema getSchema(String tableName) {
+    Schema schema =
+        ZKMetadataProvider.getTableSchema(MINION_CONTEXT.getHelixPropertyStore(), tableName);
+    Preconditions.checkState(schema != null, "Failed to find schema for table: %s", tableName);
+    return schema;
   }
 }

@@ -114,8 +114,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private final RateLimiter _numDroppedLogRateLimiter;
   private final AtomicInteger _numDroppedLog;
 
-  private final boolean _enableQueryLimitOverride;
   private final int _defaultHllLog2m;
+  private final boolean _enableQueryLimitOverride;
+  private final boolean _enableDistinctCountBitmapOverride;
 
   public BaseBrokerRequestHandler(PinotConfiguration config, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
@@ -130,6 +131,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _defaultHllLog2m = _config.getProperty(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY,
         CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M);
     _enableQueryLimitOverride = _config.getProperty(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, false);
+    _enableDistinctCountBitmapOverride =
+        _config.getProperty(CommonConstants.Helix.ENABLE_DISTINCT_COUNT_BITMAP_OVERRIDE_KEY, false);
 
     _brokerId = config.getProperty(Broker.CONFIG_OF_BROKER_ID, getDefaultBrokerId());
     _brokerTimeoutMs = config.getProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, Broker.DEFAULT_BROKER_TIMEOUT_MS);
@@ -204,6 +207,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
     if (_enableQueryLimitOverride) {
       handleQueryLimitOverride(brokerRequest, _queryResponseLimit);
+    }
+    if (_enableDistinctCountBitmapOverride) {
+      handleDistinctCountBitmapOverride(brokerRequest);
     }
     String tableName = brokerRequest.getQuerySource().getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
@@ -400,7 +406,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       // Table name might have been changed (with suffix _OFFLINE/_REALTIME appended)
       LOGGER.info("requestId={},table={},timeMs={},docs={}/{},entries={}/{},"
               + "segments(queried/processed/matched/consuming/unavailable):{}/{}/{}/{}/{},consumingFreshnessTimeMs={},"
-              + "servers={}/{},groupLimitReached={},exceptions={},serverStats={},query={}", requestId,
+              + "servers={}/{},groupLimitReached={},brokerReduceTimeMs={},exceptions={},serverStats={},query={}", requestId,
           brokerRequest.getQuerySource().getTableName(), totalTimeMs, brokerResponse.getNumDocsScanned(),
           brokerResponse.getTotalDocs(), brokerResponse.getNumEntriesScannedInFilter(),
           brokerResponse.getNumEntriesScannedPostFilter(), brokerResponse.getNumSegmentsQueried(),
@@ -408,7 +414,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           brokerResponse.getNumConsumingSegmentsQueried(), numUnavailableSegments,
           brokerResponse.getMinConsumingFreshnessTimeMs(), brokerResponse.getNumServersResponded(),
           brokerResponse.getNumServersQueried(), brokerResponse.isNumGroupsLimitReached(),
-          brokerResponse.getExceptionsSize(), serverStats.getServerStats(),
+          requestStatistics.getReduceTimeMillis(), brokerResponse.getExceptionsSize(), serverStats.getServerStats(),
           StringUtils.substring(query, 0, _queryLogLength));
 
       // Limit the dropping log message at most once per second.
@@ -569,6 +575,55 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   /**
+   * Helper method to rewrite 'DistinctCount' with 'DistinctCountBitmap' for the given broker request.
+   */
+  private static void handleDistinctCountBitmapOverride(BrokerRequest brokerRequest) {
+    List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
+    if (aggregationsInfo != null) {
+      for (AggregationInfo aggregationInfo : aggregationsInfo) {
+        if (StringUtils.remove(aggregationInfo.getAggregationType(), '_')
+            .equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNT.name())) {
+          aggregationInfo.setAggregationType(AggregationFunctionType.DISTINCTCOUNTBITMAP.name());
+        }
+      }
+    }
+    PinotQuery pinotQuery = brokerRequest.getPinotQuery();
+    if (pinotQuery != null) {
+      for (Expression expression : pinotQuery.getSelectList()) {
+        handleDistinctCountBitmapOverride(expression);
+      }
+      List<Expression> orderByExpressions = pinotQuery.getOrderByList();
+      if (orderByExpressions != null) {
+        for (Expression expression : orderByExpressions) {
+          handleDistinctCountBitmapOverride(expression);
+        }
+      }
+      Expression havingExpression = pinotQuery.getHavingExpression();
+      if (havingExpression != null) {
+        handleDistinctCountBitmapOverride(havingExpression);
+      }
+    }
+  }
+
+  /**
+   * Helper method to rewrite 'DistinctCount' with 'DistinctCountBitmap' for the given expression.
+   */
+  private static void handleDistinctCountBitmapOverride(Expression expression) {
+    Function function = expression.getFunctionCall();
+    if (function == null) {
+      return;
+    }
+    if (StringUtils.remove(function.getOperator(), '_')
+        .equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNT.name())) {
+      function.setOperator(AggregationFunctionType.DISTINCTCOUNTBITMAP.name());
+    } else {
+      for (Expression operand : function.getOperands()) {
+        handleDistinctCountBitmapOverride(operand);
+      }
+    }
+  }
+
+  /**
    * Check if a SQL parsed BrokerRequest is a literal only query.
    * @param brokerRequest
    * @return true if this query selects only Literals
@@ -695,10 +750,20 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
     if (brokerRequest.isSetAggregationsInfo()) {
       for (AggregationInfo info : brokerRequest.getAggregationsInfo()) {
-        if (!info.getAggregationType().equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
+        String functionName = StringUtils.remove(info.getAggregationType(), '_');
+        if (!functionName.equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
           // Always read from backward compatible api in AggregationFunctionUtils.
           List<String> arguments = AggregationFunctionUtils.getArguments(info);
-          arguments.replaceAll(e -> fixColumnName(rawTableName, e, columnNameMap));
+
+          if (functionName.equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {
+            // For DISTINCT query, all arguments are expressions
+            arguments.replaceAll(e -> fixColumnName(rawTableName, e, columnNameMap));
+          } else {
+            // For non-DISTINCT query, only the first argument is expression, others are literals
+            // NOTE: We skip fixing the literal arguments because of the legacy behavior of PQL compiler treating string
+            //       literal as identifier in the aggregation function.
+            arguments.set(0, fixColumnName(rawTableName, arguments.get(0), columnNameMap));
+          }
           info.setExpressions(arguments);
         }
       }

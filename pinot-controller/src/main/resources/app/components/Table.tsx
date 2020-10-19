@@ -49,19 +49,20 @@ import TableToolbar from './TableToolbar';
 import SimpleAccordion from './SimpleAccordion';
 
 type Props = {
-  title?: string;
-  data: TableData;
-  noOfRows?: number;
-  addLinks?: boolean;
-  isPagination?: boolean;
+  title?: string,
+  data: TableData,
+  noOfRows?: number,
+  addLinks?: boolean,
+  isPagination?: boolean,
   cellClickCallback?: Function,
   isCellClickable?: boolean,
   highlightBackground?: boolean,
-  isSticky?: boolean
+  isSticky?: boolean,
   baseURL?: string,
   recordsCount?: number,
   showSearchBox: boolean,
-  inAccordionFormat?: boolean
+  inAccordionFormat?: boolean,
+  regexReplace?: boolean
 };
 
 const StyledTableRow = withStyles((theme) =>
@@ -140,7 +141,7 @@ const useStyles = makeStyles((theme) => ({
     textAlign: 'center',
   },
   link: {
-    color: 'inherit',
+    color: '#4285f4',
   },
   spacer: {
     flex: '0 1 auto',
@@ -249,7 +250,8 @@ export default function CustomizedTables({
   baseURL,
   recordsCount,
   showSearchBox,
-  inAccordionFormat
+  inAccordionFormat,
+  regexReplace
 }: Props) {
   const [finalData, setFinalData] = React.useState(Utils.tableFormat(data));
 
@@ -382,12 +384,18 @@ export default function CustomizedTables({
                   .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                   .map((row, index) => (
                     <StyledTableRow key={index} hover>
-                      {Object.values(row).map((cell, idx) =>
-                        addLinks && !idx ? (
+                      {Object.values(row).map((cell, idx) =>{
+                        let url = baseURL;
+                        if(regexReplace){
+                          let regex = /\:.*?:/;
+                          let matches = baseURL.match(regex);
+                          url = baseURL.replace(matches[0], row[matches[0].replace(/:/g, '')]);
+                        }
+                        return addLinks && !idx ? (
                           <StyledTableCell key={idx}>
                             <NavLink
                               className={classes.link}
-                              to={`${baseURL}${cell}`}
+                              to={`${url}${cell}`}
                             >
                               {cell}
                             </NavLink>
@@ -401,7 +409,7 @@ export default function CustomizedTables({
                             {styleCell(cell.toString())}
                           </StyledTableCell>
                         )
-                      )}
+                      })}
                     </StyledTableRow>
                   ))
               )}

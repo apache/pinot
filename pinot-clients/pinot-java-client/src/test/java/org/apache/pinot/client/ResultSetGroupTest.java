@@ -32,7 +32,7 @@ import org.testng.annotations.Test;
  *
  */
 public class ResultSetGroupTest {
-  private DummyJsonTransport _dummyJsonTransport = new DummyJsonTransport();
+  private final DummyJsonTransport _dummyJsonTransport = new DummyJsonTransport();
   private PinotClientTransportFactory _previousTransportFactory = null;
 
   @Test
@@ -55,11 +55,15 @@ public class ResultSetGroupTest {
     Assert.assertEquals(resultSet.getColumnCount(), 79);
     Assert.assertEquals(resultSet.getColumnName(0), "ActualElapsedTime");
     Assert.assertEquals(resultSet.getColumnName(1), "AirTime");
+
+    // Verify the execution stats.
+    Assert.assertEquals(115545, resultSetGroup.getExecutionStats().getTotalDocs());
+    Assert.assertEquals(82, resultSetGroup.getExecutionStats().getTimeUsedMs());
+    Assert.assertEquals(24, resultSetGroup.getExecutionStats().getNumDocsScanned());
   }
 
   @Test
-  public void testDeserializeAggregationResultSet()
-      throws Exception {
+  public void testDeserializeAggregationResultSet() {
     // Deserialize aggregation result
     ResultSetGroup resultSetGroup = getResultSet("aggregation.json");
 
@@ -131,7 +135,7 @@ public class ResultSetGroupTest {
     ConnectionFactory._transportFactory = _previousTransportFactory;
   }
 
-  class DummyJsonTransport implements PinotClientTransport {
+  static class DummyJsonTransport implements PinotClientTransport {
     public String _resource;
 
     @Override

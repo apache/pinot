@@ -137,7 +137,7 @@ public class RulesToExecute {
   // Be careful with the sequence, each rule can execute individually
   // but a rule may depend on its previous rule when they both fired
   public enum Rule {
-    FlagQueryRule, // Should always fire to exclude invalid queries
+    FlagQueryRule, 
     KafkaPartitionRule,
     InvertedSortedIndexJointRule,
     NoDictionaryOnHeapDictionaryJointRule, // NoDictionaryOnHeapDictionaryJointRule must go after InvertedSortedIndexJointRule since we do not recommend NoDictionary on cols with indices

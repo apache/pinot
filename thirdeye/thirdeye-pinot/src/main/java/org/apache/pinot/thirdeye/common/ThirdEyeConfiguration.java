@@ -23,7 +23,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import io.federecio.dropwizard.swagger.SwaggerBundleConfiguration;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.ArrayList;
 import java.util.List;
 
 import io.dropwizard.Configuration;
@@ -38,8 +37,6 @@ public class ThirdEyeConfiguration extends Configuration {
   private String rootDir = "";
   private String dataSources = "data-sources/data-sources-config.yml";
   private String cacheDataSource = "data-sources/cache-config.yml";
-
-  private List<String> whitelistDatasets = new ArrayList<>();
 
   private String dashboardHost;
 
@@ -74,11 +71,6 @@ public class ThirdEyeConfiguration extends Configuration {
     return getSourceAsUrl(this.dataSources);
   }
 
-  // same as above but for cache config
-  public URL getCacheConfigAsUrl() {
-    return getSourceAsUrl(this.cacheDataSource);
-  }
-
   private URL getSourceAsUrl(String path) {
     try {
       return new URL(path);
@@ -98,6 +90,16 @@ public class ThirdEyeConfiguration extends Configuration {
     return dataSources;
   }
 
+  public void setDataSources(String dataSources) {
+    this.dataSources = dataSources;
+  }
+
+  public URL getCacheConfigAsUrl() {
+    return getSourceAsUrl(this.cacheDataSource);
+  }
+
+  public void setCacheDataSource(String cacheDataSource) { this.cacheDataSource = cacheDataSource; }
+
   public String getRootDir() {
     return rootDir;
   }
@@ -114,14 +116,6 @@ public class ThirdEyeConfiguration extends Configuration {
     this.cors = cors;
   }
 
-  public List<String> getWhitelistDatasets() {
-    return whitelistDatasets;
-  }
-
-  public void setWhitelistDatasets(List<String> whitelistDatasets) {
-    this.whitelistDatasets = whitelistDatasets;
-  }
-
   public String getFunctionConfigPath() {
     return getRootDir() + "/detector-config/anomaly-functions/functions.properties";
   }
@@ -129,19 +123,6 @@ public class ThirdEyeConfiguration extends Configuration {
   //alertFilter.properties format: {alert filter type} = {path to alert filter implementation}
   public String getAlertFilterConfigPath() {
     return getRootDir() + "/detector-config/anomaly-functions/alertFilter.properties";
-  }
-
-  //alertFilterAutotune.properties format: {auto tune type} = {path to auto tune implementation}
-  public String getFilterAutotuneConfigPath() {
-    return getRootDir() + "/detector-config/anomaly-functions/alertFilterAutotune.properties";
-  }
-
-  public String getAlertGroupRecipientProviderConfigPath() {
-    return getRootDir() + "/detector-config/anomaly-functions/alertGroupRecipientProvider.properties";
-  }
-
-  public String getAnomalyClassifierConfigPath() {
-    return getRootDir() + "/detector-config/anomaly-functions/anomalyClassifier.properties";
   }
 
   public String getCalendarApiKeyPath(){
@@ -179,12 +160,6 @@ public class ThirdEyeConfiguration extends Configuration {
   public void setFailureToAddress(String failureToAddress) {
     this.failureToAddress = failureToAddress;
   }
-
-  public void setDataSources(String dataSources) {
-    this.dataSources = dataSources;
-  }
-
-  public void setCacheDataSource(String cacheDataSource) { this.cacheDataSource = cacheDataSource; }
 
   public Map<String, Map<String, Object>> getAlerterConfiguration() {
     return alerterConfigurations;

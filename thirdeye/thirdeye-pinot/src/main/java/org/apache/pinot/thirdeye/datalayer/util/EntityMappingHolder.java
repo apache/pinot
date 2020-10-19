@@ -48,7 +48,6 @@ public class EntityMappingHolder {
   public void register(Connection connection, Class<? extends AbstractEntity> entityClass,
       String tableName) throws Exception {
     tableName = tableName.toLowerCase();
-    LOG.info("GENERATING MAPPING FOR TABLE: {}", tableName);
     DatabaseMetaData databaseMetaData = connection.getMetaData();
     String catalog = null;
     String schemaPattern = null;
@@ -92,7 +91,6 @@ public class EntityMappingHolder {
         if (success) {
           columnInfoMap.get(dbColumn).columnNameInEntity = entityColumn;
           columnInfoMap.get(dbColumn).field = field;
-          LOG.debug("Mapped {} to {}", dbColumn, entityColumn);
           columnMappingPerTable.get(tableName).put(dbColumn, entityColumn);
           break;
         }

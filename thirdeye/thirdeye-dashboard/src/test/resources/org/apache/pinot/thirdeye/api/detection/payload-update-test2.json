@@ -1,0 +1,2 @@
+{"metric-configuration": "metricColumn: metric_update",
+  "data":{"columns":["date","metric_update"],"rows":[["20200325","68"],["20200428","67"],["20200422","63"]]}}

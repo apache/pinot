@@ -73,7 +73,7 @@
                 <JOBS>1</JOBS>
               </environmentalVariables>
               <!-- Used for local build only -->
-              <arguments>run build --prod --output-path=../thirdeye-pinot/src/main/resources/app</arguments>
+              <arguments>run build --prod --output-path=../thirdeye-dashboard/src/main/resources/app</arguments>
             </configuration>
           </execution>
           <execution>

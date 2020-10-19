@@ -57,6 +57,9 @@ public class CommonConstants {
     public static final String DEFAULT_HYPERLOGLOG_LOG2M_KEY = "default.hyperloglog.log2m";
     public static final int DEFAULT_HYPERLOGLOG_LOG2M = 8;
 
+    // Whether to rewrite DistinctCount to DistinctCountBitmap
+    public static final String ENABLE_DISTINCT_COUNT_BITMAP_OVERRIDE_KEY = "enable.distinct.count.bitmap.override";
+
     // More information on why these numbers are set can be found in the following doc:
     // https://cwiki.apache.org/confluence/display/PINOT/Controller+Separation+between+Helix+and+Pinot
     public static final int NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE = 24;
@@ -87,6 +90,9 @@ public class CommonConstants {
 
     public static class ZkClient {
       public static final long DEFAULT_CONNECT_TIMEOUT_SEC = 60L;
+      // Retry interval and count for ZK operations where we would rather fail than get an empty (wrong) result back
+      public static final int RETRY_INTERVAL_MS = 50;
+      public static final int RETRY_COUNT = 2;
     }
 
     public static class DataSource {
@@ -102,6 +108,7 @@ public class CommonConstants {
       public static final String INSTANCE_ID_KEY = "instanceId";
       public static final String DATA_DIR_KEY = "dataDir";
       public static final String ADMIN_PORT_KEY = "adminPort";
+      public static final String GRPC_PORT_KEY = "grpcPort";
     }
 
     public static final String SET_INSTANCE_ID_TO_HOSTNAME_KEY = "pinot.set.instance.id.to.hostname";
@@ -133,11 +140,13 @@ public class CommonConstants {
     public static final String METRICS_CONFIG_PREFIX = "pinot.broker.metrics";
     public static final String CONFIG_OF_METRICS_NAME_PREFIX = "pinot.broker.metrics.prefix";
     public static final String DEFAULT_METRICS_NAME_PREFIX = "pinot.broker.";
-    public static final boolean DEFAULT_METRICS_GLOBAL_ENABLED = false;
 
     public static final String CONFIG_OF_DELAY_SHUTDOWN_TIME_MS = "pinot.broker.delayShutdownTimeMs";
     public static final long DEFAULT_DELAY_SHUTDOWN_TIME_MS = 10_000L;
     public static final String CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS = "pinot.broker.enableTableLevelMetrics";
+    public static final boolean DEFAULT_ENABLE_TABLE_LEVEL_METRICS = true;
+    public static final String CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS =
+        "pinot.broker.allowedTablesForEmittingMetrics";
 
     public static final String CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT = "pinot.broker.query.response.limit";
     public static final int DEFAULT_BROKER_QUERY_RESPONSE_LIMIT = Integer.MAX_VALUE;
@@ -187,7 +196,12 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_EXECUTOR_CLASS = "pinot.server.query.executor.class";
     public static final String CONFIG_OF_REQUEST_HANDLER_FACTORY_CLASS = "pinot.server.requestHandlerFactory.class";
     public static final String CONFIG_OF_NETTY_PORT = "pinot.server.netty.port";
+    public static final String CONFIG_OF_ENABLE_GRPC_SERVER = "pinot.server.grpc.enable";
+    public static final boolean DEFAULT_ENABLE_GRPC_SERVER = false;
+    public static final String CONFIG_OF_GRPC_PORT = "pinot.server.grpc.port";
+    public static final int DEFAULT_GRPC_PORT = 8090;
     public static final String CONFIG_OF_ADMIN_API_PORT = "pinot.server.adminapi.port";
+    public static final int DEFAULT_ADMIN_API_PORT = 8097;
 
     public static final String CONFIG_OF_SEGMENT_FORMAT_VERSION = "pinot.server.instance.segment.format.version";
     public static final String CONFIG_OF_ENABLE_SPLIT_COMMIT = "pinot.server.instance.enable.split.commit";
@@ -208,7 +222,6 @@ public class CommonConstants {
         "pinot.server.starter.realtimeConsumptionCatchupWaitMs";
     public static final int DEFAULT_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS = 0;
 
-    public static final int DEFAULT_ADMIN_API_PORT = 8097;
     public static final String DEFAULT_READ_MODE = "mmap";
     // Whether to reload consuming segment on scheme update. Will change default behavior to true when this feature is stabilized
     public static final boolean DEFAULT_RELOAD_CONSUMING_SEGMENT = false;
@@ -271,7 +284,10 @@ public class CommonConstants {
     }
 
     public static final String DEFAULT_METRICS_PREFIX = "pinot.server.";
-    public static final boolean DEFAULT_METRICS_GLOBAL_ENABLED = false;
+    public static final String CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS = "pinot.server.enableTableLevelMetrics";
+    public static final boolean DEFAULT_ENABLE_TABLE_LEVEL_METRICS = true;
+    public static final String CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS =
+        "pinot.server.allowedTablesForEmittingMetrics";
     public static final String ACCESS_CONTROL_FACTORY_CLASS = "pinot.server.admin.access.control.factory.class";
     public static final String DEFAULT_ACCESS_CONTROL_FACTORY_CLASS =
         "org.apache.pinot.server.api.access.AllowAllAccessFactory";
@@ -284,6 +300,7 @@ public class CommonConstants {
     public static final String VERSION_HTTP_HEADER = "Pinot-Controller-Version";
     public static final String SEGMENT_NAME_HTTP_HEADER = "Pinot-Segment-Name";
     public static final String TABLE_NAME_HTTP_HEADER = "Pinot-Table-Name";
+    public static final String INGESTION_DESCRIPTOR = "Pinot-Ingestion-Descriptor";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "pinot.controller.crypter";
 
     public static final String CONFIG_OF_CONTROLLER_METRICS_PREFIX = "controller.metrics.prefix";
@@ -383,5 +400,37 @@ public class CommonConstants {
 
     @Deprecated
     public static final String TABLE_NAME = "segment.table.name";
+  }
+
+  public static class Query {
+    public static class Request {
+      public static class MetadataKeys {
+        public static final String REQUEST_ID = "requestId";
+        public static final String BROKER_ID = "brokerId";
+        public static final String ENABLE_TRACE = "enableTrace";
+        public static final String ENABLE_STREAMING = "enableStreaming";
+        public static final String PAYLOAD_TYPE = "payloadType";
+      }
+
+      public static class PayloadType {
+        public static final String SQL = "sql";
+        public static final String BROKER_REQUEST = "brokerRequest";
+      }
+    }
+
+    public static class Response {
+      public static class MetadataKeys {
+        public static final String RESPONSE_TYPE = "responseType";
+      }
+
+      public static class ResponseType {
+        // For streaming response, multiple (could be 0 if no data should be returned, or query encounters exception)
+        // data responses will be returned, followed by one single metadata response
+        public static final String DATA = "data";
+        public static final String METADATA = "metadata";
+        // For non-streaming response
+        public static final String NON_STREAMING = "nonStreaming";
+      }
+    }
   }
 }

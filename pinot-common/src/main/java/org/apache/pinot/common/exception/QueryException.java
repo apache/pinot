@@ -45,6 +45,7 @@ public class QueryException {
   // TODO: Handle these errors in broker
   public static final int SERVER_SHUTTING_DOWN_ERROR_CODE = 210;
   public static final int SERVER_OUT_OF_CAPACITY_ERROR_CODE = 211;
+  public static final int SERVER_TABLE_MISSING_ERROR_CODE = 230;
   public static final int QUERY_SCHEDULING_TIMEOUT_ERROR_CODE = 240;
   public static final int EXECUTION_TIMEOUT_ERROR_CODE = 250;
   public static final int BROKER_GATHER_ERROR_CODE = 300;
@@ -76,6 +77,8 @@ public class QueryException {
       new ProcessingException(SERVER_SHUTTING_DOWN_ERROR_CODE);
   public static final ProcessingException SERVER_OUT_OF_CAPACITY_ERROR =
       new ProcessingException(SERVER_OUT_OF_CAPACITY_ERROR_CODE);
+  public static final ProcessingException SERVER_TABLE_MISSING_ERROR =
+      new ProcessingException(SERVER_TABLE_MISSING_ERROR_CODE);
   public static final ProcessingException QUERY_SCHEDULING_TIMEOUT_ERROR =
       new ProcessingException(QUERY_SCHEDULING_TIMEOUT_ERROR_CODE);
   public static final ProcessingException EXECUTION_TIMEOUT_ERROR =
@@ -108,6 +111,7 @@ public class QueryException {
     QUERY_EXECUTION_ERROR.setMessage("QueryExecutionError");
     SERVER_SCHEDULER_DOWN_ERROR.setMessage("ServerShuttingDown");
     SERVER_OUT_OF_CAPACITY_ERROR.setMessage("ServerOutOfCapacity");
+    SERVER_TABLE_MISSING_ERROR.setMessage("ServerTableMissing");
     QUERY_SCHEDULING_TIMEOUT_ERROR.setMessage("QuerySchedulingTimeoutError");
     EXECUTION_TIMEOUT_ERROR.setMessage("ExecutionTimeoutError");
     BROKER_GATHER_ERROR.setMessage("BrokerGatherError");

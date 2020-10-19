@@ -23,6 +23,11 @@ import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.DoubleRawValueBasedRangePredicateEvaluator;
+import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.FloatRawValueBasedRangePredicateEvaluator;
+import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.IntRawValueBasedRangePredicateEvaluator;
+import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.LongRawValueBasedRangePredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.OfflineDictionaryBasedRangePredicateEvaluator;
 import org.apache.pinot.core.segment.index.readers.RangeIndexReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -34,12 +39,11 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
 
   // NOTE: Range index can only apply to dictionary-encoded columns for now
   // TODO: Support raw index columns
-  private final OfflineDictionaryBasedRangePredicateEvaluator _rangePredicateEvaluator;
+  private final PredicateEvaluator _rangePredicateEvaluator;
   private final DataSource _dataSource;
   private final int _numDocs;
 
-  public RangeIndexBasedFilterOperator(OfflineDictionaryBasedRangePredicateEvaluator rangePredicateEvaluator,
-      DataSource dataSource, int numDocs) {
+  public RangeIndexBasedFilterOperator(PredicateEvaluator rangePredicateEvaluator, DataSource dataSource, int numDocs) {
     _rangePredicateEvaluator = rangePredicateEvaluator;
     _dataSource = dataSource;
     _numDocs = numDocs;
@@ -49,9 +53,45 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
   protected FilterBlock getNextBlock() {
     RangeIndexReader rangeIndexReader = (RangeIndexReader) _dataSource.getRangeIndex();
     assert rangeIndexReader != null;
-    int firstRangeId = rangeIndexReader.findRangeId(_rangePredicateEvaluator.getStartDictId());
-    // NOTE: End dictionary id is exclusive in OfflineDictionaryBasedRangePredicateEvaluator.
-    int lastRangeId = rangeIndexReader.findRangeId(_rangePredicateEvaluator.getEndDictId() - 1);
+
+    int firstRangeId;
+    int lastRangeId;
+    if (_rangePredicateEvaluator instanceof OfflineDictionaryBasedRangePredicateEvaluator) {
+      firstRangeId = rangeIndexReader
+          .findRangeId(((OfflineDictionaryBasedRangePredicateEvaluator) _rangePredicateEvaluator).getStartDictId());
+      // NOTE: End dictionary id is exclusive in OfflineDictionaryBasedRangePredicateEvaluator.
+      lastRangeId = rangeIndexReader
+          .findRangeId(((OfflineDictionaryBasedRangePredicateEvaluator) _rangePredicateEvaluator).getEndDictId() - 1);
+    } else {
+      switch (_rangePredicateEvaluator.getDataType()) {
+        case INT:
+          firstRangeId = rangeIndexReader
+              .findRangeId(((IntRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).geLowerBound());
+          lastRangeId = rangeIndexReader
+              .findRangeId(((IntRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).getUpperBound());
+          break;
+        case LONG:
+          firstRangeId = rangeIndexReader
+              .findRangeId(((LongRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).geLowerBound());
+          lastRangeId = rangeIndexReader
+              .findRangeId(((LongRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).getUpperBound());
+          break;
+        case FLOAT:
+          firstRangeId = rangeIndexReader
+              .findRangeId(((FloatRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).geLowerBound());
+          lastRangeId = rangeIndexReader
+              .findRangeId(((FloatRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).getUpperBound());
+          break;
+        case DOUBLE:
+          firstRangeId = rangeIndexReader
+              .findRangeId(((DoubleRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).geLowerBound());
+          lastRangeId = rangeIndexReader
+              .findRangeId(((DoubleRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).getUpperBound());
+          break;
+        default:
+          throw new IllegalStateException("String and Bytes data type not supported for Range Indexing");
+      }
+    }
 
     // Need to scan the first and last range as they might be partially matched
     // TODO: Detect fully matched first and last range

@@ -32,19 +32,24 @@ public class ExecutionFrameworkSpec implements Serializable {
   private String _name;
 
   /**
-   * The class implements org.apache.pinot.spi.batch.ingestion.runner.SegmentGenerationJobRunner interface.
+   * The class implements org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner interface.
    */
   private String _segmentGenerationJobRunnerClassName;
 
   /**
-   * The class implements org.apache.pinot.spi.batch.ingestion.runner.SegmentTarPushJobRunner interface.
+   * The class implements org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner interface.
    */
   private String _segmentTarPushJobRunnerClassName;
 
   /**
-   * The class implements org.apache.pinot.spi.batch.ingestion.runner.SegmentUriPushJobRunner interface.
+   * The class implements org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner interface.
    */
   private String _segmentUriPushJobRunnerClassName;
+
+  /**
+   * The class implements org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner interface.
+   */
+  private String _segmentMetadataPushJobRunnerClassName;
 
   /**
    * Extra configs for execution framework.
@@ -89,5 +94,13 @@ public class ExecutionFrameworkSpec implements Serializable {
 
   public void setExtraConfigs(Map<String, String> extraConfigs) {
     _extraConfigs = extraConfigs;
+  }
+
+  public String getSegmentMetadataPushJobRunnerClassName() {
+    return _segmentMetadataPushJobRunnerClassName;
+  }
+
+  public void setSegmentMetadataPushJobRunnerClassName(String segmentMetadataPushJobRunnerClassName) {
+    _segmentMetadataPushJobRunnerClassName = segmentMetadataPushJobRunnerClassName;
   }
 }

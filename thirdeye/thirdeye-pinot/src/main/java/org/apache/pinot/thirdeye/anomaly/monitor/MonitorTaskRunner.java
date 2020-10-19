@@ -132,9 +132,6 @@ public class MonitorTaskRunner implements TaskRunner {
         }
       }
 
-      // update detection health
-      updateDetectionHealth();
-
       // disable alerts that failed consecutively for a long time
       disableLongFailedAlerts();
 
@@ -188,31 +185,6 @@ public class MonitorTaskRunner implements TaskRunner {
     EmailHelper.sendEmailWithTextBody(email,
         SmtpConfiguration.createFromProperties(thirdeyeConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY)), subject,
         textBody, thirdeyeConfig.getFailureFromAddress(), new DetectionAlertFilterRecipients(recipients));
-  }
-
-  private void updateDetectionHealth() {
-    DetectionConfigManager detectionDAO = DAO_REGISTRY.getDetectionConfigManager();
-    List<DetectionConfigDTO> detectionConfigs = detectionDAO.findAllActive();
-    for (DetectionConfigDTO config : detectionConfigs) {
-      // update detection health status
-      try {
-        DateTime healthStatusWindowEnd = DateTime.now();
-        DetectionHealth health = new DetectionHealth.Builder(config.getId(), healthStatusWindowEnd.minusDays(30).getMillis(),
-            healthStatusWindowEnd.getMillis()).addRegressionStatus(DAO_REGISTRY.getEvaluationManager())
-            .addAnomalyCoverageStatus(DAO_REGISTRY.getMergedAnomalyResultDAO())
-            .addDetectionTaskStatus(DAO_REGISTRY.getTaskDAO())
-            .addOverallHealth()
-            .addOriginalDetectionHealth(config.getHealth())
-            .build();
-        // fetch the config again before saving to DB to avoid overriding config that is updated by other threads
-        config = detectionDAO.findById(config.getId());
-        config.setHealth(health);
-        detectionDAO.update(config);
-        LOG.info("Updated detection health for {}", config.getId());
-      } catch (Exception e) {
-        LOG.info("Update detection health for {} failed", config.getId(), e);
-      }
-    }
   }
 
   private void executeMonitorExpire(MonitorTaskInfo monitorTaskInfo) {
@@ -280,6 +252,26 @@ public class MonitorTaskRunner implements TaskRunner {
       LOG.info("Deleted {} evaluations that are older than {} days.", deletedEvaluations, monitorTaskInfo.getDefaultRetentionDays());
     } catch (Exception e) {
       LOG.error("Exception when deleting old evaluations.", e);
+    }
+
+    // Delete expired online detection data
+    try {
+      int deletedOnlineDetectionDatas = DAO_REGISTRY.getOnlineDetectionDataManager()
+          .deleteRecordsOlderThanDays(monitorTaskInfo.getDefaultRetentionDays());
+      LOG.info("Deleted {} online detection data that are older than {} days.",
+          deletedOnlineDetectionDatas, monitorTaskInfo.getDefaultRetentionDays());
+    } catch (Exception e) {
+      LOG.error("Exception when deleting old online detection data.", e);
+    }
+
+    // Delete old anomaly subscription notifications.
+    try {
+      int deletedRecords = DAO_REGISTRY.getAnomalySubscriptionGroupNotificationManager()
+          .deleteRecordsOlderThanDays(monitorTaskInfo.getDefaultRetentionDays());
+      LOG.info("Deleted {} anomaly subscription notifications that are older than {} days.", deletedRecords,
+          monitorTaskInfo.getDefaultRetentionDays());
+    } catch (Exception e) {
+      LOG.error("Exception when deleting old anomaly subscription notifications.", e);
     }
   }
 

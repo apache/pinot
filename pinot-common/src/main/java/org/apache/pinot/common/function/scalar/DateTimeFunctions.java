@@ -20,7 +20,7 @@ package org.apache.pinot.common.function.scalar;
 
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.function.DateTimePatternHandler;
-import org.apache.pinot.common.function.annotations.ScalarFunction;
+import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 

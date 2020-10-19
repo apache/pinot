@@ -34,8 +34,8 @@ import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
-import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreator;
-import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.apache.pinot.core.segment.creator.impl.text.LuceneTextIndexCreator;
+import org.apache.pinot.core.segment.index.readers.TextIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -48,7 +48,7 @@ import org.slf4j.LoggerFactory;
  * When {@link org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader} loads the segment,
  * it also loads (mmaps) the Lucene text index if the segment has TEXT column(s).
  */
-public class LuceneTextIndexReader implements InvertedIndexReader<MutableRoaringBitmap> {
+public class LuceneTextIndexReader implements TextIndexReader {
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(LuceneTextIndexReader.class);
 
   private final IndexReader _indexReader;
@@ -114,13 +114,6 @@ public class LuceneTextIndexReader implements InvertedIndexReader<MutableRoaring
       throw new IllegalStateException("Failed to find text index file for column: " + _column);
     }
     return file;
-  }
-
-  @Override
-  public MutableRoaringBitmap getDocIds(int dictId) {
-    // This should not be called from anywhere. If it happens, there is a bug in the current implementation
-    // and that's why we throw illegal state exception
-    throw new IllegalStateException("Using dictionary ID is not supported on Lucene inverted index");
   }
 
   @Override

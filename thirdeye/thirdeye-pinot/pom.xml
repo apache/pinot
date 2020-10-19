@@ -8,15 +8,17 @@
     <artifactId>thirdeye</artifactId>
     <version>${revision}${sha1}</version>
   </parent>
-  <groupId>org.apache.pinot.thirdeye</groupId>
   <artifactId>thirdeye-pinot</artifactId>
-  <name>thirdeye-pinot</name>
   <url>http://maven.apache.org</url>
   <properties>
-    <mainClass>org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardApplication</mainClass>
+
   </properties>
 
   <dependencies>
+    <dependency>
+      <groupId>org.apache.pinot.thirdeye</groupId>
+      <artifactId>thirdeye-spi</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.apache.httpcomponents</groupId>
       <artifactId>httpclient</artifactId>
@@ -53,14 +55,6 @@
           <groupId>org.glassfish.hk2.external</groupId>
           <artifactId>aopalliance-repackaged</artifactId>
         </exclusion>
-        <exclusion>
-          <groupId>ch.qos.logback</groupId>
-          <artifactId>logback-classic</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>ch.qos.logback</groupId>
-          <artifactId>logback-access</artifactId>
-        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
@@ -70,12 +64,6 @@
     <dependency>
       <groupId>io.dropwizard</groupId>
       <artifactId>dropwizard-migrations</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>ch.qos.logback</groupId>
-          <artifactId>logback-classic</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
       <groupId>io.dropwizard</groupId>
@@ -99,29 +87,7 @@
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
     </dependency>
-    <dependency>
-      <groupId>com.fasterxml.jackson.core</groupId>
-      <artifactId>jackson-annotations</artifactId>
-    </dependency>
 
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-spi</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>javax.mail</groupId>
-          <artifactId>mail</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.slf4j</groupId>
-          <artifactId>slf4j-log4j12</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-java-client</artifactId>
-    </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
@@ -166,10 +132,6 @@
       <artifactId>guava</artifactId>
     </dependency>
     <dependency>
-      <groupId>joda-time</groupId>
-      <artifactId>joda-time</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.eclipse.jetty</groupId>
       <artifactId>jetty-proxy</artifactId>
       <version>${jetty.version}</version>
@@ -192,16 +154,6 @@
       <groupId>io.prestosql</groupId>
       <artifactId>presto-jdbc</artifactId>
       <version>333</version>
-    </dependency>
-
-    <!-- dataframe specific -->
-    <dependency>
-      <groupId>org.apache.commons</groupId>
-      <artifactId>commons-csv</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.udojava</groupId>
-      <artifactId>EvalEx</artifactId>
     </dependency>
 
     <!-- DB specific -->
@@ -232,11 +184,6 @@
 
 
     <!-- TODO: restructure this -->
-    <dependency>
-      <groupId>org.modelmapper</groupId>
-      <artifactId>modelmapper</artifactId>
-      <version>0.7.6</version>
-    </dependency>
     <dependency>
       <groupId>com.jayway.jsonpath</groupId>
       <artifactId>json-path</artifactId>
@@ -321,6 +268,11 @@
       <artifactId>hsqldb</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <scope>test</scope>
+    </dependency>
 
     <!-- Swagger -->
     <dependency>
@@ -386,56 +338,45 @@
       <groupId>org.apache.logging.log4j</groupId>
       <artifactId>log4j-slf4j-impl</artifactId>
     </dependency>
+
+    <!-- yaml validator -->
+    <dependency>
+      <groupId>com.github.java-json-tools</groupId>
+      <artifactId>json-schema-validator</artifactId>
+      <version>${json-schema-validator.version}</version>
+    </dependency>
   </dependencies>
+
+  <profiles>
+  <profile>
+    <id>bigquery</id>
+    <dependencies>
+      <dependency>
+        <groupId>com.google.auth</groupId>
+        <artifactId>google-auth-library-oauth2-http</artifactId>
+      </dependency>
+      <dependency>
+        <groupId>com.google.api</groupId>
+        <artifactId>gax</artifactId>
+      </dependency>
+      <dependency>
+        <groupId>com.google.apis</groupId>
+        <artifactId>google-api-services-bigquery</artifactId>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.avro</groupId>
+        <artifactId>avro</artifactId>
+      </dependency>
+      <dependency>
+        <groupId>com.simba.googlebigquery</groupId>
+        <artifactId>jdbc42</artifactId>
+      </dependency>
+    </dependencies>
+  </profile>
+  </profiles>
 
   <build>
     <plugins>
-      <plugin>
-        <artifactId>maven-shade-plugin</artifactId>
-        <version>3.1.0</version>
-        <configuration>
-          <createDependencyReducedPom>true</createDependencyReducedPom>
-          <transformers>
-            <transformer
-                implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
-            <transformer
-                implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-              <mainClass>${mainClass}</mainClass>
-            </transformer>
-          </transformers>
-          <!-- exclude signed Manifests -->
-          <filters>
-            <filter>
-              <artifact>*:*</artifact>
-              <excludes>
-                <exclude>META-INF/*.SF</exclude>
-                <exclude>META-INF/*.DSA</exclude>
-                <exclude>META-INF/*.RSA</exclude>
-              </excludes>
-            </filter>
-          </filters>
-        </configuration>
-        <executions>
-          <execution>
-            <phase>package</phase>
-            <goals>
-              <goal>shade</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <artifactId>maven-jar-plugin</artifactId>
-        <version>2.4</version>
-        <configuration>
-          <archive>
-            <manifest>
-              <addClasspath>true</addClasspath>
-              <mainClass>${mainClass}</mainClass>
-            </manifest>
-          </archive>
-        </configuration>
-      </plugin>
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
         <version>2.3.2</version>
@@ -481,12 +422,6 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
           <threadCount>1</threadCount>
-          <properties>
-            <property>
-              <name>listener</name>
-              <value>org.apache.pinot.thirdeye.TestListener</value>
-            </property>
-          </properties>
         </configuration>
       </plugin>
     </plugins>

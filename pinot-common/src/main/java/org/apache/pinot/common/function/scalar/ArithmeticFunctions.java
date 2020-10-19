@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.common.function.scalar;
 
-import org.apache.pinot.common.function.annotations.ScalarFunction;
+import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
 /**

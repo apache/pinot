@@ -83,8 +83,8 @@ export default Component.extend({
       return {
         grouped: true,
         position: function (data, width, height, element) {
-          const chartOffsetX = document.querySelector("#chart").getBoundingClientRect().left;
-          const graphOffsetX = document.querySelector("#chart g.c3-axis-y").getBoundingClientRect().right;
+          const chartOffsetX = document.querySelector(".timeseries-chart").getBoundingClientRect().left;
+          const graphOffsetX = document.querySelector(".timeseries-chart g.c3-axis-y").getBoundingClientRect().right;
           const tooltipWidth = document.getElementById('tooltip').parentNode.clientWidth;
           const x = (parseInt(element.getAttribute('cx'))) + graphOffsetX - chartOffsetX - Math.floor(tooltipWidth/2);
           const y = element.getAttribute('cy') - height - 14;

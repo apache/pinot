@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -29,34 +28,39 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.TreeMap;
-import javax.annotation.Nonnull;
 import org.apache.commons.collections.comparators.ComparableComparator;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.pinot.common.response.broker.GroupByResult;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.function.MinAggregationFunction;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.GroupByUtils;
 
 
 /**
  * The <code>AggregationGroupByTrimmingService</code> class provides trimming service for aggregation group-by queries.
  */
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class AggregationGroupByTrimmingService {
-
   private final AggregationFunction[] _aggregationFunctions;
-  private final int _groupByTopN;
+  private final int _numGroupByExpressions;
+  private final int _limit;
   private final int _trimSize;
   private final int _trimThreshold;
 
-  public AggregationGroupByTrimmingService(@Nonnull AggregationFunction[] aggregationFunctions, int groupByTopN) {
-    Preconditions.checkArgument(groupByTopN > 0);
+  public AggregationGroupByTrimmingService(QueryContext queryContext) {
+    _aggregationFunctions = queryContext.getAggregationFunctions();
+    List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
+    assert groupByExpressions != null;
+    _numGroupByExpressions = groupByExpressions.size();
+    _limit = queryContext.getLimit();
+    assert _limit > 0;
 
-    _aggregationFunctions = aggregationFunctions;
-    _groupByTopN = groupByTopN;
-
-    // To keep the precision, _trimSize is the larger of (_groupByTopN * 5) or 5000
-    _trimSize = GroupByUtils.getTableCapacity(_groupByTopN);
+    // To keep the precision, _trimSize is max(_limit * 5, 5000)
+    _trimSize = GroupByUtils.getTableCapacity(_limit);
 
     // To trigger the trimming, number of groups should be larger than _trimThreshold which is (_trimSize * 4)
     _trimThreshold = _trimSize * 4;
@@ -67,8 +71,7 @@ public class AggregationGroupByTrimmingService {
    * desired size and put them into a list of maps from group key to intermediate result for each aggregation function.
    */
   @SuppressWarnings("unchecked")
-  @Nonnull
-  public List<Map<String, Object>> trimIntermediateResultsMap(@Nonnull Map<String, Object[]> intermediateResultsMap) {
+  public List<Map<String, Object>> trimIntermediateResultsMap(Map<String, Object[]> intermediateResultsMap) {
     int numAggregationFunctions = _aggregationFunctions.length;
     Map<String, Object>[] trimmedResultMaps = new Map[numAggregationFunctions];
 
@@ -119,8 +122,7 @@ public class AggregationGroupByTrimmingService {
    * Given an array of maps from group key to final result for each aggregation function, trim the results to topN size.
    */
   @SuppressWarnings("unchecked")
-  @Nonnull
-  public List<GroupByResult>[] trimFinalResults(@Nonnull Map<String, Comparable>[] finalResultMaps) {
+  public List<GroupByResult>[] trimFinalResults(Map<String, Comparable>[] finalResultMaps) {
     int numAggregationFunctions = _aggregationFunctions.length;
     List<GroupByResult>[] trimmedResults = new List[numAggregationFunctions];
 
@@ -134,7 +136,7 @@ public class AggregationGroupByTrimmingService {
       }
 
       // Final result is always comparable
-      Sorter sorter = getSorter(_groupByTopN, _aggregationFunctions[i], true);
+      Sorter sorter = getSorter(_limit, _aggregationFunctions[i], true);
 
       // Add results into sorter
       for (Map.Entry<String, Comparable> entry : finalResultMap.entrySet()) {
@@ -142,7 +144,7 @@ public class AggregationGroupByTrimmingService {
       }
 
       // Dump trimmed results into list
-      sorter.dumpToGroupByResults(groupByResults);
+      sorter.dumpToGroupByResults(groupByResults, _numGroupByExpressions);
     }
 
     return trimmedResults;
@@ -153,10 +155,9 @@ public class AggregationGroupByTrimmingService {
 
     void dumpToMap(Map<String, Object> dest);
 
-    void dumpToGroupByResults(LinkedList<GroupByResult> dest);
+    void dumpToGroupByResults(LinkedList<GroupByResult> dest, int numGroupByExpressions);
   }
 
-  @SuppressWarnings("unchecked")
   private static Sorter getSorter(int trimSize, AggregationFunction aggregationFunction, boolean isComparable) {
     // This will cover both MIN and MINMV
     boolean minOrder = aggregationFunction instanceof MinAggregationFunction;
@@ -201,7 +202,6 @@ public class AggregationGroupByTrimmingService {
       _heap = new PriorityQueue<>(_trimSize, comparator);
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public void add(String groupKey, Object result) {
       GroupKeyResultPair newGroupKeyResultPair = new GroupKeyResultPair(groupKey, (Comparable) result);
@@ -225,32 +225,44 @@ public class AggregationGroupByTrimmingService {
     }
 
     @Override
-    public void dumpToGroupByResults(LinkedList<GroupByResult> dest) {
+    public void dumpToGroupByResults(LinkedList<GroupByResult> dest, int numGroupByExpressions) {
       GroupKeyResultPair groupKeyResultPair;
-      while ((groupKeyResultPair = _heap.poll()) != null) {
-        // Set limit to -1 to prevent removing trailing empty strings
-        String[] groupKeys = groupKeyResultPair._groupKey.split(GroupKeyGenerator.DELIMITER, -1);
+      if (numGroupByExpressions == 1) {
+        while ((groupKeyResultPair = _heap.poll()) != null) {
+          GroupByResult groupByResult = new GroupByResult();
+          groupByResult.setGroup(Collections.singletonList(groupKeyResultPair._groupKey));
+          groupByResult.setValue(AggregationFunctionUtils.getSerializableValue(groupKeyResultPair._result));
 
-        GroupByResult groupByResult = new GroupByResult();
-        groupByResult.setGroup(Arrays.asList(groupKeys));
-        groupByResult.setValue(AggregationFunctionUtils.getSerializableValue(groupKeyResultPair._result));
+          // Add to head to reverse the order
+          dest.addFirst(groupByResult);
+        }
+      } else {
+        while ((groupKeyResultPair = _heap.poll()) != null) {
+          // Preserve all tokens to support empty strings
+          String[] groupKeys =
+              StringUtils.splitPreserveAllTokens(groupKeyResultPair._groupKey, GroupKeyGenerator.DELIMITER);
 
-        // Add to head to reverse the order
-        dest.addFirst(groupByResult);
+          GroupByResult groupByResult = new GroupByResult();
+          groupByResult.setGroup(Arrays.asList(groupKeys));
+          groupByResult.setValue(AggregationFunctionUtils.getSerializableValue(groupKeyResultPair._result));
+
+          // Add to head to reverse the order
+          dest.addFirst(groupByResult);
+        }
       }
     }
 
     private static class GroupKeyResultPair implements Comparable<GroupKeyResultPair> {
-      private String _groupKey;
-      private Comparable<? super Comparable> _result;
+      private final String _groupKey;
+      private final Comparable<? super Comparable> _result;
 
-      public GroupKeyResultPair(@Nonnull String groupKey, @Nonnull Comparable<? super Comparable> result) {
+      public GroupKeyResultPair(String groupKey, Comparable<? super Comparable> result) {
         _groupKey = groupKey;
         _result = result;
       }
 
       @Override
-      public int compareTo(@Nonnull GroupKeyResultPair o) {
+      public int compareTo(GroupKeyResultPair o) {
         return _result.compareTo(o._result);
       }
     }
@@ -292,7 +304,6 @@ public class AggregationGroupByTrimmingService {
       _treeMap = new TreeMap<>(comparator);
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public void add(String groupKey, Object result) {
       Comparable newKey = _aggregationFunction.extractFinalResult(result);
@@ -345,7 +356,7 @@ public class AggregationGroupByTrimmingService {
     }
 
     @Override
-    public void dumpToGroupByResults(LinkedList<GroupByResult> dest) {
+    public void dumpToGroupByResults(LinkedList<GroupByResult> dest, int numGroupByExpressions) {
       throw new UnsupportedOperationException();
     }
   }

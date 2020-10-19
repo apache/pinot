@@ -39,8 +39,9 @@ public class StarTreeV2Constants {
 
   // Metadata keys
   public static class MetadataKey {
-    public static final String STAR_TREE_COUNT = "startree.v2.count";
-    public static final String STAR_TREE_PREFIX = "startree.v2.";
+    public static final String STAR_TREE_SUBSET = "startree.v2";
+    public static final String STAR_TREE_PREFIX = STAR_TREE_SUBSET + '.';
+    public static final String STAR_TREE_COUNT = STAR_TREE_PREFIX + "count";
 
     public static final String TOTAL_DOCS = "total.docs";
     public static final String DIMENSIONS_SPLIT_ORDER = "split.order";

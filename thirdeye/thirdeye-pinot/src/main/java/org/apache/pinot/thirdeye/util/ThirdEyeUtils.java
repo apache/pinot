@@ -56,10 +56,11 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.thirdeye.anomaly.views.AnomalyTimelinesView;
+import org.apache.pinot.thirdeye.common.ThirdEyeConfiguration;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
-import org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -69,6 +70,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean.COMPARE_MODE;
 import org.apache.pinot.thirdeye.datalayer.pojo.MetricConfigBean;
 import org.apache.pinot.thirdeye.datalayer.util.DaoProviderUtil;
+import org.apache.pinot.thirdeye.datalayer.util.ThirdEyeDataUtils;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.MetricExpression;
 import org.apache.pinot.thirdeye.datasource.MetricFunction;
@@ -83,13 +85,11 @@ import org.joda.time.Period;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.thirdeye.detection.wrapper.GrouperWrapper.PROP_DETECTOR_COMPONENT_NAME;
-
+import static org.apache.pinot.thirdeye.detection.GrouperWrapperConstants.PROP_DETECTOR_COMPONENT_NAME;
+import static org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO.TIME_SERIES_SNAPSHOT_KEY;
 
 public abstract class ThirdEyeUtils {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeUtils.class);
-  private static final String FILTER_VALUE_ASSIGNMENT_SEPARATOR = "=";
-  private static final String FILTER_CLAUSE_SEPARATOR = ";";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
@@ -113,21 +113,6 @@ public abstract class ThirdEyeUtils {
 
   private ThirdEyeUtils () {
 
-  }
-
-  public static Multimap<String, String> getFilterSet(String filters) {
-    Multimap<String, String> filterSet = ArrayListMultimap.create();
-    if (StringUtils.isNotBlank(filters)) {
-      String[] filterClauses = filters.split(FILTER_CLAUSE_SEPARATOR);
-      for (String filterClause : filterClauses) {
-        String[] values = filterClause.split(FILTER_VALUE_ASSIGNMENT_SEPARATOR, 2);
-        if (values.length != 2) {
-          throw new IllegalArgumentException("Filter values assigments should in pairs: " + filters);
-        }
-        filterSet.put(values[0], values[1]);
-      }
-    }
-    return filterSet;
   }
 
   /**
@@ -197,38 +182,9 @@ public abstract class ThirdEyeUtils {
     return multimap;
   }
 
-  public static String getSortedFiltersFromMultiMap(Multimap<String, String> filterMultiMap) {
-    Set<String> filterKeySet = filterMultiMap.keySet();
-    ArrayList<String> filterKeyList = new ArrayList<String>(filterKeySet);
-    Collections.sort(filterKeyList);
-
-    StringBuilder sb = new StringBuilder();
-    for (String filterKey : filterKeyList) {
-      ArrayList<String> values = new ArrayList<String>(filterMultiMap.get(filterKey));
-      Collections.sort(values);
-      for (String value : values) {
-        sb.append(filterKey);
-        sb.append(FILTER_VALUE_ASSIGNMENT_SEPARATOR);
-        sb.append(value);
-        sb.append(FILTER_CLAUSE_SEPARATOR);
-      }
-    }
-    return StringUtils.chop(sb.toString());
-  }
-
-  public static String getSortedFilters(String filters) {
-    Multimap<String, String> filterMultiMap = getFilterSet(filters);
-    String sortedFilters = getSortedFiltersFromMultiMap(filterMultiMap);
-
-    if (StringUtils.isBlank(sortedFilters)) {
-      return null;
-    }
-    return sortedFilters;
-  }
-
   public static String getSortedFiltersFromJson(String filterJson) {
     Multimap<String, String> filterMultiMap = convertToMultiMap(filterJson);
-    String sortedFilters = getSortedFiltersFromMultiMap(filterMultiMap);
+    String sortedFilters = ThirdEyeDataUtils.getSortedFiltersFromMultiMap(filterMultiMap);
 
     if (StringUtils.isBlank(sortedFilters)) {
       return null;
@@ -439,6 +395,25 @@ public abstract class ThirdEyeUtils {
 
   /**
    * Get rounded double value, according to the value of the double.
+   * Max rounding will be up to 4 decimals
+   * For values >= 0.1, use 2 decimals (eg. 123, 2.5, 1.26, 0.5, 0.162)
+   * For values < 0.1, use 3 decimals (eg. 0.08, 0.071, 0.0123)
+   * @param value any double value
+   * @return the rounded double value
+   */
+  public static Double getRoundedDouble(Double value) {
+    if (Double.isNaN(value) || Double.isInfinite(value)) {
+      return Double.NaN;
+    }
+    if (value >= 0.1) {
+      return Math.round(value * (Math.pow(10, 2))) / (Math.pow(10, 2));
+    } else {
+      return Math.round(value * (Math.pow(10, 3))) / (Math.pow(10, 3));
+    }
+  }
+
+  /**
+   * Get rounded double value, according to the value of the double.
    * Max rounding will be upto 4 decimals
    * For values gte 0.1, use ##.## (eg. 123, 2.5, 1.26, 0.5, 0.162)
    * For values lt 0.1 and gte 0.01, use ##.### (eg. 0.08, 0.071, 0.0123)
@@ -542,12 +517,13 @@ public abstract class ThirdEyeUtils {
     DaoProviderUtil.init(new File(persistenceConfig));
 
     // Read configuration for data sources, etc.
-    ThirdEyeDashboardConfiguration config;
+    // TODO spyne Fix dependency loading
+    ThirdEyeConfiguration config;
     try {
       String dashboardConfigFilePath = thirdEyeConfigDir + "/dashboard.yml";
       File configFile = new File(dashboardConfigFilePath);
-      YamlConfigurationFactory<ThirdEyeDashboardConfiguration> factory =
-          new YamlConfigurationFactory<>(ThirdEyeDashboardConfiguration.class,
+      YamlConfigurationFactory<ThirdEyeConfiguration> factory =
+          new YamlConfigurationFactory<>(ThirdEyeConfiguration.class,
               Validation.buildDefaultValidatorFactory().getValidator(), Jackson.newObjectMapper(), "");
       config = factory.build(configFile);
       config.setRootDir(thirdEyeConfigDir);
@@ -683,6 +659,19 @@ public abstract class ThirdEyeUtils {
           String component = ThirdEyeUtils.combineComponents(parent.get(PROP_DETECTOR_COMPONENT_NAME), child.get(PROP_DETECTOR_COMPONENT_NAME));
           parent.put(PROP_DETECTOR_COMPONENT_NAME, component);
         }
+        // combine time series snapshot of parent and child anomalies
+        if (key.equals(MergedAnomalyResultDTO.TIME_SERIES_SNAPSHOT_KEY)) {
+          try {
+            AnomalyTimelinesView parentTimeSeries = AnomalyTimelinesView
+                .fromJsonString(parent.get(TIME_SERIES_SNAPSHOT_KEY));
+            AnomalyTimelinesView childTimeSeries = AnomalyTimelinesView
+                .fromJsonString(child.get(TIME_SERIES_SNAPSHOT_KEY));
+            parent.put(TIME_SERIES_SNAPSHOT_KEY,
+                mergeTimeSeriesSnapshot(parentTimeSeries, childTimeSeries).toJsonString());
+          } catch (Exception e) {
+            LOG.warn("Unable to merge time series, so skipping...", e);
+          }
+        }
       }
     }
   }
@@ -744,5 +733,58 @@ public abstract class ThirdEyeUtils {
       throw new IllegalArgumentException("Invalid job name: " + jobName);
     }
     return Long.parseLong(parts[1]);
+  }
+
+  /**
+   * A helper function to merge time series snapshot of two anomalies. This function assumes that the time series of
+   * both parent and child anomalies are aligned with the metric granularity boundary.
+   * @param parent time series snapshot of parent anomaly
+   * @param child time series snapshot of parent anaomaly
+   * @return merged time series snapshot based on timestamps
+   */
+  private static AnomalyTimelinesView mergeTimeSeriesSnapshot(AnomalyTimelinesView parent, AnomalyTimelinesView child) {
+    AnomalyTimelinesView mergedTimeSeriesSnapshot = new AnomalyTimelinesView();
+    int i = 0 , j = 0;
+    while(i < parent.getTimeBuckets().size() && j < child.getTimeBuckets().size()) {
+      long parentTime = parent.getTimeBuckets().get(i).getCurrentStart();
+      long childTime = child.getTimeBuckets().get(j).getCurrentStart();
+      if (parentTime == childTime) {
+        // use the values in parent anomalies when the time series overlap
+        mergedTimeSeriesSnapshot.addTimeBuckets(parent.getTimeBuckets().get(i));
+        mergedTimeSeriesSnapshot.addCurrentValues(parent.getCurrentValues().get(i));
+        mergedTimeSeriesSnapshot.addBaselineValues(parent.getBaselineValues().get(i));
+        i++;
+        j++;
+      } else if (parentTime < childTime) {
+        mergedTimeSeriesSnapshot.addTimeBuckets(parent.getTimeBuckets().get(i));
+        mergedTimeSeriesSnapshot.addCurrentValues(parent.getCurrentValues().get(i));
+        mergedTimeSeriesSnapshot.addBaselineValues(parent.getBaselineValues().get(i));
+        i++;
+      } else {
+        mergedTimeSeriesSnapshot.addTimeBuckets(child.getTimeBuckets().get(j));
+        mergedTimeSeriesSnapshot.addCurrentValues(child.getCurrentValues().get(j));
+        mergedTimeSeriesSnapshot.addBaselineValues(child.getBaselineValues().get(j));
+        j++;
+      }
+    }
+    while (i < parent.getTimeBuckets().size()) {
+      mergedTimeSeriesSnapshot.addTimeBuckets(parent.getTimeBuckets().get(i));
+      mergedTimeSeriesSnapshot.addCurrentValues(parent.getCurrentValues().get(i));
+      mergedTimeSeriesSnapshot.addBaselineValues(parent.getBaselineValues().get(i));
+      i++;
+    }
+    while (j < child.getTimeBuckets().size()) {
+      mergedTimeSeriesSnapshot.addTimeBuckets(child.getTimeBuckets().get(j));
+      mergedTimeSeriesSnapshot.addCurrentValues(child.getCurrentValues().get(j));
+      mergedTimeSeriesSnapshot.addBaselineValues(child.getBaselineValues().get(j));
+      j++;
+    }
+    mergedTimeSeriesSnapshot.getSummary().putAll(parent.getSummary());
+    for (String key : child.getSummary().keySet()) {
+      if (!mergedTimeSeriesSnapshot.getSummary().containsKey(key)) {
+        mergedTimeSeriesSnapshot.getSummary().put(key, child.getSummary().get(key));
+      }
+    }
+    return mergedTimeSeriesSnapshot;
   }
 }

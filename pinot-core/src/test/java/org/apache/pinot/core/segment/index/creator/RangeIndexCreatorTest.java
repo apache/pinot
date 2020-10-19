@@ -18,144 +18,366 @@
  */
 package org.apache.pinot.core.segment.index.creator;
 
-import com.google.common.base.Preconditions;
-import java.io.DataInputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.Random;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.segment.creator.impl.inv.RangeIndexCreator;
 import org.apache.pinot.core.segment.index.readers.RangeIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.core.segment.creator.impl.V1Constants.Indexes.BITMAP_RANGE_INDEX_FILE_EXTENSION;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
-/**
- * Class for testing Range index.
- */
 public class RangeIndexCreatorTest {
+  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "RangeIndexCreatorTest");
+  private static final Random RANDOM = new Random();
+  private static final String COLUMN_NAME = "testColumn";
+
+  @BeforeClass
+  public void setUp()
+      throws IOException {
+    FileUtils.forceMkdir(INDEX_DIR);
+  }
 
   @Test
   public void testInt()
       throws Exception {
-    File indexDir = new File(System.getProperty("java.io.tmpdir") + "/testRangeIndex");
-    indexDir.mkdirs();
-    FieldSpec fieldSpec = new MetricFieldSpec();
-    fieldSpec.setDataType(FieldSpec.DataType.INT);
-    String columnName = "latency";
-    fieldSpec.setName(columnName);
-    int cardinality = 20;
+    testDataType(DataType.INT);
+  }
+
+  @Test
+  public void testLong()
+      throws Exception {
+    testDataType(DataType.LONG);
+  }
+
+  @Test
+  public void testFloat()
+      throws Exception {
+    testDataType(DataType.FLOAT);
+  }
+
+  @Test
+  public void testDouble()
+      throws Exception {
+    testDataType(DataType.DOUBLE);
+  }
+
+  @Test
+  public void testIntMV()
+      throws Exception {
+    testDataTypeMV(DataType.INT);
+  }
+
+  @Test
+  public void testLongMV()
+      throws Exception {
+    testDataTypeMV(DataType.LONG);
+  }
+
+  @Test
+  public void testFloatMV()
+      throws Exception {
+    testDataTypeMV(DataType.FLOAT);
+  }
+
+  @Test
+  public void testDoubleMV()
+      throws Exception {
+    testDataTypeMV(DataType.DOUBLE);
+  }
+
+  @AfterClass
+  public void tearDown()
+      throws IOException {
+    FileUtils.deleteDirectory(INDEX_DIR);
+  }
+
+  private void testDataType(DataType dataType)
+      throws IOException {
+    FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, dataType, true);
     int numDocs = 1000;
-    int numValues = 1000;
-    RangeIndexCreator creator =
-        new RangeIndexCreator(indexDir, fieldSpec, FieldSpec.DataType.INT, -1, -1, numDocs, numValues);
-    Random r = new Random();
-    Number[] values = new Number[numValues];
-    for (int i = 0; i < numDocs; i++) {
-      int val = r.nextInt(cardinality);
-      creator.add(val);
-      values[i] = val;
+    Number[] values = new Number[numDocs];
+
+    try (RangeIndexCreator creator = new RangeIndexCreator(INDEX_DIR, fieldSpec, dataType, -1, -1, numDocs, numDocs)) {
+      addDataToIndexer(dataType, numDocs, 1, creator, values);
+      creator.seal();
     }
-    creator.seal();
 
-    File rangeIndexFile = new File(indexDir, columnName + BITMAP_RANGE_INDEX_FILE_EXTENSION);
-    //TEST THE BUFFER FORMAT
-
-    testRangeIndexBufferFormat(values, rangeIndexFile);
-
-    //TEST USING THE READER
-    PinotDataBuffer pinotDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(rangeIndexFile);
-    RangeIndexReader rangeIndexReader = new RangeIndexReader(pinotDataBuffer);
-    Number[] rangeStartArray = rangeIndexReader.getRangeStartArray();
-    for (int rangeId = 0; rangeId < rangeStartArray.length; rangeId++) {
-      ImmutableRoaringBitmap bitmap = rangeIndexReader.getDocIds(rangeId);
-      for (int docId : bitmap.toArray()) {
-        checkInt(rangeStartArray, rangeId, values, docId);
+    File rangeIndexFile = new File(INDEX_DIR, COLUMN_NAME + BITMAP_RANGE_INDEX_FILE_EXTENSION);
+    try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(rangeIndexFile)) {
+      RangeIndexReader rangeIndexReader = new RangeIndexReader(dataBuffer);
+      Number[] rangeStartArray = rangeIndexReader.getRangeStartArray();
+      for (int rangeId = 0; rangeId < rangeStartArray.length; rangeId++) {
+        ImmutableRoaringBitmap bitmap = rangeIndexReader.getDocIds(rangeId);
+        for (int docId : bitmap.toArray()) {
+          checkValueForDocId(dataType, values, rangeStartArray, rangeId, docId, 1);
+        }
       }
     }
+
+    FileUtils.forceDelete(rangeIndexFile);
   }
 
-  private void checkInt(Number[] rangeStartArray, int rangeId, Number[] values, int docId) {
-    if (rangeId != rangeStartArray.length - 1) {
-      Assert.assertTrue(
-          rangeStartArray[rangeId].intValue() <= values[docId].intValue() && values[docId].intValue() < rangeStartArray[
-              rangeId + 1].intValue(), "rangestart:" + rangeStartArray[rangeId] + " value:" + values[docId]);
-    } else {
-      Assert.assertTrue(rangeStartArray[rangeId].intValue() <= values[docId].intValue(),
-          "rangestart:" + rangeStartArray[rangeId] + " value:" + values[docId]);
-    }
-  }
-
-  private void testRangeIndexBufferFormat(Number[] values, File rangeIndexFile)
+  private void testDataTypeMV(DataType dataType)
       throws IOException {
-    DataInputStream dis = new DataInputStream(new FileInputStream(rangeIndexFile));
-    int version = dis.readInt();
-    int valueTypeBytesLength = dis.readInt();
+    FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, dataType, false);
+    int numDocs = 1000;
+    int numValuesPerMVEntry = 10;
+    int numValues = numDocs * numValuesPerMVEntry;
+    Number[] values = new Number[numValues];
 
-    byte[] valueTypeBytes = new byte[valueTypeBytesLength];
-    dis.read(valueTypeBytes);
-    String name = new String(valueTypeBytes);
-    FieldSpec.DataType dataType = FieldSpec.DataType.valueOf(name);
+    try (
+        RangeIndexCreator creator = new RangeIndexCreator(INDEX_DIR, fieldSpec, dataType, -1, -1, numDocs, numValues)) {
+      addDataToIndexer(dataType, numDocs, numValuesPerMVEntry, creator, values);
+      creator.seal();
+    }
 
-    int numRanges = dis.readInt();
+    File rangeIndexFile = new File(INDEX_DIR, COLUMN_NAME + BITMAP_RANGE_INDEX_FILE_EXTENSION);
+    try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(rangeIndexFile)) {
+      RangeIndexReader rangeIndexReader = new RangeIndexReader(dataBuffer);
+      Number[] rangeStartArray = rangeIndexReader.getRangeStartArray();
+      int numRanges = rangeStartArray.length;
+      for (int rangeId = 0; rangeId < numRanges; rangeId++) {
+        ImmutableRoaringBitmap bitmap = rangeIndexReader.getDocIds(rangeId);
+        for (int docId : bitmap.toArray()) {
+          checkValueForDocId(dataType, values, rangeStartArray, rangeId, docId, numValuesPerMVEntry);
+        }
+      }
+    }
 
-    Number[] rangeStart = new Number[numRanges];
-    Number rangeEnd;
+    FileUtils.forceDelete(rangeIndexFile);
+  }
 
+  private void addDataToIndexer(DataType dataType, int numDocs, int numValuesPerEntry, RangeIndexCreator creator,
+      Number[] values) {
     switch (dataType) {
       case INT:
-        for (int i = 0; i < numRanges; i++) {
-          rangeStart[i] = dis.readInt();
+        if (numValuesPerEntry == 1) {
+          for (int i = 0; i < numDocs; i++) {
+            int value = RANDOM.nextInt();
+            values[i] = value;
+            creator.add(value);
+          }
+        } else {
+          int[] intValues = new int[numValuesPerEntry];
+          for (int i = 0; i < numDocs; i++) {
+            for (int j = 0; j < numValuesPerEntry; j++) {
+              int value = RANDOM.nextInt();
+              intValues[j] = value;
+              values[i * numValuesPerEntry + j] = value;
+            }
+            creator.add(intValues, numValuesPerEntry);
+          }
         }
-        rangeEnd = dis.readInt();
         break;
       case LONG:
-        for (int i = 0; i < numRanges; i++) {
-          rangeStart[i] = dis.readLong();
+        if (numValuesPerEntry == 1) {
+          for (int i = 0; i < numDocs; i++) {
+            long value = RANDOM.nextLong();
+            values[i] = value;
+            creator.add(value);
+          }
+        } else {
+          long[] longValues = new long[numValuesPerEntry];
+          for (int i = 0; i < numDocs; i++) {
+            for (int j = 0; j < numValuesPerEntry; j++) {
+              long value = RANDOM.nextLong();
+              longValues[j] = value;
+              values[i * numValuesPerEntry + j] = value;
+            }
+            creator.add(longValues, numValuesPerEntry);
+          }
         }
-        rangeEnd = dis.readLong();
         break;
       case FLOAT:
-        for (int i = 0; i < numRanges; i++) {
-          rangeStart[i] = dis.readFloat();
+        if (numValuesPerEntry == 1) {
+          for (int i = 0; i < numDocs; i++) {
+            float value = RANDOM.nextFloat();
+            values[i] = value;
+            creator.add(value);
+          }
+        } else {
+          float[] floatValues = new float[numValuesPerEntry];
+          for (int i = 0; i < numDocs; i++) {
+            for (int j = 0; j < numValuesPerEntry; j++) {
+              float value = RANDOM.nextFloat();
+              floatValues[j] = value;
+              values[i * numValuesPerEntry + j] = value;
+            }
+            creator.add(floatValues, numValuesPerEntry);
+          }
         }
-        rangeEnd = dis.readFloat();
         break;
       case DOUBLE:
-        for (int i = 0; i < numRanges; i++) {
-          rangeStart[i] = dis.readDouble();
-        }
-        rangeEnd = dis.readDouble();
-        break;
-    }
-
-    long[] rangeBitmapOffsets = new long[numRanges + 1];
-    for (int i = 0; i <= numRanges; i++) {
-      rangeBitmapOffsets[i] = dis.readLong();
-    }
-    ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[numRanges];
-    for (int i = 0; i < numRanges; i++) {
-      long serializedBitmapLength;
-      serializedBitmapLength = rangeBitmapOffsets[i + 1] - rangeBitmapOffsets[i];
-      byte[] bytes = new byte[(int) serializedBitmapLength];
-      dis.read(bytes, 0, (int) serializedBitmapLength);
-      bitmaps[i] = new ImmutableRoaringBitmap(ByteBuffer.wrap(bytes));
-      for (int docId : bitmaps[i].toArray()) {
-        if (i != numRanges - 1) {
-          Assert.assertTrue(
-              rangeStart[i].intValue() <= values[docId].intValue() && values[docId].intValue() < rangeStart[i + 1]
-                  .intValue(), "rangestart:" + rangeStart[i] + " value:" + values[docId]);
+        if (numValuesPerEntry == 1) {
+          for (int i = 0; i < numDocs; i++) {
+            double value = RANDOM.nextDouble();
+            values[i] = value;
+            creator.add(value);
+          }
         } else {
-          Assert.assertTrue(rangeStart[i].intValue() <= values[docId].intValue());
+          double[] doubleValues = new double[numValuesPerEntry];
+          for (int i = 0; i < numDocs; i++) {
+            for (int j = 0; j < numValuesPerEntry; j++) {
+              double value = RANDOM.nextDouble();
+              doubleValues[j] = value;
+              values[i * numValuesPerEntry + j] = value;
+            }
+            creator.add(doubleValues, numValuesPerEntry);
+          }
+        }
+        break;
+      default:
+        throw new IllegalStateException();
+    }
+  }
+
+  private void checkValueForDocId(DataType dataType, Number[] values, Number[] rangeStartArray, int rangeId, int docId,
+      int numValuesPerEntry) {
+    switch (dataType) {
+      case INT:
+        if (numValuesPerEntry == 1) {
+          checkInt(rangeStartArray, rangeId, values[docId].intValue());
+        } else {
+          checkIntMV(rangeStartArray, rangeId, values, docId, numValuesPerEntry);
+        }
+        break;
+      case LONG:
+        if (numValuesPerEntry == 1) {
+          checkLong(rangeStartArray, rangeId, values[docId].longValue());
+        } else {
+          checkLongMV(rangeStartArray, rangeId, values, docId, numValuesPerEntry);
+        }
+        break;
+      case FLOAT:
+        if (numValuesPerEntry == 1) {
+          checkFloat(rangeStartArray, rangeId, values[docId].floatValue());
+        } else {
+          checkFloatMV(rangeStartArray, rangeId, values, docId, numValuesPerEntry);
+        }
+        break;
+      case DOUBLE:
+        if (numValuesPerEntry == 1) {
+          checkDouble(rangeStartArray, rangeId, values[docId].doubleValue());
+        } else {
+          checkDoubleMV(rangeStartArray, rangeId, values, docId, numValuesPerEntry);
+        }
+        break;
+      default:
+        throw new IllegalStateException();
+    }
+  }
+
+  private void checkInt(Number[] rangeStartArray, int rangeId, int value) {
+    assertTrue(rangeStartArray[rangeId].intValue() <= value);
+    if (rangeId != rangeStartArray.length - 1) {
+      assertTrue(value < rangeStartArray[rangeId + 1].intValue());
+    }
+  }
+
+  private void checkIntMV(Number[] rangeStartArray, int rangeId, Number[] values, int docId, int numValuesPerMVEntry) {
+    if (rangeId != rangeStartArray.length - 1) {
+      for (int i = 0; i < numValuesPerMVEntry; i++) {
+        if (rangeStartArray[rangeId].intValue() <= values[docId * numValuesPerMVEntry + i].intValue()
+            && values[docId * numValuesPerMVEntry + i].intValue() < rangeStartArray[rangeId + 1].intValue()) {
+          return;
+        }
+      }
+    } else {
+      for (int i = 0; i < numValuesPerMVEntry; i++) {
+        if (rangeStartArray[rangeId].intValue() <= values[docId * numValuesPerMVEntry + i].intValue()) {
+          return;
         }
       }
     }
+    fail();
+  }
+
+  private void checkLong(Number[] rangeStartArray, int rangeId, long value) {
+    assertTrue(rangeStartArray[rangeId].longValue() <= value);
+    if (rangeId != rangeStartArray.length - 1) {
+      assertTrue(value < rangeStartArray[rangeId + 1].longValue());
+    }
+  }
+
+  private void checkLongMV(Number[] rangeStartArray, int rangeId, Number[] values, int docId, int numValuesPerMVEntry) {
+    if (rangeId != rangeStartArray.length - 1) {
+      for (int i = 0; i < numValuesPerMVEntry; i++) {
+        if (rangeStartArray[rangeId].longValue() <= values[docId * numValuesPerMVEntry + i].longValue()
+            && values[docId * numValuesPerMVEntry + i].longValue() < rangeStartArray[rangeId + 1].longValue()) {
+          return;
+        }
+      }
+    } else {
+      for (int i = 0; i < numValuesPerMVEntry; i++) {
+        if (rangeStartArray[rangeId].longValue() <= values[docId * numValuesPerMVEntry + i].longValue()) {
+          return;
+        }
+      }
+    }
+    fail();
+  }
+
+  private void checkFloat(Number[] rangeStartArray, int rangeId, float value) {
+    assertTrue(rangeStartArray[rangeId].floatValue() <= value);
+    if (rangeId != rangeStartArray.length - 1) {
+      assertTrue(value < rangeStartArray[rangeId + 1].floatValue());
+    }
+  }
+
+  private void checkFloatMV(Number[] rangeStartArray, int rangeId, Number[] values, int docId,
+      int numValuesPerMVEntry) {
+    if (rangeId != rangeStartArray.length - 1) {
+      for (int i = 0; i < numValuesPerMVEntry; i++) {
+        if (rangeStartArray[rangeId].floatValue() <= values[docId * numValuesPerMVEntry + i].floatValue()
+            && values[docId * numValuesPerMVEntry + i].floatValue() < rangeStartArray[rangeId + 1].floatValue()) {
+          return;
+        }
+      }
+    } else {
+      for (int i = 0; i < numValuesPerMVEntry; i++) {
+        if (rangeStartArray[rangeId].floatValue() <= values[docId * numValuesPerMVEntry + i].floatValue()) {
+          return;
+        }
+      }
+    }
+    fail();
+  }
+
+  private void checkDouble(Number[] rangeStartArray, int rangeId, double value) {
+    assertTrue(rangeStartArray[rangeId].doubleValue() <= value);
+    if (rangeId != rangeStartArray.length - 1) {
+      assertTrue(value < rangeStartArray[rangeId + 1].doubleValue());
+    }
+  }
+
+  private void checkDoubleMV(Number[] rangeStartArray, int rangeId, Number[] values, int docId,
+      int numValuesPerMVEntry) {
+    if (rangeId != rangeStartArray.length - 1) {
+      for (int i = 0; i < numValuesPerMVEntry; i++) {
+        if (rangeStartArray[rangeId].doubleValue() <= values[docId * numValuesPerMVEntry + i].doubleValue()
+            && values[docId * numValuesPerMVEntry + i].doubleValue() < rangeStartArray[rangeId + 1].doubleValue()) {
+          return;
+        }
+      }
+    } else {
+      for (int i = 0; i < numValuesPerMVEntry; i++) {
+        if (rangeStartArray[rangeId].doubleValue() <= values[docId * numValuesPerMVEntry + i].doubleValue()) {
+          return;
+        }
+      }
+    }
+    fail();
   }
 }

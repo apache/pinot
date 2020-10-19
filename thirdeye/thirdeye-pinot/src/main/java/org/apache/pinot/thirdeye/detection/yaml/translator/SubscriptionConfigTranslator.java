@@ -26,6 +26,7 @@ import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionAlertRegistry;
 import java.util.ArrayList;
@@ -68,19 +69,20 @@ public class SubscriptionConfigTranslator extends ConfigTranslator<DetectionAler
 
   private static final String PROP_DIMENSION = "dimension";
   private static final String PROP_DIMENSION_RECIPIENTS = "dimensionRecipients";
+  private static final String PROP_SEVERITY_RECIPIENTS = "severityRecipients";
 
   private static final DetectionAlertRegistry DETECTION_ALERT_REGISTRY = DetectionAlertRegistry.getInstance();
   private static final Set<String> PROPERTY_KEYS = new HashSet<>(
-      Arrays.asList(PROP_RECIPIENTS, PROP_DIMENSION, PROP_DIMENSION_RECIPIENTS));
-  private final DetectionConfigManager detectionConfigDAO;
+      Arrays.asList(PROP_RECIPIENTS, PROP_DIMENSION, PROP_DIMENSION_RECIPIENTS, PROP_SEVERITY_RECIPIENTS));
 
-  public SubscriptionConfigTranslator(DetectionConfigManager detectionConfigDAO, String yamlConfig) {
-    this(detectionConfigDAO, yamlConfig, new SubscriptionConfigValidator());
+  private final DetectionConfigManager detectionConfigDAO = DAORegistry.getInstance().getDetectionConfigManager();
+
+  public SubscriptionConfigTranslator(String yamlConfig) {
+    this(yamlConfig, new SubscriptionConfigValidator());
   }
 
-  public SubscriptionConfigTranslator(DetectionConfigManager detectionConfigDAO, String yamlConfig, SubscriptionConfigValidator validator) {
+  public SubscriptionConfigTranslator(String yamlConfig, SubscriptionConfigValidator validator) {
     super(yamlConfig, validator);
-    this.detectionConfigDAO = detectionConfigDAO;
   }
 
   private Map<String, Object> buildAlerterProperties(Map<String, Object> alertYamlConfigs, Collection<Long> detectionConfigIds) {
@@ -166,13 +168,17 @@ public class SubscriptionConfigTranslator extends ConfigTranslator<DetectionAler
    * Generates the {@link DetectionAlertConfigDTO} from the YAML Alert Map
    */
   @Override
-  DetectionAlertConfigDTO translateConfig(Map<String, Object> yamlConfigMap) throws IllegalArgumentException {
+  DetectionAlertConfigDTO translateConfig() {
+    Map<String, Object> yamlConfigMap = ConfigUtils.getMap(this.yaml.load(yamlConfig));
+
     DetectionAlertConfigDTO alertConfigDTO = new DetectionAlertConfigDTO();
 
     alertConfigDTO.setName(MapUtils.getString(yamlConfigMap, PROP_SUBS_GROUP_NAME));
     alertConfigDTO.setApplication(MapUtils.getString(yamlConfigMap, PROP_APPLICATION));
     alertConfigDTO.setFrom(MapUtils.getString(yamlConfigMap, PROP_FROM));
-    alertConfigDTO.setOwners(filterOwners(ConfigUtils.getList(yamlConfigMap.get(PROP_OWNERS))));
+    List<String> owners = ConfigUtils.getList(yamlConfigMap.get(PROP_OWNERS));
+    owners.replaceAll(String::trim);
+    alertConfigDTO.setOwners(new ArrayList<>(new HashSet<>(owners)));
 
     alertConfigDTO.setCronExpression(MapUtils.getString(yamlConfigMap, PROP_CRON, CRON_SCHEDULE_DEFAULT));
     alertConfigDTO.setActive(MapUtils.getBooleanValue(yamlConfigMap, PROP_ACTIVE, true));
@@ -182,10 +188,6 @@ public class SubscriptionConfigTranslator extends ConfigTranslator<DetectionAler
         (String) MapUtils.getObject(yamlConfigMap, PROP_EMAIL_SUBJECT_TYPE, AlertConfigBean.SubjectType.METRICS.name())));
 
     Map<String, String> refLinks = ConfigUtils.getMap(yamlConfigMap.get(PROP_REFERENCE_LINKS));
-    if (refLinks == null) {
-      refLinks = new HashMap<>();
-      yamlConfigMap.put(PROP_REFERENCE_LINKS, refLinks);
-    }
     if (refLinks.isEmpty()) {
       refLinks.put("How to label Anomalies?", "https://go/howtolabel");
       refLinks.put("ThirdEye User Guide", "https://go/thirdeyeuserguide");

@@ -65,7 +65,7 @@ public class DataSourcesLoader {
      String className = dataSourceConfig.getClassName();
      Map<String, Object> properties = dataSourceConfig.getProperties();
      try {
-       LOG.info("Creating thirdeye datasource {} with properties '{}'", className, properties);
+       LOG.info("Creating thirdeye datasource {}", className);
        Constructor<?> constructor = Class.forName(className).getConstructor(Map.class);
        ThirdEyeDataSource thirdeyeDataSource = (ThirdEyeDataSource) constructor.newInstance(properties);
        // use class simple name as key, this enforces that there cannot be more than one data source of the same type

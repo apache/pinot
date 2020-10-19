@@ -26,8 +26,12 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
+import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 
 
 /**
@@ -47,6 +51,29 @@ public class StarTreeBuilderUtils {
     public int _aggregatedDocId = INVALID_ID;
     public int _childDimensionId = INVALID_ID;
     public Map<Integer, TreeNode> _children;
+  }
+
+  /**
+   * Generates the deduplicated star-tree builder configs.
+   */
+  public static List<StarTreeV2BuilderConfig> generateBuilderConfigs(@Nullable List<StarTreeIndexConfig> indexConfigs,
+      boolean enableDefaultStarTree, SegmentMetadataImpl segmentMetadata) {
+    List<StarTreeV2BuilderConfig> builderConfigs = new ArrayList<>();
+    if (indexConfigs != null) {
+      for (StarTreeIndexConfig indexConfig : indexConfigs) {
+        StarTreeV2BuilderConfig builderConfig = StarTreeV2BuilderConfig.fromIndexConfig(indexConfig);
+        if (!builderConfigs.contains(builderConfig)) {
+          builderConfigs.add(builderConfig);
+        }
+      }
+    }
+    if (enableDefaultStarTree) {
+      StarTreeV2BuilderConfig defaultConfig = StarTreeV2BuilderConfig.generateDefaultConfig(segmentMetadata);
+      if (!builderConfigs.contains(defaultConfig)) {
+        builderConfigs.add(defaultConfig);
+      }
+    }
+    return builderConfigs;
   }
 
   /**

@@ -226,7 +226,7 @@ public class MetricComponentAnalysisPipeline extends Pipeline {
 
     DataFrame raw = DataFrameUtils.evaluateResponse(res, rc);
 
-    return raw.getDoubles(DataFrameUtils.COL_VALUE).doubleValue();
+    return raw.getDoubles(DataFrame.COL_VALUE).doubleValue();
   }
 
   private DataFrame getContribution(MetricSlice slice, String dimension) throws Exception {
@@ -238,8 +238,8 @@ public class MetricComponentAnalysisPipeline extends Pipeline {
 
     DataFrame out = new DataFrame();
     out.addSeries(dimension, raw.getStrings(dimension));
-    out.addSeries(COL_CONTRIB, raw.getDoubles(DataFrameUtils.COL_VALUE).normalizeSum());
-    out.addSeries(COL_RAW, raw.getDoubles(DataFrameUtils.COL_VALUE));
+    out.addSeries(COL_CONTRIB, raw.getDoubles(DataFrame.COL_VALUE).normalizeSum());
+    out.addSeries(COL_RAW, raw.getDoubles(DataFrame.COL_VALUE));
     out.setIndex(dimension);
 
     return out;

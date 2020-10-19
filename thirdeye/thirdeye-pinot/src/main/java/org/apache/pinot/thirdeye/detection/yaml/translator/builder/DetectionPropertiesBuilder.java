@@ -37,6 +37,7 @@ import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.algorithm.DimensionWrapper;
 import org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper;
 import org.apache.pinot.thirdeye.detection.wrapper.AnomalyFilterWrapper;
+import org.apache.pinot.thirdeye.detection.wrapper.AnomalyLabelerWrapper;
 import org.apache.pinot.thirdeye.detection.wrapper.BaselineFillingMergeWrapper;
 import org.apache.pinot.thirdeye.detection.wrapper.ChildKeepingMergeWrapper;
 import org.apache.pinot.thirdeye.detection.wrapper.EntityAnomalyMergeWrapper;
@@ -81,15 +82,26 @@ public class DetectionPropertiesBuilder extends DetectionConfigPropertiesBuilder
           subEntityName, metricUrn, detectionYamls, mergerProperties, datasetConfigDTO.bucketTimeGranularity());
 
       List<Map<String, Object>> filterYamls = ConfigUtils.getList(ruleYaml.get(PROP_FILTER));
-      if (filterYamls.isEmpty()) {
+      List<Map<String, Object>> labelerYamls = ConfigUtils.getList(ruleYaml.get(PROP_LABELER));
+      if (filterYamls.isEmpty() && labelerYamls.isEmpty()) {
+        // output detection properties if neither filter and labeler is configured
         nestedPipelines.addAll(detectionProperties);
       } else {
+        // wrap detection properties around with filter properties if a filter is configured
         List<Map<String, Object>> filterNestedProperties = detectionProperties;
         for (Map<String, Object> filterProperties : filterYamls) {
           filterNestedProperties = buildFilterWrapperProperties(metricUrn, AnomalyFilterWrapper.class.getName(), filterProperties,
               filterNestedProperties);
         }
-        nestedPipelines.addAll(filterNestedProperties);
+        if (labelerYamls.isEmpty()) {
+          // output filter properties if no labeler is configured
+          nestedPipelines.addAll(filterNestedProperties);
+        } else {
+          // wrap filter properties around with labeler properties if a labeler is configured
+          nestedPipelines.add(
+              buildLabelerWrapperProperties(metricUrn, AnomalyLabelerWrapper.class.getName(), labelerYamls.get(0),
+                  filterNestedProperties));
+        }
       }
     }
 
@@ -157,7 +169,7 @@ public class DetectionPropertiesBuilder extends DetectionConfigPropertiesBuilder
 
     fillInDetectorWrapperProperties(nestedProperties, yamlConfig, detectorType, datasetTimegranularity);
 
-    buildComponentSpec(metricUrn, yamlConfig, detectorType, detectorRefKey);
+    buildComponentSpec(metricUrn, yamlConfig, detectorRefKey);
 
     Map<String, Object> properties = new HashMap<>();
     properties.put(PROP_CLASS_NAME, BaselineFillingMergeWrapper.class.getName());
@@ -169,9 +181,8 @@ public class DetectionPropertiesBuilder extends DetectionConfigPropertiesBuilder
       // if the detector implements the baseline provider interface, use it to generate baseline
       properties.put(PROP_BASELINE_PROVIDER, detectorRefKey);
     } else {
-      String baselineProviderType = DEFAULT_BASELINE_PROVIDER_YAML_TYPE;
-      String baselineProviderKey = makeComponentRefKey(baselineProviderType, name);
-      buildComponentSpec(metricUrn, yamlConfig, baselineProviderType, baselineProviderKey);
+      String baselineProviderKey = makeComponentRefKey(DEFAULT_BASELINE_PROVIDER_YAML_TYPE, name);
+      buildComponentSpec(metricUrn, yamlConfig, baselineProviderKey);
       properties.put(PROP_BASELINE_PROVIDER, baselineProviderKey);
     }
     properties.putAll(mergerProperties);

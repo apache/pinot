@@ -67,17 +67,17 @@ public class GroupByCombineOperator extends BaseOperator<IntermediateResultsBloc
   private final List<Operator> _operators;
   private final QueryContext _queryContext;
   private final ExecutorService _executorService;
-  private final long _timeOutMs;
+  private final long _endTimeMs;
   // Limit on number of groups stored, beyond which no new group will be created
   private final int _innerSegmentNumGroupsLimit;
   private final int _interSegmentNumGroupsLimit;
 
   public GroupByCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService,
-      long timeOutMs, int innerSegmentNumGroupsLimit) {
+      long endTimeMs, int innerSegmentNumGroupsLimit) {
     _operators = operators;
     _queryContext = queryContext;
     _executorService = executorService;
-    _timeOutMs = timeOutMs;
+    _endTimeMs = endTimeMs;
     _innerSegmentNumGroupsLimit = innerSegmentNumGroupsLimit;
     _interSegmentNumGroupsLimit =
         (int) Math.min((long) innerSegmentNumGroupsLimit * INTER_SEGMENT_NUM_GROUPS_LIMIT_FACTOR, Integer.MAX_VALUE);
@@ -189,11 +189,12 @@ public class GroupByCombineOperator extends BaseOperator<IntermediateResultsBloc
     }
 
     try {
-      boolean opCompleted = operatorLatch.await(_timeOutMs, TimeUnit.MILLISECONDS);
+      long timeoutMs = _endTimeMs - System.currentTimeMillis();
+      boolean opCompleted = operatorLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
       if (!opCompleted) {
         // If this happens, the broker side should already timed out, just log the error and return
         String errorMessage = String
-            .format("Timed out while combining group-by results after %dms, queryContext = %s", _timeOutMs,
+            .format("Timed out while combining group-by results after %dms, queryContext = %s", timeoutMs,
                 _queryContext);
         LOGGER.error(errorMessage);
         return new IntermediateResultsBlock(new TimeoutException(errorMessage));
@@ -201,7 +202,7 @@ public class GroupByCombineOperator extends BaseOperator<IntermediateResultsBloc
 
       // Trim the results map.
       AggregationGroupByTrimmingService aggregationGroupByTrimmingService =
-          new AggregationGroupByTrimmingService(aggregationFunctions, _queryContext.getLimit());
+          new AggregationGroupByTrimmingService(_queryContext);
       List<Map<String, Object>> trimmedResults =
           aggregationGroupByTrimmingService.trimIntermediateResultsMap(resultsMap);
       IntermediateResultsBlock mergedBlock = new IntermediateResultsBlock(aggregationFunctions, trimmedResults, true);

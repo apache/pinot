@@ -19,30 +19,29 @@
 
 package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Inject;
 import com.google.inject.Singleton;
-import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
+import com.google.inject.persist.Transactional;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
-import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.pojo.DetectionConfigBean;
-import org.apache.pinot.thirdeye.detection.DetectionPipelineTaskInfo;
-import org.joda.time.DateTime;
-
-import com.google.inject.persist.Transactional;
+import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
+import org.apache.pinot.thirdeye.datalayer.dao.GenericPojoDao;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.DetectionConfigBean;
 import org.apache.pinot.thirdeye.datalayer.pojo.TaskBean;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
+import org.apache.pinot.thirdeye.detection.DetectionPipelineTaskInfo;
+import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,8 +77,9 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
 
   private static final Logger LOG = LoggerFactory.getLogger(TaskManagerImpl.class);
 
-  public TaskManagerImpl() {
-    super(TaskDTO.class, TaskBean.class);
+  @Inject
+  public TaskManagerImpl(GenericPojoDao genericPojoDao) {
+    super(TaskDTO.class, TaskBean.class, genericPojoDao);
   }
 
   public Long save(TaskDTO entity) {

@@ -38,8 +38,10 @@ public class SegmentGenerationJobSpec implements Serializable {
    *  'SegmentCreation'
    *  'SegmentTarPush'
    *  'SegmentUriPush'
+   *  'SegmentMetadataPush'
    *  'SegmentCreationAndTarPush'
    *  'SegmentCreationAndUriPush'
+   *  'SegmentCreationAndMetadataPush'
    */
   private String _jobType;
 
@@ -68,6 +70,11 @@ public class SegmentGenerationJobSpec implements Serializable {
    * Root directory of output segments, expected to have scheme configured in PinotFS.
    */
   private String _outputDirURI;
+
+  /**
+   * Segment creation job parallelism.
+   */
+  private int _segmentCreationJobParallelism;
 
   /**
    * Should overwrite output segments if existed.
@@ -231,6 +238,14 @@ public class SegmentGenerationJobSpec implements Serializable {
 
   public void setPushJobSpec(PushJobSpec pushJobSpec) {
     _pushJobSpec = pushJobSpec;
+  }
+
+  public int getSegmentCreationJobParallelism() {
+    return _segmentCreationJobParallelism;
+  }
+
+  public void setSegmentCreationJobParallelism(int segmentCreationJobParallelism) {
+    _segmentCreationJobParallelism = segmentCreationJobParallelism;
   }
 }
 

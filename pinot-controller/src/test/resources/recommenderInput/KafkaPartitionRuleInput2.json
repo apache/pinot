@@ -120,7 +120,7 @@
     }
   },
   "numKafkaPartitions": 16,
-  "numMessagesPerSecInKafKaTopic": 1000,
+  "numMessagesPerSecInKafkaTopic": 1000,
   "tableType": "HYBRID",
   "numRecordsPerPush":1000000000
 }

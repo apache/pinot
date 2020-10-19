@@ -37,6 +37,7 @@ import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
+import org.apache.pinot.core.startree.StarTreeBuilderUtils;
 import org.apache.pinot.core.startree.v2.StarTreeV2Constants;
 import org.apache.pinot.core.startree.v2.StarTreeV2Constants.MetadataKey;
 import org.apache.pinot.core.startree.v2.store.StarTreeIndexMapUtils;
@@ -58,14 +59,33 @@ import org.slf4j.LoggerFactory;
 public class MultipleTreesBuilder implements Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultipleTreesBuilder.class);
 
+  private final List<StarTreeV2BuilderConfig> _builderConfigs;
   private final BuildMode _buildMode;
   private final File _segmentDirectory;
   private final PropertiesConfiguration _metadataProperties;
   private final ImmutableSegment _segment;
-  private final List<StarTreeV2BuilderConfig> _builderConfigs = new ArrayList<>();
 
   public enum BuildMode {
     ON_HEAP, OFF_HEAP
+  }
+
+  /**
+   * Constructor for the multiple star-trees builder.
+   *
+   * @param builderConfigs List of builder configs (should already be deduplicated)
+   * @param indexDir Index directory
+   * @param buildMode Build mode (ON_HEAP or OFF_HEAP)
+   */
+  public MultipleTreesBuilder(List<StarTreeV2BuilderConfig> builderConfigs, File indexDir, BuildMode buildMode)
+      throws Exception {
+    Preconditions.checkArgument(CollectionUtils.isNotEmpty(builderConfigs), "Must provide star-tree builder configs");
+    _builderConfigs = builderConfigs;
+    _buildMode = buildMode;
+    _segmentDirectory = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
+    _metadataProperties =
+        CommonsConfigurationUtils.fromFile(new File(_segmentDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME));
+    Preconditions.checkState(!_metadataProperties.containsKey(MetadataKey.STAR_TREE_COUNT), "Star-tree already exists");
+    _segment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
   }
 
   /**
@@ -85,21 +105,11 @@ public class MultipleTreesBuilder implements Closeable {
     _segmentDirectory = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
     _metadataProperties =
         CommonsConfigurationUtils.fromFile(new File(_segmentDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME));
-    // TODO: Support removing/modifying star-trees
     Preconditions.checkState(!_metadataProperties.containsKey(MetadataKey.STAR_TREE_COUNT), "Star-tree already exists");
     _segment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
     try {
-      if (indexConfigs != null) {
-        for (StarTreeIndexConfig indexConfig : indexConfigs) {
-          _builderConfigs.add(StarTreeV2BuilderConfig.fromIndexConfig(indexConfig));
-        }
-      }
-      if (enableDefaultStarTree) {
-        StarTreeV2BuilderConfig defaultConfig =
-            StarTreeV2BuilderConfig.generateDefaultConfig((SegmentMetadataImpl) _segment.getSegmentMetadata());
-        LOGGER.info("Generated default star-tree config: {}", defaultConfig);
-        _builderConfigs.add(defaultConfig);
-      }
+      _builderConfigs = StarTreeBuilderUtils.generateBuilderConfigs(indexConfigs, enableDefaultStarTree,
+          (SegmentMetadataImpl) _segment.getSegmentMetadata());
     } catch (Exception e) {
       _segment.destroy();
       throw e;

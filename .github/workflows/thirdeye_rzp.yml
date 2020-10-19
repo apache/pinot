@@ -1,0 +1,70 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+name: Thirdeye RZP Builder
+
+on: [push]
+
+jobs:
+  cancel:
+    runs-on: [self-hosted]
+    name: Cancel Previous Runs
+    if: always()
+    steps:
+      - uses: styfle/cancel-workflow-action@d57d93c
+        if: github.ref != 'refs/heads/rzp-master'
+        name: cancel old workflows
+        id: cancel
+        with:
+          access_token: ${{ github.token }}
+      - if: github.ref == 'refs/heads/rzp-master'
+        name: Don't cancel old workflows
+        id: dont_cancel
+        run: |
+          echo "Don't cancel old workflow"
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up JDK 1.14
+        uses: actions/setup-java@v1
+        with:
+          java-version: '14.0.2'
+          architecture: x64
+      - name: Cache Maven packages
+        uses: actions/cache@v2
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+      - name: Install Base Packages
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends vim wget curl git automake bison flex g++ libboost-all-dev libevent-dev libssl-dev libtool make pkg-config nodejs 
+      - name: Build Thirdeye
+        #run: cd thirdeye && mvn -DskipTests -T 1C clean compile package && cd .. || exit 1
+        run: cd thirdeye && ./install.sh && cd ..|| exit 1
+      - name: Docker Push
+        uses: docker/build-push-action@v1
+        with:
+          dockerfile: docker/images/pinot-thirdeye/Dockerfile.java14
+          registry: c.rzp.io
+          repository: razorpay/thirdeye
+          username: ${{ secrets.HARBOR_DOCKER_USERNAME }}
+          password: ${{ secrets.HARBOR_DOCKER_PASSWORD }}
+          tags: ${{ github.sha }}
+

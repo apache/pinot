@@ -33,7 +33,7 @@ public class AggregationFunctionColumnPairTest {
     Assert.assertEquals(pair.getColumn(), AggregationFunctionColumnPair.STAR);
     String columnName = pair.toColumnName();
     Assert.assertEquals(columnName, "count__*");
-    AggregationFunctionColumnPair fromColumnName = AggregationFunctionColumnPair.fromColumnName(columnName);
+    AggregationFunctionColumnPair fromColumnName = AggregationFunctionColumnPair.fromColumnName("count__*");
     Assert.assertEquals(fromColumnName, pair);
     Assert.assertEquals(fromColumnName.hashCode(), pair.hashCode());
 
@@ -42,7 +42,7 @@ public class AggregationFunctionColumnPairTest {
     Assert.assertEquals(pair.getColumn(), COLUMN);
     columnName = pair.toColumnName();
     Assert.assertEquals(columnName, "min__column");
-    fromColumnName = AggregationFunctionColumnPair.fromColumnName(columnName);
+    fromColumnName = AggregationFunctionColumnPair.fromColumnName("MIN__column");
     Assert.assertEquals(fromColumnName, pair);
     Assert.assertEquals(fromColumnName.hashCode(), pair.hashCode());
 
@@ -51,7 +51,7 @@ public class AggregationFunctionColumnPairTest {
     Assert.assertEquals(pair.getColumn(), COLUMN);
     columnName = pair.toColumnName();
     Assert.assertEquals(columnName, "max__column");
-    fromColumnName = AggregationFunctionColumnPair.fromColumnName(columnName);
+    fromColumnName = AggregationFunctionColumnPair.fromColumnName("mAx__column");
     Assert.assertEquals(fromColumnName, pair);
     Assert.assertEquals(fromColumnName.hashCode(), pair.hashCode());
 
@@ -60,7 +60,7 @@ public class AggregationFunctionColumnPairTest {
     Assert.assertEquals(pair.getColumn(), COLUMN);
     columnName = pair.toColumnName();
     Assert.assertEquals(columnName, "sum__column");
-    fromColumnName = AggregationFunctionColumnPair.fromColumnName(columnName);
+    fromColumnName = AggregationFunctionColumnPair.fromColumnName("SuM__column");
     Assert.assertEquals(fromColumnName, pair);
     Assert.assertEquals(fromColumnName.hashCode(), pair.hashCode());
 
@@ -69,7 +69,7 @@ public class AggregationFunctionColumnPairTest {
     Assert.assertEquals(pair.getColumn(), COLUMN);
     columnName = pair.toColumnName();
     Assert.assertEquals(columnName, "distinctCountHLL__column");
-    fromColumnName = AggregationFunctionColumnPair.fromColumnName(columnName);
+    fromColumnName = AggregationFunctionColumnPair.fromColumnName("distinctCountHLL__column");
     Assert.assertEquals(fromColumnName, pair);
     Assert.assertEquals(fromColumnName.hashCode(), pair.hashCode());
 
@@ -78,7 +78,7 @@ public class AggregationFunctionColumnPairTest {
     Assert.assertEquals(pair.getColumn(), COLUMN);
     columnName = pair.toColumnName();
     Assert.assertEquals(columnName, "distinctCountRawHLL__column");
-    fromColumnName = AggregationFunctionColumnPair.fromColumnName(columnName);
+    fromColumnName = AggregationFunctionColumnPair.fromColumnName("distinct_count_raw_hll__column");
     Assert.assertEquals(fromColumnName, pair);
     Assert.assertEquals(fromColumnName.hashCode(), pair.hashCode());
 
@@ -87,7 +87,7 @@ public class AggregationFunctionColumnPairTest {
     Assert.assertEquals(pair.getColumn(), COLUMN);
     columnName = pair.toColumnName();
     Assert.assertEquals(columnName, "percentileEst__column");
-    fromColumnName = AggregationFunctionColumnPair.fromColumnName(columnName);
+    fromColumnName = AggregationFunctionColumnPair.fromColumnName("PERCENTILE_EST__column");
     Assert.assertEquals(fromColumnName, pair);
     Assert.assertEquals(fromColumnName.hashCode(), pair.hashCode());
 
@@ -96,7 +96,7 @@ public class AggregationFunctionColumnPairTest {
     Assert.assertEquals(pair.getColumn(), COLUMN);
     columnName = pair.toColumnName();
     Assert.assertEquals(columnName, "percentileTDigest__column");
-    fromColumnName = AggregationFunctionColumnPair.fromColumnName(columnName);
+    fromColumnName = AggregationFunctionColumnPair.fromColumnName("percentiletdigest__column");
     Assert.assertEquals(fromColumnName, pair);
     Assert.assertEquals(fromColumnName.hashCode(), pair.hashCode());
   }

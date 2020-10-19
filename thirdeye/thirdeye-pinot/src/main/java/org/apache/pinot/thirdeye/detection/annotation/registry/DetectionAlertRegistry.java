@@ -20,7 +20,6 @@
 package org.apache.pinot.thirdeye.detection.annotation.registry;
 
 import com.google.common.base.Preconditions;
-import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilter;
 import org.apache.pinot.thirdeye.detection.alert.scheme.DetectionAlertScheme;
 import org.apache.pinot.thirdeye.detection.alert.suppress.DetectionAlertSuppressor;
@@ -70,7 +69,7 @@ public class DetectionAlertRegistry {
    */
   private static void init() {
     try {
-      Reflections reflections = new Reflections();
+      Reflections reflections = new Reflections("org.apache.pinot.thirdeye.detection");
 
       // register alert filters
       Set<Class<? extends DetectionAlertFilter>> alertFilterClasses =

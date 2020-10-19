@@ -27,8 +27,14 @@ import static org.testng.Assert.assertTrue;
 public class FunctionDefinitionRegistryTest {
 
   @Test
-  public void testScalarFunction() {
+  public void testIsAggFunc() {
+    assertTrue(FunctionDefinitionRegistry.isAggFunc("count"));
     assertFalse(FunctionDefinitionRegistry.isAggFunc("toEpochSeconds"));
+  }
+
+  @Test
+  public void testIsTransformFunc() {
     assertTrue(FunctionDefinitionRegistry.isTransformFunc("toEpochSeconds"));
+    assertFalse(FunctionDefinitionRegistry.isTransformFunc("foo_bar"));
   }
 }

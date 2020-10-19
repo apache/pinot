@@ -19,6 +19,9 @@
 
 package org.apache.pinot.thirdeye.datalayer.util;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.collect.BiMap;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -35,30 +38,26 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import javax.inject.Inject;
+import javax.inject.Singleton;
+import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
+import org.apache.pinot.thirdeye.datalayer.entity.AbstractEntity;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.config.Configuration.AccessLevel;
 import org.modelmapper.convention.NameTokenizers;
 
-import com.google.common.collect.BiMap;
-import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
-import org.apache.pinot.thirdeye.datalayer.entity.AbstractEntity;
-
+@Singleton
 public class GenericResultSetMapper {
 
-  ModelMapper modelMapper = new ModelMapper();
-  private EntityMappingHolder entityMappingHolder;
+  private final ModelMapper modelMapper = new ModelMapper();
+  private final EntityMappingHolder entityMappingHolder;
 
   {
     modelMapper.getConfiguration().setSourceNameTokenizer(NameTokenizers.CAMEL_CASE)
         .setFieldMatchingEnabled(true).setFieldAccessLevel(AccessLevel.PRIVATE);
-    //    modelMapper.getConfiguration().setSourceNameTokenizer(NameTokenizers.UNDERSCORE)
-    //        .setMatchingStrategy(MatchingStrategies.LOOSE)
-    //        .setDestinationNameTokenizer(NameTokenizers.UNDERSCORE);
   }
 
+  @Inject
   public GenericResultSetMapper(EntityMappingHolder entityMappingHolder) {
     this.entityMappingHolder = entityMappingHolder;
   }
@@ -76,8 +75,6 @@ public class GenericResultSetMapper {
       Class<E> entityClass) throws Exception {
     return toEntityList(rs, entityClass);
   }
-
-
 
   private <E extends AbstractEntity> List<E> toEntityList(ResultSet rs,
       Class<E> entityClass) throws Exception {

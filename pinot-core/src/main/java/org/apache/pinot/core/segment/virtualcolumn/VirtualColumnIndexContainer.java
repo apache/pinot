@@ -25,6 +25,7 @@ import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReaderImpl;
+import org.apache.pinot.core.segment.index.readers.TextIndexReader;
 
 
 /**
@@ -58,7 +59,7 @@ public class VirtualColumnIndexContainer implements ColumnIndexContainer {
   }
 
   @Override
-  public InvertedIndexReader<?> getTextIndex() {
+  public TextIndexReader getTextIndex() {
     return null;
   }
 

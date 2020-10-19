@@ -5,15 +5,5 @@ coverage:
     - pinot-perf/.*
     - pinot-hadoop/.*
     # Ignore all the auto generated files.
-    - pinot-common/src/main/java/com/linkedin/pinot/common/request/AggregationInfo.java
-    - pinot-common/src/main/java/com/linkedin/pinot/common/request/BrokerRequest.java
-    - pinot-common/src/main/java/com/linkedin/pinot/common/request/FilterOperator.java
-    - pinot-common/src/main/java/com/linkedin/pinot/common/request/FilterQuery.java
-    - pinot-common/src/main/java/com/linkedin/pinot/common/request/FilterQueryMap.java
-    - pinot-common/src/main/java/com/linkedin/pinot/common/request/GroupBy.java
-    - pinot-common/src/main/java/com/linkedin/pinot/common/request/InstanceRequest.java
-    - pinot-common/src/main/java/com/linkedin/pinot/common/request/QuerySource.java
-    - pinot-common/src/main/java/com/linkedin/pinot/common/request/QueryType.java
-    - pinot-common/src/main/java/com/linkedin/pinot/common/request/Selection.java
-    - pinot-common/src/main/java/com/linkedin/pinot/common/request/SelectionSort.java
-    - pinot-common/src/main/java/com/linkedin/pinot/common/response/ProcessingException.java
+    - pinot-common/src/main/java/org/apache/pinot/common/request/*.java
+    - pinot-common/src/main/java/org/apache/pinot/common/response/ProcessingException.java

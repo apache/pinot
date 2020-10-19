@@ -35,7 +35,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants.Server;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
@@ -304,7 +304,6 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       _indexSegment.destroy();
     }
   }
-
 
   /**
    * Test DISTINCT query within a single segment.
@@ -759,6 +758,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     };
     testDistinctInterSegmentHelper(pqlQueries, sqlQueries);
   }
+
   /**
    * Helper method to query 2 servers with different segments. Server0 will have 2 copies of segment0; Server1 will have
    * 2 copies of segment1.
@@ -768,10 +768,10 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     // Server side
     DataTable instanceResponse0 = PLAN_MAKER
         .makeInstancePlan(Arrays.asList(segment0, segment0), queryContext, EXECUTOR_SERVICE,
-            CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS).execute();
+            System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS).execute();
     DataTable instanceResponse1 = PLAN_MAKER
         .makeInstancePlan(Arrays.asList(segment1, segment1), queryContext, EXECUTOR_SERVICE,
-            CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS).execute();
+            System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS).execute();
 
     // Broker side
     BrokerReduceService brokerReduceService = new BrokerReduceService();

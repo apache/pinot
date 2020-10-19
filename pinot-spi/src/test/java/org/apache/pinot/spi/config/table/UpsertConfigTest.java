@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.spi.config.table;
 
-import com.google.common.collect.ImmutableList;
-import java.util.Collections;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -30,40 +28,12 @@ public class UpsertConfigTest {
 
   @Test
   public void testUpsertConfig() {
-    UpsertConfig upsertConfig =
-        new UpsertConfig(Collections.singletonList("primaryKey"), "offset", "validFrom", "validUntil");
-    assertEquals(upsertConfig.getPrimaryKeyColumns(), Collections.singletonList("primaryKey"));
-    assertEquals(upsertConfig.getOffsetColumn(), "offset");
-    assertEquals(upsertConfig.getValidFromColumn(), "validFrom");
-    assertEquals(upsertConfig.getValidUntilColumn(), "validUntil");
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    assertEquals(upsertConfig.getMode(), UpsertConfig.Mode.FULL);
 
     // Test illegal arguments
     try {
-      new UpsertConfig(null, "offset", "validFrom", "validUntil");
-      fail();
-    } catch (IllegalArgumentException e) {
-      // Expected
-    }
-    try {
-      new UpsertConfig(ImmutableList.of("pk1", "pk2"), "offset", "validFrom", "validUntil");
-      fail();
-    } catch (IllegalArgumentException e) {
-      // Expected
-    }
-    try {
-      new UpsertConfig(ImmutableList.of("pk1"), null, "validFrom", "validUntil");
-      fail();
-    } catch (IllegalArgumentException e) {
-      // Expected
-    }
-    try {
-      new UpsertConfig(ImmutableList.of("pk1"), "offset", null, "validUntil");
-      fail();
-    } catch (IllegalArgumentException e) {
-      // Expected
-    }
-    try {
-      new UpsertConfig(ImmutableList.of("pk1"), "offset", "validFrom", null);
+      new UpsertConfig(UpsertConfig.Mode.PARTIAL);
       fail();
     } catch (IllegalArgumentException e) {
       // Expected

@@ -27,7 +27,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -60,9 +59,6 @@ import org.apache.pinot.thirdeye.detection.spi.model.EventSlice;
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-
 
 public class DefaultDataProvider implements DataProvider {
   private static final Logger LOG = LoggerFactory.getLogger(DefaultDataProvider.class);
@@ -131,7 +127,9 @@ public class DefaultDataProvider implements DataProvider {
       for (MetricSlice slice : slices) {
         DataFrame result = futures.get(slice).get(DetectionUtils.makeTimeout(deadline), TimeUnit.MILLISECONDS);
         // fill in time stamps
-        result.dropSeries(COL_TIME).addSeries(COL_TIME, LongSeries.fillValues(result.size(), slice.getStart())).setIndex(COL_TIME);
+        result.dropSeries(DataFrame.COL_TIME).addSeries(
+            DataFrame.COL_TIME, LongSeries.fillValues(result.size(), slice.getStart())).setIndex(
+            DataFrame.COL_TIME);
         output.put(slice, result);
       }
       return output;
@@ -215,7 +213,7 @@ public class DefaultDataProvider implements DataProvider {
   }
 
   @Override
-  public DetectionPipeline loadPipeline(DetectionConfigDTO config, long start, long end) throws Exception {
+  public DetectionPipeline loadPipeline(DetectionConfigDTO config, long start, long end) {
     return this.loader.from(this, config, start, end);
   }
 

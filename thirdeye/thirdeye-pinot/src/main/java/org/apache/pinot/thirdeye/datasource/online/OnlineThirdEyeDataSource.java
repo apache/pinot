@@ -22,11 +22,14 @@ package org.apache.pinot.thirdeye.datasource.online;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Multimap;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.datalayer.bao.OnlineDetectionDataManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.OnlineDetectionDataDTO;
 import org.apache.pinot.thirdeye.datasource.*;
 import org.apache.pinot.thirdeye.datasource.pinot.resultset.*;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
@@ -44,10 +47,11 @@ import java.util.LinkedHashMap;
 import java.util.Collection;
 
 public class OnlineThirdEyeDataSource implements ThirdEyeDataSource {
-  public static final String DATA_SOURCE_NAME = OnlineThirdEyeDataSource.class.getSimpleName();
   static final Logger LOG = LoggerFactory.getLogger(OnlineThirdEyeDataSource.class);
-  private static final String ONLINE = "Online";
 
+  public static final String DATA_SOURCE_NAME = OnlineThirdEyeDataSource.class.getSimpleName();
+  private static final String ONLINE = "Online";
+  private final OnlineDetectionDataManager onlineDetectionDataDAO;
   Map<String, DataFrame> dataSets;
 
   /**
@@ -57,6 +61,8 @@ public class OnlineThirdEyeDataSource implements ThirdEyeDataSource {
    */
   public OnlineThirdEyeDataSource(Map<String, Object> properties) {
     LOG.info("Initializing online datasource with prop: " + properties);
+
+    this.onlineDetectionDataDAO = DAORegistry.getInstance().getOnlineDetectionDataManager();
   }
 
   private static DateTime convertStringToDate(final String str, String tz, String dateFormat) {
@@ -80,27 +86,34 @@ public class OnlineThirdEyeDataSource implements ThirdEyeDataSource {
         new LinkedHashMap<>();
 
     // Retrieve online data from database
-    // TODO: should retrieve online from a new table
     MetricFunction metricFunction = request.getMetricFunctions().get(0);
     MetricConfigDTO metricConfig = metricFunction.getMetricConfig();
-    String onlineData = metricConfig.getOnlineData();
 
     String dataset = metricFunction.getDataset();
     DatasetConfigDTO datasetConfig = ThirdEyeUtils.getDatasetConfigFromName(dataset);
     TimeSpec dataTimeSpec = ThirdEyeUtils.getTimestampTimeSpecFromDatasetConfig(datasetConfig);
 
+    List<OnlineDetectionDataDTO> onlineDetectionDataDTOs
+        = onlineDetectionDataDAO.findByDatasetAndMetric(dataset, metricConfig.getName());
+    Preconditions.checkState(onlineDetectionDataDTOs.size()==1,
+        String.format("Find %d online data", onlineDetectionDataDTOs.size()));
+    String onlineDetectionData = onlineDetectionDataDTOs.get(0).getOnlineDetectionData();
+
+    String timeColumnName = datasetConfig.getTimeColumn();
+    String metricColumnName = metricConfig.getName();
+
     Multimap<String, String> decoratedFilterSet = request.getFilterSet();
 
     List<String> columnNameWithDataType = new ArrayList<>();
-    columnNameWithDataType.add(datasetConfig.getTimeColumn() + ":STRING");
-    columnNameWithDataType.add(metricConfig.getName() + ":STRING");
+    columnNameWithDataType.add(timeColumnName + ":STRING");
+    columnNameWithDataType.add(metricColumnName + ":STRING");
     DataFrame.Builder dfBuilder = DataFrame.builder(columnNameWithDataType);
 
     // Find time/metric/filtering column indices
     int totalColumnCount = 2; // Currently only support default settings: <date, online_metric>
     String[] columnsOfTheRow;
     ObjectMapper objectMapper = new ObjectMapper();
-    JsonNode rootNode = objectMapper.readTree(onlineData);
+    JsonNode rootNode = objectMapper.readTree(onlineDetectionData);
     ArrayNode columnsNode = (ArrayNode) rootNode.path("columns");
     ArrayNode rowsNode = (ArrayNode) rootNode.path("rows");
 
@@ -110,9 +123,9 @@ public class OnlineThirdEyeDataSource implements ThirdEyeDataSource {
       int idx = 0;
       for (JsonNode columnNode : columnsNode) {
         String columnName = columnNode.textValue();
-        if (columnName.equals(datasetConfig.getTimeColumn()))
+        if (columnName.equals(timeColumnName))
           timeColIdx = idx;
-        else if (columnName.equals(metricConfig.getName()))
+        else if (columnName.equals(metricColumnName))
           metricColIdx = idx;
         if (decoratedFilterSet.keySet().contains(columnName))
           colNameToFilterColIndices.put(columnName, idx);
@@ -160,9 +173,9 @@ public class OnlineThirdEyeDataSource implements ThirdEyeDataSource {
 
     // Create resultSetGroup
     List<String> groupKeyColumnNames = new ArrayList<>();
-    groupKeyColumnNames.add(datasetConfig.getTimeColumn());
+    groupKeyColumnNames.add(timeColumnName);
     List<String> metricColumnNames = new ArrayList<>();
-    metricColumnNames.add(metricConfig.getName());
+    metricColumnNames.add(metricColumnName);
     ThirdEyeResultSetMetaData thirdEyeResultSetMetaData =
         new ThirdEyeResultSetMetaData(groupKeyColumnNames, metricColumnNames);
 

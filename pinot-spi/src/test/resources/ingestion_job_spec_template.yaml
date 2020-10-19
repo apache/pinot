@@ -28,6 +28,7 @@ includeFileNamePattern: 'glob:**/*.parquet'
 excludeFileNamePattern: 'glob:**/*.avro'
 outputDirURI: 'file:///path/to/output/${year}/${month}/${day}'
 overwriteOutput: true
+segmentCreationJobParallelism: 100
 pinotFSSpecs:
   - scheme: file
     className: org.apache.pinot.spi.filesystem.LocalPinotFS

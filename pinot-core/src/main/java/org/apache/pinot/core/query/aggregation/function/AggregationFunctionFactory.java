@@ -117,6 +117,8 @@ public class AggregationFunctionFactory {
             return new MaxAggregationFunction(firstArgument);
           case SUM:
             return new SumAggregationFunction(firstArgument);
+          case SUMPRECISION:
+            return new SumPrecisionAggregationFunction(arguments);
           case AVG:
             return new AvgAggregationFunction(firstArgument);
           case MINMAXRANGE:
@@ -137,6 +139,8 @@ public class AggregationFunctionFactory {
             return new DistinctCountThetaSketchAggregationFunction(arguments);
           case DISTINCTCOUNTRAWTHETASKETCH:
             return new DistinctCountRawThetaSketchAggregationFunction(arguments);
+          case IDSET:
+            return new IdSetAggregationFunction(arguments);
           case COUNTMV:
             return new CountMVAggregationFunction(firstArgument);
           case MINMV:

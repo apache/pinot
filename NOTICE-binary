@@ -19,25 +19,13 @@ This product includes software developed at
 The Apache Software Foundation (http://www.apache.org/).
 
 Apache Commons Configuration
-Copyright 2001-2008 The Apache Software Foundation
-
-This product includes software developed by
-The Apache Software Foundation (http://www.apache.org/).
-
-Apache Commons Collections
-Copyright 2001-2008 The Apache Software Foundation
-
-Apache Jakarta Commons Digester
-Copyright 2001-2006 The Apache Software Foundation
-
-Apache Commons BeanUtils
-Copyright 2000-2010 The Apache Software Foundation
-
-Apache Commons BeanUtils
-Copyright 2000-2008 The Apache Software Foundation
+Copyright 2001-2013 The Apache Software Foundation
 
 Apache Commons Codec
 Copyright 2002-2011 The Apache Software Foundation
+
+This product includes software developed by
+The Apache Software Foundation (http://www.apache.org/).
 
 --------------------------------------------------------------------------------
 src/test/org/apache/commons/codec/language/DoubleMetaphoneTest.java contains 
@@ -62,6 +50,9 @@ Copyright 2001-2016 The Apache Software Foundation
 
 This product includes software from the Spring Framework,
 under the Apache License 2.0 (see: StringUtils.containsWhitespace())
+
+Apache Commons Collections
+Copyright 2001-2008 The Apache Software Foundation
 
 Apache Log4j SLF4J Binding
 Copyright 1999-2019 The Apache Software Foundation
@@ -99,6 +90,17 @@ A list of contributors may be found from CREDITS file, which is included
 in some artifacts (usually source distributions); but is always available
 from the source code management (SCM) system project uses.
 
+Apache Avro
+Copyright 2009-2014 The Apache Software Foundation
+
+This product currently only contains code developed by authors
+of specific components, as identified by the source code files;
+if such notes are missing files have been created by
+Tatu Saloranta.
+
+For additional credits (generally to people who reported problems)
+see CREDITS file.
+
 Apache Groovy
 Copyright 2003-2017 The Apache Software Foundation
 
@@ -114,10 +116,10 @@ Apache HttpClient Mime
 Copyright 1999-2017 The Apache Software Foundation
 
 Apache HttpClient
-Copyright 1999-2017 The Apache Software Foundation
+Copyright 1999-2019 The Apache Software Foundation
 
 Apache HttpCore
-Copyright 2005-2017 The Apache Software Foundation
+Copyright 2005-2018 The Apache Software Foundation
 
 Calcite Core
 Copyright 2012-2019 The Apache Software Foundation
@@ -138,7 +140,12 @@ Apache Jakarta HttpClient
 Copyright 1999-2007 The Apache Software Foundation
 
 Apache Commons Compress
-Copyright 2002-2014 The Apache Software Foundation
+Copyright 2002-2020 The Apache Software Foundation
+
+This product includes software developed at
+The Apache Software Foundation (https://www.apache.org/).
+
+---
 
 The files in the package org.apache.commons.compress.archivers.sevenz
 were derived from the LZMA SDK, version 9.20 (C/ and CPP/7zip/),
@@ -146,16 +153,48 @@ which has been placed in the public domain:
 
 "LZMA SDK is placed in the public domain." (http://www.7-zip.org/sdk.html)
 
+The test file lbzip2_32767.bz2 has been copied from libbzip2's source
+repository:
+
+This program, "bzip2", the associated library "libbzip2", and all
+documentation, are copyright (C) 1996-2019 Julian R Seward.  All
+rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+
+1. Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+
+2. The origin of this software must not be misrepresented; you must 
+   not claim that you wrote the original software.  If you use this 
+   software in a product, an acknowledgment in the product 
+   documentation would be appreciated but is not required.
+
+3. Altered source versions must be plainly marked as such, and must
+   not be misrepresented as being the original software.
+
+4. The name of the author may not be used to endorse or promote 
+   products derived from this software without specific prior written 
+   permission.
+
+THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS
+OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+Julian Seward, jseward@acm.org
+
 Apache Helix :: Core
 Copyright 2020 The Apache Software Foundation
-
-This product currently only contains code developed by authors
-of specific components, as identified by the source code files;
-if such notes are missing files have been created by
-Tatu Saloranta.
-
-For additional credits (generally to people who reported problems)
-see CREDITS file.
 
                             The Netty Project
                             =================
@@ -564,9 +603,6 @@ Copyright 2015 The Apache Software Foundation
 Apache Parquet Format (Incubating)
 Copyright 2015 The Apache Software Foundation
 
-Apache Avro
-Copyright 2009-2014 The Apache Software Foundation
-
 Apache Log4j Core
 Copyright 1999-2012 Apache Software Foundation
 
@@ -637,5 +673,4 @@ Copyright 2010 CS Systèmes d'Information
 The creation of the package "o.a.c.m.analysis.integration.gauss" was inspired
 by an original code donated by Sébastien Brisard.
 ===============================================================================
-
 

@@ -18,35 +18,22 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.Base64;
 import java.util.List;
-import java.util.Map;
-import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.datasketches.theta.Sketch;
 import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.spi.utils.ByteArray;
-
-import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.BYTES;
 
 
 /**
- * A variation of the {@link DistinctCountThetaSketchAggregationFunction} that returns the serialized bytes
- * of the theta-sketch, as opposed to the actual distinct value.
- *
- * Note: It would have been natural for this class to extend the {@link DistinctCountThetaSketchAggregationFunction},
- * except that the return type for this class is a String, as opposed to Integer for the former, due to which the
- * extension is not possible.
+ * The {@code DistinctCountRawThetaSketchAggregationFunction} shares the same usage as the
+ * {@link DistinctCountThetaSketchAggregationFunction}, and returns the sketch as a base64 encoded string.
  */
-public class DistinctCountRawThetaSketchAggregationFunction implements AggregationFunction<Map<String, Sketch>, ByteArray> {
-  private final DistinctCountThetaSketchAggregationFunction _thetaSketchAggregationFunction;
+public class DistinctCountRawThetaSketchAggregationFunction extends DistinctCountThetaSketchAggregationFunction {
 
-  public DistinctCountRawThetaSketchAggregationFunction(List<ExpressionContext> arguments)
-      throws SqlParseException {
-    _thetaSketchAggregationFunction = new DistinctCountThetaSketchAggregationFunction(arguments);
+  public DistinctCountRawThetaSketchAggregationFunction(List<ExpressionContext> arguments) {
+    super(arguments);
   }
 
   @Override
@@ -55,81 +42,16 @@ public class DistinctCountRawThetaSketchAggregationFunction implements Aggregati
   }
 
   @Override
-  public String getColumnName() {
-    return _thetaSketchAggregationFunction.getColumnName();
+  public ColumnDataType getFinalResultColumnType() {
+    return ColumnDataType.STRING;
   }
 
   @Override
-  public String getResultColumnName() {
-    return _thetaSketchAggregationFunction.getResultColumnName();
-  }
+  public String extractFinalResult(List<Sketch> sketches) {
+    Sketch sketch = evaluatePostAggregationExpression(sketches);
 
-  @Override
-  public List<ExpressionContext> getInputExpressions() {
-    return _thetaSketchAggregationFunction.getInputExpressions();
-  }
-
-  @Override
-  public AggregationResultHolder createAggregationResultHolder() {
-    return _thetaSketchAggregationFunction.createAggregationResultHolder();
-  }
-
-  @Override
-  public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity) {
-    return _thetaSketchAggregationFunction.createGroupByResultHolder(initialCapacity, maxCapacity);
-  }
-
-  @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-      Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    _thetaSketchAggregationFunction.aggregate(length, aggregationResultHolder, blockValSetMap);
-  }
-
-  @Override
-  public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    _thetaSketchAggregationFunction.aggregateGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSetMap);
-  }
-
-  @Override
-  public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    _thetaSketchAggregationFunction.aggregateGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSetMap);
-  }
-
-  @Override
-  public Map<String, Sketch> extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    return _thetaSketchAggregationFunction.extractAggregationResult(aggregationResultHolder);
-  }
-
-  @Override
-  public Map<String, Sketch> extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    return _thetaSketchAggregationFunction.extractGroupByResult(groupByResultHolder, groupKey);
-  }
-
-  @Override
-  public Map<String, Sketch> merge(Map<String, Sketch> intermediateResult1, Map<String, Sketch> intermediateResult2) {
-    return _thetaSketchAggregationFunction.merge(intermediateResult1, intermediateResult2);
-  }
-
-  @Override
-  public boolean isIntermediateResultComparable() {
-    return _thetaSketchAggregationFunction.isIntermediateResultComparable();
-  }
-
-  @Override
-  public DataSchema.ColumnDataType getIntermediateResultColumnType() {
-    return _thetaSketchAggregationFunction.getIntermediateResultColumnType();
-  }
-
-  @Override
-  public DataSchema.ColumnDataType getFinalResultColumnType() {
-    return BYTES;
-  }
-
-  @Override
-  public ByteArray extractFinalResult(Map<String, Sketch> intermediateResult) {
-    Sketch finalSketch = _thetaSketchAggregationFunction.extractFinalSketch(intermediateResult);
-    return new ByteArray(finalSketch.compact().toByteArray());
+    // NOTE: Compact the sketch in unsorted, on-heap fashion for performance concern.
+    //       See https://datasketches.apache.org/docs/Theta/ThetaSize.html for more details.
+    return Base64.getEncoder().encodeToString(sketch.compact(false, null).toByteArray());
   }
 }

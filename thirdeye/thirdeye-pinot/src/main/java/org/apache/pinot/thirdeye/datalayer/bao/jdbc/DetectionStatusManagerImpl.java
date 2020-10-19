@@ -19,16 +19,13 @@
 
 package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Inject;
 import com.google.inject.Singleton;
-import java.sql.Timestamp;
 import java.util.Collections;
 import java.util.List;
-
 import org.apache.commons.collections4.CollectionUtils;
-import org.joda.time.DateTime;
-
-import com.google.inject.persist.Transactional;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionStatusManager;
+import org.apache.pinot.thirdeye.datalayer.dao.GenericPojoDao;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionStatusDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.DetectionStatusBean;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
@@ -37,8 +34,9 @@ import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 public class DetectionStatusManagerImpl extends AbstractManagerImpl<DetectionStatusDTO>
     implements DetectionStatusManager {
 
-  public DetectionStatusManagerImpl() {
-    super(DetectionStatusDTO.class, DetectionStatusBean.class);
+  @Inject
+  public DetectionStatusManagerImpl(GenericPojoDao genericPojoDao) {
+    super(DetectionStatusDTO.class, DetectionStatusBean.class, genericPojoDao);
   }
 
   @Override

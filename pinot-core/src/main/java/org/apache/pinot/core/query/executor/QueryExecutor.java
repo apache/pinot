@@ -18,12 +18,13 @@
  */
 package org.apache.pinot.core.query.executor;
 
+import io.grpc.stub.StreamObserver;
 import java.util.concurrent.ExecutorService;
-
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
@@ -53,7 +54,24 @@ public interface QueryExecutor {
   void shutDown();
 
   /**
-   * Processes the query with the given executor service.
+   * Processes the non-streaming query with the given executor service.
    */
-  DataTable processQuery(ServerQueryRequest queryRequest, ExecutorService executorService);
+  default DataTable processQuery(ServerQueryRequest queryRequest, ExecutorService executorService) {
+    return processQuery(queryRequest, executorService, null);
+  }
+
+  /**
+   * Processes the query (streaming or non-streaming) with the given executor service.
+   * <ul>
+   *   <li>
+   *     For streaming request, the returned DataTable contains only the metadata. The response is streamed back via the
+   *     observer.
+   *   </li>
+   *   <li>
+   *     For non-streaming request, the returned DataTable contains both data and metadata.
+   *   </li>
+   * </ul>
+   */
+  DataTable processQuery(ServerQueryRequest queryRequest, ExecutorService executorService,
+      @Nullable StreamObserver<Server.ServerResponse> responseObserver);
 }

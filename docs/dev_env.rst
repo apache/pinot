@@ -83,6 +83,9 @@ To import the Pinot stylesheet this launch intellij and navigate to ``Preference
 
 .. figure:: img/import_scheme.png
 
+* Pinot uses TestNG for unit testing, thus to enable intellij to use them, make sure you have the testNG plugin
+installed and enabled.
+
 Eclipse
 ^^^^^^^
 To import the Pinot stylesheet this launch eclipse and navigate to ``Preferences`` (on Mac) or ``Settings`` on Linux.

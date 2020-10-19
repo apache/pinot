@@ -20,6 +20,8 @@ package org.apache.pinot.common.metrics;
 
 import com.yammer.metrics.core.MetricsRegistry;
 import com.yammer.metrics.reporting.JmxReporter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -27,8 +29,12 @@ import com.yammer.metrics.reporting.JmxReporter;
  *
  */
 public class JmxReporterMetricsRegistryRegistrationListener implements MetricsRegistryRegistrationListener {
+  private static final Logger LOGGER = LoggerFactory.getLogger(JmxReporterMetricsRegistryRegistrationListener.class);
+
   @Override
   public void onMetricsRegistryRegistered(MetricsRegistry metricsRegistry) {
+    LOGGER.info("Registering JmxReporterMetricsRegistryRegistrationListener");
     new JmxReporter(metricsRegistry).start();
+    LOGGER.info("Number of metrics in metricsRegistry: {}", metricsRegistry.allMetrics().size());
   }
 }

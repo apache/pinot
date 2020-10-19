@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -114,22 +115,22 @@ public class BrokerRequestToQueryContextConverter {
         List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
         selectExpressions = new ArrayList<>(aggregationsInfo.size());
         for (AggregationInfo aggregationInfo : aggregationsInfo) {
-          String functionName = aggregationInfo.getAggregationType();
+          String functionName = StringUtils.remove(aggregationInfo.getAggregationType(), '_');
           List<String> stringExpressions = aggregationInfo.getExpressions();
           int numArguments = stringExpressions.size();
           List<ExpressionContext> arguments = new ArrayList<>(numArguments);
-          if (functionName.equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNTTHETASKETCH.getName()) || functionName
-              .equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNTRAWTHETASKETCH.getName())) {
-            // NOTE: For DistinctCountThetaSketch and DistinctCountRawThetaSketch, because of the legacy behavior of PQL
-            //       compiler treating string literal as identifier in aggregation, here we treat all expressions except
-            //       for the first one as string literal.
+          if (functionName.equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {
+            // For DISTINCT query, all arguments are expressions
+            for (String expression : stringExpressions) {
+              arguments.add(QueryContextConverterUtils.getExpression(expression));
+            }
+          } else {
+            // For non-DISTINCT query, only the first argument is expression, others are literals
+            // NOTE: We directly use the string as the literal value because of the legacy behavior of PQL compiler
+            //       treating string literal as identifier in the aggregation function.
             arguments.add(QueryContextConverterUtils.getExpression(stringExpressions.get(0)));
             for (int i = 1; i < numArguments; i++) {
               arguments.add(ExpressionContext.forLiteral(stringExpressions.get(i)));
-            }
-          } else {
-            for (String expression : stringExpressions) {
-              arguments.add(QueryContextConverterUtils.getExpression(expression));
             }
           }
           FunctionContext function = new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, arguments);

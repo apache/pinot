@@ -19,14 +19,16 @@
 
 package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Inject;
 import com.google.inject.Singleton;
-import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
-import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dao.GenericPojoDao;
+import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
 
 @Singleton
 public class AlertConfigManagerImpl extends AbstractManagerImpl<AlertConfigDTO>
@@ -35,8 +37,9 @@ public class AlertConfigManagerImpl extends AbstractManagerImpl<AlertConfigDTO>
   private static final String FIND_BY_NAME_EQUALS = " WHERE name = :name";
   private static final String FIND_BY_APPLICATION_LIKE = " WHERE application like :application";
 
-  public AlertConfigManagerImpl() {
-    super(AlertConfigDTO.class, AlertConfigBean.class);
+  @Inject
+  public AlertConfigManagerImpl(GenericPojoDao genericPojoDao) {
+    super(AlertConfigDTO.class, AlertConfigBean.class, genericPojoDao);
   }
 
   @Override

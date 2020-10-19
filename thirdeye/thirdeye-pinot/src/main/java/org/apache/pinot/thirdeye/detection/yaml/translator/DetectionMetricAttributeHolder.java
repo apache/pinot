@@ -110,7 +110,7 @@ public class DetectionMetricAttributeHolder {
     components.put(componentKey, componentSpecs);
   }
 
-  public Map<String, Object> getAllComponenets() {
+  public Map<String, Object> getAllComponents() {
     return components;
   }
 

@@ -71,7 +71,7 @@ public class DetectionRegistry {
    */
   private static void init() {
     try {
-      Reflections reflections = new Reflections();
+      Reflections reflections = new Reflections("org.apache.pinot.thirdeye.detection");
       // register components
       Set<Class<? extends BaseComponent>> classes = reflections.getSubTypesOf(BaseComponent.class);
       for (Class<? extends BaseComponent> clazz : classes) {

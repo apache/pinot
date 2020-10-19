@@ -19,7 +19,8 @@
 
 import { AxiosResponse } from 'axios';
 import { TableData, Instances, Instance, Tenants, ClusterConfig, TableName, TableSize,
-  IdealState, QueryTables, TableSchema, SQLResult, ClusterName, ZKGetList, ZKConfig
+  IdealState, QueryTables, TableSchema, SQLResult, ClusterName, ZKGetList, ZKConfig, ZKOperationResponsne,
+  BrokerList, ServerList
 } from 'Models';
 import { baseApi } from '../utils/axios-config';
 
@@ -56,8 +57,8 @@ export const getInstance = (name: string): Promise<AxiosResponse<Instance>> =>
 export const getClusterConfig = (): Promise<AxiosResponse<ClusterConfig>> =>
   baseApi.get('/cluster/configs');
 
-export const getQueryTables = (): Promise<AxiosResponse<QueryTables>> =>
-  baseApi.get('/tables');
+export const getQueryTables = (type?: string): Promise<AxiosResponse<QueryTables>> =>
+  baseApi.get(`/tables${type ? "?type="+type: ""}`);
 
 export const getTableSchema = (name: string): Promise<AxiosResponse<TableSchema>> =>
   baseApi.get(`/tables/${name}/schema`);
@@ -79,3 +80,15 @@ export const zookeeperGetStat = (params: string): Promise<AxiosResponse<ZKConfig
 
 export const zookeeperGetListWithStat = (params: string): Promise<AxiosResponse<ZKConfig>> =>
   baseApi.get(`/zk/lsl?path=${params}`);
+
+export const zookeeperPutData = (params: string): Promise<AxiosResponse<ZKOperationResponsne>> =>
+  baseApi.put(`/zk/put?${params}`, null, { headers: { 'Content-Type': 'application/json; charset=UTF-8', 'Accept': 'text/plain, */*; q=0.01' } });
+
+export const zookeeperDeleteNode = (params: string): Promise<AxiosResponse<ZKOperationResponsne>> =>
+  baseApi.delete(`/zk/delete?path=${params}`);
+
+export const getBrokerListOfTenant = (name: string): Promise<AxiosResponse<BrokerList>> =>
+  baseApi.get(`/brokers/tenants/${name}`);
+
+export const getServerListOfTenant = (name: string): Promise<AxiosResponse<ServerList>> =>
+  baseApi.get(`/tenants/${name}?type=server`);

@@ -38,10 +38,11 @@ import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.io.util.PinotDataBitSet;
 import org.apache.pinot.core.io.writer.impl.BaseChunkSVForwardIndexWriter;
 import org.apache.pinot.core.segment.creator.ColumnIndexCreationInfo;
+import org.apache.pinot.core.segment.creator.DictionaryBasedInvertedIndexCreator;
 import org.apache.pinot.core.segment.creator.ForwardIndexCreator;
-import org.apache.pinot.core.segment.creator.InvertedIndexCreator;
 import org.apache.pinot.core.segment.creator.SegmentCreator;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationInfo;
+import org.apache.pinot.core.segment.creator.TextIndexCreator;
 import org.apache.pinot.core.segment.creator.TextIndexType;
 import org.apache.pinot.core.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueFixedByteRawIndexCreator;
@@ -50,8 +51,8 @@ import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForward
 import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.inv.OnHeapBitmapInvertedIndexCreator;
-import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.nullvalue.NullValueVectorCreator;
+import org.apache.pinot.core.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -78,12 +79,15 @@ import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKey
 public class SegmentColumnarIndexCreator implements SegmentCreator {
   // TODO Refactor class name to match interface name
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentColumnarIndexCreator.class);
+  // Allow at most 512 characters for the metadata property
+  private static final int METADATA_PROPERTY_LENGTH_LIMIT = 512;
+
   private SegmentGeneratorConfig config;
   private Map<String, ColumnIndexCreationInfo> indexCreationInfoMap;
   private Map<String, SegmentDictionaryCreator> _dictionaryCreatorMap = new HashMap<>();
   private Map<String, ForwardIndexCreator> _forwardIndexCreatorMap = new HashMap<>();
-  private Map<String, InvertedIndexCreator> _invertedIndexCreatorMap = new HashMap<>();
-  private Map<String, InvertedIndexCreator> _textIndexCreatorMap = new HashMap<>();
+  private Map<String, DictionaryBasedInvertedIndexCreator> _invertedIndexCreatorMap = new HashMap<>();
+  private Map<String, TextIndexCreator> _textIndexCreatorMap = new HashMap<>();
   private Map<String, NullValueVectorCreator> _nullValueVectorCreatorMap = new HashMap<>();
   private String segmentName;
   private Schema schema;
@@ -324,7 +328,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           int dictId = dictionaryCreator.indexOfSV(columnValueToIndex);
           // store the docID -> dictID mapping in forward index
           forwardIndexCreator.putDictId(dictId);
-          InvertedIndexCreator invertedIndexCreator = _invertedIndexCreatorMap.get(columnName);
+          DictionaryBasedInvertedIndexCreator invertedIndexCreator = _invertedIndexCreatorMap.get(columnName);
           if (invertedIndexCreator != null) {
             // if inverted index enabled during segment creation,
             // then store dictID -> docID mapping in inverted index
@@ -358,15 +362,13 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         }
         // text-index enabled SV column
         if (_textIndexColumns.contains(columnName)) {
-          InvertedIndexCreator textInvertedIndexCreator = _textIndexCreatorMap.get(columnName);
-          // add the column value to lucene index
-          textInvertedIndexCreator.addDoc(columnValueToIndex, docIdCounter);
+          _textIndexCreatorMap.get(columnName).add((String) columnValueToIndex);
         }
       } else {
         // MV column (always dictionary encoded)
         int[] dictIds = dictionaryCreator.indexOfMV(columnValueToIndex);
         forwardIndexCreator.putDictIdMV(dictIds);
-        InvertedIndexCreator invertedIndexCreator = _invertedIndexCreatorMap.get(columnName);
+        DictionaryBasedInvertedIndexCreator invertedIndexCreator = _invertedIndexCreatorMap.get(columnName);
         if (invertedIndexCreator != null) {
           invertedIndexCreator.add(dictIds, dictIds.length);
         }
@@ -390,8 +392,11 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   @Override
   public void seal()
       throws ConfigurationException, IOException {
-    for (InvertedIndexCreator invertedIndexCreator : _invertedIndexCreatorMap.values()) {
+    for (DictionaryBasedInvertedIndexCreator invertedIndexCreator : _invertedIndexCreatorMap.values()) {
       invertedIndexCreator.seal();
+    }
+    for (TextIndexCreator textIndexCreator : _textIndexCreatorMap.values()) {
+      textIndexCreator.seal();
     }
     for (NullValueVectorCreator nullValueVectorCreator : _nullValueVectorCreatorMap.values()) {
       nullValueVectorCreator.seal();
@@ -559,6 +564,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
    * Helper method to check whether the given value is a valid property value.
    * <p>Value is invalid iff:
    * <ul>
+   *   <li>It contains more than 512 characters</li>
    *   <li>It contains leading/trailing whitespace</li>
    *   <li>It contains list separator (',')</li>
    * </ul>
@@ -568,6 +574,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     int length = value.length();
     if (length == 0) {
       return true;
+    }
+    if (length > METADATA_PROPERTY_LENGTH_LIMIT) {
+      return false;
     }
     if (Character.isWhitespace(value.charAt(0)) || Character.isWhitespace(value.charAt(length - 1))) {
       return false;
@@ -617,6 +626,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       throws IOException {
     FileUtils.close(Iterables
         .concat(_dictionaryCreatorMap.values(), _forwardIndexCreatorMap.values(), _invertedIndexCreatorMap.values(),
-            _nullValueVectorCreatorMap.values(), _textIndexCreatorMap.values()));
+            _textIndexCreatorMap.values(), _nullValueVectorCreatorMap.values()));
   }
 }

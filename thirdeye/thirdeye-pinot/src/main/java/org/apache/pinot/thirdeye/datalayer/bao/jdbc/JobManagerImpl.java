@@ -20,22 +20,24 @@
 package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
+import com.google.inject.Inject;
 import com.google.inject.Singleton;
-import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
+import com.google.inject.persist.Transactional;
 import java.sql.Timestamp;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import org.apache.commons.collections4.CollectionUtils;
-import org.joda.time.DateTime;
-import com.google.common.collect.ImmutableMap;
-import com.google.inject.persist.Transactional;
 import org.apache.pinot.thirdeye.anomaly.job.JobConstants.JobStatus;
+import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import org.apache.pinot.thirdeye.datalayer.bao.JobManager;
+import org.apache.pinot.thirdeye.datalayer.dao.GenericPojoDao;
 import org.apache.pinot.thirdeye.datalayer.dto.JobDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.JobBean;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
+import org.joda.time.DateTime;
 
 @Singleton
 public class JobManagerImpl extends AbstractManagerImpl<JobDTO> implements JobManager {
@@ -43,8 +45,9 @@ public class JobManagerImpl extends AbstractManagerImpl<JobDTO> implements JobMa
   private static final String FIND_RECENT_SCHEDULED_JOB_BY_TYPE_AND_CONFIG_ID =
       "where type=:type and configId=:configId and status!=:status and scheduleStartTime>=:scheduleStartTime order by scheduleStartTime desc";
 
-  public JobManagerImpl() {
-    super(JobDTO.class, JobBean.class);
+  @Inject
+  public JobManagerImpl(GenericPojoDao genericPojoDao) {
+    super(JobDTO.class, JobBean.class, genericPojoDao);
   }
 
   @Override

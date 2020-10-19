@@ -17,42 +17,16 @@
  * under the License.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, {  } from 'react';
 import map from 'lodash/map';
-import AppLoader from '../AppLoader';
 import InstanceTable from './InstanceTable';
-import PinotMethodUtils from '../../utils/PinotMethodUtils';
 
-type DataTable = {
-  [name: string]: string[]
-};
-
-const Instances = () => {
-  const [fetching, setFetching] = useState(true);
-  const [instances, setInstances] = useState<DataTable>();
-  const [clusterName, setClusterName] = useState('');
-
-  const fetchData = async () => {
-    const result = await PinotMethodUtils.getAllInstances();
-    let clusterNameRes = localStorage.getItem('pinot_ui:clusterName');
-    if(!clusterNameRes){
-      clusterNameRes = await PinotMethodUtils.getClusterName();
-    }
-    setInstances(result);
-    setClusterName(clusterNameRes);
-    setFetching(false);
-  };
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  return fetching ? (
-    <AppLoader />
-  ) : (
+const Instances = ({instances, clusterName}) => {
+  return (
     <>
       {
         map(instances, (value, key) => {
-          return <InstanceTable key={key} name={key} instances={value} clusterName={clusterName} />;
+          return <InstanceTable key={key} name={`${key}s`} instances={value} clusterName={clusterName} />;
         })
       }
     </>

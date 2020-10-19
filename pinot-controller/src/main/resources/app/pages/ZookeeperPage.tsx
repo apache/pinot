@@ -21,16 +21,13 @@
 import React, { useEffect, useState } from 'react';
 import { makeStyles, useTheme } from '@material-ui/core/styles';
 import { Grid, Paper, Tabs, Tab } from '@material-ui/core';
-import { UnControlled as CodeMirror } from 'react-codemirror2';
-import 'codemirror/lib/codemirror.css';
-import 'codemirror/theme/material.css';
-import 'codemirror/mode/javascript/javascript';
 import _ from 'lodash';
 import AppLoader from '../components/AppLoader';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 import TreeDirectory from '../components/Zookeeper/TreeDirectory';
 import TabPanel from '../components/TabPanel';
 import Utils from '../utils/Utils';
+import CustomCodemirror from '../components/CustomCodemirror';
 
 const useStyles = makeStyles((theme) => ({
   root:{
@@ -48,20 +45,11 @@ const useStyles = makeStyles((theme) => ({
     borderRadius: 4,
     marginBottom: '20px',
   },
-  codeMirror: {
-    '& .CodeMirror': { height: 600, border: '1px solid #BDCCD9', fontSize: '13px' },
+  lastRefreshDiv: {
+    direction: 'rtl',
+    margin: '-15px 0'
   }
 }));
-
-const jsonoptions = {
-  lineNumbers: true,
-  mode: 'application/json',
-  styleActiveLine: true,
-  gutters: ['CodeMirror-lint-markers'],
-  lint: true,
-  theme: 'default',
-  readOnly: true
-};
 
 const ZookeeperPage = () => {
   const classes = useStyles();
@@ -72,10 +60,12 @@ const ZookeeperPage = () => {
   const [currentNodeMetadata, setCurrentNodeMetadata] =  useState({});
   const [selectedNode, setSelectedNode] =  useState(null);
   const [count, setCount] = useState(1);
+  const [leafNode, setLeafNode] = useState(false);
 
   // states and handlers for toggle and select of tree
   const [expanded, setExpanded] = React.useState<string[]>(["1"]);
   const [selected, setSelected] = React.useState<string[]>(["1"]);
+  const [lastRefresh, setLastRefresh] = React.useState(null);
 
   const handleToggle = (event: React.ChangeEvent<{}>, nodeIds: string[]) => {
     setExpanded(nodeIds);
@@ -86,6 +76,8 @@ const ZookeeperPage = () => {
       setSelected(nodeIds);
       const treeObj = Utils.findNestedObj(treeData, 'nodeId', nodeIds);
       if(treeObj){
+        setLeafNode(treeObj.isLeafNode);
+        setSelectedNode(treeObj.fullPath || '/');
         showInfoEvent(treeObj.fullPath || '/');
       }
     }
@@ -96,6 +88,7 @@ const ZookeeperPage = () => {
     const { currentNodeData, currentNodeMetadata } = await PinotMethodUtils.getNodeData(fullPath);
     setCurrentNodeData(currentNodeData);
     setCurrentNodeMetadata(currentNodeMetadata);
+    setLastRefresh(new Date());
   }
 
   // handlers for Tabs
@@ -114,6 +107,7 @@ const ZookeeperPage = () => {
   const fetchInnerPath = async (pathObj) => {
     const {newTreeData, currentNodeData, currentNodeMetadata, counter } = await PinotMethodUtils.getZookeeperData(pathObj.fullPath, count);
     pathObj.child = newTreeData[0].child;
+    pathObj.isLeafNode = newTreeData[0].child.length === 0;
     pathObj.hasChildRendered = true;
     // setting the old treeData again here since pathObj has the reference of old treeData
     // and newTreeData is not useful here.
@@ -135,12 +129,27 @@ const ZookeeperPage = () => {
     setCount(counter);
     setExpanded(["1"]);
     setSelected(["1"]);
+    setLastRefresh(new Date());
     setFetching(false);
   };
 
   useEffect(() => {
     fetchData();
   }, []);
+
+  const renderLastRefresh = () => (
+    <div className={classes.lastRefreshDiv}>
+      <p>
+        {`Last Refreshed: ${lastRefresh.toLocaleTimeString("en-US",{
+            hour12: true,
+            hour: 'numeric',
+            minute: '2-digit',
+            second: '2-digit'
+          })}
+        `}
+      </p>
+    </div>
+  )
 
   return fetching ? (
     <AppLoader />
@@ -155,7 +164,11 @@ const ZookeeperPage = () => {
           selected={selected}
           handleToggle={handleToggle}
           handleSelect={handleSelect}
-          refreshAction={fetchData}
+          isLeafNodeSelected={leafNode}
+          currentNodeData={currentNodeData}
+          currentNodeMetadata={currentNodeMetadata}
+          showInfoEvent={showInfoEvent}
+          fetchInnerPath={fetchInnerPath}
         />
       </Grid>
       <Grid item xs style={{ padding: 20, backgroundColor: 'white', maxHeight: 'calc(100vh - 70px)', overflowY: 'auto' }}>
@@ -178,23 +191,15 @@ const ZookeeperPage = () => {
               index={0}
               dir={theme.direction}
             >
+              {lastRefresh && renderLastRefresh()}
               <div className={classes.codeMirrorDiv}>
-                <CodeMirror
-                  options={jsonoptions}
-                  value={JSON.stringify(currentNodeData, null , 2)}
-                  className={classes.codeMirror}
-                  autoCursor={false}
-                />
+                <CustomCodemirror data={currentNodeData}/>
               </div>
             </TabPanel>
             <TabPanel value={value} index={1} dir={theme.direction}>
+              {lastRefresh && renderLastRefresh()}
               <div className={classes.codeMirrorDiv}>
-                <CodeMirror
-                  options={jsonoptions}
-                  value={JSON.stringify(currentNodeMetadata, null , 2)}
-                  className={classes.codeMirror}
-                  autoCursor={false}
-                />
+                <CustomCodemirror data={currentNodeMetadata}/>
               </div>
             </TabPanel>
           </Grid>

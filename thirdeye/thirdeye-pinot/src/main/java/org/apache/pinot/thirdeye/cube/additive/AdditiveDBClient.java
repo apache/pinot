@@ -57,6 +57,10 @@ public class AdditiveDBClient extends BaseCubePinotClient<AdditiveRow> {
     this.metric = Preconditions.checkNotNull(metric);
   }
 
+  public String getMetric() {
+    return metric;
+  }
+
   @Override
   protected List<CubeSpec> getCubeSpecs() {
     List<CubeSpec> cubeSpecs = new ArrayList<>();

@@ -23,11 +23,9 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,23 +37,15 @@ import org.slf4j.LoggerFactory;
 public class SimpleIndexedTable extends IndexedTable {
   private static final Logger LOGGER = LoggerFactory.getLogger(SimpleIndexedTable.class);
 
-  private Map<Key, Record> _lookupMap;
+  private final Map<Key, Record> _lookupMap;
   private Iterator<Record> _iterator;
 
   private boolean _noMoreNewRecords = false;
   private int _numResizes = 0;
   private long _resizeTime = 0;
 
-  /**
-   * Initializes the data structures needed for this Table
-   * @param dataSchema data schema of the record's keys and values
-   * @param aggregationFunctions aggregation functions for the record's values
-   * @param orderByExpressions list of {@link OrderByExpressionContext} defining the order by
-   * @param capacity the capacity of the table
-   */
-  public SimpleIndexedTable(DataSchema dataSchema, AggregationFunction[] aggregationFunctions,
-      @Nullable List<OrderByExpressionContext> orderByExpressions, int capacity) {
-    super(dataSchema, aggregationFunctions, orderByExpressions, capacity);
+  public SimpleIndexedTable(DataSchema dataSchema, QueryContext queryContext, int capacity) {
+    super(dataSchema, queryContext, capacity);
 
     _lookupMap = new HashMap<>();
   }
@@ -94,7 +84,7 @@ public class SimpleIndexedTable extends IndexedTable {
       });
 
       if (_lookupMap.size() >= _maxCapacity) {
-        if (_isOrderBy) {
+        if (_hasOrderBy) {
           // reached max capacity, resize
           resize(_capacity);
         } else {
@@ -147,7 +137,7 @@ public class SimpleIndexedTable extends IndexedTable {
   @Override
   public void finish(boolean sort) {
 
-    if (_isOrderBy) {
+    if (_hasOrderBy) {
 
       if (sort) {
         List<Record> sortedRecords = resizeAndSort(_capacity);

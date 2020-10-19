@@ -25,8 +25,10 @@ data:
   pinot-controller.conf: |-
     controller.helix.cluster.name={{ .Values.cluster.name }}
     controller.port={{ .Values.controller.port }}
-    controller.vip.host={{ include "pinot.controller.fullname" . }}
-    controller.vip.port={{ .Values.controller.service.port }}
+{{- if .Values.controller.vip.enabled }}
+    controller.vip.host={{ .Values.controller.vip.host }}
+    controller.vip.port={{ .Values.controller.vip.port }}
+{{- end }}
     controller.data.dir={{ .Values.controller.data.dir }}
     controller.zk.str={{ include "zookeeper.url" . }}
-    pinot.set.instance.id.to.hostname=true
+{{ .Values.controller.extra.configs | indent 4 }}

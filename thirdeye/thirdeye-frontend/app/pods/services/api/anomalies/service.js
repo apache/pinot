@@ -6,7 +6,8 @@ import { humanizeFloat, humanizeChange } from 'thirdeye-frontend/utils/utils';
 import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
 import {
   getFormattedDuration,
-  anomalyResponseObjNew
+  anomalyResponseObjNew,
+  anomalySeverityLevelObj
 } from 'thirdeye-frontend/utils/anomaly';
 
 const HumanizedAnomaly = EmberObject.extend({// ex: record.humanizedChangeDisplay (humanized), record.anomaly.start (raw)
@@ -48,6 +49,10 @@ const HumanizedAnomaly = EmberObject.extend({// ex: record.humanizedChangeDispla
   start: computed.alias('anomaly.start'),
   settings: computed.alias('anomaly.settings'),
   settingsNum: computed.alias('anomaly.settingsNum'),
+  severityLabel: computed('anomaly.severityLabel', function () {
+    return get(this, 'anomaly.severityLabel') ? anomalySeverityLevelObj.find(
+      res => res.value == get(this, 'anomaly.severityLabel')).name : 'Default'
+  }),
   anomalyFeedback: computed('anomaly.feedback', function() {
     return get(this, 'anomaly.feedback') ? anomalyResponseObjNew.find(res => res.value === get(this, 'anomaly.feedback')).name : '';
   }),

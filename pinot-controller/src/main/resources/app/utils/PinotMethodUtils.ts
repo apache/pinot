@@ -18,7 +18,7 @@
  */
 
 import _ from 'lodash';
-import { SQLResult } from 'Models';
+import { DataTable, SQLResult } from 'Models';
 import moment from 'moment';
 import {
   getTenants,
@@ -38,7 +38,11 @@ import {
   zookeeperGetList,
   zookeeperGetData,
   zookeeperGetListWithStat,
-  zookeeperGetStat
+  zookeeperGetStat,
+  zookeeperPutData,
+  zookeeperDeleteNode,
+  getBrokerListOfTenant,
+  getServerListOfTenant
 } from '../requests';
 import Utils from './Utils';
 
@@ -48,22 +52,26 @@ import Utils from './Utils';
 const getTenantsData = () => {
   return getTenants().then(({ data }) => {
     const records = _.union(data.SERVER_TENANTS, data.BROKER_TENANTS);
-    return {
+    let promiseArr = [];
+    let finalResponse = {
       columns: ['Tenant Name', 'Server', 'Broker', 'Tables'],
-      records: [
-        ...records.map((record) => [
-          record,
-          data.SERVER_TENANTS.indexOf(record) > -1 ? 1 : 0,
-          data.BROKER_TENANTS.indexOf(record) > -1 ? 1 : 0,
-          '-',
-        ]),
-      ],
+      records: []
     };
+    records.map((record)=>{
+      finalResponse.records.push([
+        record,
+        data.SERVER_TENANTS.indexOf(record) > -1 ? 1 : 0,
+        data.BROKER_TENANTS.indexOf(record) > -1 ? 1 : 0
+      ]);
+      promiseArr.push(getTenantTable(record));
+    });
+    return Promise.all(promiseArr).then((results)=>{
+      results.map((result, index)=>{
+        finalResponse.records[index].push(result.data.tables.length);
+      });
+      return finalResponse;
+    });
   });
-};
-
-type DataTable = {
-  [name: string]: string[];
 };
 
 // This method is used to fetch all instances on cluster manager home page
@@ -80,7 +88,7 @@ const getAllInstances = () => {
       r[key] = [...(r[key] || []), a];
       return r;
     }, initialVal);
-    return groupedData;
+    return {"Controller": groupedData.Controller, ...groupedData};
   });
 };
 
@@ -92,7 +100,7 @@ const getInstanceData = (instances, liveInstanceArr) => {
 
   return Promise.all(promiseArr).then((result) => {
     return {
-      columns: ['Insance Name', 'Enabled', 'Hostname', 'Port', 'Status'],
+      columns: ['Instance Name', 'Enabled', 'Hostname', 'Port', 'Status'],
       records: [
         ...result.map(({ data }) => [
           data.instanceName,
@@ -140,14 +148,20 @@ const getClusterConfigData = () => {
 // This method is used to display table listing on query page
 // API: /tables
 // Expected Output: {columns: [], records: []}
-const getQueryTablesList = () => {
-  return getQueryTables().then(({ data }) => {
-    return {
+const getQueryTablesList = ({bothType = false}) => {
+  let promiseArr = bothType ? [getQueryTables('realtime'), getQueryTables('offline')] : [getQueryTables()];
+  
+  return Promise.all(promiseArr).then((results) => {
+    let responseObj = {
       columns: ['Tables'],
-      records: data.tables.map((table) => {
-        return [table];
-      }),
-    };
+      records:  []
+    }
+    results.map((result)=>{
+      result.data.tables.map((table)=>{
+        responseObj.records.push([table]);
+      });
+    });
+    return responseObj;
   });
 };
 
@@ -533,7 +547,42 @@ const getNodeData = (path) => {
     const currentNodeData = results[0].data || {};
     const currentNodeListStat = results[1].data;
     const currentNodeMetadata = results[2].data;
+
+    if(currentNodeMetadata['ctime'] || currentNodeMetadata['mtime']){
+      currentNodeMetadata['ctime'] = moment(+currentNodeMetadata['ctime']).format(
+        'MMMM Do YYYY, h:mm:ss'
+      );
+      currentNodeMetadata['mtime'] = moment(+currentNodeMetadata['mtime']).format(
+        'MMMM Do YYYY, h:mm:ss'
+      );
+    }
     return { currentNodeData, currentNodeMetadata, currentNodeListStat };
+  });
+};
+
+const putNodeData = (data) => {
+  const serializedData = Utils.serialize(data);
+  return zookeeperPutData(serializedData).then((obj)=>{
+    return obj;
+  });
+};
+
+const deleteNode = (path) => {
+  const params = encodeURIComponent(path);
+  return zookeeperDeleteNode(params).then((obj)=>{
+    return obj;
+  });
+};
+
+const getBrokerOfTenant = (tenantName) => {
+  return getBrokerListOfTenant(tenantName).then((response)=>{
+    return response.data;
+  });
+};
+
+const getServerOfTenant = (tenantName) => {
+  return getServerListOfTenant(tenantName).then((response)=>{
+    return response.data.ServerInstances;
   });
 };
 
@@ -556,5 +605,9 @@ export default {
   getInstanceConfig,
   getTenantsFromInstance,
   getZookeeperData,
-  getNodeData
+  getNodeData,
+  putNodeData,
+  deleteNode,
+  getBrokerOfTenant,
+  getServerOfTenant
 };

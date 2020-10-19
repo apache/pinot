@@ -44,9 +44,9 @@ import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomaly.events.EventFilter;
 import org.apache.pinot.thirdeye.anomaly.events.EventType;
 import org.apache.pinot.thirdeye.anomaly.events.HolidayEventProvider;
+import org.apache.pinot.thirdeye.anomaly.utils.AnomalyUtils;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
-import org.apache.pinot.thirdeye.dashboard.resources.v2.AnomaliesResource;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
@@ -476,7 +476,7 @@ public abstract class BaseNotificationContent implements NotificationContent {
    * @return a list of filter values
    */
   protected List<String> getMatchedFilterValues(MergedAnomalyResultDTO anomaly, String matchText) {
-    Multimap<String, String> filterSet = AnomaliesResource.generateFilterSetForTimeSeriesQuery(anomaly);
+    Multimap<String, String> filterSet = AnomalyUtils.generateFilterSetForTimeSeriesQuery(anomaly);
     for (String filterKey : filterSet.keySet()) {
       if (filterKey.contains(matchText)) {
         return new ArrayList<>(filterSet.get(filterKey));

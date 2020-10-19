@@ -87,9 +87,10 @@ docker push apachepinot/pinot:release-0.1.0
 
 ## Kubernetes Examples
 
-Please refer to [Kubernetes Quickstart](../../docs/administration/installation/cloud/on-premises.md) for deployment examples.
+Please refer to [Kubernetes Quickstart](../administration/installation/cloud/on-premise.md) for deployment examples.
 
-[Kubernetes Quickstart](../../docs/administration/installation/cloud/on-premises.md)
+[Kubernetes Quickstart](../administration/installation/cloud/on-premise.md)
+
 
 ## Pinot Presto
 

@@ -19,13 +19,11 @@
 
 package org.apache.pinot.thirdeye.datalayer.util;
 
-import java.util.Map;
-
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.Maps;
-
 import io.dropwizard.Configuration;
+import java.util.Map;
 
 public class PersistenceConfig extends Configuration {
 
@@ -40,8 +38,10 @@ public class PersistenceConfig extends Configuration {
     return databaseConfiguration;
   }
 
-  public void setDatabaseConfiguration(DatabaseConfiguration databaseConfiguration) {
+  public PersistenceConfig setDatabaseConfiguration(
+      final DatabaseConfiguration databaseConfiguration) {
     this.databaseConfiguration = databaseConfiguration;
+    return this;
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
@@ -56,40 +56,46 @@ public class PersistenceConfig extends Configuration {
       return user;
     }
 
-    public void setUser(String user) {
+    public DatabaseConfiguration setUser(final String user) {
       this.user = user;
+      return this;
     }
 
     public String getPassword() {
       return password;
     }
 
-    public void setPassword(String password) {
+    public DatabaseConfiguration setPassword(final String password) {
       this.password = password;
-    }
-
-    public Map<String, String> getProperties() {
-      return properties;
-    }
-
-    public void setProperties(Map<String, String> properties) {
-      this.properties = properties;
+      return this;
     }
 
     public String getUrl() {
       return url;
     }
 
-    public void setUrl(String url) {
+    public DatabaseConfiguration setUrl(final String url) {
       this.url = url;
+      return this;
     }
 
     public String getDriver() {
       return driver;
     }
 
-    public void setDriver(String driver) {
+    public DatabaseConfiguration setDriver(final String driver) {
       this.driver = driver;
+      return this;
+    }
+
+    public Map<String, String> getProperties() {
+      return properties;
+    }
+
+    public DatabaseConfiguration setProperties(
+        final Map<String, String> properties) {
+      this.properties = properties;
+      return this;
     }
   }
 }

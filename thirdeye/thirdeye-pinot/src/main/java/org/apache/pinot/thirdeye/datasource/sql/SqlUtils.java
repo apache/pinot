@@ -88,6 +88,7 @@ public class SqlUtils {
   private static final String MYSQL = "MySQL";
   private static final String H2 = "H2";
   private static final String VERTICA = "Vertica";
+  private static final String BIGQUERY = "BigQuery";
   private static final String POSTGRESQL = "PostgreSQL";
   private static final String DRUID = "Druid";
 
@@ -266,7 +267,7 @@ public class SqlUtils {
     }
 
     if (limit > 0 ){
-      sb.append(" ORDER BY " + getSelectMetricClauseName(metricConfig, metricFunction) + " DESC");
+      sb.append(" ORDER BY " + getSelectMetricClause(metricConfig, metricFunction) + " DESC");
     }
 
     limit = limit > 0 ? limit : DEFAULT_LIMIT;
@@ -314,19 +315,6 @@ public class SqlUtils {
       metricName = metricConfig.getName();
     }
     builder.append(convertAggFunction(metricFunction.getFunctionName())).append("(").append(metricName).append(")");
-    builder.append(" AS ").append(getSelectMetricClauseName(metricConfig, metricFunction));
-    return builder.toString();
-  }
-
-  private static String getSelectMetricClauseName(MetricConfigDTO metricConfig, MetricFunction metricFunction) {
-    StringBuilder builder = new StringBuilder();
-    String metricName = null;
-    if (metricFunction.getMetricName().equals("*")) {
-      metricName = "all_star";
-    } else {
-      metricName = metricConfig.getName();
-    }
-    builder.append(convertAggFunction(metricFunction.getFunctionName())).append("_").append(metricName);
     return builder.toString();
   }
 
@@ -598,14 +586,22 @@ public class SqlUtils {
    * Convert java SimpleDateFormat to PostgreSQL's format
    *
    * @param timeFormat
-   * @return MySQL's time format
+   * @return Postgres's time format
    */
   private static String timeFormatToPostgreSQLFormat(String timeFormat) {
     if (timeFormat.contains("mm")) {
-      return timeFormat.replaceAll("(?i):mm", ":mi");
-    } else {
-      return timeFormat;
+      timeFormat = timeFormat.replaceAll("(?i):mm", ":mi");
     }
+
+    if (timeFormat == "yyyy-MM-dd hh:mm:ss") {
+      timeFormat = "yyyy-MM-dd HH:mm:ss";
+    }
+
+    // in postgres HH is 12 hour format and in Java it's 24 hour format, convert it
+    if (timeFormat.contains("HH")) {
+      timeFormat = timeFormat.replaceAll("HH", "HH24");
+    }
+    return timeFormat;
   }
 
   /**
@@ -625,6 +621,26 @@ public class SqlUtils {
       return timeFormat;
     }
   }
+
+  /**
+   * Convert java SimpleDateFormat to BigQuery StandardSQL's format
+   *
+   * @param timeFormat
+   * @return BigQuery Standard SQL time format
+   */
+  private static String timeFormatToBigQueryFormat(String timeFormat) {
+    switch (timeFormat) {
+      case "yyyyMMdd":
+        return "%Y%m%d";
+      case "yyyy-MM-dd hh:mm:ss":
+        return "%Y-%m-%d %H:%M:%S";
+      case "yyyy-MM-dd-HH":
+        return "%Y-%m-%d-%H";
+      default:
+        return "%Y-%m-%d %H:%M:%S";
+    }
+  }
+
 
   /**
    * Return a SQL clause that cast any timeColumn as unix timestamp
@@ -647,6 +663,8 @@ public class SqlUtils {
       return "TO_UNIXTIME(PARSEDATETIME(CAST(" + timeColumn + " AS VARCHAR), '" + timeFormat + "'))";
     } else if (sourceName.equals(VERTICA)) {
       return "EXTRACT(EPOCH FROM to_timestamp(to_char(" + timeColumn + "), '" + timeFormatToVerticaFormat(timeFormat) + "'))";
+    } else if (sourceName.equals(BIGQUERY)) {
+      return "UNIX_SECONDS(TIMESTAMP(PARSE_DATETIME(\"" + timeFormatToBigQueryFormat(timeFormat) + "\", " + timeColumn + ")))";
     }
     return "";
   }

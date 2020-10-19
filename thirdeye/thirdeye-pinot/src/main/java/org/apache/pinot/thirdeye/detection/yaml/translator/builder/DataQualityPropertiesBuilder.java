@@ -131,7 +131,7 @@ public class DataQualityPropertiesBuilder extends DetectionConfigPropertiesBuild
     String qualityRefKey = makeComponentRefKey(qualityType, name);
     properties.put(PROP_QUALITY_CHECK, qualityRefKey);
 
-    buildComponentSpec(metricUrn, yamlConfig, qualityType, qualityRefKey);
+    buildComponentSpec(metricUrn, yamlConfig, qualityRefKey);
 
     properties.putAll(mergerProperties);
     return properties;

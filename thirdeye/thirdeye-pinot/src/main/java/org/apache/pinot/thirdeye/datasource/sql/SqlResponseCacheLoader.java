@@ -59,6 +59,7 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
   private static final String PRESTO = "Presto";
   private static final String MYSQL = "MySQL";
   private static final String VERTICA = "Vertica";
+  private static final String BIGQUERY = "BigQuery";
   private static final String DRUID = "Druid";
   private static final String POSTGRESQL = "PostgreSQL";
 
@@ -75,12 +76,14 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
   private Map<String, DataSource> prestoDBNameToDataSourceMap = new HashMap<>();
   private Map<String, DataSource> mysqlDBNameToDataSourceMap = new HashMap<>();
   private Map<String, DataSource> verticaDBNameToDataSourceMap = new HashMap<>();
+  private Map<String, DataSource> BigQueryDBNameToDataSourceMap = new HashMap<>();
   private Map<String, DataSource> druidDBNameToDataSourceMap = new HashMap<>();
   private Map<String, DataSource> postgresqlDBNameToDataSourceMap = new HashMap<>();
 
   private static Map<String, String> prestoDBNameToURLMap = new HashMap<>();
   private static Map<String, String> mysqlDBNameToURLMap = new HashMap<>();
   private static Map<String, String> verticaDBNameToURLMap = new HashMap<>();
+  private static Map<String, String> BigQueryDBNameToURLMap = new HashMap<>();
   private static Map<String, String> druidDBNameToURLMap = new HashMap<>();
   private static Map<String, String> postgresqlDBNameToURLMap = new HashMap<>();
 
@@ -141,58 +144,6 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
       }
     }
 
-    // Init PostgreSQL datasources
-    if (properties.containsKey(POSTGRESQL)) {
-      List<Map<String, Object>> mysqlMapList = ConfigUtils.getList(properties.get(POSTGRESQL));
-      for (Map<String, Object> objMap: mysqlMapList) {
-        Map<String, String> dbNameToURLMap = (Map)objMap.get(DB);
-        String postgresqlUser = (String)objMap.get(USER);
-        String postgresqlPassword = getPassword(objMap);
-
-        for (Map.Entry<String, String> entry: dbNameToURLMap.entrySet()) {
-          DataSource dataSource = new DataSource();
-          dataSource.setInitialSize(INIT_CONNECTIONS);
-          dataSource.setMaxActive(MAX_CONNECTIONS);
-          dataSource.setUsername(postgresqlUser);
-          dataSource.setPassword(postgresqlPassword);
-          dataSource.setUrl(entry.getValue());
-
-          // Timeout before an abandoned(in use) connection can be removed.
-          dataSource.setRemoveAbandonedTimeout(ABANDONED_TIMEOUT);
-          dataSource.setRemoveAbandoned(true);
-
-          postgresqlDBNameToDataSourceMap.put(entry.getKey(), dataSource);
-          postgresqlDBNameToURLMap.putAll(dbNameToURLMap);
-        }
-      }
-    }
-
-    // Init Druid datasources
-    if (properties.containsKey(POSTGRESQL)) {
-      List<Map<String, Object>> mysqlMapList = ConfigUtils.getList(properties.get(DRUID));
-      for (Map<String, Object> objMap: mysqlMapList) {
-        Map<String, String> dbNameToURLMap = (Map)objMap.get(DB);
-        String druidUser = (String)objMap.get(USER);
-        String druidPassword = getPassword(objMap);
-
-        for (Map.Entry<String, String> entry: dbNameToURLMap.entrySet()) {
-          DataSource dataSource = new DataSource();
-          dataSource.setInitialSize(INIT_CONNECTIONS);
-          dataSource.setMaxActive(MAX_CONNECTIONS);
-          dataSource.setUsername(druidUser);
-          dataSource.setPassword(druidPassword);
-          dataSource.setUrl(entry.getValue());
-
-          // Timeout before an abandoned(in use) connection can be removed.
-          dataSource.setRemoveAbandonedTimeout(ABANDONED_TIMEOUT);
-          dataSource.setRemoveAbandoned(true);
-
-          druidDBNameToDataSourceMap.put(entry.getKey(), dataSource);
-          druidDBNameToURLMap.putAll(dbNameToURLMap);
-        }
-      }
-    }
-
     // Init Vertica datasources
     if (properties.containsKey(VERTICA)) {
       List<Map<String, Object>> verticaMapList = ConfigUtils.getList(properties.get(VERTICA));
@@ -220,6 +171,84 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
         }
       }
     }
+
+    // Init BigQuery datasources
+    if (properties.containsKey(BIGQUERY)) {
+      List<Map<String, Object>> bigQueryMapList = ConfigUtils.getList(properties.get(BIGQUERY));
+      for (Map<String, Object> objMap: bigQueryMapList) {
+        System.out.println(bigQueryMapList.toString());
+        Map<String, String> dbNameToURLMap = (Map)objMap.get(DB);
+        String bigQueryDriver = (String)objMap.get(DRIVER);
+
+        for (Map.Entry<String, String> entry: dbNameToURLMap.entrySet()) {
+          DataSource dataSource = new DataSource();
+          dataSource.setInitialSize(INIT_CONNECTIONS);
+          dataSource.setMaxActive(MAX_CONNECTIONS);
+          dataSource.setDriverClassName(bigQueryDriver);
+          dataSource.setUrl(entry.getValue());
+
+          // Timeout before an abandoned(in use) connection can be removed.
+          dataSource.setRemoveAbandonedTimeout(ABANDONED_TIMEOUT);
+          dataSource.setRemoveAbandoned(true);
+
+          BigQueryDBNameToDataSourceMap.put(entry.getKey(), dataSource);
+          BigQueryDBNameToURLMap.putAll(dbNameToURLMap);
+        }
+      }
+    }
+
+    // Init PostgreSQL datasources
+    if (properties.containsKey(POSTGRESQL)) {
+      List<Map<String, Object>> postgresqlMapList = ConfigUtils.getList(properties.get(POSTGRESQL));
+      for (Map<String, Object> objMap: postgresqlMapList) {
+        Map<String, String> dbNameToURLMap = (Map)objMap.get(DB);
+        String postgresqlUser = (String)objMap.get(USER);
+        String postgresqlPassword = getPassword(objMap);
+
+        for (Map.Entry<String, String> entry: dbNameToURLMap.entrySet()) {
+          DataSource dataSource = new DataSource();
+          dataSource.setInitialSize(INIT_CONNECTIONS);
+          dataSource.setMaxActive(MAX_CONNECTIONS);
+          dataSource.setUsername(postgresqlUser);
+          dataSource.setPassword(postgresqlPassword);
+          dataSource.setUrl(entry.getValue());
+
+          // Timeout before an abandoned(in use) connection can be removed.
+          dataSource.setRemoveAbandonedTimeout(ABANDONED_TIMEOUT);
+          dataSource.setRemoveAbandoned(true);
+
+          postgresqlDBNameToDataSourceMap.put(entry.getKey(), dataSource);
+          postgresqlDBNameToURLMap.putAll(dbNameToURLMap);
+        }
+      }
+    }
+
+    // Init Druid datasources
+    if (properties.containsKey(DRUID)) {
+      List<Map<String, Object>> druidMapList = ConfigUtils.getList(properties.get(DRUID));
+      for (Map<String, Object> objMap: druidMapList) {
+        Map<String, String> dbNameToURLMap = (Map)objMap.get(DB);
+        String druidUser = (String)objMap.get(USER);
+        String druidPassword = getPassword(objMap);
+
+        for (Map.Entry<String, String> entry: dbNameToURLMap.entrySet()) {
+          DataSource dataSource = new DataSource();
+          dataSource.setInitialSize(INIT_CONNECTIONS);
+          dataSource.setMaxActive(MAX_CONNECTIONS);
+          dataSource.setUsername(druidUser);
+          dataSource.setPassword(druidPassword);
+          dataSource.setUrl(entry.getValue());
+
+          // Timeout before an abandoned(in use) connection can be removed.
+          dataSource.setRemoveAbandonedTimeout(ABANDONED_TIMEOUT);
+          dataSource.setRemoveAbandoned(true);
+
+          druidDBNameToDataSourceMap.put(entry.getKey(), dataSource);
+          druidDBNameToURLMap.putAll(dbNameToURLMap);
+        }
+      }
+    }
+
 
     // Init H2 datasource
     if (properties.containsKey(H2)) {
@@ -368,12 +397,14 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
       dataSource = prestoDBNameToDataSourceMap.get(SQLQuery.getDbName());
     } else if (sourceName.equals(MYSQL)) {
       dataSource = mysqlDBNameToDataSourceMap.get(SQLQuery.getDbName());
+    } else if (sourceName.equals(VERTICA)) {
+      dataSource = verticaDBNameToDataSourceMap.get(SQLQuery.getDbName());
+    } else if (sourceName.equals(BIGQUERY)) {
+      dataSource = BigQueryDBNameToDataSourceMap.get(SQLQuery.getDbName());
     } else if (sourceName.equals(POSTGRESQL)) {
       dataSource = postgresqlDBNameToDataSourceMap.get(SQLQuery.getDbName());
     } else if (sourceName.equals(DRUID)) {
       dataSource = druidDBNameToDataSourceMap.get(SQLQuery.getDbName());
-    } else if (sourceName.equals(VERTICA)) {
-      dataSource = verticaDBNameToDataSourceMap.get(SQLQuery.getDbName());
     } else {
       dataSource = h2DataSource;
     }
@@ -405,6 +436,7 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
     dbNameToURLMap.put(PRESTO, prestoDBNameToURLMap);
     dbNameToURLMap.put(MYSQL, mysqlDBNameToURLMap);
     dbNameToURLMap.put(VERTICA, verticaDBNameToURLMap);
+    dbNameToURLMap.put(BIGQUERY, BigQueryDBNameToURLMap);
     dbNameToURLMap.put(POSTGRESQL, postgresqlDBNameToURLMap);
     dbNameToURLMap.put(DRUID, druidDBNameToURLMap);
 
@@ -432,12 +464,14 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
       return prestoDBNameToDataSourceMap.get(dbName);
     } else if (sourceName.equals(MYSQL)) {
       return mysqlDBNameToDataSourceMap.get(dbName);
+    } else if (sourceName.equals(VERTICA)) {
+      return verticaDBNameToDataSourceMap.get(dbName);
+    } else if (sourceName.equals(BIGQUERY)) {
+      return BigQueryDBNameToDataSourceMap.get(dbName);
     } else if (sourceName.equals(POSTGRESQL)) {
       return postgresqlDBNameToDataSourceMap.get(dbName);
     } else if (sourceName.equals(DRUID)) {
       return druidDBNameToDataSourceMap.get(dbName);
-    } else if (sourceName.equals(VERTICA)) {
-      return verticaDBNameToDataSourceMap.get(dbName);
     } else {
       return h2DataSource;
     }

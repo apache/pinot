@@ -20,23 +20,21 @@ package org.apache.pinot.core.operator.filter;
 
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
-import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.apache.pinot.core.segment.index.readers.TextIndexReader;
 
 
 /**
  * Filter operator for supporting the execution of text search
  * queries: WHERE TEXT_MATCH(column_name, query_string....)
  */
-@SuppressWarnings("rawtypes")
 public class TextMatchFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "TextMatchFilterOperator";
 
-  private final InvertedIndexReader _textIndexReader;
+  private final TextIndexReader _textIndexReader;
   private final String _searchQuery;
   private final int _numDocs;
 
-  public TextMatchFilterOperator(InvertedIndexReader textIndexReader, String searchQuery, int numDocs) {
+  public TextMatchFilterOperator(TextIndexReader textIndexReader, String searchQuery, int numDocs) {
     _textIndexReader = textIndexReader;
     _searchQuery = searchQuery;
     _numDocs = numDocs;
@@ -44,8 +42,7 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
 
   @Override
   protected FilterBlock getNextBlock() {
-    return new FilterBlock(
-        new BitmapDocIdSet((ImmutableRoaringBitmap) _textIndexReader.getDocIds(_searchQuery), _numDocs));
+    return new FilterBlock(new BitmapDocIdSet(_textIndexReader.getDocIds(_searchQuery), _numDocs));
   }
 
   @Override

@@ -61,9 +61,6 @@ import org.joda.time.Period;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-
-
 /**
  * Detection pipeline for dimension exploration with a configurable nested detection pipeline.
  * Loads and prunes a metric's dimensions and sequentially retrieves data to run detection on
@@ -88,6 +85,7 @@ public class DimensionWrapper extends DetectionPipeline {
 
   // Stop running if the first several dimension combinations all failed.
   private static final int EARLY_STOP_THRESHOLD = 10;
+  private static final double EARLY_STOP_THRESHOLD_PERCENTAGE = 0.1;
 
   // by default, don't pre-fetch data into the cache
   private static final long DEFAULT_CACHING_PERIOD_LOOKBACK = -1;
@@ -188,17 +186,17 @@ public class DimensionWrapper extends DetectionPipeline {
         return nestedMetrics;
       }
 
-      final double total = aggregates.getDoubles(COL_VALUE).sum().fillNull().doubleValue();
+      final double total = aggregates.getDoubles(DataFrame.COL_VALUE).sum().fillNull().doubleValue();
 
       // min contribution
       if (!Double.isNaN(this.minContribution)) {
-        aggregates = aggregates.filter(aggregates.getDoubles(COL_VALUE).divide(total).gte(this.minContribution)).dropNull();
+        aggregates = aggregates.filter(aggregates.getDoubles(DataFrame.COL_VALUE).divide(total).gte(this.minContribution)).dropNull();
       }
 
       // min value
       // check min value if only min live zone not set, other wise use checkMinLiveZone below
       if (!Double.isNaN(this.minValue) && Double.isNaN(this.minLiveZone)) {
-        aggregates = aggregates.filter(aggregates.getDoubles(COL_VALUE).gte(this.minValue)).dropNull();
+        aggregates = aggregates.filter(aggregates.getDoubles(DataFrame.COL_VALUE).gte(this.minValue)).dropNull();
       }
 
       double hourlyMultiplier = MetricUtils.isAggCumulative(metricConfig) ?
@@ -207,22 +205,22 @@ public class DimensionWrapper extends DetectionPipeline {
               (TimeUnit.DAYS.toMillis(1) / (double) testPeriod.toDurationFrom(start).getMillis()) : 1.0;
 
       if (!Double.isNaN(this.minValueHourly)) {
-        aggregates = aggregates.filter(aggregates.getDoubles(COL_VALUE).multiply(hourlyMultiplier).gte(this.minValueHourly)).dropNull();
+        aggregates = aggregates.filter(aggregates.getDoubles(DataFrame.COL_VALUE).multiply(hourlyMultiplier).gte(this.minValueHourly)).dropNull();
       }
 
       if (!Double.isNaN(this.maxValueHourly)) {
-        aggregates = aggregates.filter(aggregates.getDoubles(COL_VALUE).multiply(hourlyMultiplier).lte(this.maxValueHourly)).dropNull();
+        aggregates = aggregates.filter(aggregates.getDoubles(DataFrame.COL_VALUE).multiply(hourlyMultiplier).lte(this.maxValueHourly)).dropNull();
       }
 
       if (!Double.isNaN(this.minValueDaily)) {
-        aggregates = aggregates.filter(aggregates.getDoubles(COL_VALUE).multiply(dailyMultiplier).gte(this.minValueDaily)).dropNull();
+        aggregates = aggregates.filter(aggregates.getDoubles(DataFrame.COL_VALUE).multiply(dailyMultiplier).gte(this.minValueDaily)).dropNull();
       }
 
       if (!Double.isNaN(this.maxValueDaily)) {
-        aggregates = aggregates.filter(aggregates.getDoubles(COL_VALUE).multiply(dailyMultiplier).lte(this.maxValueDaily)).dropNull();
+        aggregates = aggregates.filter(aggregates.getDoubles(DataFrame.COL_VALUE).multiply(dailyMultiplier).lte(this.maxValueDaily)).dropNull();
       }
 
-      aggregates = aggregates.sortedBy(COL_VALUE).reverse();
+      aggregates = aggregates.sortedBy(DataFrame.COL_VALUE).reverse();
       // top k
       if (this.k > 0) {
         aggregates = aggregates.head(this.k);
@@ -331,7 +329,8 @@ public class DimensionWrapper extends DetectionPipeline {
       for (Map<String, Object> properties : this.nestedProperties) {
         DetectionPipelineResult intermediate;
         try {
-          intermediate = this.runNested(metric, properties);
+          properties.put(this.nestedMetricUrnKey, metric.getUrn());
+          intermediate = this.runNested(properties, this.startTime, this.endTime);
         } catch (Exception e) {
           LOG.warn("[DetectionConfigID{}] detecting anomalies for window {} to {} failed for metric urn {}.",
               this.config.getId(), this.start, this.end, metric.getUrn(), e);
@@ -390,7 +389,9 @@ public class DimensionWrapper extends DetectionPipeline {
   private void checkEarlyStop(long totalNestedMetrics, long successNestedMetrics, int i, List<Exception> exceptions)
       throws DetectionPipelineException {
     // if the first certain number of dimensions all failed, throw an exception
-    if (i == EARLY_STOP_THRESHOLD && successNestedMetrics == 0) {
+    // the threshold is set to the 10 percent of the number of dimensions and at least 10.
+    long earlyStopThreshold = Math.max(EARLY_STOP_THRESHOLD, (int)(totalNestedMetrics * EARLY_STOP_THRESHOLD_PERCENTAGE));
+    if (i == earlyStopThreshold && successNestedMetrics == 0) {
       throw new DetectionPipelineException(String.format(
           "Detection failed for first %d out of %d metric dimensions for monitoring window %d to %d, stop processing.",
           i, totalNestedMetrics, this.getStartTime(), this.getEndTime()), Iterables.getLast(exceptions));
@@ -436,30 +437,11 @@ public class DimensionWrapper extends DetectionPipeline {
     MetricSlice slice = MetricSlice.from(me.getId(), this.start.getMillis(), this.end.getMillis(), me.getFilters());
     DataFrame df = this.provider.fetchTimeseries(Collections.singleton(slice)).get(slice);
     long totalBuckets = df.size();
-    df = df.filter(df.getDoubles(COL_VALUE).gt(this.minLiveZone)).dropNull();
+    df = df.filter(df.getDoubles(DataFrame.COL_VALUE).gt(this.minLiveZone)).dropNull();
     double liveBucketPercentage = (double) df.size() / (double) totalBuckets;
     if (liveBucketPercentage >= this.liveBucketPercentageThreshold) {
-      return df.getDoubles(COL_VALUE).mean().getDouble(0)>= this.minValue;
+      return df.getDoubles(DataFrame.COL_VALUE).mean().getDouble(0)>= this.minValue;
     }
     return false;
-  }
-
-  protected DetectionPipelineResult runNested(MetricEntity metric, Map<String, Object> template) throws Exception {
-    Preconditions.checkArgument(template.containsKey(PROP_CLASS_NAME), "Nested missing " + PROP_CLASS_NAME);
-
-    Map<String, Object> properties = new HashMap<>(template);
-
-    properties.put(this.nestedMetricUrnKey, metric.getUrn());
-
-    DetectionConfigDTO nestedConfig = new DetectionConfigDTO();
-    nestedConfig.setId(this.config.getId());
-    nestedConfig.setName(this.config.getName());
-    nestedConfig.setDescription(this.config.getDescription());
-    nestedConfig.setProperties(properties);
-    nestedConfig.setComponents(this.config.getComponents());
-
-    DetectionPipeline pipeline = this.provider.loadPipeline(nestedConfig, this.startTime, this.endTime);
-
-    return pipeline.run();
   }
 }

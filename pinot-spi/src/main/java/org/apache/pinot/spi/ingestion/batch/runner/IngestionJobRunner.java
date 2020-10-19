@@ -28,6 +28,7 @@ import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
  *    SegmentGenerationJobRunner
  *    SegmentTarPushJobRunner
  *    SegmentUriPushJobRunner
+ *    SegmentMetadataPushJobRunner
  *
  */
 public interface IngestionJobRunner {

@@ -30,7 +30,7 @@ import org.testng.annotations.Test;
  *
  */
 public class PreparedStatementTest {
-  private DummyPinotClientTransport _dummyPinotClientTransport = new DummyPinotClientTransport();
+  private final DummyPinotClientTransport _dummyPinotClientTransport = new DummyPinotClientTransport();
   private PinotClientTransportFactory _previousTransportFactory = null;
 
   @Test
@@ -56,7 +56,7 @@ public class PreparedStatementTest {
     ConnectionFactory._transportFactory = _previousTransportFactory;
   }
 
-  class DummyPinotClientTransport implements PinotClientTransport {
+  static class DummyPinotClientTransport implements PinotClientTransport {
     private String _lastQuery;
 
     @Override

@@ -26,7 +26,7 @@ import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.slf4j.Logger;

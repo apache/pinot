@@ -61,4 +61,17 @@ public class MinionConstants {
     public static final String MERGE_TYPE_KEY = "mergeTypeKey";
     public static final String MERGED_SEGMENT_NAME_KEY = "mergedSegmentNameKey";
   }
+
+  public static class RealtimeToOfflineSegmentsTask {
+    public static final String TASK_TYPE = "realtimeToOfflineSegmentsTask";
+    // window
+    public static final String WINDOW_START_MILLIS_KEY = "windowStartMillis";
+    public static final String WINDOW_END_MILLIS_KEY = "windowEndMillis";
+    // segment processing
+    public static final String TIME_COLUMN_TRANSFORM_FUNCTION_KEY = "timeColumnTransformFunction";
+    public static final String COLLECTOR_TYPE_KEY = "collectorType";
+    public static final String AGGREGATION_TYPE_KEY_SUFFIX = ".aggregationType";
+    public static final String MAX_NUM_RECORDS_PER_SEGMENT_KEY = "maxNumRecordsPerSegment";
+
+  }
 }

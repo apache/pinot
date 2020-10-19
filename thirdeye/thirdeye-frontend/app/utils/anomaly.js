@@ -79,6 +79,18 @@ export const anomalyResponseObjNew = [
   }
 ];
 
+export const anomalySeverityLevelObj = [{
+  name: 'Default', value: 'DEFAULT'
+}, {
+  name: 'Low', value: 'LOW'
+}, {
+  name: 'Medium', value: 'MEDIUM'
+}, {
+  name: 'High', value: 'HIGH'
+}, {
+  name: 'Critical', value: 'CRITICAL'
+}]
+
 export const anomalyTypeMapping = {
   "DEVIATION": "Metric Deviation", "TREND_CHANGE": "Trend Change", "DATA_SLA": "SLA Violation"
 }
@@ -305,5 +317,6 @@ export default {
   getBounds,
   searchAnomaly,
   searchAnomalyWithFilters,
-  anomalyTypeMapping
+  anomalyTypeMapping,
+  anomalySeverityLevelObj
 };

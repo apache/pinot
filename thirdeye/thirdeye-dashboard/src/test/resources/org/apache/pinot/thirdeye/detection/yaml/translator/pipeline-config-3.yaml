@@ -1,0 +1,31 @@
+detectionName: testPipeline
+description: My test pipeline
+metric: test_metric
+dataset: test_dataset
+type: METRIC_ALERT
+filters:
+  D1:
+  - v1
+  - v2
+  D2:
+  - v3
+dimensionExploration:
+  dimensions:
+  - D1
+  - D2
+  minContribution: 0.05
+rules:
+- detection:
+  - type: THRESHOLD
+    name: rule1
+    params:
+      max: 100
+grouper:
+  - type: MOCK_GROUPER
+    name: test_grouper_1
+    params:
+      mockParam: 0.3
+  - type: MOCK_GROUPER
+    name: test_grouper_2
+    params:
+      mockParam: 0.5

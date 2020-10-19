@@ -19,16 +19,16 @@
 
 package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import java.util.Set;
 import org.apache.commons.collections4.CollectionUtils;
-
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dao.GenericPojoDao;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.MetricConfigBean;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
@@ -42,8 +42,9 @@ public class MetricConfigManagerImpl extends AbstractManagerImpl<MetricConfigDTO
   private static final String FIND_BY_ALIAS_LIKE = " WHERE active = :active";
   private static final String FIND_BY_ALIAS_LIKE_PART = " AND alias LIKE :alias__%d";
 
-  public MetricConfigManagerImpl() {
-    super(MetricConfigDTO.class, MetricConfigBean.class);
+  @Inject
+  public MetricConfigManagerImpl(GenericPojoDao genericPojoDao) {
+    super(MetricConfigDTO.class, MetricConfigBean.class, genericPojoDao);
   }
 
   @Override

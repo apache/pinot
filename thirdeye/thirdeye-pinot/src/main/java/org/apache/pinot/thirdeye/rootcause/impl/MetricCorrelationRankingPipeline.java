@@ -72,8 +72,8 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
   private static final String PRE_CURRENT = "current:";
   private static final String PRE_BASELINE = "baseline:";
 
-  private static final String COL_TIME = DataFrameUtils.COL_TIME;
-  private static final String COL_VALUE = DataFrameUtils.COL_VALUE;
+  private static final String COL_TIME = DataFrame.COL_TIME;
+  private static final String COL_VALUE = DataFrame.COL_VALUE;
   private static final String COL_CURRENT = "current";
   private static final String COL_BASELINE = "baseline";
   private static final String COL_CHANGE = "change";

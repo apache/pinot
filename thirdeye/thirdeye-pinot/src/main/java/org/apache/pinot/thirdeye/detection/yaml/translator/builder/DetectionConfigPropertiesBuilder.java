@@ -60,6 +60,7 @@ public abstract class DetectionConfigPropertiesBuilder {
   static final String PROP_NESTED_METRIC_URNS = "nestedMetricUrns";
   static final String PROP_RULES = "rules";
   static final String PROP_GROUPER = "grouper";
+  static final String PROP_LABELER = "labeler";
   static final String PROP_NESTED = "nested";
   static final String PROP_BASELINE_PROVIDER = "baselineValueProvider";
   static final String PROP_DETECTOR = "detector";
@@ -89,9 +90,9 @@ public abstract class DetectionConfigPropertiesBuilder {
     this.dataProvider = dataProvider;
   }
 
-  public abstract Map<String, Object> buildMetricAlertProperties(Map<String, Object> yamlConfigMap) throws IllegalArgumentException;
+  public abstract Map<String, Object> buildMetricAlertProperties(Map<String, Object> yamlConfigMap);
 
-  public abstract Map<String, Object> buildCompositeAlertProperties(Map<String, Object> yamlConfigMap) throws IllegalArgumentException;
+  public abstract Map<String, Object> buildCompositeAlertProperties(Map<String, Object> yamlConfigMap);
 
   Map<String, Object> buildDimensionWrapperProperties(Map<String, Object> yamlConfigMap,
       Map<String, Collection<String>> dimensionFilters, String metricUrn, String datasetName) {
@@ -121,12 +122,11 @@ public abstract class DetectionConfigPropertiesBuilder {
     properties.put(PROP_NESTED, nestedProps);
     properties.put(PROP_SUB_ENTITY_NAME, entityName);
 
-    String grouperType = MapUtils.getString(grouperYaml, PROP_TYPE);
-    String grouperName = MapUtils.getString(grouperYaml, PROP_NAME);
-    String grouperRefKey = makeComponentRefKey(grouperType, grouperName);
+    String grouperRefKey = makeComponentRefKey(
+        MapUtils.getString(grouperYaml, PROP_TYPE), MapUtils.getString(grouperYaml, PROP_NAME));
     properties.put(PROP_GROUPER, grouperRefKey);
 
-    buildComponentSpec(metricUrn, grouperYaml, grouperType, grouperRefKey);
+    buildComponentSpec(metricUrn, grouperYaml, grouperRefKey);
 
     return properties;
   }
@@ -140,19 +140,29 @@ public abstract class DetectionConfigPropertiesBuilder {
     if (wrapperProperties.isEmpty()) {
       return Collections.emptyList();
     }
-    String name = MapUtils.getString(yamlConfig, PROP_NAME);
-    String filterType = MapUtils.getString(yamlConfig, PROP_TYPE);
-    String filterRefKey = makeComponentRefKey(filterType, name);
+    String filterRefKey = makeComponentRefKey(
+        MapUtils.getString(yamlConfig, PROP_TYPE), MapUtils.getString(yamlConfig, PROP_NAME));
     wrapperProperties.put(PROP_FILTER, filterRefKey);
-    buildComponentSpec(metricUrn, yamlConfig, filterType, filterRefKey);
+    buildComponentSpec(metricUrn, yamlConfig, filterRefKey);
 
     return Collections.singletonList(wrapperProperties);
   }
 
-  void buildComponentSpec(String metricUrn, Map<String, Object> yamlConfig, String type, String componentRefKey) {
-    Map<String, Object> componentSpecs = new HashMap<>();
+  Map<String, Object> buildLabelerWrapperProperties(String metricUrn, String wrapperClassName,
+      Map<String, Object> yamlConfig, List<Map<String, Object>> nestedProperties) {
+    Map<String, Object> wrapperProperties = buildWrapperProperties(wrapperClassName, nestedProperties);
+    String labelerRefKey = makeComponentRefKey(
+        MapUtils.getString(yamlConfig, PROP_TYPE), MapUtils.getString(yamlConfig, PROP_NAME));
+    wrapperProperties.put(PROP_LABELER, labelerRefKey);
+    buildComponentSpec(metricUrn, yamlConfig, labelerRefKey);
+    return wrapperProperties;
+  }
 
-    String componentClassName = DETECTION_REGISTRY.lookup(type);
+
+  void buildComponentSpec(String metricUrn, Map<String, Object> yamlConfig, String componentRefKey) {
+    Map<String, Object> componentSpecs = new HashMap<>();
+    String componentKey = DetectionUtils.getComponentKey(componentRefKey);
+    String componentClassName = DETECTION_REGISTRY.lookup(DetectionUtils.getComponentType(componentKey));
     componentSpecs.put(PROP_CLASS_NAME, componentClassName);
     if (metricUrn != null) {
       componentSpecs.put(PROP_METRIC_URN, metricUrn);
@@ -168,7 +178,7 @@ public abstract class DetectionConfigPropertiesBuilder {
       componentSpecs.putAll(params);
     }
 
-    metricAttributesMap.addComponent(DetectionUtils.getComponentKey(componentRefKey), componentSpecs);
+    metricAttributesMap.addComponent(componentKey, componentSpecs);
   }
 
   Map<String, Object> compositePropertyBuilderHelper(List<Map<String, Object>> nestedPropertiesList,

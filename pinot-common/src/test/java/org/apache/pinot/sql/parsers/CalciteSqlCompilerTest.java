@@ -731,6 +731,19 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
+  public void testTimeTransformFunction() {
+    PinotQuery pinotQuery = CalciteSqlParser
+        .compileToPinotQuery("  select hour(ts), d1, sum(m1) from baseballStats group by hour(ts), d1");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "HOUR");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "ts");
+    Assert.assertEquals(pinotQuery.getSelectList().get(1).getIdentifier().getName(), "d1");
+    Assert.assertEquals(pinotQuery.getSelectList().get(2).getFunctionCall().getOperator(), "SUM");
+    Assert.assertEquals(pinotQuery.getGroupByList().get(0).getFunctionCall().getOperator(), "HOUR");
+    Assert.assertEquals(pinotQuery.getGroupByList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "ts");
+    Assert.assertEquals(pinotQuery.getGroupByList().get(1).getIdentifier().getName(), "d1");
+  }
+
+  @Test
   public void testSqlDistinctQueryCompilation() {
     // test single column DISTINCT
     String sql = "SELECT DISTINCT c1 FROM foo";
