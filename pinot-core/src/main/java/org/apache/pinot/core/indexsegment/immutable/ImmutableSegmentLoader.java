@@ -66,7 +66,7 @@ public class ImmutableSegmentLoader {
    * For tests only.
    */
   public static ImmutableSegment load(File indexDir, ReadMode readMode,
-      PartitionUpsertMetadataManager partitionUpsertMetadataManager)
+      @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager)
       throws Exception {
     IndexLoadingConfig defaultIndexLoadingConfig = new IndexLoadingConfig();
     defaultIndexLoadingConfig.setReadMode(readMode);
