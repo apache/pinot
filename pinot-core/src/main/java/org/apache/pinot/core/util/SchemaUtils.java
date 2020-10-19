@@ -93,8 +93,7 @@ public class SchemaUtils {
                 "Exception in getting arguments for transform function '" + transformFunction + "' for column '"
                     + column + "'", e);
           }
-        } else if (!(fieldSpec.getFieldType().equals(FieldSpec.FieldType.TIME) && fieldSpec.getFieldType()
-            .equals(FieldSpec.FieldType.DATE_TIME))) {
+        } else {
           primaryKeyColumnCandidates.add(column);
         }
         if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.TIME)) {
@@ -111,7 +110,7 @@ public class SchemaUtils {
     if (schema.getPrimaryKeyColumns() != null) {
       for (String primaryKeyColumn : schema.getPrimaryKeyColumns()) {
         Preconditions.checkState(primaryKeyColumnCandidates.contains(primaryKeyColumn),
-            "The primary key column must exist and cannot be a time column");
+            "The primary key column must exist");
       }
     }
   }
