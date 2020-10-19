@@ -58,9 +58,7 @@ public abstract class AbstractRecordExtractorTest {
     _inputRecords = getInputRecords();
     createInputFile();
     _recordReader = createRecordReader(_sourceFieldNames);
-    if (testExtractAll()) {
-      _recordReaderNoIncludeList = createRecordReader(null);
-    }
+    _recordReaderNoIncludeList = createRecordReader(null);
   }
 
   protected List<Map<String, Object>> getInputRecords() {
@@ -89,13 +87,6 @@ public abstract class AbstractRecordExtractorTest {
 
   protected Set<String> getSourceFields() {
     return Sets.newHashSet("user_id", "firstName", "lastName", "bids", "campaignInfo", "cost", "timestamp");
-  }
-
-  /**
-   * Set to true if the extractor handles extracting all fields if fieldsToRead is null
-   */
-  protected boolean testExtractAll() {
-    return false;
   }
 
   @AfterClass
@@ -131,7 +122,7 @@ public abstract class AbstractRecordExtractorTest {
       Map<Object, Object> actualMap = (HashMap) actualValue;
       Map<Object, Object> expectedMap = (HashMap) expectedValue;
       for (Map.Entry<Object, Object> mapEntry : expectedMap.entrySet()) {
-        Assert.assertEquals(actualMap.get(mapEntry.getKey().toString()), mapEntry.getValue());
+        checkValue(mapEntry.getValue(), actualMap.get(mapEntry.getKey().toString()));
       }
     } else if (expectedValue instanceof GenericData.Record) {
       Map<Object, Object> actualMap = (HashMap) actualValue;

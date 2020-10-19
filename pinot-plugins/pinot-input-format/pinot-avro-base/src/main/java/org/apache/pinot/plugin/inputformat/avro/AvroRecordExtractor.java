@@ -18,25 +18,27 @@
  */
 package org.apache.pinot.plugin.inputformat.avro;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.pinot.spi.data.readers.BaseRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 
 
 /**
  * Extractor for Avro Records
  */
-public class AvroRecordExtractor implements RecordExtractor<GenericRecord> {
+public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
   private Set<String> _fields;
   private boolean _extractAll = false;
 
   @Override
-  public void init(Set<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig) {
+  public void init(@Nullable Set<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig) {
     _fields = fields;
     if (fields == null || fields.isEmpty()) {
       _extractAll = true;
@@ -49,13 +51,56 @@ public class AvroRecordExtractor implements RecordExtractor<GenericRecord> {
       List<Schema.Field> fields = from.getSchema().getFields();
       for (Schema.Field field : fields) {
         String fieldName = field.name();
-        to.putValue(fieldName, AvroUtils.convert(from.get(fieldName)));
+        Object value = from.get(fieldName);
+        if (value != null) {
+          value = convert(value);
+        }
+        to.putValue(fieldName, value);
       }
     } else {
       for (String fieldName : _fields) {
-        to.putValue(fieldName, AvroUtils.convert(from.get(fieldName)));
+        Object value = from.get(fieldName);
+        if (value != null) {
+          value = convert(value);
+        }
+        to.putValue(fieldName, value);
       }
     }
     return to;
+  }
+
+  /**
+   * Returns whether the object is an Avro GenericRecord.
+   */
+  @Override
+  protected boolean isRecord(Object value) {
+    return value instanceof GenericRecord;
+  }
+
+  /**
+   * Handles the conversion of every field of the Avro GenericRecord.
+   *
+   * @param value should be verified to be a GenericRecord type prior to calling this method as it will be casted
+   *              without checking
+   */
+  @Override
+  @Nullable
+  protected Object convertRecord(Object value) {
+    GenericRecord record = (GenericRecord) value;
+    List<Schema.Field> fields = record.getSchema().getFields();
+    if (fields.isEmpty()) {
+      return null;
+    }
+
+    Map<Object, Object> convertedMap = new HashMap<>();
+    for (Schema.Field field : fields) {
+      String fieldName = field.name();
+      Object fieldValue = record.get(fieldName);
+      if (fieldValue != null) {
+        fieldValue = convert(fieldValue);
+      }
+      convertedMap.put(fieldName, fieldValue);
+    }
+    return convertedMap;
   }
 }

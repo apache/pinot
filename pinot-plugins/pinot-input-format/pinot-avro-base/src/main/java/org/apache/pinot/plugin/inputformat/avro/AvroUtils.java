@@ -22,9 +22,6 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -33,7 +30,6 @@ import javax.annotation.Nullable;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.file.DataFileStream;
-import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -45,11 +41,13 @@ import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
-import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * Utils for handling Avro records
+ */
 public class AvroUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(AvroUtils.class);
 
@@ -281,87 +279,5 @@ public class AvroUtils {
     } else {
       return fieldSchema;
     }
-  }
-
-  /**
-   * Converts the value to either a single value (string, number, bytebuffer), multi value (Object[]) or a Map
-   *
-   * Natively Pinot only understands single values and multi values.
-   * Map is useful only if some ingestion transform functions operates on it in the transformation layer
-   */
-  public static Object convert(Object value) {
-    if (value == null) {
-      return null;
-    }
-    Object convertedValue;
-    if (value instanceof Collection) {
-      convertedValue = handleMultiValue((Collection) value);
-    } else if (value instanceof Map) {
-      convertedValue = handleMap((Map) value);
-    } else if(value instanceof GenericData.Record) {
-      convertedValue = handleGenericRecord((GenericData.Record) value);
-    } else {
-      convertedValue = RecordReaderUtils.convertSingleValue(value);
-    }
-    return convertedValue;
-  }
-
-  /**
-   * Handles the conversion of each value of the Collection.
-   * Converts the Collection to an Object array
-   */
-  public static Object handleMultiValue(Collection values) {
-
-    if (values.isEmpty()) {
-      return null;
-    }
-    int numValues = values.size();
-    Object[] array = new Object[numValues];
-    int index = 0;
-    for (Object value : values) {
-      Object convertedValue = convert(value);
-      if (convertedValue != null && !convertedValue.toString().equals("")) {
-        array[index++] = convertedValue;
-      }
-    }
-    if (index == numValues) {
-      return array;
-    } else if (index == 0) {
-      return null;
-    } else {
-      return Arrays.copyOf(array, index);
-    }
-  }
-
-  /**
-   * Handles the conversion of every value of the Map
-   */
-  public static Object handleMap(Map map) {
-    if (map.isEmpty()) {
-      return null;
-    }
-
-    Map<Object, Object> convertedMap = new HashMap<>();
-    for (Object key : map.keySet()) {
-      convertedMap.put(RecordReaderUtils.convertSingleValue(key), convert(map.get(key)));
-    }
-    return convertedMap;
-  }
-
-  /**
-   * Handles the conversion of every field of the GenericRecord
-   */
-  private static Object handleGenericRecord(GenericData.Record record) {
-    List<Field> fields = record.getSchema().getFields();
-    if (fields.isEmpty()) {
-      return null;
-    }
-
-    Map<Object, Object> convertedMap = new HashMap<>();
-    for (Field field : fields) {
-      String fieldName = field.name();
-      convertedMap.put(fieldName, convert(record.get(fieldName)));
-    }
-    return convertedMap;
   }
 }

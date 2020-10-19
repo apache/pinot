@@ -36,6 +36,7 @@ import org.apache.hadoop.hive.ql.exec.vector.DoubleColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.ListColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.LongColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.MapColumnVector;
+import org.apache.hadoop.hive.ql.exec.vector.StructColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.TimestampColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
 import org.apache.orc.OrcFile;
@@ -72,7 +73,7 @@ public class ORCRecordReader implements RecordReader {
   private int _nextRowId;
 
   @Override
-  public void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
+  public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
     Configuration configuration = new Configuration();
     Reader orcReader = OrcFile.createReader(new Path(dataFile.getAbsolutePath()),
@@ -89,40 +90,11 @@ public class ORCRecordReader implements RecordReader {
     // NOTE: Include for ORC reader uses field id as the index
     boolean[] orcReaderInclude = new boolean[orcSchema.getMaximumId() + 1];
     orcReaderInclude[orcSchema.getId()] = true;
+    boolean extractAllFields = fieldsToRead == null || fieldsToRead.isEmpty();
     for (int i = 0; i < numOrcFields; i++) {
       String field = _orcFields.get(i);
-      if (fieldsToRead.contains(field)) {
-        TypeDescription fieldType = _orcFieldTypes.get(i);
-        TypeDescription.Category category = fieldType.getCategory();
-        if (category == TypeDescription.Category.LIST) {
-          // Multi-value field
-          TypeDescription.Category childCategory = fieldType.getChildren().get(0).getCategory();
-          Preconditions.checkState(isSupportedSingleValueType(childCategory), "Illegal multi-value field type: %s (field %s)",
-              childCategory, field);
-          // NOTE: LIST is stored as 2 vectors
-          int fieldId = fieldType.getId();
-          orcReaderInclude[fieldId] = true;
-          orcReaderInclude[fieldId + 1] = true;
-        } else if (category == TypeDescription.Category.MAP) {
-          // Map field
-          List<TypeDescription> children = fieldType.getChildren();
-          TypeDescription.Category keyCategory = children.get(0).getCategory();
-          Preconditions
-              .checkState(isSupportedSingleValueType(keyCategory), "Illegal map key field type: %s (field %s)", keyCategory, field);
-          TypeDescription.Category valueCategory = children.get(1).getCategory();
-          Preconditions
-              .checkState(isSupportedSingleValueType(valueCategory), "Illegal map value field type: %s (field %s)", valueCategory, field);
-          // NOTE: MAP is stored as 3 vectors
-          int fieldId = fieldType.getId();
-          orcReaderInclude[fieldId] = true;
-          orcReaderInclude[fieldId + 1] = true;
-          orcReaderInclude[fieldId + 2] = true;
-        } else {
-          // Single-value field
-          Preconditions
-              .checkState(isSupportedSingleValueType(category), "Illegal single-value field type: %s (field %s)", category, field);
-          orcReaderInclude[fieldType.getId()] = true;
-        }
+      if (extractAllFields || fieldsToRead.contains(field)) {
+        initFieldsToRead(orcReaderInclude, _orcFieldTypes.get(i), field);
         _includeOrcFields[i] = true;
       }
     }
@@ -131,6 +103,45 @@ public class ORCRecordReader implements RecordReader {
     _rowBatch = orcSchema.createRowBatch();
     _hasNext = _orcRecordReader.nextBatch(_rowBatch);
     _nextRowId = 0;
+  }
+
+  /**
+   * Initializes the fields to be read using the field ID. Traverses children fields in the case
+   * of struct, list, or map types.
+   *
+   * @param orcReaderInclude IDs of the fields to be read
+   * @param fieldType contains the field ID and its children TypeDescriptions (if not a single value field)
+   * @param field name of the field being read
+   */
+  private void initFieldsToRead(boolean[] orcReaderInclude, TypeDescription fieldType, String field) {
+    int fieldId = fieldType.getId();
+    orcReaderInclude[fieldId] = true; // Include ID for top level field
+    TypeDescription.Category category = fieldType.getCategory();
+    if (category == TypeDescription.Category.LIST) {
+      // Lists always have a single child column for its elements
+      TypeDescription childFieldType = fieldType.getChildren().get(0);
+      initFieldsToRead(orcReaderInclude, childFieldType, field);
+    } else if (category == TypeDescription.Category.MAP) {
+      orcReaderInclude[fieldId + 1] = true; //include ID for the map's keys
+
+      // Maps always have two child columns for its keys and values
+      List<TypeDescription> children = fieldType.getChildren();
+      TypeDescription.Category keyCategory = children.get(0).getCategory();
+      Preconditions.checkState(isSupportedSingleValueType(keyCategory),
+          "Illegal map key field type: %s (field %s)", keyCategory, field);
+      initFieldsToRead(orcReaderInclude, children.get(1), field);
+    } else if (category == TypeDescription.Category.STRUCT) {
+      List<String> childrenFieldNames = fieldType.getFieldNames();
+      List<TypeDescription> childrenFieldTypes = fieldType.getChildren();
+      // Struct columns have one child column for each field of the struct
+      for (int i = 0; i < childrenFieldNames.size(); i++) {
+        initFieldsToRead(orcReaderInclude, childrenFieldTypes.get(i), childrenFieldNames.get(i));
+      }
+    } else {
+      // Single-value field
+      Preconditions
+          .checkState(isSupportedSingleValueType(category), "Illegal single-value field type: %s (field %s)", category, field);
+    }
   }
 
   private static boolean isSupportedSingleValueType(TypeDescription.Category category) {
@@ -175,59 +186,7 @@ public class ORCRecordReader implements RecordReader {
       }
       String field = _orcFields.get(i);
       TypeDescription fieldType = _orcFieldTypes.get(i);
-      TypeDescription.Category category = fieldType.getCategory();
-      if (category == TypeDescription.Category.LIST) {
-        // Multi-value field, extract to Object[]
-        TypeDescription.Category childCategory = fieldType.getChildren().get(0).getCategory();
-        ListColumnVector listColumnVector = (ListColumnVector) _rowBatch.cols[i];
-        int rowId = listColumnVector.isRepeating ? 0 : _nextRowId;
-        if ((listColumnVector.noNulls || !listColumnVector.isNull[rowId])) {
-          int offset = (int) listColumnVector.offsets[rowId];
-          int length = (int) listColumnVector.lengths[rowId];
-          List<Object> values = new ArrayList<>(length);
-          for (int j = 0; j < length; j++) {
-            Object value = extractSingleValue(field, listColumnVector.child, offset + j, childCategory);
-            // NOTE: Only keep non-null values
-            // TODO: Revisit
-            if (value != null) {
-              values.add(value);
-            }
-          }
-          if (!values.isEmpty()) {
-            reuse.putValue(field, values.toArray());
-          } else {
-            // NOTE: Treat empty list as null
-            // TODO: Revisit
-            reuse.putValue(field, null);
-          }
-        } else {
-          reuse.putValue(field, null);
-        }
-      } else if (category == TypeDescription.Category.MAP) {
-        // Map field
-        List<TypeDescription> children = fieldType.getChildren();
-        TypeDescription.Category keyCategory = children.get(0).getCategory();
-        TypeDescription.Category valueCategory = children.get(1).getCategory();
-        MapColumnVector mapColumnVector = (MapColumnVector) _rowBatch.cols[i];
-        int rowId = mapColumnVector.isRepeating ? 0 : _nextRowId;
-        if ((mapColumnVector.noNulls || !mapColumnVector.isNull[rowId])) {
-          int offset = (int) mapColumnVector.offsets[rowId];
-          int length = (int) mapColumnVector.lengths[rowId];
-          Map<Object, Object> map = new HashMap<>();
-          for (int j = 0; j < length; j++) {
-            int childRowId = offset + j;
-            Object key = extractSingleValue(field, mapColumnVector.keys, childRowId, keyCategory);
-            Object value = extractSingleValue(field, mapColumnVector.values, childRowId, valueCategory);
-            map.put(key, value);
-          }
-          reuse.putValue(field, map);
-        } else {
-          reuse.putValue(field, null);
-        }
-      } else {
-        // Single-value field
-        reuse.putValue(field, extractSingleValue(field, _rowBatch.cols[i], _nextRowId, category));
-      }
+      reuse.putValue(field, extractValue(field, _rowBatch.cols[i], fieldType, _nextRowId));
     }
 
     if (++_nextRowId == _rowBatch.size) {
@@ -236,6 +195,92 @@ public class ORCRecordReader implements RecordReader {
     }
     return reuse;
   }
+
+  /**
+   * Extracts the values for a given column vector.
+   *
+   * @param field name of the field being extracted
+   * @param columnVector contains values of the field and its sub-types
+   * @param fieldType information about the field such as the category (STRUCT, LIST, MAP, INT, etc)
+   * @param rowId the ID of the row value being extracted
+   * @return extracted row value from the column
+   */
+  @Nullable
+  private Object extractValue(String field, ColumnVector columnVector, TypeDescription fieldType, int rowId) {
+    TypeDescription.Category category = fieldType.getCategory();
+
+    if (category == TypeDescription.Category.LIST) {
+      TypeDescription childType = fieldType.getChildren().get(0);
+      ListColumnVector listColumnVector = (ListColumnVector) columnVector;
+      if (columnVector.isRepeating) {
+        rowId = 0;
+      }
+      if ((listColumnVector.noNulls || !listColumnVector.isNull[rowId])) {
+        int offset = (int) listColumnVector.offsets[rowId];
+        int length = (int) listColumnVector.lengths[rowId];
+        List<Object> values = new ArrayList<>(length);
+        for (int j = 0; j < length; j++) {
+          Object value = extractValue(field, listColumnVector.child, childType,offset + j);
+          // NOTE: Only keep non-null values
+          if (value != null) {
+            values.add(value);
+          }
+        }
+        if (!values.isEmpty()) {
+          return values.toArray();
+        } else {
+          // NOTE: Treat empty list as null
+          return null;
+        }
+      } else {
+        return null;
+      }
+    } else if (category == TypeDescription.Category.MAP) {
+      List<TypeDescription> children = fieldType.getChildren();
+      TypeDescription.Category keyCategory = children.get(0).getCategory();
+      TypeDescription valueType = children.get(1);
+      MapColumnVector mapColumnVector = (MapColumnVector) columnVector;
+
+      if (columnVector.isRepeating) {
+        rowId = 0;
+      }
+
+      if ((mapColumnVector.noNulls || !mapColumnVector.isNull[rowId])) {
+        int offset = (int) mapColumnVector.offsets[rowId];
+        int length = (int) mapColumnVector.lengths[rowId];
+        Map<Object, Object> map = new HashMap<>();
+        for (int j = 0; j < length; j++) {
+          int childRowId = offset + j;
+          Object key = extractSingleValue(field, mapColumnVector.keys, childRowId, keyCategory);
+          Object value = extractValue(field, mapColumnVector.values, valueType, childRowId);
+          map.put(key, value);
+        }
+
+        return map;
+      } else {
+        return null;
+      }
+    } else if (category == TypeDescription.Category.STRUCT) {
+      StructColumnVector structColumnVector = (StructColumnVector) columnVector;
+      if (!structColumnVector.isNull[rowId]) {
+        List<TypeDescription> childrenFieldTypes = fieldType.getChildren();
+        List<String> childrenFieldNames = fieldType.getFieldNames();
+
+        Map<Object, Object> convertedMap = new HashMap<>();
+        for (int i = 0; i < childrenFieldNames.size(); i++) {
+          convertedMap.put(childrenFieldNames.get(i),
+              extractValue(childrenFieldNames.get(i), structColumnVector.fields[i], childrenFieldTypes.get(i), rowId));
+        }
+        return convertedMap;
+      } else {
+        return null;
+      }
+    } else {
+      // Handle single-value field
+      return extractSingleValue(field, columnVector, rowId, category);
+    }
+  }
+
 
   @Nullable
   private static Object extractSingleValue(String field, ColumnVector columnVector, int rowId, TypeDescription.Category category) {
@@ -301,13 +346,7 @@ public class ORCRecordReader implements RecordReader {
         BytesColumnVector bytesColumnVector = (BytesColumnVector) columnVector;
         if (bytesColumnVector.noNulls || !bytesColumnVector.isNull[rowId]) {
           int length = bytesColumnVector.length[rowId];
-          if (length != 0) {
-            return StringUtils.decodeUtf8(bytesColumnVector.vector[rowId], bytesColumnVector.start[rowId], length);
-          } else {
-            // NOTE: Treat empty String as null
-            // TODO: Revisit
-            return null;
-          }
+          return StringUtils.decodeUtf8(bytesColumnVector.vector[rowId], bytesColumnVector.start[rowId], length);
         } else {
           return null;
         }

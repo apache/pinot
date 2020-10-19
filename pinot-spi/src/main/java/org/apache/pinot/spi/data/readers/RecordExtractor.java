@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.data.readers;
 
 import java.util.Set;
+import javax.annotation.Nullable;
 
 
 /**
@@ -33,10 +34,10 @@ public interface RecordExtractor<T> {
   /**
    * Initialize the record extractor with its config
    *
-   * @param fields List of field names to extract from the provided input record. If blank, extracts all fields (only for AVRO/JSON currently)
+   * @param fields List of field names to extract from the provided input record. If null or empty, extracts all fields.
    * @param recordExtractorConfig The record extractor config
    */
-  void init(Set<String> fields, RecordExtractorConfig recordExtractorConfig);
+  void init(@Nullable Set<String> fields, RecordExtractorConfig recordExtractorConfig);
 
   /**
    * Extracts fields as listed in the sourceFieldNames from the given input record and sets them into the GenericRow
@@ -46,4 +47,17 @@ public interface RecordExtractor<T> {
    * @return The output GenericRow
    */
   GenericRow extract(T from, GenericRow to);
+
+  /**
+   * Converts a field of the given input record. The field value will be converted to either a single value
+   * (string, number, byte[]), multi value (Object[]) or a Map.
+   *
+   * Natively Pinot only understands single values and multi values.
+   * Map is useful only if some ingestion transform functions operates on it in the transformation layer.
+   *
+   * @param value the field value to be converted
+   * @return The converted field value. Returns null for empty array/collection/map.
+   */
+  @Nullable
+  Object convert(Object value);
 }

@@ -19,12 +19,10 @@
 package org.apache.pinot.plugin.inputformat.avro;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -90,11 +88,6 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
         fileWriter.append(record);
       }
     }
-  }
-
-  @Override
-  protected boolean testExtractAll() {
-    return true;
   }
 
   @Test
