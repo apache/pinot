@@ -18,10 +18,48 @@
 # under the License.
 #
 
-JAR_PATH="$(find /opt/pinot/lib/pinot-all-*-jar-with-dependencies.jar)"
-ADMIN_PATH="/opt/pinot/bin/pinot-admin.sh"
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
+JAR_PATH="$(find $DIR/../lib/pinot-all-*-jar-with-dependencies.jar 2>/dev/null)"
+ADMIN_PATH="$DIR/pinot-admin.sh"
 TEMP_DIR=$(mktemp -d -t pinotGenerator-XXXXXXXX)
 TEMPLATE_BASEDIR="$TEMP_DIR/generator"
+CONTROLLER_HOST="localhost"
+CONTROLLER_PORT="9000"
+
+USAGE="$(basename "$0") [-h] [-a PATH] [-c HOST:PORT] [-j PATH] TEMPLATE_NAME [TABLE_NAME]
+
+  where:
+      -h  show this help text
+      -a  set pinot-admin path for segement creation
+      -c  set the controller host and port (default: 'localhost:9000')
+      -j  set jar path for resource extraction"
+
+while getopts ':ha:c:j:' OPTION; do
+  case "$OPTION" in
+    h) echo "$USAGE"
+       exit
+       ;;
+    a) ADMIN_PATH="$OPTARG"
+       ;;
+    c) case $OPTARG in
+         (*:*) CONTROLLER_HOST=${OPTARG%:*} CONTROLLER_PORT=${OPTARG##*:};;
+         (*)   CONTROLLER_HOST=$OPTARG      CONTROLLER_PORT=9000;;
+       esac
+       ;;
+    j) JAR_PATH="$OPTARG"
+       ;;
+    :) printf "missing argument for -%s\n" "$OPTARG" >&2
+       echo "$USAGE" >&2
+       exit 1
+       ;;
+   \?) printf "illegal option: -%s\n" "$OPTARG" >&2
+       echo "$USAGE" >&2
+       exit 1
+       ;;
+  esac
+done
+shift $((OPTIND - 1))
 
 TEMPLATE_NAME="$1"
 if [ -z "$TEMPLATE_NAME" ]; then
@@ -38,8 +76,21 @@ fi
 DATA_DIR="${TEMP_DIR:?}/${TEMPLATE_NAME}"
 SEGMENT_DIR="${TEMP_DIR:?}/${TEMPLATE_NAME}Segment"
 
-echo "Extracting template files to '${TEMP_DIR}'"
+echo "Extracting template files from '${JAR_PATH}' to '${TEMP_DIR}'"
+
 /bin/sh -c "cd \"${TEMP_DIR}\" && jar -xf \"${JAR_PATH}\" \"generator/${TEMPLATE_NAME}_schema.json\" \"generator/${TEMPLATE_NAME}_config.json\" \"generator/${TEMPLATE_NAME}_generator.json\""
+
+if [ $? != 0 ]; then
+  echo "Extracting template failed. Aborting."
+  rm -rf "$TEMP_DIR"
+  exit 1
+fi
+
+if [ ! -e "${TEMP_DIR}/generator/${TEMPLATE_NAME}_schema.json" ] || [ ! -e "${TEMP_DIR}/generator/${TEMPLATE_NAME}_config.json" ] || [ ! -e "${TEMP_DIR}/generator/${TEMPLATE_NAME}_generator.json" ]; then
+  echo "Could not find template '$TEMPLATE_NAME'. Aborting."
+  rm -rf "$TEMP_DIR"
+  exit 1
+fi
 
 echo "Setting table name and schema name to $TABLE_NAME"
 sed -i -e "s/\"tableName\": \"$TEMPLATE_NAME\"/\"tableName\": \"$TABLE_NAME\"/g" "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_config.json"
@@ -68,7 +119,7 @@ JAVA_OPTS="" ${ADMIN_PATH} CreateSegment \
 -outDir "${SEGMENT_DIR}"
 
 if [ ! -d "${SEGMENT_DIR}" ]; then
-  echo "Data generation failed. Aborting."
+  echo "Segment creation failed. Aborting."
   rm -rf "$TEMP_DIR"
   exit 1
 fi
@@ -76,12 +127,28 @@ fi
 echo "Adding table ${TABLE_NAME} from template ${TEMPLATE_NAME}"
 JAVA_OPTS="" ${ADMIN_PATH} AddTable -exec \
 -tableConfigFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_config.json" \
--schemaFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_schema.json" || exit 1
+-schemaFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_schema.json" \
+-controllerHost "${CONTROLLER_HOST}" \
+-controllerPort "${CONTROLLER_PORT}"
+
+if [ $? != 0 ]; then
+  echo "Adding table failed. Aborting."
+  rm -rf "$TEMP_DIR"
+  exit 1
+fi
 
 echo "Uploading segment for ${TEMPLATE_NAME}"
 JAVA_OPTS="" ${ADMIN_PATH} UploadSegment \
 -tableName "${TABLE_NAME}" \
--segmentDir "${SEGMENT_DIR}"
+-segmentDir "${SEGMENT_DIR}" \
+-controllerHost "${CONTROLLER_HOST}" \
+-controllerPort "${CONTROLLER_PORT}"
+
+if [ $? != 0 ]; then
+  echo "Segment upload failed. Aborting."
+  rm -rf "$TEMP_DIR"
+  exit 1
+fi
 
 echo "Deleting temp directory"
 rm -rf "$TEMP_DIR"
