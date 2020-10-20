@@ -75,9 +75,11 @@ public class SchemaUtils {
 
     Set<String> transformedColumns = new HashSet<>();
     Set<String> argumentColumns = new HashSet<>();
+    Set<String> primaryKeyColumnCandidates = new HashSet<>();
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn()) {
         String column = fieldSpec.getName();
+        primaryKeyColumnCandidates.add(column);
         String transformFunction = fieldSpec.getTransformFunction();
         if (transformFunction != null) {
           try {
@@ -104,6 +106,12 @@ public class SchemaUtils {
     Preconditions.checkState(Collections.disjoint(transformedColumns, argumentColumns),
         "Columns: %s are a result of transformations, and cannot be used as arguments to other transform functions",
         transformedColumns.retainAll(argumentColumns));
+    if (schema.getPrimaryKeyColumns() != null) {
+      for (String primaryKeyColumn : schema.getPrimaryKeyColumns()) {
+        Preconditions.checkState(primaryKeyColumnCandidates.contains(primaryKeyColumn),
+            "The primary key column must exist");
+      }
+    }
   }
 
   /**
