@@ -125,6 +125,15 @@ function stopServices() {
   echo "Cluster stopped."
 } 
 
+# Setup the path and classpath prefix for compatibility tester executable
+function setupCompatTester() {
+  COMPAT_TESTER="$(dirname $0)/../${COMPAT_TESTER_PATH}"
+  local pinotIntegTestsRelDir="$(dirname $0)/../pinot-integration-tests/target"
+  local pinotIntegTestsAbsDir=`(cd ${pinotIntegTestsRelDir};pwd)`
+  CLASSPATH_PREFIX=$(ls ${pinotIntegTestsAbsDir}/pinot-integration-tests-*-tests.jar)
+  export CLASSPATH_PREFIX
+}
+
 #
 # Main
 #
@@ -132,7 +141,7 @@ function stopServices() {
 # cleanp the temporary directory when the bash script exits 
 trap cleanup EXIT
 
-COMPAT_TESTER="$(dirname $0)/../${COMPAT_TESTER_PATH}"
+setupCompatTester
 
 if [ $# -lt 2 ] || [ $# -gt 3 ] ; then
   usage compCheck
