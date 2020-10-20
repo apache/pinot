@@ -140,6 +140,8 @@ public class PinotHelixResourceManager {
 
   private final Map<String, Map<String, Long>> _segmentCrcMap = new HashMap<>();
   private final Map<String, Map<String, Integer>> _lastKnownSegmentMetadataVersionMap = new HashMap<>();
+  private final Map<String, Object> _tableUpdaterLockMap = new HashMap<>();
+
   private final LoadingCache<String, String> _instanceAdminEndpointCache;
 
   private final String _helixZkURL;
@@ -1505,10 +1507,19 @@ public class PinotHelixResourceManager {
     LOGGER.info("Deleting table {}: Removed table config", offlineTableName);
 
     // Remove instance partitions
+    final String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     InstancePartitionsUtils.removeInstancePartitions(_propertyStore,
-        InstancePartitionsType.OFFLINE.getInstancePartitionsName(TableNameBuilder.extractRawTableName(tableName)));
+        InstancePartitionsType.OFFLINE.getInstancePartitionsName(rawTableName));
     LOGGER.info("Deleting table {}: Removed instance partitions", offlineTableName);
 
+    // Remove table locker if there
+    if (_tableUpdaterLockMap.containsKey(rawTableName)) {
+      synchronized (_tableUpdaterLockMap) {
+        if (_tableUpdaterLockMap.containsKey(rawTableName)) {
+          _tableUpdaterLockMap.remove(rawTableName);
+        }
+      }
+    }
     LOGGER.info("Deleting table {}: Finish", offlineTableName);
   }
 
@@ -1641,23 +1652,30 @@ public class PinotHelixResourceManager {
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = Collections
           .singletonMap(InstancePartitionsType.OFFLINE, InstancePartitionsUtils
               .fetchOrComputeInstancePartitions(_helixZkManager, offlineTableConfig, InstancePartitionsType.OFFLINE));
-      HelixHelper.updateIdealState(_helixZkManager, offlineTableName, idealState -> {
-        assert idealState != null;
-        Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
-        if (currentAssignment.containsKey(segmentName)) {
-          LOGGER.warn("Segment: {} already exists in the IdealState for table: {}, do not update", segmentName,
-              offlineTableName);
-        } else {
-          List<String> assignedInstances =
-              segmentAssignment.assignSegment(segmentName, currentAssignment, instancePartitionsMap);
-          LOGGER.info("Assigning segment: {} to instances: {} for table: {}", segmentName, assignedInstances,
-              offlineTableName);
-          currentAssignment.put(segmentName,
-              SegmentAssignmentUtils.getInstanceStateMap(assignedInstances, SegmentStateModel.ONLINE));
+      if (_tableUpdaterLockMap.get(offlineTableName) == null) {
+        synchronized (_tableUpdaterLockMap) {
+          if (_tableUpdaterLockMap.get(offlineTableName) == null) {
+            _tableUpdaterLockMap.put(offlineTableName, new Object());
+          }
         }
-        return idealState;
-      });
-      LOGGER.info("Added segment: {} to IdealState for table: {}", segmentName, offlineTableName);
+      }
+      synchronized (_tableUpdaterLockMap.get(offlineTableName)) {
+        HelixHelper.updateIdealState(_helixZkManager, offlineTableName, idealState -> {
+          assert idealState != null;
+          Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
+          if (currentAssignment.containsKey(segmentName)) {
+            LOGGER.warn("Segment: {} already exists in the IdealState for table: {}, do not update", segmentName,
+                offlineTableName);
+          } else {
+            List<String> assignedInstances = segmentAssignment.assignSegment(segmentName, currentAssignment, instancePartitionsMap);
+            LOGGER.info("Assigning segment: {} to instances: {} for table: {}", segmentName, assignedInstances,
+                offlineTableName);
+            currentAssignment.put(segmentName, SegmentAssignmentUtils.getInstanceStateMap(assignedInstances, SegmentStateModel.ONLINE));
+          }
+          return idealState;
+        });
+        LOGGER.info("Added segment: {} to IdealState for table: {}", segmentName, offlineTableName);
+      }
     } catch (Exception e) {
       LOGGER
           .error("Caught exception while adding segment: {} to IdealState for table: {}, deleting segment ZK metadata",
