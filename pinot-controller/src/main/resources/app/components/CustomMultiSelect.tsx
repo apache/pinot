@@ -17,7 +17,7 @@
  * under the License.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { forwardRef, useEffect, useState } from 'react';
 import Chip from '@material-ui/core/Chip';
 import Autocomplete, { AutocompleteRenderInputParams } from '@material-ui/lab/Autocomplete';
 import TextField from '@material-ui/core/TextField';
@@ -69,12 +69,12 @@ type Props = {
   error?: {isError: boolean, errorMessage: string}
 };
 
-export default function CustomMultiSelect({
+const CustomMultiSelect = forwardRef(({
   options,
   value,
   handleChange,
   error
-}: Props) {
+}: Props, ref) => {
   const [currentValue, setCurrentValue] = useState(value);
 
   useEffect(() => {
@@ -111,6 +111,7 @@ export default function CustomMultiSelect({
         params.inputProps.onKeyDown = handleKeyDown;
         return (
         <TextField
+          inputRef={ref}
           error={error && error.isError}
           helperText={error && error.errorMessage}
           {...params} variant="filled" placeholder="Enter Tags ..."
@@ -118,4 +119,5 @@ export default function CustomMultiSelect({
       )}}}
     />
   );
-}
+});
+export default CustomMultiSelect;

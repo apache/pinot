@@ -180,7 +180,7 @@ const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
           isValid = false;
           setTagsErrorObj({
             isError: true,
-            errorMessage: "Tags should end with _OFFLINE or _REALTIME.."
+            errorMessage: "Tags should end with _OFFLINE or _REALTIME."
           });
         }
       }
@@ -188,11 +188,15 @@ const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
     return isValid;
   }
 
-  const saveTagsAction = async () => {
-    if(!isTagsValid(tagsList)){
+  const saveTagsAction = async (event, typedTag) => {
+    let newTagsList = [...tagsList];
+    if(typedTag.length > 0){
+      newTagsList.push(typedTag);
+    }
+    if(!isTagsValid(newTagsList)){
       return;
     }
-    const result = await PinotMethodUtils.updateTags(instanceName, tagsList);
+    const result = await PinotMethodUtils.updateTags(instanceName, newTagsList);
     if(result.status){
       setNotificationData({type: 'success', message: result.status});
       fetchData();

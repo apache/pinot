@@ -17,7 +17,7 @@
  * under the License.
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 import { DialogContent} from '@material-ui/core';
 import Dialog from '../../CustomDialog';
 import CustomMultiSelect from '../../CustomMultiSelect';
@@ -25,7 +25,7 @@ import CustomMultiSelect from '../../CustomMultiSelect';
 type Props = {
   showModal: boolean,
   hideModal: (event: React.MouseEvent<HTMLElement, MouseEvent>) => void,
-  saveTags: (event: React.MouseEvent<HTMLElement, MouseEvent>) => void,
+  saveTags: (event: React.MouseEvent<HTMLElement, MouseEvent>, tag: string) => void,
   tags: Array<string>,
   handleTagsChange: (e: React.ChangeEvent<HTMLInputElement>, value: Array<string>|null) => void,
   error: {isError: boolean, errorMessage: string}
@@ -40,15 +40,19 @@ export default function CustomModal({
   error
 }: Props) {
 
+  const tagsRef = React.createRef<HTMLInputElement>();
+
   return (
     <Dialog
       open={showModal}
       handleClose={hideModal}
       title="Edit Tags"
-      handleSave={saveTags}
+      handleSave={(event)=>{
+        saveTags(event, tagsRef.current.value);
+      }}
     >
       <DialogContent>
-        <CustomMultiSelect handleChange={handleTagsChange} value={tags} error={error}/>
+        <CustomMultiSelect ref={tagsRef} handleChange={handleTagsChange} value={tags} error={error}/>
       </DialogContent>
     </Dialog>
   );
