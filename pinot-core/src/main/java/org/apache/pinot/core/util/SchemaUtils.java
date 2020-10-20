@@ -79,6 +79,7 @@ public class SchemaUtils {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn()) {
         String column = fieldSpec.getName();
+        primaryKeyColumnCandidates.add(column);
         String transformFunction = fieldSpec.getTransformFunction();
         if (transformFunction != null) {
           try {
@@ -93,8 +94,6 @@ public class SchemaUtils {
                 "Exception in getting arguments for transform function '" + transformFunction + "' for column '"
                     + column + "'", e);
           }
-        } else {
-          primaryKeyColumnCandidates.add(column);
         }
         if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.TIME)) {
           validateTimeFieldSpec(fieldSpec);
