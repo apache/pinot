@@ -22,22 +22,6 @@ name: Thirdeye RZP Builder
 on: [push]
 
 jobs:
-  cancel:
-    runs-on: [self-hosted]
-    name: Cancel Previous Runs
-    if: always()
-    steps:
-      - uses: styfle/cancel-workflow-action@d57d93c
-        if: github.ref != 'refs/heads/rzp-master'
-        name: cancel old workflows
-        id: cancel
-        with:
-          access_token: ${{ github.token }}
-      - if: github.ref == 'refs/heads/rzp-master'
-        name: Don't cancel old workflows
-        id: dont_cancel
-        run: |
-          echo "Don't cancel old workflow"
   build:
     runs-on: ubuntu-latest
     steps:
