@@ -66,7 +66,7 @@ Pinot was originally built at LinkedIn to power rich interactive real-time analy
 
 * **Cloud-native on Kubernetes**: Helm chart provides a horizontally scalable and fault-tolerant clustered deployment that is easy to manage using Kubernetes.
 
-<img src="https://github.com/kbastani/raw-image-content/blob/master/apache-pinot-ui.gif?raw=true" align="center" alt="Apache Pinot"/>
+<a href="https://docs.pinot.apache.org/basics/getting-started"><img src="https://github.com/kbastani/raw-image-content/blob/master/apache-pinot-ui.gif?raw=true" align="center" alt="Apache Pinot"/></a>
 
 ## When should I use Pinot?
 
