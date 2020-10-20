@@ -76,11 +76,16 @@ public class SelectionQuerySegmentPruner implements SegmentPruner {
     }
 
     // If LIMIT is not 0, only prune segments for selection queries without filter
-    // TODO: This does not take upsert valid doc ids filter into account, which can cause less than expected records
-    //       returned for upsert table
     FilterContext filter = queryContext.getFilter();
     if (filter != null) {
       return segmentDataManagers;
+    }
+
+    // Do not prune for upsert table
+    if (!segmentDataManagers.isEmpty()) {
+      if (segmentDataManagers.get(0).getSegment().getValidDocIndex() != null) {
+        return segmentDataManagers;
+      }
     }
 
     if (queryContext.getOrderByExpressions() == null) {

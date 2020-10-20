@@ -30,6 +30,7 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
+import org.apache.pinot.core.segment.index.readers.ValidDocIndexReader;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -61,6 +62,26 @@ public class SelectionQuerySegmentPrunerTest {
     result = _segmentPruner.prune(_tableDataManager, segmentDataManagers, queryRequest);
     assertEquals(result.size(), 1);
     assertSame(result.get(0), segmentDataManagers.get(0));
+  }
+
+  @Test
+  public void testSelectionOnlyUpsert() {
+    List<SegmentDataManager> segmentDataManagers = Arrays
+        .asList(getSegmentDataManager(null, null, 10, true), getSegmentDataManager(0L, 10L, 10, true),
+            getSegmentDataManager(-5L, 5L, 15, true));
+
+    // Should keep enough documents to fulfill the LIMIT requirement
+    ServerQueryRequest queryRequest = getQueryRequest("SELECT * FROM testTable LIMIT 5");
+    List<SegmentDataManager> result = _segmentPruner.prune(_tableDataManager, segmentDataManagers, queryRequest);
+    assertEquals(result.size(), 3);
+
+    queryRequest = getQueryRequest("SELECT * FROM testTable LIMIT 10");
+    result = _segmentPruner.prune(_tableDataManager, segmentDataManagers, queryRequest);
+    assertEquals(result.size(), 3);
+
+    queryRequest = getQueryRequest("SELECT * FROM testTable LIMIT 15");
+    result = _segmentPruner.prune(_tableDataManager, segmentDataManagers, queryRequest);
+    assertEquals(result.size(), 3);
   }
 
   @Test
@@ -182,6 +203,11 @@ public class SelectionQuerySegmentPrunerTest {
   }
 
   private SegmentDataManager getSegmentDataManager(@Nullable Long minValue, @Nullable Long maxValue, int totalDocs) {
+    return getSegmentDataManager(minValue, maxValue, totalDocs, false);
+  }
+
+  private SegmentDataManager getSegmentDataManager(@Nullable Long minValue, @Nullable Long maxValue, int totalDocs,
+      boolean upsert) {
     SegmentDataManager segmentDataManager = mock(SegmentDataManager.class);
     IndexSegment segment = mock(IndexSegment.class);
     when(segmentDataManager.getSegment()).thenReturn(segment);
@@ -194,6 +220,10 @@ public class SelectionQuerySegmentPrunerTest {
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
     when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
     when(segmentMetadata.getTotalDocs()).thenReturn(totalDocs);
+    if (upsert) {
+      ValidDocIndexReader reader = mock(ValidDocIndexReader.class);
+      when(segment.getValidDocIndex()).thenReturn(reader);
+    }
     return segmentDataManager;
   }
 
