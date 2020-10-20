@@ -266,11 +266,9 @@ public final class TableConfigUtils {
             .equalsIgnoreCase(tableConfig.getRoutingConfig().getInstanceSelectorType()),
         "Upsert table must use replica-group (i.e. replicaGroup) based routing");
     // no startree index
-    if (tableConfig.getIndexingConfig() != null && tableConfig.getIndexingConfig().getStarTreeIndexConfigs() != null) {
-      Preconditions.checkState(
-          tableConfig.getIndexingConfig().getStarTreeIndexConfigs().isEmpty() && !tableConfig.getIndexingConfig()
-              .isEnableDefaultStarTree(), "The upsert table cannot have star-tree index.");
-    }
+    Preconditions.checkState(
+        CollectionUtils.isEmpty(tableConfig.getIndexingConfig().getStarTreeIndexConfigs()) && !tableConfig
+            .getIndexingConfig().isEnableDefaultStarTree(), "The upsert table cannot have star-tree index.");
   }
 
   /**
