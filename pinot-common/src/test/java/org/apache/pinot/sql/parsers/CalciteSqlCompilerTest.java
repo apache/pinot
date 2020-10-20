@@ -732,14 +732,16 @@ public class CalciteSqlCompilerTest {
 
   @Test
   public void testTimeTransformFunction() {
-    PinotQuery pinotQuery = CalciteSqlParser
-        .compileToPinotQuery("  select hour(ts), d1, sum(m1) from baseballStats group by hour(ts), d1");
+    PinotQuery pinotQuery =
+        CalciteSqlParser.compileToPinotQuery("  select hour(ts), d1, sum(m1) from baseballStats group by hour(ts), d1");
     Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "HOUR");
-    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "ts");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "ts");
     Assert.assertEquals(pinotQuery.getSelectList().get(1).getIdentifier().getName(), "d1");
     Assert.assertEquals(pinotQuery.getSelectList().get(2).getFunctionCall().getOperator(), "SUM");
     Assert.assertEquals(pinotQuery.getGroupByList().get(0).getFunctionCall().getOperator(), "HOUR");
-    Assert.assertEquals(pinotQuery.getGroupByList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "ts");
+    Assert.assertEquals(
+        pinotQuery.getGroupByList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "ts");
     Assert.assertEquals(pinotQuery.getGroupByList().get(1).getIdentifier().getName(), "d1");
   }
 
@@ -1555,6 +1557,57 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getIdentifier().getName(),
         "distinct_bar");
+  }
+
+  @Test
+  public void testOrdinalsQueryRewrite() {
+    String query = "SELECT foo, bar, count(*) FROM t GROUP BY 1, 2 ORDER BY 1, 2 DESC";
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getIdentifier().getName(), "foo");
+    Assert.assertEquals(pinotQuery.getSelectList().get(1).getIdentifier().getName(), "bar");
+    Assert.assertEquals(pinotQuery.getGroupByList().get(0).getIdentifier().getName(), "foo");
+    Assert.assertEquals(pinotQuery.getGroupByList().get(1).getIdentifier().getName(), "bar");
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "foo");
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(1).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "bar");
+
+    query = "SELECT foo, bar, count(*) FROM t GROUP BY 2, 1 ORDER BY 2, 1 DESC";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getIdentifier().getName(), "foo");
+    Assert.assertEquals(pinotQuery.getSelectList().get(1).getIdentifier().getName(), "bar");
+    Assert.assertEquals(pinotQuery.getGroupByList().get(0).getIdentifier().getName(), "bar");
+    Assert.assertEquals(pinotQuery.getGroupByList().get(1).getIdentifier().getName(), "foo");
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "bar");
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(1).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "foo");
+
+    query = "SELECT foo as f, bar as b, count(*) FROM t GROUP BY 2, 1 ORDER BY 2, 1 DESC";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getGroupByList().get(0).getIdentifier().getName(), "bar");
+    Assert.assertEquals(pinotQuery.getGroupByList().get(1).getIdentifier().getName(), "foo");
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "bar");
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(1).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "foo");
+
+    query = "select a, b + 2, array_sum(c) as array_sum_c, count(*) from data group by a, 2, array_sum_c";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getGroupByList().get(0).getIdentifier().getName(), "a");
+    Assert.assertEquals(pinotQuery.getGroupByList().get(1).getFunctionCall().getOperator(), "PLUS");
+    Assert.assertEquals(
+        pinotQuery.getGroupByList().get(1).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "b");
+    Assert.assertEquals(
+        pinotQuery.getGroupByList().get(1).getFunctionCall().getOperands().get(1).getLiteral().getLongValue(), 2L);
+    Assert.assertEquals(pinotQuery.getGroupByList().get(2).getFunctionCall().getOperator(), "ARRAY_SUM");
+    Assert.assertEquals(
+        pinotQuery.getGroupByList().get(2).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "c");
+
+    Assert.expectThrows(SqlCompilationException.class,
+        () -> CalciteSqlParser.compileToPinotQuery("SELECT foo, bar, count(*) FROM t GROUP BY 0"));
+    Assert.expectThrows(SqlCompilationException.class,
+        () -> CalciteSqlParser.compileToPinotQuery("SELECT foo, bar, count(*) FROM t GROUP BY 3"));
   }
 
   @Test
