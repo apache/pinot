@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.upsert;
 
-import java.util.Objects;
+import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
 
 
 /**
@@ -28,13 +28,13 @@ public class RecordLocation {
   private final String _segmentName;
   private final int _docId;
   private final long _timestamp;
-  private final boolean _isConsuming;
+  private final ThreadSafeMutableRoaringBitmap _validDocIds;
 
-  public RecordLocation(String segmentName, int docId, long timestamp, boolean isConsuming) {
+  public RecordLocation(String segmentName, int docId, long timestamp, ThreadSafeMutableRoaringBitmap validDocIds) {
     _segmentName = segmentName;
     _docId = docId;
     _timestamp = timestamp;
-    _isConsuming = isConsuming;
+    _validDocIds = validDocIds;
   }
 
   public String getSegmentName() {
@@ -49,25 +49,7 @@ public class RecordLocation {
     return _timestamp;
   }
 
-  public boolean isConsuming() {
-    return _isConsuming;
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) {
-      return true;
-    }
-    if (!(o instanceof RecordLocation)) {
-      return false;
-    }
-    RecordLocation that = (RecordLocation) o;
-    return _docId == that._docId && _timestamp == that._timestamp && _isConsuming == that._isConsuming && Objects
-        .equals(_segmentName, that._segmentName);
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects.hash(_segmentName, _docId, _timestamp, _isConsuming);
+  public ThreadSafeMutableRoaringBitmap getValidDocIds() {
+    return _validDocIds;
   }
 }

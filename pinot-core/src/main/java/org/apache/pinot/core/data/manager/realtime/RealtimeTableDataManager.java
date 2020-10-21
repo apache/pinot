@@ -24,6 +24,7 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.net.URI;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -52,6 +53,7 @@ import org.apache.pinot.core.data.manager.BaseTableDataManager;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.data.readers.PinotSegmentColumnReader;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
@@ -59,7 +61,7 @@ import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.loader.LoaderUtils;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager;
-import org.apache.pinot.core.upsert.RecordLocation;
+import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager.RecordInfo;
 import org.apache.pinot.core.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
@@ -278,7 +280,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
     if (indexDir.exists() && realtimeSegmentZKMetadata.getStatus() == Status.DONE) {
       // Segment already exists on disk, and metadata has been committed. Treat it like an offline segment
-      addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema, partitionUpsertMetadataManager));
+      addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema));
     } else {
       // Either we don't have the segment on disk or we have not committed in ZK. We should be starting the consumer
       // for realtime segment here. If we wrote it on disk but could not get to commit to zk yet, we should replace the
@@ -321,12 +323,12 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @Override
   public void addSegment(ImmutableSegment immutableSegment) {
     if (isUpsertEnabled()) {
-      handleUpsert(immutableSegment);
+      handleUpsert((ImmutableSegmentImpl) immutableSegment);
     }
     super.addSegment(immutableSegment);
   }
 
-  private void handleUpsert(ImmutableSegment immutableSegment) {
+  private void handleUpsert(ImmutableSegmentImpl immutableSegment) {
     Map<String, PinotSegmentColumnReader> columnToReaderMap = new HashMap<>();
     for (String primaryKeyColumn : _primaryKeyColumns) {
       columnToReaderMap.put(primaryKeyColumn, new PinotSegmentColumnReader(immutableSegment, primaryKeyColumn));
@@ -337,24 +339,35 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     int partitionId = new LLCSegmentName(immutableSegment.getSegmentName()).getPartitionId();
     PartitionUpsertMetadataManager partitionUpsertMetadataManager =
         _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionId);
-    ThreadSafeMutableRoaringBitmap validDocIds = partitionUpsertMetadataManager.getValidDocIds(segmentName);
     int numPrimaryKeyColumns = _primaryKeyColumns.size();
-    for (int docId = 0; docId < numTotalDocs; docId++) {
-      Object[] values = new Object[numPrimaryKeyColumns];
-      for (int i = 0; i < numPrimaryKeyColumns; i++) {
-        Object value = columnToReaderMap.get(_primaryKeyColumns.get(i)).getValue(docId);
-        if (value instanceof byte[]) {
-          value = new ByteArray((byte[]) value);
-        }
-        values[i] = value;
+    Iterator<RecordInfo> recordInfoIterator = new Iterator<RecordInfo>() {
+      private int _docId = 0;
+
+      @Override
+      public boolean hasNext() {
+        return _docId < numTotalDocs;
       }
-      PrimaryKey primaryKey = new PrimaryKey(values);
-      Object timeValue = columnToReaderMap.get(_timeColumnName).getValue(docId);
-      Preconditions.checkArgument(timeValue instanceof Comparable, "time column shall be comparable");
-      long timestamp = IngestionUtils.extractTimeValue((Comparable) timeValue);
-      RecordLocation recordLocation = new RecordLocation(segmentName, docId, timestamp, false);
-      partitionUpsertMetadataManager.updateRecordLocation(primaryKey, recordLocation, validDocIds);
-    }
+
+      @Override
+      public RecordInfo next() {
+        Object[] values = new Object[numPrimaryKeyColumns];
+        for (int i = 0; i < numPrimaryKeyColumns; i++) {
+          Object value = columnToReaderMap.get(_primaryKeyColumns.get(i)).getValue(_docId);
+          if (value instanceof byte[]) {
+            value = new ByteArray((byte[]) value);
+          }
+          values[i] = value;
+        }
+        PrimaryKey primaryKey = new PrimaryKey(values);
+        Object timeValue = columnToReaderMap.get(_timeColumnName).getValue(_docId);
+        Preconditions.checkArgument(timeValue instanceof Comparable, "time column shall be comparable");
+        long timestamp = IngestionUtils.extractTimeValue((Comparable) timeValue);
+        return new RecordInfo(primaryKey, _docId++, timestamp);
+      }
+    };
+    ThreadSafeMutableRoaringBitmap validDocIds =
+        partitionUpsertMetadataManager.addSegment(segmentName, recordInfoIterator);
+    immutableSegment.enableUpsert(partitionUpsertMetadataManager, validDocIds);
   }
 
   public void downloadAndReplaceSegment(String segmentName, LLCRealtimeSegmentZKMetadata llcSegmentMetadata,
@@ -463,12 +476,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     try {
       File indexDir = new File(_indexDir, segmentName);
       Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
-      PartitionUpsertMetadataManager partitionUpsertMetadataManager = null;
-      if (_tableUpsertMetadataManager != null) {
-        int partitionId = new LLCSegmentName(segmentName).getPartitionId();
-        partitionUpsertMetadataManager = _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionId);
-      }
-      addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema, partitionUpsertMetadataManager));
+      addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema));
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

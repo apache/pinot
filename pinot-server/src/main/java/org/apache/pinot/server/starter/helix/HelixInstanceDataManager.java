@@ -203,12 +203,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       LOGGER.warn("Failed to find table data manager for table: {}, skipping reloading segment", tableNameWithType);
       return;
     }
-    // TODO: Support reloading segments from upsert enabled table
-    if (tableDataManager instanceof RealtimeTableDataManager && ((RealtimeTableDataManager) tableDataManager)
-        .isUpsertEnabled()) {
-      LOGGER.warn("Skip reloading segment from upsert enabled table: {}", tableNameWithType);
-      return;
-    }
 
     File indexDir = segmentMetadata.getIndexDir();
     if (indexDir == null) {
