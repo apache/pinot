@@ -68,7 +68,7 @@ import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
 import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager;
-import org.apache.pinot.core.upsert.RecordLocation;
+import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager.RecordInfo;
 import org.apache.pinot.core.util.FixedIntArray;
 import org.apache.pinot.core.util.FixedIntArrayOffHeapIdMap;
 import org.apache.pinot.core.util.IdMap;
@@ -92,7 +92,6 @@ import org.slf4j.LoggerFactory;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class MutableSegmentImpl implements MutableSegment {
-  private static final Logger LOGGER = LoggerFactory.getLogger(MutableSegmentImpl.class);
   // For multi-valued column, forward-index.
   // Maximum number of multi-values per row. We assert on this.
   private static final int MAX_MULTI_VALUES_PER_ROW = 1000;
@@ -484,8 +483,8 @@ public class MutableSegmentImpl implements MutableSegment {
     Object timeValue = row.getValue(_timeColumnName);
     Preconditions.checkArgument(timeValue instanceof Comparable, "time column shall be comparable");
     long timestamp = IngestionUtils.extractTimeValue((Comparable) timeValue);
-    RecordLocation recordLocation = new RecordLocation(_segmentName, docId, timestamp, true);
-    _partitionUpsertMetadataManager.updateRecordLocation(primaryKey, recordLocation, _validDocIds);
+    _partitionUpsertMetadataManager
+        .updateRecord(_segmentName, new RecordInfo(primaryKey, docId, timestamp), _validDocIds);
   }
 
   private void updateDictionary(GenericRow row) {
