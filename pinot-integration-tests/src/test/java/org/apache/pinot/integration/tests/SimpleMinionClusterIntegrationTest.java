@@ -27,7 +27,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 import org.apache.helix.task.TaskState;
-import org.apache.pinot.controller.helix.core.minion.ClusterInfoProvider;
+import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
@@ -94,7 +94,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     _taskManager = _controllerStarter.getTaskManager();
 
     // Register the test task generator into task manager
-    _taskManager.registerTaskGenerator(new TestTaskGenerator(_taskManager.getClusterInfoProvider()));
+    _taskManager.registerTaskGenerator(new TestTaskGenerator(_taskManager.getClusterInfoAccessor()));
 
     Map<String, PinotTaskExecutorFactory> taskExecutorFactoryRegistry =
         Collections.singletonMap(TestTaskGenerator.TASK_TYPE, new TestTaskExecutorFactory());
@@ -199,10 +199,10 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
   private static class TestTaskGenerator implements PinotTaskGenerator {
     public static final String TASK_TYPE = "TestTask";
 
-    private final ClusterInfoProvider _clusterInfoProvider;
+    private final ClusterInfoAccessor _clusterInfoAccessor;
 
-    public TestTaskGenerator(ClusterInfoProvider clusterInfoProvider) {
-      _clusterInfoProvider = clusterInfoProvider;
+    public TestTaskGenerator(ClusterInfoAccessor clusterInfoAccessor) {
+      _clusterInfoAccessor = clusterInfoAccessor;
     }
 
     @Override
@@ -215,7 +215,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
       assertEquals(tableConfigs.size(), 2);
 
       // Generate at most 2 tasks
-      if (_clusterInfoProvider.getTaskStates(TASK_TYPE).size() >= 2) {
+      if (_clusterInfoAccessor.getTaskStates(TASK_TYPE).size() >= 2) {
         return Collections.emptyList();
       }
 

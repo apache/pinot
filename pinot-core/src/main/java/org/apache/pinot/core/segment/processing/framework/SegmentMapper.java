@@ -50,9 +50,9 @@ import org.slf4j.LoggerFactory;
  * Mapper phase of the SegmentProcessorFramework.
  * Reads the input segment and creates partitioned avro data files
  * Performs:
- * - record transformations
+ * - record filtering
+ * - column transformations
  * - partitioning
- * - partition filtering
  */
 public class SegmentMapper {
 
@@ -74,8 +74,8 @@ public class SegmentMapper {
 
     _mapperId = mapperId;
     _avroSchema = SegmentProcessorUtils.convertPinotSchemaToAvroSchema(mapperConfig.getPinotSchema());
-    _recordTransformer = RecordTransformerFactory.getRecordTransformer(mapperConfig.getRecordTransformerConfig());
     _recordFilter = RecordFilterFactory.getRecordFilter(mapperConfig.getRecordFilterConfig());
+    _recordTransformer = RecordTransformerFactory.getRecordTransformer(mapperConfig.getRecordTransformerConfig());
     for (PartitionerConfig partitionerConfig : mapperConfig.getPartitionerConfigs()) {
       _partitioners.add(PartitionerFactory.getPartitioner(partitionerConfig));
     }
@@ -101,13 +101,13 @@ public class SegmentMapper {
     while (segmentRecordReader.hasNext()) {
       reusableRow = segmentRecordReader.next(reusableRow);
 
-      // Record transformation
-      reusableRow = _recordTransformer.transformRecord(reusableRow);
-
       // Record filtering
       if (_recordFilter.filter(reusableRow)) {
         continue;
       }
+
+      // Record transformation
+      reusableRow = _recordTransformer.transformRecord(reusableRow);
 
       // Partitioning
       int p = 0;

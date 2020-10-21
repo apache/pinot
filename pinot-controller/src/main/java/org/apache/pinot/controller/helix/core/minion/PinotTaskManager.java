@@ -48,7 +48,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTaskManager.class);
 
   private final PinotHelixTaskResourceManager _helixTaskResourceManager;
-  private final ClusterInfoProvider _clusterInfoProvider;
+  private final ClusterInfoAccessor _clusterInfoAccessor;
   private final TaskGeneratorRegistry _taskGeneratorRegistry;
 
   public PinotTaskManager(PinotHelixTaskResourceManager helixTaskResourceManager,
@@ -58,8 +58,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
         controllerConf.getPinotTaskManagerInitialDelaySeconds(), helixResourceManager, leadControllerManager,
         controllerMetrics);
     _helixTaskResourceManager = helixTaskResourceManager;
-    _clusterInfoProvider = new ClusterInfoProvider(helixResourceManager, helixTaskResourceManager, controllerConf);
-    _taskGeneratorRegistry = new TaskGeneratorRegistry(_clusterInfoProvider);
+    _clusterInfoAccessor = new ClusterInfoAccessor(helixResourceManager, helixTaskResourceManager, controllerConf);
+    _taskGeneratorRegistry = new TaskGeneratorRegistry(_clusterInfoAccessor);
   }
 
   /**
@@ -69,8 +69,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
    *
    * @return Cluster info provider
    */
-  public ClusterInfoProvider getClusterInfoProvider() {
-    return _clusterInfoProvider;
+  public ClusterInfoAccessor getClusterInfoAccessor() {
+    return _clusterInfoAccessor;
   }
 
   /**
