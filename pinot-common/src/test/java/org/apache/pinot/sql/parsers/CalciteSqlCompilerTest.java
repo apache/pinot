@@ -1611,6 +1611,15 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
+  public void testOrdinalsQueryRewriteWithDistinctOrderby() {
+    String query = "SELECT baseballStats.playerName AS playerName FROM baseballStats GROUP BY baseballStats.playerName ORDER BY 1 ASC";
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "baseballStats.playerName");
+    Assert.assertTrue(pinotQuery.getGroupByList().isEmpty());
+    Assert.assertEquals(pinotQuery.getOrderByList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "baseballStats.playerName");
+  }
+
+  @Test
   public void testNoArgFunction() {
     String query = "SELECT noArgFunc() FROM foo ";
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
