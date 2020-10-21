@@ -115,7 +115,7 @@
     <!-- Configuration for unit/integration tests section 1 of 3 (properties) ENDS HERE.-->
     <avro.version>1.7.6</avro.version>
     <parquet.version>1.8.0</parquet.version>
-    <helix.version>0.9.7</helix.version>
+    <helix.version>0.9.8</helix.version>
     <zkclient.version>0.7</zkclient.version>
     <jackson.version>2.9.8</jackson.version>
     <async-http-client.version>1.9.21</async-http-client.version>
