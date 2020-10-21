@@ -353,11 +353,11 @@ public class CalciteSqlParser {
       pinotQuery.setHavingExpression(updateComparisonPredicate(havingExpression));
     }
 
-    // Rewrite GroupBy to Distinct
-    rewriteNonAggregationGroupByToDistinct(pinotQuery);
-
     // Update Ordinals
     applyOrdinals(pinotQuery);
+
+    // Rewrite GroupBy to Distinct
+    rewriteNonAggregationGroupByToDistinct(pinotQuery);
 
     // Update alias
     Map<Identifier, Expression> aliasMap = extractAlias(pinotQuery.getSelectList());
