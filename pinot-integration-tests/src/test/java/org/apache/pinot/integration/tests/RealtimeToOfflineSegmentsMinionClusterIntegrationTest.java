@@ -141,7 +141,7 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
 
     // Check segment ZK metadata
     RealtimeToOfflineSegmentsTaskMetadata minionTaskMetadata =
-        _taskManager.getClusterInfoProvider().getMinionRealtimeToOfflineSegmentsTaskMetadata(_realtimeTableName);
+        _taskManager.getClusterInfoAccessor().getMinionRealtimeToOfflineSegmentsTaskMetadata(_realtimeTableName);
     Assert.assertNotNull(minionTaskMetadata);
     Assert.assertEquals(minionTaskMetadata.getWatermarkMs(), expectedWatermark);
   }

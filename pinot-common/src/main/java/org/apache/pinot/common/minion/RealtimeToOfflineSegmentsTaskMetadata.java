@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.common.minion;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.helix.ZNRecord;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -48,15 +46,11 @@ public class RealtimeToOfflineSegmentsTaskMetadata {
   private final String _tableNameWithType;
   private final long _watermarkMs;
 
-  @JsonCreator
-  public RealtimeToOfflineSegmentsTaskMetadata(
-      @JsonProperty(value = "tableNameWithType", required = true) String tableNameWithType,
-      @JsonProperty(value = "watermarkMs", required = true) long watermarkMs) {
+  public RealtimeToOfflineSegmentsTaskMetadata(String tableNameWithType, long watermarkMs) {
     _tableNameWithType = tableNameWithType;
     _watermarkMs = watermarkMs;
   }
 
-  @JsonProperty
   public String getTableNameWithType() {
     return _tableNameWithType;
   }
@@ -64,7 +58,6 @@ public class RealtimeToOfflineSegmentsTaskMetadata {
   /**
    * Get the watermark in millis
    */
-  @JsonProperty
   public long getWatermarkMs() {
     return _watermarkMs;
   }

@@ -33,8 +33,7 @@ import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.common.utils.CommonConstants.Segment;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.controller.helix.core.minion.ClusterInfoProvider;
-import org.apache.pinot.controller.helix.core.minion.ClusterUpdater;
+import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.RealtimeToOfflineSegmentsTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
@@ -80,13 +79,10 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
   private static final String DEFAULT_BUCKET_PERIOD = "1d";
   private static final String DEFAULT_BUFFER_PERIOD = "2d";
 
-  private final ClusterInfoProvider _clusterInfoProvider;
-  private final ClusterUpdater _clusterUpdater;
+  private final ClusterInfoAccessor _clusterInfoAccessor;
 
-  public RealtimeToOfflineSegmentsTaskGenerator(ClusterInfoProvider clusterInfoProvider,
-      ClusterUpdater clusterUpdater) {
-    _clusterInfoProvider = clusterInfoProvider;
-    _clusterUpdater = clusterUpdater;
+  public RealtimeToOfflineSegmentsTaskGenerator(ClusterInfoAccessor clusterInfoAccessor) {
+    _clusterInfoAccessor = clusterInfoAccessor;
   }
 
   @Override
@@ -115,7 +111,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
 
       // Only schedule 1 task of this type, per table
       Map<String, TaskState> incompleteTasks =
-          TaskGeneratorUtils.getIncompleteTasks(taskType, realtimeTableName, _clusterInfoProvider);
+          TaskGeneratorUtils.getIncompleteTasks(taskType, realtimeTableName, _clusterInfoAccessor);
       if (!incompleteTasks.isEmpty()) {
         LOGGER
             .warn("Found incomplete tasks: {} for same table: {}. Skipping task generation.", incompleteTasks.keySet(),
@@ -205,7 +201,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
       configs.put(MinionConstants.TABLE_NAME_KEY, realtimeTableName);
       configs.put(MinionConstants.SEGMENT_NAME_KEY, StringUtils.join(segmentNames, ","));
       configs.put(MinionConstants.DOWNLOAD_URL_KEY, StringUtils.join(downloadURLs, MinionConstants.URL_SEPARATOR));
-      configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoProvider.getVipUrl() + "/segments");
+      configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
 
       // Execution window
       configs.put(RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY, String.valueOf(windowStartMs));
@@ -249,7 +245,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
       List<LLCRealtimeSegmentZKMetadata> completedSegmentsMetadataList,
       Map<Integer, String> partitionToLatestCompletedSegmentName, Set<Integer> allPartitions) {
     List<LLCRealtimeSegmentZKMetadata> realtimeSegmentsMetadataList =
-        _clusterInfoProvider.getLLCRealtimeSegmentsMetadata(realtimeTableName);
+        _clusterInfoAccessor.getLLCRealtimeSegmentsMetadata(realtimeTableName);
 
     Map<Integer, LLCSegmentName> latestLLCSegmentNameMap = new HashMap<>();
     for (LLCRealtimeSegmentZKMetadata metadata : realtimeSegmentsMetadataList) {
@@ -284,7 +280,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
   private long getWatermarkMs(String realtimeTableName, List<LLCRealtimeSegmentZKMetadata> completedSegmentsMetadata,
       long bucketMs) {
     RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
-        _clusterInfoProvider.getMinionRealtimeToOfflineSegmentsTaskMetadata(realtimeTableName);
+        _clusterInfoAccessor.getMinionRealtimeToOfflineSegmentsTaskMetadata(realtimeTableName);
 
     if (realtimeToOfflineSegmentsTaskMetadata == null) {
       // No ZNode exists. Cold-start.
@@ -309,7 +305,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
 
       // Create RealtimeToOfflineSegmentsTaskMetadata ZNode using watermark calculated above
       realtimeToOfflineSegmentsTaskMetadata = new RealtimeToOfflineSegmentsTaskMetadata(realtimeTableName, watermarkMs);
-      _clusterUpdater.setRealtimeToOfflineSegmentsTaskMetadata(realtimeToOfflineSegmentsTaskMetadata);
+      _clusterInfoAccessor.setRealtimeToOfflineSegmentsTaskMetadata(realtimeToOfflineSegmentsTaskMetadata);
     }
     return realtimeToOfflineSegmentsTaskMetadata.getWatermarkMs();
   }

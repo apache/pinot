@@ -64,6 +64,18 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       File workingDir)
       throws Exception;
 
+  /**
+   * Pre processing operations to be done at the beginning of task execution
+   */
+  protected void preProcess(PinotTaskConfig pinotTaskConfig) {
+  }
+
+  /**
+   * Post processing operations to be done before exiting a successful task execution
+   */
+  protected void postProcess(PinotTaskConfig pinotTaskConfig) {
+  }
+
   @Override
   public List<SegmentConversionResult> executeTask(PinotTaskConfig pinotTaskConfig)
       throws Exception {

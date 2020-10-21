@@ -65,7 +65,6 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
   @Override
   public SegmentConversionResult executeTask(PinotTaskConfig pinotTaskConfig)
       throws Exception {
-    preProcess(pinotTaskConfig);
 
     String taskType = pinotTaskConfig.getTaskType();
     Map<String, String> configs = pinotTaskConfig.getConfigs();
@@ -136,7 +135,6 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       SegmentConversionUtils.uploadSegment(configs, httpHeaders, parameters, tableNameWithType, segmentName, uploadURL,
           convertedSegmentTarFile);
 
-      postProcess(pinotTaskConfig);
       LOGGER.info("Done executing {} on table: {}, segment: {}", taskType, tableNameWithType, segmentName);
       return segmentConversionResult;
     } finally {

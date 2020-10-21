@@ -25,7 +25,7 @@ import java.util.Set;
 import javax.annotation.Nonnull;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.data.Segment;
-import org.apache.pinot.controller.helix.core.minion.ClusterInfoProvider;
+import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
@@ -40,13 +40,13 @@ public class TaskGeneratorUtils {
    * NOTE: we consider tasks not finished in one day as stuck and don't count the segments in them
    *
    * @param taskType Task type
-   * @param clusterInfoProvider Cluster info provider
+   * @param clusterInfoAccessor Cluster info accessor
    * @return Set of running segments
    */
   public static Set<Segment> getRunningSegments(@Nonnull String taskType,
-      @Nonnull ClusterInfoProvider clusterInfoProvider) {
+      @Nonnull ClusterInfoAccessor clusterInfoAccessor) {
     Set<Segment> runningSegments = new HashSet<>();
-    Map<String, TaskState> taskStates = clusterInfoProvider.getTaskStates(taskType);
+    Map<String, TaskState> taskStates = clusterInfoAccessor.getTaskStates(taskType);
     for (Map.Entry<String, TaskState> entry : taskStates.entrySet()) {
       // Skip COMPLETED tasks
       if (entry.getValue() == TaskState.COMPLETED) {
@@ -59,7 +59,7 @@ public class TaskGeneratorUtils {
         continue;
       }
 
-      for (PinotTaskConfig pinotTaskConfig : clusterInfoProvider.getTaskConfigs(entry.getKey())) {
+      for (PinotTaskConfig pinotTaskConfig : clusterInfoAccessor.getTaskConfigs(entry.getKey())) {
         Map<String, String> configs = pinotTaskConfig.getConfigs();
         runningSegments.add(
             new Segment(configs.get(MinionConstants.TABLE_NAME_KEY), configs.get(MinionConstants.SEGMENT_NAME_KEY)));
@@ -75,10 +75,10 @@ public class TaskGeneratorUtils {
    * NOTE: we consider tasks not finished in one day as stuck and don't count them
    */
   public static Map<String, TaskState> getIncompleteTasks(String taskType, String tableNameWithType,
-      ClusterInfoProvider clusterInfoProvider) {
+      ClusterInfoAccessor clusterInfoAccessor) {
 
     Map<String, TaskState> nonCompletedTasks = new HashMap<>();
-    Map<String, TaskState> taskStates = clusterInfoProvider.getTaskStates(taskType);
+    Map<String, TaskState> taskStates = clusterInfoAccessor.getTaskStates(taskType);
     for (Map.Entry<String, TaskState> entry : taskStates.entrySet()) {
       if (entry.getValue() == TaskState.COMPLETED) {
         continue;
@@ -87,7 +87,7 @@ public class TaskGeneratorUtils {
       if (isTaskOlderThanOneDay(taskName)) {
         continue;
       }
-      for (PinotTaskConfig pinotTaskConfig : clusterInfoProvider.getTaskConfigs(entry.getKey())) {
+      for (PinotTaskConfig pinotTaskConfig : clusterInfoAccessor.getTaskConfigs(entry.getKey())) {
         if (tableNameWithType.equals(pinotTaskConfig.getConfigs().get(MinionConstants.TABLE_NAME_KEY))) {
           nonCompletedTasks.put(entry.getKey(), entry.getValue());
         }
