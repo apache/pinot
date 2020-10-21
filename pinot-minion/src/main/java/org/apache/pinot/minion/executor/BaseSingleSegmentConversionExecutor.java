@@ -65,7 +65,6 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
   @Override
   public SegmentConversionResult executeTask(PinotTaskConfig pinotTaskConfig)
       throws Exception {
-
     String taskType = pinotTaskConfig.getTaskType();
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
