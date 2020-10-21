@@ -87,8 +87,7 @@ export default function SimpleAccordion({
             value={searchValue}
             onChange={(e) => handleSearch(e.target.value)}
           />
-          : null
-        }
+          : null}
         {children}
       </AccordionDetails>
     </Accordion>

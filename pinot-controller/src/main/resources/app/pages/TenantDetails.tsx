@@ -68,7 +68,6 @@ const jsonoptions = {
   mode: 'application/json',
   styleActiveLine: true,
   gutters: ['CodeMirror-lint-markers'],
-  lint: true,
   theme: 'default',
 };
 

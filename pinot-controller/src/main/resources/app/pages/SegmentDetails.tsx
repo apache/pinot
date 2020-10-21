@@ -20,7 +20,7 @@
 import React, { useState, useEffect } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
 import { Grid } from '@material-ui/core';
-import { RouteComponentProps } from 'react-router-dom';
+import { RouteComponentProps, useHistory, useLocation } from 'react-router-dom';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
 import AppLoader from '../components/AppLoader';
 import TableToolbar from '../components/TableToolbar';
@@ -31,6 +31,9 @@ import 'codemirror/mode/sql/sql';
 import SimpleAccordion from '../components/SimpleAccordion';
 import CustomizedTables from '../components/Table';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
+import CustomButton from '../components/CustomButton';
+import Confirm from '../components/Confirm';
+import CustomNotification from '../components/CustomNotification';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -59,6 +62,11 @@ const useStyles = makeStyles((theme) => ({
     borderRadius: 4,
     marginBottom: '20px',
   },
+  operationDiv: {
+    border: '1px #BDCCD9 solid',
+    borderRadius: 4,
+    marginBottom: 20
+  }
 }));
 
 const jsonoptions = {
@@ -66,7 +74,6 @@ const jsonoptions = {
   mode: 'application/json',
   styleActiveLine: true,
   gutters: ['CodeMirror-lint-markers'],
-  lint: true,
   theme: 'default',
 };
 
@@ -84,9 +91,16 @@ type Summary = {
 
 const SegmentDetails = ({ match }: RouteComponentProps<Props>) => {
   const classes = useStyles();
+  const history = useHistory();
+  const location = useLocation();
   const { tableName, segmentName } = match.params;
 
   const [fetching, setFetching] = useState(true);
+  const [confirmDialog, setConfirmDialog] = React.useState(false);
+  const [dialogDetails, setDialogDetails] = React.useState(null);
+  const [notificationData, setNotificationData] = React.useState({type: '', message: ''});
+  const [showNotification, setShowNotification] = React.useState(false);
+
   const [segmentSummary, setSegmentSummary] = useState<Summary>({
     segmentName,
     totalDocs: '',
@@ -109,6 +123,65 @@ const SegmentDetails = ({ match }: RouteComponentProps<Props>) => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const closeDialog = () => {
+    setConfirmDialog(false);
+    setDialogDetails(null);
+  };
+
+  const handleDeleteSegmentClick = () => {
+    setDialogDetails({
+      title: 'Delete Segment',
+      content: 'Are you sure want to delete this instance? Data from this segment will be permanently deleted.',
+      successCb: () => handleDeleteSegment()
+    });
+    setConfirmDialog(true);
+  };
+
+  const handleDeleteSegment = async () => {
+    const result = await PinotMethodUtils.deleteSegmentOp(tableName, segmentName);
+    if(result.status){
+      setNotificationData({type: 'success', message: result.status});
+      fetchData();
+    } else {
+      setNotificationData({type: 'error', message: result.error});
+    }
+    setShowNotification(true);
+    closeDialog();
+    setTimeout(()=>{
+      navigateToPreviousPage();
+    }, 1000);
+  };
+
+  const navigateToPreviousPage = () => {
+    const hasharr = location.pathname.split('/');
+    hasharr.pop();
+    const path = hasharr.join('/');
+    console.log(path)
+    history.push(path);
+  };
+
+  const handleReloadSegmentClick = () => {
+    setDialogDetails({
+      title: 'Reload Segment',
+      content: 'Are you sure want to reload this segment?',
+      successCb: () => handleReloadOp()
+    });
+    setConfirmDialog(true);
+  };
+
+  const handleReloadOp = async () => {
+    const result = await PinotMethodUtils.reloadSegmentOp(tableName, segmentName);
+    if(result.status){
+      setNotificationData({type: 'success', message: result.status});
+      fetchData();
+    } else {
+      setNotificationData({type: 'error', message: result.error});
+    }
+    setShowNotification(true);
+    closeDialog();
+  }
+
   return fetching ? (
     <AppLoader />
   ) : (
@@ -122,6 +195,21 @@ const SegmentDetails = ({ match }: RouteComponentProps<Props>) => {
         overflowY: 'auto',
       }}
     >
+      <div className={classes.operationDiv}>
+        <SimpleAccordion
+          headerTitle="Operations"
+          showSearchBox={false}
+        >
+          <div>
+            <CustomButton onClick={()=>{handleDeleteSegmentClick()}}>
+              Delete Segment
+            </CustomButton>
+            <CustomButton onClick={()=>{handleReloadSegmentClick()}}>
+              Reload Segment
+            </CustomButton>
+          </div>
+        </SimpleAccordion>
+      </div>
       <div className={classes.highlightBackground}>
         <TableToolbar name="Summary" showSearchBox={false} />
         <Grid container className={classes.body}>
@@ -163,6 +251,21 @@ const SegmentDetails = ({ match }: RouteComponentProps<Props>) => {
           </div>
         </Grid>
       </Grid>
+      {confirmDialog && dialogDetails && <Confirm
+        openDialog={confirmDialog}
+        dialogTitle={dialogDetails.title}
+        dialogContent={dialogDetails.content}
+        successCallback={dialogDetails.successCb}
+        closeDialog={closeDialog}
+        dialogYesLabel='Yes'
+        dialogNoLabel='No'
+      />}
+      <CustomNotification
+        type={notificationData.type}
+        message={notificationData.message}
+        show={showNotification}
+        hide={()=>{setShowNotification(false)}}
+      />
     </Grid>
   );
 };

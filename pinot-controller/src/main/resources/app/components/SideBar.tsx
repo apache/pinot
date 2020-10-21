@@ -147,12 +147,13 @@ const Sidebar = ({ showMenu, list, selectedId, highlightSidebarLink }: Props) =>
                     <ListItem color="white" button className={`${classes.itemContainer} ${selectedId === id ? classes.selectedItem : ''}`} selected={selectedId === id} onClick={(event) => highlightSidebarLink(id)}>
                       {icon}
                       <Typography
-                        className={clsx('menu-item',{
+                        className={clsx('menu-item', {
                           [classes.sidebarLabel]: showMenu,
                           [classes.sidebarLabelClose]: !showMenu,
                         })}
                         component="span"
-                      >{name} &ensp;</Typography>
+                      >{name} &ensp;
+                      </Typography>
                     </ListItem>
                   </NavLink>
                   :
@@ -160,12 +161,13 @@ const Sidebar = ({ showMenu, list, selectedId, highlightSidebarLink }: Props) =>
                     <ListItem color="white" button className={`${classes.itemContainer}`}>
                       {icon}
                       <Typography
-                        className={clsx('menu-item',{
+                        className={clsx('menu-item', {
                           [classes.sidebarLabel]: showMenu,
                           [classes.sidebarLabelClose]: !showMenu,
                         })}
                         component="span"
-                      >{name} &ensp;</Typography>
+                      >{name} &ensp;
+                      </Typography>
                     </ListItem>
                   </a>}
               </Box>

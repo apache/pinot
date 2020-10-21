@@ -47,7 +47,7 @@ const TablesListingPage = () => {
 
   const fetchData = async () => {
     const tenantsDataResponse = await PinotMethodUtils.getTenantsData();
-    let promiseArr = [];
+    const promiseArr = [];
     tenantsDataResponse.records.map((tenantRecord)=>{
       promiseArr.push(PinotMethodUtils.getTenantTableData(tenantRecord[0]));
     });
@@ -55,21 +55,21 @@ const TablesListingPage = () => {
       results.map((result, index)=>{
         const tenantName = tenantsDataResponse.records[index][0];
         records.push(...result.records.map((record)=>{
-          record.splice(1,0,tenantName);
+          record.splice(1, 0, tenantName);
           return record;
         }));
       });
       setTableData({columns: columnHeaders, records});
       setFetching(false);
     });
-  }
+  };
 
   useEffect(() => {
     fetchData();
   }, []);
 
   return fetching ? (
-    <AppLoader/>
+    <AppLoader />
   ) : (
     <Grid item xs className={classes.gridContainer}>
       <CustomizedTables
@@ -77,13 +77,13 @@ const TablesListingPage = () => {
         data={tableData}
         isPagination
         addLinks
-        baseURL={`/tenants/:Tenant Name:/table/`} // TODO
+        baseURL="/tenants/:Tenant Name:/table/" // TODO
         regexReplace={true}
         showSearchBox={true}
         inAccordionFormat={true}
       />
     </Grid>
-  )
+  );
 };
 
 export default TablesListingPage;

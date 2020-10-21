@@ -86,3 +86,7 @@ li.codemirror-func.CodeMirror-hint::before {
 li.CodeMirror-hint-active {
   background-color: #dae2f2;
 }
+
+.CodeMirror-lint-tooltip{
+  z-index: 9999 !important;
+}
