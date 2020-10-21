@@ -70,7 +70,8 @@ public class UpsertQuickStart {
     printStatus(Color.CYAN, "***** Starting Kafka *****");
     final ZkStarter.ZookeeperInstance zookeeperInstance = ZkStarter.startLocalZkServer();
     try {
-      _kafkaStarter = StreamDataProvider.getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, KafkaStarterUtils.getDefaultKafkaConfiguration());
+      _kafkaStarter = StreamDataProvider.getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME,
+          KafkaStarterUtils.getDefaultKafkaConfiguration());
     } catch (Exception e) {
       throw new RuntimeException("Failed to start " + KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, e);
     }
@@ -98,7 +99,7 @@ public class UpsertQuickStart {
     printStatus(Color.CYAN, "***** Waiting for 5 seconds for a few events to get populated *****");
     Thread.sleep(5000);
 
-    printStatus(Color.YELLOW, "***** Realtime quickstart setup complete *****");
+    printStatus(Color.YELLOW, "***** Upsert quickstart setup complete *****");
 
     String q1 = "select event_id, count(*) from meetupRsvp group by event_id limit 10";
     printStatus(Color.YELLOW, "Total number of documents per event_id in the table");
@@ -106,8 +107,6 @@ public class UpsertQuickStart {
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q1)));
     printStatus(Color.GREEN, "***************************************************");
 
-    printStatus(Quickstart.Color.YELLOW, "***** Realtime quickstart setup complete *****");
-
-    printStatus(Quickstart.Color.GREEN, "You can always go to http://localhost:9000/query/ to play around in the query console");
+    printStatus(Color.GREEN, "You can always go to http://localhost:9000 to play around in the query console");
   }
 }
