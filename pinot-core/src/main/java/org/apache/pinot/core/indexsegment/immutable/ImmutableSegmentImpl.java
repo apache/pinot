@@ -67,7 +67,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   }
 
   /**
-   * Enables upsert for this segment.
+   * Enables upsert for this segment. It should be called before the segment getting queried.
    */
   public void enableUpsert(PartitionUpsertMetadataManager partitionUpsertMetadataManager,
       ThreadSafeMutableRoaringBitmap validDocIds) {

@@ -91,6 +91,19 @@ public class PartitionUpsertMetadataManagerTest {
     assertEquals(newValidDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 4});
     assertSame(recordLocationMap.get(getPrimaryKey(0)).getValidDocIds(), newValidDocIds1);
     assertSame(recordLocationMap.get(getPrimaryKey(1)).getValidDocIds(), newValidDocIds1);
+
+    // Remove the original segment1
+    upsertMetadataManager.removeSegment(segment1, validDocIds1);
+    // segment2: 2 -> {2, 120}, 3 -> {3, 80}
+    // new segment1: 0 -> {0, 100}, 1 -> {4, 120}
+    checkRecordLocation(recordLocationMap, 0, segment1, 0, 100);
+    checkRecordLocation(recordLocationMap, 1, segment1, 4, 120);
+    checkRecordLocation(recordLocationMap, 2, segment2, 2, 120);
+    checkRecordLocation(recordLocationMap, 3, segment2, 3, 80);
+    assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{2, 3});
+    assertEquals(newValidDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 4});
+    assertSame(recordLocationMap.get(getPrimaryKey(0)).getValidDocIds(), newValidDocIds1);
+    assertSame(recordLocationMap.get(getPrimaryKey(1)).getValidDocIds(), newValidDocIds1);
   }
 
   private static PrimaryKey getPrimaryKey(int value) {

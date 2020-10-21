@@ -42,8 +42,8 @@ import org.slf4j.LoggerFactory;
  *     the RealtimeTableDataManager.
  *   </li>
  *   <li>
- *     When replacing an existing segment, the updates applied to the new segment won't be reflected to the replaced
- *     segment.
+ *     When replacing an existing segment, after the record location being replaced with the new segment, the following
+ *     updates applied to the new segment's valid doc ids won't be reflected to the replaced segment's valid doc ids.
  *   </li>
  * </ul>
  */
@@ -94,15 +94,17 @@ public class PartitionUpsertMetadataManager {
               }
             }
             return currentRecordLocation;
-          }
-
-          // Update the record location when getting a newer timestamp
-          if (recordInfo._timestamp > currentRecordLocation.getTimestamp()) {
-            currentRecordLocation.getValidDocIds().remove(currentRecordLocation.getDocId());
-            validDocIds.add(recordInfo._docId);
-            return new RecordLocation(segmentName, recordInfo._docId, recordInfo._timestamp, validDocIds);
           } else {
-            return currentRecordLocation;
+            // The current record location is pointing to a different segment
+
+            // Update the record location when getting a newer timestamp
+            if (recordInfo._timestamp > currentRecordLocation.getTimestamp()) {
+              currentRecordLocation.getValidDocIds().remove(currentRecordLocation.getDocId());
+              validDocIds.add(recordInfo._docId);
+              return new RecordLocation(segmentName, recordInfo._docId, recordInfo._timestamp, validDocIds);
+            } else {
+              return currentRecordLocation;
+            }
           }
         } else {
           // New primary key
@@ -117,8 +119,7 @@ public class PartitionUpsertMetadataManager {
   /**
    * Updates the upsert metadata for a new consumed record in the given consuming segment.
    */
-  public synchronized void updateRecord(String segmentName, RecordInfo recordInfo,
-      ThreadSafeMutableRoaringBitmap validDocIds) {
+  public void updateRecord(String segmentName, RecordInfo recordInfo, ThreadSafeMutableRoaringBitmap validDocIds) {
     _primaryKeyToRecordLocationMap.compute(recordInfo._primaryKey, (primaryKey, currentRecordLocation) -> {
       if (currentRecordLocation != null) {
         // Existing primary key
@@ -143,7 +144,7 @@ public class PartitionUpsertMetadataManager {
    * Removes the upsert metadata for the given immutable segment. No need to remove the upsert metadata for the
    * consuming segment because it should be replaced by the committed segment.
    */
-  public synchronized void removeSegment(String segmentName, ThreadSafeMutableRoaringBitmap validDocIds) {
+  public void removeSegment(String segmentName, ThreadSafeMutableRoaringBitmap validDocIds) {
     LOGGER.info("Removing upsert metadata for segment: {}", segmentName);
 
     if (!validDocIds.getMutableRoaringBitmap().isEmpty()) {
