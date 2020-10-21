@@ -41,8 +41,11 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.data.manager.TableDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.server.starter.ServerInstance;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /**
@@ -118,5 +121,34 @@ public class TableSizeResource {
       @ApiParam(value = "Provide detailed information") @DefaultValue("true") @QueryParam("detailed") boolean detailed)
       throws WebApplicationException {
     return this.getTableSize(tableName, detailed);
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/tables/{tableName}/avgMemoryConsumedRealtime")
+  @ApiOperation(value = "Show average off heap memory consumed by mutable segments", notes = "Averages off heap memory consumed by consuming segments of realtime table")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"), @ApiResponse(code = 404, message = "Table not found")})
+  public String getTableSize(
+      @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName)
+      throws WebApplicationException {
+    double avgMemoryConsumed = 0;
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    if (tableType != TableType.REALTIME) {
+      throw new WebApplicationException("This api cannot be used with non real-time table: " + tableName,
+          Response.Status.BAD_REQUEST);
+    }
+
+    InstanceDataManager instanceDataManager = serverInstance.getInstanceDataManager();
+    if (instanceDataManager == null) {
+      throw new WebApplicationException("Invalid server initialization", Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    RealtimeTableDataManager realtimeTableDataManager =
+        (RealtimeTableDataManager) instanceDataManager.getTableDataManager(tableName);
+    if (realtimeTableDataManager == null) {
+      throw new WebApplicationException("Table: " + tableName + " is not found", Response.Status.NOT_FOUND);
+    }
+
+    avgMemoryConsumed = realtimeTableDataManager.getStatsHistory().getAvgMemoryConsumed();
+    return ResourceUtils.convertToJsonString(avgMemoryConsumed);
   }
 }
