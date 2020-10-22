@@ -1680,7 +1680,7 @@ public class PinotHelixResourceManager {
   }
 
   private Object getTableUpdaterLock(String offlineTableName) {
-    return _tableUpdaterLocks[offlineTableName.hashCode() % _tableUpdaterLocks.length];
+    return _tableUpdaterLocks[(offlineTableName.hashCode() & Integer.MAX_VALUE) % _tableUpdaterLocks.length];
   }
 
   @Nullable

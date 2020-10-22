@@ -50,6 +50,18 @@ public class RetryPolicies {
   }
 
   /**
+   * Creates a {@link RandomDelayRetryPolicy}.
+   *
+   * @param maxNumAttempts The maximum number of attempts to try
+   * @param minDelayMs The min delay in milliseconds between attempts (inclusive)
+   * @param maxDelayMs The max delay in milliseconds between attempts (exclusive)
+   * @return The retry policy
+   */
+  public static RandomDelayRetryPolicy randomDelayRetryPolicy(int maxNumAttempts, long minDelayMs, long maxDelayMs) {
+    return new RandomDelayRetryPolicy(maxNumAttempts, minDelayMs, maxDelayMs);
+  }
+
+  /**
    * Creates a {@link NoDelayRetryPolicy}.
    *
    * @param maxNumAttempts The maximum number of attempts to try
