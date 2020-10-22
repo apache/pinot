@@ -341,18 +341,14 @@ public class RealtimeSegmentStatsHistory implements Serializable {
     return (numRowsIndexed > 0) ? (int) (numRowsIndexed / numEntriesToScan) : DEFAULT_ROWS_TO_INDEX;
   }
 
-  public synchronized double getAvgMemoryConsumed() {
-    int numEntriesToScan = getNumEntriesToScan();
-    if (numEntriesToScan == 0) {
+  public synchronized long getLatestSegmentMemoryConsumed() {
+    if (isEmpty()) {
       return 0;
     }
-
-    long totalMemUsedBytes = 0;
-    for (int i = 0; i < numEntriesToScan; i++) {
-      SegmentStats segmentStats = getSegmentStatsAt(i);
-      totalMemUsedBytes += segmentStats.getMemUsedBytes();
-    }
-    return (double) totalMemUsedBytes / numEntriesToScan;
+    // Get the last updated index
+    int latestSegmentIndex = (_cursor + _arraySize - 1) % _arraySize;
+    SegmentStats stats = getSegmentStatsAt(latestSegmentIndex);
+    return stats._memUsedBytes;
   }
 
   public SegmentStats getSegmentStatsAt(int index) {

@@ -252,7 +252,7 @@ public class RealtimeSegmentStatsHistoryTest {
   }
 
   @Test
-  public void testAvgConsumedMemory()
+  public void testLatestConsumedMemory()
       throws IOException, ClassNotFoundException {
     final String tmpDir = System.getProperty("java.io.tmpdir");
     File serializedFile = new File(tmpDir, STATS_FILE_NAME);
@@ -261,18 +261,17 @@ public class RealtimeSegmentStatsHistoryTest {
     long[] memoryValues = {100, 100, 200, 400, 450, 600};
 
     RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserialzeFrom(serializedFile);
+    Assert.assertEquals(history.getLatestSegmentMemoryConsumed(), 0);
     RealtimeSegmentStatsHistory.SegmentStats segmentStats = null;
 
-    long total = 0;
     for (int i=0;i< memoryValues.length; i++) {
       segmentStats = new RealtimeSegmentStatsHistory.SegmentStats();
       segmentStats.setMemUsedBytes(memoryValues[i]);
       history.addSegmentStats(segmentStats);
-      total += memoryValues[i];
     }
 
-    double expectedAvgMemUsed = (double) total / memoryValues.length;
-    Assert.assertEquals(history.getAvgMemoryConsumed(), expectedAvgMemUsed);
+    long expectedMemUsed = memoryValues[memoryValues.length-1];
+    Assert.assertEquals(history.getLatestSegmentMemoryConsumed(), expectedMemUsed);
   }
 
   private static class StatsUpdater implements Runnable {
