@@ -55,6 +55,7 @@ public class HelixHelper {
   private static final String ENABLE_COMPRESSIONS_KEY = "enableCompression";
 
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
+  private static final RetryPolicy DEFAULT_TABLE_IDEALSTATES_UPDATE_RETRY_POLICY = RetryPolicies.fixedDelayRetryPolicy(20, 100L);
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixHelper.class);
   private static final ZNRecordSerializer ZN_RECORD_SERIALIZER = new ZNRecordSerializer();
 
@@ -167,7 +168,7 @@ public class HelixHelper {
 
   public static void updateIdealState(HelixManager helixManager, String resourceName,
       Function<IdealState, IdealState> updater) {
-    updateIdealState(helixManager, resourceName, updater, DEFAULT_RETRY_POLICY, false);
+    updateIdealState(helixManager, resourceName, updater, DEFAULT_TABLE_IDEALSTATES_UPDATE_RETRY_POLICY, false);
   }
 
   public static void updateIdealState(final HelixManager helixManager, final String resourceName,

@@ -133,6 +133,7 @@ public class PinotHelixResourceManager {
   private static final long CACHE_ENTRY_EXPIRE_TIME_HOURS = 6L;
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
   public static final String APPEND = "APPEND";
+  private static final int DEFAULT_TABLE_UPDATER_LOCKERS_SIZE = 100;
 
   // TODO: make this configurable
   public static final long EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS = 10 * 60_000L; // 10 minutes
@@ -140,7 +141,7 @@ public class PinotHelixResourceManager {
 
   private final Map<String, Map<String, Long>> _segmentCrcMap = new HashMap<>();
   private final Map<String, Map<String, Integer>> _lastKnownSegmentMetadataVersionMap = new HashMap<>();
-  private final Map<String, Object> _tableUpdaterLockMap = new HashMap<>();
+  private final Object[] _tableUpdaterLocks;
 
   private final LoadingCache<String, String> _instanceAdminEndpointCache;
 
@@ -189,6 +190,10 @@ public class PinotHelixResourceManager {
                 return hostname + ":" + adminPort;
               }
             });
+    _tableUpdaterLocks = new Object[DEFAULT_TABLE_UPDATER_LOCKERS_SIZE];
+    for (int i = 0; i < _tableUpdaterLocks.length; i++) {
+      _tableUpdaterLocks[i] = new Object();
+    }
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf) {
@@ -1507,19 +1512,10 @@ public class PinotHelixResourceManager {
     LOGGER.info("Deleting table {}: Removed table config", offlineTableName);
 
     // Remove instance partitions
-    final String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     InstancePartitionsUtils.removeInstancePartitions(_propertyStore,
-        InstancePartitionsType.OFFLINE.getInstancePartitionsName(rawTableName));
+        InstancePartitionsType.OFFLINE.getInstancePartitionsName(TableNameBuilder.extractRawTableName(tableName)));
     LOGGER.info("Deleting table {}: Removed instance partitions", offlineTableName);
 
-    // Remove table locker if there
-    if (_tableUpdaterLockMap.containsKey(rawTableName)) {
-      synchronized (_tableUpdaterLockMap) {
-        if (_tableUpdaterLockMap.containsKey(rawTableName)) {
-          _tableUpdaterLockMap.remove(rawTableName);
-        }
-      }
-    }
     LOGGER.info("Deleting table {}: Finish", offlineTableName);
   }
 
@@ -1652,14 +1648,7 @@ public class PinotHelixResourceManager {
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = Collections
           .singletonMap(InstancePartitionsType.OFFLINE, InstancePartitionsUtils
               .fetchOrComputeInstancePartitions(_helixZkManager, offlineTableConfig, InstancePartitionsType.OFFLINE));
-      if (_tableUpdaterLockMap.get(offlineTableName) == null) {
-        synchronized (_tableUpdaterLockMap) {
-          if (_tableUpdaterLockMap.get(offlineTableName) == null) {
-            _tableUpdaterLockMap.put(offlineTableName, new Object());
-          }
-        }
-      }
-      synchronized (_tableUpdaterLockMap.get(offlineTableName)) {
+      synchronized (getTableUpdaterLock(offlineTableName)) {
         HelixHelper.updateIdealState(_helixZkManager, offlineTableName, idealState -> {
           assert idealState != null;
           Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
@@ -1688,6 +1677,10 @@ public class PinotHelixResourceManager {
       }
       throw e;
     }
+  }
+
+  private Object getTableUpdaterLock(String offlineTableName) {
+    return _tableUpdaterLocks[offlineTableName.hashCode() % _tableUpdaterLocks.length];
   }
 
   @Nullable
