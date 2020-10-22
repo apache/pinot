@@ -31,10 +31,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import org.apache.commons.lang.RandomStringUtils;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
+import org.apache.pinot.core.segment.index.readers.MutableDictionary;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
@@ -60,14 +61,14 @@ public class MutableDictionaryTest {
   @Test
   public void testSingleReaderSingleWriter() {
     try {
-      try (BaseMutableDictionary dictionary = new IntOnHeapMutableDictionary()) {
+      try (MutableDictionary dictionary = new IntOnHeapMutableDictionary()) {
         testSingleReaderSingleWriter(dictionary, FieldSpec.DataType.INT);
       }
-      try (BaseMutableDictionary dictionary = new IntOffHeapMutableDictionary(EST_CARDINALITY, 2000, _memoryManager,
+      try (MutableDictionary dictionary = new IntOffHeapMutableDictionary(EST_CARDINALITY, 2000, _memoryManager,
           "intColumn")) {
         testSingleReaderSingleWriter(dictionary, FieldSpec.DataType.INT);
       }
-      try (BaseMutableDictionary dictionary = new StringOffHeapMutableDictionary(EST_CARDINALITY, 2000, _memoryManager,
+      try (MutableDictionary dictionary = new StringOffHeapMutableDictionary(EST_CARDINALITY, 2000, _memoryManager,
           "stringColumn", 32)) {
         testSingleReaderSingleWriter(dictionary, FieldSpec.DataType.STRING);
       }
@@ -76,7 +77,7 @@ public class MutableDictionaryTest {
     }
   }
 
-  private void testSingleReaderSingleWriter(BaseMutableDictionary dictionary, FieldSpec.DataType dataType)
+  private void testSingleReaderSingleWriter(MutableDictionary dictionary, FieldSpec.DataType dataType)
       throws Exception {
     Future<Void> readerFuture = _executorService.submit(new Reader(dictionary, dataType));
     Future<Void> writerFuture = _executorService.submit(new Writer(dictionary, dataType));
@@ -88,14 +89,14 @@ public class MutableDictionaryTest {
   @Test
   public void testMultiReadersSingleWriter() {
     try {
-      try (BaseMutableDictionary dictionary = new IntOnHeapMutableDictionary()) {
+      try (MutableDictionary dictionary = new IntOnHeapMutableDictionary()) {
         testMultiReadersSingleWriter(dictionary, FieldSpec.DataType.INT);
       }
-      try (BaseMutableDictionary dictionary = new IntOffHeapMutableDictionary(EST_CARDINALITY, 2000, _memoryManager,
+      try (MutableDictionary dictionary = new IntOffHeapMutableDictionary(EST_CARDINALITY, 2000, _memoryManager,
           "intColumn")) {
         testMultiReadersSingleWriter(dictionary, FieldSpec.DataType.INT);
       }
-      try (BaseMutableDictionary dictionary = new StringOffHeapMutableDictionary(EST_CARDINALITY, 2000, _memoryManager,
+      try (MutableDictionary dictionary = new StringOffHeapMutableDictionary(EST_CARDINALITY, 2000, _memoryManager,
           "stringColumn", 32)) {
         testMultiReadersSingleWriter(dictionary, FieldSpec.DataType.STRING);
       }
@@ -104,7 +105,7 @@ public class MutableDictionaryTest {
     }
   }
 
-  private void testMultiReadersSingleWriter(BaseMutableDictionary dictionary, FieldSpec.DataType dataType)
+  private void testMultiReadersSingleWriter(MutableDictionary dictionary, FieldSpec.DataType dataType)
       throws Exception {
     Future[] readerFutures = new Future[NUM_READERS];
     for (int i = 0; i < NUM_READERS; i++) {
@@ -122,7 +123,7 @@ public class MutableDictionaryTest {
   public void testOnHeapMutableDictionary() {
     try {
       for (FieldSpec.DataType dataType : DATA_TYPES) {
-        try (BaseMutableDictionary dictionary = MutableDictionaryFactory
+        try (MutableDictionary dictionary = MutableDictionaryFactory
             .getMutableDictionary(dataType, false, null, 0, 0, null)) {
           testMutableDictionary(dictionary, dataType);
         }
@@ -139,7 +140,7 @@ public class MutableDictionaryTest {
     try {
       for (FieldSpec.DataType dataType : DATA_TYPES) {
         for (int maxOverflowSize : maxOverflowSizes) {
-          try (BaseMutableDictionary dictionary = makeOffHeapDictionary(EST_CARDINALITY, maxOverflowSize, dataType)) {
+          try (MutableDictionary dictionary = makeOffHeapDictionary(EST_CARDINALITY, maxOverflowSize, dataType)) {
             testMutableDictionary(dictionary, dataType);
           }
         }
@@ -149,7 +150,7 @@ public class MutableDictionaryTest {
     }
   }
 
-  private void testMutableDictionary(BaseMutableDictionary dictionary, FieldSpec.DataType dataType) {
+  private void testMutableDictionary(MutableDictionary dictionary, FieldSpec.DataType dataType) {
     Map<Object, Integer> valueToDictId = new HashMap<>();
     int numEntries = 0;
 
@@ -200,7 +201,7 @@ public class MutableDictionaryTest {
         dictionary.length());
   }
 
-  private BaseMutableDictionary makeOffHeapDictionary(int estCardinality, int maxOverflowSize,
+  private MutableDictionary makeOffHeapDictionary(int estCardinality, int maxOverflowSize,
       FieldSpec.DataType dataType) {
     switch (dataType) {
       case INT:
@@ -253,10 +254,10 @@ public class MutableDictionaryTest {
    * <p>We can assume that we always first get the index of a value, then use the index to fetch the value.
    */
   private class Reader implements Callable<Void> {
-    private final BaseMutableDictionary _dictionary;
+    private final MutableDictionary _dictionary;
     private final FieldSpec.DataType _dataType;
 
-    private Reader(BaseMutableDictionary dictionary, FieldSpec.DataType dataType) {
+    private Reader(MutableDictionary dictionary, FieldSpec.DataType dataType) {
       _dictionary = dictionary;
       _dataType = dataType;
     }
@@ -282,10 +283,10 @@ public class MutableDictionaryTest {
    * Writer to index value into dictionary, then check the index of the value.
    */
   private class Writer implements Callable<Void> {
-    private final BaseMutableDictionary _dictionary;
+    private final MutableDictionary _dictionary;
     private final FieldSpec.DataType _dataType;
 
-    private Writer(BaseMutableDictionary dictionary, FieldSpec.DataType dataType) {
+    private Writer(MutableDictionary dictionary, FieldSpec.DataType dataType) {
       _dictionary = dictionary;
       _dataType = dataType;
     }
@@ -321,7 +322,7 @@ public class MutableDictionaryTest {
   /**
    * Helper method to check whether the value of the given dictId is one larger than the dictId.
    */
-  private static void checkEquals(BaseMutableDictionary dictionary, int dictId, FieldSpec.DataType dataType) {
+  private static void checkEquals(MutableDictionary dictionary, int dictId, FieldSpec.DataType dataType) {
     switch (dataType) {
       case INT:
         Assert.assertEquals(dictionary.getIntValue(dictId), dictId + 1);

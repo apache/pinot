@@ -34,6 +34,11 @@ public class ConstantValueStringDictionary extends BaseImmutableDictionary {
   }
 
   @Override
+  public DataType getValueType() {
+    return DataType.STRING;
+  }
+
+  @Override
   public int insertionIndexOf(String stringValue) {
     int result = stringValue.compareTo(_value);
     if (result < 0) {
@@ -46,8 +51,18 @@ public class ConstantValueStringDictionary extends BaseImmutableDictionary {
   }
 
   @Override
-  public DataType getValueType() {
-    return DataType.STRING;
+  public String getMinVal() {
+    return _value;
+  }
+
+  @Override
+  public String getMaxVal() {
+    return _value;
+  }
+
+  @Override
+  public String[] getSortedValues() {
+    return new String[]{_value};
   }
 
   @Override

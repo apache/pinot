@@ -33,6 +33,11 @@ public class ConstantValueLongDictionary extends BaseImmutableDictionary {
   }
 
   @Override
+  public DataType getValueType() {
+    return DataType.LONG;
+  }
+
+  @Override
   public int insertionIndexOf(String stringValue) {
     long longValue = Long.parseLong(stringValue);
     if (longValue < _value) {
@@ -45,8 +50,18 @@ public class ConstantValueLongDictionary extends BaseImmutableDictionary {
   }
 
   @Override
-  public DataType getValueType() {
-    return DataType.LONG;
+  public Long getMinVal() {
+    return _value;
+  }
+
+  @Override
+  public Long getMaxVal() {
+    return _value;
+  }
+
+  @Override
+  public long[] getSortedValues() {
+    return new long[]{_value};
   }
 
   @Override

@@ -33,6 +33,11 @@ public class ConstantValueFloatDictionary extends BaseImmutableDictionary {
   }
 
   @Override
+  public DataType getValueType() {
+    return DataType.FLOAT;
+  }
+
+  @Override
   public int insertionIndexOf(String stringValue) {
     float floatValue = Float.parseFloat(stringValue);
     if (floatValue < _value) {
@@ -45,8 +50,18 @@ public class ConstantValueFloatDictionary extends BaseImmutableDictionary {
   }
 
   @Override
-  public DataType getValueType() {
-    return DataType.FLOAT;
+  public Float getMinVal() {
+    return _value;
+  }
+
+  @Override
+  public Float getMaxVal() {
+    return _value;
+  }
+
+  @Override
+  public float[] getSortedValues() {
+    return new float[]{_value};
   }
 
   @Override

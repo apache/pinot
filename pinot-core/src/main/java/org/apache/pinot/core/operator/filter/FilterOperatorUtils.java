@@ -26,7 +26,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.OfflineDictionaryBasedRangePredicateEvaluator;
 import org.apache.pinot.core.query.request.context.predicate.Predicate;
 
 
@@ -54,8 +53,7 @@ public class FilterOperatorUtils {
         return new SortedIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
       }
       if (dataSource.getRangeIndex() != null) {
-        return new RangeIndexBasedFilterOperator((OfflineDictionaryBasedRangePredicateEvaluator) predicateEvaluator,
-            dataSource, numDocs);
+        return new RangeIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
       }
       return new ScanBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
     } else if (predicateType == Predicate.Type.REGEXP_LIKE) {

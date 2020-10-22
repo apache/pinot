@@ -21,8 +21,6 @@ package org.apache.pinot.core.operator.filter.predicate;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import org.apache.pinot.core.query.request.context.predicate.Predicate;
 import org.apache.pinot.core.query.request.context.predicate.RangePredicate;
-import org.apache.pinot.core.realtime.impl.dictionary.BaseMutableDictionary;
-import org.apache.pinot.core.segment.index.readers.BaseImmutableDictionary;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -46,11 +44,10 @@ public class RangePredicateEvaluatorFactory {
    */
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(RangePredicate rangePredicate,
       Dictionary dictionary, DataType dataType) {
-    if (dictionary instanceof BaseImmutableDictionary) {
-      return new OfflineDictionaryBasedRangePredicateEvaluator(rangePredicate, (BaseImmutableDictionary) dictionary);
+    if (dictionary.isSorted()) {
+      return new SortedDictionaryBasedRangePredicateEvaluator(rangePredicate, dictionary);
     } else {
-      return new RealtimeDictionaryBasedRangePredicateEvaluator(rangePredicate, (BaseMutableDictionary) dictionary,
-          dataType);
+      return new UnsortedDictionaryBasedRangePredicateEvaluator(rangePredicate, dictionary, dataType);
     }
   }
 
@@ -81,14 +78,14 @@ public class RangePredicateEvaluatorFactory {
     }
   }
 
-  public static final class OfflineDictionaryBasedRangePredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
+  public static final class SortedDictionaryBasedRangePredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
     final int _startDictId;
     // Exclusive
     final int _endDictId;
     final int _numMatchingDictIds;
     int[] _matchingDictIds;
 
-    OfflineDictionaryBasedRangePredicateEvaluator(RangePredicate rangePredicate, BaseImmutableDictionary dictionary) {
+    SortedDictionaryBasedRangePredicateEvaluator(RangePredicate rangePredicate, Dictionary dictionary) {
       String lowerBound = rangePredicate.getLowerBound();
       String upperBound = rangePredicate.getUpperBound();
       boolean lowerInclusive = rangePredicate.isLowerInclusive();
@@ -170,19 +167,19 @@ public class RangePredicateEvaluatorFactory {
     }
   }
 
-  private static final class RealtimeDictionaryBasedRangePredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
+  private static final class UnsortedDictionaryBasedRangePredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
     // When the cardinality of the column is lower than this threshold, pre-calculate the matching dictionary ids;
     // otherwise, fetch the value when evaluating each dictionary id.
     // TODO: Tune this threshold
     private static final int DICT_ID_SET_BASED_CARDINALITY_THRESHOLD = 1000;
 
-    final BaseMutableDictionary _dictionary;
+    final Dictionary _dictionary;
     final DataType _dataType;
     final boolean _dictIdSetBased;
     final IntSet _matchingDictIdSet;
     final BaseRawValueBasedPredicateEvaluator _rawValueBasedEvaluator;
 
-    RealtimeDictionaryBasedRangePredicateEvaluator(RangePredicate rangePredicate, BaseMutableDictionary dictionary,
+    UnsortedDictionaryBasedRangePredicateEvaluator(RangePredicate rangePredicate, Dictionary dictionary,
         DataType dataType) {
       _dictionary = dictionary;
       _dataType = dataType;

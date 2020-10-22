@@ -19,17 +19,22 @@
 package org.apache.pinot.core.segment.index.readers;
 
 import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.ints.IntSet;
 import java.io.IOException;
 import java.util.Arrays;
 import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.core.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.core.io.util.ValueReader;
 import org.apache.pinot.core.io.util.VarLengthBytesValueReaderWriter;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
-public abstract class BaseImmutableDictionary extends BaseDictionary {
+/**
+ * Base implementation of immutable dictionary.
+ */
+@SuppressWarnings("rawtypes")
+public abstract class BaseImmutableDictionary implements Dictionary {
   private final ValueReader _valueReader;
   private final int _length;
   private final int _numBytesPerValue;
@@ -59,12 +64,6 @@ public abstract class BaseImmutableDictionary extends BaseDictionary {
     _paddingByte = 0;
   }
 
-  /**
-   * Returns the insertion index of string representation of the value in the dictionary. Follows the same behavior as
-   * in {@link Arrays#binarySearch(Object[], Object)}. This API is for range predicate evaluation.
-   */
-  public abstract int insertionIndexOf(String stringValue);
-
   @Override
   public boolean isSorted() {
     return true;
@@ -79,6 +78,31 @@ public abstract class BaseImmutableDictionary extends BaseDictionary {
   public int indexOf(String stringValue) {
     int index = insertionIndexOf(stringValue);
     return (index >= 0) ? index : NULL_VALUE_INDEX;
+  }
+
+  @Override
+  public IntSet getDictIdsInRange(String lower, String upper, boolean includeLower, boolean includeUpper) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public int compare(int dictId1, int dictId2) {
+    return Integer.compare(dictId1, dictId2);
+  }
+
+  @Override
+  public Comparable getMinVal() {
+    return (Comparable) get(0);
+  }
+
+  @Override
+  public Comparable getMaxVal() {
+    return (Comparable) get(_length - 1);
+  }
+
+  @Override
+  public Object getSortedValues() {
+    throw new UnsupportedOperationException();
   }
 
   @Override
