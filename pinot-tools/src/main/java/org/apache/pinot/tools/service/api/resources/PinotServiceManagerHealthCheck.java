@@ -25,6 +25,7 @@ import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import java.util.Map;
+import java.util.Set;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -34,6 +35,7 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.tools.service.PinotServiceManager;
 
 
@@ -50,13 +52,17 @@ public class PinotServiceManagerHealthCheck {
   @ApiOperation(value = "Checking Pinot Service health")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Pinot Starter is healthy"), @ApiResponse(code = 503, message = "Pinot Starter is not healthy")})
   public String getStarterHealth() {
-    if (_pinotServiceManager.isHealthCheckAllComponents()) {
+    final Set<String> healthCheckServices = _pinotServiceManager.getHealthCheckServices();
+    if (!healthCheckServices.isEmpty()) {
       Map<String, Map<String, String>> serviceStatusMap = ServiceStatus.getServiceStatusMap();
       for (String instanceName : serviceStatusMap.keySet()) {
-        ServiceStatus.Status status = ServiceStatus.getServiceStatus(instanceName);
-        if (status != ServiceStatus.Status.GOOD) {
-          throw new WebApplicationException(String.format("Pinot instance [ %s ] status is [ %s ]", instanceName, status),
-              Response.Status.SERVICE_UNAVAILABLE);
+        PinotInstanceStatus instanceStatus = _pinotServiceManager.getInstanceStatus(instanceName);
+        if (healthCheckServices.contains(instanceStatus.getServiceRole().toString())) {
+          ServiceStatus.Status status = instanceStatus.getServiceStatus();
+          if (status != ServiceStatus.Status.GOOD) {
+            throw new WebApplicationException(String.format("Pinot instance [ %s ] status is [ %s ]", instanceName, status),
+                Response.Status.SERVICE_UNAVAILABLE);
+          }
         }
       }
     }

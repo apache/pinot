@@ -69,12 +69,12 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
   private String _clusterName = DEFAULT_CLUSTER_NAME;
   @Option(name = "-port", required = true, metaVar = "<int>", usage = "Pinot service manager admin port, -1 means disable, 0 means a random available port.")
   private int _port;
-  @Option(name = "-healthCheckAllComponents", metaVar = "<boolean>", usage = "Pinot service manager health check returns the all components health check. The health check returns OK when all the components are returning OK.")
-  private boolean _healthCheckAllComponents;
   @Option(name = "-bootstrapConfigPaths", handler = StringArrayOptionHandler.class, required = false, usage = "A list of Pinot service config file paths. Each config file requires an extra config: 'pinot.service.role' to indicate which service to start.", forbids = {"-bootstrapServices"})
   private String[] _bootstrapConfigPaths;
   @Option(name = "-bootstrapServices", handler = StringArrayOptionHandler.class, required = false, usage = "A list of Pinot service roles to start with default config. E.g. CONTROLLER/BROKER/SERVER", forbids = {"-bootstrapConfigPaths"})
   private String[] _bootstrapServices = BOOTSTRAP_SERVICES;
+  @Option(name = "-healthCheckServices", handler = StringArrayOptionHandler.class, required = false, usage = "A list of Pinot service roles to be included in health check. E.g. CONTROLLER/BROKER/SERVER")
+  private String[] _healthCheckServices = BOOTSTRAP_SERVICES;
 
   private PinotServiceManager _pinotServiceManager;
 
@@ -120,6 +120,15 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
 
   public StartServiceManagerCommand setBootstrapServices(String[] bootstrapServices) {
     _bootstrapServices = bootstrapServices;
+    return this;
+  }
+
+  public String[] getHealthCheckServices() {
+    return _healthCheckServices;
+  }
+
+  public StartServiceManagerCommand setHealthCheckServices(String[] healthCheckServices) {
+    _healthCheckServices = healthCheckServices;
     return this;
   }
 
@@ -197,7 +206,7 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
   }
 
   private String startServiceManager() {
-    _pinotServiceManager = new PinotServiceManager(_zkAddress, _clusterName, _port, _healthCheckAllComponents);
+    _pinotServiceManager = new PinotServiceManager(_zkAddress, _clusterName, _port, _healthCheckServices);
     _pinotServiceManager.start();
     return _pinotServiceManager.getInstanceId();
   }
@@ -304,13 +313,5 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
     config.put(PINOT_SERVICE_ROLE, role.toString()); // Ensure config has role key
     _bootstrapConfigurations.add(new SimpleImmutableEntry<>(role, config));
     return this;
-  }
-
-  public boolean isHealthCheckAllComponents() {
-    return _healthCheckAllComponents;
-  }
-
-  public void setHealthCheckAllComponents(boolean healthCheckAllComponents) {
-    _healthCheckAllComponents = healthCheckAllComponents;
   }
 }
