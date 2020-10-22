@@ -42,6 +42,7 @@ public interface MutableDictionary extends Dictionary {
 
   @Override
   default int insertionIndexOf(String stringValue) {
+    // This method should not be called for unsorted dictionary.
     throw new UnsupportedOperationException();
   }
 }

@@ -82,6 +82,7 @@ public abstract class BaseImmutableDictionary implements Dictionary {
 
   @Override
   public IntSet getDictIdsInRange(String lower, String upper, boolean includeLower, boolean includeUpper) {
+    // This method should not be called for sorted dictionary.
     throw new UnsupportedOperationException();
   }
 
@@ -102,6 +103,8 @@ public abstract class BaseImmutableDictionary implements Dictionary {
 
   @Override
   public Object getSortedValues() {
+    // This method is for the stats collection phase when sealing the consuming segment, so it is not required for
+    // regular immutable dictionary within the immutable segment.
     throw new UnsupportedOperationException();
   }
 

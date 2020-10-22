@@ -55,29 +55,32 @@ public interface Dictionary extends Closeable {
 
   /**
    * Returns the insertion index of the string representation of the value in the dictionary. This method follows the
-   * same behavior as in {@link Arrays#binarySearch(Object[], Object)}. All sorted dictionary should support this
+   * same behavior as in {@link Arrays#binarySearch(Object[], Object)}. All sorted dictionaries should support this
    * method. This method is for the range predicate evaluation.
    */
   int insertionIndexOf(String stringValue);
 
   /**
    * Returns a set of dictIds in the given value range, where lower/upper bound can be "*" which indicates unbounded
-   * range. All unsorted dictionary should support this method. This method is for the range predicate evaluation.
+   * range. All unsorted dictionaries should support this method. This method is for the range predicate evaluation.
    */
   IntSet getDictIdsInRange(String lower, String upper, boolean includeLower, boolean includeUpper);
 
   /**
-   * Returns the comparison result of value for dictId 1 and dictId 2, i.e. {@code value1.compareTo(value2)}.
+   * Returns the comparison result of the values (actual value instead of string representation of the value) for the
+   * given dictionary ids, i.e. {@code value1.compareTo(value2)}.
    */
   int compare(int dictId1, int dictId2);
 
   /**
-   * Returns the minimum value in the dictionary. Note that for type BYTES, {@code ByteArray} will be returned.
+   * Returns the minimum value in the dictionary. For type BYTES, {@code ByteArray} will be returned. Undefined if the
+   * dictionary is empty.
    */
   Comparable getMinVal();
 
   /**
-   * Returns the maximum value in the dictionary. Note that for type BYTES, {@code ByteArray} will be returned.
+   * Returns the maximum value in the dictionary. For type BYTES, {@code ByteArray} will be returned. Undefined if the
+   * dictionary is empty.
    */
   Comparable getMaxVal();
 
