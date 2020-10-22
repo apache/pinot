@@ -267,7 +267,7 @@ public class SqlUtils {
     }
 
     if (limit > 0 ){
-      sb.append(" ORDER BY " + getSelectMetricClause(metricConfig, metricFunction) + " DESC");
+      sb.append(" ORDER BY " + getSelectMetricClauseName(metricConfig, metricFunction) + " DESC");
     }
 
     limit = limit > 0 ? limit : DEFAULT_LIMIT;
@@ -315,6 +315,19 @@ public class SqlUtils {
       metricName = metricConfig.getName();
     }
     builder.append(convertAggFunction(metricFunction.getFunctionName())).append("(").append(metricName).append(")");
+    builder.append(" AS ").append(getSelectMetricClauseName(metricConfig, metricFunction)); 
+    return builder.toString();
+  }
+
+  private static String getSelectMetricClauseName(MetricConfigDTO metricConfig, MetricFunction metricFunction) {
+    StringBuilder builder = new StringBuilder();
+    String metricName = null;
+    if (metricFunction.getMetricName().equals("*")) {
+      metricName = "all_star";
+    } else {
+      metricName = metricConfig.getName();
+    }
+    builder.append(convertAggFunction(metricFunction.getFunctionName())).append("_").append(metricName);
     return builder.toString();
   }
 

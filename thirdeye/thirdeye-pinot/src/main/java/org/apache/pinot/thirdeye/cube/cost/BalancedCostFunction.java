@@ -93,8 +93,8 @@ public class BalancedCostFunction implements CostFunction {
     /*if (Double.compare(contribution, 1) > 0 || Double.compare(contribution, 0) < 0) {
       System.out.println("Here");
     }*/
-    Preconditions.checkState(Double.compare(contribution, 0) >= 0, "Contribution {} is smaller than 0.", contribution);
-    // Preconditions.checkState(Double.compare(contribution, 1) <= 0, "Contribution {} is larger than 1", contribution);
+    //Preconditions.checkState(Double.compare(contribution, 0) >= 0, "Contribution {} is smaller than 0.", contribution);
+    //Preconditions.checkState(Double.compare(contribution, 1) <= 0, "Contribution {} is larger than 1", contribution);
     // The cost function considers change difference, change changeRatio, and node size (i.e., contribution)
     return fillEmptyValuesAndGetError(baselineValue, currentValue, parentChangeRatio, contribution);
   }
