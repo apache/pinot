@@ -59,7 +59,8 @@ public class PinotTableMetadataConfigs {
       Schema schema = pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, "Invalid table config", Response.Status.BAD_REQUEST, e);
+      String msg = String.format("Invalid table config: %s", tableName);
+      throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
     try {
       pinotHelixResourceManager.updateMetadataConfigFor(tableConfig.getTableName(), tableConfig.getTableType(),

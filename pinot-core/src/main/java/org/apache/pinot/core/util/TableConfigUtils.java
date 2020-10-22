@@ -152,8 +152,8 @@ public final class TableConfigUtils {
     // timeColumnName can be null in OFFLINE table
     if (timeColumnName != null && schema != null) {
       Preconditions.checkState(schema.getSpecForTimeColumn(timeColumnName) != null,
-          "Cannot find valid fieldSpec for timeColumn: %s from the table config, in the schema: %s", timeColumnName,
-          schema.getSchemaName());
+          "Cannot find valid fieldSpec for timeColumn: %s from the table config: %s, in the schema: %s", timeColumnName,
+          tableConfig.getTableName(), schema.getSchemaName());
     }
 
     String peerSegmentDownloadScheme = validationConfig.getPeerSegmentDownloadScheme();
