@@ -78,6 +78,7 @@ public class DetectionAlertRegistry {
         for (Annotation annotation : clazz.getAnnotations()) {
           if (annotation instanceof AlertFilter) {
             ALERT_FILTER_MAP.put(((AlertFilter) annotation).type(), clazz.getName());
+            LOG.info("Registered Alter Filter {}", clazz.getName());
           }
         }
       }
@@ -89,6 +90,7 @@ public class DetectionAlertRegistry {
         for (Annotation annotation : clazz.getAnnotations()) {
           if (annotation instanceof AlertScheme) {
             ALERT_SCHEME_MAP.put(((AlertScheme) annotation).type(), clazz.getName());
+            LOG.info("Registered Alter Scheme {}", clazz.getName());
           }
         }
       }
@@ -100,6 +102,7 @@ public class DetectionAlertRegistry {
         for (Annotation annotation : clazz.getAnnotations()) {
           if (annotation instanceof AlertSuppressor) {
             ALERT_SUPPRESSOR_MAP.put(((AlertSuppressor) annotation).type(), clazz.getName());
+            LOG.info("Registered Alter AlertSuppressor {}", clazz.getName());
           }
         }
       }
