@@ -104,7 +104,7 @@ public class ThirdEyeJiraClient {
     StringBuilder jiraQuery = new StringBuilder();
     // Query by project first as a jira optimization
     jiraQuery.append("project=").append(project);
-    jiraQuery.append(" and ").append("reporter IN (").append(reporter).append(")");
+    jiraQuery.append(" and ").append("reporter IN (\"").append(reporter).append("\")");
     jiraQuery.append(" and ").append(buildQueryOnLabels(labels));
     jiraQuery.append(" and ").append(buildQueryOnCreatedBy(lookBackMillis));
 
