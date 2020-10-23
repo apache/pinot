@@ -133,6 +133,7 @@ public class PinotHelixResourceManager {
   private static final long CACHE_ENTRY_EXPIRE_TIME_HOURS = 6L;
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
   public static final String APPEND = "APPEND";
+  private static final int DEFAULT_TABLE_UPDATER_LOCKERS_SIZE = 100;
 
   // TODO: make this configurable
   public static final long EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS = 10 * 60_000L; // 10 minutes
@@ -140,6 +141,8 @@ public class PinotHelixResourceManager {
 
   private final Map<String, Map<String, Long>> _segmentCrcMap = new HashMap<>();
   private final Map<String, Map<String, Integer>> _lastKnownSegmentMetadataVersionMap = new HashMap<>();
+  private final Object[] _tableUpdaterLocks;
+
   private final LoadingCache<String, String> _instanceAdminEndpointCache;
 
   private final String _helixZkURL;
@@ -187,6 +190,10 @@ public class PinotHelixResourceManager {
                 return hostname + ":" + adminPort;
               }
             });
+    _tableUpdaterLocks = new Object[DEFAULT_TABLE_UPDATER_LOCKERS_SIZE];
+    for (int i = 0; i < _tableUpdaterLocks.length; i++) {
+      _tableUpdaterLocks[i] = new Object();
+    }
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf) {
@@ -1641,23 +1648,23 @@ public class PinotHelixResourceManager {
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = Collections
           .singletonMap(InstancePartitionsType.OFFLINE, InstancePartitionsUtils
               .fetchOrComputeInstancePartitions(_helixZkManager, offlineTableConfig, InstancePartitionsType.OFFLINE));
-      HelixHelper.updateIdealState(_helixZkManager, offlineTableName, idealState -> {
-        assert idealState != null;
-        Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
-        if (currentAssignment.containsKey(segmentName)) {
-          LOGGER.warn("Segment: {} already exists in the IdealState for table: {}, do not update", segmentName,
-              offlineTableName);
-        } else {
-          List<String> assignedInstances =
-              segmentAssignment.assignSegment(segmentName, currentAssignment, instancePartitionsMap);
-          LOGGER.info("Assigning segment: {} to instances: {} for table: {}", segmentName, assignedInstances,
-              offlineTableName);
-          currentAssignment.put(segmentName,
-              SegmentAssignmentUtils.getInstanceStateMap(assignedInstances, SegmentStateModel.ONLINE));
-        }
-        return idealState;
-      });
-      LOGGER.info("Added segment: {} to IdealState for table: {}", segmentName, offlineTableName);
+      synchronized (getTableUpdaterLock(offlineTableName)) {
+        HelixHelper.updateIdealState(_helixZkManager, offlineTableName, idealState -> {
+          assert idealState != null;
+          Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
+          if (currentAssignment.containsKey(segmentName)) {
+            LOGGER.warn("Segment: {} already exists in the IdealState for table: {}, do not update", segmentName,
+                offlineTableName);
+          } else {
+            List<String> assignedInstances = segmentAssignment.assignSegment(segmentName, currentAssignment, instancePartitionsMap);
+            LOGGER.info("Assigning segment: {} to instances: {} for table: {}", segmentName, assignedInstances,
+                offlineTableName);
+            currentAssignment.put(segmentName, SegmentAssignmentUtils.getInstanceStateMap(assignedInstances, SegmentStateModel.ONLINE));
+          }
+          return idealState;
+        });
+        LOGGER.info("Added segment: {} to IdealState for table: {}", segmentName, offlineTableName);
+      }
     } catch (Exception e) {
       LOGGER
           .error("Caught exception while adding segment: {} to IdealState for table: {}, deleting segment ZK metadata",
@@ -1670,6 +1677,10 @@ public class PinotHelixResourceManager {
       }
       throw e;
     }
+  }
+
+  private Object getTableUpdaterLock(String offlineTableName) {
+    return _tableUpdaterLocks[(offlineTableName.hashCode() & Integer.MAX_VALUE) % _tableUpdaterLocks.length];
   }
 
   @Nullable
