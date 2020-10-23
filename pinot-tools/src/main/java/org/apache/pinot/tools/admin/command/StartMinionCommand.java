@@ -19,11 +19,13 @@
 package org.apache.pinot.tools.admin.command;
 
 import java.io.File;
+import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.util.Map;
 
 import org.apache.commons.configuration.ConfigurationException;
-import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.minion.MinionStarter;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.utils.PinotConfigUtils;
@@ -33,24 +35,24 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Class to implement StartBroker command.
+ * Class to implement StartMinion command.
  *
  */
-public class StartBrokerCommand extends AbstractBaseAdminCommand implements Command {
-  private static final Logger LOGGER = LoggerFactory.getLogger(StartBrokerCommand.class);
+public class StartMinionCommand extends AbstractBaseAdminCommand implements Command {
+  private static final Logger LOGGER = LoggerFactory.getLogger(StartMinionCommand.class);
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
-  @Option(name = "-brokerHost", required = false, metaVar = "<String>", usage = "host name for broker.")
-  private String _brokerHost;
-  @Option(name = "-brokerPort", required = false, metaVar = "<int>", usage = "Broker port number to use for query.")
-  private int _brokerPort = CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT;
+  @Option(name = "-minionHost", required = false, metaVar = "<String>", usage = "Host name for minion.")
+  private String _minionHost;
+  @Option(name = "-minionPort", required = false, metaVar = "<int>", usage = "Port number to start the minion at.")
+  private int _minionPort = CommonConstants.Minion.DEFAULT_HELIX_PORT;
   @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "HTTP address of Zookeeper.")
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
   @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
   private String _clusterName = "PinotCluster";
-  @Option(name = "-configFileName", required = false, metaVar = "<Config File Name>", usage = "Broker Starter Config file.", forbids = {"-brokerHost", "-brokerPort"})
+  @Option(name = "-configFileName", required = false, metaVar = "<Config File Name>", usage = "Minion Starter Config file.", forbids = {"-minionHost", "-minionPort"})
   private String _configFileName;
-  private HelixBrokerStarter _brokerStarter;
+  private MinionStarter _minionStarter;
 
   public boolean getHelp() {
     return _help;
@@ -58,48 +60,28 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
 
   @Override
   public String getName() {
-    return "StartBroker";
+    return "StartMinion";
   }
 
   @Override
   public String toString() {
     if (_configFileName != null) {
-      return ("StartBroker -zkAddress " + _zkAddress + " -configFileName " + _configFileName);
+      return ("StartMinion -zkAddress " + _zkAddress + " -configFileName " + _configFileName);
     } else {
-      return ("StartBroker -brokerHost " + _brokerHost + " -brokerPort " + _brokerPort + " -zkAddress " + _zkAddress);
+      return ("StartMinion -minionHost " + _minionHost + " -minionPort " + _minionPort + " -zkAddress " + _zkAddress);
     }
   }
 
   @Override
   public void cleanup() {
-    if (_brokerStarter != null) {
-      _brokerStarter.stop();
+    if (_minionStarter != null) {
+      _minionStarter.stop();
     }
   }
 
   @Override
   public String description() {
-    return "Start the Pinot Broker process at the specified port";
-  }
-
-  public StartBrokerCommand setClusterName(String clusterName) {
-    _clusterName = clusterName;
-    return this;
-  }
-
-  public StartBrokerCommand setPort(int port) {
-    _brokerPort = port;
-    return this;
-  }
-
-  public StartBrokerCommand setZkAddress(String zkAddress) {
-    _zkAddress = zkAddress;
-    return this;
-  }
-
-  public StartBrokerCommand setConfigFileName(String configFileName) {
-    _configFileName = configFileName;
-    return this;
+    return "Start the Pinot Minion process at the specified port";
   }
 
   @Override
@@ -109,23 +91,23 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
       LOGGER.info("Executing command: " + toString());
       StartServiceManagerCommand startServiceManagerCommand =
           new StartServiceManagerCommand().setZkAddress(_zkAddress).setClusterName(_clusterName).setPort(-1)
-              .setBootstrapServices(new String[0]).addBootstrapService(ServiceRole.BROKER, getBrokerConf());
+              .setBootstrapServices(new String[0]).addBootstrapService(ServiceRole.MINION, getMinionConf());
       startServiceManagerCommand.execute();
-      String pidFile = ".pinotAdminBroker-" + System.currentTimeMillis() + ".pid";
+      String pidFile = ".pinotAdminMinion-" + System.currentTimeMillis() + ".pid";
       savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
       return true;
     } catch (Exception e) {
-      LOGGER.error("Caught exception while starting broker, exiting", e);
+      LOGGER.error("Caught exception while starting minion, exiting", e);
       System.exit(-1);
       return false;
     }
   }
 
-  private Map<String, Object> getBrokerConf()
-      throws ConfigurationException {
+  private Map<String, Object> getMinionConf()
+      throws ConfigurationException, SocketException, UnknownHostException {
     if (_configFileName != null) {
       return PinotConfigUtils.readConfigFromFile(_configFileName);
     }
-    return PinotConfigUtils.generateBrokerConf(_brokerPort);
+    return PinotConfigUtils.generateMinionConf(_minionHost, _minionPort);
   }
 }

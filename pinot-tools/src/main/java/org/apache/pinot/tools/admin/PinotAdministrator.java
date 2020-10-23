@@ -44,6 +44,7 @@ import org.apache.pinot.tools.admin.command.SegmentProcessorFrameworkCommand;
 import org.apache.pinot.tools.admin.command.ShowClusterInfoCommand;
 import org.apache.pinot.tools.admin.command.StartBrokerCommand;
 import org.apache.pinot.tools.admin.command.StartControllerCommand;
+import org.apache.pinot.tools.admin.command.StartMinionCommand;
 import org.apache.pinot.tools.admin.command.StartServiceManagerCommand;
 import org.apache.pinot.tools.admin.command.StreamGitHubEventsCommand;
 import org.apache.pinot.tools.admin.command.StartKafkaCommand;
@@ -100,6 +101,7 @@ public class PinotAdministrator {
       @SubCommand(name = "StartController", impl = StartControllerCommand.class),
       @SubCommand(name = "StartBroker", impl = StartBrokerCommand.class),
       @SubCommand(name = "StartServer", impl = StartServerCommand.class),
+      @SubCommand(name = "StartMinion", impl = StartMinionCommand.class),
       @SubCommand(name = "StartServiceManager", impl = StartServiceManagerCommand.class),
       @SubCommand(name = "AddTable", impl = AddTableCommand.class),
       @SubCommand(name = "ChangeTableState", impl = ChangeTableState.class),

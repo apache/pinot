@@ -123,7 +123,7 @@ public class PinotServiceManagerInstanceResource {
   @ApiOperation(value = "Start a Pinot instance")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Pinot instance is started"), @ApiResponse(code = 400, message = "Bad Request"), @ApiResponse(code = 404, message = "Pinot Role Not Found"), @ApiResponse(code = 500, message = "Internal Server Error")})
   public PinotInstanceStatus startPinotInstance(
-      @ApiParam(value = "A Role of Pinot Instance to start: CONTROLLER/BROKER/SERVER") @PathParam("role") String role,
+      @ApiParam(value = "A Role of Pinot Instance to start: CONTROLLER/BROKER/SERVER/MINION") @PathParam("role") String role,
       @ApiParam(value = "true|false") @QueryParam("autoMode") boolean autoMode, String confStr) {
     ServiceRole serviceRole;
     try {
@@ -240,6 +240,23 @@ public class PinotServiceManagerInstanceResource {
               String.format("%s%s_%s", CommonConstants.Server.DEFAULT_METRICS_PREFIX,
                   properties.get(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST),
                   properties.get(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT)));
+        }
+        return;
+      case MINION:
+
+        if (!properties.containsKey(CommonConstants.Helix.KEY_OF_MINION_PORT)) {
+          properties.put(CommonConstants.Helix.KEY_OF_MINION_PORT, getAvailablePort());
+        }
+        if (!properties.containsKey(CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX_KEY)) {
+          String hostname;
+          try {
+            hostname = NetUtil.getHostAddress();
+          } catch (Exception e) {
+            hostname = "localhost";
+          }
+          properties.put(CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX_KEY,
+              String.format("%s%s_%s", CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX, hostname,
+                  properties.get(CommonConstants.Helix.KEY_OF_MINION_PORT)));
         }
         return;
     }
