@@ -23,6 +23,7 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
+import java.util.Collections;
 import java.util.List;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
@@ -49,7 +50,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 public class MmapDebugResource {
 
   @Inject
-  ServerInstance serverInstance;
+  private ServerInstance _serverInstance;
 
   @GET
   @Path("memory/offheap")
@@ -62,20 +63,19 @@ public class MmapDebugResource {
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
-  @Path("/tables/{tableName}/memoryConsumedRealtime")
+  @Path("/memory/offheap/table/{tableName}")
   @ApiOperation(value = "Show off heap memory consumed by latest mutable segment", notes = "Returns off heap memory consumed by latest consuming segment of realtime table")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"), @ApiResponse(code = 404, message = "Table not found")})
   public String getTableSize(
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName)
       throws WebApplicationException {
-    double memoryConsumed = 0;
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (tableType != TableType.REALTIME) {
       throw new WebApplicationException("This api cannot be used with non real-time table: " + tableName,
           Response.Status.BAD_REQUEST);
     }
 
-    InstanceDataManager instanceDataManager = serverInstance.getInstanceDataManager();
+    InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
     if (instanceDataManager == null) {
       throw new WebApplicationException("Invalid server initialization", Response.Status.INTERNAL_SERVER_ERROR);
     }
@@ -85,7 +85,7 @@ public class MmapDebugResource {
       throw new WebApplicationException("Table: " + tableName + " is not found", Response.Status.NOT_FOUND);
     }
 
-    memoryConsumed = realtimeTableDataManager.getStatsHistory().getLatestSegmentMemoryConsumed();
-    return ResourceUtils.convertToJsonString(memoryConsumed);
+    long memoryConsumed = realtimeTableDataManager.getStatsHistory().getLatestSegmentMemoryConsumed();
+    return ResourceUtils.convertToJsonString(Collections.singletonMap("offheapMemoryConsumed", memoryConsumed));
   }
 }

@@ -261,16 +261,16 @@ public class RealtimeSegmentStatsHistoryTest {
     long[] memoryValues = {100, 100, 200, 400, 450, 600};
 
     RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserialzeFrom(serializedFile);
-    Assert.assertEquals(history.getLatestSegmentMemoryConsumed(), 0);
+    Assert.assertEquals(history.getLatestSegmentMemoryConsumed(), -1);
     RealtimeSegmentStatsHistory.SegmentStats segmentStats = null;
 
-    for (int i=0;i< memoryValues.length; i++) {
+    for (int i = 0; i < memoryValues.length; i++) {
       segmentStats = new RealtimeSegmentStatsHistory.SegmentStats();
       segmentStats.setMemUsedBytes(memoryValues[i]);
       history.addSegmentStats(segmentStats);
     }
 
-    long expectedMemUsed = memoryValues[memoryValues.length-1];
+    long expectedMemUsed = memoryValues[memoryValues.length - 1];
     Assert.assertEquals(history.getLatestSegmentMemoryConsumed(), expectedMemUsed);
   }
 

@@ -343,7 +343,7 @@ public class RealtimeSegmentStatsHistory implements Serializable {
 
   public synchronized long getLatestSegmentMemoryConsumed() {
     if (isEmpty()) {
-      return 0;
+      return -1;
     }
     // Get the last updated index
     int latestSegmentIndex = (_cursor + _arraySize - 1) % _arraySize;
@@ -389,15 +389,5 @@ public class RealtimeSegmentStatsHistory implements Serializable {
       return getArraySize();
     }
     return getCursor();
-  }
-
-  public static void main(String[] args)
-      throws Exception {
-    RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserialzeFrom(new File("/tmp/stats.ser"));
-    System.out.println(history.toString());
-    for (int i = 0; i < history.getNumEntriesToScan(); i++) {
-      SegmentStats segmentStats = history.getSegmentStatsAt(i);
-      System.out.println(segmentStats.toString());
-    }
   }
 }
