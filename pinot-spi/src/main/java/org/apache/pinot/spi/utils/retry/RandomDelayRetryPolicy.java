@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.utils.retry;
 
+import com.google.common.base.Preconditions;
 import java.util.Random;
 
 
@@ -27,18 +28,17 @@ import java.util.Random;
 public class RandomDelayRetryPolicy extends BaseRetryPolicy {
   private final static Random RANDOM = new Random(System.currentTimeMillis());
   private final long _minDelayMs;
-  private final int _rangeUpper;
-  private final int _rangeLower;
+  private final long _maxDelayMs;
 
   public RandomDelayRetryPolicy(int maxNumAttempts, long minDelayMs, long maxDelayMs) {
     super(maxNumAttempts);
+    Preconditions.checkState(maxDelayMs > minDelayMs, "RandomDelayRetryPolicy requires maxDelayMs > minDelayMs");
     _minDelayMs = minDelayMs;
-    _rangeUpper = (int) ((maxDelayMs - minDelayMs) / Integer.MAX_VALUE + 1);
-    _rangeLower = (int) ((maxDelayMs - minDelayMs) % Integer.MAX_VALUE);
+    _maxDelayMs = maxDelayMs;
   }
 
   @Override
   protected long getDelayMs(int currentAttempt) {
-    return RANDOM.nextInt(_rangeUpper) * Integer.MAX_VALUE + RANDOM.nextInt(_rangeLower) + _minDelayMs;
+    return _minDelayMs + (long) (RANDOM.nextDouble() * (_maxDelayMs - _minDelayMs));
   }
 }
