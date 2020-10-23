@@ -25,11 +25,11 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.utils.Pairs.IntPair;
 import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.segment.index.readers.SortedIndexReader;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.SortedDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.OfflineDictionaryBasedRangePredicateEvaluator;
+import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.SortedDictionaryBasedRangePredicateEvaluator;
+import org.apache.pinot.core.segment.index.readers.SortedIndexReader;
 
 
 public class SortedIndexBasedFilterOperator extends BaseFilterOperator {
@@ -54,10 +54,10 @@ public class SortedIndexBasedFilterOperator extends BaseFilterOperator {
     // - "Subtractive" operators (NEQ, NOT IN): Build up a list of non-matching docIdRanges with adjacent ones merged,
     //   then subtract them from the range of [0, numDocs) to get a list of matching docIdRanges.
 
-    if (_predicateEvaluator instanceof OfflineDictionaryBasedRangePredicateEvaluator) {
+    if (_predicateEvaluator instanceof SortedDictionaryBasedRangePredicateEvaluator) {
       // For RANGE predicate, use start/end document id to construct a new document id range
-      OfflineDictionaryBasedRangePredicateEvaluator rangePredicateEvaluator =
-          (OfflineDictionaryBasedRangePredicateEvaluator) _predicateEvaluator;
+      SortedDictionaryBasedRangePredicateEvaluator rangePredicateEvaluator =
+          (SortedDictionaryBasedRangePredicateEvaluator) _predicateEvaluator;
       int startDocId = _sortedIndexReader.getDocIds(rangePredicateEvaluator.getStartDictId()).getLeft();
       // NOTE: End dictionary id is exclusive in OfflineDictionaryBasedRangePredicateEvaluator.
       int endDocId = _sortedIndexReader.getDocIds(rangePredicateEvaluator.getEndDictId() - 1).getRight();

@@ -35,6 +35,11 @@ public class ConstantValueBytesDictionary extends BaseImmutableDictionary {
   }
 
   @Override
+  public DataType getValueType() {
+    return DataType.BYTES;
+  }
+
+  @Override
   public int insertionIndexOf(String stringValue) {
     int result = ByteArray.compare(BytesUtils.toBytes(stringValue), _value);
     if (result < 0) {
@@ -47,8 +52,18 @@ public class ConstantValueBytesDictionary extends BaseImmutableDictionary {
   }
 
   @Override
-  public DataType getValueType() {
-    return DataType.BYTES;
+  public ByteArray getMinVal() {
+    return new ByteArray(_value);
+  }
+
+  @Override
+  public ByteArray getMaxVal() {
+    return new ByteArray(_value);
+  }
+
+  @Override
+  public Object getSortedValues() {
+    return new ByteArray[]{new ByteArray(_value)};
   }
 
   @Override

@@ -22,8 +22,8 @@ import java.util.Set;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.data.partition.PartitionFunction;
-import org.apache.pinot.core.realtime.impl.dictionary.BaseMutableDictionary;
 import org.apache.pinot.core.segment.creator.ColumnStatistics;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.MutableForwardIndex;
 import org.apache.pinot.spi.data.FieldSpec;
 
@@ -36,32 +36,35 @@ import org.apache.pinot.spi.data.FieldSpec;
 public class RealtimeColumnStatistics implements ColumnStatistics {
   private final DataSource _dataSource;
   private final int[] _sortedDocIdIterationOrder;
-  private final BaseMutableDictionary _mutableDictionary;
+
+  // NOTE: For new added columns during the ingestion, this will be constant value dictionary instead of mutable
+  //       dictionary.
+  private final Dictionary _dictionary;
 
   public RealtimeColumnStatistics(DataSource dataSource, int[] sortedDocIdIterationOrder) {
     _dataSource = dataSource;
     _sortedDocIdIterationOrder = sortedDocIdIterationOrder;
-    _mutableDictionary = (BaseMutableDictionary) dataSource.getDictionary();
+    _dictionary = dataSource.getDictionary();
   }
 
   @Override
   public Object getMinValue() {
-    return _mutableDictionary.getMinVal();
+    return _dictionary.getMinVal();
   }
 
   @Override
   public Object getMaxValue() {
-    return _mutableDictionary.getMaxVal();
+    return _dictionary.getMaxVal();
   }
 
   @Override
   public Object getUniqueValuesSet() {
-    return _mutableDictionary.getSortedValues();
+    return _dictionary.getSortedValues();
   }
 
   @Override
   public int getCardinality() {
-    return _mutableDictionary.length();
+    return _dictionary.length();
   }
 
   @Override
@@ -71,15 +74,15 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
 
     // If this column is a string/bytes column, iterate over the dictionary to find the maximum length
     FieldSpec.DataType dataType = _dataSource.getDataSourceMetadata().getDataType();
-    int length = _mutableDictionary.length();
+    int length = _dictionary.length();
 
     if (dataType.equals(FieldSpec.DataType.STRING)) {
       for (int i = 0; i < length; i++) {
-        minStringLength = Math.min(_mutableDictionary.getStringValue(i).length(), minStringLength);
+        minStringLength = Math.min(_dictionary.getStringValue(i).length(), minStringLength);
       }
     } else if (dataType.equals(FieldSpec.DataType.BYTES)) {
       for (int i = 0; i < length; i++) {
-        minStringLength = Math.min(_mutableDictionary.getBytesValue(i).length, minStringLength);
+        minStringLength = Math.min(_dictionary.getBytesValue(i).length, minStringLength);
       }
     }
 
@@ -93,15 +96,15 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
 
     // If this column is a string/bytes column, iterate over the dictionary to find the maximum length
     FieldSpec.DataType dataType = _dataSource.getDataSourceMetadata().getDataType();
-    int length = _mutableDictionary.length();
+    int length = _dictionary.length();
 
     if (dataType.equals(FieldSpec.DataType.STRING)) {
       for (int i = 0; i < length; i++) {
-        maximumStringLength = Math.max(_mutableDictionary.getStringValue(i).length(), maximumStringLength);
+        maximumStringLength = Math.max(_dictionary.getStringValue(i).length(), maximumStringLength);
       }
     } else if (dataType.equals(FieldSpec.DataType.BYTES)) {
       for (int i = 0; i < length; i++) {
-        maximumStringLength = Math.max(_mutableDictionary.getBytesValue(i).length, maximumStringLength);
+        maximumStringLength = Math.max(_dictionary.getBytesValue(i).length, maximumStringLength);
       }
     }
 
@@ -130,7 +133,7 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
       int previousDictId = mutableForwardIndex.getDictId(_sortedDocIdIterationOrder[0]);
       for (int i = 1; i < numDocs; i++) {
         int currentDictId = mutableForwardIndex.getDictId(_sortedDocIdIterationOrder[i]);
-        if (_mutableDictionary.compare(previousDictId, currentDictId) > 0) {
+        if (_dictionary.compare(previousDictId, currentDictId) > 0) {
           return false;
         }
         previousDictId = currentDictId;
@@ -139,7 +142,7 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
       int previousDictId = mutableForwardIndex.getDictId(0);
       for (int i = 1; i < numDocs; i++) {
         int currentDictId = mutableForwardIndex.getDictId(i);
-        if (_mutableDictionary.compare(previousDictId, currentDictId) > 0) {
+        if (_dictionary.compare(previousDictId, currentDictId) > 0) {
           return false;
         }
         previousDictId = currentDictId;

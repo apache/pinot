@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.core.segment.index.readers;
 
+import it.unimi.dsi.fastutil.ints.IntSet;
 import java.io.Closeable;
-import org.apache.pinot.spi.data.FieldSpec;
+import java.util.Arrays;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -27,11 +28,12 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * Interface for the dictionary. For the read APIs, type conversion among INT, LONG, FLOAT, DOUBLE, STRING should be
  * supported. Type conversion between STRING and BYTES via Hex encoding/decoding should be supported.
  */
+@SuppressWarnings("rawtypes")
 public interface Dictionary extends Closeable {
   int NULL_VALUE_INDEX = -1;
 
   /**
-   * NOTE: Immutable dictionary is always sorted; mutable dictionary is always unsorted.
+   * Returns {@code true} if the values in the dictionary are sorted, {@code false} otherwise.
    */
   boolean isSorted();
 
@@ -40,13 +42,54 @@ public interface Dictionary extends Closeable {
    */
   DataType getValueType();
 
+  /**
+   * Returns the number of values in the dictionary.
+   */
   int length();
 
   /**
    * Returns the index of the string representation of the value in the dictionary, or {@link #NULL_VALUE_INDEX} (-1) if
-   * the value does not exist. This API is for cross-type predicate evaluation.
+   * the value does not exist. This method is for the cross-type predicate evaluation.
    */
   int indexOf(String stringValue);
+
+  /**
+   * Returns the insertion index of the string representation of the value in the dictionary. This method follows the
+   * same behavior as in {@link Arrays#binarySearch(Object[], Object)}. All sorted dictionaries should support this
+   * method. This method is for the range predicate evaluation.
+   */
+  int insertionIndexOf(String stringValue);
+
+  /**
+   * Returns a set of dictIds in the given value range, where lower/upper bound can be "*" which indicates unbounded
+   * range. All unsorted dictionaries should support this method. This method is for the range predicate evaluation.
+   */
+  IntSet getDictIdsInRange(String lower, String upper, boolean includeLower, boolean includeUpper);
+
+  /**
+   * Returns the comparison result of the values (actual value instead of string representation of the value) for the
+   * given dictionary ids, i.e. {@code value1.compareTo(value2)}.
+   */
+  int compare(int dictId1, int dictId2);
+
+  /**
+   * Returns the minimum value in the dictionary. For type BYTES, {@code ByteArray} will be returned. Undefined if the
+   * dictionary is empty.
+   */
+  Comparable getMinVal();
+
+  /**
+   * Returns the maximum value in the dictionary. For type BYTES, {@code ByteArray} will be returned. Undefined if the
+   * dictionary is empty.
+   */
+  Comparable getMaxVal();
+
+  /**
+   * Returns an sorted array of all values in the dictionary. For type INT/LONG/FLOAT/DOUBLE, primitive type array will
+   * be returned; for type STRING, {@code String[]} will be returned; for type BYTES, {@code ByteArray[]} will be
+   * returned. This method is for the stats collection phase when sealing the consuming segment.
+   */
+  Object getSortedValues();
 
   // Single-value read APIs
 
@@ -74,19 +117,48 @@ public interface Dictionary extends Closeable {
 
   String getStringValue(int dictId);
 
-  byte[] getBytesValue(int dictId);
+  /**
+   * NOTE: Should be overridden for STRING and BYTES dictionary.
+   */
+  default byte[] getBytesValue(int dictId) {
+    throw new UnsupportedOperationException();
+  }
 
   // Batch read APIs
 
-  void readIntValues(int[] dictIds, int length, int[] outValues);
+  default void readIntValues(int[] dictIds, int length, int[] outValues) {
+    for (int i = 0; i < length; i++) {
+      outValues[i] = getIntValue(dictIds[i]);
+    }
+  }
 
-  void readLongValues(int[] dictIds, int length, long[] outValues);
+  default void readLongValues(int[] dictIds, int length, long[] outValues) {
+    for (int i = 0; i < length; i++) {
+      outValues[i] = getLongValue(dictIds[i]);
+    }
+  }
 
-  void readFloatValues(int[] dictIds, int length, float[] outValues);
+  default void readFloatValues(int[] dictIds, int length, float[] outValues) {
+    for (int i = 0; i < length; i++) {
+      outValues[i] = getFloatValue(dictIds[i]);
+    }
+  }
 
-  void readDoubleValues(int[] dictIds, int length, double[] outValues);
+  default void readDoubleValues(int[] dictIds, int length, double[] outValues) {
+    for (int i = 0; i < length; i++) {
+      outValues[i] = getDoubleValue(dictIds[i]);
+    }
+  }
 
-  void readStringValues(int[] dictIds, int length, String[] outValues);
+  default void readStringValues(int[] dictIds, int length, String[] outValues) {
+    for (int i = 0; i < length; i++) {
+      outValues[i] = getStringValue(dictIds[i]);
+    }
+  }
 
-  void readBytesValues(int[] dictIds, int length, byte[][] outValues);
+  default void readBytesValues(int[] dictIds, int length, byte[][] outValues) {
+    for (int i = 0; i < length; i++) {
+      outValues[i] = getBytesValue(dictIds[i]);
+    }
+  }
 }
