@@ -26,6 +26,7 @@ import java.sql.Statement;
 import java.util.List;
 import org.apache.pinot.client.base.AbstractBaseConnection;
 import org.apache.pinot.client.controller.PinotControllerTransport;
+import org.apache.pinot.client.controller.response.ControllerTenantBrokerResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,19 +39,31 @@ public class PinotConnection extends AbstractBaseConnection {
   private String _controllerURL;
   private PinotControllerTransport _controllerTransport;
 
-  PinotConnection(List<String> brokerList, PinotClientTransport transport) {
-    this(brokerList, null, transport);
+  PinotConnection(String controllerURL, PinotClientTransport transport, String tenant) {
+    this(controllerURL, transport, tenant, null);
   }
 
-  PinotConnection(List<String> brokerList, String controllerURL, PinotClientTransport transport) {
+  PinotConnection(String controllerURL, PinotClientTransport transport, String tenant,
+      PinotControllerTransport controllerTransport) {
     _closed = false;
     _controllerURL = controllerURL;
-    _controllerTransport  = new PinotControllerTransport();
-    _session = new org.apache.pinot.client.Connection(brokerList, transport);
+    if (controllerTransport == null) {
+      _controllerTransport = new PinotControllerTransport();
+    } else {
+      _controllerTransport = controllerTransport;
+    }
+    List<String> brokers = getBrokerList(controllerURL, tenant);
+    _session = new org.apache.pinot.client.Connection(brokers, transport);
   }
 
   public org.apache.pinot.client.Connection getSession() {
     return _session;
+  }
+
+  private List<String> getBrokerList(String controllerURL, String tenant) {
+    ControllerTenantBrokerResponse controllerTenantBrokerResponse =
+        _controllerTransport.getBrokersFromController(controllerURL, tenant);
+    return controllerTenantBrokerResponse.getBrokers();
   }
 
   @Override
