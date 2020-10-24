@@ -448,6 +448,7 @@ public class CalciteSqlCompilerTest {
 
   @Test
   public void testGroupbys() {
+
     PinotQuery pinotQuery;
     try {
       pinotQuery = CalciteSqlParser.compileToPinotQuery(
@@ -504,6 +505,24 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(
         pinotQuery.getOrderByList().get(1).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
             .getIdentifier().getName(), "*");
+    Assert.assertEquals(10, pinotQuery.getLimit());
+
+    // nested functions in group by
+    try {
+      pinotQuery = CalciteSqlParser.compileToPinotQuery("select concat(upper(playerName), lower(teamID), '-') playerTeam, "
+          + "upper(league) leagueUpper, count(playerName) cnt from baseballStats group by playerTeam, lower(teamID), leagueUpper "
+          + "having cnt > 1 order by cnt desc limit 10");
+    } catch (SqlCompilationException e) {
+      throw e;
+    }
+    Assert.assertTrue(pinotQuery.isSetGroupByList());
+    Assert.assertEquals(pinotQuery.getGroupByList().size(), 3);
+    Assert.assertTrue(pinotQuery.isSetLimit());
+    Assert.assertTrue(pinotQuery.isSetOrderByList());
+    Assert.assertEquals(pinotQuery.getOrderByList().get(0).getType(), ExpressionType.FUNCTION);
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
+        "COUNT");
     Assert.assertEquals(10, pinotQuery.getLimit());
   }
 
