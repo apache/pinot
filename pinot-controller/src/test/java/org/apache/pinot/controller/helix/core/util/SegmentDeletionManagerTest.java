@@ -42,6 +42,7 @@ import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.helix.core.SegmentDeletionManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
+import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.joda.time.DateTime;
 import org.mockito.invocation.InvocationOnMock;
@@ -289,7 +290,7 @@ public class SegmentDeletionManagerTest {
     }
 
     @Override
-    protected void removeSegmentFromStore(String tableName, String segmentId) {
+    protected <T extends PinotFS> void removeSegmentFromStore(String tableName, String segmentId, PinotFS.ParallelOperationsBuilder<T> operationsBuilder) {
       segmentsRemovedFromStore.add(segmentId);
     }
 

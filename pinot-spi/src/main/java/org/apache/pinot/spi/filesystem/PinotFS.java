@@ -27,13 +27,22 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.google.common.util.concurrent.Futures.allAsList;
+import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
+import static java.util.concurrent.Executors.newSingleThreadExecutor;
+import static java.util.stream.Collectors.toList;
 
 /**
  * PinotFS is a restricted FS API that exposes functionality that is required for Pinot to use
@@ -48,7 +57,74 @@ import org.slf4j.LoggerFactory;
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public abstract class PinotFS implements Closeable, Serializable {
+  public interface FileOperation<T extends PinotFS>  {
+    boolean execute(T pinotFS) throws IOException;
+  }
+
+  public class ParallelOperationsBuilder<T extends PinotFS>
+  {
+    protected final ImmutableList.Builder<FileOperation<T>> operationBuilder = ImmutableList.builder();
+
+    public ParallelOperationsBuilder() {}
+
+    public void add(FileOperation<T> fileOperation) {
+      operationBuilder.add(fileOperation);
+    }
+
+    public void addDelete(URI uri, boolean forceDelete) {
+      operationBuilder.add(pinotFS -> pinotFS.delete(uri, forceDelete));
+    }
+
+    public void addCopy(URI src, URI dst) {
+      operationBuilder.add(pinotFS -> pinotFS.copy(src, dst));
+    }
+
+    public void addMove(URI src, URI dst) {
+      operationBuilder.add(pinotFS -> pinotFS.doMove(src, dst));
+    }
+
+    public void addExists(URI uri) {
+      operationBuilder.add(pinotFS -> pinotFS.exists(uri));
+    }
+
+    @SuppressWarnings("unchecked")
+    public boolean execute()
+            throws ExecutionException, InterruptedException
+    {
+      List<FileOperation<T>> fileOperations = operationBuilder.build();
+      List<ListenableFuture<Boolean>> result = fileOperations.stream()
+              .map(fileOperation -> PinotFS.this.getFileOperationExecutorService()
+                      .submit(() -> fileOperation.execute((T) PinotFS.this)))
+              .collect(toList());
+      return allAsList(result).get().stream()
+              .reduce(true,
+                      (allSucceeded, succeeded) -> allSucceeded && succeeded,
+                      (thisSucceeded, thatSucceeded) -> thisSucceeded && thatSucceeded);
+    }
+
+    public boolean executeDirect() throws IOException {
+        boolean result = true;
+        for (FileOperation<T> fileOperation : operationBuilder.build()) {
+          result &= fileOperation.execute((T) PinotFS.this);
+        }
+        return result;
+    }
+  }
+
+  public <T extends PinotFS> ParallelOperationsBuilder<T> getParallelOperationsBuilder() {
+    return new ParallelOperationsBuilder<>();
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotFS.class);
+
+  protected ListeningExecutorService getFileOperationExecutorService() {
+    return listeningDecorator(newSingleThreadExecutor(runnable -> {
+      Thread thread = new Thread(runnable);
+      thread.setDaemon(true);
+      thread.setName("PinotGcsFileOperationExecutorService");
+      return thread;
+    }));
+  }
 
   /**
    * Initializes the configurations specific to that filesystem. For instance, any security related parameters can be
