@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.config.Lex;
 import org.apache.calcite.sql.SqlBasicCall;
@@ -157,25 +158,11 @@ public class CalciteSqlParser {
       return;
     }
     // Sanity check group by query: All non-aggregate expression in selection list should be also included in group by list.
+    Set<Expression> groupByExprs = new HashSet<>(pinotQuery.getGroupByList());
     for (Expression selectExpression : pinotQuery.getSelectList()) {
-      if (!isAggregateExpression(selectExpression)) {
-        boolean foundInGroupByClause = false;
-        Expression selectionToCheck;
-        if (selectExpression.getFunctionCall() != null && selectExpression.getFunctionCall().getOperator()
-            .equalsIgnoreCase(SqlKind.AS.toString())) {
-          selectionToCheck = selectExpression.getFunctionCall().getOperands().get(0);
-        } else {
-          selectionToCheck = selectExpression;
-        }
-        for (Expression groupByExpression : pinotQuery.getGroupByList()) {
-          if (groupByExpression.equals(selectionToCheck)) {
-            foundInGroupByClause = true;
-          }
-        }
-        if (!foundInGroupByClause) {
-          throw new SqlCompilationException(
-              "'" + RequestUtils.prettyPrint(selectionToCheck) + "' should appear in GROUP BY clause.");
-        }
+      if (!isAggregateExpression(selectExpression) && expressionOutsideGroupByList(selectExpression, groupByExprs)) {
+        throw new SqlCompilationException(
+            "'" + RequestUtils.prettyPrint(selectExpression) + "' should appear in GROUP BY clause.");
       }
     }
     // Sanity check on group by clause shouldn't contain aggregate expression.
@@ -185,6 +172,28 @@ public class CalciteSqlParser {
             + "' is not allowed in GROUP BY clause.");
       }
     }
+  }
+
+  /**
+   * Check recursively if an expression contains any reference not appearing in the GROUP BY clause.
+   */
+  private static boolean expressionOutsideGroupByList(Expression expr, Set<Expression> groupByExprs) {
+    // return early for Literal, Aggregate and if we have an exact match
+    if (expr.getType() == ExpressionType.LITERAL || isAggregateExpression(expr) || groupByExprs.contains(expr)) {
+      return false;
+    }
+
+    final Function funcExpr = expr.getFunctionCall();
+    // function expression
+    if (funcExpr != null) {
+      // for Alias function, check the actual value
+      if (funcExpr.getOperator().equalsIgnoreCase(SqlKind.AS.toString())) {
+        return expressionOutsideGroupByList(funcExpr.getOperands().get(0), groupByExprs);
+      }
+      // Expression is invalid if any of its children is invalid
+      return funcExpr.getOperands().stream().anyMatch(e -> expressionOutsideGroupByList(e, groupByExprs));
+    }
+    return true;
   }
 
   private static boolean isAggregateExpression(Expression expression) {
