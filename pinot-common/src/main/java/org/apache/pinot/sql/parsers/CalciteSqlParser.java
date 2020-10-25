@@ -174,17 +174,23 @@ public class CalciteSqlParser {
     }
   }
 
+  /**
+   * Check recursively if an expression contains any reference not appearing in the GROUP BY clause.
+   */
   private static boolean expressionOutsideGroupByList(Expression expr, Set<Expression> groupByExprs) {
+    // return early for Literal, Aggregate and if we have an exact match
     if (expr.getType() == ExpressionType.LITERAL || isAggregateExpression(expr) || groupByExprs.contains(expr)) {
       return false;
     }
 
     final Function funcExpr = expr.getFunctionCall();
+    // function expression
     if (funcExpr != null) {
+      // for Alias function, check the actual value
       if (funcExpr.getOperator().equalsIgnoreCase(SqlKind.AS.toString())) {
         return expressionOutsideGroupByList(funcExpr.getOperands().get(0), groupByExprs);
       }
-      // Expression is invalid if any of its child is invalid
+      // Expression is invalid if any of its children is invalid
       return funcExpr.getOperands().stream().anyMatch(e -> expressionOutsideGroupByList(e, groupByExprs));
     }
     return true;
