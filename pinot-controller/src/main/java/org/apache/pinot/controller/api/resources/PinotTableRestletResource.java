@@ -25,6 +25,7 @@ import com.google.common.base.Preconditions;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -330,7 +331,8 @@ public class PinotTableRestletResource {
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, "Invalid table config", Response.Status.BAD_REQUEST, e);
+      String msg = String.format("Invalid table config: %s", tableName);
+      throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
 
     try {
@@ -369,8 +371,15 @@ public class PinotTableRestletResource {
       "This API returns the table config that matches the one you get from 'GET /tables/{tableName}'."
           + " This allows us to validate table config before apply.")
   public String checkTableConfig(String tableConfigStr) {
+    TableConfig tableConfig;
     try {
-      TableConfig tableConfig = JsonUtils.stringToObject(tableConfigStr, TableConfig.class);
+      tableConfig = JsonUtils.stringToObject(tableConfigStr, TableConfig.class);
+    } catch (IOException e) {
+      String msg = String.format("Invalid table config json string: %s", tableConfigStr);
+      throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
+    }
+
+    try {
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
       TableConfigUtils.validate(tableConfig, schema);
       ObjectNode tableConfigValidateStr = JsonUtils.newObjectNode();
@@ -381,7 +390,8 @@ public class PinotTableRestletResource {
       }
       return tableConfigValidateStr.toString();
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, "Invalid table config", Response.Status.BAD_REQUEST, e);
+      String msg = String.format("Invalid table config: %s", tableConfig.getTableName());
+      throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
   }
 

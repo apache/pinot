@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
+import org.apache.pinot.core.segment.index.readers.MutableDictionary;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -131,7 +132,7 @@ import org.slf4j.LoggerFactory;
  * - It may be useful to implement a way to stop adding new items when the the number of buffers reaches a certain
  *   threshold. In this case, we could close the realtime segment, and start a new one with bigger buffers.
  */
-public abstract class BaseOffHeapMutableDictionary extends BaseMutableDictionary {
+public abstract class BaseOffHeapMutableDictionary implements MutableDictionary {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseOffHeapMutableDictionary.class);
 
   // List of primes from http://compoasso.free.fr/primelistweb/page/prime/liste_online_en.php

@@ -41,8 +41,8 @@ const InstaceTable = ({ name, instances, clusterName }: Props) => {
     fetchLiveInstance(clusterName);
   };
 
-  const fetchLiveInstance = async (clusterName) => {
-    const liveInstanceArr = await PinotMethodUtils.getLiveInstance(clusterName);
+  const fetchLiveInstance = async (cluster) => {
+    const liveInstanceArr = await PinotMethodUtils.getLiveInstance(cluster);
     fetchData(liveInstanceArr.data);
   };
 
@@ -64,7 +64,7 @@ const InstaceTable = ({ name, instances, clusterName }: Props) => {
       showSearchBox={true}
       inAccordionFormat={true}
       addLinks
-      baseURL={'/instance/'}
+      baseURL="/instance/"
     />
   );
 };

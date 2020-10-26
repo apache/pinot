@@ -23,7 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
-import org.apache.pinot.controller.helix.core.minion.ClusterInfoProvider;
+import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 
 
@@ -33,8 +33,9 @@ import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManag
 public class TaskGeneratorRegistry {
   private final Map<String, PinotTaskGenerator> _taskGeneratorRegistry = new HashMap<>();
 
-  public TaskGeneratorRegistry(@Nonnull ClusterInfoProvider clusterInfoProvider) {
-    registerTaskGenerator(new ConvertToRawIndexTaskGenerator(clusterInfoProvider));
+  public TaskGeneratorRegistry(@Nonnull ClusterInfoAccessor clusterInfoAccessor) {
+    registerTaskGenerator(new ConvertToRawIndexTaskGenerator(clusterInfoAccessor));
+    registerTaskGenerator(new RealtimeToOfflineSegmentsTaskGenerator(clusterInfoAccessor));
   }
 
   /**

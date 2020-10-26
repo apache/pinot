@@ -20,22 +20,21 @@ package org.apache.pinot.client.controller;
 
 import com.ning.http.client.AsyncHttpClient;
 import com.ning.http.client.Response;
-import java.util.HashMap;
-import java.util.List;
+
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+
 import org.apache.pinot.client.PinotClientException;
+import org.apache.pinot.client.controller.response.ControllerTenantBrokerResponse;
 import org.apache.pinot.client.controller.response.SchemaResponse;
-import org.apache.pinot.client.controller.response.SchemaResponse.SchemaResponseFuture;
 import org.apache.pinot.client.controller.response.TableResponse;
-import org.apache.pinot.client.controller.response.TableResponse.TableResponseFuture;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public class PinotControllerTransport {
+
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotControllerTransport.class);
 
   AsyncHttpClient _httpClient = new AsyncHttpClient();
@@ -59,7 +58,7 @@ public class PinotControllerTransport {
       final Future<Response> response =
           requestBuilder.addHeader("Content-Type", "application/json; charset=utf-8").execute();
 
-      TableResponseFuture tableResponseFuture = new TableResponseFuture(response, url);
+      TableResponse.TableResponseFuture tableResponseFuture = new TableResponse.TableResponseFuture(response, url);
       return tableResponseFuture.get();
     } catch (ExecutionException e) {
       throw new PinotClientException(e);
@@ -77,8 +76,26 @@ public class PinotControllerTransport {
       final Future<Response> response =
           requestBuilder.addHeader("Content-Type", "application/json; charset=utf-8").execute();
 
-      SchemaResponseFuture schemaResponseFuture = new SchemaResponseFuture(response, url);
+      SchemaResponse.SchemaResponseFuture schemaResponseFuture = new SchemaResponse.SchemaResponseFuture(response, url);
       return schemaResponseFuture.get();
+    } catch (ExecutionException e) {
+      throw new PinotClientException(e);
+    }
+  }
+
+  public ControllerTenantBrokerResponse getBrokersFromController(String controllerAddress, String tenant) {
+    try {
+      String url = "http://" + controllerAddress + "/v2/brokers/tenants/" + tenant;
+      AsyncHttpClient.BoundRequestBuilder requestBuilder = _httpClient.prepareGet(url);
+      if (_headers != null) {
+        _headers.forEach((k, v) -> requestBuilder.addHeader(k, v));
+      }
+
+      final Future<Response> response =
+              requestBuilder.addHeader("Content-Type", "application/json; charset=utf-8").execute();
+
+      ControllerTenantBrokerResponse.ControllerTenantBrokerResponseFuture controllerTableBrokerResponseFuture = new ControllerTenantBrokerResponse.ControllerTenantBrokerResponseFuture(response, url);
+      return controllerTableBrokerResponseFuture.get();
     } catch (ExecutionException e) {
       throw new PinotClientException(e);
     }

@@ -42,6 +42,7 @@ import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.minion.events.EventObserverFactoryRegistry;
 import org.apache.pinot.minion.events.MinionEventObserverFactory;
+import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
 import org.apache.pinot.minion.executor.TaskExecutorFactoryRegistry;
 import org.apache.pinot.minion.metrics.MinionMeter;
@@ -73,15 +74,16 @@ public class MinionStarter implements ServiceStartable {
   private final TaskExecutorFactoryRegistry _taskExecutorFactoryRegistry;
   private final EventObserverFactoryRegistry _eventObserverFactoryRegistry;
 
-  public MinionStarter(String zkAddress, String helixClusterName, PinotConfiguration config)
+  public MinionStarter(String helixClusterName, String zkAddress, PinotConfiguration config)
       throws Exception {
     _config = config;
     _instanceId = config.getProperty(CommonConstants.Helix.Instance.INSTANCE_ID_KEY,
         CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE + NetUtil.getHostAddress() + "_"
-            + CommonConstants.Minion.DEFAULT_HELIX_PORT);
+            + _config.getProperty(CommonConstants.Helix.KEY_OF_MINION_PORT, CommonConstants.Minion.DEFAULT_HELIX_PORT));
     setupHelixSystemProperties();
     _helixManager = new ZKHelixManager(helixClusterName, _instanceId, InstanceType.PARTICIPANT, zkAddress);
-    _taskExecutorFactoryRegistry = new TaskExecutorFactoryRegistry();
+    MinionTaskZkMetadataManager minionTaskZkMetadataManager = new MinionTaskZkMetadataManager(_helixManager);
+    _taskExecutorFactoryRegistry = new TaskExecutorFactoryRegistry(minionTaskZkMetadataManager);
     _eventObserverFactoryRegistry = new EventObserverFactoryRegistry();
   }
 

@@ -38,12 +38,13 @@ public class PinotPreparedStatementTest {
   public static final String DATE_QUERY = "SELECT * FROM dummy WHERE date = ? and updated_at = ? and created_at = ?";
   public static final String SINGLE_STRING_QUERY = "SELECT * FROM dummy WHERE value = ?";
   private DummyPinotClientTransport _dummyPinotClientTransport = new DummyPinotClientTransport();
+  private DummyPinotControllerTransport _dummyPinotControllerTransport = new DummyPinotControllerTransport();
   private PinotClientTransportFactory _previousTransportFactory = null;
 
   @Test
   public void testSetAndClearValues()
       throws Exception {
-    PinotConnection connection = new PinotConnection(Collections.singletonList("dummy"), _dummyPinotClientTransport);
+    PinotConnection connection = new PinotConnection("dummy", _dummyPinotClientTransport, "dummy" ,_dummyPinotControllerTransport);
     PreparedStatement preparedStatement = connection.prepareStatement(QUERY);
 
     preparedStatement.setString(1, "foo");
@@ -73,7 +74,7 @@ public class PinotPreparedStatementTest {
   @Test
   public void testSetDateTime()
       throws Exception {
-    PinotConnection connection = new PinotConnection(Collections.singletonList("dummy"), _dummyPinotClientTransport);
+    PinotConnection connection = new PinotConnection("dummy", _dummyPinotClientTransport, "dummy" ,_dummyPinotControllerTransport);
     PreparedStatement preparedStatement = connection.prepareStatement(DATE_QUERY);
 
     Long currentTimestamp = System.currentTimeMillis();
@@ -93,7 +94,7 @@ public class PinotPreparedStatementTest {
   @Test
   public void testSetAdditionalDataTypes()
       throws Exception {
-    PinotConnection connection = new PinotConnection(Collections.singletonList("dummy"), _dummyPinotClientTransport);
+    PinotConnection connection = new PinotConnection("dummy", _dummyPinotClientTransport, "dummy" ,_dummyPinotControllerTransport);
     PreparedStatement preparedStatement = connection.prepareStatement(SINGLE_STRING_QUERY);
 
     String value = "1234567891011121314151617181920";

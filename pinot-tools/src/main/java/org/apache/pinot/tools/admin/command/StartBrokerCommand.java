@@ -40,7 +40,7 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
   private static final Logger LOGGER = LoggerFactory.getLogger(StartBrokerCommand.class);
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
-  @Option(name = "-brokerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
+  @Option(name = "-brokerHost", required = false, metaVar = "<String>", usage = "host name for broker.")
   private String _brokerHost;
   @Option(name = "-brokerPort", required = false, metaVar = "<int>", usage = "Broker port number to use for query.")
   private int _brokerPort = CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT;

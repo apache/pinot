@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
 import org.apache.pinot.core.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
@@ -50,25 +51,29 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   private final SegmentMetadataImpl _segmentMetadata;
   private final Map<String, ColumnIndexContainer> _indexContainerMap;
   private final StarTreeIndexContainer _starTreeIndexContainer;
-  private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
-  private final ValidDocIndexReader _validDocIndex;
+
+  // For upsert
+  private PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
+  private ThreadSafeMutableRoaringBitmap _validDocIds;
+  private ValidDocIndexReader _validDocIndex;
 
   public ImmutableSegmentImpl(SegmentDirectory segmentDirectory, SegmentMetadataImpl segmentMetadata,
       Map<String, ColumnIndexContainer> columnIndexContainerMap,
-      @Nullable StarTreeIndexContainer starTreeIndexContainer,
-      @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
+      @Nullable StarTreeIndexContainer starTreeIndexContainer) {
     _segmentDirectory = segmentDirectory;
     _segmentMetadata = segmentMetadata;
     _indexContainerMap = columnIndexContainerMap;
     _starTreeIndexContainer = starTreeIndexContainer;
-    if (partitionUpsertMetadataManager != null) {
-      _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
-      _validDocIndex =
-          new ValidDocIndexReaderImpl(partitionUpsertMetadataManager.createValidDocIds(getSegmentName()));
-    } else {
-      _partitionUpsertMetadataManager = null;
-      _validDocIndex = null;
-    }
+  }
+
+  /**
+   * Enables upsert for this segment. It should be called before the segment getting queried.
+   */
+  public void enableUpsert(PartitionUpsertMetadataManager partitionUpsertMetadataManager,
+      ThreadSafeMutableRoaringBitmap validDocIds) {
+    _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
+    _validDocIds = validDocIds;
+    _validDocIndex = new ValidDocIndexReaderImpl(validDocIds);
   }
 
   @Override
@@ -147,7 +152,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
       }
     }
     if (_partitionUpsertMetadataManager != null) {
-      _partitionUpsertMetadataManager.removeSegment(segmentName);
+      _partitionUpsertMetadataManager.removeSegment(segmentName, _validDocIds);
     }
   }
 

@@ -44,7 +44,7 @@ const InstanceListingPage = () => {
 
   const fetchData = async () => {
     const instanceResponse = await PinotMethodUtils.getAllInstances();
-    const instanceType = _.startCase(location.hash.split('/')[1].slice(0, -1));
+    const instanceType = _.startCase(window.location.hash.split('/')[1].slice(0, -1));
     setInstances(_.pick(instanceResponse, instanceType));
     let clusterNameRes = localStorage.getItem('pinot_ui:clusterName');
     if(!clusterNameRes){
@@ -52,19 +52,19 @@ const InstanceListingPage = () => {
     }
     setClusterName(clusterNameRes);
     setFetching(false);
-  }
+  };
 
   useEffect(() => {
     fetchData();
   }, []);
 
   return fetching ? (
-    <AppLoader/>
+    <AppLoader />
   ) : (
     <Grid item xs className={classes.gridContainer}>
-      <Instances instances={instances} clusterName={clusterName}/>
+      <Instances instances={instances} clusterName={clusterName} />
     </Grid>
-  )
+  );
 };
 
 export default InstanceListingPage;

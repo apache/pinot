@@ -41,7 +41,7 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
   private static final Logger LOGGER = LoggerFactory.getLogger(StartServerCommand.class);
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
-  @Option(name = "-serverHost", required = false, metaVar = "<String>", usage = "Host name for controller.")
+  @Option(name = "-serverHost", required = false, metaVar = "<String>", usage = "Host name for server.")
   private String _serverHost;
   @Option(name = "-serverPort", required = false, metaVar = "<int>", usage = "Port number to start the server at.")
   private int _serverPort = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
@@ -55,7 +55,7 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
   @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
   private String _clusterName = "PinotCluster";
-  @Option(name = "-configFileName", required = false, metaVar = "<Config File Name>", usage = "Broker Starter Config file.", forbids = {"-serverHost", "-serverPort", "-dataDir", "-segmentDir",})
+  @Option(name = "-configFileName", required = false, metaVar = "<Config File Name>", usage = "Server Starter Config file.", forbids = {"-serverHost", "-serverPort", "-dataDir", "-segmentDir",})
   private String _configFileName;
 
   @Override

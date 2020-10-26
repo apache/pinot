@@ -448,6 +448,7 @@ public class CalciteSqlCompilerTest {
 
   @Test
   public void testGroupbys() {
+
     PinotQuery pinotQuery;
     try {
       pinotQuery = CalciteSqlParser.compileToPinotQuery(
@@ -504,6 +505,24 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(
         pinotQuery.getOrderByList().get(1).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
             .getIdentifier().getName(), "*");
+    Assert.assertEquals(10, pinotQuery.getLimit());
+
+    // nested functions in group by
+    try {
+      pinotQuery = CalciteSqlParser.compileToPinotQuery("select concat(upper(playerName), lower(teamID), '-') playerTeam, "
+          + "upper(league) leagueUpper, count(playerName) cnt from baseballStats group by playerTeam, lower(teamID), leagueUpper "
+          + "having cnt > 1 order by cnt desc limit 10");
+    } catch (SqlCompilationException e) {
+      throw e;
+    }
+    Assert.assertTrue(pinotQuery.isSetGroupByList());
+    Assert.assertEquals(pinotQuery.getGroupByList().size(), 3);
+    Assert.assertTrue(pinotQuery.isSetLimit());
+    Assert.assertTrue(pinotQuery.isSetOrderByList());
+    Assert.assertEquals(pinotQuery.getOrderByList().get(0).getType(), ExpressionType.FUNCTION);
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
+        "COUNT");
     Assert.assertEquals(10, pinotQuery.getLimit());
   }
 
@@ -732,14 +751,16 @@ public class CalciteSqlCompilerTest {
 
   @Test
   public void testTimeTransformFunction() {
-    PinotQuery pinotQuery = CalciteSqlParser
-        .compileToPinotQuery("  select hour(ts), d1, sum(m1) from baseballStats group by hour(ts), d1");
+    PinotQuery pinotQuery =
+        CalciteSqlParser.compileToPinotQuery("  select hour(ts), d1, sum(m1) from baseballStats group by hour(ts), d1");
     Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "HOUR");
-    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "ts");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "ts");
     Assert.assertEquals(pinotQuery.getSelectList().get(1).getIdentifier().getName(), "d1");
     Assert.assertEquals(pinotQuery.getSelectList().get(2).getFunctionCall().getOperator(), "SUM");
     Assert.assertEquals(pinotQuery.getGroupByList().get(0).getFunctionCall().getOperator(), "HOUR");
-    Assert.assertEquals(pinotQuery.getGroupByList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "ts");
+    Assert.assertEquals(
+        pinotQuery.getGroupByList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "ts");
     Assert.assertEquals(pinotQuery.getGroupByList().get(1).getIdentifier().getName(), "d1");
   }
 
@@ -1558,6 +1579,66 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
+  public void testOrdinalsQueryRewrite() {
+    String query = "SELECT foo, bar, count(*) FROM t GROUP BY 1, 2 ORDER BY 1, 2 DESC";
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getIdentifier().getName(), "foo");
+    Assert.assertEquals(pinotQuery.getSelectList().get(1).getIdentifier().getName(), "bar");
+    Assert.assertEquals(pinotQuery.getGroupByList().get(0).getIdentifier().getName(), "foo");
+    Assert.assertEquals(pinotQuery.getGroupByList().get(1).getIdentifier().getName(), "bar");
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "foo");
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(1).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "bar");
+
+    query = "SELECT foo, bar, count(*) FROM t GROUP BY 2, 1 ORDER BY 2, 1 DESC";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getIdentifier().getName(), "foo");
+    Assert.assertEquals(pinotQuery.getSelectList().get(1).getIdentifier().getName(), "bar");
+    Assert.assertEquals(pinotQuery.getGroupByList().get(0).getIdentifier().getName(), "bar");
+    Assert.assertEquals(pinotQuery.getGroupByList().get(1).getIdentifier().getName(), "foo");
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "bar");
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(1).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "foo");
+
+    query = "SELECT foo as f, bar as b, count(*) FROM t GROUP BY 2, 1 ORDER BY 2, 1 DESC";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getGroupByList().get(0).getIdentifier().getName(), "bar");
+    Assert.assertEquals(pinotQuery.getGroupByList().get(1).getIdentifier().getName(), "foo");
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "bar");
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(1).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "foo");
+
+    query = "select a, b + 2, array_sum(c) as array_sum_c, count(*) from data group by a, 2, array_sum_c";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getGroupByList().get(0).getIdentifier().getName(), "a");
+    Assert.assertEquals(pinotQuery.getGroupByList().get(1).getFunctionCall().getOperator(), "PLUS");
+    Assert.assertEquals(
+        pinotQuery.getGroupByList().get(1).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "b");
+    Assert.assertEquals(
+        pinotQuery.getGroupByList().get(1).getFunctionCall().getOperands().get(1).getLiteral().getLongValue(), 2L);
+    Assert.assertEquals(pinotQuery.getGroupByList().get(2).getFunctionCall().getOperator(), "ARRAY_SUM");
+    Assert.assertEquals(
+        pinotQuery.getGroupByList().get(2).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "c");
+
+    Assert.expectThrows(SqlCompilationException.class,
+        () -> CalciteSqlParser.compileToPinotQuery("SELECT foo, bar, count(*) FROM t GROUP BY 0"));
+    Assert.expectThrows(SqlCompilationException.class,
+        () -> CalciteSqlParser.compileToPinotQuery("SELECT foo, bar, count(*) FROM t GROUP BY 3"));
+  }
+
+  @Test
+  public void testOrdinalsQueryRewriteWithDistinctOrderby() {
+    String query = "SELECT baseballStats.playerName AS playerName FROM baseballStats GROUP BY baseballStats.playerName ORDER BY 1 ASC";
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "baseballStats.playerName");
+    Assert.assertTrue(pinotQuery.getGroupByList().isEmpty());
+    Assert.assertEquals(pinotQuery.getOrderByList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "baseballStats.playerName");
+  }
+
+  @Test
   public void testNoArgFunction() {
     String query = "SELECT noArgFunc() FROM foo ";
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
@@ -2047,5 +2128,51 @@ public class CalciteSqlCompilerTest {
       Assert.assertNull(brokerRequest.getHavingFilterQuery());
       Assert.assertNull(brokerRequest.getHavingFilterSubQueryMap());
     }
+  }
+
+  @Test
+  public void testArrayAggregationRewrite() {
+    String sql;
+    PinotQuery pinotQuery;
+    sql = "SELECT sum(array_sum(a)) FROM Foo";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "sumMV");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().size(), 1);
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "a");
+
+    sql = "SELECT MIN(ARRAYMIN(a)) FROM Foo";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "minMV");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().size(), 1);
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "a");
+
+    sql = "SELECT Max(ArrayMax(a)) FROM Foo";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "maxMV");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().size(), 1);
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "a");
+
+    sql = "SELECT Max(ArrayMax(a)) + 1 FROM Foo";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "PLUS");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().size(), 2);
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
+        "maxMV");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().size(),
+        1);
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
+            .getIdentifier().getName(), "a");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getLiteral().getLongValue(), 1L);
   }
 }

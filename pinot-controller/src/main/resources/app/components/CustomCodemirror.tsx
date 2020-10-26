@@ -22,8 +22,19 @@ import React, {  } from 'react';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
 import 'codemirror/lib/codemirror.css';
 import 'codemirror/theme/material.css';
-import 'codemirror/mode/javascript/javascript'
+import 'codemirror/addon/lint/lint.css';
+import 'codemirror/mode/javascript/javascript';
+import 'codemirror/addon/lint/lint';
+import 'codemirror/addon/lint/json-lint';
 import { makeStyles } from '@material-ui/core';
+
+declare global {
+  interface Window {
+    jsonlint:any;
+  }
+}
+
+window.jsonlint = require('jsonlint');
 
 type Props = {
   data: Object,
@@ -45,7 +56,7 @@ const CustomCodemirror = ({data, isEditable, returnCodemirrorValue}: Props) => {
     mode: 'application/json',
     styleActiveLine: true,
     gutters: ['CodeMirror-lint-markers'],
-    lint: true,
+    lint: isEditable || false,
     theme: 'default',
     readOnly: !isEditable
   };
@@ -53,10 +64,10 @@ const CustomCodemirror = ({data, isEditable, returnCodemirrorValue}: Props) => {
   return (
     <CodeMirror
       options={jsonoptions}
-      value={JSON.stringify(data, null , 2)}
+      value={typeof data === 'string' ? data : JSON.stringify(data, null, 2)}
       className={classes.codeMirror}
       autoCursor={false}
-      onChange={(editor, data, value) => {
+      onChange={(editor, d, value) => {
         returnCodemirrorValue && returnCodemirrorValue(value);
       }}
     />

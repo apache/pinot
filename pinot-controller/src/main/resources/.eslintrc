@@ -37,12 +37,7 @@
         "ignoreComments": true
       }
     ],
-    "no-plusplus": [
-      "error",
-      {
-        "allowForLoopAfterthoughts": true
-      }
-    ],
+    "no-plusplus": "off",
     "func-names": "off",
     "no-param-reassign": "off",
     "react/no-array-index-key": "off",

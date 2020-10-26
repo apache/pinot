@@ -42,7 +42,7 @@ import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
-import org.apache.pinot.core.realtime.impl.dictionary.BaseMutableDictionary;
+import org.apache.pinot.core.segment.index.readers.MutableDictionary;
 import org.apache.pinot.core.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
 import org.apache.pinot.core.realtime.impl.dictionary.MutableDictionaryFactory;
 import org.apache.pinot.core.realtime.impl.forward.FixedByteMVMutableForwardIndex;
@@ -68,7 +68,7 @@ import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
 import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager;
-import org.apache.pinot.core.upsert.RecordLocation;
+import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager.RecordInfo;
 import org.apache.pinot.core.util.FixedIntArray;
 import org.apache.pinot.core.util.FixedIntArrayOffHeapIdMap;
 import org.apache.pinot.core.util.IdMap;
@@ -92,7 +92,6 @@ import org.slf4j.LoggerFactory;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class MutableSegmentImpl implements MutableSegment {
-  private static final Logger LOGGER = LoggerFactory.getLogger(MutableSegmentImpl.class);
   // For multi-valued column, forward-index.
   // Maximum number of multi-values per row. We assert on this.
   private static final int MAX_MULTI_VALUES_PER_ROW = 1000;
@@ -248,7 +247,7 @@ public class MutableSegmentImpl implements MutableSegment {
       DataType dataType = fieldSpec.getDataType();
       boolean isFixedWidthColumn = dataType.isFixedWidth();
       MutableForwardIndex forwardIndex;
-      BaseMutableDictionary dictionary;
+      MutableDictionary dictionary;
       if (isNoDictionaryColumn(noDictionaryColumns, invertedIndexColumns, fieldSpec, column)) {
         // No dictionary column (always single-valued)
         assert fieldSpec.isSingleValueField();
@@ -484,8 +483,8 @@ public class MutableSegmentImpl implements MutableSegment {
     Object timeValue = row.getValue(_timeColumnName);
     Preconditions.checkArgument(timeValue instanceof Comparable, "time column shall be comparable");
     long timestamp = IngestionUtils.extractTimeValue((Comparable) timeValue);
-    RecordLocation recordLocation = new RecordLocation(_segmentName, docId, timestamp, true);
-    _partitionUpsertMetadataManager.updateRecordLocation(primaryKey, recordLocation, _validDocIds);
+    _partitionUpsertMetadataManager
+        .updateRecord(_segmentName, new RecordInfo(primaryKey, docId, timestamp), _validDocIds);
   }
 
   private void updateDictionary(GenericRow row) {
@@ -493,7 +492,7 @@ public class MutableSegmentImpl implements MutableSegment {
       String column = entry.getKey();
       IndexContainer indexContainer = entry.getValue();
       Object value = row.getValue(column);
-      BaseMutableDictionary dictionary = indexContainer._dictionary;
+      MutableDictionary dictionary = indexContainer._dictionary;
       if (dictionary != null) {
         if (indexContainer._fieldSpec.isSingleValueField()) {
           indexContainer._dictId = dictionary.index(value);
@@ -745,7 +744,7 @@ public class MutableSegmentImpl implements MutableSegment {
    * Helper method to read the value for the given document id.
    */
   private static Object getValue(int docId, MutableForwardIndex forwardIndex,
-      @Nullable BaseMutableDictionary dictionary, int maxNumMultiValues) {
+      @Nullable MutableDictionary dictionary, int maxNumMultiValues) {
     if (dictionary != null) {
       // Dictionary based
       if (forwardIndex.isSingleValue()) {
@@ -857,7 +856,7 @@ public class MutableSegmentImpl implements MutableSegment {
    */
   public int[] getSortedDocIdIterationOrderWithSortedColumn(String column) {
     IndexContainer indexContainer = _indexContainerMap.get(column);
-    BaseMutableDictionary dictionary = indexContainer._dictionary;
+    MutableDictionary dictionary = indexContainer._dictionary;
 
     // Sort all values in the dictionary
     int numValues = dictionary.length();
@@ -1033,7 +1032,7 @@ public class MutableSegmentImpl implements MutableSegment {
     final Set<Integer> _partitions;
     final NumValuesInfo _numValuesInfo;
     final MutableForwardIndex _forwardIndex;
-    final BaseMutableDictionary _dictionary;
+    final MutableDictionary _dictionary;
     final RealtimeInvertedIndexReader _invertedIndex;
     final InvertedIndexReader _rangeIndex;
     final RealtimeLuceneTextIndexReader _textIndex;
@@ -1049,7 +1048,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
     IndexContainer(FieldSpec fieldSpec, @Nullable PartitionFunction partitionFunction,
         @Nullable Set<Integer> partitions, NumValuesInfo numValuesInfo, MutableForwardIndex forwardIndex,
-        @Nullable BaseMutableDictionary dictionary, @Nullable RealtimeInvertedIndexReader invertedIndex,
+        @Nullable MutableDictionary dictionary, @Nullable RealtimeInvertedIndexReader invertedIndex,
         @Nullable InvertedIndexReader rangeIndex, @Nullable RealtimeLuceneTextIndexReader textIndex,
         @Nullable BloomFilterReader bloomFilter, @Nullable MutableNullValueVector nullValueVector) {
       _fieldSpec = fieldSpec;

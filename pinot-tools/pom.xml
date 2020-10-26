@@ -111,6 +111,10 @@
       <scope>test</scope>
     </dependency>
     <dependency>
+      <groupId>org.glassfish.jersey.containers</groupId>
+      <artifactId>jersey-container-grizzly2-http</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.glassfish.tyrus.bundles</groupId>
       <artifactId>tyrus-standalone-client</artifactId>
     </dependency>
@@ -129,6 +133,10 @@
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-math3</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-minion</artifactId>
     </dependency>
   </dependencies>
   <build>
@@ -244,6 +252,17 @@
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
                   <extraArgument>-Dlog4j2.configurationFile=conf/pinot-server-log4j2.xml</extraArgument>
+                </extraArguments>
+              </jvmSettings>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.tools.admin.PinotMinion</mainClass>
+              <name>start-minion</name>
+              <jvmSettings>
+                <initialMemorySize>1G</initialMemorySize>
+                <maxMemorySize>1G</maxMemorySize>
+                <extraArguments>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-minion-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>

@@ -43,8 +43,7 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
   }
 
   protected Schema getSchema(String tableName) {
-    Schema schema =
-        ZKMetadataProvider.getTableSchema(MINION_CONTEXT.getHelixPropertyStore(), tableName);
+    Schema schema = ZKMetadataProvider.getTableSchema(MINION_CONTEXT.getHelixPropertyStore(), tableName);
     Preconditions.checkState(schema != null, "Failed to find schema for table: %s", tableName);
     return schema;
   }

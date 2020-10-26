@@ -25,6 +25,9 @@ module.exports = (env, argv) => {
 
   return {
     mode: !devMode ? 'production' : 'development',
+    node: {
+      fs: 'empty'
+    },
 
     // Enable sourcemaps for debugging webpack's output.
     devtool: 'source-map',

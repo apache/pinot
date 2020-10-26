@@ -111,12 +111,15 @@ declare module 'Models' {
 
   export type ClusterName = {
     clusterName: string
-  }
+  };
 
-  export type ZKGetList = Array<string>
+  export type ZKGetList = Array<string>;
 
-  export type ZKConfig = Object;
-  export type ZKOperationResponsne = any;
+  export type ZKConfig = {
+    ctime: any,
+    mtime: any
+  };
+  export type OperationResponse = any;
 
   export type DataTable = {
     [name: string]: Array<string>

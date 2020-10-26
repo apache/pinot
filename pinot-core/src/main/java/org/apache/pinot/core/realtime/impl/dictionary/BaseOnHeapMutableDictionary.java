@@ -21,6 +21,7 @@ package org.apache.pinot.core.realtime.impl.dictionary;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import org.apache.pinot.core.segment.index.readers.MutableDictionary;
 
 
 /**
@@ -31,7 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * value later, but not reversely. So whenever we return a valid dictionary id for a value, we need to ensure the value
  * can be fetched by the dictionary id returned.
  */
-public abstract class BaseOnHeapMutableDictionary extends BaseMutableDictionary {
+public abstract class BaseOnHeapMutableDictionary implements MutableDictionary {
   private static final int SHIFT_OFFSET = 13;  // INITIAL_DICTIONARY_SIZE = 8192
   private static final int INITIAL_DICTIONARY_SIZE = 1 << SHIFT_OFFSET;
   private static final int MASK = 0xFFFFFFFF >>> (Integer.SIZE - SHIFT_OFFSET);

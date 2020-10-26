@@ -70,14 +70,8 @@ public class DriverUtils {
       url = url.substring(5);
     }
     URI uri = URI.create(url);
-    String[] params = uri.getRawQuery().split(QUERY_SEPERATOR);
-    for (String param : params) {
-      String[] query = param.split(PARAM_SEPERATOR);
-      if (query[0].toLowerCase().contentEquals(CONTROLLER)) {
-        return query[1];
-      }
-    }
-    return null;
+    String controllerUrl = String.format("%s:%d", uri.getHost(), uri.getPort());
+    return controllerUrl;
   }
 
   public static Integer getSQLDataType(String columnDataType) {

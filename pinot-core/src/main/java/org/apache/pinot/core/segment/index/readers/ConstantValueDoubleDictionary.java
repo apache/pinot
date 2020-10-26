@@ -33,6 +33,11 @@ public class ConstantValueDoubleDictionary extends BaseImmutableDictionary {
   }
 
   @Override
+  public DataType getValueType() {
+    return DataType.DOUBLE;
+  }
+
+  @Override
   public int insertionIndexOf(String stringValue) {
     double doubleValue = Double.parseDouble(stringValue);
     if (doubleValue < _value) {
@@ -45,8 +50,18 @@ public class ConstantValueDoubleDictionary extends BaseImmutableDictionary {
   }
 
   @Override
-  public DataType getValueType() {
-    return DataType.DOUBLE;
+  public Double getMinVal() {
+    return _value;
+  }
+
+  @Override
+  public Double getMaxVal() {
+    return _value;
+  }
+
+  @Override
+  public double[] getSortedValues() {
+    return new double[]{_value};
   }
 
   @Override
