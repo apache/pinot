@@ -118,6 +118,8 @@ public class CommonConstants {
     public static final String KEY_OF_BROKER_QUERY_PORT = "pinot.broker.client.queryPort";
     public static final int DEFAULT_BROKER_QUERY_PORT = 8099;
     public static final String KEY_OF_SERVER_NETTY_HOST = "pinot.server.netty.host";
+    public static final String KEY_OF_MINION_HOST = "pinot.minion.host";
+    public static final String KEY_OF_MINION_PORT = "pinot.minion.port";
 
     // NOTE: Helix will disconnect the manager and disable the instance if it detects flapping (too frequent disconnect
     // from ZooKeeper). Setting flapping time window to a small value can avoid this from happening. Helix ignores the

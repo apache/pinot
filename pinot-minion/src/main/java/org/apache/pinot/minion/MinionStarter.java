@@ -74,12 +74,12 @@ public class MinionStarter implements ServiceStartable {
   private final TaskExecutorFactoryRegistry _taskExecutorFactoryRegistry;
   private final EventObserverFactoryRegistry _eventObserverFactoryRegistry;
 
-  public MinionStarter(String zkAddress, String helixClusterName, PinotConfiguration config)
+  public MinionStarter(String helixClusterName, String zkAddress, PinotConfiguration config)
       throws Exception {
     _config = config;
     _instanceId = config.getProperty(CommonConstants.Helix.Instance.INSTANCE_ID_KEY,
         CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE + NetUtil.getHostAddress() + "_"
-            + CommonConstants.Minion.DEFAULT_HELIX_PORT);
+            + _config.getProperty(CommonConstants.Helix.KEY_OF_MINION_PORT, CommonConstants.Minion.DEFAULT_HELIX_PORT));
     setupHelixSystemProperties();
     _helixManager = new ZKHelixManager(helixClusterName, _instanceId, InstanceType.PARTICIPANT, zkAddress);
     MinionTaskZkMetadataManager minionTaskZkMetadataManager = new MinionTaskZkMetadataManager(_helixManager);

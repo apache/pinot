@@ -56,7 +56,7 @@ public class PinotConfigUtils {
     if (StringUtils.isEmpty(clusterName)) {
       throw new RuntimeException("clusterName cannot be empty.");
     }
-    
+
     Map<String, Object> properties = new HashMap<>();
     properties.put(ControllerConf.ZK_STR, zkAddress);
     properties.put(ControllerConf.HELIX_CLUSTER_NAME, clusterName);
@@ -94,14 +94,14 @@ public class PinotConfigUtils {
 
     Map<String, Object> properties = CommonsConfigurationUtils.toMap(new PropertiesConfiguration(configFile));
     ControllerConf conf = new ControllerConf(properties);
-    
+
     conf.setPinotFSFactoryClasses(null);
-    
+
     if (!validateControllerConfig(conf)) {
       LOGGER.error("Failed to validate controller conf.");
       throw new ConfigurationException("Pinot Controller Conf validation failure");
     }
-    
+
     return properties;
   }
 
@@ -136,14 +136,14 @@ public class PinotConfigUtils {
     if (configFile.exists()) {
       return CommonsConfigurationUtils.toMap(new PropertiesConfiguration(configFile));
     }
-    
+
     return null;
   }
 
   public static Map<String, Object> generateBrokerConf(int brokerPort) {
     Map<String, Object> properties = new HashMap<>();
     properties.put(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, brokerPort != 0 ? brokerPort : getAvailablePort());
-    
+
     return properties;
   }
 
@@ -170,7 +170,19 @@ public class PinotConfigUtils {
     properties.put(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT, serverAdminPort);
     properties.put(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR, serverDataDir);
     properties.put(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, serverSegmentDir);
-    
+
+    return properties;
+  }
+
+  public static Map<String, Object> generateMinionConf(String minionHost, int minionPort)
+      throws SocketException, UnknownHostException {
+    if (minionHost == null) {
+      minionHost = NetUtil.getHostAddress();
+    }
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Helix.KEY_OF_MINION_HOST, minionHost);
+    properties.put(CommonConstants.Helix.KEY_OF_MINION_PORT, minionPort != 0 ? minionPort : getAvailablePort());
+
     return properties;
   }
 
@@ -186,7 +198,7 @@ public class PinotConfigUtils {
 
   private static List<String> validateControllerAccessProtocols(ControllerConf conf) throws ConfigurationException {
     List<String> protocols = conf.getControllerAccessProtocols();
-    
+
     if(!protocols.isEmpty()) {
       Optional<String> invalidProtocol =
           protocols.stream().filter(protocol -> !protocol.equals("http") && !protocol.equals("https")).findFirst();
@@ -195,7 +207,7 @@ public class PinotConfigUtils {
         throw new ConfigurationException(String.format(CONTROLLER_CONFIG_VALIDATION_ERROR_MESSAGE_FORMAT,
             invalidProtocol.get() + " is not a valid protocol for the 'controller.access.protocols' property."));
       }
-      
+
       Optional<ConfigurationException> invalidPort = protocols.stream()
           .map(protocol -> validatePort(protocol, conf.getControllerAccessProtocolProperty(protocol, "port")))
 
@@ -209,7 +221,7 @@ public class PinotConfigUtils {
         throw invalidPort.get();
       }
     }
-    
+
     return protocols;
   }
 

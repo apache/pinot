@@ -184,7 +184,7 @@ public abstract class ClusterTest extends ControllerTest {
     FileUtils.deleteQuietly(new File(Minion.DEFAULT_INSTANCE_BASE_DIR));
     try {
       _minionStarter =
-          new MinionStarter(ZkStarter.DEFAULT_ZK_STR, getHelixClusterName(), new PinotConfiguration());
+          new MinionStarter(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, new PinotConfiguration());
       // Register task executor factories
       if (taskExecutorFactoryRegistry != null) {
         for (Map.Entry<String, PinotTaskExecutorFactory> entry : taskExecutorFactoryRegistry.entrySet()) {

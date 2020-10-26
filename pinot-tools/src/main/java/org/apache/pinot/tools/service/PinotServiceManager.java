@@ -29,6 +29,7 @@ import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
+import org.apache.pinot.minion.MinionStarter;
 import org.apache.pinot.server.starter.helix.HelixServerStarter;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.services.ServiceRole;
@@ -92,6 +93,8 @@ public class PinotServiceManager {
         return startBroker(new PinotConfiguration(properties));
       case SERVER:
         return startServer(new PinotConfiguration(properties));
+      case MINION:
+        return startMinion(new PinotConfiguration(properties));
     }
     return null;
   }
@@ -149,6 +152,18 @@ public class PinotServiceManager {
     String instanceId = serverStarter.getInstanceId();
     _runningInstanceMap.put(instanceId, serverStarter);
     LOGGER.info("Pinot Server instance [{}] is Started...", instanceId);
+    return instanceId;
+  }
+
+  public String startMinion(PinotConfiguration minionConf)
+      throws Exception {
+    LOGGER.info("Trying to start Pinot Minion...");
+    MinionStarter minionStarter = new MinionStarter(_clusterName, _zkAddress, minionConf);
+    minionStarter.start();
+
+    String instanceId = minionStarter.getInstanceId();
+    _runningInstanceMap.put(instanceId, minionStarter);
+    LOGGER.info("Pinot Minion instance [{}] is Started...", instanceId);
     return instanceId;
   }
 
