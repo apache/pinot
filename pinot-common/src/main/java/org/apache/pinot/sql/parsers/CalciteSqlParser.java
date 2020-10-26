@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.sql.parsers;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -48,11 +49,13 @@ import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.parser.babel.SqlBabelParserImpl;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.function.FunctionDefinitionRegistry;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
+import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -352,6 +355,9 @@ public class CalciteSqlParser {
     // Invoke compilation time functions
     invokeCompileTimeFunctions(pinotQuery);
 
+    // Rewrite Selection list
+    rewriteSelections(pinotQuery.getSelectList());
+
     // Update Predicate Comparison
     Expression filterExpression = pinotQuery.getFilterExpression();
     if (filterExpression != null) {
@@ -409,6 +415,72 @@ public class CalciteSqlParser {
       throw new SqlCompilationException(
           String.format("Expected Ordinal value to be between 1 and %d.", selectList.size()));
     }
+  }
+
+  private static void rewriteSelections(List<Expression> selectList) {
+    for (Expression expression : selectList) {
+      // Rewrite aggregation
+      tryToRewriteArrayFunction(expression);
+    }
+  }
+
+  private static void tryToRewriteArrayFunction(Expression expression) {
+    if (!expression.isSetFunctionCall()) {
+      return;
+    }
+    Function functionCall = expression.getFunctionCall();
+    switch (canonicalize(functionCall.getOperator())) {
+      case "sum":
+        if (functionCall.getOperands().size() != 1) {
+          return;
+        }
+        if (functionCall.getOperands().get(0).isSetFunctionCall()) {
+          Function innerFunction = functionCall.getOperands().get(0).getFunctionCall();
+          if (isSameFunction(innerFunction.getOperator(), TransformFunctionType.ARRAYSUM.getName())) {
+            Function sumMvFunc = new Function(AggregationFunctionType.SUMMV.getName());
+            sumMvFunc.setOperands(innerFunction.getOperands());
+            expression.setFunctionCall(sumMvFunc);
+          }
+        }
+        return;
+      case "min":
+        if (functionCall.getOperands().size() != 1) {
+          return;
+        }
+        if (functionCall.getOperands().get(0).isSetFunctionCall()) {
+          Function innerFunction = functionCall.getOperands().get(0).getFunctionCall();
+          if (isSameFunction(innerFunction.getOperator(), TransformFunctionType.ARRAYMIN.getName())) {
+            Function sumMvFunc = new Function(AggregationFunctionType.MINMV.getName());
+            sumMvFunc.setOperands(innerFunction.getOperands());
+            expression.setFunctionCall(sumMvFunc);
+          }
+        }
+        return;
+      case "max":
+        if (functionCall.getOperands().size() != 1) {
+          return;
+        }
+        if (functionCall.getOperands().get(0).isSetFunctionCall()) {
+          Function innerFunction = functionCall.getOperands().get(0).getFunctionCall();
+          if (isSameFunction(innerFunction.getOperator(), TransformFunctionType.ARRAYMAX.getName())) {
+            Function sumMvFunc = new Function(AggregationFunctionType.MAXMV.getName());
+            sumMvFunc.setOperands(innerFunction.getOperands());
+            expression.setFunctionCall(sumMvFunc);
+          }
+        }
+        return;
+    }
+    for (Expression operand : functionCall.getOperands()) {
+      tryToRewriteArrayFunction(operand);
+    }
+  }
+
+  private static String canonicalize(String functionName) {
+    return StringUtils.remove(functionName, '_').toLowerCase();
+  }
+
+  private static boolean isSameFunction(String function1, String function2) {
+    return canonicalize(function1).equals(canonicalize(function2));
   }
 
   /**
