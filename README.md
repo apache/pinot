@@ -66,6 +66,8 @@ Pinot was originally built at LinkedIn to power rich interactive real-time analy
 
 * **Cloud-native on Kubernetes**: Helm chart provides a horizontally scalable and fault-tolerant clustered deployment that is easy to manage using Kubernetes.
 
+<a href="https://docs.pinot.apache.org/basics/getting-started"><img src="https://gblobscdn.gitbook.com/assets%2F-LtH6nl58DdnZnelPdTc%2F-MK7-D-ozvqsINCqoisu%2F-MK7-IjsO2Nv5xufkHSj%2Fapache-pinot-ui.gif?alt=media&token=e8a58e78-4d6d-4dde-b83a-a55c84bb48bf" align="center" alt="Apache Pinot query console"/></a>
+
 ## When should I use Pinot?
 
 Pinot is designed to execute real-time OLAP queries with low latency on massive amounts of data and events. In addition to real-time stream ingestion, Pinot also supports batch use cases with the same low latency guarantees. It is suited in contexts where fast analytics, such as aggregations, are needed on immutable data, possibly, with real-time data ingestion. Pinot works very well for querying time series data with lots of dimensions and metrics.
