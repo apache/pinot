@@ -60,6 +60,8 @@ public abstract class QueryScheduler {
   private static final String INVALID_NUM_SCANNED = "-1";
   private static final String INVALID_SEGMENTS_COUNT = "-1";
   private static final String INVALID_FRESHNESS_MS = "-1";
+  private static final String INVALID_NUM_RESIZES = "-1";
+  private static final String INVALID_RESIZE_TIME_MS = "-1";
   private static final String QUERY_LOG_MAX_RATE_KEY = "query.log.maxRatePerSecond";
   private static final double DEFAULT_QUERY_LOG_MAX_RATE = 10_000d;
 
@@ -183,6 +185,8 @@ public abstract class QueryScheduler {
         Long.parseLong(dataTableMetadata.getOrDefault(DataTable.NUM_CONSUMING_SEGMENTS_PROCESSED, INVALID_SEGMENTS_COUNT));
     long minConsumingFreshnessMs =
         Long.parseLong(dataTableMetadata.getOrDefault(DataTable.MIN_CONSUMING_FRESHNESS_TIME_MS, INVALID_FRESHNESS_MS));
+    int numResizes = Integer.parseInt(dataTableMetadata.getOrDefault(DataTable.NUM_RESIZES_METADATA_KEY, INVALID_NUM_RESIZES));
+    long resizeTimeMs = Long.parseLong(dataTableMetadata.getOrDefault(DataTable.RESIZE_TIME_MS_METADATA_KEY, INVALID_RESIZE_TIME_MS));
 
     if (numDocsScanned > 0) {
       serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_DOCS_SCANNED, numDocsScanned);
@@ -194,6 +198,12 @@ public abstract class QueryScheduler {
     if (numEntriesScannedPostFilter > 0) {
       serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_ENTRIES_SCANNED_POST_FILTER,
           numEntriesScannedPostFilter);
+    }
+    if (numResizes > 0) {
+      serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_RESIZES, numResizes);
+    }
+    if (resizeTimeMs > 0) {
+      serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.RESIZE_TIME_MS, resizeTimeMs);
     }
 
     TimerContext timerContext = queryRequest.getTimerContext();

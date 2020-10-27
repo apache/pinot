@@ -29,6 +29,8 @@ public class DataTableReducerContext {
   private final ExecutorService _executorService;
   private final int _maxReduceThreadsPerQuery;
   private final long _reduceTimeOutMs;
+  // used for SQL GROUP BY
+  private final int _groupByTrimThreshold;
 
   /**
    * Constructor for the class.
@@ -37,10 +39,12 @@ public class DataTableReducerContext {
    * @param maxReduceThreadsPerQuery Max number of threads to use for reduce phase
    * @param reduceTimeOutMs Reduce Phase timeOut in ms
    */
-  public DataTableReducerContext(ExecutorService executorService, int maxReduceThreadsPerQuery, long reduceTimeOutMs) {
+  public DataTableReducerContext(ExecutorService executorService, int maxReduceThreadsPerQuery, long reduceTimeOutMs,
+      int sqlGroupByTrimThreshold) {
     _executorService = executorService;
     _maxReduceThreadsPerQuery = maxReduceThreadsPerQuery;
     _reduceTimeOutMs = reduceTimeOutMs;
+    _groupByTrimThreshold = sqlGroupByTrimThreshold;
   }
 
   public ExecutorService getExecutorService() {
@@ -53,5 +57,9 @@ public class DataTableReducerContext {
 
   public long getReduceTimeOutMs() {
     return _reduceTimeOutMs;
+  }
+
+  public int getGroupByTrimThreshold() {
+    return _groupByTrimThreshold;
   }
 }

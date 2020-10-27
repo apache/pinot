@@ -39,17 +39,16 @@ import org.slf4j.LoggerFactory;
 public class ConcurrentIndexedTable extends IndexedTable {
   private static final Logger LOGGER = LoggerFactory.getLogger(ConcurrentIndexedTable.class);
 
-  private final ConcurrentMap<Key, Record> _lookupMap;
-  private final ReentrantReadWriteLock _readWriteLock;
+  protected volatile ConcurrentMap<Key, Record> _lookupMap;
+  protected final AtomicBoolean _noMoreNewRecords = new AtomicBoolean();
   private Iterator<Record> _iterator;
-
-  private final AtomicBoolean _noMoreNewRecords = new AtomicBoolean();
+  private final ReentrantReadWriteLock _readWriteLock;
   private final AtomicInteger _numResizes = new AtomicInteger();
-  private final AtomicLong _resizeTime = new AtomicLong();
+  private final AtomicLong _resizeTimeMs = new AtomicLong();
 
-  public ConcurrentIndexedTable(DataSchema dataSchema, QueryContext queryContext, int capacity) {
-    super(dataSchema, queryContext, capacity);
-
+  public ConcurrentIndexedTable(DataSchema dataSchema, QueryContext queryContext, int trimSize,
+      int trimThreshold) {
+    super(dataSchema, queryContext, trimSize, trimThreshold);
     _lookupMap = new ConcurrentHashMap<>();
     _readWriteLock = new ReentrantReadWriteLock();
   }
@@ -59,9 +58,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
    */
   @Override
   public boolean upsert(Key key, Record newRecord) {
-
     Preconditions.checkNotNull(key, "Cannot upsert record with null keys");
-
     if (_noMoreNewRecords.get()) { // allow only existing record updates
       _lookupMap.computeIfPresent(key, (k, v) -> {
         Object[] existingValues = v.getValues();
@@ -93,14 +90,14 @@ public class ConcurrentIndexedTable extends IndexedTable {
         _readWriteLock.readLock().unlock();
       }
 
-      // resize if exceeds max capacity
-      if (_lookupMap.size() >= _maxCapacity) {
+      // resize if exceeds trim threshold
+      if (_lookupMap.size() >= _trimThreshold) {
         if (_hasOrderBy) {
           // reached capacity, resize
           _readWriteLock.writeLock().lock();
           try {
-            if (_lookupMap.size() >= _maxCapacity) {
-              resize(_capacity);
+            if (_lookupMap.size() >= _trimThreshold) {
+              resize(_trimSize);
             }
           } finally {
             _readWriteLock.writeLock().unlock();
@@ -116,7 +113,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
 
   @Override
   public int size() {
-    return _lookupMap.size();
+    return _sortedRecords == null ? _lookupMap.size() : _sortedRecords.size();
   }
 
   @Override
@@ -125,52 +122,55 @@ public class ConcurrentIndexedTable extends IndexedTable {
   }
 
   private void resize(int trimToSize) {
-
     long startTime = System.currentTimeMillis();
-
-    _tableResizer.resizeRecordsMap(_lookupMap, trimToSize);
-
+    // when the resizer trims using a PQ, it will return a new trimmed map.
+    // the reference held by the indexed table needs to be updated. this is also
+    // the reason why it is volatile since the thread doing the resize will result in
+    // a new reference
+    _lookupMap = (ConcurrentMap)_tableResizer.resizeRecordsMap(_lookupMap, trimToSize);
     long endTime = System.currentTimeMillis();
     long timeElapsed = endTime - startTime;
-
     _numResizes.incrementAndGet();
-    _resizeTime.addAndGet(timeElapsed);
+    _resizeTimeMs.addAndGet(timeElapsed);
   }
 
   private List<Record> resizeAndSort(int trimToSize) {
-
     long startTime = System.currentTimeMillis();
-
-    List<Record> sortedRecords = _tableResizer.resizeAndSortRecordsMap(_lookupMap, trimToSize);
-
+    List<Record> sortedRecords = _tableResizer.sortRecordsMap(_lookupMap, trimToSize);
     long endTime = System.currentTimeMillis();
     long timeElapsed = endTime - startTime;
-
     _numResizes.incrementAndGet();
-    _resizeTime.addAndGet(timeElapsed);
-
+    _resizeTimeMs.addAndGet(timeElapsed);
     return sortedRecords;
   }
 
   @Override
   public void finish(boolean sort) {
-
     if (_hasOrderBy) {
-
       if (sort) {
-        List<Record> sortedRecords = resizeAndSort(_capacity);
-        _iterator = sortedRecords.iterator();
+        _sortedRecords = resizeAndSort(_trimSize);
+        _iterator = _sortedRecords.iterator();
       } else {
-        resize(_capacity);
+        resize(_trimSize);
       }
       int numResizes = _numResizes.get();
-      long resizeTime = _resizeTime.get();
-      LOGGER.debug("Num resizes : {}, Total time spent in resizing : {}, Avg resize time : {}", numResizes, resizeTime,
-          numResizes == 0 ? 0 : resizeTime / numResizes);
+      long resizeTime = _resizeTimeMs.get();
+      LOGGER.debug(
+          "Num resizes : {}, Total time spent in resizing : {}, Avg resize time : {}, trimSize: {}, trimThreshold: {}",
+          numResizes, resizeTime, numResizes == 0 ? 0 : resizeTime / numResizes, _trimSize, _trimThreshold);
     }
-
     if (_iterator == null) {
       _iterator = _lookupMap.values().iterator();
     }
+  }
+
+  @Override
+  public int getNumResizes() {
+    return _numResizes.get();
+  }
+
+  @Override
+  public long getResizeTimeMs() {
+    return _resizeTimeMs.get();
   }
 }
