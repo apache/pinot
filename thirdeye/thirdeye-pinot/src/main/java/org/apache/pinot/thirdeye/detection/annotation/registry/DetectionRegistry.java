@@ -21,6 +21,11 @@ package org.apache.pinot.thirdeye.detection.annotation.registry;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import io.github.classgraph.AnnotationInfo;
+import io.github.classgraph.ClassGraph;
+import io.github.classgraph.ClassInfo;
+import io.github.classgraph.ClassInfoList;
+import io.github.classgraph.ScanResult;
 import org.apache.pinot.thirdeye.detection.annotation.Components;
 import org.apache.pinot.thirdeye.detection.annotation.Tune;
 import org.apache.pinot.thirdeye.detection.spi.components.BaseComponent;
@@ -30,9 +35,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.commons.collections4.MapUtils;
-import org.reflections.Reflections;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,18 +73,18 @@ public class DetectionRegistry {
    * Read all the components, tune, and yaml annotations and initialize the registry.
    */
   private static void init() {
-    try {
-      Reflections reflections = new Reflections();
+    try (ScanResult scanResult = new ClassGraph().enableAnnotationInfo().enableClassInfo().scan()) {
       // register components
-      Set<Class<? extends BaseComponent>> classes = reflections.getSubTypesOf(BaseComponent.class);
-      for (Class<? extends BaseComponent> clazz : classes) {
-        String className = clazz.getName();
-        for (Annotation annotation : clazz.getAnnotations()) {
+      ClassInfoList classes = scanResult.getClassesImplementing(BaseComponent.class.getName());
+      for (ClassInfo classInfo : classes) {
+        String className = classInfo.getName();
+        for (AnnotationInfo annotationInfo : classInfo.getAnnotationInfo()) {
+          Annotation annotation = annotationInfo.loadClassAndInstantiate();
           if (annotation instanceof Components) {
             Components componentsAnnotation = (Components) annotation;
             REGISTRY_MAP.put(componentsAnnotation.type(),
                 ImmutableMap.of(KEY_CLASS_NAME, className, KEY_ANNOTATION, componentsAnnotation,
-                    KEY_IS_BASELINE_PROVIDER, isBaselineProvider(clazz)));
+                    KEY_IS_BASELINE_PROVIDER, isBaselineProvider(Class.forName(className))));
             LOG.info("Registered component {} - {}", componentsAnnotation.type(), className);
           }
           if (annotation instanceof Tune) {
@@ -189,7 +192,7 @@ public class DetectionRegistry {
     return String.join(", ", YAML_MAP.keySet());
   }
 
-  private static boolean isBaselineProvider(Class<? extends BaseComponent> clazz) {
+  private static boolean isBaselineProvider(Class<?> clazz) {
     return BaselineProvider.class.isAssignableFrom(clazz);
   }
 }
