@@ -138,6 +138,11 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
       printUsage();
       return false;
     }
+    if (!Arrays.asList("pql", "sql").contains(_dialect)) {
+      LOGGER.error("Argument dialect must one of either 'pql' or 'sql");
+      printUsage();
+      return false;
+    }
 
     LOGGER.info("Start query runner targeting broker: {}:{}", _brokerHost, _brokerPort);
     PerfBenchmarkDriverConf conf = new PerfBenchmarkDriverConf();

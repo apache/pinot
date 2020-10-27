@@ -404,7 +404,12 @@ public class PerfBenchmarkDriver {
     }
 
     long start = System.currentTimeMillis();
-    URLConnection conn = new URL(_brokerBaseApiUrl + "/query").openConnection();
+    String queryUrl = _brokerBaseApiUrl + "/query";
+    if (!"pql".equals(dialect)) {
+      queryUrl = _brokerBaseApiUrl + "/query/" + dialect;
+    }
+
+    URLConnection conn = new URL(queryUrl).openConnection();
     conn.setDoOutput(true);
 
     try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(),
