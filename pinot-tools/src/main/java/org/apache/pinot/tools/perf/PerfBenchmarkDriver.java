@@ -104,7 +104,7 @@ public class PerfBenchmarkDriver {
   private PinotHelixResourceManager _helixResourceManager;
 
   public PerfBenchmarkDriver(PerfBenchmarkDriverConf conf) {
-    this(conf, "/tmp/", "HEAP", null, false);
+    this(conf, "/tmp/", "HEAP", null, conf.isVerbose());
   }
 
   public PerfBenchmarkDriver(PerfBenchmarkDriverConf conf, String tempDir, String loadMode, String segmentFormatVersion,
@@ -386,13 +386,18 @@ public class PerfBenchmarkDriver {
 
   public JsonNode postQuery(String query)
       throws Exception {
-    return postQuery(query, null);
+    return postQuery(_conf.getDialect(), query, null);
   }
 
   public JsonNode postQuery(String query, String optimizationFlags)
+          throws Exception {
+    return postQuery(_conf.getDialect(), query, optimizationFlags);
+  }
+
+  public JsonNode postQuery(String dialect, String query, String optimizationFlags)
       throws Exception {
     ObjectNode requestJson = JsonUtils.newObjectNode();
-    requestJson.put("pql", query);
+    requestJson.put(dialect, query);
 
     if (optimizationFlags != null && !optimizationFlags.isEmpty()) {
       requestJson.put("debugOptions", "optimizationFlags=" + optimizationFlags);
@@ -403,30 +408,41 @@ public class PerfBenchmarkDriver {
     conn.setDoOutput(true);
 
     try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(),
-        StandardCharsets.UTF_8))) {
+      StandardCharsets.UTF_8))) {
       String requestString = requestJson.toString();
       writer.write(requestString);
       writer.flush();
 
-      StringBuilder stringBuilder = new StringBuilder();
-      try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(),
-          StandardCharsets.UTF_8))) {
-        String line;
-        while ((line = reader.readLine()) != null) {
-          stringBuilder.append(line);
+      try {
+        StringBuilder stringBuilder = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(),
+                StandardCharsets.UTF_8))) {
+          String line;
+          while ((line = reader.readLine()) != null) {
+            stringBuilder.append(line);
+          }
         }
-      }
 
-      long totalTime = System.currentTimeMillis() - start;
-      String responseString = stringBuilder.toString();
-      ObjectNode responseJson = (ObjectNode) JsonUtils.stringToJsonNode(responseString);
-      responseJson.put("totalTime", totalTime);
+        long totalTime = System.currentTimeMillis() - start;
+        String responseString = stringBuilder.toString();
+        ObjectNode responseJson = (ObjectNode) JsonUtils.stringToJsonNode(responseString);
+        responseJson.put("totalTime", totalTime);
 
-      if (_verbose && (responseJson.get("numDocsScanned").asLong() > 0)) {
-        LOGGER.info("requestString: {}", requestString);
-        LOGGER.info("responseString: {}", responseString);
+        if (_verbose) {
+          if (!responseJson.has("exceptions") || responseJson.get("exceptions").size() <= 0) {
+            LOGGER.info("requestString: {}", requestString);
+            LOGGER.info("responseString: {}", responseString);
+          } else {
+            LOGGER.error("requestString: {}", requestString);
+            LOGGER.error("responseString: {}", responseString);
+          }
+        }
+
+        return responseJson;
+      } catch (Exception e) {
+        LOGGER.error("requestString: {}", requestString);
+        throw e;
       }
-      return responseJson;
     }
   }
 

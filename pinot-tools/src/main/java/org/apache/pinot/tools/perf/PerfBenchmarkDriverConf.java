@@ -72,6 +72,10 @@ public class PerfBenchmarkDriverConf {
 
   String resultsOutputDirectory;
 
+  boolean verbose = false;
+
+  String dialect = "pql";
+
   public String getClusterName() {
     return clusterName;
   }
@@ -262,5 +266,21 @@ public class PerfBenchmarkDriverConf {
 
   public void setSchemaFileNamePath(String schemaFileNamePath) {
     this.schemaFileNamePath = schemaFileNamePath;
+  }
+
+  public boolean isVerbose() {
+    return verbose;
+  }
+
+  public void setVerbose(boolean verbose) {
+    this.verbose = verbose;
+  }
+
+  public String getDialect() {
+    return dialect;
+  }
+
+  public void setDialect(String dialect) {
+    this.dialect = dialect;
   }
 }
