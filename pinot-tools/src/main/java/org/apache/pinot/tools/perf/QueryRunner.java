@@ -79,6 +79,10 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
   private int _queueDepth = 64;
   @Option(name = "-timeout", required = false, metaVar = "<long>", usage = "Timeout in milliseconds for completing all queries (default: unlimited).")
   private long _timeout = 0;
+  @Option(name = "-verbose", required = false, usage = "Enable verbose query logging (default: false).")
+  private boolean _verbose = false;
+  @Option(name = "-dialect", required = false, metaVar = "<String>", usage = "Query dialect to use (pql|sql).")
+  private String _dialect = "pql";
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help;
 
@@ -134,6 +138,11 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
       printUsage();
       return false;
     }
+    if (!Arrays.asList("pql", "sql").contains(_dialect)) {
+      LOGGER.error("Argument dialect must one of either 'pql' or 'sql");
+      printUsage();
+      return false;
+    }
 
     LOGGER.info("Start query runner targeting broker: {}:{}", _brokerHost, _brokerPort);
     PerfBenchmarkDriverConf conf = new PerfBenchmarkDriverConf();
@@ -144,6 +153,8 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     conf.setStartController(false);
     conf.setStartBroker(false);
     conf.setStartServer(false);
+    conf.setVerbose(_verbose);
+    conf.setDialect(_dialect);
 
     Stream<String> queries = makeQueries(
             IOUtils.readLines(new FileInputStream(_queryFile)),
