@@ -1,65 +1,65 @@
 # Aggregation
-{"sql":"SELECT AVG(ActualElapsedTime), COUNT(DivDistance), MIN(DepDelay) FROM mytable LIMIT 18"}
-{"sql":"SELECT AVG(ArrDelayMinutes) FROM mytable LIMIT 23"}
-{"sql":"SELECT AVG(ArrTime), AVG(DivDistance), MIN(NASDelay) FROM mytable LIMIT 22"}
-{"sql":"SELECT AVG(CRSDepTime), AVG(ArrDel15), MAX(DepartureDelayGroups) FROM mytable LIMIT 20"}
+{"sql":"SELECT AVG(ActualElapsedTime), COUNT(DivDistance), MIN(DepDelay) FROM mytable"}
+{"sql":"SELECT AVG(ArrDelayMinutes) FROM mytable"}
+{"sql":"SELECT AVG(ArrTime), AVG(DivDistance), MIN(NASDelay) FROM mytable"}
+{"sql":"SELECT AVG(CRSDepTime), AVG(ArrDel15), MAX(DepartureDelayGroups) FROM mytable"}
 {"sql":"SELECT AVG(CarrierDelay), MIN(DivReachedDest), MIN(FirstDepTime) FROM mytable"}
-{"sql":"SELECT AVG(DayOfWeek), AVG(DestAirportID), AVG(DepTime) FROM mytable LIMIT 16"}
-{"sql":"SELECT AVG(DepDel15), MAX(LateAircraftDelay) FROM mytable LIMIT 17"}
-{"sql":"SELECT AVG(DestAirportSeqID), SUM(DestCityMarketID) FROM mytable LIMIT 10"}
-{"sql":"SELECT AVG(LateAircraftDelay), SUM(DaysSinceEpoch), MAX(\"Month\") FROM mytable LIMIT 24","hsqls":["SELECT AVG(LateAircraftDelay), SUM(DaysSinceEpoch), MAX(Month) FROM mytable LIMIT 24"]}
-{"sql":"SELECT AVG(LongestAddGTime), COUNT(DepDelayMinutes) FROM mytable LIMIT 2"}
-{"sql":"SELECT AVG(LongestAddGTime), MAX(DivArrDelay) FROM mytable LIMIT 17"}
+{"sql":"SELECT AVG(DayOfWeek), AVG(DestAirportID), AVG(DepTime) FROM mytable"}
+{"sql":"SELECT AVG(DepDel15), MAX(LateAircraftDelay) FROM mytable"}
+{"sql":"SELECT AVG(DestAirportSeqID), SUM(DestCityMarketID) FROM mytable"}
+{"sql":"SELECT AVG(LateAircraftDelay), SUM(DaysSinceEpoch), MAX(\"Month\") FROM mytable","hsqls":["SELECT AVG(LateAircraftDelay), SUM(DaysSinceEpoch), MAX(Month) FROM mytable"]}
+{"sql":"SELECT AVG(LongestAddGTime), COUNT(DepDelayMinutes) FROM mytable"}
+{"sql":"SELECT AVG(LongestAddGTime), MAX(DivArrDelay) FROM mytable"}
 {"sql":"SELECT AVG(Quarter), MIN(DayOfWeek), SUM(TaxiIn) FROM mytable"}
-{"sql":"SELECT AVG(TotalAddGTime), COUNT(DivAirportLandings) FROM mytable LIMIT 20"}
-{"sql":"SELECT AVG(WheelsOn), AVG(WheelsOff) FROM mytable LIMIT 27"}
-{"sql":"SELECT AVG(\"Month\"), AVG(LateAircraftDelay), MAX(\"Month\") FROM mytable LIMIT 4","hsqls":["SELECT AVG(Month), AVG(LateAircraftDelay), MAX(Month) FROM mytable LIMIT 4"]}
-{"sql":"SELECT AVG(\"Month\"), MIN(DepartureDelayGroups) FROM mytable LIMIT 16","hsqls":["SELECT AVG(Month), MIN(DepartureDelayGroups) FROM mytable LIMIT 16"]}
-{"sql":"SELECT AVG(\"Year\"), AVG(DivReachedDest), MIN(ArrDel15) FROM mytable LIMIT 22","hsqls":["SELECT AVG(Year), AVG(DivReachedDest), MIN(ArrDel15) FROM mytable LIMIT 22"]}
+{"sql":"SELECT AVG(TotalAddGTime), COUNT(DivAirportLandings) FROM mytable"}
+{"sql":"SELECT AVG(WheelsOn), AVG(WheelsOff) FROM mytable"}
+{"sql":"SELECT AVG(\"Month\"), AVG(LateAircraftDelay), MAX(\"Month\") FROM mytable LIMIT 4","hsqls":["SELECT AVG(Month), AVG(LateAircraftDelay), MAX(Month) FROM mytable"]}
+{"sql":"SELECT AVG(\"Month\"), MIN(DepartureDelayGroups) FROM mytable LIMIT 16","hsqls":["SELECT AVG(Month), MIN(DepartureDelayGroups) FROM mytable"]}
+{"sql":"SELECT AVG(\"Year\"), AVG(DivReachedDest), MIN(ArrDel15) FROM mytable LIMIT 22","hsqls":["SELECT AVG(Year), AVG(DivReachedDest), MIN(ArrDel15) FROM mytable"]}
 {"sql":"SELECT COUNT(*) FROM mytable"}
-{"sql":"SELECT COUNT(ArrDelayMinutes), MAX(ArrDelayMinutes), SUM(TaxiIn) FROM mytable LIMIT 16"}
-{"sql":"SELECT COUNT(ArrDelayMinutes), SUM(SecurityDelay) FROM mytable LIMIT 11"}
-{"sql":"SELECT COUNT(Carrier), AVG(DivDistance), SUM(DistanceGroup) FROM mytable LIMIT 14"}
-{"sql":"SELECT COUNT(CarrierDelay), SUM(DepartureDelayGroups) FROM mytable LIMIT 9"}
-{"sql":"SELECT COUNT(DayofMonth), COUNT(OriginCityName), COUNT(TailNum) FROM mytable LIMIT 5"}
+{"sql":"SELECT COUNT(ArrDelayMinutes), MAX(ArrDelayMinutes), SUM(TaxiIn) FROM mytable"}
+{"sql":"SELECT COUNT(ArrDelayMinutes), SUM(SecurityDelay) FROM mytable"}
+{"sql":"SELECT COUNT(Carrier), AVG(DivDistance), SUM(DistanceGroup) FROM mytable"}
+{"sql":"SELECT COUNT(CarrierDelay), SUM(DepartureDelayGroups) FROM mytable"}
+{"sql":"SELECT COUNT(DayofMonth), COUNT(OriginCityName), COUNT(TailNum) FROM mytable"}
 {"sql":"SELECT COUNT(DepDel15), COUNT(DepDelay), SUM(DepartureDelayGroups) FROM mytable LIMIT 13"}
-{"sql":"SELECT COUNT(DestCityName), MIN(\"Month\") FROM mytable LIMIT 20","hsqls":["SELECT COUNT(DestCityName), MIN(Month) FROM mytable LIMIT 20"]}
-{"sql":"SELECT COUNT(DestStateFips), SUM(CRSElapsedTime) FROM mytable LIMIT 13"}
-{"sql":"SELECT COUNT(Origin), MIN(ArrDel15), MIN(ArrivalDelayGroups) FROM mytable LIMIT 10"}
-{"sql":"SELECT COUNT(OriginAirportID), AVG(FlightNum) FROM mytable LIMIT 23"}
-{"sql":"SELECT COUNT(OriginCityMarketID), MIN(SecurityDelay), MAX(DepTime) FROM mytable LIMIT 6"}
-{"sql":"SELECT MAX(ArrDelay), AVG(Distance), MIN(DayofMonth) FROM mytable LIMIT 23"}
-{"sql":"SELECT MAX(ArrDelayMinutes) FROM mytable LIMIT 21"}
-{"sql":"SELECT MAX(ArrivalDelayGroups) FROM mytable LIMIT 15"}
-{"sql":"SELECT MAX(CRSArrTime), SUM(ArrDelay), MAX(DayOfWeek) FROM mytable LIMIT 4"}
+{"sql":"SELECT COUNT(DestCityName), MIN(\"Month\") FROM mytable LIMIT 20","hsqls":["SELECT COUNT(DestCityName), MIN(Month) FROM mytable"]}
+{"sql":"SELECT COUNT(DestStateFips), SUM(CRSElapsedTime) FROM mytable"}
+{"sql":"SELECT COUNT(Origin), MIN(ArrDel15), MIN(ArrivalDelayGroups) FROM mytable"}
+{"sql":"SELECT COUNT(OriginAirportID), AVG(FlightNum) FROM mytable"}
+{"sql":"SELECT COUNT(OriginCityMarketID), MIN(SecurityDelay), MAX(DepTime) FROM mytable"}
+{"sql":"SELECT MAX(ArrDelay), AVG(Distance), MIN(DayofMonth) FROM mytable"}
+{"sql":"SELECT MAX(ArrDelayMinutes) FROM mytable"}
+{"sql":"SELECT MAX(ArrivalDelayGroups) FROM mytable"}
+{"sql":"SELECT MAX(CRSArrTime), SUM(ArrDelay), MAX(DayOfWeek) FROM mytable"}
 {"sql":"SELECT MAX(DaysSinceEpoch), SUM(DestStateFips) FROM mytable"}
-{"sql":"SELECT MAX(DepTime), AVG(OriginWac), AVG(OriginCityMarketID) FROM mytable LIMIT 15"}
-{"sql":"SELECT MAX(DestAirportID), AVG(CRSElapsedTime), MAX(DivActualElapsedTime) FROM mytable LIMIT 18"}
-{"sql":"SELECT MAX(DestAirportID), MAX(DestStateFips), MIN(DestAirportID) FROM mytable LIMIT 16"}
-{"sql":"SELECT MAX(DestAirportSeqID), MAX(AirTime) FROM mytable LIMIT 22"}
-{"sql":"SELECT MAX(WheelsOff), MIN(LateAircraftDelay), COUNT(FlightDate) FROM mytable LIMIT 13"}
+{"sql":"SELECT MAX(DepTime), AVG(OriginWac), AVG(OriginCityMarketID) FROM mytable"}
+{"sql":"SELECT MAX(DestAirportID), AVG(CRSElapsedTime), MAX(DivActualElapsedTime) FROM mytable"}
+{"sql":"SELECT MAX(DestAirportID), MAX(DestStateFips), MIN(DestAirportID) FROM mytable"}
+{"sql":"SELECT MAX(DestAirportSeqID), MAX(AirTime) FROM mytable"}
+{"sql":"SELECT MAX(WheelsOff), MIN(LateAircraftDelay), COUNT(FlightDate) FROM mytable"}
 {"sql":"SELECT MAX(\"Year\"), MIN(Distance) FROM mytable","hsqls":["SELECT MAX(Year), MIN(Distance) FROM mytable"]}
-{"sql":"SELECT MAX(\"Year\"), SUM(OriginAirportSeqID) FROM mytable LIMIT 25","hsqls":["SELECT MAX(Year), SUM(OriginAirportSeqID) FROM mytable LIMIT 25"]}
-{"sql":"SELECT MIN(AirTime), MAX(CRSArrTime), MIN(DivReachedDest) FROM mytable LIMIT 3"}
-{"sql":"SELECT MIN(DepDelayMinutes), MIN(DaysSinceEpoch), MAX(DivReachedDest) FROM mytable LIMIT 12"}
-{"sql":"SELECT MIN(Diverted), MAX(\"Month\") FROM mytable LIMIT 20","hsqls":["SELECT MIN(Diverted), MAX(Month) FROM mytable LIMIT 20"]}
-{"sql":"SELECT MIN(FlightNum), SUM(DestAirportSeqID) FROM mytable LIMIT 26"}
-{"sql":"SELECT MIN(OriginAirportSeqID), COUNT(OriginStateFips), AVG(NASDelay) FROM mytable LIMIT 16"}
-{"sql":"SELECT MIN(Quarter), MIN(DestCityMarketID), MIN(NASDelay) FROM mytable LIMIT 21"}
-{"sql":"SELECT MIN(SecurityDelay), MIN(DivArrDelay), MIN(DestAirportSeqID) FROM mytable LIMIT 13"}
-{"sql":"SELECT MIN(WheelsOn), MIN(ActualElapsedTime), AVG(OriginAirportID) FROM mytable LIMIT 1"}
-{"sql":"SELECT MIN(\"Year\") FROM mytable LIMIT 18","hsqls":["SELECT MIN(Year) FROM mytable LIMIT 18"]}
-{"sql":"SELECT SUM(CarrierDelay), SUM(DivActualElapsedTime), AVG(DepDelayMinutes) FROM mytable LIMIT 25"}
-{"sql":"SELECT SUM(DepDel15), SUM(WeatherDelay), AVG(Cancelled) FROM mytable LIMIT 16"}
-{"sql":"SELECT SUM(DepDelayMinutes), COUNT(OriginCityName), COUNT(DivAirportLandings) FROM mytable LIMIT 29"}
-{"sql":"SELECT SUM(DestAirportSeqID), MIN(\"Month\"), MAX(DayOfWeek) FROM mytable LIMIT 20","hsqls":["SELECT SUM(DestAirportSeqID), MIN(Month), MAX(DayOfWeek) FROM mytable LIMIT 20"]}
-{"sql":"SELECT SUM(LateAircraftDelay), AVG(AirlineID) FROM mytable LIMIT 5"}
-{"sql":"SELECT SUM(LongestAddGTime), MIN(TaxiIn), AVG(LateAircraftDelay) FROM mytable LIMIT 2"}
-{"sql":"SELECT SUM(NASDelay), MAX(WheelsOff), SUM(ArrDelay) FROM mytable LIMIT 13"}
-{"sql":"SELECT SUM(OriginAirportID), COUNT(TailNum), MIN(DestStateFips) FROM mytable LIMIT 8"}
-{"sql":"SELECT SUM(WheelsOff), SUM(CRSArrTime), SUM(DestStateFips) FROM mytable LIMIT 11"}
-{"sql":"SELECT SUM(\"Year\"), AVG(OriginStateFips) FROM mytable LIMIT 24","hsqls":["SELECT SUM(Year), AVG(OriginStateFips) FROM mytable LIMIT 24"]}
-{"sql":"SELECT SUM(\"Year\"), MIN(OriginCityMarketID) FROM mytable LIMIT 11","hsqls":["SELECT SUM(Year), MIN(OriginCityMarketID) FROM mytable LIMIT 11"]}
+{"sql":"SELECT MAX(\"Year\"), SUM(OriginAirportSeqID) FROM mytable","hsqls":["SELECT MAX(Year), SUM(OriginAirportSeqID) FROM mytable"]}
+{"sql":"SELECT MIN(AirTime), MAX(CRSArrTime), MIN(DivReachedDest) FROM mytable"}
+{"sql":"SELECT MIN(DepDelayMinutes), MIN(DaysSinceEpoch), MAX(DivReachedDest) FROM mytable"}
+{"sql":"SELECT MIN(Diverted), MAX(\"Month\") FROM mytable","hsqls":["SELECT MIN(Diverted), MAX(Month) FROM mytable"]}
+{"sql":"SELECT MIN(FlightNum), SUM(DestAirportSeqID) FROM mytable"}
+{"sql":"SELECT MIN(OriginAirportSeqID), COUNT(OriginStateFips), AVG(NASDelay) FROM mytable"}
+{"sql":"SELECT MIN(Quarter), MIN(DestCityMarketID), MIN(NASDelay) FROM mytable"}
+{"sql":"SELECT MIN(SecurityDelay), MIN(DivArrDelay), MIN(DestAirportSeqID) FROM mytable"}
+{"sql":"SELECT MIN(WheelsOn), MIN(ActualElapsedTime), AVG(OriginAirportID) FROM mytable"}
+{"sql":"SELECT MIN(\"Year\") FROM mytable","hsqls":["SELECT MIN(Year) FROM mytable"]}
+{"sql":"SELECT SUM(CarrierDelay), SUM(DivActualElapsedTime), AVG(DepDelayMinutes) FROM mytable"}
+{"sql":"SELECT SUM(DepDel15), SUM(WeatherDelay), AVG(Cancelled) FROM mytable"}
+{"sql":"SELECT SUM(DepDelayMinutes), COUNT(OriginCityName), COUNT(DivAirportLandings) FROM mytable"}
+{"sql":"SELECT SUM(DestAirportSeqID), MIN(\"Month\"), MAX(DayOfWeek) FROM mytable","hsqls":["SELECT SUM(DestAirportSeqID), MIN(Month), MAX(DayOfWeek) FROM mytable"]}
+{"sql":"SELECT SUM(LateAircraftDelay), AVG(AirlineID) FROM mytable"}
+{"sql":"SELECT SUM(LongestAddGTime), MIN(TaxiIn), AVG(LateAircraftDelay) FROM mytable"}
+{"sql":"SELECT SUM(NASDelay), MAX(WheelsOff), SUM(ArrDelay) FROM mytable"}
+{"sql":"SELECT SUM(OriginAirportID), COUNT(TailNum), MIN(DestStateFips) FROM mytable"}
+{"sql":"SELECT SUM(WheelsOff), SUM(CRSArrTime), SUM(DestStateFips) FROM mytable"}
+{"sql":"SELECT SUM(\"Year\"), AVG(OriginStateFips) FROM mytable","hsqls":["SELECT SUM(Year), AVG(OriginStateFips) FROM mytable"]}
+{"sql":"SELECT SUM(\"Year\"), MIN(OriginCityMarketID) FROM mytable","hsqls":["SELECT SUM(Year), MIN(OriginCityMarketID) FROM mytable"]}
 
 # Grouping on Aggregation
 {"sql":"SELECT ActualElapsedTime, COUNT(DayofMonth), AVG(Cancelled), MIN(OriginCityMarketID) FROM mytable GROUP BY ActualElapsedTime  ORDER BY ActualElapsedTime LIMIT 22","hsqls":["SELECT ActualElapsedTime, COUNT(DayofMonth), AVG(Cancelled), MIN(OriginCityMarketID) FROM mytable GROUP BY ActualElapsedTime  ORDER BY ActualElapsedTime LIMIT 22"]}
