@@ -42,6 +42,12 @@ export const getTenantTable = (name: string): Promise<AxiosResponse<TableName>> 
 export const getTenantTableDetails = (tableName: string): Promise<AxiosResponse<IdealState>> =>
   baseApi.get(`/tables/${tableName}`);
 
+export const putTable = (name: string, params: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.put(`/tables/${name}`, params, { headers });
+
+export const putSchema = (name: string, params: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.put(`/schemas/${name}`, params, { headers });
+
 export const getSegmentMetadata = (tableName: string, segmentName: string): Promise<AxiosResponse<IdealState>> =>
   baseApi.get(`/segments/${tableName}/${segmentName}/metadata`);
 
@@ -68,6 +74,9 @@ export const updateInstanceTags = (name: string, params: string): Promise<AxiosR
 
 export const setInstanceState = (name: string, stateName: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.post(`/instances/${name}/state`, stateName, { headers: {'Content-Type': 'text/plain', 'Accept': 'application/json'} });
+
+export const setTableState = (name: string, stateName: string, tableType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/tables/${name}?state=${stateName}&type=${tableType}`);
 
 export const dropInstance = (name: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.delete(`instances/${name}`, { headers });
@@ -114,5 +123,23 @@ export const getServerListOfTenant = (name: string): Promise<AxiosResponse<Serve
 export const reloadSegment = (tableName: string, instanceName: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.post(`/segments/${tableName}/${instanceName}/reload`, null, {headers});
 
+export const reloadAllSegments = (tableName: string, tableType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.post(`/segments/${tableName}/reload?type=${tableType}`, null, {headers});
+
+export const reloadStatus = (tableName: string, tableType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/segments/${tableName}/metadata?type=${tableType}`);
+
 export const deleteSegment = (tableName: string, instanceName: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.delete(`/segments/${tableName}/${instanceName}`, {headers});
+
+export const deleteTable = (tableName: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.delete(`/tables/${tableName}`, {headers});
+
+export const deleteSchema = (schemaName: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.delete(`/schemas/${schemaName}`, {headers});
+
+export const rebalanceServersForTable = (tableName: string, qParams: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.post(`/tables/${tableName}/rebalance?${qParams}`, null, {headers});
+
+export const rebalanceBrokersForTable = (tableName: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.post(`/tables/${tableName}/rebuildBrokerResourceFromHelixTags`, null, {headers});

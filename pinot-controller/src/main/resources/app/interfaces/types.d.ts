@@ -77,6 +77,7 @@ declare module 'Models' {
     dimensionFieldSpecs: Array<schema>;
     metricFieldSpecs?: Array<schema>;
     dateTimeFieldSpecs?: Array<schema>;
+    error?: string;
   };
 
   type schema = {

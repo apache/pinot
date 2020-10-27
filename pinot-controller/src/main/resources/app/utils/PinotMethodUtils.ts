@@ -26,6 +26,7 @@ import {
   getInstance,
   putInstance,
   setInstanceState,
+  setTableState,
   dropInstance,
   updateInstanceTags,
   getClusterConfig,
@@ -48,7 +49,15 @@ import {
   zookeeperDeleteNode,
   getBrokerListOfTenant,
   getServerListOfTenant,
-  deleteSegment
+  deleteSegment,
+  putTable,
+  putSchema,
+  deleteTable,
+  deleteSchema,
+  reloadAllSegments,
+  reloadStatus,
+  rebalanceServersForTable,
+  rebalanceBrokersForTable
 } from '../requests';
 import Utils from './Utils';
 
@@ -173,39 +182,9 @@ const getQueryTablesList = ({bothType = false}) => {
 
 // This method is used to display particular table schema on query page
 // API: /tables/:tableName/schema
-// Expected Output: {columns: [], records: []}
-const getTableSchemaData = (tableName, showFieldType) => {
+const getTableSchemaData = (tableName) => {
   return getTableSchema(tableName).then(({ data }) => {
-    const dimensionFields = data.dimensionFieldSpecs || [];
-    const metricFields = data.metricFieldSpecs || [];
-    const dateTimeField = data.dateTimeFieldSpecs || [];
-
-    dimensionFields.map((field) => {
-      field.fieldType = 'Dimension';
-    });
-
-    metricFields.map((field) => {
-      field.fieldType = 'Metric';
-    });
-
-    dateTimeField.map((field) => {
-      field.fieldType = 'Date-Time';
-    });
-    const columnList = [...dimensionFields, ...metricFields, ...dateTimeField];
-    if (showFieldType) {
-      return {
-        columns: ['column', 'type', 'Field Type'],
-        records: columnList.map((field) => {
-          return [field.name, field.dataType, field.fieldType];
-        }),
-      };
-    }
-    return {
-      columns: ['column', 'type'],
-      records: columnList.map((field) => {
-        return [field.name, field.dataType];
-      }),
-    };
+    return data;
   });
 };
 
@@ -403,7 +382,7 @@ const getTableSummaryData = (tableName) => {
 // This method is used to display segment list of a particular tenant table
 // API: /tables/:tableName/idealstate
 //      /tables/:tableName/externalview
-// Expected Output: {columns: [], records: []}
+// Expected Output: {columns: [], records: [], externalViewObject: {}}
 const getSegmentList = (tableName) => {
   const promiseArr = [];
   promiseArr.push(getIdealState(tableName));
@@ -421,6 +400,7 @@ const getSegmentList = (tableName) => {
           _.isEqual(idealStateObj[key], externalViewObj[key]) ? 'Good' : 'Bad',
         ];
       }),
+      externalViewObj
     };
   });
 };
@@ -600,6 +580,12 @@ const toggleInstanceState = (instanceName, state) => {
   });
 };
 
+const toggleTableState = (tableName, state, tableType) => {
+  return setTableState(tableName, state, tableType).then((response)=>{
+    return response.data;
+  });
+};
+
 const deleteInstance = (instanceName) => {
   return dropInstance(instanceName).then((response)=>{
     return response.data;
@@ -612,8 +598,57 @@ const reloadSegmentOp = (tableName, segmentName) => {
   });
 };
 
+const reloadAllSegmentsOp = (tableName, tableType) => {
+  return reloadAllSegments(tableName, tableType).then((response)=>{
+    return response.data;
+  });
+};
+
+const reloadStatusOp = (tableName, tableType) => {
+  return reloadStatus(tableName, tableType).then((response)=>{
+    return response.data;
+  });
+}
+
 const deleteSegmentOp = (tableName, segmentName) => {
   return deleteSegment(tableName, segmentName).then((response)=>{
+    return response.data;
+  });
+};
+
+const updateTable = (tableName: string, table: string) => {
+  return putTable(tableName, table).then((res)=>{
+    return res.data;
+  })
+};
+
+const updateSchema = (schemaName: string, schema: string) => {
+  return putSchema(schemaName, schema).then((res)=>{
+    return res.data;
+  })
+};
+
+const deleteTableOp = (tableName) => {
+  return deleteTable(tableName).then((response)=>{
+    return response.data;
+  });
+};
+
+const deleteSchemaOp = (tableName) => {
+  return deleteSchema(tableName).then((response)=>{
+    return response.data;
+  });
+};
+
+const rebalanceServersForTableOp = (tableName, queryParams) => {
+  const q_params = Utils.serialize(queryParams);
+  return rebalanceServersForTable(tableName, q_params).then((response)=>{
+    return  response.data;
+  });
+};
+
+const rebalanceBrokersForTableOp = (tableName) => {
+  return rebalanceBrokersForTable(tableName).then((response)=>{
     return response.data;
   });
 };
@@ -645,7 +680,16 @@ export default {
   getServerOfTenant,
   updateTags,
   toggleInstanceState,
+  toggleTableState,
   deleteInstance,
   deleteSegmentOp,
-  reloadSegmentOp
+  reloadSegmentOp,
+  reloadStatusOp,
+  reloadAllSegmentsOp,
+  updateTable,
+  updateSchema,
+  deleteTableOp,
+  deleteSchemaOp,
+  rebalanceServersForTableOp,
+  rebalanceBrokersForTableOp
 };

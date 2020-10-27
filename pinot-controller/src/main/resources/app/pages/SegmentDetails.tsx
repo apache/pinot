@@ -33,7 +33,8 @@ import CustomizedTables from '../components/Table';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 import CustomButton from '../components/CustomButton';
 import Confirm from '../components/Confirm';
-import CustomNotification from '../components/CustomNotification';
+import { NotificationContext } from '../components/Notification/NotificationContext';
+import Utils from '../utils/Utils';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -75,6 +76,7 @@ const jsonoptions = {
   styleActiveLine: true,
   gutters: ['CodeMirror-lint-markers'],
   theme: 'default',
+  readOnly: true
 };
 
 type Props = {
@@ -98,8 +100,7 @@ const SegmentDetails = ({ match }: RouteComponentProps<Props>) => {
   const [fetching, setFetching] = useState(true);
   const [confirmDialog, setConfirmDialog] = React.useState(false);
   const [dialogDetails, setDialogDetails] = React.useState(null);
-  const [notificationData, setNotificationData] = React.useState({type: '', message: ''});
-  const [showNotification, setShowNotification] = React.useState(false);
+  const {dispatch} = React.useContext(NotificationContext);
 
   const [segmentSummary, setSegmentSummary] = useState<Summary>({
     segmentName,
@@ -140,25 +141,16 @@ const SegmentDetails = ({ match }: RouteComponentProps<Props>) => {
 
   const handleDeleteSegment = async () => {
     const result = await PinotMethodUtils.deleteSegmentOp(tableName, segmentName);
-    if(result.status){
-      setNotificationData({type: 'success', message: result.status});
+    if(result && result.status){
+      dispatch({type: 'success', message: result.status, show: true});
       fetchData();
     } else {
-      setNotificationData({type: 'error', message: result.error});
+      dispatch({type: 'error', message: result.error, show: true});
     }
-    setShowNotification(true);
     closeDialog();
     setTimeout(()=>{
-      navigateToPreviousPage();
+      history.push(Utils.navigateToPreviousPage(location, false));
     }, 1000);
-  };
-
-  const navigateToPreviousPage = () => {
-    const hasharr = location.pathname.split('/');
-    hasharr.pop();
-    const path = hasharr.join('/');
-    console.log(path)
-    history.push(path);
   };
 
   const handleReloadSegmentClick = () => {
@@ -173,12 +165,11 @@ const SegmentDetails = ({ match }: RouteComponentProps<Props>) => {
   const handleReloadOp = async () => {
     const result = await PinotMethodUtils.reloadSegmentOp(tableName, segmentName);
     if(result.status){
-      setNotificationData({type: 'success', message: result.status});
+      dispatch({type: 'success', message: result.status, show: true});
       fetchData();
     } else {
-      setNotificationData({type: 'error', message: result.error});
+      dispatch({type: 'error', message: result.error, show: true});
     }
-    setShowNotification(true);
     closeDialog();
   }
 
@@ -201,10 +192,18 @@ const SegmentDetails = ({ match }: RouteComponentProps<Props>) => {
           showSearchBox={false}
         >
           <div>
-            <CustomButton onClick={()=>{handleDeleteSegmentClick()}}>
+            <CustomButton
+              onClick={()=>{handleDeleteSegmentClick()}}
+              tooltipTitle="Delete Segment"
+              enableTooltip={true}
+            >
               Delete Segment
             </CustomButton>
-            <CustomButton onClick={()=>{handleReloadSegmentClick()}}>
+            <CustomButton
+              onClick={()=>{handleReloadSegmentClick()}}
+              tooltipTitle="Reload Segment"
+              enableTooltip={true}
+            >
               Reload Segment
             </CustomButton>
           </div>
@@ -260,12 +259,6 @@ const SegmentDetails = ({ match }: RouteComponentProps<Props>) => {
         dialogYesLabel='Yes'
         dialogNoLabel='No'
       />}
-      <CustomNotification
-        type={notificationData.type}
-        message={notificationData.message}
-        show={showNotification}
-        hide={()=>{setShowNotification(false)}}
-      />
     </Grid>
   );
 };

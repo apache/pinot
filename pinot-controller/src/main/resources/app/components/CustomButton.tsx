@@ -18,7 +18,7 @@
  */
 
 import React from 'react';
-import { Button, makeStyles } from '@material-ui/core';
+import { Button, makeStyles, Tooltip } from '@material-ui/core';
 
 const useStyles = makeStyles((theme) => ({
   button: {
@@ -29,24 +29,33 @@ const useStyles = makeStyles((theme) => ({
 
 type Props = {
   children: any;
-  onClick: (event: React.MouseEvent<HTMLElement, MouseEvent>) => void
+  onClick: (event: React.MouseEvent<HTMLElement, MouseEvent>) => void,
+  isDisabled?: boolean,
+  tooltipTitle?: string,
+  enableTooltip?: boolean
 };
 
 export default function CustomButton({
   children,
-  onClick
+  isDisabled,
+  onClick,
+  tooltipTitle = '',
+  enableTooltip = false
 }: Props) {
   const classes = useStyles();
 
   return (
-    <Button
-      variant="contained"
-      color="primary"
-      className={classes.button}
-      size="small"
-      onClick={onClick}
-    >
-      {children}
-    </Button>
+    <Tooltip title={tooltipTitle} disableHoverListener={!enableTooltip} placement="top" arrow>
+      <Button
+        variant="contained"
+        color="primary"
+        className={classes.button}
+        size="small"
+        onClick={onClick}
+        disabled={isDisabled}
+      >
+        {children}
+      </Button>
+    </Tooltip>
   );
 }

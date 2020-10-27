@@ -18,41 +18,36 @@
  */
 
 import React from 'react';
-import { DialogContent} from '@material-ui/core';
+import { DialogContent, DialogContentText, makeStyles } from '@material-ui/core';
 import Dialog from '../../CustomDialog';
-import CustomCodemirror from '../../CustomCodemirror';
+
+const useStyles = makeStyles((theme) => ({
+  
+}));
 
 type Props = {
   showModal: boolean,
-  hideModal: (event: React.MouseEvent<HTMLElement, MouseEvent>) => void,
-  saveConfig: (event: React.MouseEvent<HTMLElement, MouseEvent>) => void,
-  config: string,
-  handleConfigChange: (value: string) => void,
+  hideModal: (event: React.MouseEvent<HTMLElement, MouseEvent>) => void
 };
 
-export default function EditConfigOp({
+export default function RebalanceServerTenantOp({
   showModal,
-  hideModal,
-  saveConfig,
-  handleConfigChange,
-  config
+  hideModal
 }: Props) {
+  const classes = useStyles();
 
   return (
     <Dialog
       open={showModal}
       handleClose={hideModal}
-      title="Edit Config"
-      handleSave={saveConfig}
+      handleSave={(e)=>{console.log('save clicked');}}
+      title="Rebalance Server Tenant"
     >
       <DialogContent>
-        <CustomCodemirror
-          data={config}
-          isEditable={true}
-          returnCodemirrorValue={(newValue)=>{
-            handleConfigChange(newValue);
-          }}
-        />
+        <DialogContentText>
+          To subscribe to this website, please enter your email address here. We will send updates
+          occasionally.
+        </DialogContentText>
       </DialogContent>
     </Dialog>
   );

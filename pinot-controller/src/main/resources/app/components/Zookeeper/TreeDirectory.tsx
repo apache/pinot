@@ -32,7 +32,7 @@ import Confirm from '../Confirm';
 import CustomCodemirror from '../CustomCodemirror';
 import PinotMethodUtils from '../../utils/PinotMethodUtils';
 import Utils from '../../utils/Utils';
-import CustomNotification from '../CustomNotification';
+import { NotificationContext } from '../Notification/NotificationContext';
 
 const drawerWidth = 400;
 
@@ -118,8 +118,7 @@ const TreeDirectory = ({
   const [dialogYesLabel, setDialogYesLabel] = React.useState(null);
   const [dialogNoLabel, setDialogNoLabel] = React.useState(null);
   const [anchorEl, setAnchorEl] = React.useState<HTMLButtonElement | null>(null);
-  const [notificationData, setNotificationData] = React.useState({type: '', message: ''});
-  const [showNotification, setShowNotification] = React.useState(false);
+  const {dispatch} = React.useContext(NotificationContext);
 
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setAnchorEl(event.currentTarget);
@@ -133,6 +132,7 @@ const TreeDirectory = ({
     if(!isLeafNodeSelected){
       return;
     }
+    newCodeMirrorData = JSON.stringify(currentNodeData);
     setDialogTitle('Update Node Data');
     setDialogContent(<CustomCodemirror
       data={currentNodeData}
@@ -170,12 +170,19 @@ const TreeDirectory = ({
     };
     const result = await PinotMethodUtils.putNodeData(nodeData);
     if(result.data.status){
-      setNotificationData({type: 'success', message: result.data.status});
+      dispatch({
+        type: 'success',
+        message: result.data.status,
+        show: true
+      });
       showInfoEvent(selectedNode);
     } else {
-      setNotificationData({type: 'error', message: result.data.error});
+      dispatch({
+        type: 'error',
+        message: result.data.error,
+        show: true
+      });
     }
-    setShowNotification(true);
     closeDialog();
   };
 
@@ -184,13 +191,20 @@ const TreeDirectory = ({
     const treeObj = Utils.findNestedObj(treeData, 'fullPath', parentPath);
     const result = await PinotMethodUtils.deleteNode(selectedNode);
     if(result.data.status){
-      setNotificationData({type: 'success', message: result.data.status});
+      dispatch({
+        type: 'success',
+        message: result.data.status,
+        show: true
+      });
       showInfoEvent(selectedNode);
       fetchInnerPath(treeObj);
     } else {
-      setNotificationData({type: 'error', message: result.data.error});
+      dispatch({
+        type: 'error',
+        message: result.data.error,
+        show: true
+      });
     }
-    setShowNotification(true);
     closeDialog();
   };
 
@@ -270,12 +284,6 @@ const TreeDirectory = ({
         closeDialog={closeDialog}
         dialogYesLabel={dialogYesLabel}
         dialogNoLabel={dialogNoLabel}
-      />
-      <CustomNotification
-        type={notificationData.type}
-        message={notificationData.message}
-        show={showNotification}
-        hide={()=>{setShowNotification(false)}}
       />
     </>
   );
