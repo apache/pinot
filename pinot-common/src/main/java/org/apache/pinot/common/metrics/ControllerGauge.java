@@ -64,7 +64,11 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   TABLE_STORAGE_QUOTA_UTILIZATION("TableStorageQuotaUtilization", false),
 
   // Percentage of segments we failed to get size for
-  TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT("TableStorageEstMissingSegmentPercent", false);
+  TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT("TableStorageEstMissingSegmentPercent", false),
+
+  JOB_EXECUTION_TIME("JobExecutionTime", false),
+
+  JOB_FAILED("JobFailed", false);
 
   private final String gaugeName;
   private final String unit;
@@ -94,5 +98,17 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   @Override
   public boolean isGlobal() {
     return global;
+  }
+
+  public static ControllerGauge getGauge(String gaugeName) {
+    if (gaugeName == null || gaugeName.isEmpty()) {
+      return null;
+    }
+    for (ControllerGauge gauge : ControllerGauge.values()) {
+      if (gauge.getGaugeName().equalsIgnoreCase(gaugeName)) {
+        return gauge;
+      }
+    }
+    return null;
   }
 }

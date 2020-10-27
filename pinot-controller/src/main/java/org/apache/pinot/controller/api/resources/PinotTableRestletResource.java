@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -29,6 +30,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
@@ -47,6 +49,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.exception.TableNotFoundException;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
@@ -557,5 +560,38 @@ public class PinotTableRestletResource {
     } catch (TableNotFoundException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
     }
+  }
+
+  /**
+   * API to submit the status of the jobs like segment creation job, segment push job that run in Hadoop or Spark,
+   * and emit certain fields as metrics.
+   */
+  @POST
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/tables/{tableName}/jobStatus")
+  @ApiOperation(value = "Submit job status for a Pinot table", notes = "Submit job status for a Pinot table")
+  public SuccessResponse submitJobStatus(
+      @ApiParam(value = "Name of the table to submit job status", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Detailed job status payload") @QueryParam("details") String details) {
+    LOGGER.info("Received job status for Table: {}. Details: {}", tableName, details);
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+    Map<String, String> statusMap = parseMapFromPayload(details);
+    String metricKeyName = statusMap.getOrDefault("jobName", "default") + "." + offlineTableName;
+
+    for (Map.Entry<String, String> entry : statusMap.entrySet()) {
+      String metricName = entry.getKey();
+      String metricValue = entry.getValue();
+      ControllerGauge controllerGauge = ControllerGauge.getGauge(metricName);
+      if (controllerGauge != null) {
+        _controllerMetrics
+            .setValueOfTableGauge(metricKeyName, ControllerGauge.getGauge(metricName), Long.parseLong(metricValue));
+      }
+    }
+    return new SuccessResponse("Successfully submitted job status for Table: " + tableName);
+  }
+
+  private Map<String, String> parseMapFromPayload(String payload) {
+    return Splitter.on(';').omitEmptyStrings().trimResults().withKeyValueSeparator('=').split(payload);
   }
 }
