@@ -22,6 +22,8 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.pinot.common.metrics.ServerGauge;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.slf4j.Logger;
@@ -50,6 +52,16 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public class PartitionUpsertMetadataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PartitionUpsertMetadataManager.class);
+
+  private final String _tableName;
+  private final int _partitionId;
+  private final ServerMetrics _serverMetrics;
+
+  public PartitionUpsertMetadataManager(String tableName, int partitionId, ServerMetrics serverMetrics) {
+    _tableName = tableName;
+    _partitionId = partitionId;
+    _serverMetrics = serverMetrics;
+  }
 
   // TODO(upset): consider an off-heap KV store to persist this index to improve the recovery speed.
   @VisibleForTesting
@@ -85,8 +97,7 @@ public class PartitionUpsertMetadataManager {
               // committing a consuming segment, or reloading a completed segment.
 
               // Update the record location when the new timestamp is greater than or equal to the current timestamp.
-              // Update the record location when there is a tie because the record locations should point to the new
-              // segment instead of the old segment being replaced. Also, do not update the valid doc ids for the old
+               // segment instead of the old segment being replaced. Also, do not update the valid doc ids for the old
               // segment because it has not been replaced yet.
               if (recordInfo._timestamp >= currentRecordLocation.getTimestamp()) {
                 validDocIds.add(recordInfo._docId);
@@ -113,6 +124,9 @@ public class PartitionUpsertMetadataManager {
         }
       });
     }
+    // update metrics
+    _serverMetrics.setValueOfPartitionGauge(_tableName, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
+        _primaryKeyToRecordLocationMap.size());
     return validDocIds;
   }
 
@@ -156,6 +170,9 @@ public class PartitionUpsertMetadataManager {
         }
       });
     }
+    // update metrics
+    _serverMetrics.setValueOfPartitionGauge(_tableName, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
+        _primaryKeyToRecordLocationMap.size());
   }
 
   public static final class RecordInfo {

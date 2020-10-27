@@ -21,6 +21,7 @@ package org.apache.pinot.core.upsert;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.pinot.common.metrics.ServerMetrics;
 
 
 /**
@@ -29,8 +30,16 @@ import javax.annotation.concurrent.ThreadSafe;
 @ThreadSafe
 public class TableUpsertMetadataManager {
   private final Map<Integer, PartitionUpsertMetadataManager> _partitionMetadataManagerMap = new ConcurrentHashMap<>();
+  private final String _tableName;
+  private final ServerMetrics _serverMetrics;
+
+  public TableUpsertMetadataManager(String tableName, ServerMetrics serverMetrics) {
+    _tableName = tableName;
+    _serverMetrics = serverMetrics;
+  }
 
   public PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId) {
-    return _partitionMetadataManagerMap.computeIfAbsent(partitionId, k -> new PartitionUpsertMetadataManager());
+    return _partitionMetadataManagerMap
+        .computeIfAbsent(partitionId, k -> new PartitionUpsertMetadataManager(_tableName, partitionId, _serverMetrics));
   }
 }

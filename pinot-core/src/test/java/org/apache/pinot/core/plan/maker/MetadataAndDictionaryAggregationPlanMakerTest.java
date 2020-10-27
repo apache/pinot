@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -49,6 +50,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.mockito.Mockito;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeClass;
@@ -70,11 +72,13 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
 
   private IndexSegment _indexSegment;
   private IndexSegment _upsertIndexSegment;
+  private ServerMetrics _serverMetrics;
 
   @BeforeTest
   public void buildSegment()
       throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
+    _serverMetrics = Mockito.mock(ServerMetrics.class);
 
     // Get resource file path.
     URL resource = getClass().getClassLoader().getResource(AVRO_DATA);
@@ -121,7 +125,8 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     _indexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
     _upsertIndexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
     ((ImmutableSegmentImpl) _upsertIndexSegment)
-        .enableUpsert(new PartitionUpsertMetadataManager(), new ThreadSafeMutableRoaringBitmap());
+        .enableUpsert(new PartitionUpsertMetadataManager("testTable", 0, _serverMetrics),
+            new ThreadSafeMutableRoaringBitmap());
   }
 
   @AfterClass

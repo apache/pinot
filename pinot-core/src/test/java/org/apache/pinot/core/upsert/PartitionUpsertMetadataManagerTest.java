@@ -21,9 +21,11 @@ package org.apache.pinot.core.upsert;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager.RecordInfo;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
+import org.mockito.Mockito;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -37,7 +39,8 @@ public class PartitionUpsertMetadataManagerTest {
 
   @Test
   public void testAddSegment() {
-    PartitionUpsertMetadataManager upsertMetadataManager = new PartitionUpsertMetadataManager();
+    PartitionUpsertMetadataManager upsertMetadataManager =
+        new PartitionUpsertMetadataManager("testTable", 0, Mockito.mock(ServerMetrics.class));
     Map<PrimaryKey, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
 
     // Add the first segment
@@ -121,7 +124,8 @@ public class PartitionUpsertMetadataManagerTest {
 
   @Test
   public void testUpdateRecord() {
-    PartitionUpsertMetadataManager upsertMetadataManager = new PartitionUpsertMetadataManager();
+    PartitionUpsertMetadataManager upsertMetadataManager =
+        new PartitionUpsertMetadataManager("testTable", 0, Mockito.mock(ServerMetrics.class));
     Map<PrimaryKey, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
 
     // Add the first segment
@@ -181,7 +185,8 @@ public class PartitionUpsertMetadataManagerTest {
 
   @Test
   public void testRemoveSegment() {
-    PartitionUpsertMetadataManager upsertMetadataManager = new PartitionUpsertMetadataManager();
+    PartitionUpsertMetadataManager upsertMetadataManager =
+        new PartitionUpsertMetadataManager("testTable", 0, Mockito.mock(ServerMetrics.class));
     Map<PrimaryKey, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
 
     // Add 2 segments

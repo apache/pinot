@@ -21,6 +21,7 @@ package org.apache.pinot.core.indexsegment.mutable;
 import java.io.File;
 import java.net.URL;
 import java.util.Collections;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.core.upsert.TableUpsertMetadataManager;
@@ -33,6 +34,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.mockito.Mockito;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
@@ -58,7 +60,8 @@ public class MutableSegmentImplUpsertTest {
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).build();
     _recordTransformer = CompositeTransformer.getDefaultTransformer(_tableConfig, _schema);
     File jsonFile = new File(dataResourceUrl.getFile());
-    _partitionUpsertMetadataManager = new TableUpsertMetadataManager().getOrCreatePartitionManager(0);
+    _partitionUpsertMetadataManager =
+        new TableUpsertMetadataManager("testTable", Mockito.mock(ServerMetrics.class)).getOrCreatePartitionManager(0);
     _mutableSegmentImpl = MutableSegmentImplTestUtils
         .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
             false, true, new UpsertConfig(UpsertConfig.Mode.FULL), "secondsSinceEpoch",
