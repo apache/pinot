@@ -157,6 +157,12 @@ public class TableConfigUtilsTest {
       // expected
     }
 
+    // empty timeColumnName - valid
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
+    tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTimeColumnName("").build();
+    TableConfigUtils.validate(tableConfig, schema);
+
     // valid
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
@@ -501,6 +507,10 @@ public class TableConfigUtilsTest {
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setInvertedIndexColumns(Arrays.asList("")).build();
+    TableConfigUtils.validate(tableConfig, schema);
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setInvertedIndexColumns(Arrays.asList("myCol2")).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
@@ -508,6 +518,10 @@ public class TableConfigUtilsTest {
     } catch (Exception e) {
       // expected
     }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setNoDictionaryColumns(Arrays.asList("")).build();
+    TableConfigUtils.validate(tableConfig, schema);
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(Arrays.asList("myCol2")).build();
@@ -519,6 +533,10 @@ public class TableConfigUtilsTest {
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setOnHeapDictionaryColumns(Arrays.asList("")).build();
+    TableConfigUtils.validate(tableConfig, schema);
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setOnHeapDictionaryColumns(Arrays.asList("myCol2")).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
@@ -526,6 +544,11 @@ public class TableConfigUtilsTest {
     } catch (Exception e) {
       // expected
     }
+
+    tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setRangeIndexColumns(Arrays.asList(""))
+            .build();
+    TableConfigUtils.validate(tableConfig, schema);
 
     tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setRangeIndexColumns(Arrays.asList("myCol2"))
@@ -537,6 +560,9 @@ public class TableConfigUtilsTest {
       // expected
     }
 
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setSortedColumn("").build();
+    TableConfigUtils.validate(tableConfig, schema);
+
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setSortedColumn("myCol2").build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
@@ -544,6 +570,10 @@ public class TableConfigUtilsTest {
     } catch (Exception e) {
       // expected
     }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setVarLengthDictionaryColumns(Arrays.asList("")).build();
+    TableConfigUtils.validate(tableConfig, schema);
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setVarLengthDictionaryColumns(Arrays.asList("myCol2")).build();
