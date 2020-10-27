@@ -24,7 +24,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -43,8 +42,6 @@ public class PinotConnectionMetaData extends AbstractBaseConnectionMetaData {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotConnectionMetaData.class);
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-  private static final String DAYS_SINCE_EPOCH_TIME_FORMAT = "1:DAYS:EPOCH";
-  private static final String MILLISECONDS_SINCE_EPOCH_TIME_FORMAT = "1:MILLISECONDS:EPOCH";
 
   private final PinotConnection _connection;
   private final PinotControllerTransport _controllerTransport;
