@@ -18,11 +18,9 @@
  */
 package org.apache.pinot.controller.helix.core.minion.generator;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -116,9 +114,9 @@ public class TaskGeneratorUtils {
    * @param clusterInfoAccessor Cluster info accessor
    * @return a map of table name as a key and the list of scheduled segments as the value.
    */
-  public static Map<String, List<String>> getScheduledSegmentsMap(@Nonnull String taskType,
+  public static Map<String, Set<String>> getScheduledSegmentsMap(@Nonnull String taskType,
       @Nonnull ClusterInfoAccessor clusterInfoAccessor) {
-    Map<String, List<String>> scheduledSegments = new HashMap<>();
+    Map<String, Set<String>> scheduledSegments = new HashMap<>();
     Map<String, TaskState> taskStates = clusterInfoAccessor.getTaskStates(taskType);
     for (Map.Entry<String, TaskState> entry : taskStates.entrySet()) {
       // Skip COMPLETED tasks
@@ -127,16 +125,12 @@ public class TaskGeneratorUtils {
       }
       for (PinotTaskConfig pinotTaskConfig : clusterInfoAccessor.getTaskConfigs(entry.getKey())) {
         Map<String, String> configs = pinotTaskConfig.getConfigs();
-        List<String> scheduledSegmentsForTable =
-            scheduledSegments.computeIfAbsent(configs.get(MinionConstants.TABLE_NAME_KEY), v -> new ArrayList<>());
+        Set<String> scheduledSegmentsForTable =
+            scheduledSegments.computeIfAbsent(configs.get(MinionConstants.TABLE_NAME_KEY), v -> new HashSet<>());
         String segmentName = configs.get(MinionConstants.SEGMENT_NAME_KEY);
-        if (taskType.equals(MinionConstants.MergeRollupTask.TASK_TYPE)) {
-          List<String> segmentNames =
-              Arrays.stream(segmentName.split(",")).map(String::trim).collect(Collectors.toList());
-          scheduledSegmentsForTable.addAll(segmentNames);
-        } else {
-          scheduledSegmentsForTable.add(segmentName);
-        }
+        Set<String> segmentNames =
+            Arrays.stream(segmentName.split(",")).map(String::trim).collect(Collectors.toSet());
+        scheduledSegmentsForTable.addAll(segmentNames);
       }
     }
     return scheduledSegments;

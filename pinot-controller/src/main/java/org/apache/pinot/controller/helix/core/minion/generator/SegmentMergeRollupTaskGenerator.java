@@ -69,9 +69,11 @@ public class SegmentMergeRollupTaskGenerator implements PinotTaskGenerator {
     List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
 
     // Get the segments that are being converted so that we don't submit them again
-    Map<String, List<String>> scheduledSegmentsMap =
+    Map<String, Set<String>> scheduledSegmentsMap =
         TaskGeneratorUtils.getScheduledSegmentsMap(MinionConstants.MergeRollupTask.TASK_TYPE, _clusterInfoAccessor);
 
+    // Generate tasks
+    int numTasks = 0;
     for (TableConfig tableConfig : tableConfigs) {
       // Only generate tasks for OFFLINE tables
       String offlineTableName = tableConfig.getTableName();
@@ -85,9 +87,6 @@ public class SegmentMergeRollupTaskGenerator implements PinotTaskGenerator {
       Map<String, String> taskConfigs =
           tableTaskConfig.getConfigsForTaskType(MinionConstants.MergeRollupTask.TASK_TYPE);
       Preconditions.checkNotNull(taskConfigs, "Task config shouldn't be null for Table: {}", offlineTableName);
-
-      int tableMaxNumTasks =
-          readIntConfigWithDefaultValue(taskConfigs, MinionConstants.TABLE_MAX_NUM_TASKS_KEY, DEFAULT_MAX_NUM_TASKS);
 
       int maxNumSegmentsPerTask =
           readIntConfigWithDefaultValue(taskConfigs, MinionConstants.MergeRollupTask.MAX_NUM_SEGMENTS_PER_TASK_KEY,
@@ -107,9 +106,6 @@ public class SegmentMergeRollupTaskGenerator implements PinotTaskGenerator {
             offlineTableName, e);
         throw e;
       }
-
-      // Generate tasks
-      int tableNumTasks = 0;
 
       List<OfflineSegmentZKMetadata> segmentsForOfflineTable =
           _clusterInfoAccessor.getOfflineSegmentsMetadata(offlineTableName);
@@ -133,7 +129,7 @@ public class SegmentMergeRollupTaskGenerator implements PinotTaskGenerator {
 
       // Filter out the segments that cannot be merged
       List<SegmentZKMetadata> segmentsToMergeForTable = new ArrayList<>();
-      List<String> scheduledSegments = scheduledSegmentsMap.getOrDefault(offlineTableName, Collections.emptyList());
+      Set<String> scheduledSegments = scheduledSegmentsMap.getOrDefault(offlineTableName, Collections.emptySet());
       for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : segmentsForOfflineTable) {
         String segmentName = offlineSegmentZKMetadata.getSegmentName();
 
@@ -155,7 +151,8 @@ public class SegmentMergeRollupTaskGenerator implements PinotTaskGenerator {
 
       // Generate tasks
       for (List<SegmentZKMetadata> segments : segmentsToSchedule) {
-        if (tableNumTasks == tableMaxNumTasks) {
+        // TODO: wire the max num tasks to the cluster config to make it configurable.
+        if (numTasks >= DEFAULT_MAX_NUM_TASKS) {
           break;
         }
         if (segments.size() >= 1) {
@@ -175,7 +172,7 @@ public class SegmentMergeRollupTaskGenerator implements PinotTaskGenerator {
           configs.put(MinionConstants.MergeRollupTask.COLLECTOR_TYPE_KEY,
               CollectorFactory.CollectorType.CONCAT.toString());
           pinotTaskConfigs.add(new PinotTaskConfig(MinionConstants.MergeRollupTask.TASK_TYPE, configs));
-          tableNumTasks++;
+          numTasks++;
         }
       }
     }

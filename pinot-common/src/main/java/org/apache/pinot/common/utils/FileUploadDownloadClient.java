@@ -317,7 +317,7 @@ public class FileUploadDownloadClient implements Closeable {
     return requestBuilder.build();
   }
 
-  private static HttpUriRequest endStartReplaceSegmentsRequest(URI uri, int socketTimeoutMs) {
+  private static HttpUriRequest getEndReplaceSegmentsRequest(URI uri, int socketTimeoutMs) {
     RequestBuilder requestBuilder = RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
         .setHeader(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE);
     setTimeout(requestBuilder, socketTimeoutMs);
@@ -612,7 +612,7 @@ public class FileUploadDownloadClient implements Closeable {
    */
   public SimpleHttpResponse endReplaceSegments(URI uri, int socketTimeoutMs)
       throws IOException, HttpErrorStatusException {
-    return sendRequest(endStartReplaceSegmentsRequest(uri, socketTimeoutMs));
+    return sendRequest(getEndReplaceSegmentsRequest(uri, socketTimeoutMs));
   }
 
   /**
