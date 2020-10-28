@@ -53,12 +53,12 @@ import org.slf4j.LoggerFactory;
 public class PartitionUpsertMetadataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PartitionUpsertMetadataManager.class);
 
-  private final String _tableName;
+  private final String _tableNameWithType;
   private final int _partitionId;
   private final ServerMetrics _serverMetrics;
 
-  public PartitionUpsertMetadataManager(String tableName, int partitionId, ServerMetrics serverMetrics) {
-    _tableName = tableName;
+  public PartitionUpsertMetadataManager(String tableNameWithType, int partitionId, ServerMetrics serverMetrics) {
+    _tableNameWithType = tableNameWithType;
     _partitionId = partitionId;
     _serverMetrics = serverMetrics;
   }
@@ -97,7 +97,7 @@ public class PartitionUpsertMetadataManager {
               // committing a consuming segment, or reloading a completed segment.
 
               // Update the record location when the new timestamp is greater than or equal to the current timestamp.
-               // segment instead of the old segment being replaced. Also, do not update the valid doc ids for the old
+              // segment instead of the old segment being replaced. Also, do not update the valid doc ids for the old
               // segment because it has not been replaced yet.
               if (recordInfo._timestamp >= currentRecordLocation.getTimestamp()) {
                 validDocIds.add(recordInfo._docId);
@@ -124,8 +124,8 @@ public class PartitionUpsertMetadataManager {
         }
       });
     }
-    // update metrics
-    _serverMetrics.setValueOfPartitionGauge(_tableName, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
+    // Update metrics
+    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
         _primaryKeyToRecordLocationMap.size());
     return validDocIds;
   }
@@ -152,6 +152,9 @@ public class PartitionUpsertMetadataManager {
         return new RecordLocation(segmentName, recordInfo._docId, recordInfo._timestamp, validDocIds);
       }
     });
+    // Update metrics
+    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
+        _primaryKeyToRecordLocationMap.size());
   }
 
   /**
@@ -170,8 +173,8 @@ public class PartitionUpsertMetadataManager {
         }
       });
     }
-    // update metrics
-    _serverMetrics.setValueOfPartitionGauge(_tableName, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
+    // Update metrics
+    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
         _primaryKeyToRecordLocationMap.size());
   }
 

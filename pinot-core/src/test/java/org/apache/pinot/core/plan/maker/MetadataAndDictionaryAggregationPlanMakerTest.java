@@ -72,13 +72,11 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
 
   private IndexSegment _indexSegment;
   private IndexSegment _upsertIndexSegment;
-  private ServerMetrics _serverMetrics;
 
   @BeforeTest
   public void buildSegment()
       throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
-    _serverMetrics = Mockito.mock(ServerMetrics.class);
 
     // Get resource file path.
     URL resource = getClass().getClassLoader().getResource(AVRO_DATA);
@@ -123,9 +121,10 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
   public void loadSegment()
       throws Exception {
     _indexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
+    ServerMetrics serverMetrics = Mockito.mock(ServerMetrics.class);
     _upsertIndexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
     ((ImmutableSegmentImpl) _upsertIndexSegment)
-        .enableUpsert(new PartitionUpsertMetadataManager("testTable", 0, _serverMetrics),
+        .enableUpsert(new PartitionUpsertMetadataManager("testTable", 0, serverMetrics),
             new ThreadSafeMutableRoaringBitmap());
   }
 

@@ -30,16 +30,16 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 @ThreadSafe
 public class TableUpsertMetadataManager {
   private final Map<Integer, PartitionUpsertMetadataManager> _partitionMetadataManagerMap = new ConcurrentHashMap<>();
-  private final String _tableName;
+  private final String _tableNameWithType;
   private final ServerMetrics _serverMetrics;
 
-  public TableUpsertMetadataManager(String tableName, ServerMetrics serverMetrics) {
-    _tableName = tableName;
+  public TableUpsertMetadataManager(String tableNameWithType, ServerMetrics serverMetrics) {
+    _tableNameWithType = tableNameWithType;
     _serverMetrics = serverMetrics;
   }
 
   public PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId) {
-    return _partitionMetadataManagerMap
-        .computeIfAbsent(partitionId, k -> new PartitionUpsertMetadataManager(_tableName, partitionId, _serverMetrics));
+    return _partitionMetadataManagerMap.computeIfAbsent(partitionId,
+        k -> new PartitionUpsertMetadataManager(_tableNameWithType, k, _serverMetrics));
   }
 }

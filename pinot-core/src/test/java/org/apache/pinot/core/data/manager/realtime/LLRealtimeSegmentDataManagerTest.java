@@ -53,7 +53,6 @@ import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
-import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -802,7 +801,7 @@ public class LLRealtimeSegmentDataManagerTest {
       super(segmentZKMetadata, tableConfig, realtimeTableDataManager, resourceDataDir,
           new IndexLoadingConfig(makeInstanceDataManagerConfig(), tableConfig), schema, llcSegmentName,
           semaphoreMap.get(llcSegmentName.getPartitionId()), serverMetrics,
-          new PartitionUpsertMetadataManager("testTable", 0, Mockito.mock(ServerMetrics.class)));
+          new PartitionUpsertMetadataManager("testTable", 0, serverMetrics));
       _state = LLRealtimeSegmentDataManager.class.getDeclaredField("_state");
       _state.setAccessible(true);
       _shouldStop = LLRealtimeSegmentDataManager.class.getDeclaredField("_shouldStop");
