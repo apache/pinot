@@ -859,7 +859,9 @@ public class ClusterIntegrationTestUtils {
     BrokerRequest brokerRequest =
         PinotQueryParserFactory.get(CommonConstants.Broker.Request.SQL).compileToBrokerRequest(pinotQuery);
     if (isSelectionQuery(brokerRequest)) { // selection
-      // TODO: compare results for selection queries, w/o order by
+      // TODO: 1. compare results for selection queries, w/o order by.
+      //       2. validate values of multi-value columns.
+      //       3. remove the restriction that order by column has to be in selection clause.
 
       // Compare results for selection queries, with order by
       if (brokerRequest.getOrderBy() != null && brokerRequest.getOrderBy().size() > 0) {
