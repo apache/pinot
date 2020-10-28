@@ -97,6 +97,7 @@ public class PartitionUpsertMetadataManager {
               // committing a consuming segment, or reloading a completed segment.
 
               // Update the record location when the new timestamp is greater than or equal to the current timestamp.
+              // Update the record location when there is a tie because the record locations should point to the new
               // segment instead of the old segment being replaced. Also, do not update the valid doc ids for the old
               // segment because it has not been replaced yet.
               if (recordInfo._timestamp >= currentRecordLocation.getTimestamp()) {
