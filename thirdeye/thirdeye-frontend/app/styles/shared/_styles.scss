@@ -750,6 +750,12 @@ body {
   }
 }
 
+.te-alert-page {
+  &__subtitle {
+    margin: 0 0 $te-content-container-margin 0;
+  }
+}
+
 .glyphicon-spin {
   -webkit-animation: spin 1000ms infinite linear;
   animation: spin 1000ms infinite linear;
@@ -779,10 +785,6 @@ body {
   }
 
   &__header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 14px;
   }
 
   &__row {
@@ -820,8 +822,6 @@ body {
   &__value {
     overflow: hidden;
     text-overflow: ellipsis;
-    color: black;
-    max-height: 19px;
   }
 
   &__value-solo {
@@ -843,6 +843,7 @@ body {
 
   &__title {
     min-width: 95px;
+    display: flex;
   }
 
   &__title-name {
@@ -850,6 +851,8 @@ body {
     text-overflow: ellipsis;
     max-width: 80%;
     display: inline-block;
+    font-weight: 600;
+    margin: 0 $te-spacing 0 0;
   }
 
   &__edit-button {
@@ -893,6 +896,7 @@ body {
     width: auto;
     font-weight: bold;
     border: 2px solid;
+    cursor: default;
 
     &--list {
       margin: 3px 10px 0 0;
