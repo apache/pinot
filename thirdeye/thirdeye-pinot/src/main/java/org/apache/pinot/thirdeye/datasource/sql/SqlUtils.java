@@ -372,7 +372,7 @@ public class SqlUtils {
       return String.format(" %s = %d", getToUnixTimeClause(timeFormat, timeField, sourceName), startUnits);
     }
     // This is an explicit DRUID RZP Hack
-    if (sourceName.equals(DRUID)){
+    if (sourceName.equals(DRUID)) {
       String startTime = getDruidTimeStamp((long)Math.ceil(start.getMillis()));
       String endTime = getDruidTimeStamp((long)Math.ceil(endExclusive.getMillis()));
       return String.format("%s BETWEEN '%s' AND '%s'", getToUnixTimeClause(timeFormat, timeField, sourceName), startTime, endTime);
