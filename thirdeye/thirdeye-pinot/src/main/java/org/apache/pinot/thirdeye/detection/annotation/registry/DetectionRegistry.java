@@ -90,7 +90,7 @@ public class DetectionRegistry {
           if (annotation instanceof Tune) {
             Tune tunableAnnotation = (Tune) annotation;
             TUNE_MAP.put(className, tunableAnnotation);
-            LOG.info("Registered tuner {}", className);
+            LOG.info("Registered tuner {} - {}", className, tunableAnnotation.tunable());
           }
         }
       }
