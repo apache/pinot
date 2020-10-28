@@ -1,22 +1,24 @@
 <div class="te-search-results__header">
   <div class="te-search-results__title-group">
     <div class="te-search-results__title">
-      <span title={{alertData.detectionName}}>{{alertData.detectionName}}</span>
+      <h3 class="te-search-results__title-name" title={{alertData.detectionName}}>{{alertData.detectionName}}</h3>
       {{#if (eq displayMode "list")}}
-        {{#link-to "manage.explore" alertData.id}}
-          <div class="te-search-results__title-name" title={{alertData.detectionName}}>{{alertData.detectionName}}</div>
-        {{/link-to}}
+      {{#link-to "manage.explore" alertData.id}}
+      <div class="te-search-results__title-name" title={{alertData.detectionName}}>{{alertData.detectionName}}</div>
+      {{/link-to}}
       {{/if}}
       <h4 class="te-alert-page__subtitle">{{alertData.description}}</h4>
       {{#if isLoadError}}
-        <div class="te-search-results__tag {{if (eq displayMode "list") "te-search-results__tag--list"}} {{if alertData.isActive "te-search-results__tag--active"}}">
-          Error
-        </div>
+      <div
+        class="te-search-results__tag {{if (eq displayMode "list") "te-search-results__tag--list"}} {{if alertData.isActive "te-search-results__tag--active"}}">
+        Error
+      </div>
       {{else}}
-        <div class="te-search-results__tag {{if (eq displayMode "list") "te-search-results__tag--list"}} {{if alertData.isActive "te-search-results__tag--active"}}">
-          {{if alertData.isActive "Active" "Inactive"}}
-        </div>
-        {{#x-toggle
+      <div
+        class="te-search-results__tag {{if (eq displayMode "list") "te-search-results__tag--list"}} {{if alertData.isActive "te-search-results__tag--active"}}">
+        {{if alertData.isActive "Active" "Inactive"}}
+      </div>
+      {{#x-toggle
           value=alertData.isActive
           classNames="te-toggle te-toggle--form te-toggle--left report-toggle activation-toggle"
           theme="ios"
@@ -25,8 +27,8 @@
           name="activeToggle"
           onToggle=(action "toggleAlertActivation")
           as |toggle|}}
-          {{toggle.switch theme='ios' onLabel='diff on' offLabel='diff off'}}
-        {{/x-toggle}}
+      {{toggle.switch theme='ios' onLabel='diff on' offLabel='diff off'}}
+      {{/x-toggle}}
       {{/if}}
     </div>
   </div>
@@ -34,70 +36,26 @@
 </div>
 
 {{#if (not isLoadError)}}
-  <ul class="te-search-results__list te-search-results__list--details-block row">
-    <div class="col-xs-12 col-sm-5">
-      <li class="te-search-results__row">
-        <div class="te-search-results__option te-search-results__option--{{modeSubClass}} te-search-results__option--left">Metric</div>
-        <div class="te-search-results__value{{valueClassSuffix}}" title={{alertData.metric}}>{{alertData.metric}}</div>
-      </li>
-      <li class="te-search-results__row">
-        <div class="te-search-results__option te-search-results__option--{{modeSubClass}} te-search-results__option--left">Dataset</div>
-        <div class="te-search-results__value{{valueClassSuffix}}" title={{alertData.dataset}}>
-          <span class="{{unless alertData.dataset 'te-search-results__prop--missing' 'te-search-results__prop'}}">
-            {{if alertData.dataset alertData.dataset 'N/A'}}
-          </span>
-        </div>
-      </li>
-      <li class="te-search-results__row">
-        <div class="te-search-results__option te-search-results__option--{{modeSubClass}} te-search-results__option--left">Filtered By</div>
-        <div class="te-search-results__value{{valueClassSuffix}}" title={{alertData.filters}}>
-          <span class="{{unless alertData.filters 'te-search-results__prop--missing' 'te-search-results__prop'}}">
-            {{if alertData.filters alertData.filters 'N/A'}}
-          </span>
-        </div>
-      </li>
-      <li class="te-search-results__row">
-        <div class="te-search-results__option te-search-results__option--{{modeSubClass}} te-search-results__option--left">Breakdown By</div>
-        <div class="te-search-results__value{{valueClassSuffix}}" title={{alertData.dimensionExploration}}>
-          <span class="{{unless alertData.dimensionExploration 'te-search-results__prop--missing' 'te-search-results__prop'}}">
-            {{if alertData.dimensionExploration alertData.dimensionExploration 'N/A'}}
-          </span>
-        </div>
-      </li>
-    </div>
-    <div class="col-xs-12 col-sm-7">
-      <li class="te-search-results__row">
-        <div class="te-search-results__option te-search-results__option--{{modeSubClass}} te-search-results__option--left">Created By</div>
-        <div class="te-search-results__value{{valueClassSuffix}}" title={{alertData.createdBy}}>
-          <span class="{{unless alertData.createdBy 'te-search-results__prop--missing' 'te-search-results__prop'}}">
-            {{if alertData.createdBy alertData.createdBy 'N/A'}}
-          </span>
-        </div>
-      </li>
-      <li class="te-search-results__row">
-        <div class="te-search-results__option te-search-results__option--{{modeSubClass}} te-search-results__option--left">Updated By</div>
-        <div class="te-search-results__value{{valueClassSuffix}}" title={{alertData.updatedBy}}>
-          <span class="{{unless alertData.updatedBy 'te-search-results__prop--missing' 'te-search-results__prop'}}">
-            {{if alertData.updatedBy alertData.updatedBy 'N/A'}}
-          </span>
-        </div>
-      </li>
-      <li class="te-search-results__row">
-        <div class="te-search-results__option te-search-results__option--{{modeSubClass}} te-search-results__option--left">Last detection</div>
-        <div class="te-search-results__value{{valueClassSuffix}}" title={{alertData.lastDetectionTime}}>
-          <span class="{{unless alertData.lastDetectionTime 'te-search-results__prop--missing' 'te-search-results__prop'}}">
-            {{if alertData.lastDetectionTime alertData.lastDetectionTime 'N/A'}}
-          </span>
-        </div>
-      </li>
-      <li class="te-search-results__row">
-        <div class="te-search-results__option te-search-results__option--{{modeSubClass}} te-search-results__option--left">Subscribed Groups</div>
-        <div class="te-search-results__value{{valueClassSuffix}}" title={{subscribedGroups}}>
-          <span class="{{unless subscribedGroups 'te-search-results__prop--missing' 'te-search-results__prop'}}">
-            {{if subscribedGroups subscribedGroups 'N/A'}}
-          </span>
-        </div>
-      </li>
-    </div>
-  </ul>
+<div class="te-alert-detail-breakdown row">
+  <dl class="col-xs-12 col-sm-5 row">
+    <dt class="col-md-4">Metric</dt>
+    <dd class="col-md-8">{{alertData.metric}}</dd>
+    <dt class="col-md-4">Dataset</dt>
+    <dd class="col-md-8">{{if alertData.dataset alertData.dataset 'N/A'}}</dd>
+    <dt class="col-md-4">Filtered By</dt>
+    <dd class="col-md-8">{{if alertData.filters alertData.filters 'N/A'}}</dd>
+    <dt class="col-md-4">Breakdown By</dt>
+    <dd class="col-md-8">{{if alertData.dimensionExploration alertData.dimensionExploration 'N/A'}}</dd>
+  </dl>
+  <dl class="col-xs-12 col-sm-5">
+    <dt class="col-md-4">Created By</dt>
+    <dd class="col-md-8">{{if alertData.createdBy alertData.createdBy 'N/A'}}</dd>
+    <dt class="col-md-4">Updated By</dt>
+    <dd class="col-md-8">{{if alertData.updatedBy alertData.updatedBy 'N/A'}}</dd>
+    <dt class="col-md-4">Last detection</dt>
+    <dd class="col-md-8">{{if alertData.lastDetectionTime alertData.lastDetectionTime 'N/A'}}</dd>
+    <dt class="col-md-4">Subscribed Groups</dt>
+    <dd class="col-md-8">{{if subscribedGroups subscribedGroups 'N/A'}}</dd>
+  </dl>
+</div>
 {{/if}}

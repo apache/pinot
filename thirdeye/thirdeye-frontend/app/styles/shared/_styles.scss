@@ -54,7 +54,7 @@ body {
 .te-table-global-filter {
   display: inline-block;
   padding-bottom: 5px;
-  padding-right:5px;
+  padding-right: 5px;
 }
 
 .te-column-dropdown {
@@ -340,7 +340,7 @@ body {
     background-color: rgba(0, 0, 0, 0.03);
   }
 
-  &:hover:not(:disabled){
+  &:hover:not(:disabled) {
     border-color: app-shade(black, 0.55);
   }
 
@@ -392,7 +392,7 @@ body {
     font-size: $te-font-size-small;
     color: $te-link-blue;
     font-weight: 600;
-    letter-spacing: .03em;
+    letter-spacing: 0.03em;
     float: right;
     margin: -15px 10px 0 0;
     cursor: pointer;
@@ -448,17 +448,17 @@ body {
   &__number {
     color: black;
     &--good {
-      color: #4B9D27;
+      color: #4b9d27;
       font-weight: normal;
     }
 
     &--average {
-      color: #F5A623;
+      color: #f5a623;
       font-weight: normal;
     }
 
     &--poor {
-      color: #FF4B51;
+      color: #ff4b51;
       font-weight: normal;
     }
   }
@@ -590,7 +590,6 @@ body {
   }
 
   &__val-glyph {
-
     &--middle {
       padding: 26px 10px 0 9px;
       font-size: 19px;
@@ -722,7 +721,7 @@ body {
   &__title {
     font-size: 40px;
     font-weight: 100;
-    letter-spacing: .02em;
+    letter-spacing: 0.02em;
   }
 
   &__text {
@@ -752,8 +751,8 @@ body {
 }
 
 .glyphicon-spin {
-    -webkit-animation: spin 1000ms infinite linear;
-    animation: spin 1000ms infinite linear;
+  -webkit-animation: spin 1000ms infinite linear;
+  animation: spin 1000ms infinite linear;
 }
 
 .te-search-results {
@@ -849,7 +848,7 @@ body {
   &__title-name {
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 660px;
+    max-width: 80%;
     display: inline-block;
   }
 
@@ -884,7 +883,7 @@ body {
     background-color: app-shade(black, 3);
     font-size: 13px;
     text-transform: uppercase;
-    letter-spacing: .08em;
+    letter-spacing: 0.08em;
     line-height: 20px;
     border-radius: 3px;
     padding: 4px 8px;
@@ -940,7 +939,6 @@ body {
   }
 
   &__a-tag {
-
     &--good {
       text-decoration: none !important;
       color: $te-good !important;
