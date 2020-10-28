@@ -57,6 +57,10 @@ import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.TimeZone;
+import java.text.DateFormat;
 
 
 public class SqlUtils {
@@ -91,6 +95,9 @@ public class SqlUtils {
   private static final String BIGQUERY = "BigQuery";
   private static final String POSTGRESQL = "PostgreSQL";
   private static final String DRUID = "Druid";
+
+  // For druid, set the default timezone to IST
+  private static final String DRUID_TIMEZONE = "Asia/Calcutta";
 
   /**
    * Insert a table to SQL database, currently only used by H2, that can be read by ThirdEye
@@ -364,7 +371,26 @@ public class SqlUtils {
     if (Objects.equals(startUnits, endUnits)) {
       return String.format(" %s = %d", getToUnixTimeClause(timeFormat, timeField, sourceName), startUnits);
     }
+    // This is an explicit DRUID RZP Hack
+    if (sourceName.equals(DRUID)){
+      String startTime = getDruidTimeStamp((long)Math.ceil(start.getMillis()));
+      String endTime = getDruidTimeStamp((long)Math.ceil(endExclusive.getMillis()));
+      return String.format("%s BETWEEN '%s' AND '%s'", getToUnixTimeClause(timeFormat, timeField, sourceName), startTime, endTime);
+    }
+
     return String.format(" %s BETWEEN %d AND %d", getToUnixTimeClause(timeFormat, timeField, sourceName), startUnits, endUnits);
+  }
+
+  /**
+   * For druid performance. We need to remove the TIME_EXTRACT and actually pass the actual date time strings
+   * @param timeInMilliSeconds start time of where clause in milliseconds
+   * @return formatted date time string
+   */
+  private static String getDruidTimeStamp(long timeInMilliSeconds) {
+    Date date = new Date(timeInMilliSeconds);
+    DateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+    format.setTimeZone(TimeZone.getTimeZone(DRUID_TIMEZONE));
+    return format.format(date);
   }
 
   /**
@@ -671,7 +697,8 @@ public class SqlUtils {
     } else if (sourceName.equals(POSTGRESQL)) {
       return "EXTRACT(EPOCH FROM to_timestamp(" + timeColumn + ", '" + timeFormatToPostgreSQLFormat(timeFormat) + "'))";
     } else if (sourceName.equals(DRUID)) {
-      return "TIME_EXTRACT(" + timeColumn + ", '" + timeFormatToDruidFormat(timeFormat) + "') ";
+      //return "TIME_EXTRACT(" + timeColumn + ", '" + timeFormatToDruidFormat(timeFormat) + "') ";
+      return timeColumn;
     } else if (sourceName.equals(H2)){
       return "TO_UNIXTIME(PARSEDATETIME(CAST(" + timeColumn + " AS VARCHAR), '" + timeFormat + "'))";
     } else if (sourceName.equals(VERTICA)) {
