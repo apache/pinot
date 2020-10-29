@@ -19,8 +19,10 @@
 package org.apache.pinot.controller.helix.core.rebalance;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.testng.annotations.Test;
 
@@ -43,27 +45,31 @@ public class TableRebalancerTest {
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2"), ONLINE);
     Map<String, String> targetInstanceStateMap =
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3"), ONLINE);
-    Map<String, String> nextInstanceStateMap =
-        TableRebalancer.getNextInstanceStateMap(currentInstanceStateMap, targetInstanceStateMap, 0);
-    assertEquals(nextInstanceStateMap, targetInstanceStateMap);
+    TableRebalancer.SingleSegmentAssignment assignment =
+        TableRebalancer.getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, 0);
+    assertEquals(assignment._instanceStateMap, targetInstanceStateMap);
+    assertEquals(assignment._availableInstances, Collections.singleton("host1"));
 
     // Without common instance, next assignment should be the same as target assignment
     targetInstanceStateMap = SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host3", "host4"), ONLINE);
-    nextInstanceStateMap = TableRebalancer.getNextInstanceStateMap(currentInstanceStateMap, targetInstanceStateMap, 0);
-    assertEquals(nextInstanceStateMap, targetInstanceStateMap);
+    assignment = TableRebalancer.getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, 0);
+    assertEquals(assignment._instanceStateMap, targetInstanceStateMap);
+    assertTrue(assignment._availableInstances.isEmpty());
 
     // With increasing number of replicas, next assignment should be the same as target assignment
     targetInstanceStateMap =
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host3", "host4", "host5"), ONLINE);
-    nextInstanceStateMap = TableRebalancer.getNextInstanceStateMap(currentInstanceStateMap, targetInstanceStateMap, 0);
-    assertEquals(nextInstanceStateMap, targetInstanceStateMap);
+    assignment = TableRebalancer.getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, 0);
+    assertEquals(assignment._instanceStateMap, targetInstanceStateMap);
+    assertTrue(assignment._availableInstances.isEmpty());
 
     // With decreasing number of replicas, next assignment should be the same as target assignment
     currentInstanceStateMap =
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE);
     targetInstanceStateMap = SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host4", "host5"), ONLINE);
-    nextInstanceStateMap = TableRebalancer.getNextInstanceStateMap(currentInstanceStateMap, targetInstanceStateMap, 0);
-    assertEquals(nextInstanceStateMap, targetInstanceStateMap);
+    assignment = TableRebalancer.getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, 0);
+    assertEquals(assignment._instanceStateMap, targetInstanceStateMap);
+    assertTrue(assignment._availableInstances.isEmpty());
   }
 
   @Test
@@ -73,35 +79,41 @@ public class TableRebalancerTest {
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE);
     Map<String, String> targetInstanceStateMap =
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host4"), ONLINE);
-    Map<String, String> nextInstanceStateMap =
-        TableRebalancer.getNextInstanceStateMap(currentInstanceStateMap, targetInstanceStateMap, 1);
-    assertEquals(nextInstanceStateMap, targetInstanceStateMap);
+    TableRebalancer.SingleSegmentAssignment assignment =
+        TableRebalancer.getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, 1);
+    assertEquals(assignment._instanceStateMap, targetInstanceStateMap);
+    assertEquals(assignment._availableInstances, new TreeSet<>(Arrays.asList("host1", "host2")));
 
     // With 1 common instance, next assignment should be the same as target assignment
     targetInstanceStateMap =
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host4", "host5"), ONLINE);
-    nextInstanceStateMap = TableRebalancer.getNextInstanceStateMap(currentInstanceStateMap, targetInstanceStateMap, 1);
-    assertEquals(nextInstanceStateMap, targetInstanceStateMap);
+    assignment = TableRebalancer.getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, 1);
+    assertEquals(assignment._instanceStateMap, targetInstanceStateMap);
+    assertEquals(assignment._availableInstances, Collections.singleton("host1"));
 
     // Without common instance, next assignment should have 1 common instances with current assignment
     targetInstanceStateMap =
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host4", "host5", "host6"), ONLINE);
     // [host1, host4, host5]
-    nextInstanceStateMap = TableRebalancer.getNextInstanceStateMap(currentInstanceStateMap, targetInstanceStateMap, 1);
-    assertEquals(getNumCommonInstances(currentInstanceStateMap, nextInstanceStateMap), 1);
+    assignment = TableRebalancer.getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, 1);
+    assertEquals(assignment._availableInstances, Collections.singleton("host1"));
     // Next round should make the assignment the same as target assignment
-    assertEquals(TableRebalancer.getNextInstanceStateMap(nextInstanceStateMap, targetInstanceStateMap, 1),
-        targetInstanceStateMap);
+    assignment =
+        TableRebalancer.getNextSingleSegmentAssignment(assignment._instanceStateMap, targetInstanceStateMap, 1);
+    assertEquals(assignment._instanceStateMap, targetInstanceStateMap);
+    assertEquals(assignment._availableInstances, new TreeSet<>(Arrays.asList("host4", "host5")));
 
     // With increasing number of replicas, next assignment should have 1 common instances with current assignment
     targetInstanceStateMap =
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host4", "host5", "host6", "host7"), ONLINE);
     // [host1, host4, host5, host6]
-    nextInstanceStateMap = TableRebalancer.getNextInstanceStateMap(currentInstanceStateMap, targetInstanceStateMap, 1);
-    assertEquals(getNumCommonInstances(currentInstanceStateMap, nextInstanceStateMap), 1);
+    assignment = TableRebalancer.getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, 1);
+    assertEquals(assignment._availableInstances, Collections.singleton("host1"));
     // Next round should make the assignment the same as target assignment
-    assertEquals(TableRebalancer.getNextInstanceStateMap(nextInstanceStateMap, targetInstanceStateMap, 1),
-        targetInstanceStateMap);
+    assignment =
+        TableRebalancer.getNextSingleSegmentAssignment(assignment._instanceStateMap, targetInstanceStateMap, 1);
+    assertEquals(assignment._instanceStateMap, targetInstanceStateMap);
+    assertEquals(assignment._availableInstances, new TreeSet<>(Arrays.asList("host4", "host5", "host6")));
 
     // With decreasing number of replicas, next assignment should have 1 common instances with current assignment
     currentInstanceStateMap =
@@ -109,11 +121,13 @@ public class TableRebalancerTest {
     targetInstanceStateMap =
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host5", "host6", "host7"), ONLINE);
     // [host1, host5, host6]
-    nextInstanceStateMap = TableRebalancer.getNextInstanceStateMap(currentInstanceStateMap, targetInstanceStateMap, 1);
-    assertEquals(getNumCommonInstances(currentInstanceStateMap, nextInstanceStateMap), 1);
+    assignment = TableRebalancer.getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, 1);
+    assertEquals(assignment._availableInstances, Collections.singleton("host1"));
     // Next round should make the assignment the same as target assignment
-    assertEquals(TableRebalancer.getNextInstanceStateMap(nextInstanceStateMap, targetInstanceStateMap, 1),
-        targetInstanceStateMap);
+    assignment =
+        TableRebalancer.getNextSingleSegmentAssignment(assignment._instanceStateMap, targetInstanceStateMap, 1);
+    assertEquals(assignment._instanceStateMap, targetInstanceStateMap);
+    assertEquals(assignment._availableInstances, new TreeSet<>(Arrays.asList("host5", "host6")));
   }
 
   @Test
@@ -123,72 +137,310 @@ public class TableRebalancerTest {
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3", "host4"), ONLINE);
     Map<String, String> targetInstanceStateMap =
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3", "host5"), ONLINE);
-    Map<String, String> nextInstanceStateMap =
-        TableRebalancer.getNextInstanceStateMap(currentInstanceStateMap, targetInstanceStateMap, 2);
-    assertEquals(nextInstanceStateMap, targetInstanceStateMap);
+    TableRebalancer.SingleSegmentAssignment assignment =
+        TableRebalancer.getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, 2);
+    assertEquals(assignment._instanceStateMap, targetInstanceStateMap);
+    assertEquals(assignment._availableInstances, new TreeSet<>(Arrays.asList("host1", "host2", "host3")));
 
     // With 2 common instances, next assignment should be the same as target assignment
     targetInstanceStateMap =
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host5", "host6"), ONLINE);
-    nextInstanceStateMap = TableRebalancer.getNextInstanceStateMap(currentInstanceStateMap, targetInstanceStateMap, 2);
-    assertEquals(nextInstanceStateMap, targetInstanceStateMap);
+    assignment = TableRebalancer.getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, 2);
+    assertEquals(assignment._instanceStateMap, targetInstanceStateMap);
+    assertEquals(assignment._availableInstances, new TreeSet<>(Arrays.asList("host1", "host2")));
 
     // With 1 common instance, next assignment should have 2 common instances with current assignment
     targetInstanceStateMap =
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host5", "host6", "host7"), ONLINE);
-    nextInstanceStateMap = TableRebalancer.getNextInstanceStateMap(currentInstanceStateMap, targetInstanceStateMap, 2);
     // [host1, host2, host5, host6]
-    assertEquals(getNumCommonInstances(currentInstanceStateMap, nextInstanceStateMap), 2);
+    assignment = TableRebalancer.getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, 2);
+    assertEquals(assignment._availableInstances, new TreeSet<>(Arrays.asList("host1", "host2")));
     // Next round should make the assignment the same as target assignment
-    assertEquals(TableRebalancer.getNextInstanceStateMap(nextInstanceStateMap, targetInstanceStateMap, 2),
-        targetInstanceStateMap);
+    assignment =
+        TableRebalancer.getNextSingleSegmentAssignment(assignment._instanceStateMap, targetInstanceStateMap, 2);
+    assertEquals(assignment._instanceStateMap, targetInstanceStateMap);
+    assertEquals(assignment._availableInstances, new TreeSet<>(Arrays.asList("host1", "host5", "host6")));
 
     // Without common instance, next assignment should have 2 common instances with current assignment
     targetInstanceStateMap =
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host5", "host6", "host7", "host8"), ONLINE);
     // [host1, host2, host5, host6]
-    nextInstanceStateMap = TableRebalancer.getNextInstanceStateMap(currentInstanceStateMap, targetInstanceStateMap, 2);
-    assertEquals(getNumCommonInstances(currentInstanceStateMap, nextInstanceStateMap), 2);
+    assignment = TableRebalancer.getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, 2);
+    assertEquals(assignment._availableInstances, new TreeSet<>(Arrays.asList("host1", "host2")));
     // Next round should make the assignment the same as target assignment
-    assertEquals(TableRebalancer.getNextInstanceStateMap(nextInstanceStateMap, targetInstanceStateMap, 2),
-        targetInstanceStateMap);
+    assignment =
+        TableRebalancer.getNextSingleSegmentAssignment(assignment._instanceStateMap, targetInstanceStateMap, 2);
+    assertEquals(assignment._instanceStateMap, targetInstanceStateMap);
+    assertEquals(assignment._availableInstances, new TreeSet<>(Arrays.asList("host5", "host6")));
 
     // With increasing number of replicas, next assignment should have 1 common instances with current assignment
     targetInstanceStateMap =
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host5", "host6", "host7", "host8", "host9"), ONLINE);
     // [host1, host2, host5, host6, host7]
-    nextInstanceStateMap = TableRebalancer.getNextInstanceStateMap(currentInstanceStateMap, targetInstanceStateMap, 2);
-    assertEquals(getNumCommonInstances(currentInstanceStateMap, nextInstanceStateMap), 2);
+    assignment = TableRebalancer.getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, 2);
+    assertEquals(assignment._availableInstances, new TreeSet<>(Arrays.asList("host1", "host2")));
     // Next round should make the assignment the same as target assignment
-    assertEquals(TableRebalancer.getNextInstanceStateMap(nextInstanceStateMap, targetInstanceStateMap, 2),
-        targetInstanceStateMap);
+    assignment =
+        TableRebalancer.getNextSingleSegmentAssignment(assignment._instanceStateMap, targetInstanceStateMap, 2);
+    assertEquals(assignment._instanceStateMap, targetInstanceStateMap);
+    assertEquals(assignment._availableInstances, new TreeSet<>(Arrays.asList("host5", "host6", "host7")));
 
     // With decreasing number of replicas, next assignment should have 2 common instances with current assignment
     targetInstanceStateMap =
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host5", "host6", "host7"), ONLINE);
     // [host1, host2, host5]
-    Map<String, String> firstRoundInstanceStateMap =
-        TableRebalancer.getNextInstanceStateMap(currentInstanceStateMap, targetInstanceStateMap, 2);
-    assertEquals(getNumCommonInstances(currentInstanceStateMap, firstRoundInstanceStateMap), 2);
+    assignment = TableRebalancer.getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, 2);
+    assertEquals(assignment._availableInstances, new TreeSet<>(Arrays.asList("host1", "host2")));
     // Next round should have 2 common instances with first round assignment
     // [host1, host5, host6]
-    Map<String, String> secondRoundInstanceStateMap =
-        TableRebalancer.getNextInstanceStateMap(firstRoundInstanceStateMap, targetInstanceStateMap, 2);
-    assertEquals(getNumCommonInstances(firstRoundInstanceStateMap, secondRoundInstanceStateMap), 2);
+    assignment =
+        TableRebalancer.getNextSingleSegmentAssignment(assignment._instanceStateMap, targetInstanceStateMap, 2);
+    assertEquals(assignment._availableInstances, new TreeSet<>(Arrays.asList("host1", "host5")));
     // Next round should make the assignment the same as target assignment
-    assertEquals(TableRebalancer.getNextInstanceStateMap(secondRoundInstanceStateMap, targetInstanceStateMap, 2),
-        targetInstanceStateMap);
+    assignment =
+        TableRebalancer.getNextSingleSegmentAssignment(assignment._instanceStateMap, targetInstanceStateMap, 2);
+    assertEquals(assignment._instanceStateMap, targetInstanceStateMap);
+    assertEquals(assignment._availableInstances, new TreeSet<>(Arrays.asList("host5", "host6")));
   }
 
-  private int getNumCommonInstances(Map<String, String> currentInstanceStateMap,
-      Map<String, String> nextInstanceStateMap) {
-    int numCommonInstances = 0;
-    for (String instanceId : currentInstanceStateMap.keySet()) {
-      if (nextInstanceStateMap.containsKey(instanceId)) {
-        numCommonInstances++;
-      }
-    }
-    return numCommonInstances;
+  @Test
+  public void testStrictReplicaGroup() {
+    // Current assignment:
+    // {
+    //   "segment1": {
+    //     "host1": "ONLINE",
+    //     "host2": "ONLINE",
+    //     "host3": "ONLINE"
+    //   },
+    //   "segment2": {
+    //     "host2": "ONLINE",
+    //     "host3": "ONLINE",
+    //     "host4": "ONLINE"
+    //   },
+    //   "segment3": {
+    //     "host1": "ONLINE",
+    //     "host2": "ONLINE",
+    //     "host3": "ONLINE"
+    //   },
+    //   "segment4": {
+    //     "host2": "ONLINE",
+    //     "host3": "ONLINE",
+    //     "host4": "ONLINE"
+    //   }
+    // }
+    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
+    currentAssignment
+        .put("segment1", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE));
+    currentAssignment
+        .put("segment2", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4"), ONLINE));
+    currentAssignment
+        .put("segment3", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE));
+    currentAssignment
+        .put("segment4", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4"), ONLINE));
+
+    // Target assignment:
+    // {
+    //   "segment1": {
+    //     "host1": "ONLINE",
+    //     "host3": "ONLINE",
+    //     "host5": "ONLINE"
+    //   },
+    //   "segment2": {
+    //     "host2": "ONLINE",
+    //     "host4": "ONLINE",
+    //     "host6": "ONLINE"
+    //   },
+    //   "segment3": {
+    //     "host1": "ONLINE",
+    //     "host3": "ONLINE",
+    //     "host5": "ONLINE"
+    //   },
+    //   "segment4": {
+    //     "host2": "ONLINE",
+    //     "host4": "ONLINE",
+    //     "host6": "ONLINE"
+    //   }
+    // }
+    Map<String, Map<String, String>> targetAssignment = new TreeMap<>();
+    targetAssignment
+        .put("segment1", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3", "host5"), ONLINE));
+    targetAssignment
+        .put("segment2", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host4", "host6"), ONLINE));
+    targetAssignment
+        .put("segment3", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3", "host5"), ONLINE));
+    targetAssignment
+        .put("segment4", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host4", "host6"), ONLINE));
+
+    // Next assignment with 2 minimum available replicas with or without strict replica-group should reach the target
+    // assignment
+    Map<String, Map<String, String>> nextAssignment =
+        TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, false);
+    assertEquals(nextAssignment, targetAssignment);
+    nextAssignment = TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, true);
+    assertEquals(nextAssignment, targetAssignment);
+
+    // Current assignment:
+    // {
+    //   "segment1": {
+    //     "host1": "ONLINE",
+    //     "host2": "ONLINE",
+    //     "host3": "ONLINE"
+    //   },
+    //   "segment2": {
+    //     "host2": "ONLINE",
+    //     "host3": "ONLINE",
+    //     "host4": "ONLINE"
+    //   },
+    //   "segment3": {
+    //     "host1": "ONLINE",
+    //     "host2": "ONLINE",
+    //     "host3": "ONLINE"
+    //   },
+    //   "segment4": {
+    //     "host2": "ONLINE",
+    //     "host3": "ONLINE",
+    //     "host4": "ONLINE"
+    //   }
+    // }
+    currentAssignment = new TreeMap<>();
+    currentAssignment
+        .put("segment1", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE));
+    currentAssignment
+        .put("segment2", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4"), ONLINE));
+    currentAssignment
+        .put("segment3", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE));
+    currentAssignment
+        .put("segment4", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4"), ONLINE));
+
+    // Target assignment:
+    // {
+    //   "segment1": {
+    //     "host2": "ONLINE",
+    //     "host4": "ONLINE",
+    //     "host6": "ONLINE"
+    //   },
+    //   "segment2": {
+    //     "host1": "ONLINE",
+    //     "host4": "ONLINE",
+    //     "host5": "ONLINE"
+    //   },
+    //   "segment3": {
+    //     "host2": "ONLINE",
+    //     "host4": "ONLINE",
+    //     "host6": "ONLINE"
+    //   },
+    //   "segment4": {
+    //     "host1": "ONLINE",
+    //     "host4": "ONLINE",
+    //     "host5": "ONLINE"
+    //   }
+    // }
+    targetAssignment = new TreeMap<>();
+    targetAssignment
+        .put("segment1", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host4", "host6"), ONLINE));
+    targetAssignment
+        .put("segment2", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host4", "host5"), ONLINE));
+    targetAssignment
+        .put("segment3", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host4", "host6"), ONLINE));
+    targetAssignment
+        .put("segment4", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host4", "host5"), ONLINE));
+
+    // Next assignment with 2 minimum available replicas without strict replica-group:
+    // (This assignment will move "segment1" and "segment3" from "host3" to "host4", and move "segment2" and "segment4"
+    // from "host3" to "host1". "host1" and "host4" might be unavailable for strict replica-group routing, which breaks
+    // the minimum available replicas requirement.)
+    // {
+    //   "segment1": {
+    //     "host1": "ONLINE",
+    //     "host2": "ONLINE",
+    //     "host4": "ONLINE"
+    //   },
+    //   "segment2": {
+    //     "host1": "ONLINE",
+    //     "host2": "ONLINE",
+    //     "host4": "ONLINE"
+    //   },
+    //   "segment3": {
+    //     "host1": "ONLINE",
+    //     "host2": "ONLINE",
+    //     "host4": "ONLINE"
+    //   },
+    //   "segment4": {
+    //     "host1": "ONLINE",
+    //     "host2": "ONLINE",
+    //     "host4": "ONLINE"
+    //   }
+    // }
+    nextAssignment = TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, false);
+    assertEquals(nextAssignment.get("segment1").keySet(), new TreeSet<>(Arrays.asList("host1", "host2", "host4")));
+    assertEquals(nextAssignment.get("segment2").keySet(), new TreeSet<>(Arrays.asList("host1", "host2", "host4")));
+    assertEquals(nextAssignment.get("segment3").keySet(), new TreeSet<>(Arrays.asList("host1", "host2", "host4")));
+    assertEquals(nextAssignment.get("segment4").keySet(), new TreeSet<>(Arrays.asList("host1", "host2", "host4")));
+
+    // Next assignment with 2 minimum available replicas with strict replica-group:
+    // (This assignment will only move "segment1" and "segment3" from "host3" to "host4". Only "host4" can be
+    // unavailable for strict replica-group routing during the rebalance, which meets the minimum available replicas
+    // requirement.)
+    // {
+    //   "segment1": {
+    //     "host1": "ONLINE",
+    //     "host2": "ONLINE",
+    //     "host4": "ONLINE"
+    //   },
+    //   "segment2": {
+    //     "host2": "ONLINE",
+    //     "host3": "ONLINE",
+    //     "host4": "ONLINE"
+    //   },
+    //   "segment3": {
+    //     "host1": "ONLINE",
+    //     "host2": "ONLINE",
+    //     "host4": "ONLINE"
+    //   },
+    //   "segment4": {
+    //     "host2": "ONLINE",
+    //     "host3": "ONLINE",
+    //     "host4": "ONLINE"
+    //   }
+    // }
+    nextAssignment = TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, true);
+    assertEquals(nextAssignment.get("segment1").keySet(), new TreeSet<>(Arrays.asList("host1", "host2", "host4")));
+    assertEquals(nextAssignment.get("segment2").keySet(), new TreeSet<>(Arrays.asList("host2", "host3", "host4")));
+    assertEquals(nextAssignment.get("segment3").keySet(), new TreeSet<>(Arrays.asList("host1", "host2", "host4")));
+    assertEquals(nextAssignment.get("segment4").keySet(), new TreeSet<>(Arrays.asList("host2", "host3", "host4")));
+
+    // Next assignment with 2 minimum available replicas with strict replica-group:
+    // {
+    //   "segment1": {
+    //     "host2": "ONLINE",
+    //     "host4": "ONLINE",
+    //     "host6": "ONLINE"
+    //   },
+    //   "segment2": {
+    //     "host1": "ONLINE",
+    //     "host2": "ONLINE",
+    //     "host4": "ONLINE"
+    //   },
+    //   "segment3": {
+    //     "host2": "ONLINE",
+    //     "host4": "ONLINE",
+    //     "host6": "ONLINE"
+    //   },
+    //   "segment4": {
+    //     "host1": "ONLINE",
+    //     "host2": "ONLINE",
+    //     "host4": "ONLINE"
+    //   }
+    // }
+    nextAssignment = TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, true);
+    assertEquals(nextAssignment.get("segment1").keySet(), new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
+    assertEquals(nextAssignment.get("segment2").keySet(), new TreeSet<>(Arrays.asList("host1", "host2", "host4")));
+    assertEquals(nextAssignment.get("segment3").keySet(), new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
+    assertEquals(nextAssignment.get("segment4").keySet(), new TreeSet<>(Arrays.asList("host1", "host2", "host4")));
+
+    // Next assignment with 2 minimum available replicas with strict replica-group should reach the target assignment
+    nextAssignment = TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, true);
+    assertEquals(nextAssignment, targetAssignment);
   }
 
   @Test
