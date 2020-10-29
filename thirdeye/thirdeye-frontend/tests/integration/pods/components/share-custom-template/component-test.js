@@ -1,6 +1,6 @@
 import $ from 'jquery';
 import { module, test } from 'qunit';
-import { run } from "@ember/runloop";
+import { run } from '@ember/runloop';
 import { setupRenderingTest } from 'ember-qunit';
 import { render } from '@ember/test-helpers';
 import hbs from 'htmlbars-inline-precompile';
@@ -18,23 +18,23 @@ module('Integration | Component | share custom template', function(hooks) {
       start: '1539626400000',
       end: '1539626400000',
       shareConfig: {
-          groupName: 'someGroup',
-          appName: 'someApp',
-          chart: 'table',
-          title: 'Title of metrics',
-          entities: [
-            [
-              { type: 'label', value: 'Column name1', index: 0},
-              { type: 'label', value: 'Column name2', index: 0},
-              { type: 'label', value: 'Column name3', index: 0}
-            ],
-            [
-              { type: 'label', value: 'Email', index: 1},
-              { type: 'change', metrics: ['thirdeye:metric:11111'], offsets: ['current', 'wo1w'], summary: ['69.0M', '-2.03'], index: 1},
-              { type: 'change', metrics: ['thirdeye:metric:22222'], offsets: ['current', 'wo1w'], summary: ['69.0M', '-2.03'], index: 1}
-            ]
+        groupName: 'someGroup',
+        appName: 'someApp',
+        chart: 'table',
+        title: 'Title of metrics',
+        entities: [
+          [
+            { type: 'label', value: 'Column name1', index: 0},
+            { type: 'label', value: 'Column name2', index: 0},
+            { type: 'label', value: 'Column name3', index: 0}
+          ],
+          [
+            { type: 'label', value: 'Email', index: 1},
+            { type: 'change', metrics: ['thirdeye:metric:11111'], offsets: ['current', 'wo1w'], summary: ['69.0M', '-2.03'], index: 1},
+            { type: 'change', metrics: ['thirdeye:metric:22222'], offsets: ['current', 'wo1w'], summary: ['69.0M', '-2.03'], index: 1}
           ]
-        }
+        ]
+      }
     });
 
     // Rendering the component

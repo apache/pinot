@@ -1,4 +1,4 @@
-import { isPresent } from "@ember/utils";
+import { isPresent } from '@ember/utils';
 
 /**
  * General self-serve element selectors
@@ -69,7 +69,7 @@ export const selfServeConst = {
   LINK_TUNE_ALERT: '.te-self-serve__side-link:contains("Customize sensitivity")',
 
   // Tuning Page Elements
-  LINK_ALERT_PAGE: '.te-button:contains("Back to overview")',
+  LINK_ALERT_PAGE: '.te-button:contains("Back to overview")'
 
 };
 

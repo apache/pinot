@@ -28,8 +28,7 @@ module.exports = {
     ],
     // TODO: fix all warnings and change rules back to 'error'
     'ember/avoid-leaking-state-in-ember-objects': ['warn'],
-    'ember/no-attrs-in-components': ['warn'],
-    'quotes': [2, 'single', { 'avoidEscape': true }]
+    'ember/no-attrs-in-components': ['warn']
   },
   overrides: [
     // node files
