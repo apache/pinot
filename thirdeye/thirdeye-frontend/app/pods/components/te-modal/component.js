@@ -44,7 +44,7 @@ export default Component.extend({
   hasFooter: true,
   isMicroModal: false,
   cancelButtonText: 'Cancel',
-  submitButtonText: 'Save',
+  submitButtonText: Save',
   isShowingModal: true,
 
   actions: {

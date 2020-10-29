@@ -19,21 +19,21 @@
  * @authors lohuynh and hjackson
  */
 
-import Component from "@ember/component";
-import { setProperties, get } from "@ember/object";
+import Component from '@ember/component';
+import { setProperties, get } from '@ember/object';
 
 export default Component.extend({
-  valueClassSuffix: "",
-  modeSubClass: "list",
+  valueClassSuffix: '',
+  modeSubClass: 'list',
   toggleActivation: null, // passed from parent - do not set
 
   init() {
     this._super(...arguments);
-    const mode = get(this, "displayMode");
-    if (mode === "single") {
+    const mode = get(this, 'displayMode');
+    if (mode === 'single') {
       setProperties(this, {
-        valueClassSuffix: "-solo",
-        modeSubClass: "solo",
+        valueClassSuffix: '-solo',
+        modeSubClass: 'solo'
       });
     }
   },
@@ -43,7 +43,7 @@ export default Component.extend({
      * send action to parent
      */
     toggleAlertActivation() {
-      this.get("toggleActivation")();
-    },
-  },
+      this.get('toggleActivation')();
+    }
+  }
 });
