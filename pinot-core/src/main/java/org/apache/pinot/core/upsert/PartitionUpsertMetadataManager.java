@@ -22,6 +22,8 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.pinot.common.metrics.ServerGauge;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.slf4j.Logger;
@@ -50,6 +52,16 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public class PartitionUpsertMetadataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PartitionUpsertMetadataManager.class);
+
+  private final String _tableNameWithType;
+  private final int _partitionId;
+  private final ServerMetrics _serverMetrics;
+
+  public PartitionUpsertMetadataManager(String tableNameWithType, int partitionId, ServerMetrics serverMetrics) {
+    _tableNameWithType = tableNameWithType;
+    _partitionId = partitionId;
+    _serverMetrics = serverMetrics;
+  }
 
   // TODO(upset): consider an off-heap KV store to persist this index to improve the recovery speed.
   @VisibleForTesting
@@ -113,6 +125,9 @@ public class PartitionUpsertMetadataManager {
         }
       });
     }
+    // Update metrics
+    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
+        _primaryKeyToRecordLocationMap.size());
     return validDocIds;
   }
 
@@ -138,6 +153,9 @@ public class PartitionUpsertMetadataManager {
         return new RecordLocation(segmentName, recordInfo._docId, recordInfo._timestamp, validDocIds);
       }
     });
+    // Update metrics
+    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
+        _primaryKeyToRecordLocationMap.size());
   }
 
   /**
@@ -156,6 +174,9 @@ public class PartitionUpsertMetadataManager {
         }
       });
     }
+    // Update metrics
+    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
+        _primaryKeyToRecordLocationMap.size());
   }
 
   public static final class RecordInfo {

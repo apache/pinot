@@ -800,7 +800,8 @@ public class LLRealtimeSegmentDataManagerTest {
         throws Exception {
       super(segmentZKMetadata, tableConfig, realtimeTableDataManager, resourceDataDir,
           new IndexLoadingConfig(makeInstanceDataManagerConfig(), tableConfig), schema, llcSegmentName,
-          semaphoreMap.get(llcSegmentName.getPartitionId()), serverMetrics, new PartitionUpsertMetadataManager());
+          semaphoreMap.get(llcSegmentName.getPartitionId()), serverMetrics,
+          new PartitionUpsertMetadataManager("testTable_REALTIME", 0, serverMetrics));
       _state = LLRealtimeSegmentDataManager.class.getDeclaredField("_state");
       _state.setAccessible(true);
       _shouldStop = LLRealtimeSegmentDataManager.class.getDeclaredField("_shouldStop");

@@ -284,6 +284,22 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   /**
+   * Sets the value of a table partition gauge.
+   *
+   * @param tableName The table name
+   * @param partitionId The partition name
+   * @param gauge The gauge to use
+   * @param value The value to set the gauge to
+   */
+  public void setValueOfPartitionGauge(final String tableName, final int partitionId, final G gauge, final long value) {
+    final String fullGaugeName;
+    String gaugeName = gauge.getGaugeName();
+    fullGaugeName = gaugeName + "." + getTableName(tableName) + "." + partitionId;
+
+    setValueOfGauge(value, fullGaugeName);
+  }
+
+  /**
    * Sets the value of a custom global gauge.
    *
    * @param suffix The suffix to attach to the gauge name
