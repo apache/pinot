@@ -26,6 +26,7 @@ import {
   getInstance,
   putInstance,
   setInstanceState,
+  setTableState,
   dropInstance,
   updateInstanceTags,
   getClusterConfig,
@@ -48,7 +49,15 @@ import {
   zookeeperDeleteNode,
   getBrokerListOfTenant,
   getServerListOfTenant,
-  deleteSegment
+  deleteSegment,
+  putTable,
+  putSchema,
+  deleteTable,
+  deleteSchema,
+  reloadAllSegments,
+  reloadStatus,
+  rebalanceServersForTable,
+  rebalanceBrokersForTable
 } from '../requests';
 import Utils from './Utils';
 
@@ -173,39 +182,9 @@ const getQueryTablesList = ({bothType = false}) => {
 
 // This method is used to display particular table schema on query page
 // API: /tables/:tableName/schema
-// Expected Output: {columns: [], records: []}
-const getTableSchemaData = (tableName, showFieldType) => {
+const getTableSchemaData = (tableName) => {
   return getTableSchema(tableName).then(({ data }) => {
-    const dimensionFields = data.dimensionFieldSpecs || [];
-    const metricFields = data.metricFieldSpecs || [];
-    const dateTimeField = data.dateTimeFieldSpecs || [];
-
-    dimensionFields.map((field) => {
-      field.fieldType = 'Dimension';
-    });
-
-    metricFields.map((field) => {
-      field.fieldType = 'Metric';
-    });
-
-    dateTimeField.map((field) => {
-      field.fieldType = 'Date-Time';
-    });
-    const columnList = [...dimensionFields, ...metricFields, ...dateTimeField];
-    if (showFieldType) {
-      return {
-        columns: ['column', 'type', 'Field Type'],
-        records: columnList.map((field) => {
-          return [field.name, field.dataType, field.fieldType];
-        }),
-      };
-    }
-    return {
-      columns: ['column', 'type'],
-      records: columnList.map((field) => {
-        return [field.name, field.dataType];
-      }),
-    };
+    return data;
   });
 };
 
@@ -317,6 +296,13 @@ const getQueryResults = (params, url, checkedOptions) => {
 //      /tables/:tableName/externalview
 // Expected Output: {columns: [], records: []}
 const getTenantTableData = (tenantName) => {
+  return getTenantTable(tenantName).then(({ data }) => {
+    const tableArr = data.tables.map((table) => table);
+    return getAllTableDetails(tableArr);
+  });
+};
+
+const getAllTableDetails = (tablesList) => {
   const columnHeaders = [
     'Table Name',
     'Reported Size',
@@ -324,67 +310,64 @@ const getTenantTableData = (tenantName) => {
     'Number of Segments',
     'Status',
   ];
-  return getTenantTable(tenantName).then(({ data }) => {
-    const tableArr = data.tables.map((table) => table);
-    if (tableArr.length) {
-      const promiseArr = [];
-      tableArr.map((name) => {
-        promiseArr.push(getTableSize(name));
-        promiseArr.push(getIdealState(name));
-        promiseArr.push(getExternalView(name));
-      });
+  if (tablesList.length) {
+    const promiseArr = [];
+    tablesList.map((name) => {
+      promiseArr.push(getTableSize(name));
+      promiseArr.push(getIdealState(name));
+      promiseArr.push(getExternalView(name));
+    });
 
-      return Promise.all(promiseArr).then((results) => {
-        const finalRecordsArr = [];
-        let singleTableData = [];
-        let idealStateObj = null;
-        let externalViewObj = null;
-        results.map((result, index) => {
-          // since we have 3 promises, we are using mod 3 below
-          if (index % 3 === 0) {
-            // response of getTableSize API
-            const {
-              tableName,
-              reportedSizeInBytes,
-              estimatedSizeInBytes,
-            } = result.data;
-            singleTableData.push(
-              tableName,
-              reportedSizeInBytes,
-              estimatedSizeInBytes
-            );
-          } else if (index % 3 === 1) {
-            // response of getIdealState API
-            idealStateObj = result.data.OFFLINE || result.data.REALTIME;
-          } else if (index % 3 === 2) {
-            // response of getExternalView API
-            externalViewObj = result.data.OFFLINE || result.data.REALTIME;
-            const externalSegmentCount = Object.keys(externalViewObj).length;
-            const idealSegmentCount = Object.keys(idealStateObj).length;
-            // Generating data for the record
-            singleTableData.push(
-              `${externalSegmentCount} / ${idealSegmentCount}`,
-              Utils.getSegmentStatus(idealStateObj, externalViewObj)
-            );
-            // saving into records array
-            finalRecordsArr.push(singleTableData);
-            // resetting the required variables
-            singleTableData = [];
-            idealStateObj = null;
-            externalViewObj = null;
-          }
-        });
-        return {
-          columns: columnHeaders,
-          records: finalRecordsArr,
-        };
+    return Promise.all(promiseArr).then((results) => {
+      const finalRecordsArr = [];
+      let singleTableData = [];
+      let idealStateObj = null;
+      let externalViewObj = null;
+      results.map((result, index) => {
+        // since we have 3 promises, we are using mod 3 below
+        if (index % 3 === 0) {
+          // response of getTableSize API
+          const {
+            tableName,
+            reportedSizeInBytes,
+            estimatedSizeInBytes,
+          } = result.data;
+          singleTableData.push(
+            tableName,
+            reportedSizeInBytes,
+            estimatedSizeInBytes
+          );
+        } else if (index % 3 === 1) {
+          // response of getIdealState API
+          idealStateObj = result.data.OFFLINE || result.data.REALTIME;
+        } else if (index % 3 === 2) {
+          // response of getExternalView API
+          externalViewObj = result.data.OFFLINE || result.data.REALTIME;
+          const externalSegmentCount = Object.keys(externalViewObj).length;
+          const idealSegmentCount = Object.keys(idealStateObj).length;
+          // Generating data for the record
+          singleTableData.push(
+            `${externalSegmentCount} / ${idealSegmentCount}`,
+            Utils.getSegmentStatus(idealStateObj, externalViewObj)
+          );
+          // saving into records array
+          finalRecordsArr.push(singleTableData);
+          // resetting the required variables
+          singleTableData = [];
+          idealStateObj = null;
+          externalViewObj = null;
+        }
       });
-    }
-    return {
-      columns: columnHeaders,
-      records: []
-    };
-  });
+      return {
+        columns: columnHeaders,
+        records: finalRecordsArr,
+      };
+    });
+  }
+  return {
+    columns: columnHeaders,
+    records: []
+  };
 };
 
 // This method is used to display summary of a particular tenant table
@@ -403,7 +386,7 @@ const getTableSummaryData = (tableName) => {
 // This method is used to display segment list of a particular tenant table
 // API: /tables/:tableName/idealstate
 //      /tables/:tableName/externalview
-// Expected Output: {columns: [], records: []}
+// Expected Output: {columns: [], records: [], externalViewObject: {}}
 const getSegmentList = (tableName) => {
   const promiseArr = [];
   promiseArr.push(getIdealState(tableName));
@@ -421,6 +404,7 @@ const getSegmentList = (tableName) => {
           _.isEqual(idealStateObj[key], externalViewObj[key]) ? 'Good' : 'Bad',
         ];
       }),
+      externalViewObj
     };
   });
 };
@@ -578,13 +562,13 @@ const deleteNode = (path) => {
 
 const getBrokerOfTenant = (tenantName) => {
   return getBrokerListOfTenant(tenantName).then((response)=>{
-    return response.data;
+    return !response.data.error ? response.data : [];
   });
 };
 
 const getServerOfTenant = (tenantName) => {
   return getServerListOfTenant(tenantName).then((response)=>{
-    return response.data.ServerInstances;
+    return !response.data.error ? response.data.ServerInstances : [];
   });
 };
 
@@ -596,6 +580,12 @@ const updateTags = (instanceName, tagsList) => {
 
 const toggleInstanceState = (instanceName, state) => {
   return setInstanceState(instanceName, state).then((response)=>{
+    return response.data;
+  });
+};
+
+const toggleTableState = (tableName, state, tableType) => {
+  return setTableState(tableName, state, tableType).then((response)=>{
     return response.data;
   });
 };
@@ -612,8 +602,57 @@ const reloadSegmentOp = (tableName, segmentName) => {
   });
 };
 
+const reloadAllSegmentsOp = (tableName, tableType) => {
+  return reloadAllSegments(tableName, tableType).then((response)=>{
+    return response.data;
+  });
+};
+
+const reloadStatusOp = (tableName, tableType) => {
+  return reloadStatus(tableName, tableType).then((response)=>{
+    return response.data;
+  });
+}
+
 const deleteSegmentOp = (tableName, segmentName) => {
   return deleteSegment(tableName, segmentName).then((response)=>{
+    return response.data;
+  });
+};
+
+const updateTable = (tableName: string, table: string) => {
+  return putTable(tableName, table).then((res)=>{
+    return res.data;
+  })
+};
+
+const updateSchema = (schemaName: string, schema: string) => {
+  return putSchema(schemaName, schema).then((res)=>{
+    return res.data;
+  })
+};
+
+const deleteTableOp = (tableName) => {
+  return deleteTable(tableName).then((response)=>{
+    return response.data;
+  });
+};
+
+const deleteSchemaOp = (tableName) => {
+  return deleteSchema(tableName).then((response)=>{
+    return response.data;
+  });
+};
+
+const rebalanceServersForTableOp = (tableName, queryParams) => {
+  const q_params = Utils.serialize(queryParams);
+  return rebalanceServersForTable(tableName, q_params).then((response)=>{
+    return  response.data;
+  });
+};
+
+const rebalanceBrokersForTableOp = (tableName) => {
+  return rebalanceBrokersForTable(tableName).then((response)=>{
     return response.data;
   });
 };
@@ -627,6 +666,7 @@ export default {
   getTableSchemaData,
   getQueryResults,
   getTenantTableData,
+  getAllTableDetails,
   getTableSummaryData,
   getSegmentList,
   getTableDetails,
@@ -645,7 +685,16 @@ export default {
   getServerOfTenant,
   updateTags,
   toggleInstanceState,
+  toggleTableState,
   deleteInstance,
   deleteSegmentOp,
-  reloadSegmentOp
+  reloadSegmentOp,
+  reloadStatusOp,
+  reloadAllSegmentsOp,
+  updateTable,
+  updateSchema,
+  deleteTableOp,
+  deleteSchemaOp,
+  rebalanceServersForTableOp,
+  rebalanceBrokersForTableOp
 };

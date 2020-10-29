@@ -193,8 +193,9 @@ const QueryPage = () => {
   };
 
   const fetchSQLData = async (tableName) => {
-    const result = await PinotMethodUtils.getTableSchemaData(tableName, false);
-    setTableSchema(result);
+    const result = await PinotMethodUtils.getTableSchemaData(tableName);
+    const tableSchema = Utils.syncTableSchemaData(result, false);
+    setTableSchema(tableSchema);
 
     const query = `select * from ${tableName} limit 10`;
     setInputQuery(query);

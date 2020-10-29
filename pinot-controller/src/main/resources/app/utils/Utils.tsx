@@ -242,11 +242,55 @@ const serialize = (obj: any, prefix?: any) => {
   return str.join("&");
 };
 
+const navigateToPreviousPage = (location, popTwice) => {
+  const hasharr = location.pathname.split('/');
+  hasharr.pop();
+  if(popTwice){
+    hasharr.pop();
+  }
+  return hasharr.join('/');
+};
+
+const syncTableSchemaData = (data, showFieldType) => {
+  const dimensionFields = data.dimensionFieldSpecs || [];
+  const metricFields = data.metricFieldSpecs || [];
+  const dateTimeField = data.dateTimeFieldSpecs || [];
+
+  dimensionFields.map((field) => {
+    field.fieldType = 'Dimension';
+  });
+
+  metricFields.map((field) => {
+    field.fieldType = 'Metric';
+  });
+
+  dateTimeField.map((field) => {
+    field.fieldType = 'Date-Time';
+  });
+  const columnList = [...dimensionFields, ...metricFields, ...dateTimeField];
+  if (showFieldType) {
+    return {
+      columns: ['Column', 'Type', 'Field Type'],
+      records: columnList.map((field) => {
+        return [field.name, field.dataType, field.fieldType];
+      }),
+    };
+  }
+  return {
+    columns: ['Column', 'Type'],
+    records: columnList.map((field) => {
+      return [field.name, field.dataType];
+    }),
+  };
+};
+
 export default {
   sortArray,
   tableFormat,
   getSegmentStatus,
   findNestedObj,
   generateCodeMirrorOptions,
-  serialize
+  serialize,
+  navigateToPreviousPage,
+  syncTableSchemaData
 };

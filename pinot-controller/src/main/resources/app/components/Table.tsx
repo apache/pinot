@@ -62,7 +62,12 @@ type Props = {
   recordsCount?: number,
   showSearchBox: boolean,
   inAccordionFormat?: boolean,
-  regexReplace?: boolean
+  regexReplace?: boolean,
+  accordionToggleObject?: {
+    toggleChangeHandler: (event: React.ChangeEvent<HTMLInputElement>) => void;
+    toggleName: string;
+    toggleValue: boolean;
+  }
 };
 
 const StyledTableRow = withStyles((theme) =>
@@ -251,7 +256,8 @@ export default function CustomizedTables({
   recordsCount,
   showSearchBox,
   inAccordionFormat,
-  regexReplace
+  regexReplace,
+  accordionToggleObject
 }: Props) {
   const [finalData, setFinalData] = React.useState(Utils.tableFormat(data));
 
@@ -261,7 +267,7 @@ export default function CustomizedTables({
   const classes = useStyles();
   const [rowsPerPage, setRowsPerPage] = React.useState(noOfRows || 10);
   const [page, setPage] = React.useState(0);
-
+ 
   const handleChangeRowsPerPage = (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -304,6 +310,10 @@ export default function CustomizedTables({
       clearTimeout(timeoutId.current);
     };
   }, [search, timeoutId, filterSearchResults]);
+
+  React.useCallback(()=>{
+    setFinalData(Utils.tableFormat(data));
+  }, [data]);
 
   const styleCell = (str: string) => {
     if (str === 'Good' || str.toLowerCase() === 'online' || str.toLowerCase() === 'alive') {
@@ -457,6 +467,7 @@ export default function CustomizedTables({
           searchValue={search}
           handleSearch={(val: string) => setSearch(val)}
           recordCount={recordsCount}
+          accordionToggleObject={accordionToggleObject}
         >
           {renderTableComponent()}
         </SimpleAccordion>

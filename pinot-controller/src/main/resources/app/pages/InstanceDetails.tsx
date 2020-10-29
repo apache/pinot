@@ -32,7 +32,7 @@ import SimpleAccordion from '../components/SimpleAccordion';
 import CustomButton from '../components/CustomButton';
 import EditTagsOp from '../components/Homepage/Operations/EditTagsOp';
 import EditConfigOp from '../components/Homepage/Operations/EditConfigOp';
-import CustomNotification from '../components/CustomNotification';
+import { NotificationContext } from '../components/Notification/NotificationContext';
 import _ from 'lodash';
 import Confirm from '../components/Confirm';
 
@@ -91,8 +91,7 @@ const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
 
   const [showEditTag, setShowEditTag] = useState(false);
   const [showEditConfig, setShowEditConfig] = useState(false);
-  const [notificationData, setNotificationData] = React.useState({type: '', message: ''});
-  const [showNotification, setShowNotification] = React.useState(false);
+  const {dispatch} = React.useContext(NotificationContext);
 
   const fetchData = async () => {
     const configResponse = await PinotMethodUtils.getInstanceConfig(clutserName, instanceName);
@@ -198,12 +197,11 @@ const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
     }
     const result = await PinotMethodUtils.updateTags(instanceName, newTagsList);
     if(result.status){
-      setNotificationData({type: 'success', message: result.status});
+      dispatch({type: 'success', message: result.status, show: true});
       fetchData();
     } else {
-      setNotificationData({type: 'error', message: result.error});
+      dispatch({type: 'error', message: result.error, show: true});
     }
-    setShowNotification(true);
     setShowEditTag(false);
   };
 
@@ -219,12 +217,11 @@ const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
   const dropInstance = async () => {
     const result = await PinotMethodUtils.deleteInstance(instanceName);
     if(result.status){
-      setNotificationData({type: 'success', message: result.status});
+      dispatch({type: 'success', message: result.status, show: true});
       fetchData();
     } else {
-      setNotificationData({type: 'error', message: result.error});
+      dispatch({type: 'error', message: result.error, show: true});
     }
-    setShowNotification(true);
     closeDialog();
   };
 
@@ -240,12 +237,11 @@ const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
   const toggleInstanceState = async () => {
     const result = await PinotMethodUtils.toggleInstanceState(instanceName, state.enabled ? 'DISABLE' : 'ENABLE');
     if(result.status){
-      setNotificationData({type: 'success', message: result.status});
+      dispatch({type: 'success', message: result.status, show: true});
       fetchData();
     } else {
-      setNotificationData({type: 'error', message: result.error});
+      dispatch({type: 'error', message: result.error, show: true});
     }
-    setShowNotification(true);
     setState({ enabled: !state.enabled });
     closeDialog();
   };
@@ -258,12 +254,11 @@ const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
     if(JSON.parse(config)){
       const result = await PinotMethodUtils.updateInstanceDetails(instanceName, config);
       if(result.status){
-        setNotificationData({type: 'success', message: result.status});
+        dispatch({type: 'success', message: result.status, show: true});
         fetchData();
       } else {
-        setNotificationData({type: 'error', message: result.error});
+        dispatch({type: 'error', message: result.error, show: true});
       }
-      setShowNotification(true);
       setShowEditConfig(false);
     }
   };
@@ -297,6 +292,8 @@ const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
                   setTagsList(JSON.parse(instanceConfig)?.listFields?.TAG_LIST || []);
                   setShowEditTag(true);
                 }}
+                tooltipTitle="Edit Tags"
+                enableTooltip={true}
               >
                 Edit Tags
               </CustomButton>
@@ -305,10 +302,16 @@ const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
                   setConfig(instanceDetails);
                   setShowEditConfig(true);
                 }}
+                tooltipTitle="Edit Config"
+                enableTooltip={true}
               >
                 Edit Config
               </CustomButton>
-              <CustomButton onClick={handleDropAction}>
+              <CustomButton
+                onClick={handleDropAction}
+                tooltipTitle="Drop"
+                enableTooltip={true}
+              >
                 Drop
               </CustomButton>
               <FormControlLabel
@@ -394,12 +397,6 @@ const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
         dialogYesLabel='Yes'
         dialogNoLabel='No'
       />}
-      <CustomNotification
-        type={notificationData.type}
-        message={notificationData.message}
-        show={showNotification}
-        hide={()=>{setShowNotification(false)}}
-      />
     </Grid>
   );
 };

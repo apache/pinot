@@ -38,30 +38,20 @@ const TablesListingPage = () => {
   const classes = useStyles();
 
   const [fetching, setFetching] = useState(true);
-  const columnHeaders = ['Table Name', 'Tenant Name', 'Reported Size', 'Estimated Size', 'Number of Segments', 'Status'];
-  const records = [];
   const [tableData, setTableData] = useState<TableData>({
-    columns: columnHeaders,
+    columns: [],
     records: []
   });
 
   const fetchData = async () => {
-    const tenantsDataResponse = await PinotMethodUtils.getTenantsData();
-    const promiseArr = [];
-    tenantsDataResponse.records.map((tenantRecord)=>{
-      promiseArr.push(PinotMethodUtils.getTenantTableData(tenantRecord[0]));
+    const tablesResponse = await PinotMethodUtils.getQueryTablesList({bothType: true});
+    const tablesList = [];
+    tablesResponse.records.map((record)=>{
+      tablesList.push(...record);
     });
-    Promise.all(promiseArr).then((results)=>{
-      results.map((result, index)=>{
-        const tenantName = tenantsDataResponse.records[index][0];
-        records.push(...result.records.map((record)=>{
-          record.splice(1, 0, tenantName);
-          return record;
-        }));
-      });
-      setTableData({columns: columnHeaders, records});
-      setFetching(false);
-    });
+    const tableDetails = await PinotMethodUtils.getAllTableDetails(tablesList);
+    setTableData(tableDetails);
+    setFetching(false);
   };
 
   useEffect(() => {

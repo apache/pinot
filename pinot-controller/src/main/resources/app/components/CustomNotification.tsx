@@ -20,49 +20,34 @@
 import React, {  } from 'react';
 import { Snackbar } from '@material-ui/core';
 import MuiAlert from '@material-ui/lab/Alert';
-
+import { NotificationContext } from './Notification/NotificationContext';
 
 const Alert = (props) => {
   return <MuiAlert elevation={6} variant="filled" {...props} />;
 };
 
-type Props = {
-  type: string,
-  message: string,
-  show: boolean,
-  hide: Function
-};
-
-const CustomNotification = ({
-  type, message, show, hide
-}: Props) => {
-
-  const [notificationData, setNotificationData] = React.useState({type, message});
-  const [showNotification, setShowNotification] = React.useState(show);
-
-  React.useEffect(()=>{
-    setShowNotification(show);
-  }, [show]);
-
-  React.useEffect(()=>{
-    setNotificationData({type, message});
-  }, [type, message]);
-
-  const hideNotification = () => {
-    hide();
-    setShowNotification(false);
-  };
-
+const CustomNotification = () => {
   return (
-    <Snackbar
-      anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-      open={showNotification}
-      onClose={hideNotification}
-      key="notification"
-      autoHideDuration={3000}
-    >
-      <Alert severity={notificationData.type}>{notificationData.message}</Alert>
-    </Snackbar>
+    <NotificationContext.Consumer>
+      {context => 
+        <Snackbar
+          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+          open={context && context.show}
+          onClose={()=>{
+            context.dispatch({type: '', message: "", show:false});
+            context.hide && context.hide()
+          }}
+          autoHideDuration={10000}
+        >
+          <Alert
+            onClose={context.hide && context.hide()}
+            severity={context && context.type}
+          >
+            {context && context.message}
+          </Alert>
+        </Snackbar>
+        }
+    </NotificationContext.Consumer>
   );
 };
 

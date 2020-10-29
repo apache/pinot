@@ -25,6 +25,8 @@ import theme from './theme';
 import Layout from './components/Layout';
 import RouterData from './router';
 import PinotMethodUtils from './utils/PinotMethodUtils';
+import CustomNotification from './components/CustomNotification';
+import { NotificationContextProvider } from './components/Notification/NotificationContextProvider';
 
 const App = () => {
   const fetchClusterName = async () => {
@@ -36,26 +38,29 @@ const App = () => {
   }, []);
   return (
     <MuiThemeProvider theme={theme}>
-      <Router>
-        <Switch>
-          {RouterData.map(({ path, Component }, key) => (
-            <Route
-              exact
-              path={path}
-              key={key}
-              render={props => {
-                return (
-                  <div className="p-8">
-                    <Layout {...props}>
-                      <Component {...props} />
-                    </Layout>
-                  </div>
-                );
-              }}
-            />
-          ))}
-        </Switch>
-      </Router>
+      <NotificationContextProvider>
+        <CustomNotification />
+        <Router>
+          <Switch>
+            {RouterData.map(({ path, Component }, key) => (
+              <Route
+                exact
+                path={path}
+                key={key}
+                render={props => {
+                  return (
+                    <div className="p-8">
+                      <Layout {...props}>
+                        <Component {...props} />
+                      </Layout>
+                    </div>
+                  );
+                }}
+              />
+            ))}
+          </Switch>
+        </Router>
+      </NotificationContextProvider>
     </MuiThemeProvider>
   );
 };

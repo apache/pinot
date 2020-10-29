@@ -18,12 +18,22 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Grid } from '@material-ui/core';
+import { Grid, makeStyles } from '@material-ui/core';
 import { TableData } from 'Models';
 import { RouteComponentProps } from 'react-router-dom';
 import CustomizedTables from '../components/Table';
 import AppLoader from '../components/AppLoader';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
+import SimpleAccordion from '../components/SimpleAccordion';
+import CustomButton from '../components/CustomButton';
+
+const useStyles = makeStyles((theme) => ({
+  operationDiv: {
+    border: '1px #BDCCD9 solid',
+    borderRadius: 4,
+    marginBottom: 20
+  }
+}));
 
 type Props = {
   tenantName: string
@@ -31,14 +41,14 @@ type Props = {
 
 const TenantPage = ({ match }: RouteComponentProps<Props>) => {
 
-  const tenantName = match.params.tenantName;
+  const {tenantName} = match.params;
   const columnHeaders = ['Table Name', 'Reported Size', 'Estimated Size', 'Number of Segments', 'Status'];
   const [fetching, setFetching] = useState(true);
   const [tableData, setTableData] = useState<TableData>({
     columns: columnHeaders,
     records: []
   });
-  const [brokerData, setBrokerData] = useState([]);
+  const [brokerData, setBrokerData] = useState(null);
   const [serverData, setServerData] = useState([]);
 
   const fetchData = async () => {
@@ -46,16 +56,44 @@ const TenantPage = ({ match }: RouteComponentProps<Props>) => {
     const brokersData = await PinotMethodUtils.getBrokerOfTenant(tenantName);
     const serversData = await PinotMethodUtils.getServerOfTenant(tenantName);
     setTableData(tenantData);
-    setBrokerData(brokersData);
-    setServerData(serversData);
+    setBrokerData(brokersData || []);
+    setServerData(serversData || []);
     setFetching(false);
   };
   useEffect(() => {
     fetchData();
   }, []);
+
+  const classes = useStyles();
+
   return (
     fetching ? <AppLoader /> :
     <Grid item xs style={{ padding: 20, backgroundColor: 'white', maxHeight: 'calc(100vh - 70px)', overflowY: 'auto' }}>
+      <div className={classes.operationDiv}>
+        <SimpleAccordion
+          headerTitle="Operations"
+          showSearchBox={false}
+        >
+          <div>
+            <CustomButton
+              onClick={()=>{console.log('rebalance');}}
+              // tooltipTitle="Rebalance Server Tenant - Coming soon"
+              // enableTooltip={true}
+              isDisabled={true}
+            >
+              Rebalance Server Tenant
+            </CustomButton>
+            <CustomButton
+              onClick={()=>{console.log('rebuild');}}
+              // tooltipTitle="Rebuild Broker Resource - Coming soon"
+              // enableTooltip={true}
+              isDisabled={true}
+            >
+              Rebuild Broker Resource
+            </CustomButton>
+          </div>
+        </SimpleAccordion>
+      </div>
       <CustomizedTables
         title={tenantName}
         data={tableData}
@@ -71,11 +109,11 @@ const TenantPage = ({ match }: RouteComponentProps<Props>) => {
             title="Brokers"
             data={{
               columns: ['Instance Name'],
-              records: [brokerData]
+              records: brokerData.length > 0 ? [brokerData] : []
             }}
             isPagination
             addLinks
-            baseURL={'/instance/'}
+            baseURL="/instance/"
             showSearchBox={true}
             inAccordionFormat={true}
           />
@@ -85,11 +123,11 @@ const TenantPage = ({ match }: RouteComponentProps<Props>) => {
             title="Servers"
             data={{
               columns: ['Instance Name'],
-              records: [serverData]
+              records: serverData.length > 0 ? [serverData] : []
             }}
             isPagination
             addLinks
-            baseURL={'/instance/'}
+            baseURL="/instance/"
             showSearchBox={true}
             inAccordionFormat={true}
           />

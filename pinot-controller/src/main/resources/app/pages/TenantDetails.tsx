@@ -17,10 +17,10 @@
  * under the License.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
-import { Grid } from '@material-ui/core';
-import { RouteComponentProps } from 'react-router-dom';
+import { FormControlLabel, Grid, Switch } from '@material-ui/core';
+import { RouteComponentProps, useHistory, useLocation } from 'react-router-dom';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
 import { TableData } from 'Models';
 import _ from 'lodash';
@@ -33,6 +33,13 @@ import 'codemirror/mode/javascript/javascript';
 import 'codemirror/mode/sql/sql';
 import SimpleAccordion from '../components/SimpleAccordion';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
+import CustomButton from '../components/CustomButton';
+import EditConfigOp from '../components/Homepage/Operations/EditConfigOp';
+import ReloadStatusOp from '../components/Homepage/Operations/ReloadStatusOp';
+import RebalanceServerTableOp from '../components/Homepage/Operations/RebalanceServerTableOp';
+import Confirm from '../components/Confirm';
+import { NotificationContext } from '../components/Notification/NotificationContext';
+import Utils from '../utils/Utils';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -61,6 +68,11 @@ const useStyles = makeStyles((theme) => ({
     borderRadius: 4,
     marginBottom: '20px',
   },
+  operationDiv: {
+    border: '1px #BDCCD9 solid',
+    borderRadius: 4,
+    marginBottom: 20
+  }
 }));
 
 const jsonoptions = {
@@ -69,6 +81,7 @@ const jsonoptions = {
   styleActiveLine: true,
   gutters: ['CodeMirror-lint-markers'],
   theme: 'default',
+  readOnly: true
 };
 
 type Props = {
@@ -86,11 +99,28 @@ type Summary = {
 const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   const { tenantName, tableName, instanceName } = match.params;
   const classes = useStyles();
+  const history = useHistory();
+  const location = useLocation();
   const [fetching, setFetching] = useState(true);
   const [tableSummary, setTableSummary] = useState<Summary>({
     tableName: match.params.tableName,
     reportedSize: '',
     estimatedSize: '',
+  });
+
+  const [state, setState] = React.useState({
+    enabled: true,
+  });
+
+  const [confirmDialog, setConfirmDialog] = React.useState(false);
+  const [dialogDetails, setDialogDetails] = React.useState(null);
+  const {dispatch} = React.useContext(NotificationContext);
+
+  const [showEditConfig, setShowEditConfig] = useState(false);
+  const [config, setConfig] = useState('{}');
+  const [instanceCountData, setInstanceCountData] = useState<TableData>({
+    columns: [],
+    records: [],
   });
 
   const [segmentList, setSegmentList] = useState<TableData>({
@@ -102,9 +132,17 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
     columns: [],
     records: [],
   });
-  const [value, setValue] = useState('');
+  const [tableType, setTableType] = useState('');
+  const [tableConfig, setTableConfig] = useState('');
+  const [schemaJSON, setSchemaJSON] = useState(null);
+  const [actionType, setActionType] = useState(null);
+  const [showReloadStatusModal, setShowReloadStatusModal] = useState(false);
+  const [reloadStatusData, setReloadStatusData] = useState(null);
+  const [showRebalanceServerModal, setShowRebalanceServerModal] = useState(false);
+  const [schemaJSONFormat, setSchemaJSONFormat] = useState(false);
 
   const fetchTableData = async () => {
+    setFetching(true);
     const result = await PinotMethodUtils.getTableSummaryData(tableName);
     setTableSummary(result);
     fetchSegmentData();
@@ -112,24 +150,193 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
 
   const fetchSegmentData = async () => {
     const result = await PinotMethodUtils.getSegmentList(tableName);
-    setSegmentList(result);
+    const {columns, records, externalViewObj} = result;
+    const instanceObj = {};
+    Object.keys(externalViewObj).map((segmentName)=>{
+      const instanceKeys = Object.keys(externalViewObj[segmentName]);
+      instanceKeys.map((instanceName)=>{
+        if(!instanceObj[instanceName]){
+          instanceObj[instanceName] = 0;
+        }
+        instanceObj[instanceName] += 1;
+      })
+    });
+    const instanceRecords = [];
+    Object.keys(instanceObj).map((instanceName)=>{
+      instanceRecords.push([instanceName, instanceObj[instanceName]]);
+    })
+    setInstanceCountData({
+      columns: ["Instance Name", "# of segments"],
+      records: instanceRecords
+    });
+    setSegmentList({columns, records});
     fetchTableSchema();
   };
 
   const fetchTableSchema = async () => {
-    const result = await PinotMethodUtils.getTableSchemaData(tableName, true);
-    setTableSchema(result);
+    const result = await PinotMethodUtils.getTableSchemaData(tableName);
+    if(result.error){
+      setSchemaJSON(null);
+      setTableSchema({
+        columns: ['Column', 'Type', 'Field Type'],
+        records: []
+      });
+    } else {
+      setSchemaJSON(JSON.parse(JSON.stringify(result)));
+      const tableSchema = Utils.syncTableSchemaData(result, true);
+      setTableSchema(tableSchema);
+    }
     fetchTableJSON();
   };
 
   const fetchTableJSON = async () => {
     const result = await PinotMethodUtils.getTableDetails(tableName);
-    setValue(JSON.stringify(result, null, 2));
+    const tableObj:any = result.OFFLINE || result.REALTIME;
+    setTableType(tableObj.tableType);
+    setTableConfig(JSON.stringify(result, null, 2));
     setFetching(false);
   };
   useEffect(() => {
     fetchTableData();
   }, []);
+
+  const handleSwitchChange = (event) => {
+    setDialogDetails({
+      title: state.enabled ? 'Disable Table' : 'Enable Table',
+      content: `Are you sure want to ${state.enabled ? 'disable' : 'enable'} this table?`,
+      successCb: () => toggleTableState()
+    });
+    setConfirmDialog(true);
+  };
+
+  const toggleTableState = async () => {
+    const result = await PinotMethodUtils.toggleTableState(tableName, state.enabled ? 'disable' : 'enable', tableType.toLowerCase());
+    if(result[0].state){
+      if(result[0].state.successful){
+        dispatch({type: 'success', message: result[0].state.message, show: true});
+        setState({ enabled: !state.enabled });
+        fetchTableData();
+      } else {
+        dispatch({type: 'error', message: result[0].state.message, show: true});
+      }
+      closeDialog();
+    } else {
+      syncResponse(result);
+    }
+  };
+
+  const handleConfigChange = (value: string) => {
+    setConfig(value);
+  };
+
+  const saveConfigAction = async () => {
+    let configObj = JSON.parse(config);
+    if(actionType === 'editTable'){
+      if(configObj.OFFLINE || configObj.REALTIME){
+        configObj = configObj.OFFLINE || configObj.REALTIME;
+      }
+      const result = await PinotMethodUtils.updateTable(tableName, configObj);
+      syncResponse(result);
+    } else if(actionType === 'editSchema'){
+      const result = await PinotMethodUtils.updateSchema(schemaJSON.schemaName, configObj);
+      syncResponse(result);
+    }
+  };
+
+  const syncResponse = (result) => {
+    if(result.status){
+      dispatch({type: 'success', message: result.status, show: true});
+      fetchTableData();
+      setShowEditConfig(false);
+    } else {
+      dispatch({type: 'error', message: result.error, show: true});
+    }
+    closeDialog();
+  };
+
+  const handleDeleteTableAction = () => {
+    setDialogDetails({
+      title: 'Delete Table',
+      content: 'Are you sure want to delete this table? All data and configs will be deleted.',
+      successCb: () => deleteTable()
+    });
+    setConfirmDialog(true);
+  };
+
+  const deleteTable = async () => {
+    const result = await PinotMethodUtils.deleteTableOp(tableName);
+    if(result.status){
+      dispatch({type: 'success', message: result.status, show: true});
+    } else {
+      dispatch({type: 'error', message: result.error, show: true});
+    }
+    closeDialog();
+    if(result.status){
+      setTimeout(()=>{
+        history.push(Utils.navigateToPreviousPage(location, true));
+      }, 1000);
+    }
+  };
+
+  const handleDeleteSchemaAction = () => {
+    setDialogDetails({
+      title: 'Delete Schema',
+      content: 'Are you sure want to delete this schema? Any tables using this schema might not function correctly.',
+      successCb: () => deleteSchema()
+    });
+    setConfirmDialog(true);
+  };
+
+  const deleteSchema = async () => {
+    const result = await PinotMethodUtils.deleteSchemaOp(schemaJSON.schemaName);
+    syncResponse(result);
+  };
+
+  const handleReloadSegments = () => {
+    setDialogDetails({
+      title: 'Reload all segments',
+      content: 'Are you sure want to reload all the segments?',
+      successCb: () => reloadSegments()
+    });
+    setConfirmDialog(true);
+  };
+
+  const reloadSegments = async () => {
+    const result = await PinotMethodUtils.reloadAllSegmentsOp(tableName, tableType);
+    syncResponse(result);
+  };
+
+  const handleReloadStatus = async () => {
+    setShowReloadStatusModal(true);
+    const result = await PinotMethodUtils.reloadStatusOp(tableName, tableType);
+    if(result.error){
+      setShowReloadStatusModal(false);
+      dispatch({type: 'error', message: result.error, show: true});
+      setShowReloadStatusModal(false);
+      return;
+    }
+    setReloadStatusData(result);
+  };
+
+  const handleRebalanceBrokers = () => {
+    setDialogDetails({
+      title: 'Rebalance brokers',
+      content: 'Are you sure want to rebalance the brokers?',
+      successCb: () => rebalanceBrokers()
+    });
+    setConfirmDialog(true);
+  };
+  
+  const rebalanceBrokers = async () => {
+    const result = await PinotMethodUtils.rebalanceBrokersForTableOp(tableName);
+    syncResponse(result);
+  };
+
+  const closeDialog = () => {
+    setConfirmDialog(false);
+    setDialogDetails(null);
+  };
+
   return fetching ? (
     <AppLoader />
   ) : (
@@ -143,6 +350,98 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
         overflowY: 'auto',
       }}
     >
+      <div className={classes.operationDiv}>
+        <SimpleAccordion
+          headerTitle="Operations"
+          showSearchBox={false}
+        >
+          <div>
+            <CustomButton
+              onClick={()=>{
+                setActionType('editTable');
+                setConfig(tableConfig);
+                setShowEditConfig(true);
+              }}
+              tooltipTitle="Edit Table"
+              enableTooltip={true}
+            >
+              Edit Table
+            </CustomButton>
+            <CustomButton
+              onClick={handleDeleteTableAction}
+              tooltipTitle="Delete Table"
+              enableTooltip={true}
+            >
+              Delete Table
+            </CustomButton>
+            <CustomButton
+              onClick={()=>{
+                setActionType('editSchema');
+                setConfig(JSON.stringify(schemaJSON, null, 2));
+                setShowEditConfig(true);
+              }}
+              tooltipTitle="Edit Schema"
+              enableTooltip={true}
+            >
+              Edit Schema
+            </CustomButton>
+            <CustomButton
+              isDisabled={!schemaJSON} onClick={handleDeleteSchemaAction}
+              tooltipTitle="Delete Schema"
+              enableTooltip={true}
+            >
+              Delete Schema
+            </CustomButton>
+            <CustomButton
+              isDisabled={true} onClick={()=>{console.log('truncate table');}}
+              // tooltipTitle="Truncate Table"
+              // enableTooltip={true}
+            >
+              Truncate Table
+            </CustomButton>
+            <CustomButton
+              onClick={handleReloadSegments}
+              tooltipTitle="Reload All Segments"
+              enableTooltip={true}
+            >
+              Reload All Segments
+            </CustomButton>
+            <CustomButton
+              onClick={handleReloadStatus}
+              tooltipTitle="Reload Status"
+              enableTooltip={true}
+            >
+              Reload Status
+            </CustomButton>
+            <CustomButton
+              onClick={()=>{setShowRebalanceServerModal(true);}}
+              tooltipTitle="Rebalance Servers"
+              enableTooltip={true}
+            >
+              Rebalance Servers
+            </CustomButton>
+            <CustomButton
+              onClick={handleRebalanceBrokers}
+              tooltipTitle="Rebalance Brokers"
+              enableTooltip={true}
+            >
+              Rebalance Brokers
+            </CustomButton>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={state.enabled}
+                  onChange={handleSwitchChange}
+                  name="enabled"
+                  color="primary"
+                  disabled={true}
+                />
+              }
+              label="Enable"
+            />
+          </div>
+        </SimpleAccordion>
+      </div>
       <div className={classes.highlightBackground}>
         <TableToolbar name="Summary" showSearchBox={false} />
         <Grid container className={classes.body}>
@@ -168,7 +467,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
             >
               <CodeMirror
                 options={jsonoptions}
-                value={value}
+                value={tableConfig}
                 className={classes.queryOutput}
                 autoCursor={false}
               />
@@ -180,23 +479,88 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
             isPagination={false}
             noOfRows={segmentList.records.length}
             baseURL={
-              tenantName ? `/tenants/${tenantName}/table/${tableName}/` :  `/instance/${instanceName}/table/${tableName}/`}
+              tenantName ? `/tenants/${tenantName}/table/${tableName}/` :  `/instance/${instanceName}/table/${tableName}/`
+            }
             addLinks
             showSearchBox={true}
             inAccordionFormat={true}
           />
         </Grid>
         <Grid item xs={6}>
+          {!schemaJSONFormat ?
+            <CustomizedTables
+              title="Table Schema"
+              data={tableSchema}
+              isPagination={false}
+              noOfRows={tableSchema.records.length}
+              showSearchBox={true}
+              inAccordionFormat={true}
+              accordionToggleObject={{
+                toggleName: "JSON Format",
+                toggleValue: schemaJSONFormat,
+                toggleChangeHandler: ()=>{setSchemaJSONFormat(!schemaJSONFormat);}
+              }}
+            />
+          :
+          <div className={classes.sqlDiv}>
+            <SimpleAccordion
+              headerTitle="Table Schema"
+              showSearchBox={false}
+              accordionToggleObject={{
+                toggleName: "JSON Format",
+                toggleValue: schemaJSONFormat,
+                toggleChangeHandler: ()=>{setSchemaJSONFormat(!schemaJSONFormat);}
+              }}
+            >
+              <CodeMirror
+                options={jsonoptions}
+                value={JSON.stringify(schemaJSON, null, 2)}
+                className={classes.queryOutput}
+                autoCursor={false}
+              />
+            </SimpleAccordion>
+          </div>
+          }
           <CustomizedTables
-            title="Table Schema"
-            data={tableSchema}
+            title="Instance Count"
+            data={instanceCountData}
             isPagination={false}
-            noOfRows={tableSchema.records.length}
+            noOfRows={instanceCountData.records.length}
             showSearchBox={true}
             inAccordionFormat={true}
           />
         </Grid>
       </Grid>
+      <EditConfigOp
+        showModal={showEditConfig}
+        hideModal={()=>{setShowEditConfig(false);}}
+        saveConfig={saveConfigAction}
+        config={config}
+        handleConfigChange={handleConfigChange}
+      />
+      {
+        showReloadStatusModal &&
+        <ReloadStatusOp
+          hideModal={()=>{setShowReloadStatusModal(false); setReloadStatusData(null)}}
+          data={reloadStatusData}
+        />
+      }
+      {showRebalanceServerModal &&
+        <RebalanceServerTableOp
+          hideModal={()=>{setShowRebalanceServerModal(false)}}
+          tableType={tableType.toUpperCase()}
+          tableName={tableName}
+        />
+      }
+      {confirmDialog && dialogDetails && <Confirm
+        openDialog={confirmDialog}
+        dialogTitle={dialogDetails.title}
+        dialogContent={dialogDetails.content}
+        successCallback={dialogDetails.successCb}
+        closeDialog={closeDialog}
+        dialogYesLabel='Yes'
+        dialogNoLabel='No'
+      />}
     </Grid>
   );
 };
