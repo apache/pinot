@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -68,9 +69,10 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   }
 
   @Override
-  public void init(Set<String> enabledInstances, ExternalView externalView, Set<String> onlineSegments) {
+  public void init(Set<String> enabledInstances, ExternalView externalView, IdealState idealState,
+      Set<String> onlineSegments) {
     _enabledInstances = enabledInstances;
-    onExternalViewChange(externalView, onlineSegments);
+    onExternalViewChange(externalView, idealState, onlineSegments);
   }
 
   /**
@@ -126,47 +128,28 @@ abstract class BaseInstanceSelector implements InstanceSelector {
    * {@inheritDoc}
    *
    * <p>Updates the cached maps ({@code segmentToOnlineInstancesMap}, {@code segmentToOfflineInstancesMap} and
-   * {@code instanceToSegmentsMap}) based on the given ExternalView and re-calculates
-   * {@code segmentToEnabledInstancesMap} and {@code unavailableSegments} based on the cached states.
+   * {@code instanceToSegmentsMap}) and re-calculates {@code segmentToEnabledInstancesMap} and
+   * {@code unavailableSegments} based on the cached states.
    */
   @Override
-  public void onExternalViewChange(ExternalView externalView, Set<String> onlineSegments) {
-    Map<String, Map<String, String>> segmentAssignment = externalView.getRecord().getMapFields();
-    int numSegments = segmentAssignment.size();
-    _segmentToOnlineInstancesMap = new HashMap<>(HashUtil.getHashMapCapacity(numSegments));
-    _segmentToOfflineInstancesMap = new HashMap<>(HashUtil.getHashMapCapacity(numSegments));
+  public void onExternalViewChange(ExternalView externalView, IdealState idealState, Set<String> onlineSegments) {
+    int numSegments = onlineSegments.size();
+    int segmentMapCapacity = HashUtil.getHashMapCapacity(numSegments);
+    _segmentToOnlineInstancesMap = new HashMap<>(segmentMapCapacity);
+    _segmentToOfflineInstancesMap = new HashMap<>(segmentMapCapacity);
     if (_instanceToSegmentsMap != null) {
       _instanceToSegmentsMap = new HashMap<>(HashUtil.getHashMapCapacity(_instanceToSegmentsMap.size()));
     } else {
       _instanceToSegmentsMap = new HashMap<>();
     }
 
-    for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
-      String segment = entry.getKey();
-      Map<String, String> instanceStateMap = entry.getValue();
-      // NOTE: Instances will be sorted here because 'instanceStateMap' is a TreeMap
-      List<String> onlineInstances = new ArrayList<>(instanceStateMap.size());
-      List<String> offlineInstances = new ArrayList<>(instanceStateMap.size());
-      _segmentToOnlineInstancesMap.put(segment, onlineInstances);
-      _segmentToOfflineInstancesMap.put(segment, offlineInstances);
-      for (Map.Entry<String, String> instanceStateEntry : instanceStateMap.entrySet()) {
-        String instance = instanceStateEntry.getKey();
-        String state = instanceStateEntry.getValue();
-        // Do not track instances in ERROR state
-        if (!state.equals(SegmentStateModel.ERROR)) {
-          _instanceToSegmentsMap.computeIfAbsent(instance, k -> new ArrayList<>()).add(segment);
-          if (state.equals(SegmentStateModel.OFFLINE)) {
-            offlineInstances.add(instance);
-          } else {
-            onlineInstances.add(instance);
-          }
-        }
-      }
-    }
+    // Update the cached maps
+    updateSegmentMaps(externalView, idealState, onlineSegments, _segmentToOnlineInstancesMap,
+        _segmentToOfflineInstancesMap, _instanceToSegmentsMap);
 
     // Generate a new map from segment to enabled ONLINE/CONSUMING instances and a new set of unavailable segments (no
     // enabled instance or all enabled instances are in ERROR state)
-    Map<String, List<String>> segmentToEnabledInstancesMap = new HashMap<>(HashUtil.getHashMapCapacity(numSegments));
+    Map<String, List<String>> segmentToEnabledInstancesMap = new HashMap<>(segmentMapCapacity);
     Set<String> unavailableSegments = new HashSet<>();
     // NOTE: Put null as the value when there is no enabled instances for a segment so that segmentToEnabledInstancesMap
     // always contains all segments. With this, in onInstancesChange() we can directly iterate over
@@ -180,6 +163,42 @@ abstract class BaseInstanceSelector implements InstanceSelector {
 
     _segmentToEnabledInstancesMap = segmentToEnabledInstancesMap;
     _unavailableSegments = unavailableSegments;
+  }
+
+  /**
+   * Updates the segment maps based on the given external view, ideal state and online segments (segments with
+   * ONLINE/CONSUMING instances in the ideal state and selected by the pre-selector).
+   */
+  void updateSegmentMaps(ExternalView externalView, IdealState idealState, Set<String> onlineSegments,
+      Map<String, List<String>> segmentToOnlineInstancesMap, Map<String, List<String>> segmentToOfflineInstancesMap,
+      Map<String, List<String>> instanceToSegmentsMap) {
+    // Iterate over the external view instead of the online segments so that the map lookups are performed on the
+    // HashSet instead of the TreeSet for performance
+    for (Map.Entry<String, Map<String, String>> entry : externalView.getRecord().getMapFields().entrySet()) {
+      String segment = entry.getKey();
+      if (!onlineSegments.contains(segment)) {
+        continue;
+      }
+      // NOTE: Instances will be sorted here because 'instanceStateMap' is a TreeMap.
+      Map<String, String> instanceStateMap = entry.getValue();
+      List<String> onlineInstances = new ArrayList<>(instanceStateMap.size());
+      List<String> offlineInstances = new ArrayList<>();
+      segmentToOnlineInstancesMap.put(segment, onlineInstances);
+      segmentToOfflineInstancesMap.put(segment, offlineInstances);
+      for (Map.Entry<String, String> instanceStateEntry : instanceStateMap.entrySet()) {
+        String instance = instanceStateEntry.getKey();
+        String state = instanceStateEntry.getValue();
+        // Do not track instances in ERROR state
+        if (!state.equals(SegmentStateModel.ERROR)) {
+          instanceToSegmentsMap.computeIfAbsent(instance, k -> new ArrayList<>()).add(segment);
+          if (state.equals(SegmentStateModel.OFFLINE)) {
+            offlineInstances.add(instance);
+          } else {
+            onlineInstances.add(instance);
+          }
+        }
+      }
+    }
   }
 
   /**

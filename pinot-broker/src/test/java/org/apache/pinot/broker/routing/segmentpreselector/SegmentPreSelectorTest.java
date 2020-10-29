@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.broker.routing.segmentselector;
+package org.apache.pinot.broker.routing.segmentpreselector;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -49,7 +49,7 @@ public class SegmentPreSelectorTest {
     Set<String> onlineSegments = new HashSet<>();
 
     int numOfflineSegments = 5;
-    for (int i = 0 ; i< numOfflineSegments; i++ ) {
+    for (int i = 0; i < numOfflineSegments; i++) {
       String segmentName = "segment_" + i;
       externalView.setStateMap(segmentName, onlineInstanceStateMap);
       onlineSegments.add(segmentName);

@@ -29,6 +29,7 @@ import javax.annotation.Nullable;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.CommonConstants;
@@ -82,21 +83,22 @@ public class TimeBoundaryManager {
 
     // For HOURLY table with time unit other than DAYS, use (maxEndTime - 1 HOUR) as the time boundary; otherwise, use
     // (maxEndTime - 1 DAY)
-    _isHourlyTable = CommonConstants.Table.PUSH_FREQUENCY_HOURLY.equalsIgnoreCase(tableConfig.getValidationConfig().getSegmentPushFrequency())
-        && _timeUnit != TimeUnit.DAYS;
+    _isHourlyTable = CommonConstants.Table.PUSH_FREQUENCY_HOURLY
+        .equalsIgnoreCase(tableConfig.getValidationConfig().getSegmentPushFrequency()) && _timeUnit != TimeUnit.DAYS;
 
     LOGGER.info("Constructed TimeBoundaryManager with timeColumn: {}, timeUnit: {}, isHourlyTable: {} for table: {}",
         _timeColumn, _timeUnit, _isHourlyTable, _offlineTableName);
   }
 
   /**
-   * Initializes the time boundary manager with the external view and online segments (segments with ONLINE/CONSUMING
-   * instances in ideal state). Should be called only once before calling other methods.
-   * <p>NOTE: {@code externalView} is unused, but intentionally passed in as argument in case it is needed in the
-   * future.
+   * Initializes the time boundary manager with the external view, ideal state and online segments (segments with
+   * ONLINE/CONSUMING instances in the ideal state and selected by the pre-selector). Should be called only once before
+   * calling other methods.
+   * <p>NOTE: {@code externalView} and {@code idealState} are unused, but intentionally passed in in case they are
+   * needed in the future.
    */
   @SuppressWarnings("unused")
-  public void init(ExternalView externalView, Set<String> onlineSegments) {
+  public void init(ExternalView externalView, IdealState idealState, Set<String> onlineSegments) {
     // Bulk load time info for all online segments
     int numSegments = onlineSegments.size();
     List<String> segments = new ArrayList<>(numSegments);
@@ -161,15 +163,16 @@ public class TimeBoundaryManager {
   }
 
   /**
-   * Processes the external view change based on the given online segments (segments with ONLINE/CONSUMING instances in
-   * ideal state).
+   * Processes the external view change based on the given ideal state and online segments (segments with
+   * ONLINE/CONSUMING instances in the ideal state and selected by the pre-selector).
    * <p>NOTE: We don't update all the segment ZK metadata for every external view change, but only the new added/removed
    * ones. The refreshed segment ZK metadata change won't be picked up.
-   * <p>NOTE: {@code externalView} is unused, but intentionally passed in as argument in case it is needed in the
-   * future.
+   * <p>NOTE: {@code externalView} and {@code idealState} are unused, but intentionally passed in in case they are
+   * needed in the future.
    */
   @SuppressWarnings("unused")
-  public synchronized void onExternalViewChange(ExternalView externalView, Set<String> onlineSegments) {
+  public synchronized void onExternalViewChange(ExternalView externalView, IdealState idealState,
+      Set<String> onlineSegments) {
     for (String segment : onlineSegments) {
       _endTimeMap.computeIfAbsent(segment, k -> extractEndTimeFromSegmentZKMetadataZNRecord(segment,
           _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT)));

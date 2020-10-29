@@ -16,20 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.broker.routing.segmentselector;
+package org.apache.pinot.broker.routing.segmentpreselector;
 
-import org.apache.helix.ZNRecord;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.pinot.spi.config.table.TableConfig;
+import java.util.Set;
 
 
-public class SegmentPreSelectorFactory {
-  private SegmentPreSelectorFactory() {
-  }
+/**
+ * The segment pre-selector filters the unnecessary online segments for the query.
+ * <p>Segment pre-selector examples:
+ * <ul>
+ *   <li>
+ *     For table with segment merge/rollup enabled, select the merged segments over the original segments with the same
+ *     data
+ *   </li>
+ * </ul>
+ */
+public interface SegmentPreSelector {
 
-  public static SegmentPreSelector getSegmentPreSelector(TableConfig tableConfig,
-      ZkHelixPropertyStore<ZNRecord> propertyStore) {
-    String tableNameWithType = tableConfig.getTableName();
-    return new SegmentLineageBasedSegmentPreSelector(tableNameWithType, propertyStore);
-  }
+  /**
+   * Pre-selects the online segments to filter out the unnecessary segments. This method might modify the online segment
+   * set passed in.
+   */
+  Set<String> preSelect(Set<String> onlineSegments);
 }

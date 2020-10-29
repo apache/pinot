@@ -242,7 +242,7 @@ public final class TableConfigUtils {
    * Validates the upsert-related configurations
    *  - check table type is realtime
    *  - the primary key exists on the schema
-   *  - replica group is configured for routing type
+   *  - strict replica-group is configured for routing type
    *  - consumer type must be low-level
    */
   protected static void validateUpsertConfig(TableConfig tableConfig, Schema schema) {
@@ -265,9 +265,9 @@ public final class TableConfigUtils {
         "Upsert table must use low-level streaming consumer type");
     // replica group is configured for routing
     Preconditions.checkState(
-        tableConfig.getRoutingConfig() != null && RoutingConfig.REPLICA_GROUP_INSTANCE_SELECTOR_TYPE
+        tableConfig.getRoutingConfig() != null && RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE
             .equalsIgnoreCase(tableConfig.getRoutingConfig().getInstanceSelectorType()),
-        "Upsert table must use replica-group (i.e. replicaGroup) based routing");
+        "Upsert table must use strict replica-group (i.e. strictReplicaGroup) based routing");
     // no startree index
     Preconditions.checkState(
         CollectionUtils.isEmpty(tableConfig.getIndexingConfig().getStarTreeIndexConfigs()) && !tableConfig
