@@ -48,7 +48,7 @@ const TenantPage = ({ match }: RouteComponentProps<Props>) => {
     columns: columnHeaders,
     records: []
   });
-  const [brokerData, setBrokerData] = useState([]);
+  const [brokerData, setBrokerData] = useState(null);
   const [serverData, setServerData] = useState([]);
 
   const fetchData = async () => {
@@ -56,8 +56,8 @@ const TenantPage = ({ match }: RouteComponentProps<Props>) => {
     const brokersData = await PinotMethodUtils.getBrokerOfTenant(tenantName);
     const serversData = await PinotMethodUtils.getServerOfTenant(tenantName);
     setTableData(tenantData);
-    setBrokerData(brokersData);
-    setServerData(serversData);
+    setBrokerData(brokersData || []);
+    setServerData(serversData || []);
     setFetching(false);
   };
   useEffect(() => {
@@ -109,7 +109,7 @@ const TenantPage = ({ match }: RouteComponentProps<Props>) => {
             title="Brokers"
             data={{
               columns: ['Instance Name'],
-              records: [brokerData]
+              records: brokerData.length > 0 ? [brokerData] : []
             }}
             isPagination
             addLinks
@@ -123,7 +123,7 @@ const TenantPage = ({ match }: RouteComponentProps<Props>) => {
             title="Servers"
             data={{
               columns: ['Instance Name'],
-              records: [serverData]
+              records: serverData.length > 0 ? [serverData] : []
             }}
             isPagination
             addLinks

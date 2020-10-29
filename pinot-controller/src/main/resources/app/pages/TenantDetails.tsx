@@ -434,6 +434,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
                   onChange={handleSwitchChange}
                   name="enabled"
                   color="primary"
+                  disabled={true}
                 />
               }
               label="Enable"

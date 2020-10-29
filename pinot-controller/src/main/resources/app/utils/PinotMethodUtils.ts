@@ -296,6 +296,13 @@ const getQueryResults = (params, url, checkedOptions) => {
 //      /tables/:tableName/externalview
 // Expected Output: {columns: [], records: []}
 const getTenantTableData = (tenantName) => {
+  return getTenantTable(tenantName).then(({ data }) => {
+    const tableArr = data.tables.map((table) => table);
+    return getAllTableDetails(tableArr);
+  });
+};
+
+const getAllTableDetails = (tablesList) => {
   const columnHeaders = [
     'Table Name',
     'Reported Size',
@@ -303,67 +310,64 @@ const getTenantTableData = (tenantName) => {
     'Number of Segments',
     'Status',
   ];
-  return getTenantTable(tenantName).then(({ data }) => {
-    const tableArr = data.tables.map((table) => table);
-    if (tableArr.length) {
-      const promiseArr = [];
-      tableArr.map((name) => {
-        promiseArr.push(getTableSize(name));
-        promiseArr.push(getIdealState(name));
-        promiseArr.push(getExternalView(name));
-      });
+  if (tablesList.length) {
+    const promiseArr = [];
+    tablesList.map((name) => {
+      promiseArr.push(getTableSize(name));
+      promiseArr.push(getIdealState(name));
+      promiseArr.push(getExternalView(name));
+    });
 
-      return Promise.all(promiseArr).then((results) => {
-        const finalRecordsArr = [];
-        let singleTableData = [];
-        let idealStateObj = null;
-        let externalViewObj = null;
-        results.map((result, index) => {
-          // since we have 3 promises, we are using mod 3 below
-          if (index % 3 === 0) {
-            // response of getTableSize API
-            const {
-              tableName,
-              reportedSizeInBytes,
-              estimatedSizeInBytes,
-            } = result.data;
-            singleTableData.push(
-              tableName,
-              reportedSizeInBytes,
-              estimatedSizeInBytes
-            );
-          } else if (index % 3 === 1) {
-            // response of getIdealState API
-            idealStateObj = result.data.OFFLINE || result.data.REALTIME;
-          } else if (index % 3 === 2) {
-            // response of getExternalView API
-            externalViewObj = result.data.OFFLINE || result.data.REALTIME;
-            const externalSegmentCount = Object.keys(externalViewObj).length;
-            const idealSegmentCount = Object.keys(idealStateObj).length;
-            // Generating data for the record
-            singleTableData.push(
-              `${externalSegmentCount} / ${idealSegmentCount}`,
-              Utils.getSegmentStatus(idealStateObj, externalViewObj)
-            );
-            // saving into records array
-            finalRecordsArr.push(singleTableData);
-            // resetting the required variables
-            singleTableData = [];
-            idealStateObj = null;
-            externalViewObj = null;
-          }
-        });
-        return {
-          columns: columnHeaders,
-          records: finalRecordsArr,
-        };
+    return Promise.all(promiseArr).then((results) => {
+      const finalRecordsArr = [];
+      let singleTableData = [];
+      let idealStateObj = null;
+      let externalViewObj = null;
+      results.map((result, index) => {
+        // since we have 3 promises, we are using mod 3 below
+        if (index % 3 === 0) {
+          // response of getTableSize API
+          const {
+            tableName,
+            reportedSizeInBytes,
+            estimatedSizeInBytes,
+          } = result.data;
+          singleTableData.push(
+            tableName,
+            reportedSizeInBytes,
+            estimatedSizeInBytes
+          );
+        } else if (index % 3 === 1) {
+          // response of getIdealState API
+          idealStateObj = result.data.OFFLINE || result.data.REALTIME;
+        } else if (index % 3 === 2) {
+          // response of getExternalView API
+          externalViewObj = result.data.OFFLINE || result.data.REALTIME;
+          const externalSegmentCount = Object.keys(externalViewObj).length;
+          const idealSegmentCount = Object.keys(idealStateObj).length;
+          // Generating data for the record
+          singleTableData.push(
+            `${externalSegmentCount} / ${idealSegmentCount}`,
+            Utils.getSegmentStatus(idealStateObj, externalViewObj)
+          );
+          // saving into records array
+          finalRecordsArr.push(singleTableData);
+          // resetting the required variables
+          singleTableData = [];
+          idealStateObj = null;
+          externalViewObj = null;
+        }
       });
-    }
-    return {
-      columns: columnHeaders,
-      records: []
-    };
-  });
+      return {
+        columns: columnHeaders,
+        records: finalRecordsArr,
+      };
+    });
+  }
+  return {
+    columns: columnHeaders,
+    records: []
+  };
 };
 
 // This method is used to display summary of a particular tenant table
@@ -558,13 +562,13 @@ const deleteNode = (path) => {
 
 const getBrokerOfTenant = (tenantName) => {
   return getBrokerListOfTenant(tenantName).then((response)=>{
-    return response.data;
+    return !response.data.error ? response.data : [];
   });
 };
 
 const getServerOfTenant = (tenantName) => {
   return getServerListOfTenant(tenantName).then((response)=>{
-    return response.data.ServerInstances;
+    return !response.data.error ? response.data.ServerInstances : [];
   });
 };
 
@@ -662,6 +666,7 @@ export default {
   getTableSchemaData,
   getQueryResults,
   getTenantTableData,
+  getAllTableDetails,
   getTableSummaryData,
   getSegmentList,
   getTableDetails,
