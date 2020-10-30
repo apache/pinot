@@ -273,7 +273,11 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
     closeDialog();
     if(result.status){
       setTimeout(()=>{
-        history.push(Utils.navigateToPreviousPage(location, true));
+        if(tenantName){
+          history.push(Utils.navigateToPreviousPage(location, true));  
+        } else {
+          history.push('/tables');
+        }
       }, 1000);
     }
   };

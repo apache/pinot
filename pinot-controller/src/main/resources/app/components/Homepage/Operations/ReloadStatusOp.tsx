@@ -22,7 +22,6 @@ import { CircularProgress, createStyles, DialogContent, makeStyles, Paper, Table
 import Dialog from '../../CustomDialog';
 import CloseIcon from '@material-ui/icons/Close';
 import CheckIcon from '@material-ui/icons/Check';
-import { red } from '@material-ui/core/colors';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -71,7 +70,7 @@ export default function ReloadStatusOp({
       handleClose={hideModal}
       title="Reload Status"
       showOkBtn={false}
-      largeSize={true}
+      size='lg'
     >
       {!data ?
         <div className={classes.root}><CircularProgress/></div>

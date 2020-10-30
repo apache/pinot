@@ -57,7 +57,12 @@ import {
   reloadAllSegments,
   reloadStatus,
   rebalanceServersForTable,
-  rebalanceBrokersForTable
+  rebalanceBrokersForTable,
+  validateSchema,
+  validateTable,
+  saveSchema,
+  saveTable,
+  getSchema
 } from '../requests';
 import Utils from './Utils';
 
@@ -657,6 +662,36 @@ const rebalanceBrokersForTableOp = (tableName) => {
   });
 };
 
+const validateSchemaAction = (schemaObj) => {
+  return validateSchema(schemaObj).then((response)=>{
+    return response.data;
+  });
+};
+
+const validateTableAction = (tableObj) => {
+  return validateTable(tableObj).then((response)=>{
+    return response.data;
+  });
+};
+
+const saveSchemaAction = (schemaObj) => {
+  return saveSchema(schemaObj).then((response)=>{
+    return response.data;
+  });
+};
+
+const saveTableAction = (tableObj) => {
+  return saveTable(tableObj).then((response)=>{
+    return response.data;
+  });
+};
+
+const getSchemaData = (schemaName) => {
+  return getSchema(schemaName).then((response)=>{
+    return response.data;
+  });
+};
+
 export default {
   getTenantsData,
   getAllInstances,
@@ -696,5 +731,10 @@ export default {
   deleteTableOp,
   deleteSchemaOp,
   rebalanceServersForTableOp,
-  rebalanceBrokersForTableOp
+  rebalanceBrokersForTableOp,
+  validateSchemaAction,
+  validateTableAction,
+  saveSchemaAction,
+  saveTableAction,
+  getSchemaData
 };

@@ -27,6 +27,7 @@ import 'codemirror/mode/javascript/javascript';
 import 'codemirror/addon/lint/lint';
 import 'codemirror/addon/lint/json-lint';
 import { makeStyles } from '@material-ui/core';
+import clsx from 'clsx';
 
 declare global {
   interface Window {
@@ -39,7 +40,8 @@ window.jsonlint = require('jsonlint');
 type Props = {
   data: Object,
   isEditable?: Object,
-  returnCodemirrorValue?: Function
+  returnCodemirrorValue?: Function,
+  customClass?: string
 };
 
 const useStyles = makeStyles((theme) => ({
@@ -48,7 +50,7 @@ const useStyles = makeStyles((theme) => ({
   }
 }));
 
-const CustomCodemirror = ({data, isEditable, returnCodemirrorValue}: Props) => {
+const CustomCodemirror = ({data, isEditable, returnCodemirrorValue, customClass = ''}: Props) => {
   const classes = useStyles();
 
   const jsonoptions = {
@@ -65,7 +67,7 @@ const CustomCodemirror = ({data, isEditable, returnCodemirrorValue}: Props) => {
     <CodeMirror
       options={jsonoptions}
       value={typeof data === 'string' ? data : JSON.stringify(data, null, 2)}
-      className={classes.codeMirror}
+      className={clsx(classes.codeMirror, customClass)}
       autoCursor={false}
       onChange={(editor, d, value) => {
         returnCodemirrorValue && returnCodemirrorValue(value);
