@@ -59,6 +59,9 @@ includeFileNamePattern: 'glob:**/*.avro'
 # outputDirURI: Root directory of output segments, expected to have scheme configured in PinotFS.
 outputDirURI: 'examples/batch/airlineStats/segments'
 
+# segmentCreationJobParallelism: Parallelism to build Pinot segments.
+segmentCreationJobParallelism: 4
+
 # overwriteOutput: Overwrite output segments if existed.
 overwriteOutput: true
 
