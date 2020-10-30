@@ -24,6 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.slf4j.Logger;
@@ -32,7 +33,10 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Manages the upsert metadata per partition.
- * <p>For multiple records with the same timestamp, there is no guarantee on which record to be preserved.
+ * <p>For multiple records with the same timestamp, the manager will preserve the latest record based on the sequence
+ * number of the segment. If 2 records with the same timestamp are in the same segment, the one with larger doc id will
+ * be preserved. Note that for tables with sorted column, the records will be re-ordered when committing the segment,
+ * and we will use the re-ordered doc ids instead of the ingestion order to decide which record to preserve.
  * <p>There will be short term inconsistency when updating the upsert metadata, but should be consistent after the
  * operation is done:
  * <ul>
@@ -83,34 +87,35 @@ public class PartitionUpsertMetadataManager {
           if (segmentName.equals(currentRecordLocation.getSegmentName())) {
             // The current record location has the same segment name
 
-            if (validDocIds == currentRecordLocation.getValidDocIds()) {
-              // The current record location is pointing to the new segment being loaded
-
-              // Update the record location when getting a newer timestamp
-              if (recordInfo._timestamp > currentRecordLocation.getTimestamp()) {
+            // Update the record location when the new timestamp is greater than or equal to the current timestamp.
+            // There are 2 scenarios:
+            //   1. The current record location is pointing to the same segment (the segment being added). In this case,
+            //      we want to update the record location when there is a tie to keep the newer record. Note that the
+            //      record info iterator will return records with incremental doc ids.
+            //   2. The current record location is pointing to the old segment being replaced. This could happen when
+            //      committing a consuming segment, or reloading a completed segment. In this case, we want to update
+            //      the record location when there is a tie because the record locations should point to the new added
+            //      segment instead of the old segment being replaced. Also, do not update the valid doc ids for the old
+            //      segment because it has not been replaced yet.
+            if (recordInfo._timestamp >= currentRecordLocation.getTimestamp()) {
+              // Only update the valid doc ids for the new segment
+              if (validDocIds == currentRecordLocation.getValidDocIds()) {
                 validDocIds.remove(currentRecordLocation.getDocId());
-                validDocIds.add(recordInfo._docId);
-                return new RecordLocation(segmentName, recordInfo._docId, recordInfo._timestamp, validDocIds);
               }
+              validDocIds.add(recordInfo._docId);
+              return new RecordLocation(segmentName, recordInfo._docId, recordInfo._timestamp, validDocIds);
             } else {
-              // The current record location is pointing to the old segment being replaced. This could happen when
-              // committing a consuming segment, or reloading a completed segment.
-
-              // Update the record location when the new timestamp is greater than or equal to the current timestamp.
-              // Update the record location when there is a tie because the record locations should point to the new
-              // segment instead of the old segment being replaced. Also, do not update the valid doc ids for the old
-              // segment because it has not been replaced yet.
-              if (recordInfo._timestamp >= currentRecordLocation.getTimestamp()) {
-                validDocIds.add(recordInfo._docId);
-                return new RecordLocation(segmentName, recordInfo._docId, recordInfo._timestamp, validDocIds);
-              }
+              return currentRecordLocation;
             }
-            return currentRecordLocation;
           } else {
             // The current record location is pointing to a different segment
 
-            // Update the record location when getting a newer timestamp
-            if (recordInfo._timestamp > currentRecordLocation.getTimestamp()) {
+            // Update the record location when getting a newer timestamp, or the timestamp is the same as the current
+            // timestamp, but the segment has a larger sequence number (the segment is newer than the current segment).
+            if (recordInfo._timestamp > currentRecordLocation.getTimestamp() || (
+                recordInfo._timestamp == currentRecordLocation.getTimestamp()
+                    && LLCSegmentName.getSequenceNumber(segmentName) > LLCSegmentName
+                    .getSequenceNumber(currentRecordLocation.getSegmentName()))) {
               currentRecordLocation.getValidDocIds().remove(currentRecordLocation.getDocId());
               validDocIds.add(recordInfo._docId);
               return new RecordLocation(segmentName, recordInfo._docId, recordInfo._timestamp, validDocIds);
@@ -139,8 +144,9 @@ public class PartitionUpsertMetadataManager {
       if (currentRecordLocation != null) {
         // Existing primary key
 
-        // Update the record location when getting a newer timestamp
-        if (recordInfo._timestamp > currentRecordLocation.getTimestamp()) {
+        // Update the record location when the new timestamp is greater than or equal to the current timestamp. Update
+        // the record location when there is a tie to keep the newer record.
+        if (recordInfo._timestamp >= currentRecordLocation.getTimestamp()) {
           currentRecordLocation.getValidDocIds().remove(currentRecordLocation.getDocId());
           validDocIds.add(recordInfo._docId);
           return new RecordLocation(segmentName, recordInfo._docId, recordInfo._timestamp, validDocIds);

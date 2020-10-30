@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils;
 
+import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
@@ -35,11 +36,11 @@ public class LLCSegmentName extends SegmentName implements Comparable {
       throw new RuntimeException(segmentName + " is not a Low level consumer segment name");
     }
 
-    String[] parts = segmentName.split(SEPARATOR);
     _segmentName = segmentName;
+    String[] parts = StringUtils.splitByWholeSeparator(segmentName, SEPARATOR);
     _tableName = parts[0];
-    _partitionId = Integer.valueOf(parts[1]);
-    _sequenceNumber = Integer.valueOf(parts[2]);
+    _partitionId = Integer.parseInt(parts[1]);
+    _sequenceNumber = Integer.parseInt(parts[2]);
     _creationTime = parts[3];
   }
 
@@ -54,6 +55,13 @@ public class LLCSegmentName extends SegmentName implements Comparable {
     DateTime dateTime = new DateTime(msSinceEpoch, DateTimeZone.UTC);
     _creationTime = dateTime.toString(DATE_FORMAT);
     _segmentName = tableName + SEPARATOR + partitionId + SEPARATOR + sequenceNumber + SEPARATOR + _creationTime;
+  }
+
+  /**
+   * Returns the sequence number of the given segment name.
+   */
+  public static int getSequenceNumber(String segmentName) {
+    return Integer.parseInt(StringUtils.splitByWholeSeparator(segmentName, SEPARATOR)[2]);
   }
 
   @Override
