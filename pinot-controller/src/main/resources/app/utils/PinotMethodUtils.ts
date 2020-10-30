@@ -344,10 +344,10 @@ const getAllTableDetails = (tablesList) => {
           );
         } else if (index % 3 === 1) {
           // response of getIdealState API
-          idealStateObj = result.data.OFFLINE || result.data.REALTIME;
+          idealStateObj = result.data.OFFLINE || result.data.REALTIME || {};
         } else if (index % 3 === 2) {
           // response of getExternalView API
-          externalViewObj = result.data.OFFLINE || result.data.REALTIME;
+          externalViewObj = result.data.OFFLINE || result.data.REALTIME || {};
           const externalSegmentCount = Object.keys(externalViewObj).length;
           const idealSegmentCount = Object.keys(idealStateObj).length;
           // Generating data for the record

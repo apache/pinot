@@ -56,7 +56,7 @@ const defaultTableObj = {
     "schemaName": "",
     "timeColumnName": null,
     "replication": "1",
-    "replicasPerPartition": "",
+    "replicasPerPartition": "1",
     "retentionTimeUnit": null,
     "retentionTimeValue": null,
     "segmentPushType": "APPEND",
@@ -135,15 +135,10 @@ export default function AddTableOp({
   fetchData
 }: Props) {
   const classes = useStyles();
-  const [tableObj, setTableObj] = useState(defaultTableObj);
-  const [schemaObj, setSchemaObj] = useState(defaultSchemaObj);
+  const [tableObj, setTableObj] = useState({...defaultTableObj});
+  const [schemaObj, setSchemaObj] = useState({...defaultSchemaObj});
   const [tableName, setTableName] = useState('');
   const {dispatch} = React.useContext(NotificationContext);
-
-  // clearTimeout(this.topicTimer);
-  // this.topicTimer = setTimeout(() => {
-  //   getSchemaFromName.call(this, topic, id, flag, schemaKeyName);
-  // }, 700);
 
   useEffect(()=>{
     if(tableName !== tableObj.tableName){
@@ -233,7 +228,11 @@ export default function AddTableOp({
                   returnCodemirrorValue={(newValue)=>{
                     try{
                       const jsonObj = JSON.parse(newValue);
-                      jsonObj && setTableObj(jsonObj);
+                      if(jsonObj){
+                        jsonObj.segmentsConfig.replicasPerPartition = jsonObj.segmentsConfig.replication;
+                        jsonObj.segmentsConfig.schemaName = jsonObj.tableName;
+                        setTableObj(jsonObj);
+                      }
                     }catch(e){}
                   }}
                 />

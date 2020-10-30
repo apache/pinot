@@ -57,7 +57,7 @@ const defaultTableObj = {
     "schemaName": "",
     "timeColumnName": null,
     "replication": "1",
-    "replicasPerPartition": "",
+    "replicasPerPartition": "1",
     "retentionTimeUnit": null,
     "retentionTimeValue": null,
     "segmentPushType": "APPEND",
@@ -129,7 +129,7 @@ export default function AddTableSchemaOp({
   const classes = useStyles();
   const [schemaObj, setSchemaObj] = useState({schemaName:'', dateTimeFieldSpecs: []});
   const [schemaName, setSchemaName] = useState("");
-  const [tableObj, setTableObj] = useState(defaultTableObj);
+  const [tableObj, setTableObj] = useState({...defaultTableObj});
   const {dispatch} = React.useContext(NotificationContext);
 
   useEffect(() => {
@@ -232,7 +232,11 @@ export default function AddTableSchemaOp({
                   returnCodemirrorValue={(newValue)=>{
                     try{
                       const jsonObj = JSON.parse(newValue);
-                      jsonObj && setTableObj(jsonObj);
+                      if(jsonObj){
+                        jsonObj.segmentsConfig.replicasPerPartition = jsonObj.segmentsConfig.replication;
+                        jsonObj.segmentsConfig.schemaName = jsonObj.tableName;
+                        setTableObj(jsonObj);
+                      }
                     }catch(e){}
                   }}
                 />

@@ -72,6 +72,7 @@ export default function AddTableComponent({
       break;
       case 'replication':
         newTableObj.segmentsConfig[fieldName] = value;
+        newTableObj.segmentsConfig['replicasPerPartition'] = value;
       break;
     };
     setTableDataObj(newTableObj);

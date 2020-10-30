@@ -88,9 +88,9 @@ export default function SchemaComponent({
     maxLength: '',
     virtualColumnProvider: '',
     defaultNullValue: '',
-    timeSize: '',
     timeUnit: '',
     timeFormat: '',
+    timePattern: '',
     granularityUnit: '',
     granularityInterval: ''
   };
@@ -119,7 +119,7 @@ export default function SchemaComponent({
     newSchemaObj.schemaName = schemaName;
     columnList.map((columnObj)=>{
       const {columnName, dataType, defaultNullValue, multiValue, maxLength, virtualColumnProvider,
-        timeSize, timeUnit, timeFormat, granularityUnit, granularityInterval
+        timeUnit, timeFormat, timePattern, granularityUnit, granularityInterval
       } = columnObj;
       let schemaColumnnObj = {
         name: columnName,
@@ -140,8 +140,8 @@ export default function SchemaComponent({
           newSchemaObj.metricFieldSpecs.push(schemaColumnnObj);
         break;
         case 'datetime':
-          if(timeSize && timeUnit){
-            schemaColumnnObj.format = `1:${timeSize}:${timeUnit}${timeUnit!=='EPOCH' ? `:${timeFormat}` : ''}`;
+          if(timeUnit && timeFormat){
+            schemaColumnnObj.format = `1:${timeUnit}:${timeFormat}${timeFormat!=='EPOCH' ? `:${timePattern}` : ''}`;
           }
           if(granularityUnit && granularityInterval){
             schemaColumnnObj.granularity = `${granularityInterval}:${granularityUnit}`;
@@ -258,12 +258,12 @@ export default function SchemaComponent({
             {columnObj.type === 'datetime' &&
               <div className={classes.dateTimeDiv}>
                 <FormControl className={classes.formControl}>
-                  <InputLabel htmlFor="timeSize">Time Size {requiredAstrix}</InputLabel>
+                  <InputLabel htmlFor="timeUnit">Time Unit {requiredAstrix}</InputLabel>
                   <Select
-                    labelId="timeSize"
-                    id="timeSize"
-                    value={columnObj.timeSize}
-                    onChange={(e)=> changeHandler(index, 'timeSize', e.target.value)}
+                    labelId="timeUnit"
+                    id="timeUnit"
+                    value={columnObj.timeUnit}
+                    onChange={(e)=> changeHandler(index, 'timeUnit', e.target.value)}
                   >
                     <MenuItem value="MILLISECONDS">MILLISECONDS</MenuItem>
                     <MenuItem value="SECONDS">SECONDS</MenuItem>
@@ -274,29 +274,37 @@ export default function SchemaComponent({
                 </FormControl>
                 
                 <FormControl className={classes.formControl}>
-                  <InputLabel htmlFor="timeUnit">Time Unit {requiredAstrix}</InputLabel>
+                  <InputLabel htmlFor="timeFormat">Time Format {requiredAstrix}</InputLabel>
                   <Select
-                    labelId="timeUnit"
-                    id="timeUnit"
-                    value={columnObj.timeUnit}
-                    onChange={(e)=> changeHandler(index, 'timeUnit', e.target.value)}
+                    labelId="timeFormat"
+                    id="timeFormat"
+                    value={columnObj.timeFormat}
+                    onChange={(e)=> changeHandler(index, 'timeFormat', e.target.value)}
                   >
                     <MenuItem value="EPOCH">EPOCH</MenuItem>
                     <MenuItem value="SIMPLE_DATE_FORMAT">SIMPLE_DATE_FORMAT</MenuItem>
                   </Select>
                 </FormControl>
 
-                {columnObj.timeUnit === 'SIMPLE_DATE_FORMAT' &&
+                {columnObj.timeFormat === 'SIMPLE_DATE_FORMAT' &&
                   <FormControl className={classes.formControl}>
-                    <InputLabel htmlFor="timeFormat">Time Format {requiredAstrix}</InputLabel>
+                    <InputLabel htmlFor="timePattern">Time Pattern {requiredAstrix}</InputLabel>
                     <Input
-                      id="timeFormat"
-                      value={columnObj.timeFormat}
-                      onChange={(e)=> changeHandler(index, 'timeFormat', e.target.value)}
+                      id="timePattern"
+                      value={columnObj.timePattern}
+                      onChange={(e)=> changeHandler(index, 'timePattern', e.target.value)}
                     />
                   </FormControl>
                 }
                 <br/>
+                <FormControl className={classes.formControl}>
+                  <InputLabel htmlFor="granularityInterval">Granularity Interval {requiredAstrix}</InputLabel>
+                  <Input
+                    id="granularityInterval"
+                    value={columnObj.granularityInterval}
+                    onChange={(e)=> changeHandler(index, 'granularityInterval', e.target.value)}
+                  />
+                </FormControl>
 
                 <FormControl className={classes.selectFormControl}>
                   <InputLabel htmlFor="granularityUnit">Granularity Unit {requiredAstrix}</InputLabel>
@@ -312,15 +320,6 @@ export default function SchemaComponent({
                     <MenuItem value="HOURS">HOURS</MenuItem>
                     <MenuItem value="DAYS">DAYS</MenuItem>
                   </Select>
-                </FormControl>
-
-                <FormControl className={classes.formControl}>
-                  <InputLabel htmlFor="granularityInterval">Granularity Interval {requiredAstrix}</InputLabel>
-                  <Input
-                    id="granularityInterval"
-                    value={columnObj.granularityInterval}
-                    onChange={(e)=> changeHandler(index, 'granularityInterval', e.target.value)}
-                  />
                 </FormControl>
               </div>
             }
