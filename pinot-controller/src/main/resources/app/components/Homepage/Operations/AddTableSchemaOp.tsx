@@ -129,7 +129,7 @@ export default function AddTableSchemaOp({
   const classes = useStyles();
   const [schemaObj, setSchemaObj] = useState({schemaName:'', dateTimeFieldSpecs: []});
   const [schemaName, setSchemaName] = useState("");
-  const [tableObj, setTableObj] = useState({...defaultTableObj});
+  const [tableObj, setTableObj] = useState(JSON.parse(JSON.stringify(defaultTableObj)));
   const {dispatch} = React.useContext(NotificationContext);
 
   useEffect(() => {
@@ -141,10 +141,10 @@ export default function AddTableSchemaOp({
 
   const validateSchema = async () => {
     const validSchema = await PinotMethodUtils.validateSchemaAction(schemaObj);
-    if(validSchema.error){
+    if(validSchema.error || typeof validSchema === 'string'){
       dispatch({
         type: 'error',
-        message: validSchema.error,
+        message: validSchema.error || validSchema,
         show: true
       });
       return false;
@@ -154,10 +154,10 @@ export default function AddTableSchemaOp({
 
   const validateTableConfig = async () => {
     const validTable = await PinotMethodUtils.validateTableAction(tableObj);
-    if(validTable.error){
+    if(validTable.error || typeof validTable === 'string'){
       dispatch({
         type: 'error',
-        message: validTable.error,
+        message: validTable.error || validTable,
         show: true
       });
       return false;
@@ -169,14 +169,14 @@ export default function AddTableSchemaOp({
     if(await validateSchema() && await validateTableConfig()){
       const schemaCreationResp = await PinotMethodUtils.saveSchemaAction(schemaObj);
       dispatch({
-        type: schemaCreationResp.error ? 'error' : 'success',
-        message: schemaCreationResp.error || schemaCreationResp.status,
+        type: (schemaCreationResp.error || typeof schemaCreationResp === 'string') ? 'error' : 'success',
+        message: schemaCreationResp.error || schemaCreationResp.status || schemaCreationResp,
         show: true
       });
       const tableCreationResp = await PinotMethodUtils.saveTableAction(tableObj);
       dispatch({
-        type: tableCreationResp.error ? 'error' : 'success',
-        message: tableCreationResp.error || tableCreationResp.status,
+        type: (tableCreationResp.error || typeof tableCreationResp === 'string') ? 'error' : 'success',
+        message: tableCreationResp.error || tableCreationResp.status || tableCreationResp,
         show: true
       });
       fetchData();
@@ -234,7 +234,6 @@ export default function AddTableSchemaOp({
                       const jsonObj = JSON.parse(newValue);
                       if(jsonObj){
                         jsonObj.segmentsConfig.replicasPerPartition = jsonObj.segmentsConfig.replication;
-                        jsonObj.segmentsConfig.schemaName = jsonObj.tableName;
                         setTableObj(jsonObj);
                       }
                     }catch(e){}

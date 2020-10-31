@@ -135,8 +135,8 @@ export default function AddTableOp({
   fetchData
 }: Props) {
   const classes = useStyles();
-  const [tableObj, setTableObj] = useState({...defaultTableObj});
-  const [schemaObj, setSchemaObj] = useState({...defaultSchemaObj});
+  const [tableObj, setTableObj] = useState(JSON.parse(JSON.stringify(defaultTableObj)));
+  const [schemaObj, setSchemaObj] = useState(JSON.parse(JSON.stringify(defaultSchemaObj)));
   const [tableName, setTableName] = useState('');
   const {dispatch} = React.useContext(NotificationContext);
 
@@ -153,10 +153,10 @@ export default function AddTableOp({
   const updateSchemaObj = async (tableName) => {
     //table name is same as schema name
     const schemaObj = await PinotMethodUtils.getSchemaData(tableName);
-    if(schemaObj.error){
+    if(schemaObj.error || typeof schemaObj === 'string'){
       dispatch({
         type: 'error',
-        message: schemaObj.error,
+        message: schemaObj.error || schemaObj,
         show: true
       });
       setSchemaObj(defaultSchemaObj)
@@ -167,10 +167,10 @@ export default function AddTableOp({
   
   const validateTableConfig = async () => {
     const validTable = await PinotMethodUtils.validateTableAction(tableObj);
-    if(validTable.error){
+    if(validTable.error || typeof validTable === 'string'){
       dispatch({
         type: 'error',
-        message: validTable.error,
+        message: validTable.error || validTable,
         show: true
       });
       return false;
@@ -182,8 +182,8 @@ export default function AddTableOp({
     if(await validateTableConfig()){
       const tableCreationResp = await PinotMethodUtils.saveTableAction(tableObj);
       dispatch({
-        type: tableCreationResp.error ? 'error' : 'success',
-        message: tableCreationResp.error || tableCreationResp.status,
+        type: (tableCreationResp.error || typeof tableCreationResp === 'string') ? 'error' : 'success',
+        message: tableCreationResp.error || tableCreationResp.status || tableCreationResp,
         show: true
       });
       tableCreationResp.status && fetchData();
@@ -230,7 +230,6 @@ export default function AddTableOp({
                       const jsonObj = JSON.parse(newValue);
                       if(jsonObj){
                         jsonObj.segmentsConfig.replicasPerPartition = jsonObj.segmentsConfig.replication;
-                        jsonObj.segmentsConfig.schemaName = jsonObj.tableName;
                         setTableObj(jsonObj);
                       }
                     }catch(e){}

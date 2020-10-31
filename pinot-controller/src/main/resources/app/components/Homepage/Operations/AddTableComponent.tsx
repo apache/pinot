@@ -56,13 +56,16 @@ export default function AddTableComponent({
   const classes = useStyles();
 
   const [tableDataObj, setTableDataObj] = useState(tableObj);
-  const [dateFields, setDateFields] = useState(dateTimeFieldSpecs);
+  const [dateFields, setDateFields] = useState([]);
   const [timeColumn, setTimeColumn] = useState('');
 
   const changeHandler = (fieldName, value) => {
     let newTableObj = {...tableDataObj};
     switch(fieldName){
       case 'tableName':
+        newTableObj[fieldName] = value;
+        newTableObj.segmentsConfig.schemaName = value;
+      break;
       case 'tableType':
         newTableObj[fieldName] = value;
       break;
@@ -86,7 +89,11 @@ export default function AddTableComponent({
   useEffect(()=>{
     let newTableObj = {...tableDataObj};
     let colName = dateTimeFieldSpecs.length ? dateTimeFieldSpecs[0].name : '';
-    setDateFields(dateTimeFieldSpecs);
+    let dateOptions = [];
+    dateTimeFieldSpecs.map((field)=>{
+      dateOptions.push(field.name);
+    });
+    setDateFields(dateOptions);
     if(!timeColumn){
       setTimeColumn(colName);
       newTableObj.segmentsConfig.timeColumnName = colName || null;
@@ -132,10 +139,9 @@ export default function AddTableComponent({
         <FormControl className={classes.selectFormControl}>
           <Autocomplete
             className={classes.autoCompleteControl}
-            inputValue={timeColumn}
+            value={timeColumn}
             options={dateFields}
-            getOptionLabel={(option)=> option ? (option.name || '') : ''}
-            onChange={(e, value)=> changeHandler('timeColumnName', value ? value.name: '')}
+            onChange={(e, value)=> changeHandler('timeColumnName', value ? value: '')}
             disableClearable={true}
             autoHighlight={true}
             renderInput={(params) => (
