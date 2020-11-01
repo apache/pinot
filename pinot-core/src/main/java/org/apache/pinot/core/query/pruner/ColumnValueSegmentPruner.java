@@ -26,9 +26,9 @@ import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
-import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.FilterContext;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.predicate.EqPredicate;
 import org.apache.pinot.core.query.request.context.predicate.Predicate;
 import org.apache.pinot.core.query.request.context.predicate.RangePredicate;
@@ -65,8 +65,8 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
   }
 
   @Override
-  public boolean prune(IndexSegment segment, ServerQueryRequest queryRequest) {
-    FilterContext filter = queryRequest.getQueryContext().getFilter();
+  public boolean prune(IndexSegment segment, QueryContext query) {
+    FilterContext filter = query.getFilter();
     if (filter == null) {
       return false;
     }

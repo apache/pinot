@@ -33,7 +33,7 @@ public class FunctionContext {
   }
 
   private final Type _type;
-  private final String _functionName;
+  private String _functionName;
   private final List<ExpressionContext> _arguments;
 
   public FunctionContext(Type type, String functionName, List<ExpressionContext> arguments) {
@@ -45,6 +45,11 @@ public class FunctionContext {
 
   public Type getType() {
     return _type;
+  }
+
+  public void setFunctionName(String functionName) {
+    // NOTE: Standardize the function name to lower case
+    _functionName = functionName.toLowerCase();
   }
 
   public String getFunctionName() {

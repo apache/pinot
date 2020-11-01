@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.executor;
 
+import com.google.common.base.Preconditions;
 import io.grpc.stub.StreamObserver;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,7 +27,10 @@ import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
@@ -43,12 +47,18 @@ import org.apache.pinot.core.indexsegment.mutable.MutableSegment;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.plan.maker.PlanMaker;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.config.QueryExecutorConfig;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.core.query.pruner.SegmentPrunerService;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.FilterContext;
+import org.apache.pinot.core.query.request.context.FunctionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.TimerContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.apache.pinot.core.util.QueryOptions;
 import org.apache.pinot.core.util.trace.TraceContext;
@@ -60,6 +70,7 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public class ServerQueryExecutorV1Impl implements QueryExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerQueryExecutorV1Impl.class);
+  private static final String IN_PARTITIONED_SUBQUERY = "inPartitionedSubquery";
 
   private InstanceDataManager _instanceDataManager;
   private SegmentPrunerService _segmentPrunerService;
@@ -159,27 +170,26 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_MISSING_SEGMENTS,
           numSegmentsQueried - numSegmentsAcquired);
     }
-
-    boolean enableTrace = queryRequest.isEnableTrace();
-    if (enableTrace) {
-      TraceContext.register(requestId);
+    List<IndexSegment> indexSegments = new ArrayList<>(numSegmentsAcquired);
+    for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+      indexSegments.add(segmentDataManager.getSegment());
     }
 
+    // Gather stats for realtime consuming segments
     int numConsumingSegmentsProcessed = 0;
     long minIndexTimeMs = Long.MAX_VALUE;
     long minIngestionTimeMs = Long.MAX_VALUE;
-    // gather stats for realtime consuming segments
-    for (SegmentDataManager segmentMgr : segmentDataManagers) {
-      if (segmentMgr.getSegment() instanceof MutableSegment) {
+    for (IndexSegment indexSegment : indexSegments) {
+      if (indexSegment instanceof MutableSegment) {
         numConsumingSegmentsProcessed += 1;
-        SegmentMetadata metadata = segmentMgr.getSegment().getSegmentMetadata();
-        long indexedTime = metadata.getLastIndexedTimestamp();
-        if (indexedTime != Long.MIN_VALUE && indexedTime < minIndexTimeMs) {
-          minIndexTimeMs = metadata.getLastIndexedTimestamp();
+        SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
+        long indexTimeMs = segmentMetadata.getLastIndexedTimestamp();
+        if (indexTimeMs != Long.MIN_VALUE && indexTimeMs < minIndexTimeMs) {
+          minIndexTimeMs = indexTimeMs;
         }
-        long ingestionTime = metadata.getLatestIngestionTimestamp();
-        if (ingestionTime != Long.MIN_VALUE && ingestionTime < minIngestionTimeMs) {
-          minIngestionTimeMs = ingestionTime;
+        long ingestionTimeMs = segmentMetadata.getLatestIngestionTimestamp();
+        if (ingestionTimeMs != Long.MIN_VALUE && ingestionTimeMs < minIngestionTimeMs) {
+          minIngestionTimeMs = ingestionTimeMs;
         }
       }
     }
@@ -195,48 +205,15 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
               minConsumingFreshnessTimeMs);
     }
 
+    boolean enableTrace = queryRequest.isEnableTrace();
+    if (enableTrace) {
+      TraceContext.register(requestId);
+    }
+
     DataTable dataTable = null;
     try {
-      // Compute total docs for the table before pruning the segments
-      long numTotalDocs = 0;
-      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        numTotalDocs += segmentDataManager.getSegment().getSegmentMetadata().getTotalDocs();
-      }
-      TimerContext.Timer segmentPruneTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.SEGMENT_PRUNING);
-      segmentDataManagers = _segmentPrunerService.prune(tableDataManager, segmentDataManagers, queryRequest);
-      segmentPruneTimer.stopAndRecord();
-      int numSegmentsMatchedAfterPruning = segmentDataManagers.size();
-      LOGGER.debug("Matched {} segments after pruning", numSegmentsMatchedAfterPruning);
-      if (numSegmentsMatchedAfterPruning == 0) {
-        // Only return metadata for streaming query
-        dataTable =
-            queryRequest.isEnableStreaming() ? new DataTableImplV2() : DataTableUtils.buildEmptyDataTable(queryContext);
-        Map<String, String> metadata = dataTable.getMetadata();
-        metadata.put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(numTotalDocs));
-        metadata.put(DataTable.NUM_DOCS_SCANNED_METADATA_KEY, "0");
-        metadata.put(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY, "0");
-        metadata.put(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, "0");
-        metadata.put(DataTable.NUM_SEGMENTS_PROCESSED, "0");
-        metadata.put(DataTable.NUM_SEGMENTS_MATCHED, "0");
-      } else {
-        TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
-        List<IndexSegment> indexSegments = new ArrayList<>(numSegmentsMatchedAfterPruning);
-        for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-          indexSegments.add(segmentDataManager.getSegment());
-        }
-        long endTimeMs = queryArrivalTimeMs + queryTimeoutMs;
-        Plan globalQueryPlan = queryRequest.isEnableStreaming() ? _planMaker
-            .makeStreamingInstancePlan(indexSegments, queryContext, executorService, responseObserver, endTimeMs)
-            : _planMaker.makeInstancePlan(indexSegments, queryContext, executorService, endTimeMs);
-        planBuildTimer.stopAndRecord();
-
-        TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);
-        dataTable = globalQueryPlan.execute();
-        planExecTimer.stopAndRecord();
-
-        // Update the total docs in the metadata based on un-pruned segments.
-        dataTable.getMetadata().put(DataTable.TOTAL_DOCS_METADATA_KEY, Long.toString(numTotalDocs));
-      }
+      dataTable = processQuery(indexSegments, queryContext, timerContext, executorService, responseObserver,
+          queryArrivalTimeMs + queryTimeoutMs, queryRequest.isEnableStreaming());
     } catch (Exception e) {
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
 
@@ -276,5 +253,126 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     LOGGER.debug("Query processing time for request Id - {}: {}", requestId, queryProcessingTime);
     LOGGER.debug("InstanceResponse for request Id - {}: {}", requestId, dataTable);
     return dataTable;
+  }
+
+  private DataTable processQuery(List<IndexSegment> indexSegments, QueryContext queryContext, TimerContext timerContext,
+      ExecutorService executorService, @Nullable StreamObserver<Server.ServerResponse> responseObserver, long endTimeMs,
+      boolean enableStreaming)
+      throws Exception {
+    handleSubquery(queryContext, indexSegments, timerContext, executorService, endTimeMs);
+
+    // Compute total docs for the table before pruning the segments
+    long numTotalDocs = 0;
+    for (IndexSegment indexSegment : indexSegments) {
+      numTotalDocs += indexSegment.getSegmentMetadata().getTotalDocs();
+    }
+
+    TimerContext.Timer segmentPruneTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.SEGMENT_PRUNING);
+    List<IndexSegment> selectedSegments = _segmentPrunerService.prune(indexSegments, queryContext);
+    segmentPruneTimer.stopAndRecord();
+    int numSelectedSegments = selectedSegments.size();
+    LOGGER.debug("Matched {} segments after pruning", numSelectedSegments);
+    if (numSelectedSegments == 0) {
+      // Only return metadata for streaming query
+      DataTable dataTable = enableStreaming ? new DataTableImplV2() : DataTableUtils.buildEmptyDataTable(queryContext);
+      Map<String, String> metadata = dataTable.getMetadata();
+      metadata.put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(numTotalDocs));
+      metadata.put(DataTable.NUM_DOCS_SCANNED_METADATA_KEY, "0");
+      metadata.put(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY, "0");
+      metadata.put(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, "0");
+      metadata.put(DataTable.NUM_SEGMENTS_PROCESSED, "0");
+      metadata.put(DataTable.NUM_SEGMENTS_MATCHED, "0");
+      return dataTable;
+    } else {
+      TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
+      Plan queryPlan = enableStreaming ? _planMaker
+          .makeStreamingInstancePlan(selectedSegments, queryContext, executorService, responseObserver, endTimeMs)
+          : _planMaker.makeInstancePlan(selectedSegments, queryContext, executorService, endTimeMs);
+      planBuildTimer.stopAndRecord();
+
+      TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);
+      DataTable dataTable = queryPlan.execute();
+      planExecTimer.stopAndRecord();
+
+      // Update the total docs in the metadata based on the un-pruned segments
+      dataTable.getMetadata().put(DataTable.TOTAL_DOCS_METADATA_KEY, Long.toString(numTotalDocs));
+
+      return dataTable;
+    }
+  }
+
+  /**
+   * Handles the subquery in the given query.
+   * <p>Currently only supports subquery within the filter.
+   */
+  private void handleSubquery(QueryContext queryContext, List<IndexSegment> indexSegments, TimerContext timerContext,
+      ExecutorService executorService, long endTimeMs)
+      throws Exception {
+    FilterContext filter = queryContext.getFilter();
+    if (filter != null) {
+      handleSubquery(filter, indexSegments, timerContext, executorService, endTimeMs);
+    }
+  }
+
+  /**
+   * Handles the subquery in the given filter.
+   * <p>Currently only supports subquery within the lhs of the predicate.
+   */
+  private void handleSubquery(FilterContext filter, List<IndexSegment> indexSegments, TimerContext timerContext,
+      ExecutorService executorService, long endTimeMs)
+      throws Exception {
+    List<FilterContext> children = filter.getChildren();
+    if (children != null) {
+      for (FilterContext child : children) {
+        handleSubquery(child, indexSegments, timerContext, executorService, endTimeMs);
+      }
+    } else {
+      handleSubquery(filter.getPredicate().getLhs(), indexSegments, timerContext, executorService, endTimeMs);
+    }
+  }
+
+  /**
+   * Handles the subquery in the given expression.
+   * <p>When subquery is detected, first executes the subquery on the given segments and gets the response, then
+   * rewrites the expression with the subquery response.
+   * <p>Currently only supports ID_SET subquery within the IN_PARTITIONED_SUBQUERY transform function, which will be
+   * rewritten to an IN_ID_SET transform function.
+   */
+  private void handleSubquery(ExpressionContext expression, List<IndexSegment> indexSegments, TimerContext timerContext,
+      ExecutorService executorService, long endTimeMs)
+      throws Exception {
+    FunctionContext function = expression.getFunction();
+    if (function == null) {
+      return;
+    }
+    List<ExpressionContext> arguments = function.getArguments();
+    if (StringUtils.remove(function.getFunctionName(), '_').equalsIgnoreCase(IN_PARTITIONED_SUBQUERY)) {
+      Preconditions
+          .checkState(arguments.size() == 2, "IN_PARTITIONED_SUBQUERY requires 2 arguments: expression, subquery");
+      ExpressionContext subqueryExpression = arguments.get(1);
+      Preconditions.checkState(subqueryExpression.getType() == ExpressionContext.Type.LITERAL,
+          "Second argument of IN_PARTITIONED_SUBQUERY must be a literal (subquery)");
+      QueryContext subquery = QueryContextConverterUtils.getQueryContextFromSQL(subqueryExpression.getLiteral());
+      // Subquery should be an ID_SET aggregation only query
+      //noinspection rawtypes
+      AggregationFunction[] aggregationFunctions = subquery.getAggregationFunctions();
+      Preconditions.checkState(aggregationFunctions != null && aggregationFunctions.length == 1
+              && aggregationFunctions[0].getType() == AggregationFunctionType.IDSET
+              && subquery.getGroupByExpressions() == null,
+          "Subquery in IN_PARTITIONED_SUBQUERY should be an ID_SET aggregation only query, found: %s",
+          subqueryExpression.getLiteral());
+      // Execute the subquery
+      DataTable dataTable =
+          processQuery(indexSegments, subquery, timerContext, executorService, null, endTimeMs, false);
+      IdSet idSet = dataTable.getObject(0, 0);
+      String serializedIdSet = idSet.toBase64String();
+      // Rewrite the expression
+      function.setFunctionName(TransformFunctionType.INIDSET.name());
+      arguments.set(1, ExpressionContext.forLiteral(serializedIdSet));
+    } else {
+      for (ExpressionContext argument : arguments) {
+        handleSubquery(argument, indexSegments, timerContext, executorService, endTimeMs);
+      }
+    }
   }
 }

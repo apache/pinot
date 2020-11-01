@@ -57,6 +57,7 @@ public class BrokerRequestToQueryContextConverter {
    *          optimizes the BrokerRequest but not the PinotQuery.
    */
   public static QueryContext convert(BrokerRequest brokerRequest) {
+    String tableName = brokerRequest.getQuerySource().getTableName();
     PinotQuery pinotQuery = brokerRequest.getPinotQuery();
 
     List<ExpressionContext> selectExpressions;
@@ -203,9 +204,9 @@ public class BrokerRequestToQueryContextConverter {
       }
     }
 
-    return new QueryContext.Builder().setSelectExpressions(selectExpressions).setAliasMap(aliasMap).setFilter(filter)
-        .setGroupByExpressions(groupByExpressions).setOrderByExpressions(orderByExpressions)
-        .setHavingFilter(havingFilter).setLimit(limit).setOffset(offset)
+    return new QueryContext.Builder().setTableName(tableName).setSelectExpressions(selectExpressions)
+        .setAliasMap(aliasMap).setFilter(filter).setGroupByExpressions(groupByExpressions)
+        .setOrderByExpressions(orderByExpressions).setHavingFilter(havingFilter).setLimit(limit).setOffset(offset)
         .setQueryOptions(brokerRequest.getQueryOptions()).setDebugOptions(brokerRequest.getDebugOptions())
         .setBrokerRequest(brokerRequest).build();
   }

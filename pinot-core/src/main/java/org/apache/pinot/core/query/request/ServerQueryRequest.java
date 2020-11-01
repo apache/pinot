@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.request;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -29,7 +28,6 @@ import org.apache.pinot.common.utils.CommonConstants.Query.Request;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.TimerContext;
 import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
-import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.protocol.TCompactProtocol;
@@ -48,29 +46,20 @@ public class ServerQueryRequest {
   private final String _brokerId;
   private final boolean _enableTrace;
   private final boolean _enableStreaming;
-  private final String _tableNameWithType;
   private final List<String> _segmentsToQuery;
+  private final QueryContext _queryContext;
 
   // Timing information for different phases of query execution
   private final TimerContext _timerContext;
-
-  // Pre-computed segment independent information
-  private final QueryContext _queryContext;
-  private final Set<String> _allColumns;
 
   public ServerQueryRequest(InstanceRequest instanceRequest, ServerMetrics serverMetrics, long queryArrivalTimeMs) {
     _requestId = instanceRequest.getRequestId();
     _brokerId = instanceRequest.getBrokerId() != null ? instanceRequest.getBrokerId() : "unknown";
     _enableTrace = instanceRequest.isEnableTrace();
     _enableStreaming = false;
-    BrokerRequest brokerRequest = instanceRequest.getQuery();
-    _tableNameWithType = brokerRequest.getQuerySource().getTableName();
     _segmentsToQuery = instanceRequest.getSearchSegments();
-    _timerContext = new TimerContext(_tableNameWithType, serverMetrics, queryArrivalTimeMs);
-
-    // Pre-compute segment independent information
-    _queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
-    _allColumns = QueryContextUtils.getAllColumns(_queryContext);
+    _queryContext = BrokerRequestToQueryContextConverter.convert(instanceRequest.getQuery());
+    _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
   }
 
   public ServerQueryRequest(Server.ServerRequest serverRequest, ServerMetrics serverMetrics)
@@ -83,6 +72,8 @@ public class ServerQueryRequest {
     _enableTrace = Boolean.parseBoolean(metadata.get(Request.MetadataKeys.ENABLE_TRACE));
     _enableStreaming = Boolean.parseBoolean(metadata.get(Request.MetadataKeys.ENABLE_STREAMING));
 
+    _segmentsToQuery = serverRequest.getSegmentsList();
+
     BrokerRequest brokerRequest;
     String payloadType = metadata.getOrDefault(Request.MetadataKeys.PAYLOAD_TYPE, Request.PayloadType.SQL);
     if (payloadType.equalsIgnoreCase(Request.PayloadType.SQL)) {
@@ -94,14 +85,8 @@ public class ServerQueryRequest {
     } else {
       throw new UnsupportedOperationException("Unsupported payloadType: " + payloadType);
     }
-
-    _tableNameWithType = brokerRequest.getQuerySource().getTableName();
-    _segmentsToQuery = serverRequest.getSegmentsList();
-    _timerContext = new TimerContext(_tableNameWithType, serverMetrics, queryArrivalTimeMs);
-
-    // Pre-compute segment independent information
     _queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
-    _allColumns = QueryContextUtils.getAllColumns(_queryContext);
+    _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
   }
 
   public long getRequestId() {
@@ -121,22 +106,18 @@ public class ServerQueryRequest {
   }
 
   public String getTableNameWithType() {
-    return _tableNameWithType;
+    return _queryContext.getTableName();
   }
 
   public List<String> getSegmentsToQuery() {
     return _segmentsToQuery;
   }
 
-  public TimerContext getTimerContext() {
-    return _timerContext;
-  }
-
   public QueryContext getQueryContext() {
     return _queryContext;
   }
 
-  public Set<String> getAllColumns() {
-    return _allColumns;
+  public TimerContext getTimerContext() {
+    return _timerContext;
   }
 }

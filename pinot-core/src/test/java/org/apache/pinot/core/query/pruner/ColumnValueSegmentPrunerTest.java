@@ -23,7 +23,6 @@ import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.data.partition.PartitionFunctionFactory;
 import org.apache.pinot.core.indexsegment.IndexSegment;
-import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -116,8 +115,6 @@ public class ColumnValueSegmentPrunerTest {
 
   private boolean runPruner(IndexSegment indexSegment, String query) {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromPQL(query);
-    ServerQueryRequest queryRequest = mock(ServerQueryRequest.class);
-    when(queryRequest.getQueryContext()).thenReturn(queryContext);
-    return PRUNER.prune(indexSegment, queryRequest);
+    return PRUNER.prune(indexSegment, queryContext);
   }
 }
