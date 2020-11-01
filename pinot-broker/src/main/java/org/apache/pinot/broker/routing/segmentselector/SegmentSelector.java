@@ -21,6 +21,7 @@ package org.apache.pinot.broker.routing.segmentselector;
 import java.util.List;
 import java.util.Set;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.request.BrokerRequest;
 
 
@@ -43,16 +44,17 @@ import org.apache.pinot.common.request.BrokerRequest;
 public interface SegmentSelector {
 
   /**
-   * Initializes the segment selector with the external view and online segments (segments with ONLINE/CONSUMING
-   * instances in ideal state). Should be called only once before calling other methods.
+   * Initializes the segment selector with the external view, ideal state and online segments (segments with
+   * ONLINE/CONSUMING instances in the ideal state and selected by the pre-selector). Should be called only once before
+   * calling other methods.
    */
-  void init(ExternalView externalView, Set<String> onlineSegments);
+  void init(ExternalView externalView, IdealState idealState, Set<String> onlineSegments);
 
   /**
-   * Processes the external view change based on the given online segments (segments with ONLINE/CONSUMING instances in
-   * ideal state).
+   * Processes the external view change based on the given ideal state and online segments (segments with
+   * ONLINE/CONSUMING instances in ideal state and selected by the pre-selector).
    */
-  void onExternalViewChange(ExternalView externalView, Set<String> onlineSegments);
+  void onExternalViewChange(ExternalView externalView, IdealState idealState, Set<String> onlineSegments);
 
   /**
    * Selects the segments queried by the given broker request. The segments selected should cover the whole dataset

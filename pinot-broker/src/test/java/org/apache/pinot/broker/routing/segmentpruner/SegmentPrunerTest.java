@@ -30,6 +30,7 @@ import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
@@ -140,12 +141,14 @@ public class SegmentPrunerTest {
     BrokerRequest brokerRequest1 = compiler.compileToBrokerRequest(QUERY_1);
     BrokerRequest brokerRequest2 = compiler.compileToBrokerRequest(QUERY_2);
     BrokerRequest brokerRequest3 = compiler.compileToBrokerRequest(QUERY_3);
+    // NOTE: External view and ideal state are not used in the current implementation.
     ExternalView externalView = Mockito.mock(ExternalView.class);
+    IdealState idealState = Mockito.mock(IdealState.class);
 
     PartitionSegmentPruner segmentPruner =
         new PartitionSegmentPruner(OFFLINE_TABLE_NAME, PARTITION_COLUMN, _propertyStore);
     Set<String> onlineSegments = new HashSet<>();
-    segmentPruner.init(externalView, onlineSegments);
+    segmentPruner.init(externalView, idealState, onlineSegments);
     assertEquals(segmentPruner.prune(brokerRequest1, Collections.emptyList()), Collections.emptyList());
     assertEquals(segmentPruner.prune(brokerRequest2, Collections.emptyList()), Collections.emptyList());
     assertEquals(segmentPruner.prune(brokerRequest3, Collections.emptyList()), Collections.emptyList());
@@ -166,7 +169,7 @@ public class SegmentPrunerTest {
     segmentZKMetadataWithoutPartitionMetadata.setSegmentName(segmentWithoutPartitionMetadata);
     ZKMetadataProvider
         .setOfflineSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, segmentZKMetadataWithoutPartitionMetadata);
-    segmentPruner.onExternalViewChange(externalView, onlineSegments);
+    segmentPruner.onExternalViewChange(externalView, idealState, onlineSegments);
     assertEquals(segmentPruner.prune(brokerRequest1, Collections.singletonList(segmentWithoutPartitionMetadata)),
         Collections.singletonList(segmentWithoutPartitionMetadata));
     assertEquals(segmentPruner.prune(brokerRequest2, Collections.singletonList(segmentWithoutPartitionMetadata)),
@@ -183,7 +186,7 @@ public class SegmentPrunerTest {
     String segment1 = "segment1";
     onlineSegments.add(segment1);
     setSegmentZKMetadata(segment1, "Murmur", 4, 0);
-    segmentPruner.onExternalViewChange(externalView, onlineSegments);
+    segmentPruner.onExternalViewChange(externalView, idealState, onlineSegments);
     assertEquals(segmentPruner.prune(brokerRequest1, Arrays.asList(segment0, segment1)),
         Arrays.asList(segment0, segment1));
     assertEquals(segmentPruner.prune(brokerRequest2, Arrays.asList(segment0, segment1)),
@@ -193,7 +196,7 @@ public class SegmentPrunerTest {
 
     // Update partition metadata without refreshing should have no effect
     setSegmentZKMetadata(segment0, "Modulo", 4, 1);
-    segmentPruner.onExternalViewChange(externalView, onlineSegments);
+    segmentPruner.onExternalViewChange(externalView, idealState, onlineSegments);
     assertEquals(segmentPruner.prune(brokerRequest1, Arrays.asList(segment0, segment1)),
         Arrays.asList(segment0, segment1));
     assertEquals(segmentPruner.prune(brokerRequest2, Arrays.asList(segment0, segment1)),

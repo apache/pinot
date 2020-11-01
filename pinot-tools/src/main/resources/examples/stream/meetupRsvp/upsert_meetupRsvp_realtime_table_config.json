@@ -31,7 +31,7 @@
     "customConfigs": {}
   },
   "routing": {
-    "instanceSelectorType": "replicaGroup"
+    "instanceSelectorType": "strictReplicaGroup"
   },
   "upsertConfig": {
     "mode": "FULL"

@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.request.BrokerRequest;
 
 
@@ -31,12 +32,11 @@ import org.apache.pinot.common.request.BrokerRequest;
 public interface InstanceSelector {
 
   /**
-   * Initializes the instance selector with the enabled instances, external view and online segments (segments with
-   * ONLINE/CONSUMING instances in ideal state). Should be called only once before calling other methods.
-   * <p>NOTE: {@code onlineSegments} is unused, but intentionally passed in as argument in case it is needed in the
-   * future.
+   * Initializes the instance selector with the enabled instances, external view, ideal state and online segments
+   * (segments with ONLINE/CONSUMING instances in the ideal state and selected by the pre-selector). Should be called
+   * only once before calling other methods.
    */
-  void init(Set<String> enabledInstances, ExternalView externalView, Set<String> onlineSegments);
+  void init(Set<String> enabledInstances, ExternalView externalView, IdealState idealState, Set<String> onlineSegments);
 
   /**
    * Processes the instances change. Changed instances are pre-computed based on the current and previous enabled
@@ -45,12 +45,10 @@ public interface InstanceSelector {
   void onInstancesChange(Set<String> enabledInstances, List<String> changedInstances);
 
   /**
-   * Processes the external view change based on the given online segments (segments with ONLINE/CONSUMING instances in
-   * ideal state).
-   * <p>NOTE: {@code onlineSegments} is unused, but intentionally passed in as argument in case it is needed in the
-   * future.
+   * Processes the external view change based on the given ideal state and online segments (segments with
+   * ONLINE/CONSUMING instances in the ideal state and selected by the pre-selector).
    */
-  void onExternalViewChange(ExternalView externalView, Set<String> onlineSegments);
+  void onExternalViewChange(ExternalView externalView, IdealState idealState, Set<String> onlineSegments);
 
   /**
    * Selects the server instances for the given segments queried by the given broker request, returns a map from segment

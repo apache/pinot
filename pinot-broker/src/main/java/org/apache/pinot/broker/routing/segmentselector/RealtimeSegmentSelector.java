@@ -27,6 +27,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.common.utils.HLCSegmentName;
@@ -55,12 +56,12 @@ public class RealtimeSegmentSelector implements SegmentSelector {
   private volatile List<String> _llcSegments;
 
   @Override
-  public void init(ExternalView externalView, Set<String> onlineSegments) {
-    onExternalViewChange(externalView, onlineSegments);
+  public void init(ExternalView externalView, IdealState idealState, Set<String> onlineSegments) {
+    onExternalViewChange(externalView, idealState, onlineSegments);
   }
 
   @Override
-  public void onExternalViewChange(ExternalView externalView, Set<String> onlineSegments) {
+  public void onExternalViewChange(ExternalView externalView, IdealState idealState, Set<String> onlineSegments) {
     // Group HLC segments by their group id
     // NOTE: Use TreeMap so that group ids are sorted and the result is deterministic
     Map<String, List<String>> groupIdToHLCSegmentsMap = new TreeMap<>();

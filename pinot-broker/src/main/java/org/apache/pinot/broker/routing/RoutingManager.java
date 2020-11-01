@@ -35,15 +35,16 @@ import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.broker.broker.helix.ClusterChangeHandler;
 import org.apache.pinot.broker.routing.instanceselector.InstanceSelector;
 import org.apache.pinot.broker.routing.instanceselector.InstanceSelectorFactory;
+import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
+import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelectorFactory;
 import org.apache.pinot.broker.routing.segmentpruner.SegmentPruner;
 import org.apache.pinot.broker.routing.segmentpruner.SegmentPrunerFactory;
-import org.apache.pinot.broker.routing.segmentselector.SegmentPreSelector;
-import org.apache.pinot.broker.routing.segmentselector.SegmentPreSelectorFactory;
 import org.apache.pinot.broker.routing.segmentselector.SegmentSelector;
 import org.apache.pinot.broker.routing.segmentselector.SegmentSelectorFactory;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
@@ -154,13 +155,13 @@ public class RoutingManager implements ClusterChangeHandler {
                   tableNameWithType);
               continue;
             }
-            Set<String> onlineSegments = getOnlineSegments(tableNameWithType);
-            if (onlineSegments == null) {
+            IdealState idealState = getIdealState(tableNameWithType);
+            if (idealState == null) {
               LOGGER
                   .warn("Failed to find ideal state for table: {}, skipping updating routing entry", tableNameWithType);
               continue;
             }
-            routingEntry.onExternalViewChange(externalView, onlineSegments);
+            routingEntry.onExternalViewChange(externalView, idealState);
           } catch (Exception e) {
             LOGGER
                 .error("Caught unexpected exception while updating routing entry on external view change for table: {}",
@@ -190,19 +191,12 @@ public class RoutingManager implements ClusterChangeHandler {
   }
 
   @Nullable
-  private Set<String> getOnlineSegments(String tableNameWithType) {
-    ZNRecord znRecord = _zkDataAccessor.get(_idealStatePathPrefix + tableNameWithType, null, AccessOption.PERSISTENT);
+  private IdealState getIdealState(String tableNameWithType) {
+    Stat stat = new Stat();
+    ZNRecord znRecord = _zkDataAccessor.get(_idealStatePathPrefix + tableNameWithType, stat, AccessOption.PERSISTENT);
     if (znRecord != null) {
-      Map<String, Map<String, String>> segmentAssignment = znRecord.getMapFields();
-      Set<String> onlineSegments = new HashSet<>(HashUtil.getHashMapCapacity(segmentAssignment.size()));
-      for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
-        Map<String, String> instanceStateMap = entry.getValue();
-        if (instanceStateMap.containsValue(SegmentStateModel.ONLINE) || instanceStateMap
-            .containsValue(SegmentStateModel.CONSUMING)) {
-          onlineSegments.add(entry.getKey());
-        }
-      }
-      return onlineSegments;
+      znRecord.setVersion(stat.getVersion());
+      return new IdealState(znRecord);
     } else {
       return null;
     }
@@ -212,9 +206,9 @@ public class RoutingManager implements ClusterChangeHandler {
     LOGGER.info("Processing instance config change");
     long startTimeMs = System.currentTimeMillis();
 
-    List<ZNRecord> instanceConfigZNRecords =
-        _zkDataAccessor.getChildren(_instanceConfigsPath, null, AccessOption.PERSISTENT,
-            CommonConstants.Helix.ZkClient.RETRY_COUNT, CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
+    List<ZNRecord> instanceConfigZNRecords = _zkDataAccessor
+        .getChildren(_instanceConfigsPath, null, AccessOption.PERSISTENT, CommonConstants.Helix.ZkClient.RETRY_COUNT,
+            CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
     long fetchInstanceConfigsEndTimeMs = System.currentTimeMillis();
 
     // Calculate new enabled and disabled instances
@@ -284,6 +278,7 @@ public class RoutingManager implements ClusterChangeHandler {
     if ("true".equals(instanceConfigZNRecord.getSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS))) {
       return false;
     }
+    //noinspection RedundantIfStatement
     if ("true".equals(instanceConfigZNRecord.getSimpleField(CommonConstants.Helix.QUERIES_DISABLED))) {
       return false;
     }
@@ -310,22 +305,22 @@ public class RoutingManager implements ClusterChangeHandler {
       externalViewVersion = externalView.getRecord().getVersion();
     }
 
-    Set<String> onlineSegments = getOnlineSegments(tableNameWithType);
-    Preconditions.checkState(onlineSegments != null, "Failed to find ideal state for table: %s", tableNameWithType);
+    IdealState idealState = getIdealState(tableNameWithType);
+    Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
 
-    Set<String> enabledInstances = _enabledServerInstanceMap.keySet();
+    Set<String> onlineSegments = getOnlineSegments(idealState);
 
     SegmentPreSelector segmentPreSelector =
         SegmentPreSelectorFactory.getSegmentPreSelector(tableConfig, _propertyStore);
     Set<String> preSelectedOnlineSegments = segmentPreSelector.preSelect(onlineSegments);
     SegmentSelector segmentSelector = SegmentSelectorFactory.getSegmentSelector(tableConfig);
-    segmentSelector.init(externalView, preSelectedOnlineSegments);
+    segmentSelector.init(externalView, idealState, preSelectedOnlineSegments);
     List<SegmentPruner> segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
     for (SegmentPruner segmentPruner : segmentPruners) {
-      segmentPruner.init(externalView, preSelectedOnlineSegments);
+      segmentPruner.init(externalView, idealState, preSelectedOnlineSegments);
     }
     InstanceSelector instanceSelector = InstanceSelectorFactory.getInstanceSelector(tableConfig, _brokerMetrics);
-    instanceSelector.init(enabledInstances, externalView, preSelectedOnlineSegments);
+    instanceSelector.init(_enabledServerInstanceMap.keySet(), externalView, idealState, preSelectedOnlineSegments);
 
     // Add time boundary manager if both offline and real-time part exist for a hybrid table
     TimeBoundaryManager timeBoundaryManager = null;
@@ -336,7 +331,7 @@ public class RoutingManager implements ClusterChangeHandler {
       if (_routingEntryMap.containsKey(realtimeTableName)) {
         LOGGER.info("Adding time boundary manager for table: {}", tableNameWithType);
         timeBoundaryManager = new TimeBoundaryManager(tableConfig, _propertyStore);
-        timeBoundaryManager.init(externalView, onlineSegments);
+        timeBoundaryManager.init(externalView, idealState, preSelectedOnlineSegments);
       }
     } else {
       // Current table is real-time
@@ -355,12 +350,18 @@ public class RoutingManager implements ClusterChangeHandler {
         if (offlineTableExternalView == null) {
           offlineTableExternalView = new ExternalView(offlineTableName);
         }
-        Set<String> offlineTableOnlineSegments = getOnlineSegments(offlineTableName);
-        Preconditions.checkState(offlineTableOnlineSegments != null, "Failed to find ideal state for table: %s",
-            offlineTableName);
+        IdealState offlineTableIdealState = getIdealState(offlineTableName);
+        Preconditions
+            .checkState(offlineTableIdealState != null, "Failed to find ideal state for table: %s", offlineTableName);
+        Set<String> offlineTableOnlineSegments = getOnlineSegments(offlineTableIdealState);
+        SegmentPreSelector offlineTableSegmentPreSelector =
+            SegmentPreSelectorFactory.getSegmentPreSelector(offlineTableConfig, _propertyStore);
+        Set<String> offlineTablePreSelectedOnlineSegments =
+            offlineTableSegmentPreSelector.preSelect(offlineTableOnlineSegments);
         TimeBoundaryManager offlineTableTimeBoundaryManager =
             new TimeBoundaryManager(offlineTableConfig, _propertyStore);
-        offlineTableTimeBoundaryManager.init(offlineTableExternalView, offlineTableOnlineSegments);
+        offlineTableTimeBoundaryManager
+            .init(offlineTableExternalView, offlineTableIdealState, offlineTablePreSelectedOnlineSegments);
         offlineTableRoutingEntry.setTimeBoundaryManager(offlineTableTimeBoundaryManager);
       }
     }
@@ -376,6 +377,22 @@ public class RoutingManager implements ClusterChangeHandler {
     } else {
       LOGGER.info("Rebuilt routing for table: {}", tableNameWithType);
     }
+  }
+
+  /**
+   * Returns the online segments (with ONLINE/CONSUMING instances) in the given ideal state.
+   */
+  private static Set<String> getOnlineSegments(IdealState idealState) {
+    Map<String, Map<String, String>> segmentAssignment = idealState.getRecord().getMapFields();
+    Set<String> onlineSegments = new HashSet<>(HashUtil.getHashMapCapacity(segmentAssignment.size()));
+    for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
+      Map<String, String> instanceStateMap = entry.getValue();
+      if (instanceStateMap.containsValue(SegmentStateModel.ONLINE) || instanceStateMap
+          .containsValue(SegmentStateModel.CONSUMING)) {
+        onlineSegments.add(entry.getKey());
+      }
+    }
+    return onlineSegments;
   }
 
   /**
@@ -525,15 +542,16 @@ public class RoutingManager implements ClusterChangeHandler {
     // NOTE: The change gets applied in sequence, and before change applied to all components, there could be some
     // inconsistency between components, which is fine because the inconsistency only exists for the newly changed
     // segments and only lasts for a very short time.
-    void onExternalViewChange(ExternalView externalView, Set<String> onlineSegments) {
+    void onExternalViewChange(ExternalView externalView, IdealState idealState) {
+      Set<String> onlineSegments = getOnlineSegments(idealState);
       Set<String> preSelectedOnlineSegments = _segmentPreSelector.preSelect(onlineSegments);
-      _segmentSelector.onExternalViewChange(externalView, preSelectedOnlineSegments);
+      _segmentSelector.onExternalViewChange(externalView, idealState, preSelectedOnlineSegments);
       for (SegmentPruner segmentPruner : _segmentPruners) {
-        segmentPruner.onExternalViewChange(externalView, preSelectedOnlineSegments);
+        segmentPruner.onExternalViewChange(externalView, idealState, preSelectedOnlineSegments);
       }
-      _instanceSelector.onExternalViewChange(externalView, preSelectedOnlineSegments);
+      _instanceSelector.onExternalViewChange(externalView, idealState, preSelectedOnlineSegments);
       if (_timeBoundaryManager != null) {
-        _timeBoundaryManager.onExternalViewChange(externalView, preSelectedOnlineSegments);
+        _timeBoundaryManager.onExternalViewChange(externalView, idealState, preSelectedOnlineSegments);
       }
       _lastUpdateExternalViewVersion = externalView.getStat().getVersion();
     }
