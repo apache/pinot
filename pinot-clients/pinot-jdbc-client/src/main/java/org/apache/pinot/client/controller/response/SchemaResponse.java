@@ -34,6 +34,7 @@ public class SchemaResponse {
   private String _schemaName;
   private JsonNode _dimensions;
   private JsonNode _metrics;
+  private JsonNode _dateTimeFieldSpecs;
 
   private SchemaResponse() {
   }
@@ -42,6 +43,7 @@ public class SchemaResponse {
     _schemaName = schemaResponse.get("schemaName").textValue();
     _dimensions = schemaResponse.get("dimensionFieldSpecs");
     _metrics = schemaResponse.get("metricFieldSpecs");
+    _dateTimeFieldSpecs = schemaResponse.get("dateTimeFieldSpecs");
   }
 
   public static SchemaResponse fromJson(JsonNode schemaResponse) {
@@ -64,6 +66,7 @@ public class SchemaResponse {
     return _metrics;
   }
 
+  public JsonNode getDateTimeFieldSpecs() { return  _dateTimeFieldSpecs; }
 
   public static class SchemaResponseFuture extends ControllerResponseFuture<SchemaResponse> {
     private final ObjectReader OBJECT_READER = new ObjectMapper().reader();

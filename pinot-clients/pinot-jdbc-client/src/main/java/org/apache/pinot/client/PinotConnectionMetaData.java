@@ -42,6 +42,7 @@ public class PinotConnectionMetaData extends AbstractBaseConnectionMetaData {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotConnectionMetaData.class);
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
   private final PinotConnection _connection;
   private final PinotControllerTransport _controllerTransport;
   private final String _controllerURL;
@@ -165,6 +166,11 @@ public class PinotConnectionMetaData extends AbstractBaseConnectionMetaData {
     }
 
     for (JsonNode columns : schemaResponse.getMetrics()) {
+      appendColumnMeta(pinotMeta, tableName, ordinalPosition, columns);
+      ordinalPosition++;
+    }
+
+    for (JsonNode columns : schemaResponse.getDateTimeFieldSpecs()) {
       appendColumnMeta(pinotMeta, tableName, ordinalPosition, columns);
       ordinalPosition++;
     }
