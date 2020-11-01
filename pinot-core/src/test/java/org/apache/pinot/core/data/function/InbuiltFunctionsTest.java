@@ -226,8 +226,8 @@ public class InbuiltFunctionsTest {
     inputs.add(new Object[]{"timezone_minute(tz)", expectedArguments, row12_0, 0});
 
     GenericRow row12_1 = new GenericRow();
-    row12_1.putValue("tz", "America/Los_Angeles");
-    inputs.add(new Object[]{"timezone_hour(tz)", expectedArguments, row12_1, 17});
+    row12_1.putValue("tz", "Asia/Shanghai");
+    inputs.add(new Object[]{"timezone_hour(tz)", expectedArguments, row12_1, 8});
     inputs.add(new Object[]{"timezone_minute(tz)", expectedArguments, row12_1, 0});
 
     GenericRow row12_2 = new GenericRow();
