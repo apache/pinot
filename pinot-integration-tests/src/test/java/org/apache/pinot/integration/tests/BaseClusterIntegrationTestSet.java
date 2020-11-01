@@ -254,19 +254,36 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     testSqlQuery(query, Collections.singletonList(query));
 
     // IN_ID_SET
-    IdSet idSet = IdSets.create(FieldSpec.DataType.LONG);
-    idSet.add(19690L);
-    idSet.add(20355L);
-    idSet.add(21171L);
-    // Also include a non-existing id
-    idSet.add(0L);
-    String serializedIdSet = idSet.toBase64String();
-    String inIdSetQuery = "SELECT COUNT(*) FROM mytable WHERE INIDSET(AirlineID, '" + serializedIdSet + "') = 1";
-    String inQuery = "SELECT COUNT(*) FROM mytable WHERE AirlineID IN (19690, 20355, 21171, 0)";
-    testSqlQuery(inIdSetQuery, Collections.singletonList(inQuery));
-    String notInIdSetQuery = "SELECT COUNT(*) FROM mytable WHERE INIDSET(AirlineID, '" + serializedIdSet + "') = 0";
-    String notInQuery = "SELECT COUNT(*) FROM mytable WHERE AirlineID NOT IN (19690, 20355, 21171, 0)";
-    testSqlQuery(notInIdSetQuery, Collections.singletonList(notInQuery));
+    {
+      IdSet idSet = IdSets.create(FieldSpec.DataType.LONG);
+      idSet.add(19690L);
+      idSet.add(20355L);
+      idSet.add(21171L);
+      // Also include a non-existing id
+      idSet.add(0L);
+      String serializedIdSet = idSet.toBase64String();
+      String inIdSetQuery = "SELECT COUNT(*) FROM mytable WHERE INIDSET(AirlineID, '" + serializedIdSet + "') = 1";
+      String inQuery = "SELECT COUNT(*) FROM mytable WHERE AirlineID IN (19690, 20355, 21171, 0)";
+      testSqlQuery(inIdSetQuery, Collections.singletonList(inQuery));
+      String notInIdSetQuery = "SELECT COUNT(*) FROM mytable WHERE INIDSET(AirlineID, '" + serializedIdSet + "') = 0";
+      String notInQuery = "SELECT COUNT(*) FROM mytable WHERE AirlineID NOT IN (19690, 20355, 21171, 0)";
+      testSqlQuery(notInIdSetQuery, Collections.singletonList(notInQuery));
+    }
+
+    // IN_SUBQUERY
+    {
+      String inSubqueryQuery =
+          "SELECT COUNT(*) FROM mytable WHERE INSUBQUERY(DestAirportID, 'SELECT IDSET(DestAirportID) FROM mytable WHERE DaysSinceEpoch = 16430') = 1";
+      String inQuery =
+          "SELECT COUNT(*) FROM mytable WHERE DestAirportID IN (SELECT DestAirportID FROM mytable WHERE DaysSinceEpoch = 16430)";
+      testSqlQuery(inSubqueryQuery, Collections.singletonList(inQuery));
+
+      String notInSubqueryQuery =
+          "SELECT COUNT(*) FROM mytable WHERE INSUBQUERY(DestAirportID, 'SELECT IDSET(DestAirportID) FROM mytable WHERE DaysSinceEpoch = 16430') = 0";
+      String notInQuery =
+          "SELECT COUNT(*) FROM mytable WHERE DestAirportID NOT IN (SELECT DestAirportID FROM mytable WHERE DaysSinceEpoch = 16430)";
+      testSqlQuery(notInSubqueryQuery, Collections.singletonList(notInQuery));
+    }
   }
 
   /**
