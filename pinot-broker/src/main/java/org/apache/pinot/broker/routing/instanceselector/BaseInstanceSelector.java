@@ -25,6 +25,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import org.apache.helix.model.ExternalView;
@@ -179,7 +181,6 @@ abstract class BaseInstanceSelector implements InstanceSelector {
       if (!onlineSegments.contains(segment)) {
         continue;
       }
-      // NOTE: Instances will be sorted here because 'instanceStateMap' is a TreeMap.
       Map<String, String> instanceStateMap = entry.getValue();
       List<String> onlineInstances = new ArrayList<>(instanceStateMap.size());
       List<String> offlineInstances = new ArrayList<>();
@@ -198,6 +199,9 @@ abstract class BaseInstanceSelector implements InstanceSelector {
           }
         }
       }
+      // Sort the online instances for replica-group routing to work. For multiple segments with the same online
+      // instances, if the list is sorted, the same index in the list will always point to the same instance.
+      onlineInstances.sort(null);
     }
   }
 

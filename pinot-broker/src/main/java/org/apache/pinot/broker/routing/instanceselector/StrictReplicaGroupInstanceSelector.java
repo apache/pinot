@@ -105,7 +105,6 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
       if (instancesInIdealState == null) {
         continue;
       }
-      // NOTE: Instances will be sorted here because 'instanceStateMap' is a TreeMap.
       Map<String, String> instanceStateMap = entry.getValue();
       Set<String> tempOnlineInstances = new TreeSet<>();
       List<String> offlineInstances = new ArrayList<>();
@@ -154,6 +153,9 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
     for (Map.Entry<String, Set<String>> entry : tempSegmentToOnlineInstancesMap.entrySet()) {
       String segment = entry.getKey();
       Set<String> tempOnlineInstances = entry.getValue();
+      // NOTE: Instances will be sorted here because 'tempOnlineInstances' is a TreeSet. We need the online instances to
+      //       be sorted for replica-group routing to work. For multiple segments with the same online instances, if the
+      //       list is sorted, the same index in the list will always point to the same instance.
       List<String> onlineInstances = new ArrayList<>(tempOnlineInstances.size());
       segmentToOnlineInstancesMap.put(segment, onlineInstances);
 
