@@ -23,6 +23,10 @@ import { TableData } from 'Models';
 import AppLoader from '../components/AppLoader';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 import CustomizedTables from '../components/Table';
+import CustomButton from '../components/CustomButton';
+import SimpleAccordion from '../components/SimpleAccordion';
+import AddTableSchemaOp from '../components/Homepage/Operations/AddTableSchemaOp';
+import AddTableOp from '../components/Homepage/Operations/AddTableOp';
 
 const useStyles = makeStyles(() => ({
   gridContainer: {
@@ -31,7 +35,11 @@ const useStyles = makeStyles(() => ({
     maxHeight: 'calc(100vh - 70px)',
     overflowY: 'auto'
   },
-
+  operationDiv: {
+    border: '1px #BDCCD9 solid',
+    borderRadius: 4,
+    marginBottom: 20
+  }
 }));
 
 const TablesListingPage = () => {
@@ -42,8 +50,11 @@ const TablesListingPage = () => {
     columns: [],
     records: []
   });
+  const [showAddTableSchemaModal, setShowAddTableSchemaModal] = useState(false);
+  const [showAddTableModal, setShowAddTableModal] = useState(false);
 
   const fetchData = async () => {
+    !fetching && setFetching(true);
     const tablesResponse = await PinotMethodUtils.getQueryTablesList({bothType: true});
     const tablesList = [];
     tablesResponse.records.map((record)=>{
@@ -62,16 +73,52 @@ const TablesListingPage = () => {
     <AppLoader />
   ) : (
     <Grid item xs className={classes.gridContainer}>
+      <div className={classes.operationDiv}>
+        <SimpleAccordion
+          headerTitle="Operations"
+          showSearchBox={false}
+        >
+          <div>
+            <CustomButton
+              onClick={()=>{setShowAddTableSchemaModal(true)}}
+              tooltipTitle="Add Schema & Table"
+              enableTooltip={true}
+            >
+              Add Schema & Table
+            </CustomButton>
+            <CustomButton
+              onClick={()=>{setShowAddTableModal(true)}}
+              tooltipTitle="Add Table"
+              enableTooltip={true}
+            >
+              Add Table
+            </CustomButton>
+          </div>
+        </SimpleAccordion>
+      </div>
       <CustomizedTables
         title="Tables"
         data={tableData}
         isPagination
         addLinks
-        baseURL="/tenants/:Tenant Name:/table/" // TODO
-        regexReplace={true}
+        baseURL="/tenants/table/"
         showSearchBox={true}
         inAccordionFormat={true}
       />
+      {
+        showAddTableSchemaModal &&
+        <AddTableSchemaOp
+          hideModal={()=>{setShowAddTableSchemaModal(false);}}
+          fetchData={fetchData}
+        />
+      }
+      {
+        showAddTableModal &&
+        <AddTableOp
+          hideModal={()=>{setShowAddTableModal(false);}}
+          fetchData={fetchData}
+        />
+      }
     </Grid>
   );
 };

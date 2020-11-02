@@ -52,7 +52,9 @@ type Props = {
   btnOkText?: string,
   showCancelBtn?: boolean,
   showOkBtn?: boolean,
-  largeSize?: boolean
+  size?: false | "xs" | "sm" | "md" | "lg" | "xl",
+  disableBackdropClick?: boolean
+  disableEscapeKeyDown?: boolean
 };
 
 export default function CustomDialog({
@@ -65,13 +67,24 @@ export default function CustomDialog({
   btnOkText,
   showCancelBtn = true,
   showOkBtn = true,
-  largeSize = false
+  size,
+  disableBackdropClick = false,
+  disableEscapeKeyDown = false
 }: Props) {
 
   const classes = useStyles();
 
   return (
-    <Dialog open={open} onClose={handleClose} aria-labelledby="form-dialog-title" className={classes.root} maxWidth={largeSize ? "lg" : false} fullWidth={largeSize}>
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      aria-labelledby="form-dialog-title"
+      className={classes.root}
+      maxWidth={size}
+      fullWidth={size ? true : false}
+      disableBackdropClick={disableBackdropClick}
+      disableEscapeKeyDown={disableEscapeKeyDown}
+    >
       <DialogTitle className={classes.dialogTitle}>{title}</DialogTitle>
       {children}
       <DialogActions>

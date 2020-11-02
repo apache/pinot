@@ -41,7 +41,7 @@ const CustomNotification = () => {
         >
           <Alert
             onClose={context.hide && context.hide()}
-            severity={context && context.type}
+            severity={(context && context.type) || 'warning'}
           >
             {context && context.message}
           </Alert>

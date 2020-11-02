@@ -38,6 +38,7 @@ export default [
   { path: '/tables', Component: TablesListingPage },
   { path: '/tenants/:tenantName', Component: TenantsPage },
   { path: '/tenants/:tenantName/table/:tableName', Component: TenantPageDetails },
+  { path: '/tenants/table/:tableName', Component: TenantPageDetails },
   { path: '/tenants/:tenantName/table/:tableName/:segmentName', Component: SegmentDetails },
   { path: '/instance/:instanceName', Component: InstanceDetails },
   { path: '/instance/:instanceName/table/:tableName', Component: TenantPageDetails },

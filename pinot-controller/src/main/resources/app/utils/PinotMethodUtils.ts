@@ -57,7 +57,12 @@ import {
   reloadAllSegments,
   reloadStatus,
   rebalanceServersForTable,
-  rebalanceBrokersForTable
+  rebalanceBrokersForTable,
+  validateSchema,
+  validateTable,
+  saveSchema,
+  saveTable,
+  getSchema
 } from '../requests';
 import Utils from './Utils';
 
@@ -339,10 +344,10 @@ const getAllTableDetails = (tablesList) => {
           );
         } else if (index % 3 === 1) {
           // response of getIdealState API
-          idealStateObj = result.data.OFFLINE || result.data.REALTIME;
+          idealStateObj = result.data.OFFLINE || result.data.REALTIME || {};
         } else if (index % 3 === 2) {
           // response of getExternalView API
-          externalViewObj = result.data.OFFLINE || result.data.REALTIME;
+          externalViewObj = result.data.OFFLINE || result.data.REALTIME || {};
           const externalSegmentCount = Object.keys(externalViewObj).length;
           const idealSegmentCount = Object.keys(idealStateObj).length;
           // Generating data for the record
@@ -657,6 +662,36 @@ const rebalanceBrokersForTableOp = (tableName) => {
   });
 };
 
+const validateSchemaAction = (schemaObj) => {
+  return validateSchema(schemaObj).then((response)=>{
+    return response.data;
+  });
+};
+
+const validateTableAction = (tableObj) => {
+  return validateTable(tableObj).then((response)=>{
+    return response.data;
+  });
+};
+
+const saveSchemaAction = (schemaObj) => {
+  return saveSchema(schemaObj).then((response)=>{
+    return response.data;
+  });
+};
+
+const saveTableAction = (tableObj) => {
+  return saveTable(tableObj).then((response)=>{
+    return response.data;
+  });
+};
+
+const getSchemaData = (schemaName) => {
+  return getSchema(schemaName).then((response)=>{
+    return response.data;
+  });
+};
+
 export default {
   getTenantsData,
   getAllInstances,
@@ -696,5 +731,10 @@ export default {
   deleteTableOp,
   deleteSchemaOp,
   rebalanceServersForTableOp,
-  rebalanceBrokersForTableOp
+  rebalanceBrokersForTableOp,
+  validateSchemaAction,
+  validateTableAction,
+  saveSchemaAction,
+  saveTableAction,
+  getSchemaData
 };

@@ -20,7 +20,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
-import { Grid, Checkbox, Button } from '@material-ui/core';
+import { Grid, Checkbox, Button, FormControl, Input, InputLabel } from '@material-ui/core';
 import Alert from '@material-ui/lab/Alert';
 import FileCopyIcon from '@material-ui/icons/FileCopy';
 import { TableData } from 'Models';
@@ -85,6 +85,9 @@ const useStyles = makeStyles((theme) => ({
   sqlError: {
     whiteSpace: 'pre-wrap',
   },
+  timeoutControl: {
+    bottom: 10
+  }
 }));
 
 const jsonoptions = {
@@ -137,6 +140,8 @@ const QueryPage = () => {
 
   const [inputQuery, setInputQuery] = useState('');
 
+  const [queryTimeout, setQueryTimeout] = useState('');
+
   const [outputResult, setOutputResult] = useState('');
 
   const [resultError, setResultError] = useState('');
@@ -166,16 +171,20 @@ const QueryPage = () => {
     setQueryLoader(true);
     let url;
     let params;
+    let timeoutStr = '';
+    if(queryTimeout !== ''){
+      timeoutStr = ` option(timeoutMs=${parseInt(queryTimeout, 10)})`
+    }
     if (checked.querySyntaxPQL) {
       url = 'pql';
       params = JSON.stringify({
-        pql: query || inputQuery.trim(),
+        pql: `${query || inputQuery.trim()}${timeoutStr}`,
         trace: checked.tracing,
       });
     } else {
       url = 'sql';
       params = JSON.stringify({
-        sql: query || inputQuery.trim(),
+        sql: `${query || inputQuery.trim()}${timeoutStr}`,
         trace: checked.tracing,
       });
     }
@@ -341,6 +350,13 @@ const QueryPage = () => {
                   checked={checked.querySyntaxPQL}
                 />
                 Query Syntax: PQL
+              </Grid>
+
+              <Grid item xs={3}>
+                <FormControl fullWidth={true} className={classes.timeoutControl}>
+                  <InputLabel htmlFor="my-input">Timeout (in Milliseconds)</InputLabel>
+                  <Input id="my-input" type="number" value={queryTimeout} onChange={(e)=> setQueryTimeout(e.target.value)}/>
+                </FormControl>
               </Grid>
 
               <Grid item xs={3} className={classes.runNowBtn}>

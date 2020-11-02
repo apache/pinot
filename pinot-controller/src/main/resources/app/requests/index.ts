@@ -45,6 +45,9 @@ export const getTenantTableDetails = (tableName: string): Promise<AxiosResponse<
 export const putTable = (name: string, params: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.put(`/tables/${name}`, params, { headers });
 
+export const getSchema = (name: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/schemas/${name}`);
+
 export const putSchema = (name: string, params: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.put(`/schemas/${name}`, params, { headers });
 
@@ -143,3 +146,15 @@ export const rebalanceServersForTable = (tableName: string, qParams: string): Pr
 
 export const rebalanceBrokersForTable = (tableName: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.post(`/tables/${tableName}/rebuildBrokerResourceFromHelixTags`, null, {headers});
+
+export const validateSchema = (schemaObject: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.post(`/schemas/validate`, JSON.stringify(schemaObject), {headers});
+
+export const validateTable = (tableObject: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.post(`/tables/validate`, JSON.stringify(tableObject), {headers});
+
+export const saveSchema = (schemaObject: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.post(`/schemas`, JSON.stringify(schemaObject), {headers});
+
+export const saveTable = (tableObject: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.post(`/tables`, JSON.stringify(tableObject), {headers});
