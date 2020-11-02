@@ -281,7 +281,7 @@ io.netty:netty-handler-proxy:4.1.42.Final
 io.netty:netty-handler:4.1.42.Final
 io.netty:netty-resolver:4.1.42.Final
 io.netty:netty-tcnative-boringssl-static:2.0.26.Final
-io.netty:netty-transport-native-epoll:jar:4.1.42.Final
+io.netty:netty-transport-native-epoll:4.1.42.Final
 io.netty:netty-transport-native-unix-common:4.1.42.Final
 io.netty:netty-transport:4.1.42.Final
 io.netty:netty:3.9.6.Final
@@ -315,7 +315,7 @@ org.apache.commons:commons-math:2.1
 org.apache.commons:commons-math3:3.2
 org.apache.datasketches:datasketches-java:1.2.0-incubating
 org.apache.datasketches:datasketches-memory:1.2.0-incubating
-org.apache.helix:helix-core:0.9.7
+org.apache.helix:helix-core:0.9.8
 org.apache.hive:hive-storage-api:2.7.1
 org.apache.httpcomponents:httpclient:4.5.9
 org.apache.httpcomponents:httpcore:4.4.9
