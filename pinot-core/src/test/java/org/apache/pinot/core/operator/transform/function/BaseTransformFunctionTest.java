@@ -70,6 +70,7 @@ public abstract class BaseTransformFunctionTest {
   protected static final String FLOAT_SV_COLUMN = "floatSV";
   protected static final String DOUBLE_SV_COLUMN = "doubleSV";
   protected static final String STRING_SV_COLUMN = "stringSV";
+  protected static final String BYTES_SV_COLUMN = "bytesSV";
   protected static final String STRING_ALPHANUM_SV_COLUMN = "stringAlphaNumSV";
   protected static final String INT_MV_COLUMN = "intMV";
   protected static final String TIME_COLUMN = "time";
@@ -80,6 +81,7 @@ public abstract class BaseTransformFunctionTest {
   protected final double[] _doubleSVValues = new double[NUM_ROWS];
   protected final String[] _stringSVValues = new String[NUM_ROWS];
   protected final String[] _stringAlphaNumericSVValues = new String[NUM_ROWS];
+  protected final byte[][] _bytesSVValues = new byte[NUM_ROWS][];
   protected final int[][] _intMVValues = new int[NUM_ROWS][];
   protected final long[] _timeValues = new long[NUM_ROWS];
   protected final String[] _jsonValues = new String[NUM_ROWS];
@@ -101,6 +103,7 @@ public abstract class BaseTransformFunctionTest {
       _doubleSVValues[i] = _intSVValues[i] * RANDOM.nextDouble();
       _stringSVValues[i] = df.format(_intSVValues[i] * RANDOM.nextDouble());
       _stringAlphaNumericSVValues[i] = RandomStringUtils.randomAlphanumeric(26);
+      _bytesSVValues[i] = RandomStringUtils.randomAlphanumeric(26).getBytes();
 
       int numValues = 1 + RANDOM.nextInt(MAX_NUM_MULTI_VALUES);
       _intMVValues[i] = new int[numValues];
@@ -121,6 +124,7 @@ public abstract class BaseTransformFunctionTest {
       map.put(DOUBLE_SV_COLUMN, _doubleSVValues[i]);
       map.put(STRING_SV_COLUMN, _stringSVValues[i]);
       map.put(STRING_ALPHANUM_SV_COLUMN, _stringAlphaNumericSVValues[i]);
+      map.put(BYTES_SV_COLUMN, _bytesSVValues[i]);
       map.put(INT_MV_COLUMN, ArrayUtils.toObject(_intMVValues[i]));
       map.put(TIME_COLUMN, _timeValues[i]);
       _jsonValues[i] = JsonUtils.objectToJsonNode(map).toString();
@@ -136,6 +140,7 @@ public abstract class BaseTransformFunctionTest {
         .addSingleValueDimension(DOUBLE_SV_COLUMN, FieldSpec.DataType.DOUBLE)
         .addSingleValueDimension(STRING_SV_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(STRING_ALPHANUM_SV_COLUMN, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(BYTES_SV_COLUMN, FieldSpec.DataType.BYTES)
         .addSingleValueDimension(JSON_COLUMN, FieldSpec.DataType.STRING)
         .addMultiValueDimension(INT_MV_COLUMN, FieldSpec.DataType.INT)
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME_COLUMN), null).build();
