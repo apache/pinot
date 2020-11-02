@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.testng.Assert;
@@ -171,5 +173,57 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     Assert.assertEquals(transformFunction.getName(), "trim");
     testTransformFunction(transformFunction, _stringAlphaNumericSVValues);
+  }
+
+  @Test
+  public void testShaTransformFunction() {
+    ExpressionContext expression = QueryContextConverterUtils.getExpression(String.format("sha(%s)", BYTES_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    Assert.assertEquals(transformFunction.getName(), "sha");
+    String[] expectedValues = new String[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = DigestUtils.shaHex(_bytesSVValues[i]);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testSha256TransformFunction() {
+    ExpressionContext expression = QueryContextConverterUtils.getExpression(String.format("sha256(%s)", BYTES_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    Assert.assertEquals(transformFunction.getName(), "sha256");
+    String[] expectedValues = new String[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = DigestUtils.sha256Hex(_bytesSVValues[i]);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testSha512TransformFunction() {
+    ExpressionContext expression = QueryContextConverterUtils.getExpression(String.format("sha512(%s)", BYTES_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    Assert.assertEquals(transformFunction.getName(), "sha512");
+    String[] expectedValues = new String[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = DigestUtils.sha512Hex(_bytesSVValues[i]);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testMd5TransformFunction() {
+    ExpressionContext expression = QueryContextConverterUtils.getExpression(String.format("md5(%s)", BYTES_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    Assert.assertEquals(transformFunction.getName(), "md5");
+    String[] expectedValues = new String[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = DigestUtils.md5Hex(_bytesSVValues[i]);
+    }
+    testTransformFunction(transformFunction, expectedValues);
   }
 }
