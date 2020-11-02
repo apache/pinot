@@ -19,6 +19,7 @@
 package org.apache.pinot.core.realtime.impl;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.util.TestUtils;
@@ -248,6 +249,29 @@ public class RealtimeSegmentStatsHistoryTest {
     Assert.assertEquals(segmentStats.getNumRowsIndexed(), 0); // Input file does not have this field.
     Assert.assertEquals(segmentStats.getMemUsedBytes(), 600);
     Assert.assertEquals(segmentStats.getNumSeconds(), 700);
+  }
+
+  @Test
+  public void testLatestConsumedMemory()
+      throws IOException, ClassNotFoundException {
+    final String tmpDir = System.getProperty("java.io.tmpdir");
+    File serializedFile = new File(tmpDir, STATS_FILE_NAME);
+    serializedFile.deleteOnExit();
+    FileUtils.deleteQuietly(serializedFile);
+    long[] memoryValues = {100, 100, 200, 400, 450, 600};
+
+    RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserialzeFrom(serializedFile);
+    Assert.assertEquals(history.getLatestSegmentMemoryConsumed(), -1);
+    RealtimeSegmentStatsHistory.SegmentStats segmentStats = null;
+
+    for (int i = 0; i < memoryValues.length; i++) {
+      segmentStats = new RealtimeSegmentStatsHistory.SegmentStats();
+      segmentStats.setMemUsedBytes(memoryValues[i]);
+      history.addSegmentStats(segmentStats);
+    }
+
+    long expectedMemUsed = memoryValues[memoryValues.length - 1];
+    Assert.assertEquals(history.getLatestSegmentMemoryConsumed(), expectedMemUsed);
   }
 
   private static class StatsUpdater implements Runnable {

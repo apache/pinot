@@ -67,7 +67,7 @@ public class TablesResource {
   private static final String PEER_SEGMENT_DOWNLOAD_DIR = "peerSegmentDownloadDir";
 
   @Inject
-  ServerInstance serverInstance;
+  private ServerInstance _serverInstance;
 
   @Inject
   private AccessControlFactory _accessControlFactory;
@@ -85,10 +85,10 @@ public class TablesResource {
   }
 
   private InstanceDataManager checkGetInstanceDataManager() {
-    if (serverInstance == null) {
+    if (_serverInstance == null) {
       throw new WebApplicationException("Server initialization error. Missing server instance");
     }
-    InstanceDataManager instanceDataManager = serverInstance.getInstanceDataManager();
+    InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
     if (instanceDataManager == null) {
       throw new WebApplicationException("Server initialization error. Missing data manager",
           Response.Status.INTERNAL_SERVER_ERROR);
@@ -218,7 +218,7 @@ public class TablesResource {
       // Note that two clients asking the same segment file will result in the same tar.gz files being created twice.
       // Will revisit for optimization if performance becomes an issue.
       File tmpSegmentTarDir =
-          new File(serverInstance.getInstanceDataManager().getSegmentFileDirectory(), PEER_SEGMENT_DOWNLOAD_DIR);
+          new File(_serverInstance.getInstanceDataManager().getSegmentFileDirectory(), PEER_SEGMENT_DOWNLOAD_DIR);
       tmpSegmentTarDir.mkdir();
 
       File segmentTarFile = new File(tmpSegmentTarDir, tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID()

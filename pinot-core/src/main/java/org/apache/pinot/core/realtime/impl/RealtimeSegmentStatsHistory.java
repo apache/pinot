@@ -240,7 +240,7 @@ public class RealtimeSegmentStatsHistory implements Serializable {
   }
 
   public synchronized boolean isEmpty() {
-    return getNumntriesToScan() == 0;
+    return getNumEntriesToScan() == 0;
   }
 
   public synchronized void setMinIntervalBetweenUpdatesMillis(long millis) {
@@ -272,7 +272,7 @@ public class RealtimeSegmentStatsHistory implements Serializable {
    * @return estimated
    */
   public synchronized int getEstimatedCardinality(@Nonnull String columnName) {
-    int numEntriesToScan = getNumntriesToScan();
+    int numEntriesToScan = getNumEntriesToScan();
     if (numEntriesToScan == 0) {
       return DEFAULT_EST_CARDINALITY;
     }
@@ -303,7 +303,7 @@ public class RealtimeSegmentStatsHistory implements Serializable {
    * @return estimated average string size
    */
   public synchronized int getEstimatedAvgColSize(@Nonnull String columnName) {
-    int numEntriesToScan = getNumntriesToScan();
+    int numEntriesToScan = getNumEntriesToScan();
     if (numEntriesToScan == 0) {
       return DEFAULT_EST_AVG_COL_SIZE;
     }
@@ -327,7 +327,7 @@ public class RealtimeSegmentStatsHistory implements Serializable {
   }
 
   public synchronized int getEstimatedRowsToIndex() {
-    int numEntriesToScan = getNumntriesToScan();
+    int numEntriesToScan = getNumEntriesToScan();
     if (numEntriesToScan == 0) {
       return DEFAULT_ROWS_TO_INDEX;
     }
@@ -339,6 +339,16 @@ public class RealtimeSegmentStatsHistory implements Serializable {
     }
 
     return (numRowsIndexed > 0) ? (int) (numRowsIndexed / numEntriesToScan) : DEFAULT_ROWS_TO_INDEX;
+  }
+
+  public synchronized long getLatestSegmentMemoryConsumed() {
+    if (isEmpty()) {
+      return -1;
+    }
+    // Get the last updated index
+    int latestSegmentIndex = (_cursor + _arraySize - 1) % _arraySize;
+    SegmentStats stats = getSegmentStatsAt(latestSegmentIndex);
+    return stats._memUsedBytes;
   }
 
   public SegmentStats getSegmentStatsAt(int index) {
@@ -374,20 +384,10 @@ public class RealtimeSegmentStatsHistory implements Serializable {
     }
   }
 
-  private int getNumntriesToScan() {
+  private int getNumEntriesToScan() {
     if (isFull()) {
       return getArraySize();
     }
     return getCursor();
-  }
-
-  public static void main(String[] args)
-      throws Exception {
-    RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserialzeFrom(new File("/tmp/stats.ser"));
-    System.out.println(history.toString());
-    for (int i = 0; i < history.getNumntriesToScan(); i++) {
-      SegmentStats segmentStats = history.getSegmentStatsAt(i);
-      System.out.println(segmentStats.toString());
-    }
   }
 }

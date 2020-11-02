@@ -53,7 +53,7 @@ import org.apache.pinot.server.starter.ServerInstance;
 public class TableSizeResource {
 
   @Inject
-  ServerInstance serverInstance;
+  private ServerInstance _serverInstance;
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
@@ -64,7 +64,7 @@ public class TableSizeResource {
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Provide detailed information") @DefaultValue("true") @QueryParam("detailed") boolean detailed)
       throws WebApplicationException {
-    InstanceDataManager instanceDataManager = serverInstance.getInstanceDataManager();
+    InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
 
     if (instanceDataManager == null) {
       throw new WebApplicationException("Invalid server initialization", Response.Status.INTERNAL_SERVER_ERROR);
