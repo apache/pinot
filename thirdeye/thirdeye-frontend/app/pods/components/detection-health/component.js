@@ -14,21 +14,24 @@ import { get, computed } from '@ember/object';
 import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
 import moment from 'moment';
 
+const LABEL_MAP = {
+  GOOD: '--good',
+  MODERATE: '--average',
+  BAD: '--poor'
+};
+
+const STATUS_MAP = {
+  GOOD: 'Good',
+  MODERATE: 'Average',
+  BAD: 'Poor',
+  UNKNOWN: 'Unknown'
+};
+
 export default Component.extend({
   selectedRule: null, // passed in by parent when relevant
-  classNames: ['te-horizontal-cards__container'],
-  labelMap: {
-    GOOD: '--good',
-    MODERATE: '--average',
-    BAD: '--poor'
-  },
-  statusMap: {
-    GOOD: 'Good',
-    MODERATE: 'Average',
-    BAD: 'Poor',
-    UNKNOWN: 'Unknown'
-  },
-
+  tagName: '',
+  labelMap: LABEL_MAP,
+  statusMap: STATUS_MAP,
   /**
    * Changes the color of text in Detection Health
    * @type {String}
@@ -115,9 +118,9 @@ export default Component.extend({
       const lastTaskExecutionTimestamp = get(this, 'health').detectionTaskStatus.lastTaskExecutionTime;
       if (lastTaskExecutionTimestamp > 0) {
         const executionDateTime = new Date(lastTaskExecutionTimestamp);
-        return executionDateTime.toDateString() + ", " +  executionDateTime.toLocaleTimeString() + " (" + moment().tz(moment.tz.guess()).format('z') + ")"
+        return executionDateTime.toDateString() + ", " +  executionDateTime.toLocaleTimeString() + " (" + moment().tz(moment.tz.guess()).format('z') + ")";
       }
-      return "-"
+      return "-";
     }
   ),
 
@@ -159,7 +162,7 @@ export default Component.extend({
       const info = {};
       info.mape = floatToPercent(NaN); // set default to Nan
       let rule = selectedRule ? selectedRule.detectorName : null;
-      info.status = 'Unknown'
+      info.status = 'Unknown';
       // 3 possibilities: selectedRule, no selectedRule and rules available, no rules available
       if (health && health.regressionStatus && typeof health.regressionStatus === 'object') {
         const regressionStatus = health.regressionStatus;
