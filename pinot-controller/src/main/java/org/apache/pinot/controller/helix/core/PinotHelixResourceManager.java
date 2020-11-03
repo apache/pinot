@@ -1982,6 +1982,22 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Check if the table enabled
+   * @param tableNameWithType Table name with suffix
+   * @return boolean true for enable | false for disabled
+   * throws {@link TableNotFoundException}
+   */
+  public boolean isTableEnabled(String tableNameWithType)
+      throws TableNotFoundException {
+    IdealState idealState = getTableIdealState(tableNameWithType);
+    if (idealState == null) {
+      throw new TableNotFoundException("Failed to find ideal state for table: " + tableNameWithType);
+    }
+
+    return idealState.isEnabled();
+  }
+
+  /**
    * Gets the ideal state of the table
    * @param tableNameWithType Table name with suffix
    * @return IdealState of tableNameWithType

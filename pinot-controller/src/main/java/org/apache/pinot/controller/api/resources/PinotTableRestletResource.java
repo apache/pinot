@@ -558,4 +558,32 @@ public class PinotTableRestletResource {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
     }
   }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/tables/{tableName}/state")
+  @ApiOperation(value = "Get current table state", notes = "Get current table state")
+  public String getTableState(
+      @ApiParam(value = "Name of the table to get its state", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "realtime|offline", required = true) @QueryParam("type") String tableTypeStr
+  ) {
+    TableType tableType;
+    try {
+      tableType = TableType.valueOf(tableTypeStr.toUpperCase());
+    } catch (IllegalArgumentException e) {
+      throw new ControllerApplicationException(LOGGER, "Illegal table type: " + tableTypeStr,
+          Response.Status.BAD_REQUEST);
+    }
+
+    String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
+    try {
+      ObjectNode data = JsonUtils.newObjectNode();
+      data.put("tableName", tableNameWithType);
+      data.put("state", _pinotHelixResourceManager.isTableEnabled(tableNameWithType) ? "enabled" : "disabled");
+      return data.toString();
+    } catch (TableNotFoundException e) {
+      throw new ControllerApplicationException(LOGGER, "Failed to find table: " + tableNameWithType,
+          Response.Status.NOT_FOUND);
+    }
+  }
 }
