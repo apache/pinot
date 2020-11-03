@@ -118,6 +118,23 @@ const sqlFuntionsList = [
   'SUMMV', 'AVGMV', 'MINMAXRANGEMV', 'DISTINCTCOUNTMV', 'DISTINCTCOUNTBITMAPMV', 'DISTINCTCOUNTHLLMV',
   'DISTINCTCOUNTRAWHLLMV', 'DISTINCT', 'ST_UNION'];
 
+const responseStatCols = [
+  'timeUsedMs',
+  'numDocsScanned',
+  'totalDocs',
+  'numServersQueried',
+  'numServersResponded',
+  'numSegmentsQueried',
+  'numSegmentsProcessed',
+  'numSegmentsMatched',
+  'numConsumingSegmentsQueried',
+  'numEntriesScannedInFilter',
+  'numEntriesScannedPostFilter',
+  'numGroupsLimitReached',
+  'partialResponse',
+  'minConsumingFreshnessTimeMs'
+];
+
 const QueryPage = () => {
   const classes = useStyles();
   const [fetching, setFetching] = useState(true);
@@ -196,7 +213,7 @@ const QueryPage = () => {
     );
     setResultError(results.error || '');
     setResultData(results.result || { columns: [], records: [] });
-    setQueryStats(results.queryStats || { columns: [], records: [] });
+    setQueryStats(results.queryStats || { columns: responseStatCols, records: [] });
     setOutputResult(JSON.stringify(results.data, null, 2) || '');
     setQueryLoader(false);
   };
@@ -380,7 +397,7 @@ const QueryPage = () => {
                   </Alert>
                 ) : (
                   <>
-                    {queryStats.records.length ? (
+                    {queryStats.columns.length ? (
                       <Grid item xs style={{ backgroundColor: 'white' }}>
                         <CustomizedTables
                           title="Query Response Stats"
@@ -392,7 +409,7 @@ const QueryPage = () => {
                     ) : null}
 
                     <Grid item xs style={{ backgroundColor: 'white' }}>
-                      {resultData.records.length ? (
+                      {resultData.columns.length ? (
                         <>
                           <Grid container className={classes.actionBtns}>
                             <Button
@@ -454,7 +471,7 @@ const QueryPage = () => {
                               showSearchBox={true}
                               inAccordionFormat={true}
                             />
-                          ) : resultData.records.length ? (
+                          ) : resultData.columns.length ? (
                             <SimpleAccordion
                               headerTitle="Query Result (JSON Format)"
                               showSearchBox={false}
