@@ -48,13 +48,12 @@ public class UpsertQuickStart {
   public void execute()
       throws Exception {
     File quickstartTmpDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
-    File configDir = new File(quickstartTmpDir, "configs");
-    File dataDir = new File(quickstartTmpDir, "data");
-    Preconditions.checkState(configDir.mkdirs());
+    File bootstrapTableDir = new File(quickstartTmpDir, "meetupRsvp");
+    File dataDir = new File(bootstrapTableDir, "data");
     Preconditions.checkState(dataDir.mkdirs());
 
-    File schemaFile = new File(configDir, "upsert_meetupRsvp_schema.json");
-    File tableConfigFile = new File(configDir, "upsert_meetupRsvp_realtime_table_config.json");
+    File schemaFile = new File(bootstrapTableDir, "meetupRsvp_schema.json");
+    File tableConfigFile = new File(bootstrapTableDir, "meetupRsvp_realtime_table_config.json");
 
     ClassLoader classLoader = Quickstart.class.getClassLoader();
     URL resource = classLoader.getResource("examples/stream/meetupRsvp/upsert_meetupRsvp_schema.json");
@@ -64,7 +63,7 @@ public class UpsertQuickStart {
     com.google.common.base.Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, tableConfigFile);
 
-    QuickstartTableRequest request = new QuickstartTableRequest("meetupRsvp", schemaFile, tableConfigFile);
+    QuickstartTableRequest request = new QuickstartTableRequest(bootstrapTableDir.getAbsolutePath());
     final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, dataDir);
 
     printStatus(Color.CYAN, "***** Starting Kafka *****");
@@ -94,8 +93,8 @@ public class UpsertQuickStart {
         e.printStackTrace();
       }
     }));
-    printStatus(Color.CYAN, "***** Adding meetupRSVP(upsert) table *****");
-    runner.addTable();
+    printStatus(Color.CYAN, "***** Bootstrap meetupRSVP(upsert) table *****");
+    runner.bootstrapTable();
     printStatus(Color.CYAN, "***** Waiting for 5 seconds for a few events to get populated *****");
     Thread.sleep(5000);
 

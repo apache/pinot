@@ -48,13 +48,13 @@ public class RealtimeQuickStart {
   public void execute()
       throws Exception {
     File quickstartTmpDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
-    File configDir = new File(quickstartTmpDir, "configs");
-    File dataDir = new File(quickstartTmpDir, "data");
-    Preconditions.checkState(configDir.mkdirs());
+
+    File baseDir = new File(quickstartTmpDir, "meetupRsvp");
+    File dataDir = new File(baseDir, "rawdata");
     Preconditions.checkState(dataDir.mkdirs());
 
-    File schemaFile = new File(configDir, "meetupRsvp_schema.json");
-    File tableConfigFile = new File(configDir, "meetupRsvp_realtime_table_config.json");
+    File schemaFile = new File(baseDir, "meetupRsvp_schema.json");
+    File tableConfigFile = new File(baseDir, "meetupRsvp_realtime_table_config.json");
 
     ClassLoader classLoader = Quickstart.class.getClassLoader();
     URL resource = classLoader.getResource("examples/stream/meetupRsvp/meetupRsvp_schema.json");
@@ -64,7 +64,7 @@ public class RealtimeQuickStart {
     com.google.common.base.Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, tableConfigFile);
 
-    QuickstartTableRequest request = new QuickstartTableRequest("meetupRsvp", schemaFile, tableConfigFile);
+    QuickstartTableRequest request = new QuickstartTableRequest(baseDir.getAbsolutePath());
     final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, dataDir);
 
     printStatus(Color.CYAN, "***** Starting Kafka *****");
@@ -93,8 +93,8 @@ public class RealtimeQuickStart {
         e.printStackTrace();
       }
     }));
-    printStatus(Color.CYAN, "***** Adding meetupRSVP table *****");
-    runner.addTable();
+    printStatus(Color.CYAN, "***** Bootstrap meetupRSVP table *****");
+    runner.bootstrapTable();
     printStatus(Color.CYAN, "***** Waiting for 5 seconds for a few events to get populated *****");
     Thread.sleep(5000);
 

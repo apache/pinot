@@ -62,7 +62,7 @@ public class GitHubEventsQuickstart {
 
   public void execute(String personalAccessToken)
       throws Exception {
-    final File quickStartDataDir = new File("githubEvents" + System.currentTimeMillis());
+    final File quickStartDataDir = new File(new File("githubEvents-" + System.currentTimeMillis()), "pullRequestMergedEvents");
 
     if (!quickStartDataDir.exists()) {
       Preconditions.checkState(quickStartDataDir.mkdirs());
@@ -82,7 +82,7 @@ public class GitHubEventsQuickstart {
 
     File tempDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
     Preconditions.checkState(tempDir.mkdirs());
-    QuickstartTableRequest request = new QuickstartTableRequest("pullRequestMergedEvents", schemaFile, tableConfigFile);
+    QuickstartTableRequest request = new QuickstartTableRequest(quickStartDataDir.getAbsolutePath());
     final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, tempDir);
 
     printStatus(Color.CYAN, "***** Starting Kafka *****");
@@ -92,7 +92,7 @@ public class GitHubEventsQuickstart {
     runner.startAll();
 
     printStatus(Color.CYAN, "***** Adding pullRequestMergedEvents table *****");
-    runner.addTable();
+    runner.bootstrapTable();
 
     printStatus(Color.CYAN, "***** Starting pullRequestMergedEvents data stream and publishing to Kafka *****");
     final PullRequestMergedEventsStream pullRequestMergedEventsStream =

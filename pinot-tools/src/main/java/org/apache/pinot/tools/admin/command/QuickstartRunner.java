@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
+import java.net.InetAddress;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,6 +37,7 @@ import org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.QuickstartTableRequest;
+import org.apache.pinot.tools.BootstrapTableTool;
 import org.apache.pinot.tools.utils.JarUtils;
 import org.yaml.snakeyaml.Yaml;
 
@@ -169,6 +171,17 @@ public class QuickstartRunner {
         .setInstances(number).setRole(TenantRole.BROKER).setExecute(true).execute();
   }
 
+  public void bootstrapTable()
+      throws Exception {
+    for (QuickstartTableRequest request : _tableRequests) {
+      if (!new BootstrapTableTool(InetAddress.getLocalHost().getHostName(), _controllerPorts.get(0), request.getBootstrapTableDir())
+          .execute()) {
+        throw new RuntimeException("Failed to bootstrap table with request - " + request);
+      }
+    }
+  }
+
+  @Deprecated
   public void addTable()
       throws Exception {
     for (QuickstartTableRequest request : _tableRequests) {
@@ -178,6 +191,7 @@ public class QuickstartRunner {
     }
   }
 
+  @Deprecated
   public void launchDataIngestionJob()
       throws Exception {
     for (QuickstartTableRequest request : _tableRequests) {
@@ -205,8 +219,7 @@ public class QuickstartRunner {
   public JsonNode runQuery(String query)
       throws Exception {
     int brokerPort = _brokerPorts.get(RANDOM.nextInt(_brokerPorts.size()));
-    return JsonUtils
-        .stringToJsonNode(new PostQueryCommand().setBrokerPort(String.valueOf(brokerPort)).setQueryType(
-            CommonConstants.Broker.Request.SQL).setQuery(query).run());
+    return JsonUtils.stringToJsonNode(new PostQueryCommand().setBrokerPort(String.valueOf(brokerPort))
+        .setQueryType(CommonConstants.Broker.Request.SQL).setQuery(query).run());
   }
 }

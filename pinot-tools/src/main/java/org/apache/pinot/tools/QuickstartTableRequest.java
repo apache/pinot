@@ -20,80 +20,87 @@ package org.apache.pinot.tools;
 
 import java.io.File;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.readers.FileFormat;
 
 
 public class QuickstartTableRequest {
 
-  File schemaFile;
-  File tableRequestFile;
-  File ingestionJobFile;
-  TableType tableType;
-  String tableName;
-  FileFormat segmentFileFormat = FileFormat.CSV;
+  private String _tableName;
+  private TableType _tableType;
+  private File _schemaFile;
+  private File _tableRequestFile;
+  private File _ingestionJobFile;
+  private String _bootstrapTableDir;
 
-  public QuickstartTableRequest(String tableName, File schemaFile, File tableRequest, File ingestionJobFile,
-      FileFormat segmentFileFormat) {
-    this.tableName = tableName;
-    this.schemaFile = schemaFile;
-    this.tableRequestFile = tableRequest;
-    tableType = TableType.OFFLINE;
-    this.segmentFileFormat = segmentFileFormat;
-    this.ingestionJobFile = ingestionJobFile;
+  public QuickstartTableRequest(String bootstrapTableDir) {
+    this._bootstrapTableDir = bootstrapTableDir;
+  }
+
+  public QuickstartTableRequest(String tableName, File schemaFile, File tableRequest, File ingestionJobFile) {
+    this._tableName = tableName;
+    this._schemaFile = schemaFile;
+    this._tableRequestFile = tableRequest;
+    _tableType = TableType.OFFLINE;
+    this._ingestionJobFile = ingestionJobFile;
   }
 
   public QuickstartTableRequest(String tableName, File schemaFile, File tableRequest) {
-    this.tableName = tableName;
-    this.schemaFile = schemaFile;
-    this.tableRequestFile = tableRequest;
-    tableType = TableType.REALTIME;
-  }
-
-  public FileFormat getSegmentFileFormat() {
-    return segmentFileFormat;
-  }
-
-  public void setSegmentFileFormat(FileFormat segmentFileFormat) {
-    this.segmentFileFormat = segmentFileFormat;
+    this._tableName = tableName;
+    this._schemaFile = schemaFile;
+    this._tableRequestFile = tableRequest;
+    _tableType = TableType.REALTIME;
   }
 
   public File getSchemaFile() {
-    return schemaFile;
+    return _schemaFile;
   }
 
   public void setSchemaFile(File schemaFile) {
-    this.schemaFile = schemaFile;
+    this._schemaFile = schemaFile;
   }
 
   public File getTableRequestFile() {
-    return tableRequestFile;
+    return _tableRequestFile;
   }
 
   public void setTableRequestFile(File tableRequestFile) {
-    this.tableRequestFile = tableRequestFile;
+    this._tableRequestFile = tableRequestFile;
   }
 
   public File getIngestionJobFile() {
-    return ingestionJobFile;
+    return _ingestionJobFile;
   }
 
   public void setIngestionJobFile(File ingestionJobFile) {
-    this.ingestionJobFile = ingestionJobFile;
+    this._ingestionJobFile = ingestionJobFile;
   }
 
   public TableType getTableType() {
-    return tableType;
+    return _tableType;
   }
 
   public void setTableType(TableType tableType) {
-    this.tableType = tableType;
+    this._tableType = tableType;
   }
 
   public String getTableName() {
-    return tableName;
+    return _tableName;
   }
 
   public void setTableName(String tableName) {
-    this.tableName = tableName;
+    this._tableName = tableName;
+  }
+
+  public String getBootstrapTableDir() {
+    return _bootstrapTableDir;
+  }
+
+  public void setBootstrapTableDir(String bootstrapTableDir) {
+    this._bootstrapTableDir = bootstrapTableDir;
+  }
+
+  public String toString() {
+    return "{ tableName = " + _tableName + ", tableType = " + _tableType + ", schemaFile = " + _schemaFile
+        + ", tableRequestFile = " + _tableRequestFile + ", ingestionJobFile = " + _ingestionJobFile
+        + ", bootstrapTableDir = " + _bootstrapTableDir + " }";
   }
 }

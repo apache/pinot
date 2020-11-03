@@ -27,7 +27,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
@@ -57,12 +56,11 @@ public class HybridQuickstart {
     new HybridQuickstart().execute();
   }
 
-  private QuickstartTableRequest prepareOfflineTableRequest(File configDir)
+  private QuickstartTableRequest prepareTableRequest(File baseDir)
       throws IOException {
-
-    _schemaFile = new File(configDir, "airlineStats_schema.json");
-    _ingestionJobSpecFile = new File(configDir, "ingestionJobSpec.yaml");
-    File tableConfigFile = new File(configDir, "airlineStats_offline_table_config.json");
+    _schemaFile = new File(baseDir, "airlineStats_schema.json");
+    _ingestionJobSpecFile = new File(baseDir, "ingestionJobSpec.yaml");
+    File tableConfigFile = new File(baseDir, "airlineStats_offline_table_config.json");
 
     ClassLoader classLoader = Quickstart.class.getClassLoader();
     URL resource = classLoader.getResource("examples/batch/airlineStats/airlineStats_schema.json");
@@ -75,26 +73,18 @@ public class HybridQuickstart {
     Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, tableConfigFile);
 
-    return new QuickstartTableRequest("airlineStats", _schemaFile, tableConfigFile, _ingestionJobSpecFile,
-        FileFormat.AVRO);
-  }
-
-  private QuickstartTableRequest prepareRealtimeTableRequest(File configDir)
-      throws IOException {
-
-    _dataFile = new File(configDir, "airlineStats_data.avro");
-    _realtimeTableConfigFile = new File(configDir, "airlineStats_realtime_table_config.json");
-
-    URL resource = Quickstart.class.getClassLoader()
+    _realtimeTableConfigFile = new File(baseDir, "airlineStats_realtime_table_config.json");
+    resource = Quickstart.class.getClassLoader()
         .getResource("examples/stream/airlineStats/airlineStats_realtime_table_config.json");
     Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, _realtimeTableConfigFile);
     resource = Quickstart.class.getClassLoader()
         .getResource("examples/stream/airlineStats/sample_data/airlineStats_data.avro");
     Preconditions.checkNotNull(resource);
+    _dataFile = new File(baseDir, "airlineStats_data.avro");
     FileUtils.copyURLToFile(resource, _dataFile);
 
-    return new QuickstartTableRequest("airlineStats", _schemaFile, _realtimeTableConfigFile);
+    return new QuickstartTableRequest(baseDir.getAbsolutePath());
   }
 
   private void startKafka() {
@@ -111,16 +101,13 @@ public class HybridQuickstart {
 
   public void execute()
       throws Exception {
-
     File quickstartTmpDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
-    File configDir = new File(quickstartTmpDir, "configs");
-    File dataDir = new File(quickstartTmpDir, "data");
-    Preconditions.checkState(configDir.mkdirs());
+    File baseDir = new File(quickstartTmpDir, "airlineStats");
+    File dataDir = new File(baseDir, "data");
     Preconditions.checkState(dataDir.mkdirs());
-    QuickstartTableRequest offlineRequest = prepareOfflineTableRequest(configDir);
-    QuickstartTableRequest realtimeTableRequest = prepareRealtimeTableRequest(configDir);
+    QuickstartTableRequest bootstrapTableRequest = prepareTableRequest(baseDir);
     final QuickstartRunner runner =
-        new QuickstartRunner(Lists.newArrayList(offlineRequest, realtimeTableRequest), 1, 1, 1, dataDir);
+        new QuickstartRunner(Lists.newArrayList(bootstrapTableRequest), 1, 1, 1, dataDir);
     printStatus(Color.YELLOW, "***** Starting Kafka  *****");
     startKafka();
     printStatus(Color.YELLOW, "***** Starting airline data stream and publishing to Kafka *****");
@@ -142,11 +129,8 @@ public class HybridQuickstart {
         e.printStackTrace();
       }
     }));
-    printStatus(Color.YELLOW, "***** Adding airlineStats offline and realtime table *****");
-    runner.addTable();
-    printStatus(Color.YELLOW,
-        "***** Launch data ingestion job to build index segments for airlineStats and push to controller *****");
-    runner.launchDataIngestionJob();
+    printStatus(Color.YELLOW, "***** Bootstrap airlineStats offline and realtime table *****");
+    runner.bootstrapTable();
 
     printStatus(Color.YELLOW, "***** Pinot Hybrid with hybrid table setup is complete *****");
     printStatus(Color.YELLOW, "***** Sequence of operations *****");
