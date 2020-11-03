@@ -519,7 +519,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected void testQuery(String pqlQuery, @Nullable List<String> sqlQueries)
       throws Exception {
     ClusterIntegrationTestUtils
-        .testQuery(pqlQuery, "pql", _brokerBaseApiUrl, getPinotConnection(), sqlQueries, getH2Connection());
+        .testPqlQuery(pqlQuery, _brokerBaseApiUrl, getPinotConnection(), sqlQueries, getH2Connection());
   }
 
   /**
