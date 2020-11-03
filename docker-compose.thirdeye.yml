@@ -48,7 +48,7 @@ services:
       THIRDEYE_DATABASE: thirdeye
       MYSQL_PASSWORD: root
       DRUID_USER: admin
-      DRUID_PWD: pooghe6phee5wohVoo8eeBei
+      DRUID_PWD: admin
       APP_MODE: prod
       JMX_CONFIG: "-Xms1G -Xmx3G"
     ports:
@@ -83,7 +83,7 @@ services:
       THIRDEYE_DATABASE: thirdeye
       MYSQL_PASSWORD: root
       DRUID_USER: admin
-      DRUID_PWD: pooghe6phee5wohVoo8eeBei
+      DRUID_PWD: admin
       APP_MODE: prod
       JMX_CONFIG: "-Xms1G -Xmx3G"
     entrypoint: ["/bin/sh", "/opt/thirdeye/bin/entrypoint_dev.sh", "backend"]
