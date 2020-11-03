@@ -54,6 +54,12 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
   private String[] _stringResults;
   private byte[][] _bytesResults;
 
+  private int[][] _intMVResults;
+  private long[][] _longMVResults;
+  private float[][] _floatMVResults;
+  private double[][] _doubleMVResults;
+  private String[][] _stringMVResults;
+
   public ScalarTransformFunctionWrapper(FunctionInfo functionInfo) {
     _name = functionInfo.getMethod().getName();
     _functionInvoker = new FunctionInvoker(functionInfo);
@@ -95,12 +101,14 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     }
     _nonLiteralValues = new Object[_numNonLiteralArguments][];
 
-    DataType resultDataType = FunctionUtils.getDataType(_functionInvoker.getResultClass());
+    Class<?> resultClass = _functionInvoker.getResultClass();
+    DataType resultDataType = FunctionUtils.getDataType(resultClass);
     // Handle unrecognized result class with STRING
     if (resultDataType == null) {
       resultDataType = DataType.STRING;
     }
-    _resultMetadata = new TransformResultMetadata(resultDataType, true, false);
+    boolean isSingleValue = !resultClass.isArray();
+    _resultMetadata = new TransformResultMetadata(resultDataType, isSingleValue, false);
   }
 
   @Override
@@ -222,6 +230,101 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     return _bytesResults;
   }
 
+  @Override
+  public int[][] transformToIntValuesMV(ProjectionBlock projectionBlock) {
+    if (_resultMetadata.getDataType() != DataType.INT) {
+      return super.transformToIntValuesMV(projectionBlock);
+    }
+    if (_intMVResults == null) {
+      _intMVResults = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+    }
+    getNonLiteralValues(projectionBlock);
+    int length = projectionBlock.getNumDocs();
+    for (int i = 0; i < length; i++) {
+      for (int j = 0; j < _numNonLiteralArguments; j++) {
+        _arguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
+      }
+      _intMVResults[i] = (int[]) _functionInvoker.invoke(_arguments);
+    }
+    return _intMVResults;
+  }
+
+  @Override
+  public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
+    if (_resultMetadata.getDataType() != DataType.LONG) {
+      return super.transformToLongValuesMV(projectionBlock);
+    }
+    if (_longMVResults == null) {
+      _longMVResults = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+    }
+    getNonLiteralValues(projectionBlock);
+    int length = projectionBlock.getNumDocs();
+    for (int i = 0; i < length; i++) {
+      for (int j = 0; j < _numNonLiteralArguments; j++) {
+        _arguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
+      }
+      _longMVResults[i] = (long[]) _functionInvoker.invoke(_arguments);
+    }
+    return _longMVResults;
+  }
+
+  @Override
+  public float[][] transformToFloatValuesMV(ProjectionBlock projectionBlock) {
+    if (_resultMetadata.getDataType() != DataType.FLOAT) {
+      return super.transformToFloatValuesMV(projectionBlock);
+    }
+    if (_floatMVResults == null) {
+      _floatMVResults = new float[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+    }
+    getNonLiteralValues(projectionBlock);
+    int length = projectionBlock.getNumDocs();
+    for (int i = 0; i < length; i++) {
+      for (int j = 0; j < _numNonLiteralArguments; j++) {
+        _arguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
+      }
+      _floatMVResults[i] = (float[]) _functionInvoker.invoke(_arguments);
+    }
+    return _floatMVResults;
+  }
+
+  @Override
+  public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
+    if (_resultMetadata.getDataType() != DataType.DOUBLE) {
+      return super.transformToDoubleValuesMV(projectionBlock);
+    }
+    if (_doubleMVResults == null) {
+      _doubleMVResults = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+    }
+    getNonLiteralValues(projectionBlock);
+    int length = projectionBlock.getNumDocs();
+    for (int i = 0; i < length; i++) {
+      for (int j = 0; j < _numNonLiteralArguments; j++) {
+        _arguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
+      }
+      _doubleMVResults[i] = (double[]) _functionInvoker.invoke(_arguments);
+    }
+    return _doubleMVResults;
+  }
+
+  @Override
+  public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
+    if (_resultMetadata.getDataType() != DataType.STRING) {
+      return super.transformToStringValuesMV(projectionBlock);
+    }
+    if (_stringMVResults == null) {
+      _stringMVResults = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+    }
+    getNonLiteralValues(projectionBlock);
+    int length = projectionBlock.getNumDocs();
+    for (int i = 0; i < length; i++) {
+      for (int j = 0; j < _numNonLiteralArguments; j++) {
+        _arguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
+      }
+      _stringMVResults[i] = (String[]) _functionInvoker.invoke(_arguments);
+    }
+    return _stringMVResults;
+  }
+
   /**
    * Helper method to fetch values for the non-literal transform functions based on the parameter types.
    */
@@ -248,6 +351,21 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
           break;
         case BYTES:
           _nonLiteralValues[i] = transformFunction.transformToBytesValuesSV(projectionBlock);
+          break;
+        case INTEGER_ARRAY:
+          _nonLiteralValues[i] = transformFunction.transformToIntValuesMV(projectionBlock);
+          break;
+        case LONG_ARRAY:
+          _nonLiteralValues[i] = transformFunction.transformToLongValuesMV(projectionBlock);
+          break;
+        case FLOAT_ARRAY:
+          _nonLiteralValues[i] = transformFunction.transformToFloatValuesMV(projectionBlock);
+          break;
+        case DOUBLE_ARRAY:
+          _nonLiteralValues[i] = transformFunction.transformToDoubleValuesMV(projectionBlock);
+          break;
+        case STRING_ARRAY:
+          _nonLiteralValues[i] = transformFunction.transformToStringValuesMV(projectionBlock);
           break;
         default:
           throw new IllegalStateException();

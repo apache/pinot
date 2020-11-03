@@ -374,4 +374,71 @@ public class InbuiltFunctionsTest {
 
     return inputs.toArray(new Object[0][]);
   }
+
+  @Test(dataProvider = "arrayFunctionsDataProvider")
+  public void testArrayFunctions(String functionExpression, List<String> expectedArguments, GenericRow row,
+      Object expectedResult) {
+    testFunction(functionExpression, expectedArguments, row, expectedResult);
+  }
+
+  @DataProvider(name = "arrayFunctionsDataProvider")
+  public Object[][] arrayFunctionsDataProvider() {
+    List<Object[]> inputs = new ArrayList<>();
+
+    GenericRow row = new GenericRow();
+    row.putValue("intArray", new int[]{3, 2, 10, 6, 1, 12});
+    row.putValue("integerArray", new Integer[]{3, 2, 10, 6, 1, 12});
+    row.putValue("stringArray", new String[]{"3", "2", "10", "6", "1", "12"});
+
+    inputs.add(new Object[]{"array_reverse_int(intArray)", Collections.singletonList(
+        "intArray"), row, new int[]{12, 1, 6, 10, 2, 3}});
+    inputs.add(new Object[]{"array_reverse_int(integerArray)", Collections.singletonList(
+        "integerArray"), row, new int[]{12, 1, 6, 10, 2, 3}});
+    inputs.add(new Object[]{"array_reverse_int(stringArray)", Collections.singletonList(
+        "stringArray"), row, new int[]{12, 1, 6, 10, 2, 3}});
+
+    inputs.add(new Object[]{"array_reverse_string(intArray)", Collections.singletonList(
+        "intArray"), row, new String[]{"12", "1", "6", "10", "2", "3"}});
+    inputs.add(new Object[]{"array_reverse_string(integerArray)", Collections.singletonList(
+        "integerArray"), row, new String[]{"12", "1", "6", "10", "2", "3"}});
+    inputs.add(new Object[]{"array_reverse_string(stringArray)", Collections.singletonList(
+        "stringArray"), row, new String[]{"12", "1", "6", "10", "2", "3"}});
+
+    inputs.add(new Object[]{"array_sort_int(intArray)", Collections.singletonList(
+        "intArray"), row, new int[]{1, 2, 3, 6, 10, 12}});
+    inputs.add(new Object[]{"array_sort_int(integerArray)", Collections.singletonList(
+        "integerArray"), row, new int[]{1, 2, 3, 6, 10, 12}});
+    inputs.add(new Object[]{"array_sort_int(stringArray)", Collections.singletonList(
+        "stringArray"), row, new int[]{1, 2, 3, 6, 10, 12}});
+
+    inputs.add(new Object[]{"array_sort_string(intArray)", Collections.singletonList(
+        "intArray"), row, new String[]{"1", "10", "12", "2", "3", "6"}});
+    inputs.add(new Object[]{"array_sort_string(integerArray)", Collections.singletonList(
+        "integerArray"), row, new String[]{"1", "10", "12", "2", "3", "6"}});
+    inputs.add(new Object[]{"array_sort_string(stringArray)", Collections.singletonList(
+        "stringArray"), row, new String[]{"1", "10", "12", "2", "3", "6"}});
+
+    inputs.add(new Object[]{"array_index_of_int(intArray, 2)", Collections.singletonList("intArray"), row, 1});
+    inputs.add(new Object[]{"array_index_of_int(integerArray, 2)", Collections.singletonList("integerArray"), row, 1});
+    inputs.add(new Object[]{"array_index_of_int(stringArray, 2)", Collections.singletonList("stringArray"), row, 1});
+
+    inputs.add(new Object[]{"array_index_of_string(intArray, '2')", Collections.singletonList("intArray"), row, 1});
+    inputs.add(
+        new Object[]{"array_index_of_string(integerArray, '2')", Collections.singletonList("integerArray"), row, 1});
+    inputs
+        .add(new Object[]{"array_index_of_string(stringArray, '2')", Collections.singletonList("stringArray"), row, 1});
+
+    inputs.add(new Object[]{"array_contains_int(intArray, 2)", Collections.singletonList("intArray"), row, true});
+    inputs
+        .add(new Object[]{"array_contains_int(integerArray, 2)", Collections.singletonList("integerArray"), row, true});
+    inputs.add(new Object[]{"array_contains_int(stringArray, 2)", Collections.singletonList("stringArray"), row, true});
+
+    inputs.add(new Object[]{"array_contains_string(intArray, '2')", Collections.singletonList("intArray"), row, true});
+    inputs.add(
+        new Object[]{"array_contains_string(integerArray, '2')", Collections.singletonList("integerArray"), row, true});
+    inputs.add(
+        new Object[]{"array_contains_string(stringArray, '2')", Collections.singletonList("stringArray"), row, true});
+
+    return inputs.toArray(new Object[0][]);
+  }
 }

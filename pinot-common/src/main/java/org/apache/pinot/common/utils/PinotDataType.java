@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -505,7 +506,7 @@ public enum PinotDataType {
     if (isSingleValue()) {
       return new Integer[]{toInteger(value)};
     } else {
-      Object[] valueArray = (Object[]) value;
+      Object[] valueArray = toObjectArray(value);
       int length = valueArray.length;
       Integer[] integerArray = new Integer[length];
       PinotDataType singleValueType = getSingleValueType();
@@ -520,7 +521,7 @@ public enum PinotDataType {
     if (isSingleValue()) {
       return new Long[]{toLong(value)};
     } else {
-      Object[] valueArray = (Object[]) value;
+      Object[] valueArray = toObjectArray(value);
       int length = valueArray.length;
       Long[] longArray = new Long[length];
       PinotDataType singleValueType = getSingleValueType();
@@ -535,7 +536,7 @@ public enum PinotDataType {
     if (isSingleValue()) {
       return new Float[]{toFloat(value)};
     } else {
-      Object[] valueArray = (Object[]) value;
+      Object[] valueArray = toObjectArray(value);
       int length = valueArray.length;
       Float[] floatArray = new Float[length];
       PinotDataType singleValueType = getSingleValueType();
@@ -550,7 +551,7 @@ public enum PinotDataType {
     if (isSingleValue()) {
       return new Double[]{toDouble(value)};
     } else {
-      Object[] valueArray = (Object[]) value;
+      Object[] valueArray = toObjectArray(value);
       int length = valueArray.length;
       Double[] doubleArray = new Double[length];
       PinotDataType singleValueType = getSingleValueType();
@@ -565,7 +566,7 @@ public enum PinotDataType {
     if (isSingleValue()) {
       return new String[]{toString(value)};
     } else {
-      Object[] valueArray = (Object[]) value;
+      Object[] valueArray = toObjectArray(value);
       int length = valueArray.length;
       String[] stringArray = new String[length];
       PinotDataType singleValueType = getSingleValueType();
@@ -573,6 +574,27 @@ public enum PinotDataType {
         stringArray[i] = singleValueType.toString(valueArray[i]);
       }
       return stringArray;
+    }
+  }
+
+  private static Object[] toObjectArray(Object array) {
+    Class<?> componentType = array.getClass().getComponentType();
+    if (componentType.isPrimitive()) {
+      if (componentType == int.class) {
+        return ArrayUtils.toObject((int[]) array);
+      }
+      if (componentType == long.class) {
+        return ArrayUtils.toObject((long[]) array);
+      }
+      if (componentType == float.class) {
+        return ArrayUtils.toObject((float[]) array);
+      }
+      if (componentType == double.class) {
+        return ArrayUtils.toObject((double[]) array);
+      }
+      throw new UnsupportedOperationException("Unsupported primitive array type: " + componentType);
+    } else {
+      return (Object[]) array;
     }
   }
 
