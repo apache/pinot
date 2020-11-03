@@ -18,8 +18,14 @@
  */
 package org.apache.pinot.core.data.recordtransformer;
 
+import com.google.common.collect.ImmutableList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import org.apache.calcite.util.graph.DefaultDirectedGraph;
+import org.apache.calcite.util.graph.DefaultEdge;
+import org.apache.calcite.util.graph.DirectedGraph;
+import org.apache.calcite.util.graph.TopologicalOrderIterator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -38,6 +44,10 @@ public class ExpressionTransformer implements RecordTransformer {
 
   private final Map<String, FunctionEvaluator> _expressionEvaluators = new HashMap<>();
 
+  /** the order of column to be evaluated */
+  private final List<String> _ordered;
+
+
   public ExpressionTransformer(TableConfig tableConfig, Schema schema) {
     if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getTransformConfigs() != null) {
       for (TransformConfig transformConfig : tableConfig.getIngestionConfig().getTransformConfigs()) {
@@ -54,13 +64,29 @@ public class ExpressionTransformer implements RecordTransformer {
         }
       }
     }
+
+    // compute the dependencies of each column to be evaluated
+    final DirectedGraph<String, DefaultEdge> columnDependencies = DefaultDirectedGraph.create();
+
+    for (Map.Entry<String, FunctionEvaluator> entry: _expressionEvaluators.entrySet()) {
+      for (String arg:entry.getValue().getArguments()) {
+        columnDependencies.addVertex(entry.getKey());
+        columnDependencies.addVertex(arg);
+        // an edge (u -> v) means u needs to happen before v (v depends on u)
+        columnDependencies.addEdge(arg, entry.getKey());
+      }
+    }
+    _ordered = ImmutableList.copyOf(new TopologicalOrderIterator<>(columnDependencies));
   }
 
   @Override
   public GenericRow transform(GenericRow record) {
-    for (Map.Entry<String, FunctionEvaluator> entry : _expressionEvaluators.entrySet()) {
-      String column = entry.getKey();
-      FunctionEvaluator transformFunctionEvaluator = entry.getValue();
+    for (String column : _ordered) {
+      FunctionEvaluator transformFunctionEvaluator = _expressionEvaluators.get(column);
+      // if not column to be evaluated
+      if (transformFunctionEvaluator == null) {
+        continue;
+      }
       // Skip transformation if column value already exist.
       // NOTE: column value might already exist for OFFLINE data
       if (record.getValue(column) == null) {
