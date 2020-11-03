@@ -51,12 +51,12 @@ jobs:
           username: ${{ secrets.HARBOR_DOCKER_USERNAME }}
           password: ${{ secrets.HARBOR_DOCKER_PASSWORD }}
           tags: ${{ github.sha }}
-      - name: Docker Push Dockerhub
-        uses: docker/build-push-action@v1
-        with:
-          dockerfile: docker/images/pinot-thirdeye/Dockerfile.java14
-          repository: razorpay/thirdeye
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-          tags: ${{ github.sha }}
+      #- name: Docker Push Dockerhub
+      #  uses: docker/build-push-action@v1
+      #  with:
+      #    dockerfile: docker/images/pinot-thirdeye/Dockerfile.java14
+      #    repository: razorpay/thirdeye
+      #    username: ${{ secrets.DOCKER_USERNAME }}
+      #    password: ${{ secrets.DOCKER_PASSWORD }}
+      #    tags: ${{ github.sha }}
 
