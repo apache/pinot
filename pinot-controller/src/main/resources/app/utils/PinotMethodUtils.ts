@@ -262,7 +262,7 @@ const getQueryResults = (params, url, checkedOptions) => {
       dataArray = queryResponse.resultTable.rows;
     }
 
-    const columnStats = [ 'timeUsedMs',
+    const columnStats = ['timeUsedMs',
       'numDocsScanned',
       'totalDocs',
       'numServersQueried',
