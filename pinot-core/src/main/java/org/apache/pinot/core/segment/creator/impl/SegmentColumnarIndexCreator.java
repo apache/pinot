@@ -439,7 +439,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
           if (config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
             // For TimeColumnType.SIMPLE_DATE_FORMAT, convert time value into millis since epoch
-            DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(config.getSimpleDateFormat());
+            DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(config.getSimpleDateFormat()).withZoneUTC();
             startTime = dateTimeFormatter.parseMillis(startTimeStr);
             endTime = dateTimeFormatter.parseMillis(endTimeStr);
             timeUnit = TimeUnit.MILLISECONDS;

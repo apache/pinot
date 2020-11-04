@@ -258,7 +258,7 @@ public class SegmentGenerationWithTimeColumnTest {
   }
 
   private long sdfToMillis(long value) {
-    DateTimeFormatter sdfFormatter = DateTimeFormat.forPattern(TIME_COL_FORMAT);
+    DateTimeFormatter sdfFormatter = DateTimeFormat.forPattern(TIME_COL_FORMAT).withZoneUTC();
     DateTime dateTime = DateTime.parse(Long.toString(value), sdfFormatter);
     return dateTime.getMillis();
   }
