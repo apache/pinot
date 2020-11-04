@@ -25,11 +25,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.common.utils.CommonConstants.Segment;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -171,9 +169,8 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
       boolean skipGenerate = false;
       for (LLCRealtimeSegmentZKMetadata realtimeSegmentZKMetadata : completedSegmentsMetadata) {
         String segmentName = realtimeSegmentZKMetadata.getSegmentName();
-        TimeUnit timeUnit = realtimeSegmentZKMetadata.getTimeUnit();
-        long segmentStartTimeMs = timeUnit.toMillis(realtimeSegmentZKMetadata.getStartTime());
-        long segmentEndTimeMs = timeUnit.toMillis(realtimeSegmentZKMetadata.getEndTime());
+        long segmentStartTimeMs = realtimeSegmentZKMetadata.getStartTimeMs();
+        long segmentEndTimeMs = realtimeSegmentZKMetadata.getEndTimeMs();
 
         // Check overlap with window
         if (windowStartMs <= segmentEndTimeMs && segmentStartTimeMs < windowEndMs) {
@@ -287,21 +284,15 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
       long watermarkMs;
 
       // Find the smallest time from all segments
-      RealtimeSegmentZKMetadata minSegmentZkMetadata = null;
+      long minStartTimeMs = Long.MAX_VALUE;
       for (LLCRealtimeSegmentZKMetadata realtimeSegmentZKMetadata : completedSegmentsMetadata) {
-        if (minSegmentZkMetadata == null || realtimeSegmentZKMetadata.getStartTime() < minSegmentZkMetadata
-            .getStartTime()) {
-          minSegmentZkMetadata = realtimeSegmentZKMetadata;
-        }
+        minStartTimeMs = Math.min(minStartTimeMs, realtimeSegmentZKMetadata.getStartTimeMs());
       }
-      Preconditions.checkState(minSegmentZkMetadata != null);
-
-      // Convert the segment minTime to millis
-      long minSegmentStartTimeMs = minSegmentZkMetadata.getTimeUnit().toMillis(minSegmentZkMetadata.getStartTime());
+      Preconditions.checkState(minStartTimeMs != Long.MAX_VALUE);
 
       // Round off according to the bucket. This ensures we align the offline segments to proper time boundaries
       // For example, if start time millis is 20200813T12:34:59, we want to create the first segment for window [20200813, 20200814)
-      watermarkMs = (minSegmentStartTimeMs / bucketMs) * bucketMs;
+      watermarkMs = (minStartTimeMs / bucketMs) * bucketMs;
 
       // Create RealtimeToOfflineSegmentsTaskMetadata ZNode using watermark calculated above
       realtimeToOfflineSegmentsTaskMetadata = new RealtimeToOfflineSegmentsTaskMetadata(realtimeTableName, watermarkMs);

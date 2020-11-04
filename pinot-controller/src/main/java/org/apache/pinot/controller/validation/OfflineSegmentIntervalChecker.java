@@ -88,9 +88,10 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> 
       List<Interval> segmentIntervals = new ArrayList<>(numSegments);
       int numSegmentsWithInvalidIntervals = 0;
       for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : offlineSegmentZKMetadataList) {
-        Interval timeInterval = offlineSegmentZKMetadata.getTimeInterval();
-        if (timeInterval != null && TimeUtils.isValidTimeInterval(timeInterval)) {
-          segmentIntervals.add(timeInterval);
+        long startTimeMs = offlineSegmentZKMetadata.getStartTimeMs();
+        long endTimeMs = offlineSegmentZKMetadata.getEndTimeMs();
+        if (TimeUtils.timeValueInValidRange(startTimeMs) && TimeUtils.timeValueInValidRange(endTimeMs)) {
+          segmentIntervals.add(new Interval(startTimeMs, endTimeMs));
         } else {
           numSegmentsWithInvalidIntervals++;
         }
@@ -110,10 +111,9 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> 
     long maxSegmentPushTime = Long.MIN_VALUE;
 
     for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : offlineSegmentZKMetadataList) {
-      Interval segmentInterval = offlineSegmentZKMetadata.getTimeInterval();
-
-      if (segmentInterval != null && maxSegmentEndTime < segmentInterval.getEndMillis()) {
-        maxSegmentEndTime = segmentInterval.getEndMillis();
+      long endTimeMs = offlineSegmentZKMetadata.getEndTimeMs();
+      if (TimeUtils.timeValueInValidRange(endTimeMs) && maxSegmentEndTime < endTimeMs) {
+        maxSegmentEndTime = endTimeMs;
       }
 
       long segmentPushTime = offlineSegmentZKMetadata.getPushTime();

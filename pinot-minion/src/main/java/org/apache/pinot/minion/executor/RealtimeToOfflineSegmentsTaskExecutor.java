@@ -255,18 +255,12 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
       filterFunction = getFilterFunctionLong(windowStartMs, windowEndMs, timeColumn);
     } else {
       // Convert windowStart and windowEnd to time format of the data
-      if (dateTimeFormatSpec.getTimeFormat().equals(DateTimeFieldSpec.TimeFormat.EPOCH)) {
-        long windowStart = dateTimeFormatSpec.fromMillisToFormat(windowStartMs, Long.class);
-        long windowEnd = dateTimeFormatSpec.fromMillisToFormat(windowEndMs, Long.class);
-        filterFunction = getFilterFunctionLong(windowStart, windowEnd, timeColumn);
+      String windowStart = dateTimeFormatSpec.fromMillisToFormat(windowStartMs);
+      String windowEnd = dateTimeFormatSpec.fromMillisToFormat(windowEndMs);
+      if (dateTimeFieldSpec.getDataType().isNumeric()) {
+        filterFunction = getFilterFunctionLong(Long.parseLong(windowStart), Long.parseLong(windowEnd), timeColumn);
       } else {
-        String windowStart = dateTimeFormatSpec.fromMillisToFormat(windowStartMs, String.class);
-        String windowEnd = dateTimeFormatSpec.fromMillisToFormat(windowEndMs, String.class);
-        if (dateTimeFieldSpec.getDataType().isNumeric()) {
-          filterFunction = getFilterFunctionLong(Long.parseLong(windowStart), Long.parseLong(windowEnd), timeColumn);
-        } else {
-          filterFunction = getFilterFunctionString(windowStart, windowEnd, timeColumn);
-        }
+        filterFunction = getFilterFunctionString(windowStart, windowEnd, timeColumn);
       }
     }
     return new RecordFilterConfig.Builder().setRecordFilterType(RecordFilterFactory.RecordFilterType.FILTER_FUNCTION)

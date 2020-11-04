@@ -22,22 +22,17 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
 import org.apache.helix.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadata;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants.Segment;
 import org.apache.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.spi.utils.EqualityUtils.hashCodeOf;
-import static org.apache.pinot.spi.utils.EqualityUtils.isEqual;
-import static org.apache.pinot.spi.utils.EqualityUtils.isNullOrNotSameClass;
-import static org.apache.pinot.spi.utils.EqualityUtils.isSameReference;
 
 
 public abstract class SegmentZKMetadata implements ZKMetadata {
@@ -50,16 +45,14 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
   private long _startTime = -1;
   private long _endTime = -1;
   private TimeUnit _timeUnit;
-  private Duration _timeGranularity;
-  private Interval _timeInterval;
   private String _indexVersion;
   private long _totalDocs = -1;
   private long _crc = -1;
   private long _creationTime = -1;
   private SegmentPartitionMetadata _partitionMetadata;
   private long _segmentUploadStartTime = -1;
-  private Map<String, String> _customMap;
   private String _crypterName;
+  private Map<String, String> _customMap;
 
   @Deprecated
   private String _tableName;
@@ -68,23 +61,20 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
   }
 
   public SegmentZKMetadata(ZNRecord znRecord) {
-    _segmentName = znRecord.getSimpleField(CommonConstants.Segment.SEGMENT_NAME);
-    _tableName = znRecord.getSimpleField(CommonConstants.Segment.TABLE_NAME);
-    _crypterName = znRecord.getSimpleField(CommonConstants.Segment.CRYPTER_NAME);
-    _segmentType = znRecord.getEnumField(CommonConstants.Segment.SEGMENT_TYPE, SegmentType.class, SegmentType.OFFLINE);
-    _startTime = znRecord.getLongField(CommonConstants.Segment.START_TIME, -1);
-    _endTime = znRecord.getLongField(CommonConstants.Segment.END_TIME, -1);
-    if (znRecord.getSimpleFields().containsKey(CommonConstants.Segment.TIME_UNIT) && !znRecord
-        .getSimpleField(CommonConstants.Segment.TIME_UNIT).equals(NULL)) {
-      setTimeUnit(znRecord.getEnumField(CommonConstants.Segment.TIME_UNIT, TimeUnit.class, TimeUnit.DAYS));
+    _segmentName = znRecord.getSimpleField(Segment.SEGMENT_NAME);
+    _segmentType = znRecord.getEnumField(Segment.SEGMENT_TYPE, SegmentType.class, SegmentType.OFFLINE);
+    _startTime = znRecord.getLongField(Segment.START_TIME, -1);
+    _endTime = znRecord.getLongField(Segment.END_TIME, -1);
+    String timeUnitString = znRecord.getSimpleField(Segment.TIME_UNIT);
+    if (timeUnitString != null && !timeUnitString.equals(NULL)) {
+      _timeUnit = znRecord.getEnumField(Segment.TIME_UNIT, TimeUnit.class, TimeUnit.DAYS);
     }
-    _indexVersion = znRecord.getSimpleField(CommonConstants.Segment.INDEX_VERSION);
-    _totalDocs = znRecord.getLongField(CommonConstants.Segment.TOTAL_DOCS, -1);
-    _crc = znRecord.getLongField(CommonConstants.Segment.CRC, -1);
-    _creationTime = znRecord.getLongField(CommonConstants.Segment.CREATION_TIME, -1);
-
+    _indexVersion = znRecord.getSimpleField(Segment.INDEX_VERSION);
+    _totalDocs = znRecord.getLongField(Segment.TOTAL_DOCS, -1);
+    _crc = znRecord.getLongField(Segment.CRC, -1);
+    _creationTime = znRecord.getLongField(Segment.CREATION_TIME, -1);
     try {
-      String partitionMetadataJson = znRecord.getSimpleField(CommonConstants.Segment.PARTITION_METADATA);
+      String partitionMetadataJson = znRecord.getSimpleField(Segment.PARTITION_METADATA);
       if (partitionMetadataJson != null) {
         _partitionMetadata = SegmentPartitionMetadata.fromJsonString(partitionMetadataJson);
       }
@@ -93,8 +83,12 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
           "Exception caught while reading partition info from zk metadata for segment '{}', partition info dropped.",
           _segmentName, e);
     }
-    _segmentUploadStartTime = znRecord.getLongField(CommonConstants.Segment.SEGMENT_UPLOAD_START_TIME, -1);
-    _customMap = znRecord.getMapField(CommonConstants.Segment.CUSTOM_MAP);
+    _segmentUploadStartTime = znRecord.getLongField(Segment.SEGMENT_UPLOAD_START_TIME, -1);
+    _crypterName = znRecord.getSimpleField(Segment.CRYPTER_NAME);
+    _customMap = znRecord.getMapField(Segment.CUSTOM_MAP);
+
+    // For backward-compatibility
+    _tableName = znRecord.getSimpleField(Segment.TABLE_NAME);
   }
 
   public String getSegmentName() {
@@ -105,64 +99,6 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     _segmentName = segmentName;
   }
 
-  @Deprecated
-  public String getTableName() {
-    return _tableName;
-  }
-
-  @Deprecated
-  public void setTableName(String tableName) {
-    _tableName = tableName;
-  }
-
-  public long getStartTime() {
-    return _startTime;
-  }
-
-  public void setStartTime(long startTime) {
-    _startTime = startTime;
-  }
-
-  public long getEndTime() {
-    return _endTime;
-  }
-
-  public void setEndTime(long endTime) {
-    _endTime = endTime;
-  }
-
-  public TimeUnit getTimeUnit() {
-    return _timeUnit;
-  }
-
-  /**
-   * NOTE: should be called after setting start and end time.
-   */
-  public void setTimeUnit(@Nonnull TimeUnit timeUnit) {
-    _timeUnit = timeUnit;
-    _timeGranularity = new Duration(_timeUnit.toMillis(1));
-    // For consuming segment, end time might not be set
-    if (_startTime >= 0 && _startTime <= _endTime) {
-      _timeInterval = new Interval(_timeUnit.toMillis(_startTime), _timeUnit.toMillis(_endTime));
-    }
-  }
-
-  public Duration getTimeGranularity() {
-    return _timeGranularity;
-  }
-
-  public Interval getTimeInterval() {
-    return _timeInterval;
-  }
-
-  public String getIndexVersion() {
-    return _indexVersion;
-  }
-
-  public void setIndexVersion(String indexVersion) {
-    _indexVersion = indexVersion;
-  }
-
   public SegmentType getSegmentType() {
     return _segmentType;
   }
@@ -171,12 +107,40 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     _segmentType = segmentType;
   }
 
-  public String getCrypterName() {
-    return _crypterName;
+  public long getStartTimeMs() {
+    if (_startTime > 0 && _timeUnit != null) {
+      return _timeUnit.toMillis(_startTime);
+    } else {
+      return -1;
+    }
   }
 
-  public void setCrypterName(String crypterName) {
-    _crypterName = crypterName;
+  public void setStartTime(long startTime) {
+    _startTime = startTime;
+  }
+
+  public long getEndTimeMs() {
+    if (_endTime > 0 && _timeUnit != null) {
+      return _timeUnit.toMillis(_endTime);
+    } else {
+      return -1;
+    }
+  }
+
+  public void setEndTime(long endTime) {
+    _endTime = endTime;
+  }
+
+  public void setTimeUnit(TimeUnit timeUnit) {
+    _timeUnit = timeUnit;
+  }
+
+  public String getIndexVersion() {
+    return _indexVersion;
+  }
+
+  public void setIndexVersion(String indexVersion) {
+    _indexVersion = indexVersion;
   }
 
   public long getTotalDocs() {
@@ -219,6 +183,14 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     _segmentUploadStartTime = segmentUploadStartTime;
   }
 
+  public String getCrypterName() {
+    return _crypterName;
+  }
+
+  public void setCrypterName(String crypterName) {
+    _crypterName = crypterName;
+  }
+
   public Map<String, String> getCustomMap() {
     return _customMap;
   }
@@ -227,76 +199,87 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     _customMap = customMap;
   }
 
+  @Deprecated
+  public String getTableName() {
+    return _tableName;
+  }
+
+  @Deprecated
+  public void setTableName(String tableName) {
+    _tableName = tableName;
+  }
+
+  @Deprecated
+  public long getStartTime() {
+    return _startTime;
+  }
+
+  @Deprecated
+  public long getEndTime() {
+    return _endTime;
+  }
+
+  @Deprecated
+  public TimeUnit getTimeUnit() {
+    return _timeUnit;
+  }
+
+  @Deprecated
+  public Duration getTimeGranularity() {
+    return _timeUnit != null ? new Duration(_timeUnit.toMillis(1)) : null;
+  }
+
+  @Deprecated
+  public Interval getTimeInterval() {
+    if (_startTime > 0 && _startTime <= _endTime && _timeUnit != null) {
+      return new Interval(_timeUnit.toMillis(_startTime), _timeUnit.toMillis(_endTime));
+    } else {
+      return null;
+    }
+  }
+
   @Override
-  public boolean equals(Object segmentMetadata) {
-    if (isSameReference(this, segmentMetadata)) {
+  public boolean equals(Object o) {
+    if (this == o) {
       return true;
     }
-
-    if (isNullOrNotSameClass(this, segmentMetadata)) {
+    if (o == null || getClass() != o.getClass()) {
       return false;
     }
-
-    SegmentZKMetadata metadata = (SegmentZKMetadata) segmentMetadata;
-    return isEqual(_segmentName, metadata._segmentName) && isEqual(_crypterName, metadata._crypterName) && isEqual(
-        _tableName, metadata._tableName) && isEqual(_indexVersion, metadata._indexVersion) && isEqual(_timeUnit,
-        metadata._timeUnit) && isEqual(_startTime, metadata._startTime) && isEqual(_endTime, metadata._endTime)
-        && isEqual(_segmentType, metadata._segmentType) && isEqual(_totalDocs, metadata._totalDocs) && isEqual(_crc,
-        metadata._crc) && isEqual(_creationTime, metadata._creationTime) && isEqual(_partitionMetadata,
-        metadata._partitionMetadata) && isEqual(_segmentUploadStartTime, metadata._segmentUploadStartTime) && isEqual(
-        _customMap, metadata._customMap);
+    SegmentZKMetadata that = (SegmentZKMetadata) o;
+    return _startTime == that._startTime && _endTime == that._endTime && _totalDocs == that._totalDocs
+        && _crc == that._crc && _creationTime == that._creationTime
+        && _segmentUploadStartTime == that._segmentUploadStartTime && Objects.equals(_segmentName, that._segmentName)
+        && _segmentType == that._segmentType && _timeUnit == that._timeUnit && Objects
+        .equals(_indexVersion, that._indexVersion) && Objects.equals(_partitionMetadata, that._partitionMetadata)
+        && Objects.equals(_crypterName, that._crypterName) && Objects.equals(_customMap, that._customMap) && Objects
+        .equals(_tableName, that._tableName);
   }
 
   @Override
   public int hashCode() {
-    int result = hashCodeOf(_segmentName);
-    result = hashCodeOf(result, _tableName);
-    result = hashCodeOf(result, _crypterName);
-    result = hashCodeOf(result, _segmentType);
-    result = hashCodeOf(result, _startTime);
-    result = hashCodeOf(result, _endTime);
-    result = hashCodeOf(result, _timeUnit);
-    result = hashCodeOf(result, _indexVersion);
-    result = hashCodeOf(result, _totalDocs);
-    result = hashCodeOf(result, _crc);
-    result = hashCodeOf(result, _creationTime);
-    result = hashCodeOf(result, _partitionMetadata);
-    result = hashCodeOf(result, _segmentUploadStartTime);
-    result = hashCodeOf(result, _customMap);
-    return result;
+    return Objects.hash(_segmentName, _segmentType, _startTime, _endTime, _timeUnit, _indexVersion, _totalDocs, _crc,
+        _creationTime, _partitionMetadata, _segmentUploadStartTime, _crypterName, _customMap, _tableName);
   }
 
   @Override
   public ZNRecord toZNRecord() {
     ZNRecord znRecord = new ZNRecord(_segmentName);
-    znRecord.setSimpleField(CommonConstants.Segment.SEGMENT_NAME, _segmentName);
 
-    if (_tableName != null) {
-      znRecord.setSimpleField(CommonConstants.Segment.TABLE_NAME, _tableName);
-    }
-
-    if (_crypterName != null) {
-      znRecord.setSimpleField(CommonConstants.Segment.CRYPTER_NAME, _crypterName);
-    }
-
-    znRecord.setEnumField(CommonConstants.Segment.SEGMENT_TYPE, _segmentType);
-    if (_timeUnit == null) {
-      znRecord.setSimpleField(CommonConstants.Segment.TIME_UNIT, NULL);
-    } else {
-      znRecord.setEnumField(CommonConstants.Segment.TIME_UNIT, _timeUnit);
-    }
-    znRecord.setLongField(CommonConstants.Segment.START_TIME, _startTime);
-    znRecord.setLongField(CommonConstants.Segment.END_TIME, _endTime);
-
-    znRecord.setSimpleField(CommonConstants.Segment.INDEX_VERSION, _indexVersion);
-    znRecord.setLongField(CommonConstants.Segment.TOTAL_DOCS, _totalDocs);
-    znRecord.setLongField(CommonConstants.Segment.CRC, _crc);
-    znRecord.setLongField(CommonConstants.Segment.CREATION_TIME, _creationTime);
+    znRecord.setSimpleField(Segment.SEGMENT_NAME, _segmentName);
+    znRecord.setEnumField(Segment.SEGMENT_TYPE, _segmentType);
+    znRecord.setLongField(Segment.START_TIME, _startTime);
+    znRecord.setLongField(Segment.END_TIME, _endTime);
+    znRecord.setSimpleField(Segment.TIME_UNIT, _timeUnit != null ? _timeUnit.name() : NULL);
+    znRecord.setSimpleField(Segment.INDEX_VERSION, _indexVersion);
+    znRecord.setLongField(Segment.TOTAL_DOCS, _totalDocs);
+    znRecord.setLongField(Segment.CRC, _crc);
+    znRecord.setLongField(Segment.CREATION_TIME, _creationTime);
 
     if (_partitionMetadata != null) {
       try {
         String partitionMetadataJson = _partitionMetadata.toJsonString();
-        znRecord.setSimpleField(CommonConstants.Segment.PARTITION_METADATA, partitionMetadataJson);
+        znRecord.setSimpleField(Segment.PARTITION_METADATA, partitionMetadataJson);
       } catch (IOException e) {
         LOGGER
             .error("Exception caught while writing partition metadata into ZNRecord for segment '{}', will be dropped",
@@ -304,57 +287,63 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
       }
     }
     if (_segmentUploadStartTime > 0) {
-      znRecord.setLongField(CommonConstants.Segment.SEGMENT_UPLOAD_START_TIME, _segmentUploadStartTime);
+      znRecord.setLongField(Segment.SEGMENT_UPLOAD_START_TIME, _segmentUploadStartTime);
+    }
+    if (_crypterName != null) {
+      znRecord.setSimpleField(Segment.CRYPTER_NAME, _crypterName);
     }
     if (_customMap != null) {
-      znRecord.setMapField(CommonConstants.Segment.CUSTOM_MAP, _customMap);
+      znRecord.setMapField(Segment.CUSTOM_MAP, _customMap);
     }
+
+    // For backward-compatibility
+    if (_tableName != null) {
+      znRecord.setSimpleField(Segment.TABLE_NAME, _tableName);
+    }
+
     return znRecord;
   }
 
   public Map<String, String> toMap() {
     Map<String, String> configMap = new HashMap<>();
-    configMap.put(CommonConstants.Segment.SEGMENT_NAME, _segmentName);
-    if (_tableName != null) {
-      configMap.put(CommonConstants.Segment.TABLE_NAME, _tableName);
-    }
-    configMap.put(CommonConstants.Segment.SEGMENT_TYPE, _segmentType.toString());
-    if (_timeUnit == null) {
-      configMap.put(CommonConstants.Segment.TIME_UNIT, null);
-    } else {
-      configMap.put(CommonConstants.Segment.TIME_UNIT, _timeUnit.toString());
-    }
-    configMap.put(CommonConstants.Segment.START_TIME, Long.toString(_startTime));
-    configMap.put(CommonConstants.Segment.END_TIME, Long.toString(_endTime));
 
-    configMap.put(CommonConstants.Segment.INDEX_VERSION, _indexVersion);
-    configMap.put(CommonConstants.Segment.TOTAL_DOCS, Long.toString(_totalDocs));
-    configMap.put(CommonConstants.Segment.CRC, Long.toString(_crc));
-    configMap.put(CommonConstants.Segment.CREATION_TIME, Long.toString(_creationTime));
+    configMap.put(Segment.SEGMENT_NAME, _segmentName);
+    configMap.put(Segment.SEGMENT_TYPE, _segmentType.toString());
+    configMap.put(Segment.START_TIME, Long.toString(_startTime));
+    configMap.put(Segment.END_TIME, Long.toString(_endTime));
+    configMap.put(Segment.TIME_UNIT, _timeUnit != null ? _timeUnit.name() : null);
+    configMap.put(Segment.INDEX_VERSION, _indexVersion);
+    configMap.put(Segment.TOTAL_DOCS, Long.toString(_totalDocs));
+    configMap.put(Segment.CRC, Long.toString(_crc));
+    configMap.put(Segment.CREATION_TIME, Long.toString(_creationTime));
 
     if (_partitionMetadata != null) {
       try {
         String partitionMetadataJson = _partitionMetadata.toJsonString();
-        configMap.put(CommonConstants.Segment.PARTITION_METADATA, partitionMetadataJson);
+        configMap.put(Segment.PARTITION_METADATA, partitionMetadataJson);
       } catch (IOException e) {
         LOGGER.error(
             "Exception caught while converting partition metadata into JSON string for segment '{}', will be dropped",
             _segmentName, e);
       }
     }
-
     if (_segmentUploadStartTime > 0) {
-      configMap.put(CommonConstants.Segment.SEGMENT_UPLOAD_START_TIME, Long.toString(_segmentUploadStartTime));
+      configMap.put(Segment.SEGMENT_UPLOAD_START_TIME, Long.toString(_segmentUploadStartTime));
     }
-
-    if (_customMap == null) {
-      configMap.put(CommonConstants.Segment.CUSTOM_MAP, null);
-    } else {
+    if (_crypterName != null) {
+      configMap.put(Segment.CRYPTER_NAME, _crypterName);
+    }
+    if (_customMap != null) {
       try {
-        configMap.put(CommonConstants.Segment.CUSTOM_MAP, JsonUtils.objectToString(_customMap));
+        configMap.put(Segment.CUSTOM_MAP, JsonUtils.objectToString(_customMap));
       } catch (JsonProcessingException e) {
         throw new RuntimeException(e);
       }
+    }
+
+    // For backward-compatibility
+    if (_tableName != null) {
+      configMap.put(Segment.TABLE_NAME, _tableName);
     }
 
     return configMap;

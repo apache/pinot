@@ -162,18 +162,13 @@ public class TableRetentionValidator {
       List<String> errorMessages = new ArrayList<>();
       for (String segmentName : segmentNames) {
         OfflineSegmentZKMetadata offlineSegmentMetadata = getOfflineSegmentMetadata(tableName, segmentName);
-        TimeUnit segmentTimeUnit = offlineSegmentMetadata.getTimeUnit();
-        if (segmentTimeUnit == null) {
-          errorMessages.add("Segment: " + segmentName + " has null time unit");
-          continue;
+        long startTimeMs = offlineSegmentMetadata.getStartTimeMs();
+        if (!TimeUtils.timeValueInValidRange(startTimeMs)) {
+          errorMessages.add("Segment: " + segmentName + " has invalid start time in millis: " + startTimeMs);
         }
-        long startTimeInMillis = segmentTimeUnit.toMillis(offlineSegmentMetadata.getStartTime());
-        if (!TimeUtils.timeValueInValidRange(startTimeInMillis)) {
-          errorMessages.add("Segment: " + segmentName + " has invalid start time in millis: " + startTimeInMillis);
-        }
-        long endTimeInMillis = segmentTimeUnit.toMillis(offlineSegmentMetadata.getEndTime());
-        if (!TimeUtils.timeValueInValidRange(endTimeInMillis)) {
-          errorMessages.add("Segment: " + segmentName + " has invalid end time in millis: " + endTimeInMillis);
+        long endTimeMs = offlineSegmentMetadata.getEndTimeMs();
+        if (!TimeUtils.timeValueInValidRange(endTimeMs)) {
+          errorMessages.add("Segment: " + segmentName + " has invalid end time in millis: " + endTimeMs);
         }
       }
 

@@ -222,7 +222,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertEquals(committedSegmentZKMetadata.getEndOffset(),
         new LongMsgOffset(PARTITION_OFFSET.getOffset() + NUM_DOCS).toString());
     assertEquals(committedSegmentZKMetadata.getCreationTime(), CURRENT_TIME_MS);
-    assertEquals(committedSegmentZKMetadata.getTimeInterval(), INTERVAL);
     assertEquals(committedSegmentZKMetadata.getCrc(), Long.parseLong(CRC));
     assertEquals(committedSegmentZKMetadata.getIndexVersion(), SEGMENT_VERSION);
     assertEquals(committedSegmentZKMetadata.getTotalDocs(), NUM_DOCS);
