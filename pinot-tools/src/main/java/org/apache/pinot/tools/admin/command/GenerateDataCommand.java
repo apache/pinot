@@ -127,6 +127,7 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
     List<String> columns = new LinkedList<>();
     final HashMap<String, DataType> dataTypes = new HashMap<>();
     final HashMap<String, FieldType> fieldTypes = new HashMap<>();
+    final HashMap<String, Boolean> singleValueFlags = new HashMap<>();
     final HashMap<String, TimeUnit> timeUnits = new HashMap<>();
 
     final HashMap<String, Integer> cardinality = new HashMap<>();
@@ -136,7 +137,7 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
     buildCardinalityRangeMaps(_schemaAnnFile, cardinality, range, pattern);
 
     final DataGeneratorSpec spec =
-        buildDataGeneratorSpec(schema, columns, dataTypes, fieldTypes, timeUnits, cardinality, range, pattern);
+        buildDataGeneratorSpec(schema, columns, dataTypes, fieldTypes, singleValueFlags, timeUnits, cardinality, range, pattern);
 
     final DataGenerator gen = new DataGenerator();
     gen.init(spec);
@@ -175,14 +176,16 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
   }
 
   private DataGeneratorSpec buildDataGeneratorSpec(Schema schema, List<String> columns,
-      HashMap<String, DataType> dataTypes, HashMap<String, FieldType> fieldTypes, HashMap<String, TimeUnit> timeUnits,
-      HashMap<String, Integer> cardinality, HashMap<String, IntRange> range, HashMap<String, Map<String, Object>> pattern) {
+      HashMap<String, DataType> dataTypes, HashMap<String, FieldType> fieldTypes, HashMap<String, Boolean> singleValueFlags,
+      HashMap<String, TimeUnit> timeUnits, HashMap<String, Integer> cardinality, HashMap<String, IntRange> range,
+      HashMap<String, Map<String, Object>> pattern) {
     for (final FieldSpec fs : schema.getAllFieldSpecs()) {
       String col = fs.getName();
 
       columns.add(col);
       dataTypes.put(col, fs.getDataType());
       fieldTypes.put(col, fs.getFieldType());
+      singleValueFlags.put(col, fs.isSingleValueField());
 
       switch (fs.getFieldType()) {
         case DIMENSION:
@@ -215,8 +218,8 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
       }
     }
 
-    return new DataGeneratorSpec(columns, cardinality, range, pattern, dataTypes, fieldTypes, timeUnits, FileFormat.AVRO,
-        _outDir, _overwrite);
+    return new DataGeneratorSpec(columns, cardinality, range, pattern, dataTypes, fieldTypes, singleValueFlags,
+            timeUnits, FileFormat.AVRO, _outDir, _overwrite);
   }
 
   public static void main(String[] args)

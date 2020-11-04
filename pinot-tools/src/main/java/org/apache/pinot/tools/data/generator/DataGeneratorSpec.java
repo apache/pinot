@@ -41,6 +41,7 @@ public class DataGeneratorSpec {
 
   private final Map<String, DataType> dataTypesMap;
   private final Map<String, FieldType> fieldTypesMap;
+  private final Map<String, Boolean> singleValueFlagsMap;
   private final Map<String, TimeUnit> timeUnitMap;
 
   private final FileFormat outputFileFormat;
@@ -49,13 +50,14 @@ public class DataGeneratorSpec {
 
   public DataGeneratorSpec() {
     this(new ArrayList<String>(), new HashMap<>(), new HashMap<>(), new HashMap<>(),
-        new HashMap<>(), new HashMap<>(), new HashMap<>(),
+        new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(),
         FileFormat.AVRO, "/tmp/dataGen", true);
   }
 
   public DataGeneratorSpec(List<String> columns, Map<String, Integer> cardinalityMap, Map<String, IntRange> rangeMap,
-      Map<String, Map<String, Object>> patternMap, Map<String, DataType> dataTypesMap, Map<String, FieldType> fieldTypesMap, Map<String, TimeUnit> timeUnitMap,
-      FileFormat format, String outputDir, boolean override) {
+      Map<String, Map<String, Object>> patternMap, Map<String, DataType> dataTypesMap, Map<String, FieldType> fieldTypesMap,
+      Map<String, Boolean> singleValueFlagsMap, Map<String, TimeUnit> timeUnitMap, FileFormat format, String outputDir,
+      boolean override) {
     this.columns = columns;
     this.cardinalityMap = cardinalityMap;
     this.rangeMap = rangeMap;
@@ -67,6 +69,7 @@ public class DataGeneratorSpec {
 
     this.dataTypesMap = dataTypesMap;
     this.fieldTypesMap = fieldTypesMap;
+    this.singleValueFlagsMap = singleValueFlagsMap;
     this.timeUnitMap = timeUnitMap;
   }
 
@@ -76,6 +79,10 @@ public class DataGeneratorSpec {
 
   public Map<String, FieldType> getFieldTypesMap() {
     return fieldTypesMap;
+  }
+
+  public Map<String, Boolean> getSingleValueFlagsMap() {
+    return singleValueFlagsMap;
   }
 
   public Map<String, TimeUnit> getTimeUnitMap() {
