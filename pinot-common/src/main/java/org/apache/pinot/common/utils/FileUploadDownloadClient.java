@@ -156,15 +156,15 @@ public class FileUploadDownloadClient implements Closeable {
   public static URI getStartReplaceSegmentsURI(URI controllerURI, String rawTableName, String tableType)
       throws URISyntaxException {
     return new URI(StringUtil.join("/", StringUtils
-            .chomp(controllerURI.getScheme() + "://" + controllerURI.getHost() + ":" + controllerURI.getPort(), "/"),
+            .chomp(controllerURI.getScheme() + "://" + controllerURI.getHost() + ":" + controllerURI.getPort()),
         OLD_SEGMENT_PATH, rawTableName + START_REPLACE_SEGMENTS_PATH + TYPE_DELIMITER + tableType));
   }
 
   public static URI getEndReplaceSegmentsURI(URI controllerURI, String rawTableName, String tableType,
       String segmentLineageEntryId)
       throws URISyntaxException {
-    return new URI(StringUtil.join("/", StringUtils
-            .chomp(controllerURI.getScheme() + "://" + controllerURI.getHost() + ":" + controllerURI.getPort(), "/"),
+    return new URI(StringUtil.join("/",
+        StringUtils.chomp(controllerURI.getScheme() + "://" + controllerURI.getHost() + ":" + controllerURI.getPort()),
         OLD_SEGMENT_PATH,
         rawTableName + END_REPLACE_SEGMENTS_PATH + TYPE_DELIMITER + tableType + SEGMENT_LINEAGE_ENTRY_ID_PARAMETER
             + segmentLineageEntryId));

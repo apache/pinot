@@ -20,9 +20,13 @@ package org.apache.pinot.controller.helix.core.minion.mergestrategy;
 
 import java.util.Map;
 import org.apache.pinot.core.common.MinionConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class MergeStrategyFactory {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MergeStrategyFactory.class);
+
   public enum MergeStrategyType {
     /**
      * Time based merge strategy
@@ -41,7 +45,8 @@ public class MergeStrategyFactory {
     try {
       mergeStrategyType = MergeStrategyType.valueOf(mergeStrategyTypeStr.toUpperCase());
     } catch (IllegalArgumentException e) {
-      mergeStrategyType = MergeStrategyType.TIME;
+      LOGGER.error("Invalid merge type: {}", mergeStrategyTypeStr);
+      throw e;
     }
 
     switch (mergeStrategyType) {

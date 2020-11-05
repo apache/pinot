@@ -26,7 +26,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.apache.pinot.common.lineage.LineageEntry;
 import org.apache.pinot.common.lineage.LineageEntryState;
 import org.apache.pinot.common.lineage.SegmentLineage;
@@ -45,6 +44,27 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * A {@link PinotTaskGenerator} implementation for generating tasks of type {@link MinionConstants.MergeRollupTask}
+ *
+ * Steps:
+ *
+ *  1. Filter out the segments that should not be considered for the merge
+ *     - If the segment is not older than bufferTimeMs, the segment is not considered for merge
+ *       where bufferTime can be provided in the taskConfigs (default 14d)
+ *     - If the segment shows up in the segment lineage with IN_PROGRESS state, the segment is not considered for merge
+ *     - If the segment is already scheduled, the segment is not considered for merge
+ *
+ *  2. Compute the segments that will be merged based on the merge strategy and schedule the tasks
+ *
+ *
+ * TODO:
+ * 1. Add the support for REALTIME table
+ * 2. Add the support for ROLLUP task
+ * 3. Add the support for segment backfill
+ * 4. Add the support for metadata only push
+ *
+ */
 public class SegmentMergeRollupTaskGenerator implements PinotTaskGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMergeRollupTaskGenerator.class);
 
@@ -73,7 +93,6 @@ public class SegmentMergeRollupTaskGenerator implements PinotTaskGenerator {
         TaskGeneratorUtils.getScheduledSegmentsMap(MinionConstants.MergeRollupTask.TASK_TYPE, _clusterInfoAccessor);
 
     // Generate tasks
-    int numTasks = 0;
     for (TableConfig tableConfig : tableConfigs) {
       // Only generate tasks for OFFLINE tables
       String offlineTableName = tableConfig.getTableName();
@@ -104,7 +123,8 @@ public class SegmentMergeRollupTaskGenerator implements PinotTaskGenerator {
       } catch (IllegalArgumentException e) {
         LOGGER.error("Buffer time period ('{}') for table '{}' is not configured correctly.", bufferTimePeriod,
             offlineTableName, e);
-        throw e;
+        // Skip to the next table
+        continue;
       }
 
       List<OfflineSegmentZKMetadata> segmentsForOfflineTable =
@@ -114,6 +134,11 @@ public class SegmentMergeRollupTaskGenerator implements PinotTaskGenerator {
       // based on the segment lineage.
       SegmentLineage segmentLineageForTable = _clusterInfoAccessor.getSegmentLineage(offlineTableName);
       Set<String> segmentsNotToMerge = new HashSet<>();
+
+      // Add the segments that are already scheduled
+      Set<String> scheduledSegments = scheduledSegmentsMap.getOrDefault(offlineTableName, Collections.emptySet());
+      segmentsNotToMerge.addAll(scheduledSegments);
+
       if (segmentLineageForTable != null) {
         for (String segmentLineageEntryId : segmentLineageForTable.getLineageEntryIds()) {
           LineageEntry lineageEntry = segmentLineageForTable.getLineageEntry(segmentLineageEntryId);
@@ -128,13 +153,12 @@ public class SegmentMergeRollupTaskGenerator implements PinotTaskGenerator {
       }
 
       // Filter out the segments that cannot be merged
-      List<SegmentZKMetadata> segmentsToMergeForTable = new ArrayList<>();
-      Set<String> scheduledSegments = scheduledSegmentsMap.getOrDefault(offlineTableName, Collections.emptySet());
+      List<SegmentZKMetadata> candidateSegments = new ArrayList<>();
       for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : segmentsForOfflineTable) {
         String segmentName = offlineSegmentZKMetadata.getSegmentName();
 
         // The segment should not be merged if it's already scheduled or in progress
-        if (scheduledSegments.contains(segmentName) || segmentsNotToMerge.contains(segmentName)) {
+        if (segmentsNotToMerge.contains(segmentName)) {
           continue;
         }
 
@@ -142,27 +166,32 @@ public class SegmentMergeRollupTaskGenerator implements PinotTaskGenerator {
         if (System.currentTimeMillis() - offlineSegmentZKMetadata.getEndTime() < bufferTimePeriodMs) {
           continue;
         }
-        segmentsToMergeForTable.add(offlineSegmentZKMetadata);
+        candidateSegments.add(offlineSegmentZKMetadata);
       }
 
       // Compute Merge Strategy
-      List<List<SegmentZKMetadata>> segmentsToSchedule = MergeStrategyFactory.getMergeStrategy(taskConfigs)
-          .generateMergeTaskCandidates(segmentsToMergeForTable, maxNumSegmentsPerTask);
+      List<List<SegmentZKMetadata>> segmentsToMerge = MergeStrategyFactory.getMergeStrategy(taskConfigs)
+          .generateMergeTaskCandidates(candidateSegments, maxNumSegmentsPerTask);
 
       // Generate tasks
-      for (List<SegmentZKMetadata> segments : segmentsToSchedule) {
+      for (List<SegmentZKMetadata> segments : segmentsToMerge) {
         // TODO: wire the max num tasks to the cluster config to make it configurable.
-        if (numTasks >= DEFAULT_MAX_NUM_TASKS) {
+        if (pinotTaskConfigs.size() >= DEFAULT_MAX_NUM_TASKS) {
           break;
         }
+
+        List<String> segmentNames = new ArrayList<>();
+        List<String> downloadUrls = new ArrayList<>();
+        for (SegmentZKMetadata segmentZKMetadata : segments) {
+          segmentNames.add(segmentZKMetadata.getSegmentName());
+          downloadUrls.add(((OfflineSegmentZKMetadata) segmentZKMetadata).getDownloadUrl());
+        }
+
         if (segments.size() >= 1) {
           Map<String, String> configs = new HashMap<>();
           configs.put(MinionConstants.TABLE_NAME_KEY, offlineTableName);
-          configs.put(MinionConstants.SEGMENT_NAME_KEY,
-              segments.stream().map(s -> s.getSegmentName()).collect(Collectors.joining(",")));
-          configs.put(MinionConstants.DOWNLOAD_URL_KEY,
-              segments.stream().map(s -> ((OfflineSegmentZKMetadata) s).getDownloadUrl())
-                  .collect(Collectors.joining(",")));
+          configs.put(MinionConstants.SEGMENT_NAME_KEY, String.join(",", segmentNames));
+          configs.put(MinionConstants.DOWNLOAD_URL_KEY, String.join(",", downloadUrls));
           configs.put(MinionConstants.VIP_URL_KEY, _clusterInfoAccessor.getVipUrl());
           configs.put(MinionConstants.REPLACE_SEGMENTS_KEY, Boolean.TRUE.toString());
           configs.put(MinionConstants.MergeRollupTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY,
@@ -172,7 +201,6 @@ public class SegmentMergeRollupTaskGenerator implements PinotTaskGenerator {
           configs.put(MinionConstants.MergeRollupTask.COLLECTOR_TYPE_KEY,
               CollectorFactory.CollectorType.CONCAT.toString());
           pinotTaskConfigs.add(new PinotTaskConfig(MinionConstants.MergeRollupTask.TASK_TYPE, configs));
-          numTasks++;
         }
       }
     }
@@ -186,6 +214,7 @@ public class SegmentMergeRollupTaskGenerator implements PinotTaskGenerator {
       try {
         intConfigValue = Integer.parseInt(intConfigStrValue);
       } catch (Exception e) {
+        LOGGER.warn("Failed to read the int config with the key = {}. Using default value = {}", key, defaultValue);
         intConfigValue = defaultValue;
       }
     } else {

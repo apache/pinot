@@ -40,6 +40,7 @@ import org.apache.pinot.core.common.MinionConstants.MergeRollupTask;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -71,25 +72,6 @@ public class MinionTasksIntegrationTest extends HybridClusterIntegrationTest {
     return SegmentVersion.v1.name();
   }
 
-  @Override
-  protected TableTaskConfig getTaskConfig() {
-    Map<String, Map<String, String>> taskConfigs = new HashMap<>();
-
-    // Configure ConverToRawIndexTask
-    Map<String, String> convertToRawIndexTaskConfigs = new HashMap<>();
-    convertToRawIndexTaskConfigs.put(MinionConstants.TABLE_MAX_NUM_TASKS_KEY, "5");
-    convertToRawIndexTaskConfigs.put(ConvertToRawIndexTask.COLUMNS_TO_CONVERT_KEY, COLUMNS_TO_CONVERT);
-    taskConfigs.put(ConvertToRawIndexTask.TASK_TYPE, convertToRawIndexTaskConfigs);
-
-    // Configure MergeRollupTask
-    Map<String, String> mergeRollupConfigs = new HashMap<>();
-    mergeRollupConfigs.put(MinionConstants.TABLE_MAX_NUM_TASKS_KEY, "5");
-    mergeRollupConfigs.put(MergeRollupTask.MAX_NUM_SEGMENTS_PER_TASK_KEY, "3");
-    taskConfigs.put(MergeRollupTask.TASK_TYPE, mergeRollupConfigs);
-
-    return new TableTaskConfig(taskConfigs);
-  }
-
   @BeforeClass
   public void setUp()
       throws Exception {
@@ -105,6 +87,16 @@ public class MinionTasksIntegrationTest extends HybridClusterIntegrationTest {
   public void testConvertToRawIndexTask()
       throws Exception {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+
+    // Configure ConverToRawIndexTask
+    TableConfig tableConfig = getOfflineTableConfig();
+    Map<String, Map<String, String>> taskConfigs = new HashMap<>();
+    Map<String, String> convertToRawIndexTaskConfigs = new HashMap<>();
+    convertToRawIndexTaskConfigs.put(MinionConstants.TABLE_MAX_NUM_TASKS_KEY, "5");
+    convertToRawIndexTaskConfigs.put(ConvertToRawIndexTask.COLUMNS_TO_CONVERT_KEY, COLUMNS_TO_CONVERT);
+    taskConfigs.put(ConvertToRawIndexTask.TASK_TYPE, convertToRawIndexTaskConfigs);
+    tableConfig.setTaskConfig(new TableTaskConfig(taskConfigs));
+    updateTableConfig(tableConfig);
 
     File testDataDir = new File(CommonConstants.Server.DEFAULT_INSTANCE_DATA_DIR + "-0", offlineTableName);
     if (!testDataDir.isDirectory()) {
@@ -211,6 +203,16 @@ public class MinionTasksIntegrationTest extends HybridClusterIntegrationTest {
       throws Exception {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
 
+    // Configure MergeRollupTask
+    TableConfig tableConfig = getOfflineTableConfig();
+    Map<String, Map<String, String>> taskConfigs = new HashMap<>();
+    Map<String, String> mergeRollupConfigs = new HashMap<>();
+    mergeRollupConfigs.put(MinionConstants.TABLE_MAX_NUM_TASKS_KEY, "5");
+    mergeRollupConfigs.put(MergeRollupTask.MAX_NUM_SEGMENTS_PER_TASK_KEY, "3");
+    taskConfigs.put(MergeRollupTask.TASK_TYPE, mergeRollupConfigs);
+    tableConfig.setTaskConfig(new TableTaskConfig(taskConfigs));
+    updateTableConfig(tableConfig);
+
     // Schedule merge task
     Assert.assertTrue(_taskManager.scheduleTasks().containsKey(MinionConstants.MergeRollupTask.TASK_TYPE));
     Assert.assertTrue(_helixTaskResourceManager.getTaskQueues()
@@ -221,7 +223,7 @@ public class MinionTasksIntegrationTest extends HybridClusterIntegrationTest {
 
     // Check with the queries
     super.testHardcodedSqlQueries();
-    super.testQueriesFromQueryFile();
+    super.testHardcodedQueries();
   }
 
   private void waitForMergeTaskToComplete(String offlineTableName) {
