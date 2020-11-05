@@ -235,7 +235,7 @@ public class SegmentGeneratorConfig {
   public void setSimpleDateFormat(String simpleDateFormat) {
     _timeColumnType = TimeColumnType.SIMPLE_DATE;
     try {
-      DateTimeFormat.forPattern(simpleDateFormat).withZoneUTC();
+      DateTimeFormat.forPattern(simpleDateFormat);
     } catch (Exception e) {
       throw new RuntimeException("Illegal simple date format specification", e);
     }
