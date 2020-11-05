@@ -186,6 +186,21 @@
                 </plugins>
             </build>
         </profile>
+        <profile>
+            <id>release-sign-artifacts</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <!-- GPG signing. It's due to the fact that maven-source-plugin and scala-maven-plugin
+                         have separate lifecycles, and the gpg files created by the former get deleted by the latter.
+                         Thus, explicitly adding this plugin to a new profile to sign the files at the end all at once. -->
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>1.6</version>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
     </profiles>
 
     <build>
