@@ -55,6 +55,7 @@ public class TableConfigBuilder {
 
   private final TableType _tableType;
   private String _tableName;
+  private boolean _isDimTable;
   private boolean _isLLC;
 
   // Segments config related
@@ -111,6 +112,11 @@ public class TableConfigBuilder {
 
   public TableConfigBuilder setTableName(String tableName) {
     _tableName = tableName;
+    return this;
+  }
+
+  public TableConfigBuilder setIsDimTable(boolean isDimTable) {
+    _isDimTable = isDimTable;
     return this;
   }
 
@@ -380,6 +386,6 @@ public class TableConfigBuilder {
 
     return new TableConfig(_tableName, _tableType.toString(), validationConfig, tenantConfig, indexingConfig,
         _customConfig, _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap,
-        _fieldConfigList, _upsertConfig, _ingestionConfig, _tierConfigList);
+        _fieldConfigList, _upsertConfig, _ingestionConfig, _tierConfigList, _isDimTable);
   }
 }

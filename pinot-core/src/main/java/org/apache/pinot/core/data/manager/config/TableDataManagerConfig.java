@@ -35,6 +35,7 @@ public class TableDataManagerConfig {
   private static final String TABLE_DATA_MANAGER_DATA_DIRECTORY = "directory";
   private static final String TABLE_DATA_MANAGER_CONSUMER_DIRECTORY = "consumerDirectory";
   private static final String TABLE_DATA_MANAGER_NAME = "name";
+  private static final String TABLE_IS_DIMENSION = "isDimTable";
 
   private final Configuration _tableDataManagerConfig;
 
@@ -62,6 +63,10 @@ public class TableDataManagerConfig {
     return _tableDataManagerConfig.getString(TABLE_DATA_MANAGER_NAME);
   }
 
+  public boolean isDimTable() {
+    return _tableDataManagerConfig.getBoolean(TABLE_IS_DIMENSION);
+  }
+
   public static TableDataManagerConfig getDefaultHelixTableDataManagerConfig(
       @Nonnull InstanceDataManagerConfig instanceDataManagerConfig, @Nonnull String tableNameWithType) {
     Configuration defaultConfig = new PropertiesConfiguration();
@@ -79,7 +84,8 @@ public class TableDataManagerConfig {
   public void overrideConfigs(@Nonnull TableConfig tableConfig) {
     // Override table level configs
 
-    // Currently we do not override any table level configs into TableDataManagerConfig
+    _tableDataManagerConfig.addProperty(TABLE_IS_DIMENSION, tableConfig.isDimTable());
+
     // If we wish to override some table level configs using table config, override them here
     // Note: the configs in TableDataManagerConfig is immutable once the table is created, which mean it will not pick
     // up the latest table config
