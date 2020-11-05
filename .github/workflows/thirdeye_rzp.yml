@@ -42,15 +42,6 @@ jobs:
       - name: Build Thirdeye
         #run: cd thirdeye && mvn -DskipTests -T 1C clean compile package && cd .. || exit 1
         run: cd thirdeye && ./install.sh && cd ..|| exit 1
-      - name: Docker Push
-        uses: docker/build-push-action@v1
-        with:
-          dockerfile: docker/images/pinot-thirdeye/Dockerfile.java14
-          registry: c.rzp.io
-          repository: razorpay/thirdeye
-          username: ${{ secrets.HARBOR_DOCKER_USERNAME }}
-          password: ${{ secrets.HARBOR_DOCKER_PASSWORD }}
-          tags: ${{ github.sha }}
       - name: Docker Push Dockerhub
         uses: docker/build-push-action@v1
         with:
