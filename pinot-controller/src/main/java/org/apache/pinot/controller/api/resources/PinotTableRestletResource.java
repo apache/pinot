@@ -578,7 +578,6 @@ public class PinotTableRestletResource {
     String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
     try {
       ObjectNode data = JsonUtils.newObjectNode();
-      data.put("tableName", tableNameWithType);
       data.put("state", _pinotHelixResourceManager.isTableEnabled(tableNameWithType) ? "enabled" : "disabled");
       return data.toString();
     } catch (TableNotFoundException e) {
