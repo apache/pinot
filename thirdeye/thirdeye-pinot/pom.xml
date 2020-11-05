@@ -11,7 +11,7 @@
   <artifactId>thirdeye-pinot</artifactId>
   <url>http://maven.apache.org</url>
   <properties>
-
+    <mainClass>org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyApplication</mainClass>
   </properties>
 
   <dependencies>
@@ -142,8 +142,8 @@
       <version>${jetty.version}</version>
     </dependency>
     <dependency>
-      <groupId>org.reflections</groupId>
-      <artifactId>reflections</artifactId>
+      <groupId>io.github.classgraph</groupId>
+      <artifactId>classgraph</artifactId>
     </dependency>
     <dependency>
       <!-- TODO: replace code dependencies and remove -->
@@ -367,26 +367,6 @@
   <build>
     <plugins>
       <plugin>
-        <artifactId>maven-compiler-plugin</artifactId>
-        <version>2.3.2</version>
-        <configuration>
-          <source>${jdk.version}</source>
-          <target>${jdk.version}</target>
-        </configuration>
-      </plugin>
-      <plugin>
-        <artifactId>maven-source-plugin</artifactId>
-        <version>2.1.2</version>
-        <executions>
-          <execution>
-            <id>attach-sources</id>
-            <goals>
-              <goal>jar</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
         <artifactId>maven-site-plugin</artifactId>
         <version>3.0</version>
         <configuration>
@@ -411,6 +391,18 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
           <threadCount>1</threadCount>
+        </configuration>
+      </plugin>
+      <plugin>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>2.4</version>
+        <configuration>
+          <archive>
+            <manifest>
+              <addClasspath>true</addClasspath>
+              <mainClass>${mainClass}</mainClass>
+            </manifest>
+          </archive>
         </configuration>
       </plugin>
     </plugins>

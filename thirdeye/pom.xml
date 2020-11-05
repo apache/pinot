@@ -59,7 +59,7 @@
     <commons-dbcp2.version>2.1.1</commons-dbcp2.version>
     <commons-conf2.version>2.7</commons-conf2.version>
     <commons-collection4.version>4.1</commons-collection4.version>
-    <reflections.version>0.9.11</reflections.version>
+    <classgraph.version>4.8.84</classgraph.version>
     <mrunit.version>1.1.0</mrunit.version>
     <slf4j-api.version>1.7.12</slf4j-api.version>
     <jodatime.version>2.7</jodatime.version>
@@ -149,6 +149,18 @@
             <source>${jdk.version}</source>
             <target>${jdk.version}</target>
           </configuration>
+        </plugin>
+        <plugin>
+          <artifactId>maven-source-plugin</artifactId>
+          <version>2.1.2</version>
+          <executions>
+            <execution>
+              <id>attach-sources</id>
+              <goals>
+                <goal>jar</goal>
+              </goals>
+            </execution>
+          </executions>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -433,11 +445,10 @@
         <version>${jsonpath.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.reflections</groupId>
-        <artifactId>reflections</artifactId>
-        <version>${reflections.version}</version>
+        <groupId>io.github.classgraph</groupId>
+        <artifactId>classgraph</artifactId>
+        <version>${classgraph.version}</version>
       </dependency>
-
       <!-- UI dependencies -->
       <dependency>
         <groupId>com.github.jknack</groupId>
