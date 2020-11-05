@@ -6,11 +6,11 @@
       isLoadError=isLoadError
       toggleActivation=(action "toggleActivation")
     }}
-      <div class="te-search-results__cta">
-        {{#link-to "manage.yaml" model.alertId}}
-          <button class="te-button te-button--outline">Edit</button>
-        {{/link-to}}
-      </div>
+    <div class="te-search-results__cta">
+      {{#link-to "manage.yaml" model.alertId}}
+      <button class="te-button te-button--outline btn">Edit</button>
+      {{/link-to}}
+    </div>
     {{/self-serve-alert-yaml-details}}
   </div>
 </section>
@@ -18,13 +18,14 @@
 <section class="te-page__bottom">
   <div class="container">
     {{#if isLoadError}}
-      <div class="te-alert-page-pending">
-        <img src="{{rootURL}}assets/images/te-alert-error.png" class="te-alert-page-pending__image te-alert-page-pending__image--error" alt="error">
-        <h2 class="te-alert-page-pending__title">Oops, something went wrong</h2>
-        <p class="te-alert-page-pending__text">{{errorText}}</p>
-      </div>
+    <div class="te-alert-page-pending">
+      <img src="{{rootURL}}assets/images/te-alert-error.png"
+        class="te-alert-page-pending__image te-alert-page-pending__image--error" alt="error">
+      <h2 class="te-alert-page-pending__title">Oops, something went wrong</h2>
+      <p class="te-alert-page-pending__text">{{errorText}}</p>
+    </div>
     {{else}}
-      {{alert-details
+    {{alert-details
         isPreviewMode=false
         alertYaml=model.detectionYaml
         showDetails=true

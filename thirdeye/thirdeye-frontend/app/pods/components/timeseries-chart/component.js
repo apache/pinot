@@ -86,20 +86,24 @@ export default Component.extend({
     pink: '#FF1B90'
   },
 
-  subchart: { // on init only
+  subchart: {
+    // on init only
     show: true
   },
 
-  zoom: { // on init only
+  zoom: {
+    // on init only
     enabled: true,
     onzoom: null
   },
 
-  point: { // on init only
+  point: {
+    // on init only
     show: true
   },
 
-  line: { // on init only
+  line: {
+    // on init only
     connectNull: false
   },
 
@@ -109,18 +113,27 @@ export default Component.extend({
     const cache = this.get('_seriesCache') || {};
     const series = this.get('series') || {};
     const colorMapping = this.get('colorMapping');
-    const { axis, legend, tooltip, focusedIds } = this.getProperties('axis', 'legend', 'tooltip', 'focusedIds');
+    const { axis, legend, tooltip, focusedIds } = this.getProperties(
+      'axis',
+      'legend',
+      'tooltip',
+      'focusedIds'
+    );
 
     const seriesKeys = Object.keys(series).sort();
 
-    const addedKeys = seriesKeys.filter(sid => !cache[sid]);
-    const changedKeys = seriesKeys.filter(sid => cache[sid] && !_.isEqual(cache[sid], series[sid]));
-    const deletedKeys = Object.keys(cache).filter(sid => !series[sid]);
-    const regionKeys = seriesKeys.filter(sid => series[sid] && series[sid].type == 'region');
+    const addedKeys = seriesKeys.filter((sid) => !cache[sid]);
+    const changedKeys = seriesKeys.filter(
+      (sid) => cache[sid] && !_.isEqual(cache[sid], series[sid])
+    );
+    const deletedKeys = Object.keys(cache).filter((sid) => !series[sid]);
+    const regionKeys = seriesKeys.filter(
+      (sid) => series[sid] && series[sid].type == 'region'
+    );
     // keys containing '-region' should not appear in the graph legend.
-    const noLegendKeys = seriesKeys.filter(sid => (sid.includes('-region')));
+    const noLegendKeys = seriesKeys.filter((sid) => sid.includes('-region'));
 
-    const regions = regionKeys.map(sid => {
+    const regions = regionKeys.map((sid) => {
       const t = series[sid].timestamps;
       let region = { start: t[0], end: t[t.length - 1] };
 
@@ -132,42 +145,72 @@ export default Component.extend({
     });
 
     const unloadKeys = deletedKeys.concat(noLegendKeys);
-    const unload = unloadKeys.concat(unloadKeys.map(sid => `${sid}-timestamps`));
+    const unload = unloadKeys.concat(
+      unloadKeys.map((sid) => `${sid}-timestamps`)
+    );
 
-    const loadKeys = addedKeys.concat(changedKeys).filter(sid => !noLegendKeys.includes(sid));
+    const loadKeys = addedKeys
+      .concat(changedKeys)
+      .filter((sid) => !noLegendKeys.includes(sid));
     const xs = {};
-    loadKeys.forEach(sid => xs[sid] = `${sid}-timestamps`);
+    loadKeys.forEach((sid) => (xs[sid] = `${sid}-timestamps`));
 
-    const values = loadKeys.map(sid => [sid].concat(series[sid].values));
+    const values = loadKeys.map((sid) => [sid].concat(series[sid].values));
 
-    const timestamps = loadKeys.map(sid => [`${sid}-timestamps`].concat(series[sid].timestamps));
+    const timestamps = loadKeys.map((sid) =>
+      [`${sid}-timestamps`].concat(series[sid].timestamps)
+    );
 
     const columns = values.concat(timestamps);
 
     const colors = {};
-    loadKeys.filter(sid => series[sid].color).forEach(sid => colors[sid] = colorMapping[series[sid].color]);
+    loadKeys
+      .filter((sid) => series[sid].color)
+      .forEach((sid) => (colors[sid] = colorMapping[series[sid].color]));
 
     const types = {};
-    loadKeys.filter(sid => series[sid].type).forEach(sid => types[sid] = series[sid].type);
+    loadKeys
+      .filter((sid) => series[sid].type)
+      .forEach((sid) => (types[sid] = series[sid].type));
 
     const axes = {};
-    loadKeys.filter(sid => 'axis' in series[sid]).forEach(sid => axes[sid] = series[sid].axis);
+    loadKeys
+      .filter((sid) => 'axis' in series[sid])
+      .forEach((sid) => (axes[sid] = series[sid].axis));
     // keep the lower bound line in graph but remove in from the legend
     legend.hide = ['lowerBound', 'old-anomaly-edges', 'new-anomaly-edges'];
-    const config = { unload, xs, columns, types, regions, tooltip, focusedIds, colors, axis, axes, legend };
+    const config = {
+      unload,
+      xs,
+      columns,
+      types,
+      regions,
+      tooltip,
+      focusedIds,
+      colors,
+      axis,
+      axes,
+      legend
+    };
     return config;
   },
 
   _makeAxisRange(axis) {
     const range = { min: {}, max: {} };
-    Object.keys(axis).filter(key => 'min' in axis[key]).forEach(key => range['min'][key] = axis[key]['min']);
-    Object.keys(axis).filter(key => 'max' in axis[key]).forEach(key => range['max'][key] = axis[key]['max']);
+    Object.keys(axis)
+      .filter((key) => 'min' in axis[key])
+      .forEach((key) => (range['min'][key] = axis[key]['min']));
+    Object.keys(axis)
+      .filter((key) => 'max' in axis[key])
+      .forEach((key) => (range['max'][key] = axis[key]['max']));
     return range;
   },
 
   _updateCache() {
     // debounce: do not trigger if chart object already destroyed
-    if (this.isDestroyed) { return; }
+    if (this.isDestroyed) {
+      return;
+    }
 
     const series = this.get('series') || {};
     this.set('_seriesCache', _.cloneDeep(series));
@@ -176,7 +219,7 @@ export default Component.extend({
   /**
    * Updates the focused entity on the chart
    */
-  _updateFocusedIds: function() {
+  _updateFocusedIds: function () {
     const ids = this.get('focusedIds');
 
     if (!_.isEmpty(ids)) {
@@ -213,69 +256,91 @@ export default Component.extend({
     this._updateCache();
   },
 
-  _shadeBounds(){
+  _shadeBounds() {
     const parentElement = this.api.internal.config.bindto;
-    d3.select(parentElement).select(".confidence-bounds").remove();
-    d3.select(parentElement).select(".sub-confidence-bounds").remove();
-    d3.select(parentElement).select('.timeseries-graph__slider-circle').remove();
-    d3.select(parentElement).selectAll('timeseries-graph__slider-line').remove();
+    d3.select(parentElement).select('.confidence-bounds').remove();
+    d3.select(parentElement).select('.sub-confidence-bounds').remove();
+    d3.select(parentElement)
+      .select('.timeseries-graph__slider-circle')
+      .remove();
+    d3.select(parentElement)
+      .selectAll('timeseries-graph__slider-line')
+      .remove();
     const chart = this.api;
-    if (chart && chart.legend && chart.internal && chart.internal.data && chart.internal.data.targets) {
+    if (
+      chart &&
+      chart.legend &&
+      chart.internal &&
+      chart.internal.data &&
+      chart.internal.data.targets
+    ) {
       if (chart.internal.data.targets.length > 24) {
         chart.legend.hide();
       }
     }
     // key is 'Upper and lower bound' because we delete the lowerBound key for the legend.
-    if(chart && chart.internal && chart.internal.data && chart.internal.data.xs && Array.isArray(chart.internal.data.xs['Upper and lower bound'])) {
-      const indices = d3.range(chart.internal.data.xs['Upper and lower bound'].length);
+    if (
+      chart &&
+      chart.internal &&
+      chart.internal.data &&
+      chart.internal.data.xs &&
+      Array.isArray(chart.internal.data.xs['Upper and lower bound'])
+    ) {
+      const indices = d3.range(
+        chart.internal.data.xs['Upper and lower bound'].length
+      );
       const yscale = chart.internal.y;
       const xscale = chart.internal.x;
       const yscaleSub = chart.internal.subY;
       const xscaleSub = chart.internal.subX;
       const xVals = chart.internal.data.xs['Upper and lower bound'];
-      let upperBoundVals = chart.internal.data.targets.find(target => {
+      let upperBoundVals = chart.internal.data.targets.find((target) => {
         return target.id === 'Upper and lower bound';
       });
-      let lowerBoundVals = chart.internal.data.targets.find(target => {
+      let lowerBoundVals = chart.internal.data.targets.find((target) => {
         return target.id === 'lowerBound';
       });
 
       if (upperBoundVals && lowerBoundVals) {
-        upperBoundVals = upperBoundVals.values.map(e => e.value);
-        lowerBoundVals = lowerBoundVals.values.map(e => e.value);
+        upperBoundVals = upperBoundVals.values.map((e) => e.value);
+        lowerBoundVals = lowerBoundVals.values.map((e) => e.value);
         // If all upper bound vals are null, we assume that there is only a lower bound
-        if (upperBoundVals.every(val => val === null)) {
-          let currentVals = chart.internal.data.targets.find(target => {
+        if (upperBoundVals.every((val) => val === null)) {
+          let currentVals = chart.internal.data.targets.find((target) => {
             return target.id === 'Current';
           });
           if (currentVals) {
-            currentVals = currentVals.values.map(e => e.value);
+            currentVals = currentVals.values.map((e) => e.value);
             const currentMax = Math.max(...currentVals);
             upperBoundVals = upperBoundVals.map(() => 2 * currentMax);
           }
         }
-        const area_main = d3.area()
+        const area_main = d3
+          .area()
           .curve(d3.curveLinear)
-          .x(d => xscale(xVals[d]))
-          .y0(d => yscale(lowerBoundVals[d]))
-          .y1(d => yscale(upperBoundVals[d]));
+          .x((d) => xscale(xVals[d]))
+          .y0((d) => yscale(lowerBoundVals[d]))
+          .y1((d) => yscale(upperBoundVals[d]));
 
-        const area_sub = d3.area()
+        const area_sub = d3
+          .area()
           .curve(d3.curveLinear)
-          .x(d => xscaleSub(xVals[d]))
-          .y0(d => yscaleSub(lowerBoundVals[d]))
-          .y1(d => yscaleSub(upperBoundVals[d]));
+          .x((d) => xscaleSub(xVals[d]))
+          .y0((d) => yscaleSub(lowerBoundVals[d]))
+          .y1((d) => yscaleSub(upperBoundVals[d]));
 
         let i = 0;
         const bothCharts = d3.select(parentElement).selectAll('.c3-chart-bars');
-        bothCharts.each(function() {
+        bothCharts.each(function () {
           if (i === 0 && this) {
-            d3.select(this).insert('path')
+            d3.select(this)
+              .insert('path')
               .datum(indices)
               .attr('class', 'confidence-bounds')
               .attr('d', area_main);
           } else if (i === 1 && this) {
-            d3.select(this).insert('path')
+            d3.select(this)
+              .insert('path')
               .datum(indices)
               .attr('class', 'sub-confidence-bounds')
               .attr('d', area_sub);
@@ -287,32 +352,36 @@ export default Component.extend({
     // add resize buttons after shading bounds
     const resizeButtons = d3.selectAll('.resize');
 
-    resizeButtons.append('circle')
+    resizeButtons
+      .append('circle')
       .attr('class', 'timeseries-graph__slider-circle')
       .attr('cx', 0)
       .attr('cy', 30)
       .attr('r', 10)
       .attr('fill', '#0091CA');
-    resizeButtons.append('line')
+    resizeButtons
+      .append('line')
       .attr('class', 'timeseries-graph__slider-line')
-      .attr("x1", 0)
-      .attr("y1", 27)
-      .attr("x2", 0)
-      .attr("y2", 33);
+      .attr('x1', 0)
+      .attr('y1', 27)
+      .attr('x2', 0)
+      .attr('y2', 33);
 
-    resizeButtons.append('line')
+    resizeButtons
+      .append('line')
       .attr('class', 'timeseries-graph__slider-line')
-      .attr("x1", -5)
-      .attr("y1", 27)
-      .attr("x2", -5)
-      .attr("y2", 33);
+      .attr('x1', -5)
+      .attr('y1', 27)
+      .attr('x2', -5)
+      .attr('y2', 33);
 
-    resizeButtons.append('line')
+    resizeButtons
+      .append('line')
       .attr('class', 'timeseries-graph__slider-line')
-      .attr("x1", 5)
-      .attr("y1", 27)
-      .attr("x2", 5)
-      .attr("y2", 33);
+      .attr('x1', 5)
+      .attr('y1', 27)
+      .attr('x2', 5)
+      .attr('y2', 33);
   },
 
   didUpdateAttrs() {
@@ -327,7 +396,7 @@ export default Component.extend({
     }
   },
 
-  didRender(){
+  didRender() {
     this._super(...arguments);
 
     later(() => {
@@ -342,7 +411,7 @@ export default Component.extend({
    */
   notifyPhantomJS() {
     if (typeof window.callPhantom === 'function') {
-      window.callPhantom({message: 'ready'});
+      window.callPhantom({ message: 'ready' });
     }
   },
 
