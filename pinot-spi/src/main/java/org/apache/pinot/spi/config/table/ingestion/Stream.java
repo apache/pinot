@@ -24,18 +24,19 @@ import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
 /**
  * Contains all the configs related to the streams for ingestion
  */
-public class Stream {
+public class Stream extends BaseJsonConfig {
 
   @JsonPropertyDescription("All configs for the streams from which to ingest")
   private final List<Map<String, String>> _streamConfigs;
 
   @JsonCreator
-  public Stream(@JsonProperty("stream") @Nullable List<Map<String, String>> streamConfigs) {
+  public Stream(@JsonProperty("streamConfigs") @Nullable List<Map<String, String>> streamConfigs) {
     _streamConfigs = streamConfigs;
   }
 

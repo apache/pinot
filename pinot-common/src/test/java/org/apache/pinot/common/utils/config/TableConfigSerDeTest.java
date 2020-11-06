@@ -21,6 +21,7 @@ package org.apache.pinot.common.utils.config;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -267,9 +268,13 @@ public class TableConfigSerDeTest {
       batchConfigMap.put("batchType", "s3");
       Map<String, String> streamConfigMap = new HashMap<>();
       streamConfigMap.put("streamType", "kafka");
+      List<Map<String, String>> streamConfigs = new ArrayList<>();
+      streamConfigs.add(streamConfigMap);
+      List<Map<String, String>> batchConfigs = new ArrayList<>();
+      batchConfigs.add(batchConfigMap);
       IngestionConfig ingestionConfig =
-          new IngestionConfig(new Batch(Lists.newArrayList(batchConfigMap), "APPEND", "HOURLY"),
-              new Stream(Lists.newArrayList(streamConfigMap)), new FilterConfig("filterFunc(foo)"), transformConfigs);
+          new IngestionConfig(new Batch(batchConfigs, "APPEND", "HOURLY"),
+              new Stream(streamConfigs), new FilterConfig("filterFunc(foo)"), transformConfigs);
       TableConfig tableConfig = tableConfigBuilder.setIngestionConfig(ingestionConfig).build();
 
       checkIngestionConfig(tableConfig);
