@@ -27,6 +27,7 @@ import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.sql.parsers.SqlCompilationException;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -225,6 +226,11 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 
+  @Test(dataProvider = "testParsingIllegalQueries", expectedExceptions = {SqlCompilationException.class})
+  public void testParsingIllegalQueries(String expressionStr) {
+    QueryContextConverterUtils.getQueryContextFromSQL(String.format("SELECT %s FROM myTable", expressionStr));
+  }
+
   @DataProvider(name = "testIllegalArguments")
   public Object[][] testIllegalArguments() {
     return new Object[][]{new Object[]{String.format("jsonExtractScalar(%s)",
@@ -233,5 +239,13 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
         "jsonExtractScalar(%s,'$.store.book[0].author')", STRING_SV_COLUMN)}, new Object[]{String.format(
         "jsonExtractScalar(%s,'$.store.book[0].author', 'STRINGARRAY')", STRING_SV_COLUMN)}, new Object[]{String.format(
         "jsonExtractScalar(%s,%s,'$.store.book[0].author', 'String','abc')", JSON_COLUMN, INT_SV_COLUMN)}};
+  }
+
+  @DataProvider(name = "testParsingIllegalQueries")
+  public Object[][] testParsingIllegalQueries() {
+    return new Object[][]{ new Object[]{String.format(
+        "jsonExtractScalar(%s, \"$.store.book[0].author\", 'String')", JSON_COLUMN, INT_SV_COLUMN)}, new Object[]{String.format(
+        "jsonExtractScalar(%s, '$.store.book[0].author', \"String\")", JSON_COLUMN, INT_SV_COLUMN)}, new Object[]{String.format(
+        "jsonExtractScalar(%s, \"$.store.book[0].author\", 'String','abc')", JSON_COLUMN, INT_SV_COLUMN)}};
   }
 }
