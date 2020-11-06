@@ -94,31 +94,12 @@
               }}
             </div>
 
-            <!-- Detection Health -->
-            <div class="te-horizontal-cards te-content-block__detection-health">
-              <h4 class="te-self-serve__block-title">
-                <label for="select-dimension" class="control-label te-label">
-                  Detection health
-                  <span>
-                    <i class="glyphicon glyphicon-question-sign"></i>
-                    {{#tooltip-on-element class="te-tooltip"}}
-                      See how your detection configuration is performing in detail
-                      by clicking 'view details' below{{#if showRules}},
-                      and select different rules above the graph
-                      to see their respective regression errors{{/if}}.
-                    {{/tooltip-on-element}}
-                  </span>
-                </label>
-              </h4>
-              {{detection-health
-                health=detectionHealth
-                selectedRule=selectedRule
-              }}
-            </div>
+            {{detection-health
+              health=detectionHealth
+              selectedRule=selectedRule
+            }}
           </div>
-
           {{else}}
-
             <!-- Anomalies, Response Rate, Precision, Recall -->
             <div class="te-horizontal-cards te-content-block">
               <h4 class="te-self-serve__block-title">
