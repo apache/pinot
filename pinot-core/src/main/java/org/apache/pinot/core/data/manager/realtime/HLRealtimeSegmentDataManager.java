@@ -155,7 +155,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     _varLengthDictionaryColumns = new ArrayList<>(indexLoadingConfig.getVarLengthDictionaryColumns());
 
-    _streamConfig = new StreamConfig(_tableNameWithType, tableConfig.getIndexingConfig().getStreamConfigs());
+    _streamConfig = new StreamConfig(_tableNameWithType, IngestionUtils.getStreamConfigsMap(tableConfig));
 
     _segmentLogger = LoggerFactory.getLogger(
         HLRealtimeSegmentDataManager.class.getName() + "_" + _segmentName + "_" + _streamConfig.getTopicName());

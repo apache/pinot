@@ -18,19 +18,26 @@
  */
 package org.apache.pinot.core.util;
 
+import com.google.common.base.Preconditions;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.core.data.function.FunctionEvaluator;
 import org.apache.pinot.core.data.function.FunctionEvaluatorFactory;
-import org.apache.pinot.spi.config.table.IngestionConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.Batch;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.stream.StreamConfig;
 
 
 /**
@@ -88,7 +95,8 @@ public class IngestionUtils {
           FunctionEvaluator expressionEvaluator =
               FunctionEvaluatorFactory.getExpressionEvaluator(transformConfig.getTransformFunction());
           fields.addAll(expressionEvaluator.getArguments());
-          fields.add(transformConfig.getColumnName()); // add the column itself too, so that if it is already transformed, we won't transform again
+          fields.add(transformConfig
+              .getColumnName()); // add the column itself too, so that if it is already transformed, we won't transform again
         }
       }
     }
@@ -113,5 +121,69 @@ public class IngestionUtils {
       }
     }
     return null;
+  }
+
+  /**
+   * Fetches the streamConfig from the given realtime table.
+   * First, the ingestionConfigs->stream->streamConfigs will be checked.
+   * If not found, the indexingConfig->streamConfigs will be checked (which is deprecated).
+   * @param tableConfig realtime table config
+   * @return streamConfigs map
+   */
+  public static Map<String, String> getStreamConfigsMap(TableConfig tableConfig) {
+    String tableNameWithType = tableConfig.getTableName();
+    Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
+        "Cannot fetch streamConfigs for OFFLINE table: %s", tableNameWithType);
+    Map<String, String> streamConfigsMap = null;
+    if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getStream() != null) {
+      List<Map<String, String>> streamConfigs = tableConfig.getIngestionConfig().getStream().getStreamConfigs();
+      if (!CollectionUtils.isEmpty(streamConfigs)) {
+        Preconditions.checkState(streamConfigs.size() == 1, "Only 1 stream supported per table");
+        streamConfigsMap = streamConfigs.get(0);
+      }
+    }
+    if (streamConfigsMap == null && tableConfig.getIndexingConfig() != null) {
+      streamConfigsMap = tableConfig.getIndexingConfig().getStreamConfigs();
+    }
+    if (streamConfigsMap == null) {
+      throw new IllegalStateException("Could not find streamConfigs for REALTIME table: " + tableNameWithType);
+    }
+    return streamConfigsMap;
+  }
+
+  /**
+   * Fetches the configured segmentPushType (APPEND/REFRESH) from the table config
+   * First checks in the ingestionConfig. If not found, checks in the segmentsConfig (has been deprecated from here in favor of ingestion config)
+   */
+  public static String getBatchSegmentPushType(TableConfig tableConfig) {
+    String segmentPushType = null;
+    if (tableConfig.getIngestionConfig() != null) {
+      Batch batch = tableConfig.getIngestionConfig().getBatch();
+      if (batch != null) {
+        segmentPushType = batch.getSegmentPushType();
+      }
+    }
+    if (segmentPushType == null) {
+      segmentPushType = tableConfig.getValidationConfig().getSegmentPushType();
+    }
+    return segmentPushType;
+  }
+
+  /**
+   * Fetches the configured segmentPushFrequency from the table config
+   * First checks in the ingestionConfig. If not found, checks in the segmentsConfig (has been deprecated from here in favor of ingestion config)
+   */
+  public static String getBatchSegmentPushFrequency(TableConfig tableConfig) {
+    String segmentPushFrequency = null;
+    if (tableConfig.getIngestionConfig() != null) {
+      Batch batch = tableConfig.getIngestionConfig().getBatch();
+      if (batch != null) {
+        segmentPushFrequency = batch.getSegmentPushFrequency();
+      }
+    }
+    if (segmentPushFrequency == null) {
+      segmentPushFrequency = tableConfig.getValidationConfig().getSegmentPushFrequency();
+    }
+    return segmentPushFrequency;
   }
 }

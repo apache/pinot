@@ -48,6 +48,7 @@ import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssign
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentFactory;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
+import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -144,7 +145,7 @@ public class TableRebalancer {
     try {
       // Do not allow rebalancing HLC real-time table
       if (tableConfig.getTableType() == TableType.REALTIME && new StreamConfig(tableNameWithType,
-          tableConfig.getIndexingConfig().getStreamConfigs()).hasHighLevelConsumerType()) {
+          IngestionUtils.getStreamConfigsMap(tableConfig)).hasHighLevelConsumerType()) {
         LOGGER.warn("Cannot rebalance table: {} with high-level consumer, aborting the rebalance", tableNameWithType);
         return new RebalanceResult(RebalanceResult.Status.FAILED, "Cannot rebalance table with high-level consumer",
             null, null);

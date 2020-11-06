@@ -49,6 +49,7 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.LazyOutputFormat;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.pinot.core.data.partition.PartitionFunctionFactory;
+import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.hadoop.io.CombineAvroKeyInputFormat;
 import org.apache.pinot.hadoop.job.mappers.SegmentPreprocessingMapper;
 import org.apache.pinot.hadoop.job.partitioners.GenericPartitioner;
@@ -371,7 +372,7 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
     // If the use case is an append use case, check that one time unit is contained in one file. If there is more than one,
     // the job should be disabled, as we should not resize for these use cases. Therefore, setting the time column name
     // and value
-    if (validationConfig.getSegmentPushType().equalsIgnoreCase("APPEND")) {
+    if (IngestionUtils.getBatchSegmentPushType(_tableConfig).equalsIgnoreCase("APPEND")) {
       job.getConfiguration().set(InternalConfigConstants.IS_APPEND, "true");
       String timeColumnName = validationConfig.getTimeColumnName();
       job.getConfiguration().set(InternalConfigConstants.TIME_COLUMN_CONFIG, timeColumnName);
@@ -387,8 +388,8 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
               .set(InternalConfigConstants.SEGMENT_TIME_SDF_PATTERN, formatSpec.getSDFPattern());
         }
       }
-      job.getConfiguration()
-          .set(InternalConfigConstants.SEGMENT_PUSH_FREQUENCY, validationConfig.getSegmentPushFrequency());
+      job.getConfiguration().set(InternalConfigConstants.SEGMENT_PUSH_FREQUENCY,
+          IngestionUtils.getBatchSegmentPushFrequency(_tableConfig));
       try (DataFileStream<GenericRecord> dataStreamReader = getAvroReader(path)) {
         job.getConfiguration()
             .set(InternalConfigConstants.TIME_COLUMN_VALUE, dataStreamReader.next().get(timeColumnName).toString());

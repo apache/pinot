@@ -37,7 +37,7 @@ import org.apache.pinot.core.data.function.FunctionEvaluatorFactory;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
-import org.apache.pinot.spi.config.table.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
@@ -48,6 +48,7 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.TimeUtils;
 
@@ -79,7 +80,7 @@ public final class TableConfigUtils {
     // Sanitize the table config before validation
     sanitize(tableConfig);
     validateValidationConfig(tableConfig, schema);
-    validateIngestionConfig(tableConfig.getIngestionConfig(), schema);
+    validateIngestionConfig(tableConfig.getTableName(), tableConfig.getIngestionConfig(), schema);
     validateTierConfigList(tableConfig.getTierConfigsList());
     validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
     validateFieldConfigList(tableConfig.getFieldConfigList(), schema);
@@ -113,7 +114,7 @@ public final class TableConfigUtils {
           String.format("Table: %s, \"segmentsConfig\" field is missing in table config", tableName));
     }
 
-    String segmentPushType = segmentsConfig.getSegmentPushType();
+    String segmentPushType = IngestionUtils.getBatchSegmentPushType(tableConfig);
     // segmentPushType is not needed for Realtime table
     if (tableConfig.getTableType() == TableType.OFFLINE && segmentPushType != null && !segmentPushType.isEmpty()) {
       if (!segmentPushType.equalsIgnoreCase("REFRESH") && !segmentPushType.equalsIgnoreCase("APPEND")) {
@@ -179,8 +180,36 @@ public final class TableConfigUtils {
    * 4. validity of transform function string
    * 5. checks for source fields used in destination columns
    */
-  private static void validateIngestionConfig(@Nullable IngestionConfig ingestionConfig, @Nullable Schema schema) {
+  public static void validateIngestionConfig(String tableNameWithType, @Nullable IngestionConfig ingestionConfig,
+      @Nullable Schema schema) {
     if (ingestionConfig != null) {
+
+      // Batch
+      if (ingestionConfig.getBatch() != null) {
+        List<Map<String, String>> batchConfigs = ingestionConfig.getBatch().getBatchConfigs();
+        try {
+          if (CollectionUtils.isNotEmpty(batchConfigs)) {
+            // Validate that BatchConfig can be created
+            batchConfigs.forEach(b -> new BatchConfig(tableNameWithType, b));
+          }
+        } catch (Exception e) {
+          throw new IllegalStateException("Could not create BatchConfig using the batchConfig map", e);
+        }
+      }
+
+      // Stream
+      if (ingestionConfig.getStream() != null) {
+        List<Map<String, String>> streamConfigs = ingestionConfig.getStream().getStreamConfigs();
+        if (CollectionUtils.isNotEmpty(streamConfigs)) {
+          Preconditions.checkState(streamConfigs.size() == 1, "Only 1 stream is supported in REALTIME table");
+          try {
+            // Validate that StreamConfig can be created
+            new StreamConfig(tableNameWithType, streamConfigs.get(0));
+          } catch (Exception e) {
+            throw new IllegalStateException("Could not create StreamConfig using the streamConfig map", e);
+          }
+        }
+      }
 
       // Filter config
       FilterConfig filterConfig = ingestionConfig.getFilterConfig();
@@ -256,11 +285,8 @@ public final class TableConfigUtils {
     Preconditions.checkState(CollectionUtils.isNotEmpty(schema.getPrimaryKeyColumns()),
         "Upsert table must have primary key columns in the schema");
     // consumer type must be low-level
-    Preconditions.checkState(
-        tableConfig.getIndexingConfig() != null && tableConfig.getIndexingConfig().getStreamConfigs() != null,
-        "streamConfig must exist in the table config");
-    StreamConfig streamConfig =
-        new StreamConfig(tableConfig.getTableName(), tableConfig.getIndexingConfig().getStreamConfigs());
+    Map<String, String> streamConfigsMap = IngestionUtils.getStreamConfigsMap(tableConfig);
+    StreamConfig streamConfig = new StreamConfig(tableConfig.getTableName(), streamConfigsMap);
     Preconditions.checkState(streamConfig.hasLowLevelConsumerType() && !streamConfig.hasHighLevelConsumerType(),
         "Upsert table must use low-level streaming consumer type");
     // replica group is configured for routing

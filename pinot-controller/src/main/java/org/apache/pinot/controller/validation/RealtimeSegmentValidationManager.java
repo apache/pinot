@@ -32,6 +32,7 @@ import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
@@ -96,7 +97,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       }
 
       PartitionLevelStreamConfig streamConfig = new PartitionLevelStreamConfig(tableConfig.getTableName(),
-          tableConfig.getIndexingConfig().getStreamConfigs());
+          IngestionUtils.getStreamConfigsMap(tableConfig));
       if (streamConfig.hasLowLevelConsumerType()) {
         _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfig);
       }
@@ -108,7 +109,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     List<RealtimeSegmentZKMetadata> metadataList =
         _pinotHelixResourceManager.getRealtimeSegmentMetadata(realtimeTableName);
     boolean countHLCSegments = true;  // false if this table has ONLY LLC segments (i.e. fully migrated)
-    StreamConfig streamConfig = new StreamConfig(realtimeTableName, tableConfig.getIndexingConfig().getStreamConfigs());
+    StreamConfig streamConfig = new StreamConfig(realtimeTableName, IngestionUtils.getStreamConfigsMap(tableConfig));
     if (streamConfig.hasLowLevelConsumerType() && !streamConfig.hasHighLevelConsumerType()) {
       countHLCSegments = false;
     }

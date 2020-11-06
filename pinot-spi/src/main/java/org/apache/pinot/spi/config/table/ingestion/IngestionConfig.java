@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.config.table;
+package org.apache.pinot.spi.config.table.ingestion;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -29,11 +29,15 @@ import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 
 
 /**
- * Class representing table ingestion configuration. For example, configs needed for
- * decoding, data source configs, ingestion transformations (flattening, filtering, transformations etc.)
- * TODO: Move fields from table config which are ingestion related (e.g. streamConfigs, segment push type, append freq etc)
+ * Class representing table ingestion configuration i.e. all configs related to the data source and the ingestion properties and operations
  */
 public class IngestionConfig extends BaseJsonConfig {
+
+  @JsonPropertyDescription("Config related to the batch data source")
+  private final Batch _batch;
+
+  @JsonPropertyDescription("Config related to the stream data source")
+  private final Stream _stream;
 
   @JsonPropertyDescription("Config related to filtering records during ingestion")
   private final FilterConfig _filterConfig;
@@ -42,10 +46,24 @@ public class IngestionConfig extends BaseJsonConfig {
   private final List<TransformConfig> _transformConfigs;
 
   @JsonCreator
-  public IngestionConfig(@JsonProperty("filterConfig") @Nullable FilterConfig filterConfig,
+  public IngestionConfig(@JsonProperty("batch") @Nullable Batch batch,
+      @JsonProperty("stream") @Nullable Stream stream,
+      @JsonProperty("filterConfig") @Nullable FilterConfig filterConfig,
       @JsonProperty("transformConfigs") @Nullable List<TransformConfig> transformConfigs) {
+    _batch = batch;
+    _stream = stream;
     _filterConfig = filterConfig;
     _transformConfigs = transformConfigs;
+  }
+
+  @Nullable
+  public Batch getBatch() {
+    return _batch;
+  }
+
+  @Nullable
+  public Stream getStream() {
+    return _stream;
   }
 
   @Nullable

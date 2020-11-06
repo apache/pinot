@@ -32,6 +32,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
+import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.TimeUtils;
@@ -102,12 +103,13 @@ public class TableRetentionValidator {
       }
 
       // Get the retention config
-      SegmentsValidationAndRetentionConfig retentionConfig = getTableConfig(tableName).getValidationConfig();
+      TableConfig tableConfig = getTableConfig(tableName);
+      SegmentsValidationAndRetentionConfig retentionConfig = tableConfig.getValidationConfig();
       if (retentionConfig == null) {
         LOGGER.error("Table: {}, \"segmentsConfig\" field is missing in table config", tableName);
         continue;
       }
-      String segmentPushType = retentionConfig.getSegmentPushType();
+      String segmentPushType = IngestionUtils.getBatchSegmentPushType(tableConfig);
       if (segmentPushType == null) {
         LOGGER.error("Table: {}, null push type", tableName);
         continue;

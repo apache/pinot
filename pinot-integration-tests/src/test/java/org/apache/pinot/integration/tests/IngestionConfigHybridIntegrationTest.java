@@ -21,11 +21,8 @@ package org.apache.pinot.integration.tests;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import javax.annotation.Nullable;
-import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.spi.config.table.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
@@ -66,7 +63,7 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
     transformConfigs.add(new TransformConfig("AmPm", "Groovy({DepTime < 1200 ? \"AM\": \"PM\"}, DepTime)"));
     transformConfigs.add(new TransformConfig("millisSinceEpoch", "fromEpochDays(DaysSinceEpoch)"));
     transformConfigs.add(new TransformConfig("lowerCaseDestCityName", "lower(DestCityName)"));
-    return new IngestionConfig(filterConfig, transformConfigs);
+    return new IngestionConfig(null, getStream(), filterConfig, transformConfigs);
   }
 
   @Override

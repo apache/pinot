@@ -31,6 +31,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.ingestion.common.JobConfigConstants;
 import org.apache.pinot.ingestion.jobs.SegmentCreationJob;
 import org.apache.pinot.ingestion.utils.JobPreparationHelper;
@@ -155,7 +156,7 @@ public class SparkSegmentCreationJob extends SegmentCreationJob {
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
 
     // For APPEND use case, timeColumnName and timeType must be set
-    if (APPEND.equalsIgnoreCase(validationConfig.getSegmentPushType())) {
+    if (APPEND.equalsIgnoreCase(IngestionUtils.getBatchSegmentPushType(tableConfig))) {
       Preconditions.checkState(validationConfig.getTimeColumnName() != null && validationConfig.getTimeType() != null,
           "For APPEND use case, time column and type must be set");
     }

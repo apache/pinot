@@ -30,7 +30,8 @@ import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.spi.config.table.CompletionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.Batch;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
@@ -48,6 +49,7 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
+import org.apache.pinot.spi.config.table.ingestion.Stream;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -261,7 +263,13 @@ public class TableConfigSerDeTest {
       // With ingestion config
       List<TransformConfig> transformConfigs =
           Lists.newArrayList(new TransformConfig("bar", "func(moo)"), new TransformConfig("zoo", "myfunc()"));
-      IngestionConfig ingestionConfig = new IngestionConfig(new FilterConfig("filterFunc(foo)"), transformConfigs);
+      Map<String, String> batchConfigMap = new HashMap<>();
+      batchConfigMap.put("batchType", "s3");
+      Map<String, String> streamConfigMap = new HashMap<>();
+      streamConfigMap.put("streamType", "kafka");
+      IngestionConfig ingestionConfig =
+          new IngestionConfig(new Batch(Lists.newArrayList(batchConfigMap), "APPEND", "HOURLY"),
+              new Stream(Lists.newArrayList(streamConfigMap)), new FilterConfig("filterFunc(foo)"), transformConfigs);
       TableConfig tableConfig = tableConfigBuilder.setIngestionConfig(ingestionConfig).build();
 
       checkIngestionConfig(tableConfig);
@@ -400,6 +408,16 @@ public class TableConfigSerDeTest {
     assertEquals(transformConfigs.get(0).getTransformFunction(), "func(moo)");
     assertEquals(transformConfigs.get(1).getColumnName(), "zoo");
     assertEquals(transformConfigs.get(1).getTransformFunction(), "myfunc()");
+    assertNotNull(ingestionConfig.getBatch());
+    assertNotNull(ingestionConfig.getBatch().getBatchConfigs());
+    assertEquals(ingestionConfig.getBatch().getBatchConfigs().size(), 1);
+    assertEquals(ingestionConfig.getBatch().getBatchConfigs().get(0).get("batchType"), "s3");
+    assertEquals(ingestionConfig.getBatch().getSegmentPushType(), "APPEND");
+    assertEquals(ingestionConfig.getBatch().getSegmentPushFrequency(), "HOURLY");
+    assertNotNull(ingestionConfig.getStream());
+    assertNotNull(ingestionConfig.getStream().getStreamConfigs());
+    assertEquals(ingestionConfig.getStream().getStreamConfigs().size(), 1);
+    assertEquals(ingestionConfig.getStream().getStreamConfigs().get(0).get("streamType"), "kafka");
   }
 
   private void checkTierConfigList(TableConfig tableConfig) {

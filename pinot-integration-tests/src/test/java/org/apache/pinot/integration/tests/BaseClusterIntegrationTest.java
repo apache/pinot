@@ -39,10 +39,11 @@ import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.Stream;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
@@ -247,6 +248,13 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return DEFAULT_NULL_HANDLING_ENABLED;
   }
 
+  @Nullable
+  protected Stream getStream() {
+    List<Map<String, String>> streamConfigs = new ArrayList<>();
+    streamConfigs.add(getStreamConfigMap());
+    return new Stream(streamConfigs);
+  }
+
   /**
    * The following methods are based on the getters. Override the getters for non-default settings before calling these
    * methods.
@@ -290,10 +298,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return getOfflineTableConfig(getTableName());
   }
 
-  /**
-   * Creates a new REALTIME table config.
-   */
-  protected TableConfig createRealtimeTableConfig(File sampleAvroFile) {
+  protected Map<String, String> getStreamConfigMap() {
     Map<String, String> streamConfigs = new HashMap<>();
     String streamType = "kafka";
     streamConfigs.put(StreamConfigProperties.STREAM_TYPE, streamType);
@@ -324,7 +329,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     streamConfigs
         .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
             getKafkaTopic());
-    AvroFileSchemaKafkaAvroMessageDecoder.avroFile = sampleAvroFile;
     streamConfigs
         .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
             AvroFileSchemaKafkaAvroMessageDecoder.class.getName());
@@ -332,15 +336,22 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, Integer.toString(getRealtimeSegmentFlushSize()));
     streamConfigs.put(StreamConfigProperties
         .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), "smallest");
+    return streamConfigs;
+  }
 
+  /**
+   * Creates a new REALTIME table config.
+   */
+  protected TableConfig createRealtimeTableConfig(File sampleAvroFile) {
+    AvroFileSchemaKafkaAvroMessageDecoder.avroFile = sampleAvroFile;
     return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName()).setSchemaName(getSchemaName())
         .setTimeColumnName(getTimeColumnName()).setSortedColumn(getSortedColumn())
         .setInvertedIndexColumns(getInvertedIndexColumns()).setNoDictionaryColumns(getNoDictionaryColumns())
         .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
         .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
         .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
-        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setLLC(useLlc)
-        .setStreamConfigs(streamConfigs).setNullHandlingEnabled(getNullHandlingEnabled()).build();
+        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setLLC(useLlc())
+        .setStreamConfigs(getStreamConfigMap()).setNullHandlingEnabled(getNullHandlingEnabled()).build();
   }
 
   /**

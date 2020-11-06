@@ -30,6 +30,7 @@ import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.util.SegmentIntervalUtils;
+import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -100,7 +101,8 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> 
         LOGGER
             .warn("Table: {} has {} segments with invalid interval", offlineTableName, numSegmentsWithInvalidIntervals);
       }
-      Duration frequency = SegmentIntervalUtils.convertToDuration(validationConfig.getSegmentPushFrequency());
+      Duration frequency =
+          SegmentIntervalUtils.convertToDuration(IngestionUtils.getBatchSegmentPushFrequency(tableConfig));
       numMissingSegments = computeNumMissingSegments(segmentIntervals, frequency);
     }
     // Update the gauge that contains the number of missing segments

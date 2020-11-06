@@ -22,17 +22,26 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.spi.config.table.IngestionConfig;
+import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.Batch;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
+import org.apache.pinot.spi.config.table.ingestion.Stream;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -134,7 +143,7 @@ public class IngestionUtilsTest {
     Schema schema = new Schema();
 
     // filter config
-    IngestionConfig ingestionConfig = new IngestionConfig(new FilterConfig("Groovy({x > 100}, x)"), null);
+    IngestionConfig ingestionConfig = new IngestionConfig(null, null, new FilterConfig("Groovy({x > 100}, x)"), null);
     Set<String> fields = IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema);
     Assert.assertEquals(fields.size(), 1);
     Assert.assertTrue(fields.containsAll(Sets.newHashSet("x")));
@@ -144,18 +153,18 @@ public class IngestionUtilsTest {
     Assert.assertEquals(fields.size(), 2);
     Assert.assertTrue(fields.containsAll(Sets.newHashSet("x", "y")));
 
-
     // transform configs
     schema = new Schema.SchemaBuilder().addSingleValueDimension("d1", FieldSpec.DataType.STRING).build();
-    List<TransformConfig> transformConfigs = Lists.newArrayList(new TransformConfig("d1", "Groovy({function}, argument1, argument2)"));
-    ingestionConfig = new IngestionConfig(null, transformConfigs);
+    List<TransformConfig> transformConfigs =
+        Lists.newArrayList(new TransformConfig("d1", "Groovy({function}, argument1, argument2)"));
+    ingestionConfig = new IngestionConfig(null, null, null, transformConfigs);
     List<String> extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema));
     Assert.assertEquals(extract.size(), 3);
     Assert.assertTrue(extract.containsAll(Arrays.asList("d1", "argument1", "argument2")));
 
     // groovy function, no arguments
     transformConfigs = Lists.newArrayList(new TransformConfig("d1", "Groovy({function})"));
-    ingestionConfig = new IngestionConfig(null, transformConfigs);
+    ingestionConfig = new IngestionConfig(null, null, null, transformConfigs);
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema));
     Assert.assertEquals(extract.size(), 1);
     Assert.assertTrue(extract.contains("d1"));
@@ -163,38 +172,149 @@ public class IngestionUtilsTest {
     // inbuilt functions
     schema = new Schema.SchemaBuilder().addSingleValueDimension("hoursSinceEpoch", FieldSpec.DataType.LONG).build();
     transformConfigs = Lists.newArrayList(new TransformConfig("hoursSinceEpoch", "toEpochHours(timestampColumn)"));
-    ingestionConfig = new IngestionConfig(null, transformConfigs);
+    ingestionConfig = new IngestionConfig(null, null, null, transformConfigs);
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema));
     Assert.assertEquals(extract.size(), 2);
     Assert.assertTrue(extract.containsAll(Arrays.asList("timestampColumn", "hoursSinceEpoch")));
 
     // inbuilt functions with literal
-    schema = new Schema.SchemaBuilder().addSingleValueDimension("tenMinutesSinceEpoch", FieldSpec.DataType.LONG).build();
-    transformConfigs = Lists.newArrayList(new TransformConfig("tenMinutesSinceEpoch", "toEpochMinutesBucket(timestampColumn, 10)"));
-    ingestionConfig = new IngestionConfig(null, transformConfigs);
+    schema =
+        new Schema.SchemaBuilder().addSingleValueDimension("tenMinutesSinceEpoch", FieldSpec.DataType.LONG).build();
+    transformConfigs =
+        Lists.newArrayList(new TransformConfig("tenMinutesSinceEpoch", "toEpochMinutesBucket(timestampColumn, 10)"));
+    ingestionConfig = new IngestionConfig(null, null, null, transformConfigs);
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema));
     Assert.assertEquals(extract.size(), 2);
     Assert.assertTrue(extract.containsAll(Lists.newArrayList("tenMinutesSinceEpoch", "timestampColumn")));
 
     // inbuilt functions on DateTimeFieldSpec
-    schema = new Schema.SchemaBuilder().addDateTime("dateColumn", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd", "1:DAYS").build();
-    transformConfigs = Lists.newArrayList(new TransformConfig("dateColumn", "toDateTime(timestampColumn, 'yyyy-MM-dd')"));
-    ingestionConfig = new IngestionConfig(null, transformConfigs);
+    schema = new Schema.SchemaBuilder()
+        .addDateTime("dateColumn", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd", "1:DAYS").build();
+    transformConfigs =
+        Lists.newArrayList(new TransformConfig("dateColumn", "toDateTime(timestampColumn, 'yyyy-MM-dd')"));
+    ingestionConfig = new IngestionConfig(null, null, null, transformConfigs);
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema));
     Assert.assertEquals(extract.size(), 2);
     Assert.assertTrue(extract.containsAll(Lists.newArrayList("dateColumn", "timestampColumn")));
 
     // filter + transform configs + schema fields  + schema transform
-    schema = new Schema.SchemaBuilder()
-        .addSingleValueDimension("d1", FieldSpec.DataType.STRING)
-        .addSingleValueDimension("d2", FieldSpec.DataType.STRING)
-        .addMetric("m1", FieldSpec.DataType.INT)
+    schema = new Schema.SchemaBuilder().addSingleValueDimension("d1", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("d2", FieldSpec.DataType.STRING).addMetric("m1", FieldSpec.DataType.INT)
         .addDateTime("dateColumn", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd", "1:DAYS").build();
     schema.getFieldSpecFor("d2").setTransformFunction("reverse(xy)");
-    transformConfigs = Lists.newArrayList(new TransformConfig("dateColumn", "toDateTime(timestampColumn, 'yyyy-MM-dd')"));
-    ingestionConfig = new IngestionConfig(new FilterConfig("Groovy({d1 == \"10\"}, d1)"), transformConfigs);
+    transformConfigs =
+        Lists.newArrayList(new TransformConfig("dateColumn", "toDateTime(timestampColumn, 'yyyy-MM-dd')"));
+    ingestionConfig = new IngestionConfig(null, null, new FilterConfig("Groovy({d1 == \"10\"}, d1)"), transformConfigs);
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema));
     Assert.assertEquals(extract.size(), 6);
     Assert.assertTrue(extract.containsAll(Lists.newArrayList("d1", "d2", "m1", "dateColumn", "xy", "timestampColumn")));
+  }
+
+  @Test
+  public void testGetStreamConfigsMap() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
+    try {
+      IngestionUtils.getStreamConfigsMap(tableConfig);
+      Assert.fail("Should fail for OFFLINE table");
+    } catch (IllegalStateException e) {
+      // expected
+    }
+
+    tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("myTable").setTimeColumnName("timeColumn").build();
+
+    // get from ingestion config (when not present in indexing config)
+    Map<String, String> streamConfigsMap = new HashMap<>();
+    streamConfigsMap.put("streamType", "kafka");
+    tableConfig
+        .setIngestionConfig(new IngestionConfig(null, new Stream(Lists.newArrayList(streamConfigsMap)), null, null));
+    Map<String, String> actualStreamConfigsMap = IngestionUtils.getStreamConfigsMap(tableConfig);
+    Assert.assertEquals(actualStreamConfigsMap.size(), 1);
+    Assert.assertEquals(actualStreamConfigsMap.get("streamType"), "kafka");
+
+    // get from ingestion config (even if present in indexing config)
+    Map<String, String> deprecatedStreamConfigsMap = new HashMap<>();
+    deprecatedStreamConfigsMap.put("streamType", "foo");
+    deprecatedStreamConfigsMap.put("customProp", "foo");
+    IndexingConfig indexingConfig = new IndexingConfig();
+    indexingConfig.setStreamConfigs(deprecatedStreamConfigsMap);
+    tableConfig.setIndexingConfig(indexingConfig);
+    actualStreamConfigsMap = IngestionUtils.getStreamConfigsMap(tableConfig);
+    Assert.assertEquals(actualStreamConfigsMap.size(), 1);
+    Assert.assertEquals(actualStreamConfigsMap.get("streamType"), "kafka");
+
+    // fail if multiple found
+    tableConfig.setIngestionConfig(
+        new IngestionConfig(null, new Stream(Lists.newArrayList(streamConfigsMap, deprecatedStreamConfigsMap)), null,
+            null));
+    try {
+      IngestionUtils.getStreamConfigsMap(tableConfig);
+      Assert.fail("Should fail for multiple stream configs");
+    } catch (IllegalStateException e) {
+      // expected
+    }
+
+    // get from indexing config
+    tableConfig.setIngestionConfig(null);
+    actualStreamConfigsMap = IngestionUtils.getStreamConfigsMap(tableConfig);
+    Assert.assertEquals(actualStreamConfigsMap.size(), 2);
+    Assert.assertEquals(actualStreamConfigsMap.get("streamType"), "foo");
+
+    // fail if found nowhere
+    tableConfig.setIndexingConfig(null);
+    try {
+      IngestionUtils.getStreamConfigsMap(tableConfig);
+      Assert.fail("Should fail for no stream config found");
+    } catch (IllegalStateException e) {
+      // expected
+    }
+  }
+
+  @Test
+  public void testGetPushFrequency() {
+    // get from ingestion config, when not present in segmentsConfig
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
+    tableConfig.setIngestionConfig(new IngestionConfig(new Batch(null, null, "HOURLY"), null, null, null));
+    Assert.assertEquals(IngestionUtils.getBatchSegmentPushFrequency(tableConfig), "HOURLY");
+
+    // get from ingestion config, even if present in segmentsConfig
+    SegmentsValidationAndRetentionConfig segmentsValidationAndRetentionConfig =
+        new SegmentsValidationAndRetentionConfig();
+    segmentsValidationAndRetentionConfig.setSegmentPushFrequency("DAILY");
+    tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
+    Assert.assertEquals(IngestionUtils.getBatchSegmentPushFrequency(tableConfig), "HOURLY");
+
+    // get from segmentsConfig
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
+    tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
+    Assert.assertEquals(IngestionUtils.getBatchSegmentPushFrequency(tableConfig), "DAILY");
+
+    // present nowhere
+    segmentsValidationAndRetentionConfig.setSegmentPushFrequency(null);
+    Assert.assertNull(IngestionUtils.getBatchSegmentPushFrequency(tableConfig));
+  }
+
+  @Test
+  public void testGetPushType() {
+    // get from ingestion config, when not present in segmentsConfig
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
+    tableConfig.setIngestionConfig(new IngestionConfig(new Batch(null, "APPEND", null), null, null, null));
+    Assert.assertEquals(IngestionUtils.getBatchSegmentPushType(tableConfig), "APPEND");
+
+    // get from ingestion config, even if present in segmentsConfig
+    SegmentsValidationAndRetentionConfig segmentsValidationAndRetentionConfig =
+        new SegmentsValidationAndRetentionConfig();
+    segmentsValidationAndRetentionConfig.setSegmentPushType("REFRESH");
+    tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
+    Assert.assertEquals(IngestionUtils.getBatchSegmentPushType(tableConfig), "APPEND");
+
+    // get from segmentsConfig
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
+    tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
+    Assert.assertEquals(IngestionUtils.getBatchSegmentPushType(tableConfig), "REFRESH");
+
+    // present nowhere
+    segmentsValidationAndRetentionConfig.setSegmentPushType(null);
+    Assert.assertNull(IngestionUtils.getBatchSegmentPushType(tableConfig));
   }
 }

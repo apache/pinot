@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.utils.TimeUtils;
 
 
@@ -29,7 +30,9 @@ import org.apache.pinot.spi.utils.TimeUtils;
 public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   private String _retentionTimeUnit;
   private String _retentionTimeValue;
+  @Deprecated
   private String _segmentPushFrequency; // DO NOT REMOVE, this is used in internal segment generation management
+  @Deprecated
   private String _segmentPushType;
   private String _replication;
   // For high-level consumers, the number of replicas should be same as num server instances
@@ -91,6 +94,9 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _retentionTimeValue = retentionTimeValue;
   }
 
+  /**
+   * @deprecated Use <code>segmentPushFrequency</code> from {@link IngestionConfig#getBatch()}
+   */
   public String getSegmentPushFrequency() {
     return _segmentPushFrequency;
   }
@@ -99,6 +105,9 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _segmentPushFrequency = segmentPushFrequency;
   }
 
+  /**
+   * @deprecated Use <code>segmentPushType</code> from {@link IngestionConfig#getBatch()}
+   */
   public String getSegmentPushType() {
     return _segmentPushType;
   }

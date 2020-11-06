@@ -35,6 +35,7 @@ import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.RealtimeToOfflineSegmentsTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -100,8 +101,8 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
         LOGGER.warn("Skip generating task: {} for non-REALTIME table: {}", taskType, realtimeTableName);
         continue;
       }
-      if (new StreamConfig(realtimeTableName, tableConfig.getIndexingConfig().getStreamConfigs())
-          .hasHighLevelConsumerType()) {
+      StreamConfig streamConfig = new StreamConfig(realtimeTableName, IngestionUtils.getStreamConfigsMap(tableConfig));
+      if (streamConfig.hasHighLevelConsumerType()) {
         LOGGER.warn("Skip generating task: {} for HLC REALTIME table: {}", taskType, realtimeTableName);
         continue;
       }

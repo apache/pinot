@@ -34,6 +34,7 @@ import org.apache.pinot.core.minion.rollup.MergeType;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.name.NormalizedDateSegmentNameGenerator;
+import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -238,8 +239,8 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
 
     // Fetch time related configurations from schema and table config.
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-    String pushFrequency = validationConfig.getSegmentPushFrequency();
-    String pushType = validationConfig.getSegmentPushType();
+    String pushFrequency = IngestionUtils.getBatchSegmentPushFrequency(tableConfig);
+    String pushType = IngestionUtils.getBatchSegmentPushType(tableConfig);
     String timeColumnName = validationConfig.getTimeColumnName();
     DateTimeFormatSpec dateTimeFormatSpec = null;
     if (timeColumnName != null) {

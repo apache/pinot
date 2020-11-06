@@ -31,6 +31,7 @@ import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.PartitionCountFetcher;
 import org.apache.pinot.spi.stream.StreamConfig;
@@ -88,7 +89,7 @@ public class PinotTableIdealStateBuilder {
     }
     setupInstanceConfigForHighLevelConsumer(realtimeTableName, realtimeInstances.size(),
         Integer.parseInt(realtimeTableConfig.getValidationConfig().getReplication()),
-        realtimeTableConfig.getIndexingConfig().getStreamConfigs(), zkHelixPropertyStore, realtimeInstances);
+        IngestionUtils.getStreamConfigsMap(realtimeTableConfig), zkHelixPropertyStore, realtimeInstances);
     return idealState;
   }
 
