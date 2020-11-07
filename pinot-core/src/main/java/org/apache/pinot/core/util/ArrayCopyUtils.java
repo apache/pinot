@@ -29,6 +29,12 @@ public class ArrayCopyUtils {
   private ArrayCopyUtils() {
   }
 
+  public static void copy(int[] src, int[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = src[i];
+    }
+  }
+
   public static void copy(int[] src, long[] dest, int length) {
     for (int i = 0; i < length; i++) {
       dest[i] = src[i];

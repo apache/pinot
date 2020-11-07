@@ -109,6 +109,11 @@ public class TransformFunctionFactory {
               GreaterThanOrEqualTransformFunction.class);
           put(canonicalize(TransformFunctionType.LESS_THAN.getName().toLowerCase()), LessThanTransformFunction.class);
           put(canonicalize(TransformFunctionType.LESS_THAN_OR_EQUAL.getName().toLowerCase()), LessThanOrEqualTransformFunction.class);
+
+          // logical functions
+          put(canonicalize(TransformFunctionType.AND.getName().toLowerCase()), AndOperatorTransformFunction.class);
+          put(canonicalize(TransformFunctionType.OR.getName().toLowerCase()), OrOperatorTransformFunction.class);
+
           // geo functions
           // geo constructors
           put(canonicalize(TransformFunctionType.ST_GEOG_FROM_TEXT.getName().toLowerCase()), StGeogFromTextFunction.class);
