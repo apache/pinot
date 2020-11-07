@@ -20,8 +20,10 @@ package org.apache.pinot.core.data.recordtransformer;
 
 import com.google.common.collect.ImmutableList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.calcite.util.graph.DefaultDirectedGraph;
 import org.apache.calcite.util.graph.DefaultEdge;
 import org.apache.calcite.util.graph.DirectedGraph;
@@ -68,8 +70,11 @@ public class ExpressionTransformer implements RecordTransformer {
     // compute the dependencies of each column to be evaluated
     final DirectedGraph<String, DefaultEdge> columnDependencies = DefaultDirectedGraph.create();
 
+    Set<String> allColumns = new HashSet<>();
     for (Map.Entry<String, FunctionEvaluator> entry: _expressionEvaluators.entrySet()) {
+      allColumns.add(entry.getKey());
       for (String arg:entry.getValue().getArguments()) {
+        allColumns.add(arg);
         columnDependencies.addVertex(entry.getKey());
         columnDependencies.addVertex(arg);
         // an edge (u -> v) means u needs to happen before v (v depends on u)
@@ -77,6 +82,9 @@ public class ExpressionTransformer implements RecordTransformer {
       }
     }
     _ordered = ImmutableList.copyOf(new TopologicalOrderIterator<>(columnDependencies));
+    if (_ordered.size() != allColumns.size()) {
+      throw new IllegalArgumentException("Invalid transformation. Cyclic dependency detected");
+    }
   }
 
   @Override
