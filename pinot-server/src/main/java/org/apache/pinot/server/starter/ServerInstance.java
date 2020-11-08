@@ -28,6 +28,7 @@ import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.metrics.MetricsHelper;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.data.manager.OfflineSegmentFetcherAndLoader;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
 import org.apache.pinot.core.query.executor.QueryExecutor;
@@ -114,6 +115,10 @@ public class ServerInstance {
     TransformFunctionFactory.init(transformFunctionClasses);
 
     LOGGER.info("Finish initializing server instance");
+  }
+
+  public void setFetcherAndLoader(OfflineSegmentFetcherAndLoader segmentFetcherAndLoader) {
+    _instanceDataManager.setFetcherAndLoader(segmentFetcherAndLoader);
   }
 
   public synchronized void start() {

@@ -18,12 +18,10 @@
  */
 package org.apache.pinot.core.data.manager.offline;
 
-import java.io.File;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.core.data.manager.BaseTableDataManager;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.core.data.manager.OfflineSegmentFetcherAndLoader;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 
 
@@ -32,6 +30,15 @@ import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
  */
 @ThreadSafe
 public class OfflineTableDataManager extends BaseTableDataManager {
+
+  private OfflineSegmentFetcherAndLoader _segmentFetcherAndLoader;
+  private SegmentCacheManager _cacheManager;
+
+  public OfflineTableDataManager(OfflineSegmentFetcherAndLoader segmentFetcherAndLoader,
+      @Nullable SegmentCacheManager cacheManager) {
+    _segmentFetcherAndLoader = segmentFetcherAndLoader;
+    _cacheManager = cacheManager;
+  }
 
   @Override
   protected void doInit() {
@@ -46,9 +53,9 @@ public class OfflineTableDataManager extends BaseTableDataManager {
   }
 
   @Override
-  public void addSegment(File indexDir, IndexLoadingConfig indexLoadingConfig)
-      throws Exception {
-    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
-    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema));
+  public void addSegment(String segmentName, IndexLoadingConfig indexLoadingConfig) {
+    addSegmentManager(
+        new OfflineSegmentDataManager(_tableNameWithType, segmentName, _segmentFetcherAndLoader, _cacheManager,
+            indexLoadingConfig));
   }
 }

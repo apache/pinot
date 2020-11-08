@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.spi.data.readers;
 
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.avro.generic.GenericData;
 
 
 /**
@@ -186,6 +188,10 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
     }
     if (value instanceof Number || value instanceof byte[]) {
       return value;
+    }
+    if (value instanceof GenericData.Fixed) {
+      GenericData.Fixed fixed = (GenericData.Fixed) value;
+      return new BigInteger(fixed.bytes());
     }
     return value.toString();
   }

@@ -33,6 +33,8 @@ public abstract class SegmentDataManager {
     return _referenceCount;
   }
 
+  // If ref count is = 1, then we can delete it and set hasData to false again.
+  // like the UI.
   /**
    * Increases the reference count. Should be called when acquiring the segment.
    *
@@ -60,6 +62,14 @@ public abstract class SegmentDataManager {
       _referenceCount--;
       return false;
     }
+  }
+
+  /**
+   * Indicates whether this segment is physically in memory or downloaded to disc.
+   * @return
+   */
+  public boolean hasLocalData() {
+    return true;
   }
 
   public abstract String getSegmentName();

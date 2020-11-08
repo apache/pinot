@@ -32,7 +32,7 @@ import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
-import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
+import org.apache.pinot.core.data.manager.realtime.ImmutableSegmentDataManager;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -101,6 +101,24 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   protected abstract void doShutdown();
 
+  protected void putSegmentDataManager(String segmentName, SegmentDataManager segmentDataManager) {
+    _segmentDataManagerMap.put(segmentName, segmentDataManager);
+  }
+
+  protected void addSegmentManager(SegmentDataManager segmentDataManager) {
+    _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1L);
+    SegmentDataManager oldSegmentManager =
+        _segmentDataManagerMap.put(segmentDataManager.getSegmentName(), segmentDataManager);
+    if (oldSegmentManager == null) {
+      _logger.info("Added new segment manager: {} to table: {}", segmentDataManager.getSegmentName(),
+          _tableNameWithType);
+    } else {
+      _logger
+          .info("Replaced segment manager: {} of table: {}", segmentDataManager.getSegmentName(), _tableNameWithType);
+      releaseSegment(oldSegmentManager);
+    }
+  }
+
   /**
    * {@inheritDoc}
    * <p>If one segment already exists with the same name, replaces it with the new one.
@@ -129,7 +147,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Override
-  public void addSegment(File indexDir, IndexLoadingConfig indexLoadingConfig)
+  public void addSegment(String segmentName, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     throw new UnsupportedOperationException();
   }
@@ -162,7 +180,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   public List<SegmentDataManager> acquireAllSegments() {
     List<SegmentDataManager> segmentDataManagers = new ArrayList<>();
     for (SegmentDataManager segmentDataManager : _segmentDataManagerMap.values()) {
-      if (segmentDataManager.increaseReferenceCount()) {
+      if (segmentDataManager.hasLocalData() && segmentDataManager.increaseReferenceCount()) {
         segmentDataManagers.add(segmentDataManager);
       }
     }

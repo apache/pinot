@@ -24,6 +24,7 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.core.data.manager.OfflineSegmentFetcherAndLoader;
 import org.apache.pinot.core.data.manager.TableDataManager;
 import org.apache.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
@@ -36,15 +37,21 @@ import org.apache.pinot.spi.config.table.TableType;
  */
 public class TableDataManagerProvider {
   private static Semaphore _segmentBuildSemaphore;
+  private static OfflineSegmentFetcherAndLoader _segmentFetcherAndLoader;
+  private static SegmentCacheManager _cacheManager;
 
   private TableDataManagerProvider() {
   }
 
-  public static void init(InstanceDataManagerConfig instanceDataManagerConfig) {
+  public static void init(InstanceDataManagerConfig instanceDataManagerConfig,
+      OfflineSegmentFetcherAndLoader segmentFetcherAndLoader, SegmentCacheManager cacheManager) {
     int maxParallelBuilds = instanceDataManagerConfig.getMaxParallelSegmentBuilds();
     if (maxParallelBuilds > 0) {
       _segmentBuildSemaphore = new Semaphore(maxParallelBuilds, true);
     }
+
+    _segmentFetcherAndLoader = segmentFetcherAndLoader;
+    _cacheManager = cacheManager;
   }
 
   public static TableDataManager getTableDataManager(@Nonnull TableDataManagerConfig tableDataManagerConfig,
@@ -53,7 +60,7 @@ public class TableDataManagerProvider {
     TableDataManager tableDataManager;
     switch (TableType.valueOf(tableDataManagerConfig.getTableDataManagerType())) {
       case OFFLINE:
-        tableDataManager = new OfflineTableDataManager();
+        tableDataManager = new OfflineTableDataManager(_segmentFetcherAndLoader, _cacheManager);
         break;
       case REALTIME:
         tableDataManager = new RealtimeTableDataManager(_segmentBuildSemaphore);

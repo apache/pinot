@@ -64,7 +64,7 @@ public interface TableDataManager {
   /**
    * Adds a segment from local disk into the OFFLINE table.
    */
-  void addSegment(File indexDir, IndexLoadingConfig indexLoadingConfig)
+  void addSegment(String segmentName, IndexLoadingConfig indexLoadingConfig)
       throws Exception;
 
   /**

@@ -16,41 +16,45 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.server.starter.helix;
+package org.apache.pinot.core.data.manager;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.UUID;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.locks.Lock;
-
 import javax.annotation.Nullable;
-
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
-import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.loader.LoaderUtils;
 import org.apache.pinot.core.segment.index.loader.V3RemoveIndexException;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.crypt.PinotCrypter;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.base.Preconditions;
 
-
-public class SegmentFetcherAndLoader {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentFetcherAndLoader.class);
+public class OfflineSegmentFetcherAndLoader {
+  private static final Logger LOGGER = LoggerFactory.getLogger(OfflineSegmentFetcherAndLoader.class);
 
   private static final String TAR_GZ_SUFFIX = ".tar.gz";
   private static final String ENCODED_SUFFIX = ".enc";
@@ -58,10 +62,24 @@ public class SegmentFetcherAndLoader {
   private final InstanceDataManager _instanceDataManager;
   private final ServerMetrics _serverMetrics;
 
-  public SegmentFetcherAndLoader(PinotConfiguration config, InstanceDataManager instanceDataManager, ServerMetrics serverMetrics)
+  // We only allow limited number of segments refresh/reload happen at the same time
+  // The reason for that is segment refresh/reload will temporarily use double-sized memory
+  private final Semaphore _refreshThreadSemaphore;
+  private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
+
+  public OfflineSegmentFetcherAndLoader(PinotConfiguration config, InstanceDataManager instanceDataManager, ServerMetrics serverMetrics,
+      ZkHelixPropertyStore<ZNRecord> propertyStore)
       throws Exception {
     _instanceDataManager = instanceDataManager;
     _serverMetrics = serverMetrics;
+    int maxParallelRefreshThreads = instanceDataManager.getMaxParallelRefreshThreads();
+    if (maxParallelRefreshThreads > 0) {
+      _refreshThreadSemaphore = new Semaphore(maxParallelRefreshThreads, true);
+    } else {
+      _refreshThreadSemaphore = null;
+    }
+
+    _propertyStore = propertyStore;
 
     PinotConfiguration pinotFSConfig = config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
     PinotConfiguration segmentFetcherFactoryConfig =
@@ -69,11 +87,93 @@ public class SegmentFetcherAndLoader {
     PinotConfiguration pinotCrypterConfig = config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
 
     PinotFSFactory.init(pinotFSConfig);
+
     SegmentFetcherFactory.init(segmentFetcherFactoryConfig);
     PinotCrypterFactory.init(pinotCrypterConfig);
   }
 
-  public void addOrReplaceOfflineSegment(String tableNameWithType, String segmentName) {
+  private void acquireSema(String context)
+      throws InterruptedException {
+    if (_refreshThreadSemaphore != null) {
+      long startTime = System.currentTimeMillis();
+      LOGGER.info("Waiting for lock to refresh : {}, queue-length: {}", context,
+          _refreshThreadSemaphore.getQueueLength());
+      _refreshThreadSemaphore.acquire();
+      LOGGER.info("Acquired lock to refresh segment: {} (lock-time={}ms, queue-length={})", context,
+          System.currentTimeMillis() - startTime, _refreshThreadSemaphore.getQueueLength());
+    } else {
+      LOGGER.info("Locking of refresh threads disabled (segment: {})", context);
+    }
+  }
+
+  private void releaseSema() {
+    if (_refreshThreadSemaphore != null) {
+      _refreshThreadSemaphore.release();
+    }
+  }
+
+  public void reloadSegment(String tableNameWithType, String segmentName) {
+    try {
+      if (segmentName.equals("")) {
+        acquireSema("ALL");
+        // NOTE: the method aborts if any segment reload encounters an unhandled exception - can lead to inconsistent
+        // state across segments
+        _instanceDataManager.reloadAllSegments(tableNameWithType);
+      } else {
+        // Reload one segment
+        acquireSema(segmentName);
+        _instanceDataManager.reloadSegment(tableNameWithType, segmentName);
+      }
+    } catch (Throwable e) {
+      // catch all Errors and Exceptions: if we only catch Exception, Errors go completely unhandled
+      // (without any corresponding logs to indicate failure!) in the callable path
+      throw new RuntimeException(
+          "Caught exception while reloading segment: " + segmentName + " in table: " + tableNameWithType, e);
+    } finally {
+      releaseSema();
+    }
+  }
+
+  private ImmutableSegment loadOfflineSegment(File indexDir, IndexLoadingConfig indexLoadingConfig, Schema schema) {
+    try {
+      return ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema);
+    } catch (Exception e) {
+      LOGGER.error("Failed to load segment at directory {}", indexDir);
+      Utils.rethrowException(e);
+    }
+
+    return null;
+  }
+
+  public ImmutableSegment loadOfflineSegment(String tableNameWithType, String segmentName,
+      IndexLoadingConfig indexLoadingConfig) {
+    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
+    File indexDir = new File(getSegmentLocalDirectory(tableNameWithType, segmentName));
+    try {
+      ImmutableSegment segment = loadOfflineSegment(indexDir, indexLoadingConfig, schema);
+      _serverMetrics.addValueToTableGauge(tableNameWithType, ServerGauge.DOCUMENT_COUNT,
+          segment.getSegmentMetadata().getTotalDocs());
+      return segment;
+    } catch (Exception e) {
+      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.REFRESH_FAILURES, 1);
+      Utils.rethrowException(e);
+    }
+
+    return null;
+  }
+
+  public ImmutableSegment fetchAndLoadOfflineSegment(String tableNameWithType, String segmentName,
+      IndexLoadingConfig indexLoadingConfig) {
+    fetchOfflineSegment(tableNameWithType, segmentName);
+    return loadOfflineSegment(tableNameWithType, segmentName, indexLoadingConfig);
+  }
+
+  public void deleteOfflineSegment(String tableNameWithType, String segmentName) {
+    LOGGER.info("Deleting segment {} of table {}", tableNameWithType, segmentName);
+    FileUtils.deleteQuietly(new File(getSegmentLocalDirectory(tableNameWithType, segmentName)));
+  }
+
+  public void fetchOfflineSegment(String tableNameWithType, String segmentName) {
     OfflineSegmentZKMetadata newSegmentZKMetadata = ZKMetadataProvider
         .getOfflineSegmentZKMetadata(_instanceDataManager.getPropertyStore(), tableNameWithType, segmentName);
     Preconditions.checkNotNull(newSegmentZKMetadata);
@@ -84,13 +184,15 @@ public class SegmentFetcherAndLoader {
     // This method might modify the file on disk. Use segment lock to prevent race condition
     Lock segmentLock = SegmentLocks.getSegmentLock(tableNameWithType, segmentName);
     try {
+      acquireSema(segmentName); // Limit the number of parallel downloads
       segmentLock.lock();
 
       // We lock the segment in order to get its metadata, and then release the lock, so it is possible
       // that the segment is dropped after we get its metadata.
-      SegmentMetadata localSegmentMetadata = _instanceDataManager.getSegmentMetadata(tableNameWithType, segmentName);
+      SegmentMetadata localSegmentMetadata = null;
+      SegmentDataManager manager = _instanceDataManager.getSegmentDataManager(tableNameWithType, segmentName);
 
-      if (localSegmentMetadata == null) {
+      if (manager == null || !manager.hasLocalData()) {
         LOGGER.info("Segment {} of table {} is not loaded in memory, checking disk", segmentName, tableNameWithType);
         File indexDir = new File(getSegmentLocalDirectory(tableNameWithType, segmentName));
         // Restart during segment reload might leave segment in inconsistent state (index directory might not exist but
@@ -113,7 +215,6 @@ public class SegmentFetcherAndLoader {
             if (!isNewSegmentMetadata(tableNameWithType, newSegmentZKMetadata, localSegmentMetadata)) {
               LOGGER.info("Segment metadata same as before, loading {} of table {} (crc {}) from disk", segmentName,
                   tableNameWithType, localSegmentMetadata.getCrc());
-              _instanceDataManager.addOfflineSegment(tableNameWithType, segmentName, indexDir);
               // TODO Update zk metadata with CRC for this instance
               return;
             }
@@ -131,6 +232,8 @@ public class SegmentFetcherAndLoader {
             localSegmentMetadata = null;
           }
         }
+      } else {
+        localSegmentMetadata = _instanceDataManager.getSegmentMetadata(tableNameWithType, segmentName);
       }
       // There is a very unlikely race condition that we may have gotten the metadata of a
       // segment that was not dropped when we checked, but was dropped after the check above.
@@ -155,7 +258,6 @@ public class SegmentFetcherAndLoader {
         // Retry will be done here.
         String localSegmentDir = downloadSegmentToLocal(uri, crypter, tableNameWithType, segmentName);
         SegmentMetadata segmentMetadata = new SegmentMetadataImpl(new File(localSegmentDir));
-        _instanceDataManager.addOfflineSegment(tableNameWithType, segmentName, new File(localSegmentDir));
         LOGGER.info("Downloaded segment {} of table {} crc {} from controller", segmentName, tableNameWithType,
             segmentMetadata.getCrc());
       } else {
@@ -168,6 +270,7 @@ public class SegmentFetcherAndLoader {
       throw new AssertionError("Should not reach this");
     } finally {
       segmentLock.unlock();
+      releaseSema();
     }
   }
 
@@ -235,6 +338,11 @@ public class SegmentFetcherAndLoader {
     } finally {
       FileUtils.deleteQuietly(tempDir);
     }
+  }
+
+  public void purgeSegmentDataDirectory() {
+    LOGGER.info("Purging existing segments at {}", _instanceDataManager.getSegmentDataDirectory());
+    FileUtils.deleteQuietly(new File(_instanceDataManager.getSegmentDataDirectory()));
   }
 
   public String getSegmentLocalDirectory(String tableName, String segmentId) {

@@ -37,11 +37,13 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.data.manager.OfflineSegmentFetcherAndLoader;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
+import org.apache.pinot.core.data.manager.SegmentLocks;
 import org.apache.pinot.core.data.manager.TableDataManager;
 import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
+import org.apache.pinot.core.data.manager.offline.SegmentCacheManager;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
-import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
@@ -71,6 +73,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private HelixManager _helixManager;
   private ServerMetrics _serverMetrics;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
+  private OfflineSegmentFetcherAndLoader _segmentFetcherAndLoader;
+  private SegmentCacheManager _cacheManager;
 
   @Override
   public synchronized void init(PinotConfiguration config, HelixManager helixManager, ServerMetrics serverMetrics)
@@ -82,6 +86,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     _instanceId = _instanceDataManagerConfig.getInstanceId();
     _helixManager = helixManager;
     _serverMetrics = serverMetrics;
+    if (_instanceDataManagerConfig.shouldLazyLoadSegments()) {
+      _cacheManager = new SegmentCacheManager(this);
+    }
 
     File instanceDataDir = new File(_instanceDataManagerConfig.getInstanceDataDir());
     if (!instanceDataDir.exists()) {
@@ -92,10 +99,16 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       Preconditions.checkState(instanceSegmentTarDir.mkdirs());
     }
 
-    // Initialize the table data manager provider
-    TableDataManagerProvider.init(_instanceDataManagerConfig);
-
     LOGGER.info("Initialized Helix instance data manager");
+  }
+
+  public void setFetcherAndLoader(OfflineSegmentFetcherAndLoader segmentFetcherAndLoader) {
+    _segmentFetcherAndLoader = segmentFetcherAndLoader;
+    // Initialize the table data manager provider
+    TableDataManagerProvider.init(_instanceDataManagerConfig, _segmentFetcherAndLoader, _cacheManager);
+    if (_instanceDataManagerConfig.shouldPurgeOnStart()) {
+      _segmentFetcherAndLoader.purgeSegmentDataDirectory();
+    }
   }
 
   @Override
@@ -113,13 +126,13 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void addOfflineSegment(String offlineTableName, String segmentName, File indexDir)
+  public void addOrReplaceOfflineSegment(String offlineTableName, String segmentName)
       throws Exception {
     LOGGER.info("Adding segment: {} to table: {}", segmentName, offlineTableName);
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, offlineTableName);
     Preconditions.checkNotNull(tableConfig);
     _tableDataManagerMap.computeIfAbsent(offlineTableName, k -> createTableDataManager(k, tableConfig))
-        .addSegment(indexDir, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig));
+        .addSegment(segmentName, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig));
     LOGGER.info("Added segment: {} to table: {}", segmentName, offlineTableName);
   }
 
@@ -277,6 +290,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
+  public int maxSegmentDiscUsageMb() {
+    return _instanceDataManagerConfig.maxSegmentDiscUsageMb();
+  }
+
+  @Override
   public Set<String> getAllTables() {
     return _tableDataManagerMap.keySet();
   }
@@ -285,6 +303,24 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @Override
   public TableDataManager getTableDataManager(String tableNameWithType) {
     return _tableDataManagerMap.get(tableNameWithType);
+  }
+
+  @Nullable
+  @Override
+  public SegmentDataManager getSegmentDataManager(String tableNameWithType, String segmentName) {
+    TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
+    if (tableDataManager != null) {
+      SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
+      if (segmentDataManager == null) {
+        return null;
+      }
+      try {
+        return segmentDataManager;
+      } finally {
+        tableDataManager.releaseSegment(segmentDataManager);
+      }
+    }
+    return null;
   }
 
   @Nullable
