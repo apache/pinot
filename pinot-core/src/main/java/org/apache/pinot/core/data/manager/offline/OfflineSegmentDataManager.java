@@ -38,6 +38,22 @@ public class OfflineSegmentDataManager extends SegmentDataManager {
   private SegmentCacheManager _cacheManager;
 
   @Override
+  public int hashCode() {
+    return getSegmentName().hashCode() + getTableNameWithType().hashCode();
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (obj.getClass().isInstance(OfflineSegmentDataManager.class)) {
+      OfflineSegmentDataManager other = (OfflineSegmentDataManager) obj;
+      return getTableNameWithType().equals(other.getTableNameWithType()) && getSegmentName()
+          .equals(other.getSegmentName());
+    }
+
+    return false;
+  }
+
+  @Override
   public boolean hasLocalData() {
     return _immutableSegment != null;
   }
@@ -51,7 +67,7 @@ public class OfflineSegmentDataManager extends SegmentDataManager {
     _segmentName = segmentName;
     _indexLoadingConfig = indexLoadingConfig;
     if (cacheManager == null) { // Must be eager loading
-      loadSegment();
+      _immutableSegment = _fetcherAndLoader.fetchAndLoadOfflineSegment(_tableNameWithType, _segmentName, _indexLoadingConfig);
     }
   }
 
@@ -64,24 +80,27 @@ public class OfflineSegmentDataManager extends SegmentDataManager {
     return _tableNameWithType;
   }
 
-  public void loadSegment() {
-    _immutableSegment = _fetcherAndLoader.fetchAndLoadOfflineSegment(_tableNameWithType, _segmentName, _indexLoadingConfig);
-    if (_cacheManager != null) {
-      _cacheManager.register(this);
-    }
+  public ImmutableSegment loadSegmentIntoCache() {
+    ImmutableSegment segment =
+        _fetcherAndLoader.fetchAndLoadOfflineSegment(_tableNameWithType, _segmentName, _indexLoadingConfig);
+    _cacheManager.put(this, segment);
+    return segment;
   }
 
   @Override
   public ImmutableSegment getSegment() {
-    if (_immutableSegment == null) {
-      loadSegment();
+    if (_cacheManager == null) {
+      return _immutableSegment;
     }
 
-    return _immutableSegment;
+    ImmutableSegment cached = _cacheManager.get(this);
+    if (cached == null) {
+      cached = loadSegmentIntoCache();
+    }
+    return cached;
   }
 
   public void releaseSegment() {
-    _immutableSegment = null;
     _fetcherAndLoader.deleteOfflineSegment(_tableNameWithType, _segmentName);
   }
 

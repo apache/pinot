@@ -9,8 +9,10 @@ import com.github.benmanes.caffeine.cache.Weigher;
 import java.io.File;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,54 +21,20 @@ public class SegmentCacheManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentCacheManager.class);
   private InstanceDataManager _instanceDataManager;
 
-  class SegmentIdentifer {
-    private final String _tableNameWithType;
-    private final String _segmentName;
-
-    @Override
-    public int hashCode() {
-      return getSegmentName().hashCode() + getTableNameWithType().hashCode();
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-      if (obj.getClass().isInstance(SegmentIdentifer.class)) {
-        SegmentIdentifer other = (SegmentIdentifer) obj;
-        return getTableNameWithType().equals(other.getTableNameWithType()) && getSegmentName()
-            .equals(other.getSegmentName());
-      }
-
-      return false;
-    }
-
-    public SegmentIdentifer(String tableNameWithType, String segmentName) {
-      _tableNameWithType = tableNameWithType;
-      _segmentName = segmentName;
-    }
-
-    public String getSegmentName() {
-      return _segmentName;
-    }
-
-    public String getTableNameWithType() {
-      return _tableNameWithType;
-    }
-  }
-
-  private final Weigher<SegmentIdentifer, OfflineSegmentDataManager> segmentSizeInMb =
-      (SegmentIdentifer identifier, OfflineSegmentDataManager segment) -> {
-        File indexDir = new File(getSegmentLocalDirectory(identifier));
+  private final Weigher<OfflineSegmentDataManager, ImmutableSegment> segmentSizeInMb =
+      (OfflineSegmentDataManager segmentDataManager, ImmutableSegment segment) -> {
+        File indexDir = new File(getSegmentLocalDirectory(segmentDataManager));
         long fileSizeBytes = FileUtils.sizeOfDirectory(indexDir);
         return (int) Math.ceil((double) fileSizeBytes / FileUtils.ONE_MB);
       };
-  private final RemovalListener<SegmentIdentifer, OfflineSegmentDataManager> segmentRemovalListener =
-      (SegmentIdentifer identifier, OfflineSegmentDataManager segmentManager, RemovalCause cause) -> {
-        LOGGER.info("Evicting segment {} of table {} with cause {}", segmentManager.getSegmentName(),
-            identifier.getTableNameWithType(), cause.toString());
-        segmentManager.releaseSegment();
+  private final RemovalListener<OfflineSegmentDataManager, ImmutableSegment> segmentRemovalListener =
+      (OfflineSegmentDataManager segmentDataManager, ImmutableSegment segment, RemovalCause cause) -> {
+        LOGGER.info("Evicting segment {} of table {} with cause {}", segmentDataManager.getSegmentName(),
+            segmentDataManager.getTableNameWithType(), cause.toString());
+        segmentDataManager.releaseSegment();
       };
 
-  private Cache<SegmentIdentifer, OfflineSegmentDataManager> _lazyLoadedSegmentCache;
+  private Cache<OfflineSegmentDataManager, ImmutableSegment> _lazyLoadedSegmentCache;
 
   public SegmentCacheManager(InstanceDataManager instanceDataManager) {
     _instanceDataManager = instanceDataManager;
@@ -86,14 +54,17 @@ public class SegmentCacheManager {
         .build();
   }
 
-  public String getSegmentLocalDirectory(SegmentIdentifer segmentIdentifer) {
+  public String getSegmentLocalDirectory(OfflineSegmentDataManager segmentIdentifer) {
     return _instanceDataManager.getSegmentDataDirectory() + "/" + segmentIdentifer.getTableNameWithType() + "/"
         + segmentIdentifer.getSegmentName();
   }
 
-  public void register(OfflineSegmentDataManager segmentDataManager) {
-    _lazyLoadedSegmentCache
-        .put(new SegmentIdentifer(segmentDataManager.getTableNameWithType(), segmentDataManager.getSegmentName()),
-            segmentDataManager);
+  public void put(OfflineSegmentDataManager segmentDataManager, ImmutableSegment segment) {
+    _lazyLoadedSegmentCache.put(segmentDataManager, segment);
+  }
+
+  @Nullable
+  public ImmutableSegment get(OfflineSegmentDataManager segmentDataManager) {
+    return _lazyLoadedSegmentCache.getIfPresent(segmentDataManager);
   }
 }

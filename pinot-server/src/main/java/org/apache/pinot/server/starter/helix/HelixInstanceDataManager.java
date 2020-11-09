@@ -173,6 +173,13 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   public void reloadSegment(String tableNameWithType, String segmentName)
       throws Exception {
     LOGGER.info("Reloading single segment: {} in table: {}", segmentName, tableNameWithType);
+    SegmentDataManager segmentDataManager = getSegmentDataManager(tableNameWithType, segmentName);
+    if (!segmentDataManager.hasLocalData()) {
+      LOGGER.info("Segment has not been lazily loaded. Skip reloading segment {} in table: {}", segmentName,
+          tableNameWithType);
+      return;
+    }
+
     SegmentMetadata segmentMetadata = getSegmentMetadata(tableNameWithType, segmentName);
     if (segmentMetadata == null) {
       LOGGER.info("Segment metadata is null. Skip reloading segment: {} in table: {}", segmentName, tableNameWithType);
