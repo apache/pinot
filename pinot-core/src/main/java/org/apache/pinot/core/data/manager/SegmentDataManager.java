@@ -33,8 +33,6 @@ public abstract class SegmentDataManager {
     return _referenceCount;
   }
 
-  // If ref count is = 1, then we can delete it and set hasData to false again.
-  // like the UI.
   /**
    * Increases the reference count. Should be called when acquiring the segment.
    *
