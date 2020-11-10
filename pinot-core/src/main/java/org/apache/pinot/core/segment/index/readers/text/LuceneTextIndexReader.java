@@ -57,6 +57,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
   private final String _column;
   private final DocIdTranslator _docIdTranslator;
   private final StandardAnalyzer _standardAnalyzer;
+  private boolean _useANDForMultiTermQueries = false;
 
   public static final String LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION = ".lucene.mapping";
 
@@ -82,6 +83,10 @@ public class LuceneTextIndexReader implements TextIndexReader {
         // Disable Lucene query result cache. While it helps a lot with performance for
         // repeated queries, on the downside it cause heap issues.
         _indexSearcher.setQueryCache(null);
+      }
+      if (textIndexProperties != null && Boolean
+          .parseBoolean(textIndexProperties.get(FieldConfig.TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES))) {
+        _useANDForMultiTermQueries = true;
       }
       // TODO: consider using a threshold of num docs per segment to decide between building
       // mapping file upfront on segment load v/s on-the-fly during query processing
@@ -125,6 +130,9 @@ public class LuceneTextIndexReader implements TextIndexReader {
       // be instantiated per query. Analyzer on the other hand is stateless
       // and can be created upfront.
       QueryParser parser = new QueryParser(_column, _standardAnalyzer);
+      if (_useANDForMultiTermQueries) {
+        parser.setDefaultOperator(QueryParser.Operator.AND);
+      }
       Query query = parser.parse(searchQuery);
       _indexSearcher.search(query, docIDCollector);
       return docIds;
