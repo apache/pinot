@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.queries;
 
-import it.unimi.dsi.fastutil.Hash;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
