@@ -44,6 +44,9 @@ public class FieldConfig extends BaseJsonConfig {
   // the cache improves performance of repeatable queries
   public static String TEXT_INDEX_ENABLE_QUERY_CACHE = "enableQueryCacheForTextIndex";
   public static String TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES = "useANDForMultiTermTextIndexQueries";
+  public static String TEXT_INDEX_NO_RAW_DATA = "noRawDataForTextIndex";
+  public static String TEXT_INDEX_RAW_VALUE = "rawValueForTextIndex";
+  public static String TEXT_INDEX_DEFAULT_RAW_VALUE = "null";
 
   @JsonCreator
   public FieldConfig(@JsonProperty(value = "name", required = true) String name,

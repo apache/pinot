@@ -299,6 +299,10 @@ public class SegmentGeneratorConfig {
     }
   }
 
+  public void setColumnProperties(Map<String, Map<String, String>> columnProperties) {
+    _columnProperties = columnProperties;
+  }
+
   public void setColumnSortOrder(List<String> sortOrder) {
     Preconditions.checkNotNull(sortOrder);
     _columnSortOrder.addAll(sortOrder);

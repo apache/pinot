@@ -95,6 +95,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private int totalDocs;
   private int docIdCounter;
   private boolean _nullHandlingEnabled;
+  private Map<String, Map<String, String>> _columnProperties;
 
   private final Set<String> _textIndexColumns = new HashSet<>();
 
@@ -105,6 +106,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     docIdCounter = 0;
     config = segmentCreationSpec;
     this.indexCreationInfoMap = indexCreationInfoMap;
+    _columnProperties = segmentCreationSpec.getColumnProperties();
 
     // Check that the output directory does not exist
     Preconditions.checkState(!outDir.exists(), "Segment output directory: %s already exists", outDir);
@@ -322,6 +324,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
       if (isSingleValue) {
         // SV column
+        // text-index enabled SV column
+        if (_textIndexColumns.contains(columnName)) {
+          _textIndexCreatorMap.get(columnName).add((String) columnValueToIndex);
+        }
         if (dictionaryCreator != null) {
           // dictionary encoded SV column
           // get dictID from dictionary
@@ -337,6 +343,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         } else {
           // non-dictionary encoded SV column
           // store the docId -> raw value mapping in forward index
+          if (_textIndexColumns.contains(columnName) && !shouldStoreRawValueForTextIndex(columnName)) {
+            // for text index on raw columns, check the config to determine if actual raw value should
+            // be stored or not
+            columnValueToIndex = _columnProperties.get(columnName).get(FieldConfig.TEXT_INDEX_RAW_VALUE);
+            if (columnValueToIndex == null) {
+              columnValueToIndex = FieldConfig.TEXT_INDEX_DEFAULT_RAW_VALUE;
+            }
+          }
           switch (forwardIndexCreator.getValueType()) {
             case INT:
               forwardIndexCreator.putInt((int) columnValueToIndex);
@@ -360,10 +374,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
               throw new IllegalStateException();
           }
         }
-        // text-index enabled SV column
-        if (_textIndexColumns.contains(columnName)) {
-          _textIndexCreatorMap.get(columnName).add((String) columnValueToIndex);
-        }
       } else {
         // MV column (always dictionary encoded)
         int[] dictIds = dictionaryCreator.indexOfMV(columnValueToIndex);
@@ -382,6 +392,20 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       }
     }
     docIdCounter++;
+  }
+
+  private boolean shouldStoreRawValueForTextIndex(String column) {
+    if (_columnProperties != null) {
+      Map<String, String> props = _columnProperties.get(column);
+      if (props != null && Boolean.parseBoolean(props.get(FieldConfig.TEXT_INDEX_NO_RAW_DATA))) {
+        // by default always store the raw value
+        // if the config is set to true, don't store the actual raw value
+        // there will be a dummy value
+        return false;
+      }
+    }
+
+    return true;
   }
 
   @Override
