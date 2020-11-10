@@ -27,6 +27,7 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 
 public class RoutingConfig extends BaseJsonConfig {
   public static final String PARTITION_SEGMENT_PRUNER_TYPE = "partition";
+  public static final String TIME_SEGMENT_PRUNER_TYPE = "time";
   public static final String REPLICA_GROUP_INSTANCE_SELECTOR_TYPE = "replicaGroup";
   public static final String STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE = "strictReplicaGroup";
 
