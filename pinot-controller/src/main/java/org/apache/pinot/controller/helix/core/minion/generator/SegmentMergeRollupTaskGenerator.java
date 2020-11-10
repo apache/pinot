@@ -163,7 +163,7 @@ public class SegmentMergeRollupTaskGenerator implements PinotTaskGenerator {
         }
 
         // The segments that are newer than the buffer time period should not be be merged
-        if (System.currentTimeMillis() - offlineSegmentZKMetadata.getEndTime() < bufferTimePeriodMs) {
+        if (System.currentTimeMillis() - offlineSegmentZKMetadata.getEndTimeMs() < bufferTimePeriodMs) {
           continue;
         }
         candidateSegments.add(offlineSegmentZKMetadata);

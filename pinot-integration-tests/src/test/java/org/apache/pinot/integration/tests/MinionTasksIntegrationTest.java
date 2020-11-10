@@ -88,7 +88,7 @@ public class MinionTasksIntegrationTest extends HybridClusterIntegrationTest {
       throws Exception {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
 
-    // Configure ConverToRawIndexTask
+    // Configure ConvertToRawIndexTask
     TableConfig tableConfig = getOfflineTableConfig();
     Map<String, Map<String, String>> taskConfigs = new HashMap<>();
     Map<String, String> convertToRawIndexTaskConfigs = new HashMap<>();

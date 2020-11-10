@@ -21,6 +21,8 @@ package org.apache.pinot.spi.env;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
@@ -49,14 +51,30 @@ public abstract class CommonsConfigurationUtils {
     try {
       PropertiesConfiguration propertiesConfiguration = new PropertiesConfiguration();
 
-      // Commons Configuration 1.10 does not support file path containing '%'. 
-      // Explicitly providing the input stream on load bypasses the problem. 
+      // Commons Configuration 1.10 does not support file path containing '%'.
+      // Explicitly providing the input stream on load bypasses the problem.
       propertiesConfiguration.setFile(file);
       if (file.exists()) {
         propertiesConfiguration.load(new FileInputStream(file));
       }
 
       return propertiesConfiguration;
+    } catch (ConfigurationException | FileNotFoundException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  /**
+   * Save a {@link PropertiesConfiguration} to a {@link File}.
+   * @param file containing properties
+   * @param propertiesConfiguration a {@link PropertiesConfiguration} instance.
+   */
+  public static void saveToFile(File file, PropertiesConfiguration propertiesConfiguration) {
+    try {
+      // Commons Configuration 1.10 does not support file path containing '%'.
+      // Explicitly providing the input stream on load bypasses the problem.
+      OutputStream out = new FileOutputStream(file);
+      propertiesConfiguration.save(out);
     } catch (ConfigurationException | FileNotFoundException e) {
       throw new RuntimeException(e);
     }

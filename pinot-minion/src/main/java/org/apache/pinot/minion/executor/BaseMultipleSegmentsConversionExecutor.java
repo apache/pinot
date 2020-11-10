@@ -91,7 +91,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     String downloadURLString = configs.get(MinionConstants.DOWNLOAD_URL_KEY);
     String[] downloadURLs = downloadURLString.split(MinionConstants.URL_SEPARATOR);
     String vipURL = configs.get(MinionConstants.VIP_URL_KEY);
-    String uploadURL = vipURL + SEGMENTS_PATH;
+    String uploadURL = (vipURL != null) ? vipURL + SEGMENTS_PATH : configs.get(MinionConstants.UPLOAD_URL_KEY);
     String replaceSegmentsString = configs.get(MinionConstants.REPLACE_SEGMENTS_KEY);
     boolean replaceSegmentsEnabled = Boolean.parseBoolean(replaceSegmentsString);
 

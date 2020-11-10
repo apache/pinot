@@ -46,6 +46,7 @@ import org.apache.pinot.core.util.CrcUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -98,7 +99,7 @@ public class RawIndexConverter {
     _originalSegmentMetadata = (SegmentMetadataImpl) _originalImmutableSegment.getSegmentMetadata();
     _convertedIndexDir = convertedIndexDir;
     _convertedProperties =
-        new PropertiesConfiguration(new File(_convertedIndexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
+        CommonsConfigurationUtils.fromFile(new File(_convertedIndexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
     _columnsToConvert = columnsToConvert;
   }
 
@@ -144,7 +145,8 @@ public class RawIndexConverter {
       for (FieldSpec columnToConvert : columnsToConvert) {
         convertColumn(columnToConvert);
       }
-      _convertedProperties.save();
+      CommonsConfigurationUtils
+          .saveToFile(new File(_convertedIndexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME), _convertedProperties);
 
       // Update creation metadata with new computed CRC and original segment creation time
       SegmentIndexCreationDriverImpl
