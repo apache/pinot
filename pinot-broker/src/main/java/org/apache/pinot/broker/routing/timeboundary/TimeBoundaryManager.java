@@ -48,15 +48,15 @@ import org.slf4j.LoggerFactory;
  */
 public class TimeBoundaryManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(TimeBoundaryManager.class);
-  private static final long INVALID_END_TIME = -1;
+  private static final long INVALID_END_TIME_MS = -1;
 
   private final String _offlineTableName;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final String _segmentZKMetadataPathPrefix;
   private final String _timeColumn;
-  private final TimeUnit _timeUnit;
-  private final boolean _isHourlyTable;
-  private final Map<String, Long> _endTimeMap = new HashMap<>();
+  private final DateTimeFormatSpec _timeFormatSpec;
+  private final long _timeOffsetMs;
+  private final Map<String, Long> _endTimeMsMap = new HashMap<>();
 
   private volatile TimeBoundaryInfo _timeBoundaryInfo;
 
@@ -75,19 +75,20 @@ public class TimeBoundaryManager {
     DateTimeFieldSpec dateTimeSpec = schema.getSpecForTimeColumn(_timeColumn);
     Preconditions.checkNotNull(dateTimeSpec, "Field spec must be specified in schema for time column: %s of table: %s",
         _timeColumn, _offlineTableName);
-    DateTimeFormatSpec formatSpec = new DateTimeFormatSpec(dateTimeSpec.getFormat());
-    _timeUnit = formatSpec.getColumnUnit();
-    Preconditions
-        .checkNotNull(_timeUnit, "Time unit must be configured in the field spec for time column: %s of table: %s",
-            _timeColumn, _offlineTableName);
+    _timeFormatSpec = new DateTimeFormatSpec(dateTimeSpec.getFormat());
+    Preconditions.checkNotNull(_timeFormatSpec.getColumnUnit(),
+        "Time unit must be configured in the field spec for time column: %s of table: %s", _timeColumn,
+        _offlineTableName);
 
     // For HOURLY table with time unit other than DAYS, use (maxEndTime - 1 HOUR) as the time boundary; otherwise, use
     // (maxEndTime - 1 DAY)
-    _isHourlyTable = CommonConstants.Table.PUSH_FREQUENCY_HOURLY
-        .equalsIgnoreCase(tableConfig.getValidationConfig().getSegmentPushFrequency()) && _timeUnit != TimeUnit.DAYS;
+    boolean isHourlyTable = CommonConstants.Table.PUSH_FREQUENCY_HOURLY
+        .equalsIgnoreCase(tableConfig.getValidationConfig().getSegmentPushFrequency())
+        && _timeFormatSpec.getColumnUnit() != TimeUnit.DAYS;
+    _timeOffsetMs = isHourlyTable ? TimeUnit.HOURS.toMillis(1) : TimeUnit.DAYS.toMillis(1);
 
-    LOGGER.info("Constructed TimeBoundaryManager with timeColumn: {}, timeUnit: {}, isHourlyTable: {} for table: {}",
-        _timeColumn, _timeUnit, _isHourlyTable, _offlineTableName);
+    LOGGER.info("Constructed TimeBoundaryManager with timeColumn: {}, timeFormat: {}, isHourlyTable: {} for table: {}",
+        _timeColumn, _timeFormatSpec.getFormat(), isHourlyTable, _offlineTableName);
   }
 
   /**
@@ -108,57 +109,44 @@ public class TimeBoundaryManager {
       segmentZKMetadataPaths.add(_segmentZKMetadataPathPrefix + segment);
     }
     List<ZNRecord> znRecords = _propertyStore.get(segmentZKMetadataPaths, null, AccessOption.PERSISTENT);
-    long maxEndTime = INVALID_END_TIME;
+    long maxEndTimeMs = INVALID_END_TIME_MS;
     for (int i = 0; i < numSegments; i++) {
       String segment = segments.get(i);
-      long endTime = extractEndTimeFromSegmentZKMetadataZNRecord(segment, znRecords.get(i));
-      _endTimeMap.put(segment, endTime);
-      maxEndTime = Math.max(maxEndTime, endTime);
+      long endTimeMs = extractEndTimeMsFromSegmentZKMetadataZNRecord(segment, znRecords.get(i));
+      _endTimeMsMap.put(segment, endTimeMs);
+      maxEndTimeMs = Math.max(maxEndTimeMs, endTimeMs);
     }
-    updateTimeBoundaryInfo(maxEndTime);
+    updateTimeBoundaryInfo(maxEndTimeMs);
   }
 
-  private long extractEndTimeFromSegmentZKMetadataZNRecord(String segment, @Nullable ZNRecord znRecord) {
+  private long extractEndTimeMsFromSegmentZKMetadataZNRecord(String segment, @Nullable ZNRecord znRecord) {
     if (znRecord == null) {
       LOGGER.warn("Failed to find segment ZK metadata for segment: {}, table: {}", segment, _offlineTableName);
-      return INVALID_END_TIME;
+      return INVALID_END_TIME_MS;
     }
 
-    long endTime = znRecord.getLongField(CommonConstants.Segment.END_TIME, INVALID_END_TIME);
-    if (endTime <= 0) {
+    long endTime = znRecord.getLongField(CommonConstants.Segment.END_TIME, -1);
+    if (endTime > 0) {
+      TimeUnit timeUnit = znRecord.getEnumField(CommonConstants.Segment.TIME_UNIT, TimeUnit.class, TimeUnit.DAYS);
+      return timeUnit.toMillis(endTime);
+    } else {
       LOGGER.warn("Failed to find valid end time for segment: {}, table: {}", segment, _offlineTableName);
-      return INVALID_END_TIME;
+      return INVALID_END_TIME_MS;
     }
-
-    TimeUnit timeUnit = znRecord.getEnumField(CommonConstants.Segment.TIME_UNIT, TimeUnit.class, TimeUnit.DAYS);
-    return _timeUnit.convert(endTime, timeUnit);
   }
 
-  private void updateTimeBoundaryInfo(long maxEndTime) {
-    if (maxEndTime > 0) {
-      long timeBoundary = getTimeBoundary(maxEndTime);
+  private void updateTimeBoundaryInfo(long maxEndTimeMs) {
+    if (maxEndTimeMs > 0) {
+      String timeBoundary = _timeFormatSpec.fromMillisToFormat(maxEndTimeMs - _timeOffsetMs);
       TimeBoundaryInfo currentTimeBoundaryInfo = _timeBoundaryInfo;
-      if (currentTimeBoundaryInfo == null || Long.parseLong(currentTimeBoundaryInfo.getTimeValue()) != timeBoundary) {
-        _timeBoundaryInfo = new TimeBoundaryInfo(_timeColumn, Long.toString(timeBoundary));
+      if (currentTimeBoundaryInfo == null || !currentTimeBoundaryInfo.getTimeValue().equals(timeBoundary)) {
+        _timeBoundaryInfo = new TimeBoundaryInfo(_timeColumn, timeBoundary);
         LOGGER.info("Updated time boundary to: {} for table: {}", timeBoundary, _offlineTableName);
       }
     } else {
       LOGGER.warn("Failed to find segment with valid end time for table: {}, no time boundary generated",
           _offlineTableName);
       _timeBoundaryInfo = null;
-    }
-  }
-
-  /**
-   * Returns the time boundary based on the given maximum end time.
-   * <p>NOTE: For HOURLY table with time unit other than DAYS, use (maxEndTime - 1 HOUR) as the time boundary;
-   * otherwise, use (maxEndTime - 1 DAY).
-   */
-  private long getTimeBoundary(long maxEndTime) {
-    if (_isHourlyTable) {
-      return maxEndTime - _timeUnit.convert(1L, TimeUnit.HOURS);
-    } else {
-      return maxEndTime - _timeUnit.convert(1L, TimeUnit.DAYS);
     }
   }
 
@@ -174,28 +162,28 @@ public class TimeBoundaryManager {
   public synchronized void onExternalViewChange(ExternalView externalView, IdealState idealState,
       Set<String> onlineSegments) {
     for (String segment : onlineSegments) {
-      _endTimeMap.computeIfAbsent(segment, k -> extractEndTimeFromSegmentZKMetadataZNRecord(segment,
+      _endTimeMsMap.computeIfAbsent(segment, k -> extractEndTimeMsFromSegmentZKMetadataZNRecord(segment,
           _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT)));
     }
-    _endTimeMap.keySet().retainAll(onlineSegments);
-    updateTimeBoundaryInfo(getMaxEndTime());
+    _endTimeMsMap.keySet().retainAll(onlineSegments);
+    updateTimeBoundaryInfo(getMaxEndTimeMs());
   }
 
-  private long getMaxEndTime() {
-    long maxEndTime = INVALID_END_TIME;
-    for (long endTime : _endTimeMap.values()) {
-      maxEndTime = Math.max(maxEndTime, endTime);
+  private long getMaxEndTimeMs() {
+    long maxEndTimeMs = INVALID_END_TIME_MS;
+    for (long endTimeMs : _endTimeMsMap.values()) {
+      maxEndTimeMs = Math.max(maxEndTimeMs, endTimeMs);
     }
-    return maxEndTime;
+    return maxEndTimeMs;
   }
 
   /**
    * Refreshes the metadata for the given segment (called when segment is getting refreshed).
    */
   public synchronized void refreshSegment(String segment) {
-    _endTimeMap.put(segment, extractEndTimeFromSegmentZKMetadataZNRecord(segment,
+    _endTimeMsMap.put(segment, extractEndTimeMsFromSegmentZKMetadataZNRecord(segment,
         _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT)));
-    updateTimeBoundaryInfo(getMaxEndTime());
+    updateTimeBoundaryInfo(getMaxEndTimeMs());
   }
 
   @Nullable

@@ -19,7 +19,6 @@
 package org.apache.pinot.common.tier;
 
 import com.google.common.base.Preconditions;
-import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -66,10 +65,10 @@ public class TimeBasedTierSegmentSelector implements TierSegmentSelector {
             tableNameWithType);
 
     // get segment end time to decide if segment gets selected
-    TimeUnit timeUnit = segmentZKMetadata.getTimeUnit();
+    long endTimeMs = segmentZKMetadata.getEndTimeMs();
     Preconditions
-        .checkNotNull(timeUnit, "Time unit is not set for segment: %s of table: %s", segmentName, tableNameWithType);
-    long endTimeMs = timeUnit.toMillis(segmentZKMetadata.getEndTime());
+        .checkState(endTimeMs > 0, "Invalid endTimeMs: %s for segment: %s of table: %s", endTimeMs, segmentName,
+            tableNameWithType);
     long now = System.currentTimeMillis();
     return (now - endTimeMs) > _segmentAgeMillis;
   }

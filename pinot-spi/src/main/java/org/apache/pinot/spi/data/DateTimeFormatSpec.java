@@ -121,61 +121,35 @@ public class DateTimeFormatSpec {
   }
 
   /**
+   * Converts the time in millis to the date time format.
    * <ul>
-   * <li>Given a timestamp in millis, convert it to the given format
-   * This method should not do validation of outputGranularity.
-   * The validation should be handled by caller using {@link #validateFormat}</li>
-   * <ul>
-   * <li>1) given dateTimeColumnValueMS = 1498892400000 and format=1:HOURS:EPOCH,
-   * dateTimeSpec.fromMillis(1498892400000) = 416359 (i.e. dateTimeColumnValueMS/(1000*60*60))</li>
-   * <li>2) given dateTimeColumnValueMS = 1498892400000 and format=5:MINUTES:EPOCH,
-   * dateTimeSpec.fromMillis(1498892400000) = 4996308 (i.e. timeColumnValueMS/(1000*60*5))</li>
-   * <li>3) given dateTimeColumnValueMS = 1498892400000 and
-   * format=1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd, dateTimeSpec.fromMillis(1498892400000) = 20170701</li>
+   *   <li>Given timeMs=1498892400000 and format='1:HOURS:EPOCH', returns 1498892400000/(1000*60*60)='416359'</li>
+   *   <li>Given timeMs=1498892400000 and format='5:MINUTES:EPOCH', returns 1498892400000/(1000*60*5)='4996308'</li>
+   *   <li>Given timeMs=1498892400000 and format='1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd', returns '20170701'</li>
    * </ul>
-   * </ul>
-   * @param type - type of return value (can be int/long or string depending on time format)
-   * @return dateTime column value in dateTimeFieldSpec
    */
-  public <T extends Object> T fromMillisToFormat(Long dateTimeColumnValueMS, Class<T> type) {
-    Preconditions.checkNotNull(dateTimeColumnValueMS);
-
-    Object dateTimeColumnValue;
-    if (_patternSpec.getTimeFormat().equals(TimeFormat.EPOCH)) {
-      dateTimeColumnValue = _unitSpec.getTimeUnit().convert(dateTimeColumnValueMS, TimeUnit.MILLISECONDS) / _size;
+  public String fromMillisToFormat(long timeMs) {
+    if (_patternSpec.getTimeFormat() == TimeFormat.EPOCH) {
+      return Long.toString(_unitSpec.getTimeUnit().convert(timeMs, TimeUnit.MILLISECONDS) / _size);
     } else {
-      dateTimeColumnValue = _patternSpec.getDateTimeFormatter().print(dateTimeColumnValueMS);
+      return _patternSpec.getDateTimeFormatter().print(timeMs);
     }
-    return type.cast(dateTimeColumnValue);
   }
 
   /**
+   * Converts the date time value to the time in millis.
    * <ul>
-   * <li>Convert a time value in a format, to millis.
-   * This method should not do validation of outputGranularity.
-   * The validation should be handled by caller using {@link #validateFormat}</li>
-   * <ul>
-   * <li>1) given dateTimeColumnValue = 416359 and format=1:HOURS:EPOCH
-   * dateTimeSpec.toMillis(416359) = 1498892400000 (i.e. timeColumnValue*60*60*1000)</li>
-   * <li>2) given dateTimeColumnValue = 4996308 and format=5:MINUTES:EPOCH
-   * dateTimeSpec.toMillis(4996308) = 1498892400000 (i.e. timeColumnValue*5*60*1000)</li>
-   * <li>3) given dateTimeColumnValue = 20170701 and format=1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd
-   * dateTimeSpec.toMillis(20170701) = 1498892400000</li>
+   *   <li>Given dateTimeValue='416359' and format='1:HOURS:EPOCH', returns 416359*(1000*60*60)=1498892400000</li>
+   *   <li>Given dateTimeValue='4996308' and format='5:MINUTES:EPOCH', returns 4996308*(1000*60*5)=1498892400000</li>
+   *   <li>Given dateTimeValue='20170701' and format='1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd', returns 1498892400000</li>
    * </ul>
-   * <ul>
-   * @param dateTimeColumnValue - datetime Column value to convert to millis
-   * @return datetime value in millis
    */
-  public Long fromFormatToMillis(Object dateTimeColumnValue) {
-    Preconditions.checkNotNull(dateTimeColumnValue);
-
-    long timeColumnValueMS;
-    if (_patternSpec.getTimeFormat().equals(TimeFormat.EPOCH)) {
-      timeColumnValueMS = TimeUnit.MILLISECONDS.convert((Long) dateTimeColumnValue * _size, _unitSpec.getTimeUnit());
+  public long fromFormatToMillis(String dateTimeValue) {
+    if (_patternSpec.getTimeFormat() == TimeFormat.EPOCH) {
+      return TimeUnit.MILLISECONDS.convert(Long.parseLong(dateTimeValue) * _size, _unitSpec.getTimeUnit());
     } else {
-      timeColumnValueMS = _patternSpec.getDateTimeFormatter().parseMillis(String.valueOf(dateTimeColumnValue));
+      return _patternSpec.getDateTimeFormatter().parseMillis(dateTimeValue);
     }
-    return timeColumnValueMS;
   }
 
   /**

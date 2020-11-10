@@ -39,19 +39,12 @@ public class TimeRetentionStrategy implements RetentionStrategy {
 
   @Override
   public boolean isPurgeable(String tableNameWithType, SegmentZKMetadata segmentZKMetadata) {
-    TimeUnit timeUnit = segmentZKMetadata.getTimeUnit();
-    if (timeUnit == null) {
-      LOGGER.warn("Time unit is not set for {} segment: {} of table: {}", segmentZKMetadata.getSegmentType(),
-          segmentZKMetadata.getSegmentName(), tableNameWithType);
-      return false;
-    }
-    long endTime = segmentZKMetadata.getEndTime();
-    long endTimeMs = timeUnit.toMillis(endTime);
+    long endTimeMs = segmentZKMetadata.getEndTimeMs();
 
     // Check that the end time is between 1971 and 2071
     if (!TimeUtils.timeValueInValidRange(endTimeMs)) {
-      LOGGER.warn("{} segment: {} of table: {} has invalid end time: {} {}", segmentZKMetadata.getSegmentType(),
-          segmentZKMetadata.getSegmentName(), tableNameWithType, endTime, timeUnit);
+      LOGGER.warn("{} segment: {} of table: {} has invalid end time in millis: {}", segmentZKMetadata.getSegmentType(),
+          segmentZKMetadata.getSegmentName(), tableNameWithType, endTimeMs);
       return false;
     }
 

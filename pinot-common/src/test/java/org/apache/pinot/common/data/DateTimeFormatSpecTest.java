@@ -40,21 +40,18 @@ public class DateTimeFormatSpecTest {
 
   // Test conversion of a dateTimeColumn value from a format to millis
   @Test(dataProvider = "testFromFormatToMillisDataProvider")
-  public void testFromFormatToMillis(String format, Object timeColumnValue, long millisExpected) {
-
-    DateTimeFormatSpec dateTimeFormatSpec = new DateTimeFormatSpec(format);
-    long millisActual = dateTimeFormatSpec.fromFormatToMillis(timeColumnValue);
-    Assert.assertEquals(millisActual, millisExpected);
+  public void testFromFormatToMillis(String format, String formattedValue, long expectedTimeMs) {
+    Assert.assertEquals(new DateTimeFormatSpec(format).fromFormatToMillis(formattedValue), expectedTimeMs);
   }
 
   @DataProvider(name = "testFromFormatToMillisDataProvider")
   public Object[][] provideTestFromFormatToMillisData() {
 
     List<Object[]> entries = new ArrayList<>();
-    entries.add(new Object[]{"1:HOURS:EPOCH", 416359L, 1498892400000L});
-    entries.add(new Object[]{"1:MILLISECONDS:EPOCH", 1498892400000L, 1498892400000L});
-    entries.add(new Object[]{"1:HOURS:EPOCH", 0L, 0L});
-    entries.add(new Object[]{"5:MINUTES:EPOCH", 4996308L, 1498892400000L});
+    entries.add(new Object[]{"1:HOURS:EPOCH", "416359", 1498892400000L});
+    entries.add(new Object[]{"1:MILLISECONDS:EPOCH", "1498892400000", 1498892400000L});
+    entries.add(new Object[]{"1:HOURS:EPOCH", "0", 0L});
+    entries.add(new Object[]{"5:MINUTES:EPOCH", "4996308", 1498892400000L});
     entries.add(new Object[]{"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "20170701", DateTimeFormat.forPattern("yyyyMMdd")
         .withZoneUTC().parseMillis("20170701")});
     entries.add(new Object[]{"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(America/Chicago)", "20170701", DateTimeFormat
@@ -73,44 +70,37 @@ public class DateTimeFormatSpecTest {
 
   // Test the conversion of a millis value to date time column value in a format
   @Test(dataProvider = "testFromMillisToFormatDataProvider")
-  public void testFromMillisToFormat(String format, long timeColumnValueMS, Class<?> type,
-      Object timeColumnValueExpected) {
-
-    DateTimeFormatSpec dateTimeFormatSpec = new DateTimeFormatSpec(format);
-    Object timeColumnValueActual = dateTimeFormatSpec.fromMillisToFormat(timeColumnValueMS, type);
-    Assert.assertEquals(timeColumnValueActual, timeColumnValueExpected);
+  public void testFromMillisToFormat(String format, long timeMs, String expectedFormattedValue) {
+    Assert.assertEquals(new DateTimeFormatSpec(format).fromMillisToFormat(timeMs), expectedFormattedValue);
   }
 
   @DataProvider(name = "testFromMillisToFormatDataProvider")
   public Object[][] provideTestFromMillisToFormatData() {
 
     List<Object[]> entries = new ArrayList<>();
-    entries.add(new Object[]{"1:HOURS:EPOCH", 1498892400000L, Long.class, 416359L});
-    entries.add(new Object[]{"1:MILLISECONDS:EPOCH", 1498892400000L, Long.class, 1498892400000L});
-    entries.add(new Object[]{"1:HOURS:EPOCH", 0L, Long.class, 0L});
-    entries.add(new Object[]{"5:MINUTES:EPOCH", 1498892400000L, Long.class, 4996308L});
-    entries.add(new Object[]{"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", 1498892400000L, String.class, DateTimeFormat
-        .forPattern("yyyyMMdd").withZoneUTC().print(1498892400000L)});
+    entries.add(new Object[]{"1:HOURS:EPOCH", 1498892400000L, "416359"});
+    entries.add(new Object[]{"1:MILLISECONDS:EPOCH", 1498892400000L, "1498892400000"});
+    entries.add(new Object[]{"1:HOURS:EPOCH", 0L, "0"});
+    entries.add(new Object[]{"5:MINUTES:EPOCH", 1498892400000L, "4996308"});
+    entries.add(new Object[]{"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", 1498892400000L, DateTimeFormat.forPattern("yyyyMMdd")
+        .withZoneUTC().print(1498892400000L)});
+    entries.add(new Object[]{"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(America/New_York)", 1498892400000L, DateTimeFormat
+        .forPattern("yyyyMMdd").withZone(DateTimeZone.forTimeZone(TimeZone.getTimeZone("America/New_York"))).print(
+        1498892400000L)});
     entries.add(
-        new Object[]{"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(America/New_York)", 1498892400000L, String.class, DateTimeFormat
-            .forPattern("yyyyMMdd").withZone(DateTimeZone.forTimeZone(TimeZone.getTimeZone("America/New_York"))).print(
-            1498892400000L)});
-    entries.add(new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH", 1498892400000L, String.class, DateTimeFormat
-        .forPattern("yyyyMMdd HH").withZoneUTC().print(1498892400000L)});
-    entries.add(
-        new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH tz(IST)", 1498892400000L, String.class, DateTimeFormat
-            .forPattern("yyyyMMdd HH").withZone(DateTimeZone.forTimeZone(TimeZone.getTimeZone("IST"))).print(
-            1498892400000L)});
-    entries.add(new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH Z", 1498892400000L, String.class, DateTimeFormat
+        new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH", 1498892400000L, DateTimeFormat.forPattern("yyyyMMdd HH")
+            .withZoneUTC().print(1498892400000L)});
+    entries.add(new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH tz(IST)", 1498892400000L, DateTimeFormat
+        .forPattern("yyyyMMdd HH").withZone(DateTimeZone.forTimeZone(TimeZone.getTimeZone("IST"))).print(
+        1498892400000L)});
+    entries.add(new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH Z", 1498892400000L, DateTimeFormat
         .forPattern("yyyyMMdd HH Z").withZoneUTC().print(1498892400000L)});
-    entries.add(
-        new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH Z tz(GMT+0500)", 1498892400000L, String.class, DateTimeFormat
-            .forPattern("yyyyMMdd HH Z").withZone(DateTimeZone.forTimeZone(TimeZone.getTimeZone("GMT+0500"))).print(
-            1498892400000L)});
-    entries.add(
-        new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a", 1498892400000L, String.class, DateTimeFormat
-            .forPattern("M/d/yyyy h:mm:ss a").withZoneUTC().withLocale(Locale.ENGLISH).print(1498892400000L)});
-    entries.add(new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h a", 1502066750000L, String.class, DateTimeFormat
+    entries.add(new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH Z tz(GMT+0500)", 1498892400000L, DateTimeFormat
+        .forPattern("yyyyMMdd HH Z").withZone(DateTimeZone.forTimeZone(TimeZone.getTimeZone("GMT+0500"))).print(
+        1498892400000L)});
+    entries.add(new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a", 1498892400000L, DateTimeFormat
+        .forPattern("M/d/yyyy h:mm:ss a").withZoneUTC().withLocale(Locale.ENGLISH).print(1498892400000L)});
+    entries.add(new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h a", 1502066750000L, DateTimeFormat
         .forPattern("M/d/yyyy h a").withZoneUTC().withLocale(Locale.ENGLISH).print(1502066750000L)});
     return entries.toArray(new Object[entries.size()][]);
   }

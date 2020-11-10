@@ -35,7 +35,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.tools.Command;
-import org.joda.time.Interval;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -136,12 +135,13 @@ public class OfflineSegmentIntervalCheckerCommand extends AbstractBaseAdminComma
     List<OfflineSegmentZKMetadata> offlineSegmentZKMetadataList =
         ZKMetadataProvider.getOfflineSegmentZKMetadataListForTable(_propertyStore, offlineTableName);
 
-    // collect segments with invalid time intervals
+    // Collect segments with invalid start/end time
     List<String> segmentsWithInvalidIntervals = new ArrayList<>();
     if (SegmentIntervalUtils.eligibleForSegmentIntervalCheck(tableConfig.getValidationConfig())) {
       for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : offlineSegmentZKMetadataList) {
-        Interval timeInterval = offlineSegmentZKMetadata.getTimeInterval();
-        if (timeInterval == null || !TimeUtils.isValidTimeInterval(timeInterval)) {
+        long startTimeMs = offlineSegmentZKMetadata.getStartTimeMs();
+        long endTimeMs = offlineSegmentZKMetadata.getEndTimeMs();
+        if (!TimeUtils.timeValueInValidRange(startTimeMs) || !TimeUtils.timeValueInValidRange(endTimeMs)) {
           segmentsWithInvalidIntervals.add(offlineSegmentZKMetadata.getSegmentName());
         }
       }
