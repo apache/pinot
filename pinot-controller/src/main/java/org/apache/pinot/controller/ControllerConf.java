@@ -55,6 +55,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final String EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT = "controller.upload.onlineToOfflineTimeout";
   public static final String CONTROLLER_MODE = "controller.mode";
   public static final String LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY = "controller.resource.rebalance.strategy";
+  public static final String INDEXING_CONFIG_RESOLVER_CLASS = "controller.indexing.config.resolver.class";
 
   public enum ControllerMode {
     DUAL, PINOT_ONLY, HELIX_ONLY
@@ -620,6 +621,19 @@ public class ControllerConf extends PinotConfiguration {
 
   public String getLeadControllerResourceRebalanceStrategy() {
     return getProperty(LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY, DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY);
+  }
+
+  public void setIndexingConfigResolverClass(String indexingConfigResolverClass) {
+    setProperty(INDEXING_CONFIG_RESOLVER_CLASS, indexingConfigResolverClass);
+  }
+
+  public String getIndexingConfigResolverClass() {
+    return getProperty(INDEXING_CONFIG_RESOLVER_CLASS);
+  }
+
+  public boolean isIndexingConfigResolverConfigured() {
+    String indexingConfigResolverClass = getIndexingConfigResolverClass();
+    return (indexingConfigResolverClass != null);
   }
 
   public boolean getHLCTablesAllowed() {

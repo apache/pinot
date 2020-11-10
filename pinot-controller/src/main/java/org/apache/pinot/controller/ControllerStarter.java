@@ -83,6 +83,7 @@ import org.apache.pinot.controller.validation.OfflineSegmentIntervalChecker;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
 import org.apache.pinot.core.periodictask.PeriodicTask;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
+import org.apache.pinot.spi.config.table.IndexingConfigResolverFactory;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -330,6 +331,7 @@ public class ControllerStarter implements ServiceStartable {
     initControllerFilePathProvider();
     initSegmentFetcherFactory();
     initPinotCrypterFactory();
+    initIndexingConfigResolver();
 
     LOGGER.info("Initializing Helix participant manager");
     _helixParticipantManager = HelixManagerFactory
@@ -508,6 +510,18 @@ public class ControllerStarter implements ServiceStartable {
       PinotCrypterFactory.init(pinotCrypterConfig);
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while initializing PinotCrypterFactory", e);
+    }
+  }
+
+  /**
+   * If an indexing config resolver has been configured, init that class
+   */
+  private void initIndexingConfigResolver() {
+    if (_config.isIndexingConfigResolverConfigured()) {
+      LOGGER.info("Initializing IndexingConfigResolver");
+      IndexingConfigResolverFactory.register(_config.getIndexingConfigResolverClass());
+    } else {
+      LOGGER.info("No IndexingConfigResolver has been configured.");
     }
   }
 

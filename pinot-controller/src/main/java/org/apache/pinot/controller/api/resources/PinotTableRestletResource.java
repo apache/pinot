@@ -56,6 +56,9 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.recommender.RecommenderDriver;
 import org.apache.pinot.core.util.ReplicationUtils;
 import org.apache.pinot.core.util.TableConfigUtils;
+import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.IndexingConfigResolver;
+import org.apache.pinot.spi.config.table.IndexingConfigResolverFactory;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStats;
@@ -117,6 +120,14 @@ public class PinotTableRestletResource {
     try {
       tableConfig = JsonUtils.stringToObject(tableConfigStr, TableConfig.class);
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
+
+      if (_controllerConf.isIndexingConfigResolverConfigured()) {
+        IndexingConfigResolver resolver = IndexingConfigResolverFactory.getResolver();
+        resolver.registerSchema(schema);
+        IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+        tableConfig.setIndexingConfig(resolver.resolveIndexingConfig(indexingConfig));
+      }
+
       // TableConfigUtils.validate(...) is used across table create/update.
       TableConfigUtils.validate(tableConfig, schema);
       // TableConfigUtils.validateTableName(...) checks table name rules.
