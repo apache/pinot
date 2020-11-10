@@ -43,6 +43,7 @@ public class FieldConfig extends BaseJsonConfig {
   // Lucene creates a query result cache if this option is enabled
   // the cache improves performance of repeatable queries
   public static String TEXT_INDEX_ENABLE_QUERY_CACHE = "enableQueryCacheForTextIndex";
+  public static String TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES = "useANDForMultiTermTextIndexQueries";
 
   @JsonCreator
   public FieldConfig(@JsonProperty(value = "name", required = true) String name,

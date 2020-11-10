@@ -230,6 +230,10 @@ public class IndexLoadingConfig {
     return _columnProperties;
   }
 
+  public void setColumnProperties(Map<String, Map<String, String>> columnProperties) {
+    _columnProperties = columnProperties;
+  }
+
   /**
    * Used in two places:
    * (1) In {@link org.apache.pinot.core.segment.index.column.PhysicalColumnIndexContainer}
