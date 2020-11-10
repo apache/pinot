@@ -1106,7 +1106,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (remainingTimeMs <= 0) {
       String errorMessage = String
           .format("Query timed out (time spent: %dms, timeout: %dms) for table: %s before scattering the request",
-              timeSpentMs, queryLevelTimeoutMs, tableNameWithType);
+              timeSpentMs, queryTimeoutMs, tableNameWithType);
       throw new TimeoutException(errorMessage);
     }
     queryOptions.put(Broker.Request.QueryOptionKey.TIMEOUT_MS, Long.toString(remainingTimeMs));
