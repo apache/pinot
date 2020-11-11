@@ -48,6 +48,7 @@ public class IndexingConfig extends BaseJsonConfig {
   private SegmentPartitionConfig _segmentPartitionConfig;
   private boolean _aggregateMetrics;
   private boolean _nullHandlingEnabled;
+  private boolean _autoModeEnabled;
 
   /**
    * The list of columns for which the variable length dictionary needs to be enabled in offline
@@ -239,5 +240,13 @@ public class IndexingConfig extends BaseJsonConfig {
 
   public void setNullHandlingEnabled(boolean nullHandlingEnabled) {
     _nullHandlingEnabled = nullHandlingEnabled;
+  }
+
+  public boolean isAutoModeEnabled() {
+    return _autoModeEnabled;
+  }
+
+  public void setAutoModeEnabled(boolean autoModeEnabled) {
+    _autoModeEnabled = autoModeEnabled;
   }
 }
