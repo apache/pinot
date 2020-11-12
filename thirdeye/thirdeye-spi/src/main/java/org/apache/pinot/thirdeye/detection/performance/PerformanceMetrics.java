@@ -3,6 +3,8 @@ package org.apache.pinot.thirdeye.detection.performance;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
+import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 
 
 /**
@@ -37,14 +39,10 @@ public class PerformanceMetrics {
   public static class Builder {
     private long respondedAnomalies, truePos, falsePos, falseNeg, numAnomalies = 0L;
     private boolean includeTotalAnomalies, includeResponseRate, includePrecision, includeRecall = false;
-    private final String NOT_CLASSIFIED = "NONE";
-    private final String TRUE_POSITIVE = "TRUE_POSITIVE";
-    private final String FALSE_POSITIVE = "FALSE_POSITIVE";
-    private final String FALSE_NEGATIVE = "FALSE_NEGATIVE";
 
     private PerformanceMetric buildTotalAnomalies() {
       PerformanceMetric totalAnomalies = new PerformanceMetric();
-      totalAnomalies.setValue((double)this.numAnomalies);
+      totalAnomalies.setValue((double) this.numAnomalies);
       totalAnomalies.setType(PerformanceMetricType.COUNT);
       return totalAnomalies;
     }
@@ -73,25 +71,46 @@ public class PerformanceMetrics {
       return recall;
     }
 
-    public Builder (List<String> statusClassifications) {
-      statusClassifications.stream()
-          .forEach(classification -> {
-            this.numAnomalies++;
-            if (!NOT_CLASSIFIED.equals(classification)) {
-              this.respondedAnomalies++;
-              switch (classification) {
-                case TRUE_POSITIVE:
-                  this.truePos++;
-                  break;
-                case FALSE_NEGATIVE:
+    /***
+     * Builds the performance given a list of anomalies. When calculating entity anomalies, it counts the total number of anomalies
+     * only on the parent level but includes children anomalies when calculating the performance
+     * @param anomalies A list of anomalies
+     */
+    public Builder (List<MergedAnomalyResultDTO> anomalies) {
+      anomalies.stream()
+          .forEach(anomaly -> {
+            if (!anomaly.isChild()) {
+              this.numAnomalies++;
+            }
+
+            if (anomaly.getAnomalyResultSource() != null) {
+              if (AnomalyResultSource.USER_LABELED_ANOMALY.equals(anomaly.getAnomalyResultSource())) {
+                if (anomaly.getFeedback() == null || anomaly.getFeedback().getFeedbackType().isAnomaly()) {
+                  // NOTE: includes user-created anomaly without feedback as false negative by default
                   this.falseNeg++;
-                  break;
-                case FALSE_POSITIVE:
-                  this.falsePos++;
-                  break;
-                default:
-                  break;
+                  this.respondedAnomalies++;
+                  return;
+                }
               }
+            }
+
+            if (anomaly.getFeedback() == null) {
+              return;
+            }
+
+            switch (anomaly.getFeedback().getFeedbackType()) {
+              case ANOMALY:
+              case ANOMALY_EXPECTED:
+              case ANOMALY_NEW_TREND:
+                this.truePos++;
+                this.respondedAnomalies++;
+                break;
+              case NOT_ANOMALY:
+                this.falsePos++;
+                this.respondedAnomalies++;
+                break;
+              default:
+                break;
             }
           });
     }

@@ -3,23 +3,30 @@ package org.apache.pinot.thirdeye.detection.performance;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.AnomalyClassificationType;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
+import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
+import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
 public class PerformanceMetricsTest {
-  private List<String> noResponses;
-  private List<String> oneTruePos;
-  private List<String> allTruePos;
-  private List<String> allFalsePos;
-  private List<String> mixedPos;
-  private List<String> posAndNeg;
-  private final String NONE = AnomalyClassificationType.NONE.toString();
-  private final String TRUE_POS = AnomalyClassificationType.TRUE_POSITIVE.toString();
-  private final String FALSE_POS = AnomalyClassificationType.FALSE_POSITIVE.toString();
-  private final String FALSE_NEG = AnomalyClassificationType.FALSE_NEGATIVE.toString();
+  private List<MergedAnomalyResultDTO> noResponses;
+  private List<MergedAnomalyResultDTO> noRepsonsesWithChild;
+  private List<MergedAnomalyResultDTO> oneTruePos;
+  private List<MergedAnomalyResultDTO> allTruePos;
+  private List<MergedAnomalyResultDTO> allFalsePos;
+  private List<MergedAnomalyResultDTO> mixedPos;
+  private List<MergedAnomalyResultDTO> posAndNeg;
+
+  private final MergedAnomalyResultDTO childAnomalyWithNoFeedback = new MergedAnomalyResultDTO();
+  private final MergedAnomalyResultDTO anomalyWithNoFeedback = new MergedAnomalyResultDTO();
+  private final MergedAnomalyResultDTO anomalyWithTruePosFeedback = new MergedAnomalyResultDTO();
+  private final MergedAnomalyResultDTO anomalyWithFalsePosFeedback = new MergedAnomalyResultDTO();
+  private final MergedAnomalyResultDTO anomalyWithFalseNegFeedback = new MergedAnomalyResultDTO();
 
   private double calculateResponseRate (long respondedAnomalies, long numAnomalies) {
     return (double) respondedAnomalies / numAnomalies * 100;
@@ -35,12 +42,30 @@ public class PerformanceMetricsTest {
 
   @BeforeMethod
   public void setUp() {
-    this.noResponses = Stream.of(NONE, NONE, NONE, NONE).collect(Collectors.toList());
-    this.oneTruePos = Stream.of(TRUE_POS, NONE, NONE, NONE).collect(Collectors.toList());
-    this.allTruePos = Stream.of(TRUE_POS, TRUE_POS, TRUE_POS, TRUE_POS).collect(Collectors.toList());
-    this.allFalsePos = Stream.of(FALSE_POS, FALSE_POS, FALSE_POS, FALSE_POS).collect(Collectors.toList());
-    this.mixedPos = Stream.of(FALSE_POS, TRUE_POS, TRUE_POS, TRUE_POS).collect(Collectors.toList());
-    this.posAndNeg = Stream.of(FALSE_NEG, TRUE_POS, TRUE_POS, NONE).collect(Collectors.toList());
+    AnomalyFeedback noFeedback = new AnomalyFeedbackDTO();
+    noFeedback.setFeedbackType(AnomalyFeedbackType.NO_FEEDBACK);
+    anomalyWithNoFeedback.setFeedback(noFeedback);
+
+    AnomalyFeedback truePosFeedback = new AnomalyFeedbackDTO();
+    truePosFeedback.setFeedbackType(AnomalyFeedbackType.ANOMALY);
+    anomalyWithTruePosFeedback.setFeedback(truePosFeedback);
+
+    AnomalyFeedback falsePosFeedback = new AnomalyFeedbackDTO();
+    falsePosFeedback.setFeedbackType(AnomalyFeedbackType.NOT_ANOMALY);
+    anomalyWithFalsePosFeedback.setFeedback(falsePosFeedback);
+
+    anomalyWithFalseNegFeedback.setAnomalyResultSource(AnomalyResultSource.USER_LABELED_ANOMALY);
+
+    childAnomalyWithNoFeedback.setFeedback(noFeedback);
+    childAnomalyWithNoFeedback.setChild(true);
+
+    this.noResponses = Stream.of(anomalyWithNoFeedback, anomalyWithNoFeedback, anomalyWithNoFeedback, anomalyWithNoFeedback).collect(Collectors.toList());
+    this.noRepsonsesWithChild = Stream.of(anomalyWithNoFeedback, anomalyWithNoFeedback, anomalyWithNoFeedback, childAnomalyWithNoFeedback).collect(Collectors.toList());
+    this.oneTruePos = Stream.of(anomalyWithTruePosFeedback, anomalyWithNoFeedback, anomalyWithNoFeedback, anomalyWithNoFeedback).collect(Collectors.toList());
+    this.allTruePos = Stream.of(anomalyWithTruePosFeedback, anomalyWithTruePosFeedback, anomalyWithTruePosFeedback, anomalyWithTruePosFeedback).collect(Collectors.toList());
+    this.allFalsePos = Stream.of(anomalyWithFalsePosFeedback, anomalyWithFalsePosFeedback, anomalyWithFalsePosFeedback, anomalyWithFalsePosFeedback).collect(Collectors.toList());
+    this.mixedPos = Stream.of(anomalyWithFalsePosFeedback, anomalyWithTruePosFeedback, anomalyWithTruePosFeedback, anomalyWithTruePosFeedback).collect(Collectors.toList());
+    this.posAndNeg = Stream.of(anomalyWithFalseNegFeedback, anomalyWithTruePosFeedback, anomalyWithTruePosFeedback, anomalyWithNoFeedback).collect(Collectors.toList());
   }
 
   @Test
@@ -52,6 +77,22 @@ public class PerformanceMetricsTest {
     totalAnomalies.setType(PerformanceMetricType.COUNT);
 
     PerformanceMetrics pm = new PerformanceMetrics.Builder(this.noResponses)
+        .addTotalAnomalies()
+        .build();
+
+    Assert.assertEquals(pm.getTotalAnomalies().getValue(), totalAnomalies.getValue());
+    Assert.assertEquals(pm.getTotalAnomalies().getType(), totalAnomalies.getType());
+  }
+
+  @Test
+  public void testBuildTotalAnomaliesWithChildren() {
+    final long numAnomalies = 3L;
+    PerformanceMetric totalAnomalies = new PerformanceMetric();
+
+    totalAnomalies.setValue((double) numAnomalies);
+    totalAnomalies.setType(PerformanceMetricType.COUNT);
+
+    PerformanceMetrics pm = new PerformanceMetrics.Builder(this.noRepsonsesWithChild)
         .addTotalAnomalies()
         .build();
 
@@ -160,15 +201,15 @@ public class PerformanceMetricsTest {
     PerformanceMetrics pmAllTrue = new PerformanceMetrics.Builder(this.allTruePos)
         .addRecall()
         .build();
-    PerformanceMetrics pmMixed = new PerformanceMetrics.Builder(this.posAndNeg)
+    PerformanceMetrics pmPosAndNeg = new PerformanceMetrics.Builder(this.posAndNeg)
         .addRecall()
         .build();
 
     Assert.assertEquals(pmNone.getRecall().getValue(), noneResponded.getValue());
     Assert.assertEquals(pmAllTrue.getRecall().getValue(), allTrue.getValue());
-    Assert.assertEquals(pmMixed.getRecall().getValue(), mixed.getValue());
+    Assert.assertEquals(pmPosAndNeg.getRecall().getValue(), mixed.getValue());
     Assert.assertEquals(pmNone.getRecall().getType(), noneResponded.getType());
     Assert.assertEquals(pmAllTrue.getRecall().getType(), allTrue.getType());
-    Assert.assertEquals(pmMixed.getRecall().getType(), mixed.getType());
+    Assert.assertEquals(pmPosAndNeg.getRecall().getType(), mixed.getType());
   }
 }

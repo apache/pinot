@@ -86,7 +86,7 @@ public class ThirdEyeAuthFilter extends AuthFilter<ThirdEyeCredentials, ThirdEye
           return;
         }
       }
-
+      
       throw new WebApplicationException("Unable to validate credentials", Response.Status.UNAUTHORIZED);
     } else {
       if (this.administrators != null && uriPath.equals("thirdeye-admin") && (principal.getName() == null
