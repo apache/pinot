@@ -63,7 +63,7 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
     transformConfigs.add(new TransformConfig("AmPm", "Groovy({DepTime < 1200 ? \"AM\": \"PM\"}, DepTime)"));
     transformConfigs.add(new TransformConfig("millisSinceEpoch", "fromEpochDays(DaysSinceEpoch)"));
     transformConfigs.add(new TransformConfig("lowerCaseDestCityName", "lower(DestCityName)"));
-    return new IngestionConfig(null, getStream(), filterConfig, transformConfigs);
+    return new IngestionConfig(null, getStreamIngestionConfig(), filterConfig, transformConfigs);
   }
 
   @Override

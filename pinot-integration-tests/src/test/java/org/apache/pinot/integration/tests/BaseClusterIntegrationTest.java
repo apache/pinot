@@ -249,7 +249,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   @Nullable
-  protected StreamIngestionConfig getStream() {
+  protected StreamIngestionConfig getStreamIngestionConfig() {
     List<Map<String, String>> streamConfigMaps = new ArrayList<>();
     streamConfigMaps.add(getStreamConfigMap());
     return new StreamIngestionConfig(streamConfigMaps);
