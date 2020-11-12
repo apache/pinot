@@ -41,7 +41,17 @@ public class IndexingConfigResolverFactory {
     }
   }
 
-  public static IndexingConfigResolver getResolver() {
+  public static synchronized void deregister() {
+    if (_resolver == null) {
+      throw new RuntimeException("Indexing config resolver has not been initialized. Failed to deregister");
+    }
+    _resolver = null;
+  }
+
+  public static synchronized IndexingConfigResolver getResolver() {
+    if (_resolver == null) {
+      throw new RuntimeException("Indexing config resolver has not been initialized.");
+    }
     return _resolver;
   }
 }

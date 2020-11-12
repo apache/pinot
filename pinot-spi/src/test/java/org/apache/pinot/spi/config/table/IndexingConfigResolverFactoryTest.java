@@ -28,5 +28,6 @@ public class IndexingConfigResolverFactoryTest {
   public void testNoOpIndexingConfigResolver() {
     IndexingConfigResolverFactory.register(NoOpIndexingConfigResolver.class.getName());
     Assert.assertTrue(IndexingConfigResolverFactory.getResolver() instanceof NoOpIndexingConfigResolver);
+    IndexingConfigResolverFactory.deregister();
   }
 }

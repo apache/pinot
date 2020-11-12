@@ -22,6 +22,7 @@ import java.util.List;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -58,5 +59,10 @@ public class AutoTuneIndexingConfigResolverTest {
     List<String> noDictionaryColumns = newConfig.getNoDictionaryColumns();
     Assert.assertTrue(noDictionaryColumns.size() == 1);
     Assert.assertEquals(noDictionaryColumns.get(0), metricColumns[0]);
+  }
+
+  @AfterClass
+  public void destroy() {
+    IndexingConfigResolverFactory.deregister();
   }
 }
