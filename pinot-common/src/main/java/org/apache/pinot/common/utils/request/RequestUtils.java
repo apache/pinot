@@ -112,7 +112,7 @@ public class RequestUtils {
         literal.setDoubleValue(node.bigDecimalValue().doubleValue());
       }
     } else {
-      literal.setStringValue(node.toString().replaceAll("^'|'$", "").replace("''", "'"));
+      literal.setStringValue(node.toValue().replace("''", "'"));
     }
     expression.setLiteral(literal);
     return expression;
