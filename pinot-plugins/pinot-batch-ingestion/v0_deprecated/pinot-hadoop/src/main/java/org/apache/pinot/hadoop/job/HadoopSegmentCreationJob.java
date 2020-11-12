@@ -37,7 +37,6 @@ import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.hadoop.job.mappers.SegmentCreationMapper;
 import org.apache.pinot.hadoop.utils.PinotHadoopJobPreparationHelper;
 import org.apache.pinot.ingestion.common.JobConfigConstants;
@@ -45,6 +44,7 @@ import org.apache.pinot.ingestion.jobs.SegmentCreationJob;
 import org.apache.pinot.ingestion.utils.JobPreparationHelper;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 
 
 public class HadoopSegmentCreationJob extends SegmentCreationJob {
@@ -143,7 +143,7 @@ public class HadoopSegmentCreationJob extends SegmentCreationJob {
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
 
     // For APPEND use case, timeColumnName and timeType must be set
-    if (APPEND.equalsIgnoreCase(IngestionUtils.getBatchSegmentPushType(tableConfig))) {
+    if (APPEND.equalsIgnoreCase(IngestionConfigUtils.getBatchSegmentPushType(tableConfig))) {
       Preconditions.checkState(validationConfig.getTimeColumnName() != null && validationConfig.getTimeType() != null,
           "For APPEND use case, time column and type must be set");
     }

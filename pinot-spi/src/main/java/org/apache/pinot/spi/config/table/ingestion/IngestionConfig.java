@@ -24,8 +24,6 @@ import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
-import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
-import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 
 
 /**
@@ -33,11 +31,11 @@ import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
  */
 public class IngestionConfig extends BaseJsonConfig {
 
-  @JsonPropertyDescription("Config related to the batch data source")
-  private final Batch _batch;
+  @JsonPropertyDescription("Config related to the batch data sources")
+  private final BatchIngestionConfig _batchIngestionConfig;
 
-  @JsonPropertyDescription("Config related to the stream data source")
-  private final Stream _stream;
+  @JsonPropertyDescription("Config related to the stream data sources")
+  private final StreamIngestionConfig _streamIngestionConfig;
 
   @JsonPropertyDescription("Config related to filtering records during ingestion")
   private final FilterConfig _filterConfig;
@@ -46,24 +44,24 @@ public class IngestionConfig extends BaseJsonConfig {
   private final List<TransformConfig> _transformConfigs;
 
   @JsonCreator
-  public IngestionConfig(@JsonProperty("batch") @Nullable Batch batch,
-      @JsonProperty("stream") @Nullable Stream stream,
+  public IngestionConfig(@JsonProperty("batchIngestionConfig") @Nullable BatchIngestionConfig batchIngestionConfig,
+      @JsonProperty("streamIngestionConfig") @Nullable StreamIngestionConfig streamIngestionConfig,
       @JsonProperty("filterConfig") @Nullable FilterConfig filterConfig,
       @JsonProperty("transformConfigs") @Nullable List<TransformConfig> transformConfigs) {
-    _batch = batch;
-    _stream = stream;
+    _batchIngestionConfig = batchIngestionConfig;
+    _streamIngestionConfig = streamIngestionConfig;
     _filterConfig = filterConfig;
     _transformConfigs = transformConfigs;
   }
 
   @Nullable
-  public Batch getBatch() {
-    return _batch;
+  public BatchIngestionConfig getBatchIngestionConfig() {
+    return _batchIngestionConfig;
   }
 
   @Nullable
-  public Stream getStream() {
-    return _stream;
+  public StreamIngestionConfig getStreamIngestionConfig() {
+    return _streamIngestionConfig;
   }
 
   @Nullable

@@ -43,7 +43,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.config.table.ingestion.Stream;
+import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
@@ -249,10 +249,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   @Nullable
-  protected Stream getStream() {
-    List<Map<String, String>> streamConfigs = new ArrayList<>();
-    streamConfigs.add(getStreamConfigMap());
-    return new Stream(streamConfigs);
+  protected StreamIngestionConfig getStream() {
+    List<Map<String, String>> streamConfigMaps = new ArrayList<>();
+    streamConfigMaps.add(getStreamConfigMap());
+    return new StreamIngestionConfig(streamConfigMaps);
   }
 
   /**
@@ -299,44 +299,44 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected Map<String, String> getStreamConfigMap() {
-    Map<String, String> streamConfigs = new HashMap<>();
+    Map<String, String> streamConfigMap = new HashMap<>();
     String streamType = "kafka";
-    streamConfigs.put(StreamConfigProperties.STREAM_TYPE, streamType);
+    streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
     boolean useLlc = useLlc();
     if (useLlc) {
       // LLC
-      streamConfigs
+      streamConfigMap
           .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
               StreamConfig.ConsumerType.LOWLEVEL.toString());
-      streamConfigs.put(KafkaStreamConfigProperties
+      streamConfigMap.put(KafkaStreamConfigProperties
               .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST),
           KafkaStarterUtils.DEFAULT_KAFKA_BROKER);
     } else {
       // HLC
-      streamConfigs
+      streamConfigMap
           .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
               StreamConfig.ConsumerType.HIGHLEVEL.toString());
-      streamConfigs.put(KafkaStreamConfigProperties
+      streamConfigMap.put(KafkaStreamConfigProperties
               .constructStreamProperty(KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_ZK_CONNECTION_STRING),
           KafkaStarterUtils.DEFAULT_ZK_STR);
-      streamConfigs.put(KafkaStreamConfigProperties
+      streamConfigMap.put(KafkaStreamConfigProperties
               .constructStreamProperty(KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_BOOTSTRAP_SERVER),
           KafkaStarterUtils.DEFAULT_KAFKA_BROKER);
     }
-    streamConfigs.put(StreamConfigProperties
+    streamConfigMap.put(StreamConfigProperties
             .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS),
         getStreamConsumerFactoryClassName());
-    streamConfigs
+    streamConfigMap
         .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
             getKafkaTopic());
-    streamConfigs
+    streamConfigMap
         .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
             AvroFileSchemaKafkaAvroMessageDecoder.class.getName());
-    streamConfigs
+    streamConfigMap
         .put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, Integer.toString(getRealtimeSegmentFlushSize()));
-    streamConfigs.put(StreamConfigProperties
+    streamConfigMap.put(StreamConfigProperties
         .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), "smallest");
-    return streamConfigs;
+    return streamConfigMap;
   }
 
   /**

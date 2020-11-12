@@ -31,7 +31,7 @@ import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.spi.config.table.CompletionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.ingestion.Batch;
+import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
@@ -50,7 +50,7 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
-import org.apache.pinot.spi.config.table.ingestion.Stream;
+import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -268,13 +268,13 @@ public class TableConfigSerDeTest {
       batchConfigMap.put("batchType", "s3");
       Map<String, String> streamConfigMap = new HashMap<>();
       streamConfigMap.put("streamType", "kafka");
-      List<Map<String, String>> streamConfigs = new ArrayList<>();
-      streamConfigs.add(streamConfigMap);
-      List<Map<String, String>> batchConfigs = new ArrayList<>();
-      batchConfigs.add(batchConfigMap);
+      List<Map<String, String>> streamConfigMaps = new ArrayList<>();
+      streamConfigMaps.add(streamConfigMap);
+      List<Map<String, String>> batchConfigMaps = new ArrayList<>();
+      batchConfigMaps.add(batchConfigMap);
       IngestionConfig ingestionConfig =
-          new IngestionConfig(new Batch(batchConfigs, "APPEND", "HOURLY"),
-              new Stream(streamConfigs), new FilterConfig("filterFunc(foo)"), transformConfigs);
+          new IngestionConfig(new BatchIngestionConfig(batchConfigMaps, "APPEND", "HOURLY"),
+              new StreamIngestionConfig(streamConfigMaps), new FilterConfig("filterFunc(foo)"), transformConfigs);
       TableConfig tableConfig = tableConfigBuilder.setIngestionConfig(ingestionConfig).build();
 
       checkIngestionConfig(tableConfig);
@@ -413,16 +413,16 @@ public class TableConfigSerDeTest {
     assertEquals(transformConfigs.get(0).getTransformFunction(), "func(moo)");
     assertEquals(transformConfigs.get(1).getColumnName(), "zoo");
     assertEquals(transformConfigs.get(1).getTransformFunction(), "myfunc()");
-    assertNotNull(ingestionConfig.getBatch());
-    assertNotNull(ingestionConfig.getBatch().getBatchConfigs());
-    assertEquals(ingestionConfig.getBatch().getBatchConfigs().size(), 1);
-    assertEquals(ingestionConfig.getBatch().getBatchConfigs().get(0).get("batchType"), "s3");
-    assertEquals(ingestionConfig.getBatch().getSegmentPushType(), "APPEND");
-    assertEquals(ingestionConfig.getBatch().getSegmentPushFrequency(), "HOURLY");
-    assertNotNull(ingestionConfig.getStream());
-    assertNotNull(ingestionConfig.getStream().getStreamConfigs());
-    assertEquals(ingestionConfig.getStream().getStreamConfigs().size(), 1);
-    assertEquals(ingestionConfig.getStream().getStreamConfigs().get(0).get("streamType"), "kafka");
+    assertNotNull(ingestionConfig.getBatchIngestionConfig());
+    assertNotNull(ingestionConfig.getBatchIngestionConfig().getBatchConfigMaps());
+    assertEquals(ingestionConfig.getBatchIngestionConfig().getBatchConfigMaps().size(), 1);
+    assertEquals(ingestionConfig.getBatchIngestionConfig().getBatchConfigMaps().get(0).get("batchType"), "s3");
+    assertEquals(ingestionConfig.getBatchIngestionConfig().getSegmentPushType(), "APPEND");
+    assertEquals(ingestionConfig.getBatchIngestionConfig().getSegmentPushFrequency(), "HOURLY");
+    assertNotNull(ingestionConfig.getStreamIngestionConfig());
+    assertNotNull(ingestionConfig.getStreamIngestionConfig().getStreamConfigMaps());
+    assertEquals(ingestionConfig.getStreamIngestionConfig().getStreamConfigMaps().size(), 1);
+    assertEquals(ingestionConfig.getStreamIngestionConfig().getStreamConfigMaps().get(0).get("streamType"), "kafka");
   }
 
   private void checkTierConfigList(TableConfig tableConfig) {

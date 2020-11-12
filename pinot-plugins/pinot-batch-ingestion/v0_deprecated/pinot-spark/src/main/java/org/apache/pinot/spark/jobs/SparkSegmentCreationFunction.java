@@ -38,7 +38,6 @@ import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl
 import org.apache.pinot.core.segment.name.NormalizedDateSegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SimpleSegmentNameGenerator;
-import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.ingestion.common.JobConfigConstants;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
 import org.apache.pinot.plugin.inputformat.protobuf.ProtoBufRecordReaderConfig;
@@ -51,6 +50,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.utils.DataSizeUtils;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -131,7 +131,8 @@ public class SparkSegmentCreationFunction implements Serializable {
         _segmentNameGenerator =
             new NormalizedDateSegmentNameGenerator(_rawTableName, _jobConf.get(JobConfigConstants.SEGMENT_NAME_PREFIX),
                 _jobConf.getBoolean(JobConfigConstants.EXCLUDE_SEQUENCE_ID, false),
-                IngestionUtils.getBatchSegmentPushType(_tableConfig), IngestionUtils.getBatchSegmentPushFrequency(_tableConfig), dateTimeFormatSpec);
+                IngestionConfigUtils.getBatchSegmentPushType(_tableConfig),
+                IngestionConfigUtils.getBatchSegmentPushFrequency(_tableConfig), dateTimeFormatSpec);
         break;
       default:
         throw new UnsupportedOperationException("Unsupported segment name generator type: " + segmentNameGeneratorType);

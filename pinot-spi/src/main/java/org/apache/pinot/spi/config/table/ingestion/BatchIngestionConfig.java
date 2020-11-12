@@ -30,10 +30,10 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 /**
  * Contains all configs related to the batch sources for ingestion.
  */
-public class Batch extends BaseJsonConfig {
+public class BatchIngestionConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription("Configs for all the batch sources to ingest from")
-  private final List<Map<String, String>> _batchConfigs;
+  private final List<Map<String, String>> _batchConfigMaps;
 
   @JsonPropertyDescription("Push type APPEND or REFRESH")
   private final String _segmentPushType;
@@ -42,25 +42,22 @@ public class Batch extends BaseJsonConfig {
   private final String _segmentPushFrequency;
 
   @JsonCreator
-  public Batch(@JsonProperty("batchConfigs") @Nullable List<Map<String, String>> batchConfigs,
-      @JsonProperty("segmentPushType") @Nullable String segmentPushType,
-      @JsonProperty("segmentPushFrequency") @Nullable String segmentPushFrequency) {
-    _batchConfigs = batchConfigs;
+  public BatchIngestionConfig(@JsonProperty("batchConfigMaps") List<Map<String, String>> batchConfigMaps,
+      @JsonProperty("segmentPushType") String segmentPushType,
+      @JsonProperty("segmentPushFrequency") String segmentPushFrequency) {
+    _batchConfigMaps = batchConfigMaps;
     _segmentPushType = segmentPushType;
     _segmentPushFrequency = segmentPushFrequency;
   }
 
-  @Nullable
-  public List<Map<String, String>> getBatchConfigs() {
-    return _batchConfigs;
+  public List<Map<String, String>> getBatchConfigMaps() {
+    return _batchConfigMaps;
   }
 
-  @Nullable
   public String getSegmentPushType() {
     return _segmentPushType;
   }
 
-  @Nullable
   public String getSegmentPushFrequency() {
     return _segmentPushFrequency;
   }

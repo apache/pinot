@@ -42,10 +42,10 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
 import org.apache.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
-import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
@@ -101,7 +101,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
     // For offline tables, ensure that the segmentPushType is APPEND.
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-    String segmentPushType = IngestionUtils.getBatchSegmentPushType(tableConfig);
+    String segmentPushType = IngestionConfigUtils.getBatchSegmentPushType(tableConfig);
     if (tableConfig.getTableType() == TableType.OFFLINE && !"APPEND".equalsIgnoreCase(segmentPushType)) {
       LOGGER.info("Segment push type is not APPEND for table: {}, skip", tableNameWithType);
       return;

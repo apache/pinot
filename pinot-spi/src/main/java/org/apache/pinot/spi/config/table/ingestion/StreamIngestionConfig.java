@@ -30,18 +30,17 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 /**
  * Contains all the configs related to the streams for ingestion
  */
-public class Stream extends BaseJsonConfig {
+public class StreamIngestionConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription("All configs for the streams from which to ingest")
-  private final List<Map<String, String>> _streamConfigs;
+  private final List<Map<String, String>> _streamConfigMaps;
 
   @JsonCreator
-  public Stream(@JsonProperty("streamConfigs") @Nullable List<Map<String, String>> streamConfigs) {
-    _streamConfigs = streamConfigs;
+  public StreamIngestionConfig(@JsonProperty("streamConfigMaps") List<Map<String, String>> streamConfigMaps) {
+    _streamConfigMaps = streamConfigMaps;
   }
 
-  @Nullable
-  public List<Map<String, String>> getStreamConfigs() {
-    return _streamConfigs;
+  public List<Map<String, String>> getStreamConfigMaps() {
+    return _streamConfigMaps;
   }
 }

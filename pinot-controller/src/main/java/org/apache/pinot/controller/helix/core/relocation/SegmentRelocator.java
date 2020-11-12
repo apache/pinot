@@ -32,10 +32,9 @@ import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTas
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
-import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
-import org.apache.pinot.spi.utils.TimeUtils;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,7 +67,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
 
     // Segment relocation doesn't apply to HLC
     boolean isRealtimeTable = TableNameBuilder.isRealtimeTableResource(tableNameWithType);
-    if (isRealtimeTable && new StreamConfig(tableNameWithType, IngestionUtils.getStreamConfigsMap(tableConfig))
+    if (isRealtimeTable && new StreamConfig(tableNameWithType, IngestionConfigUtils.getStreamConfigMap(tableConfig))
         .hasHighLevelConsumerType()) {
       return;
     }

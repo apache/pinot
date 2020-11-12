@@ -49,7 +49,6 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.LazyOutputFormat;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.pinot.core.data.partition.PartitionFunctionFactory;
-import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.hadoop.io.CombineAvroKeyInputFormat;
 import org.apache.pinot.hadoop.job.mappers.SegmentPreprocessingMapper;
 import org.apache.pinot.hadoop.job.partitioners.GenericPartitioner;
@@ -65,11 +64,8 @@ import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableCustomConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
-import org.apache.pinot.spi.data.DateTimeFormatPatternSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.TimeFieldSpec;
-import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -372,7 +368,7 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
     // If the use case is an append use case, check that one time unit is contained in one file. If there is more than one,
     // the job should be disabled, as we should not resize for these use cases. Therefore, setting the time column name
     // and value
-    if (IngestionUtils.getBatchSegmentPushType(_tableConfig).equalsIgnoreCase("APPEND")) {
+    if (IngestionConfigUtils.getBatchSegmentPushType(_tableConfig).equalsIgnoreCase("APPEND")) {
       job.getConfiguration().set(InternalConfigConstants.IS_APPEND, "true");
       String timeColumnName = validationConfig.getTimeColumnName();
       job.getConfiguration().set(InternalConfigConstants.TIME_COLUMN_CONFIG, timeColumnName);
@@ -389,7 +385,7 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
         }
       }
       job.getConfiguration().set(InternalConfigConstants.SEGMENT_PUSH_FREQUENCY,
-          IngestionUtils.getBatchSegmentPushFrequency(_tableConfig));
+          IngestionConfigUtils.getBatchSegmentPushFrequency(_tableConfig));
       try (DataFileStream<GenericRecord> dataStreamReader = getAvroReader(path)) {
         job.getConfiguration()
             .set(InternalConfigConstants.TIME_COLUMN_VALUE, dataStreamReader.next().get(timeColumnName).toString());

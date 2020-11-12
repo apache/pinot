@@ -32,9 +32,9 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
-import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -109,7 +109,7 @@ public class TableRetentionValidator {
         LOGGER.error("Table: {}, \"segmentsConfig\" field is missing in table config", tableName);
         continue;
       }
-      String segmentPushType = IngestionUtils.getBatchSegmentPushType(tableConfig);
+      String segmentPushType = IngestionConfigUtils.getBatchSegmentPushType(tableConfig);
       if (segmentPushType == null) {
         LOGGER.error("Table: {}, null push type", tableName);
         continue;

@@ -56,6 +56,7 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamLevelConsumer;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
@@ -155,7 +156,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     _varLengthDictionaryColumns = new ArrayList<>(indexLoadingConfig.getVarLengthDictionaryColumns());
 
-    _streamConfig = new StreamConfig(_tableNameWithType, IngestionUtils.getStreamConfigsMap(tableConfig));
+    _streamConfig = new StreamConfig(_tableNameWithType, IngestionConfigUtils.getStreamConfigMap(tableConfig));
 
     _segmentLogger = LoggerFactory.getLogger(
         HLRealtimeSegmentDataManager.class.getName() + "_" + _segmentName + "_" + _streamConfig.getTopicName());

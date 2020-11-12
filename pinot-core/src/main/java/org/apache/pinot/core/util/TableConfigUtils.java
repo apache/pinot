@@ -50,6 +50,7 @@ import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 
 
@@ -114,7 +115,7 @@ public final class TableConfigUtils {
           String.format("Table: %s, \"segmentsConfig\" field is missing in table config", tableName));
     }
 
-    String segmentPushType = IngestionUtils.getBatchSegmentPushType(tableConfig);
+    String segmentPushType = IngestionConfigUtils.getBatchSegmentPushType(tableConfig);
     // segmentPushType is not needed for Realtime table
     if (tableConfig.getTableType() == TableType.OFFLINE && segmentPushType != null && !segmentPushType.isEmpty()) {
       if (!segmentPushType.equalsIgnoreCase("REFRESH") && !segmentPushType.equalsIgnoreCase("APPEND")) {
@@ -185,29 +186,26 @@ public final class TableConfigUtils {
     if (ingestionConfig != null) {
 
       // Batch
-      if (ingestionConfig.getBatch() != null) {
-        List<Map<String, String>> batchConfigs = ingestionConfig.getBatch().getBatchConfigs();
+      if (ingestionConfig.getBatchIngestionConfig() != null) {
+        List<Map<String, String>> batchConfigMaps = ingestionConfig.getBatchIngestionConfig().getBatchConfigMaps();
+        Preconditions.checkState(batchConfigMaps.size() > 0, "Could not find batch config map");
         try {
-          if (CollectionUtils.isNotEmpty(batchConfigs)) {
             // Validate that BatchConfig can be created
-            batchConfigs.forEach(b -> new BatchConfig(tableNameWithType, b));
-          }
+            batchConfigMaps.forEach(b -> new BatchConfig(tableNameWithType, b));
         } catch (Exception e) {
           throw new IllegalStateException("Could not create BatchConfig using the batchConfig map", e);
         }
       }
 
       // Stream
-      if (ingestionConfig.getStream() != null) {
-        List<Map<String, String>> streamConfigs = ingestionConfig.getStream().getStreamConfigs();
-        if (CollectionUtils.isNotEmpty(streamConfigs)) {
-          Preconditions.checkState(streamConfigs.size() == 1, "Only 1 stream is supported in REALTIME table");
-          try {
-            // Validate that StreamConfig can be created
-            new StreamConfig(tableNameWithType, streamConfigs.get(0));
-          } catch (Exception e) {
-            throw new IllegalStateException("Could not create StreamConfig using the streamConfig map", e);
-          }
+      if (ingestionConfig.getStreamIngestionConfig() != null) {
+        List<Map<String, String>> streamConfigMaps = ingestionConfig.getStreamIngestionConfig().getStreamConfigMaps();
+        Preconditions.checkState(streamConfigMaps.size() == 1, "Only 1 stream is supported in REALTIME table");
+        try {
+          // Validate that StreamConfig can be created
+          new StreamConfig(tableNameWithType, streamConfigMaps.get(0));
+        } catch (Exception e) {
+          throw new IllegalStateException("Could not create StreamConfig using the streamConfig map", e);
         }
       }
 
@@ -285,7 +283,7 @@ public final class TableConfigUtils {
     Preconditions.checkState(CollectionUtils.isNotEmpty(schema.getPrimaryKeyColumns()),
         "Upsert table must have primary key columns in the schema");
     // consumer type must be low-level
-    Map<String, String> streamConfigsMap = IngestionUtils.getStreamConfigsMap(tableConfig);
+    Map<String, String> streamConfigsMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
     StreamConfig streamConfig = new StreamConfig(tableConfig.getTableName(), streamConfigsMap);
     Preconditions.checkState(streamConfig.hasLowLevelConsumerType() && !streamConfig.hasHighLevelConsumerType(),
         "Upsert table must use low-level streaming consumer type");

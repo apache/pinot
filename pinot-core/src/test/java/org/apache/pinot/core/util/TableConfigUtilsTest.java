@@ -30,7 +30,7 @@ import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.ingestion.Batch;
+import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
@@ -40,12 +40,11 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
-import org.apache.pinot.spi.config.table.ingestion.Stream;
+import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
-import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
@@ -348,7 +347,7 @@ public class TableConfigUtilsTest {
   public void ingestionStreamConfigsTest() {
     Map<String, String> fakeMap = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
     IngestionConfig ingestionConfig =
-        new IngestionConfig(null, new Stream(Lists.newArrayList(fakeMap, fakeMap)), null, null);
+        new IngestionConfig(null, new StreamIngestionConfig(Lists.newArrayList(fakeMap, fakeMap)), null, null);
 
     // only 1 stream config allowed
     try {
@@ -359,7 +358,7 @@ public class TableConfigUtilsTest {
     }
 
     // stream config should be valid
-    ingestionConfig = new IngestionConfig(null, new Stream(Lists.newArrayList(fakeMap)), null, null);
+    ingestionConfig = new IngestionConfig(null, new StreamIngestionConfig(Lists.newArrayList(fakeMap)), null, null);
     TableConfigUtils.validateIngestionConfig("myTable_REALTIME", ingestionConfig, null);
 
     fakeMap.remove(StreamConfigProperties.STREAM_TYPE);
@@ -386,7 +385,7 @@ public class TableConfigUtilsTest {
         "org.foo.Reader");
 
     IngestionConfig ingestionConfig =
-        new IngestionConfig(new Batch(Lists.newArrayList(batchConfigMap, batchConfigMap), null, null), null, null,
+        new IngestionConfig(new BatchIngestionConfig(Lists.newArrayList(batchConfigMap, batchConfigMap), null, null), null, null,
             null);
     TableConfigUtils.validateIngestionConfig("myTable_REALTIME", ingestionConfig, null);
 
