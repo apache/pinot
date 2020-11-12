@@ -223,7 +223,7 @@ public class DetectionResource {
     return Response.ok(result).build();
   }
 
-  @Path("performance/{id}")
+  @Path("{id}/performance")
   @GET
   @ApiOperation("Get performance metrics for detection with given id in time range")
   public Response getPerformanceMetrics(@PathParam("id") Long detectionConfigId, @QueryParam("start") long startTime,
@@ -234,15 +234,9 @@ public class DetectionResource {
           Predicate.LT("startTime", endTime),
           Predicate.GT("endTime", startTime)));
 
-    List<String> statusClassifications = anomalies
-        .parallelStream()
-        .filter(anomaly -> !anomaly.isChild())
-        .map(anomaly -> ResourceUtils.getStatusClassification(anomaly).toString())
-        .collect(Collectors.toList());
-
     PerformanceMetrics pm;
     try {
-      pm = new PerformanceMetrics.Builder(statusClassifications)
+      pm = new PerformanceMetrics.Builder(anomalies)
           .addTotalAnomalies()
           .addResponseRate()
           .addPrecision()
