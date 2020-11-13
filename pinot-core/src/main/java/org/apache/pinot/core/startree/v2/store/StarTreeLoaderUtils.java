@@ -26,13 +26,13 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.data.aggregator.ValueAggregatorFactory;
-import org.apache.pinot.core.segment.index.readers.forward.BaseChunkSVForwardIndexReader;
-import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReader;
-import org.apache.pinot.core.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
-import org.apache.pinot.core.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.readers.forward.BaseChunkSVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
+import org.apache.pinot.core.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.startree.OffHeapStarTree;
 import org.apache.pinot.core.startree.StarTree;
@@ -83,8 +83,8 @@ public class StarTreeLoaderUtils {
         end = start + indexValue._size;
         PinotDataBuffer forwardIndexDataBuffer = dataBuffer.view(start, end, ByteOrder.BIG_ENDIAN);
         ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(dimension);
-        FixedBitSVForwardIndexReader forwardIndex =
-            new FixedBitSVForwardIndexReader(forwardIndexDataBuffer, numDocs, columnMetadata.getBitsPerElement());
+        FixedBitSVForwardIndexReaderV2 forwardIndex =
+            new FixedBitSVForwardIndexReaderV2(forwardIndexDataBuffer, numDocs, columnMetadata.getBitsPerElement());
         dataSourceMap.put(dimension, new StarTreeDataSource(columnMetadata.getFieldSpec(), numDocs, forwardIndex,
             indexContainerMap.get(dimension).getDictionary()));
       }

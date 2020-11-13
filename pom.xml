@@ -143,7 +143,7 @@
     <log4j.version>2.11.2</log4j.version>
     <netty.version>4.1.42.Final</netty.version>
     <jts.version>1.16.1</jts.version>
-    <jmh.version>1.21</jmh.version>
+    <jmh.version>1.26</jmh.version>
 
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms4g -Xmx4g</argLine>

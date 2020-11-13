@@ -33,7 +33,7 @@ import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
 import org.apache.pinot.core.segment.index.readers.forward.FixedBitMVForwardIndexReader;
-import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
 import org.apache.pinot.core.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
@@ -225,7 +225,7 @@ public class RangeIndexHandler {
     int numBitsPerValue = columnMetadata.getBitsPerElement();
     if (columnMetadata.isSingleValue()) {
       if (columnMetadata.hasDictionary()) {
-        return new FixedBitSVForwardIndexReader(buffer, numRows, numBitsPerValue);
+        return new FixedBitSVForwardIndexReaderV2(buffer, numRows, numBitsPerValue);
       } else {
         return new FixedByteChunkSVForwardIndexReader(buffer, columnMetadata.getDataType());
       }
