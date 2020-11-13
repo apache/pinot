@@ -47,35 +47,35 @@ public class BatchConfig {
     _type = batchConfigsMap.get(BatchConfigProperties.BATCH_TYPE);
     Preconditions.checkState(_type != null, "Property: %s cannot be null", BatchConfigProperties.BATCH_TYPE);
 
-    String inputDirURIKey = BatchConfigProperties.constructStreamProperty(_type, BatchConfigProperties.INPUT_DIR_URI);
+    String inputDirURIKey = BatchConfigProperties.constructBatchProperty(_type, BatchConfigProperties.INPUT_DIR_URI);
     _inputDirURI = batchConfigsMap.get(inputDirURIKey);
     Preconditions.checkState(_inputDirURI != null, "Property: %s cannot be null", inputDirURIKey);
 
-    String outputDirURIKey = BatchConfigProperties.constructStreamProperty(_type, BatchConfigProperties.OUTPUT_DIR_URI);
+    String outputDirURIKey = BatchConfigProperties.constructBatchProperty(_type, BatchConfigProperties.OUTPUT_DIR_URI);
     _outputDirURI = batchConfigsMap.get(outputDirURIKey);
     Preconditions.checkState(_outputDirURI != null, "Property: %s cannot be null", outputDirURIKey);
 
-    String fsClassNameKey = BatchConfigProperties.constructStreamProperty(_type, BatchConfigProperties.FS_CLASS);
+    String fsClassNameKey = BatchConfigProperties.constructBatchProperty(_type, BatchConfigProperties.FS_CLASS);
     _fsClassName = batchConfigsMap.get(fsClassNameKey);
     Preconditions.checkState(_fsClassName != null, "Property: %s cannot be null", fsClassNameKey);
 
-    String inputFormatKey = BatchConfigProperties.constructStreamProperty(_type, BatchConfigProperties.INPUT_FORMAT);
+    String inputFormatKey = BatchConfigProperties.constructBatchProperty(_type, BatchConfigProperties.INPUT_FORMAT);
     String inputFormat = batchConfigsMap.get(inputFormatKey);
     Preconditions.checkState(inputFormat != null, "Property: %s cannot be null", inputFormat);
     _inputFormat = FileFormat.valueOf(inputFormat.toUpperCase());
 
     String recordReaderClassNameKey =
-        BatchConfigProperties.constructStreamProperty(_type, BatchConfigProperties.RECORD_READER_CLASS);
+        BatchConfigProperties.constructBatchProperty(_type, BatchConfigProperties.RECORD_READER_CLASS);
     _recordReaderClassName = batchConfigsMap.get(recordReaderClassNameKey);
     Preconditions.checkState(_recordReaderClassName != null, "Property: %s cannot be null", recordReaderClassNameKey);
 
     String recordReaderConfigClassNameKey =
-        BatchConfigProperties.constructStreamProperty(_type, BatchConfigProperties.RECORD_READER_CONFIG_CLASS);
+        BatchConfigProperties.constructBatchProperty(_type, BatchConfigProperties.RECORD_READER_CONFIG_CLASS);
     _recordReaderConfigClassName = batchConfigsMap.get(recordReaderConfigClassNameKey);
 
-    String fsPropPrefix = BatchConfigProperties.constructStreamProperty(_type, BatchConfigProperties.FS_PROP_PREFIX);
+    String fsPropPrefix = BatchConfigProperties.constructBatchProperty(_type, BatchConfigProperties.FS_PROP_PREFIX);
     String recordReaderPropPrefix =
-        BatchConfigProperties.constructStreamProperty(_type, BatchConfigProperties.RECORD_READER_PROP_PREFIX);
+        BatchConfigProperties.constructBatchProperty(_type, BatchConfigProperties.RECORD_READER_PROP_PREFIX);
     for (Map.Entry<String, String> entry : batchConfigsMap.entrySet()) {
       String key = entry.getKey();
       if (key.startsWith(fsPropPrefix)) {

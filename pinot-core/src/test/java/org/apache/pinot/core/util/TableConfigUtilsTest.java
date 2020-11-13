@@ -375,13 +375,13 @@ public class TableConfigUtilsTest {
     Map<String, String> batchConfigMap = new HashMap<>();
     batchConfigMap.put(BatchConfigProperties.BATCH_TYPE, "s3");
     batchConfigMap
-        .put(BatchConfigProperties.constructStreamProperty("s3", BatchConfigProperties.INPUT_DIR_URI), "s3://foo");
+        .put(BatchConfigProperties.constructBatchProperty("s3", BatchConfigProperties.INPUT_DIR_URI), "s3://foo");
     batchConfigMap
-        .put(BatchConfigProperties.constructStreamProperty("s3", BatchConfigProperties.OUTPUT_DIR_URI), "s3://bar");
+        .put(BatchConfigProperties.constructBatchProperty("s3", BatchConfigProperties.OUTPUT_DIR_URI), "s3://bar");
     batchConfigMap
-        .put(BatchConfigProperties.constructStreamProperty("s3", BatchConfigProperties.FS_CLASS), "org.foo.S3FS");
-    batchConfigMap.put(BatchConfigProperties.constructStreamProperty("s3", BatchConfigProperties.INPUT_FORMAT), "avro");
-    batchConfigMap.put(BatchConfigProperties.constructStreamProperty("s3", BatchConfigProperties.RECORD_READER_CLASS),
+        .put(BatchConfigProperties.constructBatchProperty("s3", BatchConfigProperties.FS_CLASS), "org.foo.S3FS");
+    batchConfigMap.put(BatchConfigProperties.constructBatchProperty("s3", BatchConfigProperties.INPUT_FORMAT), "avro");
+    batchConfigMap.put(BatchConfigProperties.constructBatchProperty("s3", BatchConfigProperties.RECORD_READER_CLASS),
         "org.foo.Reader");
 
     IngestionConfig ingestionConfig =

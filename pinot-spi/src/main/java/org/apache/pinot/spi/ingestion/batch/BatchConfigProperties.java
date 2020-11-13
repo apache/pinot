@@ -42,7 +42,7 @@ public class BatchConfigProperties {
   /**
    * Helper method to create a batch config property
    */
-  public static String constructStreamProperty(String batchType, String property) {
+  public static String constructBatchProperty(String batchType, String property) {
     return StringUtils.join(BATCH_PREFIX, batchType, property, DOT_SEPARATOR);
   }
 
