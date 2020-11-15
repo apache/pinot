@@ -46,6 +46,7 @@ import org.apache.pinot.thirdeye.datalayer.bao.ConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.EvaluationManager;
 import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
@@ -104,6 +105,7 @@ public class ThirdEyeDashboardModule extends AbstractModule {
      */
     bind(ConfigManager.class).toInstance(DAO_REGISTRY.getConfigDAO());
     bind(EventManager.class).toInstance(DAO_REGISTRY.getEventDAO());
+    bind(EvaluationManager.class).toInstance(DAO_REGISTRY.getEvaluationManager());
     bind(MergedAnomalyResultManager.class).toInstance(DAO_REGISTRY.getMergedAnomalyResultDAO());
     bind(DatasetConfigManager.class).toInstance(DAO_REGISTRY.getDatasetConfigDAO());
     bind(MetricConfigManager.class).toInstance(DAO_REGISTRY.getMetricConfigDAO());
@@ -162,12 +164,18 @@ public class ThirdEyeDashboardModule extends AbstractModule {
       final AggregationLoader aggregationLoader,
       final TimeSeriesLoader timeSeriesLoader,
       final MetricConfigManager metricConfigManager,
-      final DatasetConfigManager datasetConfigManager) {
+      final DatasetConfigManager datasetConfigManager,
+      final EventManager eventManager,
+      final MergedAnomalyResultManager mergedAnomalyResultManager,
+      final EvaluationManager evaluationManager) {
     return new RootCauseMetricResource(Executors.newCachedThreadPool(),
         aggregationLoader,
         timeSeriesLoader,
         metricConfigManager,
-        datasetConfigManager);
+        datasetConfigManager,
+        eventManager,
+        mergedAnomalyResultManager,
+        evaluationManager);
   }
 
   @Singleton

@@ -21,17 +21,34 @@ package org.apache.pinot.thirdeye.dashboard.resources.v2;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ListMultimap;
+import java.lang.reflect.Constructor;
 import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.LongSeries;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.EvaluationManager;
+import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
+import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
 import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
+import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.DefaultDataProvider;
+import org.apache.pinot.thirdeye.detection.DefaultInputDataFetcher;
+import org.apache.pinot.thirdeye.detection.DetectionPipelineLoader;
+import org.apache.pinot.thirdeye.detection.InputDataFetcher;
+import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
+import org.apache.pinot.thirdeye.detection.cache.builder.AnomaliesCacheBuilder;
+import org.apache.pinot.thirdeye.detection.cache.builder.TimeSeriesCacheBuilder;
+import org.apache.pinot.thirdeye.detection.spec.AbstractSpec;
+import org.apache.pinot.thirdeye.detection.spi.components.BaselineProvider;
+import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.apache.pinot.thirdeye.rootcause.timeseries.Baseline;
 import io.swagger.annotations.Api;
@@ -67,6 +84,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.thirdeye.dashboard.resources.v2.BaselineParsingUtils.*;
+import static org.apache.pinot.thirdeye.detection.DetectionUtils.*;
 
 
 /**
@@ -94,6 +112,7 @@ public class RootCauseMetricResource {
 
   private static final String OFFSET_DEFAULT = "current";
   private static final String TIMEZONE_DEFAULT = "UTC";
+  private static final String OFFSET_FORECAST = "forecast";
   private static final String GRANULARITY_DEFAULT = MetricSlice.NATIVE_GRANULARITY.toAggregationGranularityString();
   private static final int LIMIT_DEFAULT = 100;
 
@@ -102,14 +121,21 @@ public class RootCauseMetricResource {
   private final TimeSeriesLoader timeSeriesLoader;
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;
+  private final DataProvider dataProvider;
 
   public RootCauseMetricResource(ExecutorService executor, AggregationLoader aggregationLoader,
-      TimeSeriesLoader timeSeriesLoader, MetricConfigManager metricDAO, DatasetConfigManager datasetDAO) {
+      TimeSeriesLoader timeSeriesLoader, MetricConfigManager metricDAO, DatasetConfigManager datasetDAO,
+      EventManager eventDAO, MergedAnomalyResultManager anomalyDAO, EvaluationManager evaluationDAO) {
     this.executor = executor;
     this.aggregationLoader = aggregationLoader;
     this.timeSeriesLoader = timeSeriesLoader;
     this.metricDAO = metricDAO;
     this.datasetDAO = datasetDAO;
+    TimeSeriesLoader timeseriesLoader =
+        new DefaultTimeSeriesLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(), ThirdEyeCacheRegistry.getInstance().getTimeSeriesCache());
+    this.dataProvider = new DefaultDataProvider(metricDAO, datasetDAO, eventDAO, anomalyDAO, evaluationDAO,
+        timeseriesLoader, aggregationLoader, new DetectionPipelineLoader(), TimeSeriesCacheBuilder.getInstance(),
+        AnomaliesCacheBuilder.getInstance());
   }
 
   /**
@@ -406,6 +432,30 @@ public class RootCauseMetricResource {
 
     TimeGranularity granularity = TimeGranularity.fromString(granularityString);
     MetricSlice baseSlice = alignSlice(makeSlice(urn, start, end, granularity), timezone);
+
+    if(OFFSET_FORECAST.equals(offset)) {
+      String forecastClassName = DetectionRegistry.getInstance().lookup("FORECAST");
+      try {
+        InputDataFetcher dataFetcher = new DefaultInputDataFetcher(dataProvider, -1);
+        Map<String, Object> componentSpec = new HashMap<>();
+
+        Constructor<?> constructor = Class.forName(forecastClassName).getConstructor();
+        BaselineProvider forecastProvider = (BaselineProvider) constructor.newInstance();
+
+        Class clazz = Class.forName(forecastClassName);
+        Class<AbstractSpec> specClazz = (Class<AbstractSpec>) Class.forName(getSpecClassName(clazz));
+        AbstractSpec forecastSpec = AbstractSpec.fromProperties(componentSpec, specClazz);
+
+        forecastProvider.init(forecastSpec, dataFetcher);
+        TimeSeries forecast = forecastProvider.computePredictedTimeSeries(baseSlice);
+        return makeTimeSeriesMap(forecast.getDataFrame());
+      }
+      catch (Exception e) {
+        LOG.info("Failed to get Forecast baseline");
+        offset = OFFSET_DEFAULT;
+      }
+    }
+
     Baseline range = parseOffset(offset, timezone);
 
     List<MetricSlice> slices = new ArrayList<>(range.scatter(baseSlice));
