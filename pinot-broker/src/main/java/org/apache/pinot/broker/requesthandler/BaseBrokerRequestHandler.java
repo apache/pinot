@@ -451,12 +451,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   private void validateNumSegments(Map<ServerInstance, List<String>> offlineRoutingTable,
       Map<ServerInstance, List<String>> realtimeRoutingTable, int querySegmentLimit) {
-    int numOffline = offlineRoutingTable == null ? 0 : offlineRoutingTable.values().stream().mapToInt(List::size).sum();
-    int numRealtime =
-        realtimeRoutingTable == null ? 0 : realtimeRoutingTable.values().stream().mapToInt(List::size).sum();
-    int numSegments = numOffline + numRealtime;
-    if (numSegments > querySegmentLimit) {
-      throw new IllegalStateException(String.format("Query exceeds segment limit of %d", querySegmentLimit));
+    if (_querySegmentLimit > 0) {
+      int numOffline = offlineRoutingTable == null ? 0 : offlineRoutingTable.values().stream().mapToInt(List::size).sum();
+      int numRealtime =
+          realtimeRoutingTable == null ? 0 : realtimeRoutingTable.values().stream().mapToInt(List::size).sum();
+      int numSegments = numOffline + numRealtime;
+      if (numSegments > querySegmentLimit) {
+        throw new IllegalStateException(String.format("Query exceeds segment limit of %d", querySegmentLimit));
+      }
     }
   }
 

@@ -63,8 +63,9 @@ public abstract class SegmentDataManager {
   }
 
   /**
-   * Indicates whether this segment is physically in memory or downloaded to disc.
-   * @return
+   * Indicates whether this segment is downloaded to local disc
+   *
+   * @return Whether the segment is present on the local disc
    */
   public boolean hasLocalData() {
     return true;

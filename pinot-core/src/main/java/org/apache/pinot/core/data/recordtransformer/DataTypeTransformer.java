@@ -44,12 +44,6 @@ public class DataTypeTransformer implements RecordTransformer {
   private static final Map<Class, PinotDataType> SINGLE_VALUE_TYPE_MAP = new HashMap<>();
   private static final Map<Class, PinotDataType> MULTI_VALUE_TYPE_MAP = new HashMap<>();
 
-  class DataTypeConversionException extends Exception {
-    public DataTypeConversionException(String column, PinotDataType source, PinotDataType target, Exception cause) {
-      super(String.format("Error converting column %s from %s to %s", column, source, target), cause);
-    }
-  }
-
   static {
     SINGLE_VALUE_TYPE_MAP.put(Boolean.class, PinotDataType.BOOLEAN);
     SINGLE_VALUE_TYPE_MAP.put(Byte.class, PinotDataType.BYTE);
@@ -83,7 +77,7 @@ public class DataTypeTransformer implements RecordTransformer {
   }
 
   @Override
-  public GenericRow transform(GenericRow record) throws DataTypeConversionException {
+  public GenericRow transform(GenericRow record) {
     for (Map.Entry<String, PinotDataType> entry : _dataTypes.entrySet()) {
       String column = entry.getKey();
       Object value = record.getValue(column);
@@ -115,11 +109,7 @@ public class DataTypeTransformer implements RecordTransformer {
         }
       }
       if (source != dest) {
-        try {
-          value = dest.convert(value, source);
-        } catch (Exception e) {
-          throw new DataTypeConversionException(column, source, dest, e);
-        }
+        value = dest.convert(value, source);
       }
 
       record.putValue(column, value);
