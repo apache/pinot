@@ -22,9 +22,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
+import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -63,7 +65,15 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
     transformConfigs.add(new TransformConfig("AmPm", "Groovy({DepTime < 1200 ? \"AM\": \"PM\"}, DepTime)"));
     transformConfigs.add(new TransformConfig("millisSinceEpoch", "fromEpochDays(DaysSinceEpoch)"));
     transformConfigs.add(new TransformConfig("lowerCaseDestCityName", "lower(DestCityName)"));
-    return new IngestionConfig(null, getStreamIngestionConfig(), filterConfig, transformConfigs);
+
+    List<Map<String, String>> streamConfigMaps = new ArrayList<>();
+    streamConfigMaps.add(getStreamConfigMap());
+    return new IngestionConfig(null, new StreamIngestionConfig(streamConfigMaps), filterConfig, transformConfigs);
+  }
+
+  @Override
+  protected Map<String, String> getStreamConfigs() {
+    return null;
   }
 
   @Override

@@ -39,11 +39,10 @@ import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
@@ -248,13 +247,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return DEFAULT_NULL_HANDLING_ENABLED;
   }
 
-  @Nullable
-  protected StreamIngestionConfig getStreamIngestionConfig() {
-    List<Map<String, String>> streamConfigMaps = new ArrayList<>();
-    streamConfigMaps.add(getStreamConfigMap());
-    return new StreamIngestionConfig(streamConfigMaps);
-  }
-
   /**
    * The following methods are based on the getters. Override the getters for non-default settings before calling these
    * methods.
@@ -296,6 +288,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected TableConfig getOfflineTableConfig() {
     return getOfflineTableConfig(getTableName());
+  }
+
+  protected Map<String, String> getStreamConfigs() {
+    return getStreamConfigMap();
   }
 
   protected Map<String, String> getStreamConfigMap() {
@@ -351,7 +347,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
         .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
         .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setLLC(useLlc())
-        .setStreamConfigs(getStreamConfigMap()).setNullHandlingEnabled(getNullHandlingEnabled()).build();
+        .setStreamConfigs(getStreamConfigs()).setNullHandlingEnabled(getNullHandlingEnabled()).build();
   }
 
   /**
