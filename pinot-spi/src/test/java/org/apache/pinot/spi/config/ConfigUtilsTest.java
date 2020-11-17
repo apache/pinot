@@ -63,8 +63,11 @@ public class ConfigUtilsTest {
     String topic = "fakeTopic";
     String consumerType = "simple";
     String tableName = "fakeTable_REALTIME";
-    String consumerFactoryClass = "org.apache.pinot.plugin.stream.kafka20.StreamConsumerFactory";
-    String decoderClass = "org.apache.pinot.plugin.inputformat.avro.KafkaAvroMessageDecoder";
+    String defaultConsumerFactoryClass = "org.apache.pinot.plugin.stream.kafka20.StreamConsumerFactory";
+    String defaultDecoderClass = "org.apache.pinot.plugin.inputformat.avro.KafkaAvroMessageDecoder";
+
+    String consumerFactoryClass = String.format("${CONSUMER_FACTORY_CLASS:%s}", defaultConsumerFactoryClass);
+    String decoderClass = String.format("${DECODER_CLASS:%s}", defaultDecoderClass);
 
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
@@ -104,8 +107,8 @@ public class ConfigUtilsTest {
     Assert.assertEquals(streamConfig.getType(), streamType);
     Assert.assertEquals(streamConfig.getTopicName(), topic);
     Assert.assertEquals(streamConfig.getConsumerTypes().get(0), StreamConfig.ConsumerType.LOWLEVEL);
-    Assert.assertEquals(streamConfig.getConsumerFactoryClassName(), consumerFactoryClass);
-    Assert.assertEquals(streamConfig.getDecoderClass(), decoderClass);
+    Assert.assertEquals(streamConfig.getConsumerFactoryClassName(), defaultConsumerFactoryClass);
+    Assert.assertEquals(streamConfig.getDecoderClass(), defaultDecoderClass);
     Assert.assertEquals(streamConfig.getStreamConfigsMap().get("stream.fakeStream.aws.accessKey"),
         "default_aws_access_key");
     Assert.assertEquals(streamConfig.getStreamConfigsMap().get("stream.fakeStream.aws.secretKey"),

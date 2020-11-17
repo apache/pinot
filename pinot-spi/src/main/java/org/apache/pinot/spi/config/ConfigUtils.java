@@ -77,12 +77,17 @@ public class ConfigUtils {
       case STRING:
         final String field = jsonNode.asText();
         if (field.startsWith("${") && field.endsWith("}")) {
-          final String envVarKey = field.substring(2, field.length() - 1);
+          String[] envVarSplits = field.substring(2, field.length() - 1).split(":", 2);
+          String envVarKey = envVarSplits[0];
           if (ENVIRONMENT_VARIABLES.containsKey(envVarKey)) {
             return JsonNodeFactory.instance.textNode(ENVIRONMENT_VARIABLES.get(envVarKey));
+          } else if (envVarSplits.length > 1) {
+            return JsonNodeFactory.instance.textNode(envVarSplits[1]);
           }
-          throw new RuntimeException("Missing environment Variable: " + field);
+          throw new RuntimeException("Missing environment Variable: " + envVarKey);
         }
+        break;
+      default:
         break;
     }
     return jsonNode;
