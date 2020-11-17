@@ -23,7 +23,6 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -59,13 +58,11 @@ import org.apache.pinot.spi.data.IngestionSchemaValidator;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.SchemaValidatorFactory;
 import org.apache.pinot.spi.data.readers.FileFormat;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 /**
  * Implementation of an index segment creator.
@@ -192,38 +189,15 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       // Build the index
       recordReader.rewind();
       LOGGER.info("Start building IndexCreator!");
-      GenericRow reuse = new GenericRow();
-      while (recordReader.hasNext()) {
-        long recordReadStartTime = System.currentTimeMillis();
-        long recordReadStopTime;
-        long indexStopTime;
-        reuse.clear();
-        GenericRow decodedRow = recordReader.next(reuse);
-        if (decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {
-          recordReadStopTime = System.currentTimeMillis();
-          totalRecordReadTime += (recordReadStopTime - recordReadStartTime);
-          for (Object singleRow : (Collection) decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
-            recordReadStartTime = System.currentTimeMillis();
-            GenericRow transformedRow = _recordTransformer.transform((GenericRow) singleRow);
-            recordReadStopTime = System.currentTimeMillis();
-            totalRecordReadTime += (recordReadStopTime - recordReadStartTime);
-            if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
-              indexCreator.indexRow(transformedRow);
-              indexStopTime = System.currentTimeMillis();
-              totalIndexTime += (indexStopTime - recordReadStopTime);
-            }
-          }
-        } else {
-          GenericRow transformedRow = _recordTransformer.transform(decodedRow);
-          recordReadStopTime = System.currentTimeMillis();
-          totalRecordReadTime += (recordReadStopTime - recordReadStartTime);
-          if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
-            indexCreator.indexRow(transformedRow);
-            indexStopTime = System.currentTimeMillis();
-            totalIndexTime += (indexStopTime - recordReadStopTime);
-          }
-        }
-      }
+
+      BuildRingBufferConsumer consumer = new BuildRingBufferConsumer(_recordTransformer, indexCreator); 
+      ParallelRowProcessor prp = new ParallelRowProcessor(recordReader, consumer);
+
+      prp.Run();
+
+      totalIndexTime = consumer.getTotalIndexTime();
+      totalRecordReadTime = consumer.getTotalRecordReadTime();
+      totalStatsCollectorTime = consumer.getTotalStatsCollectorTime();
     } catch (Exception e) {
       indexCreator.close();
       throw e;

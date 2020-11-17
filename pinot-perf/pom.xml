@@ -129,6 +129,10 @@
               <name>pinot-BenchmarkDictionary</name>
             </program>
             <program>
+              <mainClass>org.apache.pinot.perf.BenchmarkSegmentCreation</mainClass>
+              <name>pinot-BenchmarkSegmentCreation</name>
+            </program>
+            <program>
               <mainClass>org.apache.pinot.perf.BenchmarkDictionaryCreation</mainClass>
               <name>pinot-BenchmarkDictionaryCreation</name>
             </program>

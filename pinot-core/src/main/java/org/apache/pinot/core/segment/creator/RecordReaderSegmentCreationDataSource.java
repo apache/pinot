@@ -18,17 +18,15 @@
  */
 package org.apache.pinot.core.segment.creator;
 
-import java.util.Collection;
 import org.apache.pinot.common.Utils;
-import org.apache.pinot.core.util.IngestionUtils;
-import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
+import org.apache.pinot.core.segment.creator.impl.InitRingBufferConsumer;
+import org.apache.pinot.core.segment.creator.impl.ParallelRowProcessor;
 import org.apache.pinot.core.segment.creator.impl.stats.SegmentPreIndexStatsCollectorImpl;
+import org.apache.pinot.spi.data.readers.RecordReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 /**
  * {@link org.apache.pinot.core.segment.creator.SegmentCreationDataSource} that uses a
@@ -53,26 +51,11 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
       SegmentPreIndexStatsCollector collector = new SegmentPreIndexStatsCollectorImpl(statsCollectorConfig);
       collector.init();
 
-      // Gather the stats
-      GenericRow reuse = new GenericRow();
-      while (_recordReader.hasNext()) {
-        reuse.clear();
+      ParallelRowProcessor prp = new ParallelRowProcessor(
+          _recordReader, 
+          new InitRingBufferConsumer(recordTransformer, collector));
 
-        reuse = _recordReader.next(reuse);
-        if (reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {
-          for (Object singleRow : (Collection) reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
-            GenericRow transformedRow = recordTransformer.transform((GenericRow) singleRow);
-            if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
-              collector.collectRow(transformedRow);
-            }
-          }
-        } else {
-          GenericRow transformedRow = recordTransformer.transform(reuse);
-          if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
-            collector.collectRow(transformedRow);
-          }
-        }
-      }
+      prp.Run();
 
       collector.build();
       return collector;
