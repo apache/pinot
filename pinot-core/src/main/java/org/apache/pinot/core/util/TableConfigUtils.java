@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.config.TagNameUtils;
@@ -37,7 +38,6 @@ import org.apache.pinot.core.data.function.FunctionEvaluatorFactory;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
-import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
@@ -46,6 +46,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.BatchConfig;
@@ -81,7 +82,7 @@ public final class TableConfigUtils {
     // Sanitize the table config before validation
     sanitize(tableConfig);
     validateValidationConfig(tableConfig, schema);
-    validateIngestionConfig(tableConfig.getTableName(), tableConfig.getIngestionConfig(), schema);
+    validateIngestionConfig(tableConfig, schema);
     validateTierConfigList(tableConfig.getTierConfigsList());
     validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
     validateFieldConfigList(tableConfig.getFieldConfigList(), schema);
@@ -181,17 +182,19 @@ public final class TableConfigUtils {
    * 4. validity of transform function string
    * 5. checks for source fields used in destination columns
    */
-  public static void validateIngestionConfig(String tableNameWithType, @Nullable IngestionConfig ingestionConfig,
-      @Nullable Schema schema) {
+  public static void validateIngestionConfig(TableConfig tableConfig, @Nullable Schema schema) {
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+
     if (ingestionConfig != null) {
+      String tableNameWithType = tableConfig.getTableName();
 
       // Batch
       if (ingestionConfig.getBatchIngestionConfig() != null) {
         List<Map<String, String>> batchConfigMaps = ingestionConfig.getBatchIngestionConfig().getBatchConfigMaps();
         Preconditions.checkState(batchConfigMaps.size() > 0, "Could not find batch config map");
         try {
-            // Validate that BatchConfig can be created
-            batchConfigMaps.forEach(b -> new BatchConfig(tableNameWithType, b));
+          // Validate that BatchConfig can be created
+          batchConfigMaps.forEach(b -> new BatchConfig(tableNameWithType, b));
         } catch (Exception e) {
           throw new IllegalStateException("Could not create BatchConfig using the batchConfig map", e);
         }
@@ -199,6 +202,9 @@ public final class TableConfigUtils {
 
       // Stream
       if (ingestionConfig.getStreamIngestionConfig() != null) {
+        IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+        Preconditions.checkState(indexingConfig == null || MapUtils.isEmpty(indexingConfig.getStreamConfigs()),
+            "Should not use indexingConfig#getStreamConfigs if ingestionConfig#StreamIngestionConfig is provided");
         List<Map<String, String>> streamConfigMaps = ingestionConfig.getStreamIngestionConfig().getStreamConfigMaps();
         Preconditions.checkState(streamConfigMaps.size() == 1, "Only 1 stream is supported in REALTIME table");
         try {

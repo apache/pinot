@@ -27,7 +27,7 @@ import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 
 
 /**
- * Helper methods for extracting fields from IngestionConfig
+ * Helper methods for extracting fields from IngestionConfig in a backward compatible manner
  */
 public final class IngestionConfigUtils {
   /**

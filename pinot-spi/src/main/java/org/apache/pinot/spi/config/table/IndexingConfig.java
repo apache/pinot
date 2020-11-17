@@ -34,7 +34,7 @@ public class IndexingConfig extends BaseJsonConfig {
   private List<String> _bloomFilterColumns;
   private Map<String, BloomFilterConfig> _bloomFilterConfigs;
   private String _loadMode;
-  @Deprecated // Moved to IngestionConfigs#Stream
+  @Deprecated // Moved to {@link IngestionConfig#getStreamIngestionConfig}
   private Map<String, String> _streamConfigs;
   private String _segmentFormatVersion;
   private String _columnMinMaxValueGeneratorMode;

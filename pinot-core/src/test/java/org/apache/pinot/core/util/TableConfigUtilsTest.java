@@ -348,10 +348,13 @@ public class TableConfigUtilsTest {
     Map<String, String> fakeMap = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
     IngestionConfig ingestionConfig =
         new IngestionConfig(null, new StreamIngestionConfig(Lists.newArrayList(fakeMap, fakeMap)), null, null);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
+            .setIngestionConfig(ingestionConfig).build();
 
     // only 1 stream config allowed
     try {
-      TableConfigUtils.validateIngestionConfig("myTable_REALTIME", ingestionConfig, null);
+      TableConfigUtils.validateIngestionConfig(tableConfig, null);
       Assert.fail("Should fail for more than 1 stream config");
     } catch (IllegalStateException e) {
       // expected
@@ -359,11 +362,12 @@ public class TableConfigUtilsTest {
 
     // stream config should be valid
     ingestionConfig = new IngestionConfig(null, new StreamIngestionConfig(Lists.newArrayList(fakeMap)), null, null);
-    TableConfigUtils.validateIngestionConfig("myTable_REALTIME", ingestionConfig, null);
+    tableConfig.setIngestionConfig(ingestionConfig);
+    TableConfigUtils.validateIngestionConfig(tableConfig, null);
 
     fakeMap.remove(StreamConfigProperties.STREAM_TYPE);
     try {
-      TableConfigUtils.validateIngestionConfig("myTable_REALTIME", ingestionConfig, null);
+      TableConfigUtils.validateIngestionConfig(tableConfig, null);
       Assert.fail("Should fail for invalid stream configs map");
     } catch (Exception e) {
       // expected
@@ -385,13 +389,16 @@ public class TableConfigUtilsTest {
         "org.foo.Reader");
 
     IngestionConfig ingestionConfig =
-        new IngestionConfig(new BatchIngestionConfig(Lists.newArrayList(batchConfigMap, batchConfigMap), null, null), null, null,
-            null);
-    TableConfigUtils.validateIngestionConfig("myTable_REALTIME", ingestionConfig, null);
+        new IngestionConfig(new BatchIngestionConfig(Lists.newArrayList(batchConfigMap, batchConfigMap), null, null),
+            null, null, null);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable_OFFLINE").setIngestionConfig(ingestionConfig)
+            .build();
+    TableConfigUtils.validateIngestionConfig(tableConfig, null);
 
     batchConfigMap.remove(BatchConfigProperties.BATCH_TYPE);
     try {
-      TableConfigUtils.validateIngestionConfig("myTable_REALTIME", ingestionConfig, null);
+      TableConfigUtils.validateIngestionConfig(tableConfig, null);
       Assert.fail("Should fail for invalid batch config map");
     } catch (IllegalStateException e) {
       // expected
@@ -787,7 +794,8 @@ public class TableConfigUtilsTest {
     try {
       TableConfigUtils.validateUpsertConfig(tableConfig, schema);
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "Could not find streamConfigs for REALTIME table: " + TABLE_NAME + "_REALTIME");
+      Assert
+          .assertEquals(e.getMessage(), "Could not find streamConfigs for REALTIME table: " + TABLE_NAME + "_REALTIME");
     }
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("stream.kafka.consumer.type", "highLevel");
