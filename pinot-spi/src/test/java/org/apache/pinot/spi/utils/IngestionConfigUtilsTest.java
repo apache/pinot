@@ -101,11 +101,8 @@ public class IngestionConfigUtilsTest {
   public void testGetPushFrequency() {
     // get from ingestion config, when not present in segmentsConfig
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
-    Map<String, String> batchConfigMap = new HashMap<>();
-    batchConfigMap.put("batchType", "s3");
-    tableConfig.setIngestionConfig(
-        new IngestionConfig(new BatchIngestionConfig(Lists.newArrayList(batchConfigMap), "APPEND", "HOURLY"), null,
-            null, null));
+    tableConfig
+        .setIngestionConfig(new IngestionConfig(new BatchIngestionConfig(null, "APPEND", "HOURLY"), null, null, null));
     Assert.assertEquals(IngestionConfigUtils.getBatchSegmentPushFrequency(tableConfig), "HOURLY");
 
     // get from ingestion config, even if present in segmentsConfig
@@ -129,11 +126,8 @@ public class IngestionConfigUtilsTest {
   public void testGetPushType() {
     // get from ingestion config, when not present in segmentsConfig
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
-    Map<String, String> batchConfigMap = new HashMap<>();
-    batchConfigMap.put("batchType", "s3");
-    tableConfig.setIngestionConfig(
-        new IngestionConfig(new BatchIngestionConfig(Lists.newArrayList(batchConfigMap), "APPEND", "HOURLY"), null, null,
-            null));
+    tableConfig
+        .setIngestionConfig(new IngestionConfig(new BatchIngestionConfig(null, "APPEND", "HOURLY"), null, null, null));
     Assert.assertEquals(IngestionConfigUtils.getBatchSegmentPushType(tableConfig), "APPEND");
 
     // get from ingestion config, even if present in segmentsConfig

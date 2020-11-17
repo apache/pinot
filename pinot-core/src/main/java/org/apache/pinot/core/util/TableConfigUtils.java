@@ -191,10 +191,11 @@ public final class TableConfigUtils {
       // Batch
       if (ingestionConfig.getBatchIngestionConfig() != null) {
         List<Map<String, String>> batchConfigMaps = ingestionConfig.getBatchIngestionConfig().getBatchConfigMaps();
-        Preconditions.checkState(batchConfigMaps.size() > 0, "Could not find batch config map");
         try {
-          // Validate that BatchConfig can be created
-          batchConfigMaps.forEach(b -> new BatchConfig(tableNameWithType, b));
+          if (CollectionUtils.isNotEmpty(batchConfigMaps)) {
+            // Validate that BatchConfig can be created
+            batchConfigMaps.forEach(b -> new BatchConfig(tableNameWithType, b));
+          }
         } catch (Exception e) {
           throw new IllegalStateException("Could not create BatchConfig using the batchConfig map", e);
         }

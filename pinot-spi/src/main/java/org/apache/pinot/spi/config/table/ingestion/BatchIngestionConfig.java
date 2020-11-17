@@ -42,7 +42,7 @@ public class BatchIngestionConfig extends BaseJsonConfig {
   private final String _segmentPushFrequency;
 
   @JsonCreator
-  public BatchIngestionConfig(@JsonProperty("batchConfigMaps") List<Map<String, String>> batchConfigMaps,
+  public BatchIngestionConfig(@JsonProperty("batchConfigMaps") @Nullable List<Map<String, String>> batchConfigMaps,
       @JsonProperty("segmentPushType") String segmentPushType,
       @JsonProperty("segmentPushFrequency") String segmentPushFrequency) {
     _batchConfigMaps = batchConfigMaps;
@@ -50,6 +50,7 @@ public class BatchIngestionConfig extends BaseJsonConfig {
     _segmentPushFrequency = segmentPushFrequency;
   }
 
+  @Nullable
   public List<Map<String, String>> getBatchConfigMaps() {
     return _batchConfigMaps;
   }
