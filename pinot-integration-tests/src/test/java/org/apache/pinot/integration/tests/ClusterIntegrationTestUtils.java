@@ -24,13 +24,16 @@ import com.google.common.math.DoubleMath;
 import com.google.common.primitives.Longs;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.IOException;
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -39,7 +42,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -53,6 +55,7 @@ import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.util.Utf8;
 import org.apache.commons.lang3.math.NumberUtils;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.core.requesthandler.PinotQueryParserFactory;
 import org.apache.pinot.core.requesthandler.PinotQueryRequest;
 import org.apache.pinot.client.Request;
@@ -80,6 +83,7 @@ public class ClusterIntegrationTestUtils {
   // Comparison limit
   public static final int MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE = 5;
   public static final int MAX_NUM_ROWS_TO_COMPARE = 10000;
+  public static final int H2_MULTI_VALUE_SUFFIX_LENGTH = 5;
 
   private static final Random RANDOM = new Random();
 
@@ -463,21 +467,20 @@ public class ClusterIntegrationTestUtils {
    * </ul>
    *
    * @param pinotQuery Pinot query
-   * @param queryFormat Pinot query format
    * @param brokerUrl Pinot broker URL
    * @param pinotConnection Pinot connection
    * @param sqlQueries H2 SQL queries
    * @param h2Connection H2 connection
    * @throws Exception
    */
-  public static void testQuery(String pinotQuery, String queryFormat, String brokerUrl,
+  public static void testPqlQuery(String pinotQuery, String brokerUrl,
       org.apache.pinot.client.Connection pinotConnection, @Nullable List<String> sqlQueries,
       @Nullable Connection h2Connection)
       throws Exception {
     // Use broker response for metadata check, connection response for value check
-    PinotQueryRequest pinotBrokerQueryRequest = new PinotQueryRequest(queryFormat, pinotQuery);
+    PinotQueryRequest pinotBrokerQueryRequest = new PinotQueryRequest(CommonConstants.Broker.Request.PQL, pinotQuery);
     JsonNode pinotResponse = ClusterTest.postQuery(pinotBrokerQueryRequest, brokerUrl);
-    Request pinotClientRequest = new Request(queryFormat, pinotQuery);
+    Request pinotClientRequest = new Request(CommonConstants.Broker.Request.PQL, pinotQuery);
     ResultSetGroup pinotResultSetGroup = pinotConnection.execute(pinotClientRequest);
 
     // Skip comparison if SQL queries are not specified
@@ -655,160 +658,25 @@ public class ClusterIntegrationTestUtils {
         sortSequence = new ArrayList<>();
       }
 
-      Set<String> orderByColumns;
+      List<String> orderByColumns;
       if (sortSequence == null) {
-        orderByColumns = Collections.emptySet();
+        orderByColumns = Collections.emptyList();
       } else {
-        orderByColumns = new TreeSet<>();
+        orderByColumns = new ArrayList<>();
         for (SelectionSort selectionSort : sortSequence) {
           orderByColumns.add(selectionSort.getColumn());
         }
       }
       Set<String> expectedValues = new HashSet<>();
       List<String> expectedOrderByValues = new ArrayList<>();
-      Map<String, String> reusableExpectedValueMap = new HashMap<>();
-      Map<String, List<String>> reusableMultiValuesMap = new HashMap<>();
-      List<String> reusableColumnOrder = new ArrayList<>();
-      int h2NumRows;
-      for (h2NumRows = 0; h2ResultSet.next() && h2NumRows < MAX_NUM_ROWS_TO_COMPARE; h2NumRows++) {
-        reusableExpectedValueMap.clear();
-        reusableMultiValuesMap.clear();
-        reusableColumnOrder.clear();
 
-        int numColumns = h2MetaData.getColumnCount();
-        for (int columnIndex = 1; columnIndex <= numColumns; columnIndex++) {
-          String columnName = h2MetaData.getColumnName(columnIndex);
-
-          // Handle null result and convert boolean value to lower case
-          String columnValue = h2ResultSet.getString(columnIndex);
-          if (columnValue == null) {
-            columnValue = "null";
-          } else {
-            columnValue = convertBooleanToLowerCase(columnValue);
-          }
-
-          // Handle multi-value columns
-          int length = columnName.length();
-          if (length > 5 && columnName.substring(length - 5, length - 1).equals("__MV")) {
-            // Multi-value column
-            String multiValueColumnName = columnName.substring(0, length - 5);
-            List<String> multiValue = reusableMultiValuesMap.get(multiValueColumnName);
-            if (multiValue == null) {
-              multiValue = new ArrayList<>();
-              reusableMultiValuesMap.put(multiValueColumnName, multiValue);
-              reusableColumnOrder.add(multiValueColumnName);
-            }
-            multiValue.add(columnValue);
-          } else {
-            // Single-value column
-            reusableExpectedValueMap.put(columnName, columnValue);
-            reusableColumnOrder.add(columnName);
-          }
-        }
-
-        // Add multi-value column results to the expected values
-        // The reason for this step is that Pinot does not maintain order of elements in multi-value columns
-        for (Map.Entry<String, List<String>> entry : reusableMultiValuesMap.entrySet()) {
-          List<String> multiValue = entry.getValue();
-          Collections.sort(multiValue);
-          reusableExpectedValueMap.put(entry.getKey(), multiValue.toString());
-        }
-
-        // Build expected value String
-        StringBuilder expectedValue = new StringBuilder();
-        StringBuilder expectedOrderByValue = new StringBuilder();
-        for (String column : reusableColumnOrder) {
-          expectedValue.append(column).append(':').append(reusableExpectedValueMap.get(column)).append(' ');
-          if (orderByColumns.contains(column)) {
-            expectedOrderByValue.append(column).append(':').append(reusableExpectedValueMap.get(column)).append(' ');
-          }
-        }
-        expectedValues.add(expectedValue.toString());
-        expectedOrderByValues.add(expectedOrderByValue.toString());
-      }
+      int h2NumRows = getH2ExpectedValues(expectedValues, expectedOrderByValues, h2ResultSet, h2MetaData, orderByColumns);
 
       org.apache.pinot.client.ResultSet pinotSelectionResultSet = pinotResultSetGroup.getResultSet(0);
-      int pinotNumRows = pinotSelectionResultSet.getRowCount();
-
-      // No record selected in H2
-      if (h2NumRows == 0) {
-        if (pinotNumRows != 0) {
-          String failureMessage = "No record selected in H2 but number of records selected in Pinot: " + pinotNumRows;
-          failure(pinotQuery, sqlQueries, failureMessage);
-          return;
-        }
-
-        if (pinotNumRecordsSelected != 0) {
-          String failureMessage =
-              "No selection result returned in Pinot but number of records selected: " + pinotNumRecordsSelected;
-          failure(pinotQuery, sqlQueries, failureMessage);
-          return;
-        }
-
-        // Skip further comparison
-        return;
-      }
 
       // Only compare exhausted results
-      if (h2NumRows < MAX_NUM_ROWS_TO_COMPARE) {
-        // Check that Pinot results are contained in the H2 results
-        int numColumns = pinotSelectionResultSet.getColumnCount();
-
-        for (int rowIndex = 0; rowIndex < pinotNumRows; rowIndex++) {
-          // Build actual value String.
-          StringBuilder actualValueBuilder = new StringBuilder();
-          StringBuilder actualOrderByValueBuilder = new StringBuilder();
-          for (int columnIndex = 0; columnIndex < numColumns; columnIndex++) {
-            // Convert column name to all uppercase to make it compatible with H2
-            String columnName = pinotSelectionResultSet.getColumnName(columnIndex).toUpperCase();
-            String columnResult = pinotSelectionResultSet.getString(rowIndex, columnIndex);
-
-            // TODO: Find a better way to identify multi-value column
-            if (columnResult.charAt(0) == '[') {
-              // Multi-value column
-              JsonNode columnValues = JsonUtils.stringToJsonNode(columnResult);
-              List<String> multiValue = new ArrayList<>();
-              int length = columnValues.size();
-              for (int elementIndex = 0; elementIndex < length; elementIndex++) {
-                multiValue.add(columnValues.get(elementIndex).asText());
-              }
-              for (int elementIndex = length; elementIndex < MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE;
-                  elementIndex++) {
-                multiValue.add("null");
-              }
-              Collections.sort(multiValue);
-              actualValueBuilder.append(columnName).append(':').append(multiValue.toString()).append(' ');
-              if (orderByColumns.contains(columnName)) {
-                actualOrderByValueBuilder.append(columnName).append(':').append(columnResult).append(' ');
-              }
-            } else {
-              // Single-value column
-              actualValueBuilder.append(columnName).append(':').append(columnResult).append(' ');
-              if (orderByColumns.contains(columnName)) {
-                actualOrderByValueBuilder.append(columnName).append(':').append(columnResult).append(' ');
-              }
-            }
-          }
-          String actualValue = actualValueBuilder.toString();
-          String actualOrderByValue = actualOrderByValueBuilder.toString();
-          // Check actual value in expected values set
-          if (!expectedValues.contains(actualValue)) {
-            String failureMessage = "Selection result returned in Pinot but not in H2: " + actualValue;
-            failure(pinotQuery, sqlQueries, failureMessage);
-            return;
-          }
-          if (!orderByColumns.isEmpty()) {
-            // Check actual group value is the same as expected group value in the same order.
-            if (!expectedOrderByValues.get(rowIndex).equals(actualOrderByValue)) {
-              String failureMessage = String.format(
-                  "Selection Order by result at row index: %d in Pinot: [ %s ] is different than result in H2: [ %s ].",
-                  rowIndex, actualOrderByValue, expectedOrderByValues.get(rowIndex));
-              failure(pinotQuery, sqlQueries, failureMessage);
-              return;
-            }
-          }
-        }
-      }
+      comparePinotResultsWithExpectedValues(expectedValues, expectedOrderByValues, pinotSelectionResultSet, orderByColumns,
+          pinotQuery, sqlQueries, h2NumRows, pinotNumRecordsSelected);
     } else {
       // Neither aggregation or selection results
       String failureMessage = "No aggregation or selection results found for query: " + pinotQuery;
@@ -831,6 +699,14 @@ public class ClusterIntegrationTestUtils {
       throws Exception {
     if (pinotQuery == null || sqlQueries == null) {
       return;
+    }
+
+    BrokerRequest brokerRequest =
+        PinotQueryParserFactory.get(CommonConstants.Broker.Request.SQL).compileToBrokerRequest(pinotQuery);
+
+    List<String> orderByColumns = new ArrayList<>();
+    if (isSelectionQuery(brokerRequest) && brokerRequest.getOrderBy() != null && brokerRequest.getOrderBy().size() > 0) {
+      orderByColumns.addAll(CalciteSqlParser.extractIdentifiers(brokerRequest.getPinotQuery().getOrderByList(), false));
     }
 
     // broker response
@@ -856,50 +732,13 @@ public class ClusterIntegrationTestUtils {
     ResultSet h2ResultSet = h2statement.getResultSet();
 
     // compare results
-    BrokerRequest brokerRequest =
-        PinotQueryParserFactory.get(CommonConstants.Broker.Request.SQL).compileToBrokerRequest(pinotQuery);
     if (isSelectionQuery(brokerRequest)) { // selection
-      // TODO: 1. compare results for selection queries, w/o order by.
-      //       2. validate values of multi-value columns.
-      //       3. remove the restriction that order by column has to be in selection clause.
+      Set<String> expectedValues = new HashSet<>();
+      List<String> expectedOrderByValues = new ArrayList<>();
+      int h2NumRows = getH2ExpectedValues(expectedValues, expectedOrderByValues, h2ResultSet, h2ResultSet.getMetaData(), orderByColumns);
 
-      // Compare results for selection queries, with order by
-      if (brokerRequest.getOrderBy() != null && brokerRequest.getOrderBy().size() > 0) {
-        // don't compare query with multi-value column.
-        if (sqlQuery.contains("_MV")) {
-          return;
-        }
-        Set<String> orderByColumns =
-            CalciteSqlParser.extractIdentifiers(brokerRequest.getPinotQuery().getOrderByList(), false);
-        Set<String> selectionColumns =
-            CalciteSqlParser.extractIdentifiers(brokerRequest.getPinotQuery().getSelectList(), false);
-        if (!selectionColumns.containsAll(orderByColumns)) {
-          // Selection columns has no overlap with order by column, don't compare.
-          return;
-        }
-        if (h2ResultSet.first()) {
-          for (int i = 0; i < brokerResponseRows.size(); i++) {
-            for (int c = 0; c < numColumns; c++) {
-              String h2Value = h2ResultSet.getString(c + 1);
-              String brokerValue = brokerResponseRows.get(i).get(c).asText();
-              String connectionValue = resultTableResultSet.getString(i, c);
-              if (orderByColumns.containsAll(CalciteSqlParser
-                  .extractIdentifiers(Arrays.asList(brokerRequest.getPinotQuery().getSelectList().get(c)), false))) {
-                boolean error = fuzzyCompare(h2Value, brokerValue, connectionValue);
-                if (error) {
-                  String failureMessage =
-                      "Value: " + c + " does not match, expected: " + h2Value + ", got broker value: " + brokerValue
-                          + ", got client value:" + connectionValue;
-                  failure(pinotQuery, Lists.newArrayList(sqlQuery), failureMessage);
-                }
-              }
-            }
-            if (!h2ResultSet.next()) {
-              return;
-            }
-          }
-        }
-      }
+      comparePinotResultsWithExpectedValues(expectedValues, expectedOrderByValues, resultTableResultSet,
+          orderByColumns, pinotQuery, sqlQueries, h2NumRows, pinotNumRecordsSelected);
     } else { // aggregation
       if (!brokerRequest.isSetGroupBy()) { // aggregation only
         // compare the single row
@@ -973,6 +812,202 @@ public class ClusterIntegrationTestUtils {
       return true;
     }
     return false;
+  }
+
+  private static void convertToUpperCase(List<String> columns) {
+    for (int i = 0; i < columns.size(); i++) {
+      columns.set(i, columns.get(i).toUpperCase());
+    }
+  }
+
+  private static int getH2ExpectedValues(Set<String> expectedValues, List<String> expectedOrderByValues,
+      ResultSet h2ResultSet, ResultSetMetaData h2MetaData, Collection<String> orderByColumns) throws SQLException {
+    Map<String, String> reusableExpectedValueMap = new HashMap<>();
+    Map<String, List<String>> reusableMultiValuesMap = new HashMap<>();
+    List<String> reusableColumnOrder = new ArrayList<>();
+    int h2NumRows;
+    int numColumns = h2MetaData.getColumnCount();
+
+    for (h2NumRows = 0; h2ResultSet.next() && h2NumRows < MAX_NUM_ROWS_TO_COMPARE; h2NumRows++) {
+      reusableExpectedValueMap.clear();
+      reusableMultiValuesMap.clear();
+      reusableColumnOrder.clear();
+
+      for (int columnIndex = 1; columnIndex <= numColumns; columnIndex++) { // h2 result set is 1-based
+        String columnName = h2MetaData.getColumnName(columnIndex);
+
+        // Handle null result and convert boolean value to lower case
+        String columnValue = h2ResultSet.getString(columnIndex);
+        if (columnValue == null) {
+          columnValue = "null";
+        } else {
+          columnValue = convertBooleanToLowerCase(columnValue);
+        }
+
+        // Handle multi-value columns
+        int length = columnName.length();
+        if (length > H2_MULTI_VALUE_SUFFIX_LENGTH && columnName.substring(length - H2_MULTI_VALUE_SUFFIX_LENGTH, length - 1).equals("__MV")) {
+          // Multi-value column
+          String multiValueColumnName = columnName.substring(0, length - H2_MULTI_VALUE_SUFFIX_LENGTH);
+          List<String> multiValue = reusableMultiValuesMap.get(multiValueColumnName);
+          if (multiValue == null) {
+            multiValue = new ArrayList<>();
+            reusableMultiValuesMap.put(multiValueColumnName, multiValue);
+            reusableColumnOrder.add(multiValueColumnName);
+          }
+          multiValue.add(columnValue);
+        } else {
+          // Single-value column
+          String columnDataType = h2MetaData.getColumnTypeName(columnIndex);
+          columnValue = removeTrailingZeroForNumber(columnValue, columnDataType);
+          reusableExpectedValueMap.put(columnName, columnValue);
+          reusableColumnOrder.add(columnName);
+        }
+      }
+
+      // Add multi-value column results to the expected values
+      // The reason for this step is that Pinot does not maintain order of elements in multi-value columns
+      for (Map.Entry<String, List<String>> entry : reusableMultiValuesMap.entrySet()) {
+        List<String> multiValue = entry.getValue();
+        Collections.sort(multiValue);
+        reusableExpectedValueMap.put(entry.getKey(), multiValue.toString());
+      }
+
+      // Build expected value String
+      StringBuilder expectedValue = new StringBuilder();
+      StringBuilder expectedOrderByValue = new StringBuilder();
+      for (String column : reusableColumnOrder) {
+        expectedValue.append(reusableExpectedValueMap.get(column)).append(' ');
+        if (orderByColumns.contains(column)) {
+          expectedOrderByValue.append(reusableExpectedValueMap.get(column)).append(' ');
+        }
+      }
+      expectedValues.add(expectedValue.toString());
+      expectedOrderByValues.add(expectedOrderByValue.toString());
+    }
+
+    return h2NumRows;
+  }
+
+  private static void comparePinotResultsWithExpectedValues(Set<String> expectedValues, List<String> expectedOrderByValues,
+      org.apache.pinot.client.ResultSet connectionResultSet, Collection<String> orderByColumns, String pinotQuery, List<String> sqlQueries,
+      int h2NumRows, long pinotNumRecordsSelected) throws IOException, SQLException {
+
+    int pinotNumRows = connectionResultSet.getRowCount();
+    // No record selected in H2
+    if (h2NumRows== 0) {
+      if (pinotNumRows != 0) {
+        String failureMessage = "No record selected in H2 but number of records selected in Pinot: " + pinotNumRows;
+        failure(pinotQuery, sqlQueries, failureMessage);
+        return;
+      }
+
+      if (pinotNumRecordsSelected != 0) {
+        String failureMessage =
+            "No selection result returned in Pinot but number of records selected: " + pinotNumRecordsSelected;
+        failure(pinotQuery, sqlQueries, failureMessage);
+        return;
+      }
+
+      // Skip further comparison
+      return;
+    }
+
+    PinotQuery compiledQuery = CalciteSqlParser.compileToPinotQuery(pinotQuery);
+    boolean isLimitSet = compiledQuery.isSetLimit();
+    int limit = compiledQuery.getLimit();
+
+    // Only compare exhausted results
+    if (h2NumRows < MAX_NUM_ROWS_TO_COMPARE) {
+
+      for (int rowIndex = 0; rowIndex < pinotNumRows; rowIndex++) {
+        // Build actual value String.
+        StringBuilder actualValueBuilder = new StringBuilder();
+        StringBuilder actualOrderByValueBuilder = new StringBuilder();
+        for (int columnIndex = 0; columnIndex < connectionResultSet.getColumnCount(); columnIndex++) {
+          // Convert column name to all uppercase to make it compatible with H2
+          String columnName = connectionResultSet.getColumnName(columnIndex).toUpperCase();
+          String columnResult = connectionResultSet.getString(rowIndex, columnIndex);
+
+          String columnDataType = connectionResultSet.getColumnDataType(columnIndex);
+          columnResult = removeTrailingZeroForNumber(columnResult, columnDataType);
+
+          JsonNode columnValues = null;
+          try {
+            columnValues = JsonUtils.stringToJsonNode(columnResult);
+          } catch (IOException e) {
+          }
+
+          if (columnValues != null && columnValues.isArray()) {
+            // Multi-value column
+            List<String> multiValue = new ArrayList<>();
+            int length = columnValues.size();
+            for (int elementIndex = 0; elementIndex < length; elementIndex++) {
+              multiValue.add(columnValues.get(elementIndex).asText());
+            }
+            for (int elementIndex = length; elementIndex < MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE; elementIndex++) {
+              multiValue.add("null");
+            }
+            Collections.sort(multiValue);
+            actualValueBuilder.append(multiValue.toString()).append(' ');
+            if (orderByColumns.contains(columnName)) {
+              actualOrderByValueBuilder.append(columnResult).append(' ');
+            }
+          } else {
+            // Single-value column
+            actualValueBuilder.append(columnResult).append(' ');
+            if (orderByColumns.contains(columnName)) {
+              actualOrderByValueBuilder.append(columnResult).append(' ');
+            }
+          }
+        }
+
+        String actualValue = actualValueBuilder.toString();
+        String actualOrderByValue = actualOrderByValueBuilder.toString();
+        // Check actual value in expected values set, skip comparison if query response is truncated by limit
+        if ((!isLimitSet || limit > h2NumRows) && !expectedValues.contains(actualValue)) {
+          String failureMessage = "Selection result returned in Pinot but not in H2: " + actualValue + ", " + expectedValues;
+          failure(pinotQuery, sqlQueries, failureMessage);
+          return;
+        }
+        if (!orderByColumns.isEmpty()) {
+          // Check actual group value is the same as expected group value in the same order.
+          if (!expectedOrderByValues.get(rowIndex).equals(actualOrderByValue)) {
+            String failureMessage = String.format(
+                "Selection Order by result at row index: %d in Pinot: [ %s ] is different than result in H2: [ %s ].",
+                rowIndex, actualOrderByValue, expectedOrderByValues.get(rowIndex));
+            failure(pinotQuery, sqlQueries, failureMessage);
+            return;
+          }
+        }
+      }
+    }
+  }
+
+  private static String removeTrailingZeroForNumber(String value, String type) {
+    // remove trailing zero after decimal point to compare decimal numbers with h2 data
+    if (type == null || type.toUpperCase().equals("FLOAT") || type.toUpperCase().equals("DOUBLE") || type.toUpperCase().equals("BIGINT")) {
+      try {
+        return (new BigDecimal(value)).stripTrailingZeros().toPlainString();
+      } catch (NumberFormatException e) {
+      }
+    }
+    return value;
+  }
+
+  private static List<String> appendColumnsToSelectionRequests(Collection<String> columns, List<String> requests) {
+    final int FIRST_COLUMN_INDEX = 7;
+    List<String> resultRequests = new ArrayList<>();
+    StringBuilder columnsString = new StringBuilder();
+    for (String column: columns) {
+      columnsString.append(column + ", ");
+    }
+
+    for (String request: requests) {
+      String resultRequest = "Select " + columnsString + request.trim().substring(FIRST_COLUMN_INDEX);
+      resultRequests.add(resultRequest);
+    }
+    return resultRequests;
   }
 
   private static boolean fuzzyCompare(String h2Value, String brokerValue, String connectionValue) {
