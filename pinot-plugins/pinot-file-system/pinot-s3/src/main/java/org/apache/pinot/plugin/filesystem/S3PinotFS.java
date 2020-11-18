@@ -65,24 +65,28 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.S3Object;
 
 
+/**
+ * Implementation of PinotFS for AWS S3 file system
+ */
 public class S3PinotFS extends PinotFS {
   public static final String ACCESS_KEY = "accessKey";
   public static final String SECRET_KEY = "secretKey";
   public static final String REGION = "region";
   public static final String ENDPOINT = "endpoint";
-  public static final String DISABLE_ACL = "disableAcl";
+  public static final String DISABLE_ACL_CONFIG_KEY = "disableAcl";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(S3PinotFS.class);
   private static final String DELIMITER = "/";
   public static final String S3_SCHEME = "s3://";
+  private static boolean DEFAULT_DISABLE_ACL = true;
   private S3Client _s3Client;
-  private Boolean disableAcl = true;
+  private boolean disableAcl = DEFAULT_DISABLE_ACL;
 
   @Override
   public void init(PinotConfiguration config) {
     Preconditions.checkArgument(!isNullOrEmpty(config.getProperty(REGION)));
     String region = config.getProperty(REGION);
-    disableAcl = config.getProperty(DISABLE_ACL, true);
+    disableAcl = config.getProperty(DISABLE_ACL_CONFIG_KEY, DEFAULT_DISABLE_ACL);
     AwsCredentialsProvider awsCredentialsProvider;
     try {
 
@@ -170,6 +174,12 @@ public class S3PinotFS extends PinotFS {
     }
   }
 
+  /**
+   * Determines if the file exists at the given path
+   * @param uri file path
+   * @return {@code true} if the file exists in the path
+   *         {@code false} otherwise
+   */
   private boolean existsFile(URI uri)
       throws IOException {
     try {
@@ -186,6 +196,12 @@ public class S3PinotFS extends PinotFS {
     }
   }
 
+  /**
+   * Determines if a path is a directory that is not empty
+   * @param uri The path under the S3 bucket
+   * @return {@code true} if the path is a non-empty directory,
+   *         {@code false} otherwise
+   */
   private boolean isEmptyDirectory(URI uri)
       throws IOException {
     if (!isDirectory(uri)) {
@@ -214,6 +230,13 @@ public class S3PinotFS extends PinotFS {
     return isEmpty;
   }
 
+  /**
+   * Method to copy file from source to destination.
+   * @param srcUri source path
+   * @param dstUri destination path
+   * @return {@code true} if the copy operation succeeds, i.e., response code is 200
+   *         {@code false} otherwise
+   */
   private boolean copyFile(URI srcUri, URI dstUri)
       throws IOException {
     try {
@@ -227,14 +250,12 @@ public class S3PinotFS extends PinotFS {
       String dstPath = sanitizePath(dstUri.getPath());
       CopyObjectRequest.Builder copyReqBuilder = CopyObjectRequest.builder().copySource(encodedUrl)
           .destinationBucket(dstUri.getHost()).destinationKey(dstPath);
-      CopyObjectRequest copyReq;
 
       if (!disableAcl) {
-        copyReq = copyReqBuilder.acl(ObjectCannedACL.BUCKET_OWNER_FULL_CONTROL).build();
-      } else {
-        copyReq = copyReqBuilder.build();
+        copyReqBuilder.acl(ObjectCannedACL.BUCKET_OWNER_FULL_CONTROL);
       }
 
+      CopyObjectRequest copyReq = copyReqBuilder.build();
       CopyObjectResponse copyObjectResponse = _s3Client.copyObject(copyReq);
       return copyObjectResponse.sdkHttpResponse().isSuccessful();
     } catch (S3Exception e) {
@@ -255,14 +276,12 @@ public class S3PinotFS extends PinotFS {
       }
 
       PutObjectRequest.Builder putReqBuilder = PutObjectRequest.builder().bucket(uri.getHost()).key(path);
-      PutObjectRequest putObjectRequest;
 
       if (!disableAcl) {
-        putObjectRequest = putReqBuilder.acl(ObjectCannedACL.BUCKET_OWNER_FULL_CONTROL).build();
-      } else {
-        putObjectRequest = putReqBuilder.build();
+        putReqBuilder.acl(ObjectCannedACL.BUCKET_OWNER_FULL_CONTROL);
       }
 
+      PutObjectRequest putObjectRequest = putReqBuilder.build();
       PutObjectResponse putObjectResponse = _s3Client.putObject(putObjectRequest, RequestBody.fromBytes(new byte[0]));
 
       return putObjectResponse.sdkHttpResponse().isSuccessful();
@@ -459,14 +478,12 @@ public class S3PinotFS extends PinotFS {
     URI base = getBase(dstUri);
     String prefix = sanitizePath(base.relativize(dstUri).getPath());
     PutObjectRequest.Builder putReqBuilder = PutObjectRequest.builder().bucket(dstUri.getHost()).key(prefix);
-    PutObjectRequest putObjectRequest;
 
     if (!disableAcl) {
-      putObjectRequest = putReqBuilder.acl(ObjectCannedACL.BUCKET_OWNER_FULL_CONTROL).build();
-    } else {
-      putObjectRequest = putReqBuilder.build();
+      putReqBuilder.acl(ObjectCannedACL.BUCKET_OWNER_FULL_CONTROL);
     }
 
+    PutObjectRequest putObjectRequest = putReqBuilder.build();
     _s3Client.putObject(putObjectRequest, srcFile.toPath());
   }
 
@@ -514,28 +531,24 @@ public class S3PinotFS extends PinotFS {
       CopyObjectRequest.Builder copyReqBuilder = CopyObjectRequest.builder().copySource(encodedUrl)
           .destinationBucket(uri.getHost()).destinationKey(path)
           .metadata(mp).metadataDirective(MetadataDirective.REPLACE);
-      CopyObjectRequest request;
 
       if (!disableAcl) {
-        request = copyReqBuilder.acl(ObjectCannedACL.BUCKET_OWNER_FULL_CONTROL).build();
-      } else {
-        request = copyReqBuilder.build();
+        copyReqBuilder.acl(ObjectCannedACL.BUCKET_OWNER_FULL_CONTROL);
       }
 
+      CopyObjectRequest request = copyReqBuilder.build();
       _s3Client.copyObject(request);
       long newUpdateTime = getS3ObjectMetadata(uri).lastModified().toEpochMilli();
       return newUpdateTime > s3ObjectMetadata.lastModified().toEpochMilli();
     } catch (NoSuchKeyException e) {
       String path = sanitizePath(uri.getPath());
       PutObjectRequest.Builder putReqBuilder = PutObjectRequest.builder().bucket(uri.getHost()).key(path);
-      PutObjectRequest putObjectRequest;
 
       if (!disableAcl) {
-        putObjectRequest = putReqBuilder.acl(ObjectCannedACL.BUCKET_OWNER_FULL_CONTROL).build();
-      } else {
-        putObjectRequest = putReqBuilder.build();
+        putReqBuilder.acl(ObjectCannedACL.BUCKET_OWNER_FULL_CONTROL);
       }
 
+      PutObjectRequest putObjectRequest = putReqBuilder.build();
       _s3Client.putObject(putObjectRequest, RequestBody.fromBytes(new byte[0]));
       return true;
     } catch (S3Exception e) {
