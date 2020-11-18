@@ -51,14 +51,14 @@ function Download() {
                         <div className="row">
                             <div className="col">
                                 <a
-                                    href="https://www.apache.org/dyn/closer.lua/incubator/pinot/apache-pinot-incubating-0.5.0/apache-pinot-incubating-0.5.0-bin.tar.gz"
+                                    href="https://www.apache.org/dyn/closer.lua/incubator/pinot/apache-pinot-incubating-0.6.0/apache-pinot-incubating-0.6.0-bin.tar.gz"
                                     className="panel panel--link text--center"
                                 >
                                     <div className="panel--icon">
                                         <i className="feather icon-download"></i>
                                     </div>
 
-                                    <div className="panel--title">0.5.0</div>
+                                    <div className="panel--title">0.6.0</div>
 
                                     <a href="https://www.apache.org/dyn/closer.lua/incubator/pinot/apache-pinot-incubating-0.6.0/apache-pinot-incubating-0.6.0-src.tar.gz">
                                         <div className="panel--title">
