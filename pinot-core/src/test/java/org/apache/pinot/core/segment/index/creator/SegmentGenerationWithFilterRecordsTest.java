@@ -29,7 +29,7 @@ import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
-import org.apache.pinot.spi.config.table.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
@@ -65,9 +65,11 @@ public class SegmentGenerationWithFilterRecordsTest {
 
   @BeforeClass
   public void setup() {
-    String filterFunction = "Groovy({((col2 < 1589007600000L) &&  (col3.max() < 4)) || col1 == \"B\"}, col1, col2, col3)";
-    IngestionConfig ingestionConfig = new IngestionConfig(new FilterConfig(filterFunction), null);
-    _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setIngestionConfig(ingestionConfig).build();
+    String filterFunction =
+        "Groovy({((col2 < 1589007600000L) &&  (col3.max() < 4)) || col1 == \"B\"}, col1, col2, col3)";
+    IngestionConfig ingestionConfig = new IngestionConfig(null, null, new FilterConfig(filterFunction), null);
+    _tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setIngestionConfig(ingestionConfig).build();
     _schema = new Schema.SchemaBuilder().addSingleValueDimension(STRING_COLUMN, FieldSpec.DataType.STRING)
         .addMetric(LONG_COLUMN, FieldSpec.DataType.LONG).addMultiValueDimension(MV_INT_COLUMN, FieldSpec.DataType.INT)
         .build();

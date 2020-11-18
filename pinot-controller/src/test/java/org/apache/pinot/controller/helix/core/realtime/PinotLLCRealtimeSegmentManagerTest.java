@@ -18,14 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.realtime;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
-
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -37,9 +30,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
-
 import javax.annotation.Nullable;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.assignment.InstancePartitions;
@@ -68,6 +59,7 @@ import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
@@ -77,7 +69,9 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.google.common.base.Preconditions;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.testng.Assert.*;
 
 
 public class PinotLLCRealtimeSegmentManagerTest {
@@ -843,7 +837,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
           new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(_numReplicas)
               .setLLC(true).setStreamConfigs(streamConfigs).build();
       _streamConfig = new PartitionLevelStreamConfig(_tableConfig.getTableName(),
-          _tableConfig.getIndexingConfig().getStreamConfigs());
+          IngestionConfigUtils.getStreamConfigMap(_tableConfig));
     }
 
     void makeConsumingInstancePartitions() {

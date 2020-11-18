@@ -23,7 +23,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.spi.config.table.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
@@ -60,7 +60,7 @@ public class ExpressionTransformerTest {
     transformConfigs.add(new TransformConfig("map2_values", "Groovy({map2.sort()*.value}, map2)"));
     transformConfigs.add(new TransformConfig("hoursSinceEpoch", "Groovy({timestamp/(1000*60*60)}, timestamp)"));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTransformFunctions")
-        .setIngestionConfig(new IngestionConfig(null, transformConfigs)).build();
+        .setIngestionConfig(new IngestionConfig(null, null, null, transformConfigs)).build();
 
     ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
     DataTypeTransformer dataTypeTransformer = new DataTypeTransformer(pinotSchema);
@@ -148,7 +148,7 @@ public class ExpressionTransformerTest {
     transformConfigs.add(new TransformConfig("fullName", "Groovy({firstName+' '+lastName}, firstName, lastName)"));
     transformConfigs.add(new TransformConfig("hoursSinceEpoch", "Groovy({timestamp/(1000*60*60)}, timestamp)"));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTransformFunctions")
-        .setIngestionConfig(new IngestionConfig(null, transformConfigs)).build();
+        .setIngestionConfig(new IngestionConfig(null, null, null, transformConfigs)).build();
 
     ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
 
@@ -202,7 +202,7 @@ public class ExpressionTransformerTest {
     List<TransformConfig> transformConfigs = new ArrayList<>();
     transformConfigs.add(new TransformConfig("fullName", "Groovy({firstName + ' ' + lastName}, firstName, lastName)"));
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testValueExists")
-        .setIngestionConfig(new IngestionConfig(null, transformConfigs)).build();
+        .setIngestionConfig(new IngestionConfig(null, null, null, transformConfigs)).build();
     ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
 
     GenericRow genericRow = new GenericRow();
@@ -218,7 +218,7 @@ public class ExpressionTransformerTest {
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
             new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "outgoing")).build();
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testValueExists")
-        .setIngestionConfig(new IngestionConfig(null, null)).build();
+        .setIngestionConfig(new IngestionConfig(null, null, null, null)).build();
     expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
 
     genericRow = new GenericRow();

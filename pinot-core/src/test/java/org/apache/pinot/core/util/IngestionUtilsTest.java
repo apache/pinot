@@ -25,8 +25,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.spi.config.table.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -134,7 +134,7 @@ public class IngestionUtilsTest {
     Schema schema = new Schema();
 
     // filter config
-    IngestionConfig ingestionConfig = new IngestionConfig(new FilterConfig("Groovy({x > 100}, x)"), null);
+    IngestionConfig ingestionConfig = new IngestionConfig(null, null, new FilterConfig("Groovy({x > 100}, x)"), null);
     Set<String> fields = IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema);
     Assert.assertEquals(fields.size(), 1);
     Assert.assertTrue(fields.containsAll(Sets.newHashSet("x")));
@@ -144,18 +144,18 @@ public class IngestionUtilsTest {
     Assert.assertEquals(fields.size(), 2);
     Assert.assertTrue(fields.containsAll(Sets.newHashSet("x", "y")));
 
-
     // transform configs
     schema = new Schema.SchemaBuilder().addSingleValueDimension("d1", FieldSpec.DataType.STRING).build();
-    List<TransformConfig> transformConfigs = Lists.newArrayList(new TransformConfig("d1", "Groovy({function}, argument1, argument2)"));
-    ingestionConfig = new IngestionConfig(null, transformConfigs);
+    List<TransformConfig> transformConfigs =
+        Lists.newArrayList(new TransformConfig("d1", "Groovy({function}, argument1, argument2)"));
+    ingestionConfig = new IngestionConfig(null, null, null, transformConfigs);
     List<String> extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema));
     Assert.assertEquals(extract.size(), 3);
     Assert.assertTrue(extract.containsAll(Arrays.asList("d1", "argument1", "argument2")));
 
     // groovy function, no arguments
     transformConfigs = Lists.newArrayList(new TransformConfig("d1", "Groovy({function})"));
-    ingestionConfig = new IngestionConfig(null, transformConfigs);
+    ingestionConfig = new IngestionConfig(null, null, null, transformConfigs);
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema));
     Assert.assertEquals(extract.size(), 1);
     Assert.assertTrue(extract.contains("d1"));
@@ -163,36 +163,39 @@ public class IngestionUtilsTest {
     // inbuilt functions
     schema = new Schema.SchemaBuilder().addSingleValueDimension("hoursSinceEpoch", FieldSpec.DataType.LONG).build();
     transformConfigs = Lists.newArrayList(new TransformConfig("hoursSinceEpoch", "toEpochHours(timestampColumn)"));
-    ingestionConfig = new IngestionConfig(null, transformConfigs);
+    ingestionConfig = new IngestionConfig(null, null, null, transformConfigs);
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema));
     Assert.assertEquals(extract.size(), 2);
     Assert.assertTrue(extract.containsAll(Arrays.asList("timestampColumn", "hoursSinceEpoch")));
 
     // inbuilt functions with literal
-    schema = new Schema.SchemaBuilder().addSingleValueDimension("tenMinutesSinceEpoch", FieldSpec.DataType.LONG).build();
-    transformConfigs = Lists.newArrayList(new TransformConfig("tenMinutesSinceEpoch", "toEpochMinutesBucket(timestampColumn, 10)"));
-    ingestionConfig = new IngestionConfig(null, transformConfigs);
+    schema =
+        new Schema.SchemaBuilder().addSingleValueDimension("tenMinutesSinceEpoch", FieldSpec.DataType.LONG).build();
+    transformConfigs =
+        Lists.newArrayList(new TransformConfig("tenMinutesSinceEpoch", "toEpochMinutesBucket(timestampColumn, 10)"));
+    ingestionConfig = new IngestionConfig(null, null, null, transformConfigs);
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema));
     Assert.assertEquals(extract.size(), 2);
     Assert.assertTrue(extract.containsAll(Lists.newArrayList("tenMinutesSinceEpoch", "timestampColumn")));
 
     // inbuilt functions on DateTimeFieldSpec
-    schema = new Schema.SchemaBuilder().addDateTime("dateColumn", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd", "1:DAYS").build();
-    transformConfigs = Lists.newArrayList(new TransformConfig("dateColumn", "toDateTime(timestampColumn, 'yyyy-MM-dd')"));
-    ingestionConfig = new IngestionConfig(null, transformConfigs);
+    schema = new Schema.SchemaBuilder()
+        .addDateTime("dateColumn", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd", "1:DAYS").build();
+    transformConfigs =
+        Lists.newArrayList(new TransformConfig("dateColumn", "toDateTime(timestampColumn, 'yyyy-MM-dd')"));
+    ingestionConfig = new IngestionConfig(null, null, null, transformConfigs);
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema));
     Assert.assertEquals(extract.size(), 2);
     Assert.assertTrue(extract.containsAll(Lists.newArrayList("dateColumn", "timestampColumn")));
 
     // filter + transform configs + schema fields  + schema transform
-    schema = new Schema.SchemaBuilder()
-        .addSingleValueDimension("d1", FieldSpec.DataType.STRING)
-        .addSingleValueDimension("d2", FieldSpec.DataType.STRING)
-        .addMetric("m1", FieldSpec.DataType.INT)
+    schema = new Schema.SchemaBuilder().addSingleValueDimension("d1", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("d2", FieldSpec.DataType.STRING).addMetric("m1", FieldSpec.DataType.INT)
         .addDateTime("dateColumn", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd", "1:DAYS").build();
     schema.getFieldSpecFor("d2").setTransformFunction("reverse(xy)");
-    transformConfigs = Lists.newArrayList(new TransformConfig("dateColumn", "toDateTime(timestampColumn, 'yyyy-MM-dd')"));
-    ingestionConfig = new IngestionConfig(new FilterConfig("Groovy({d1 == \"10\"}, d1)"), transformConfigs);
+    transformConfigs =
+        Lists.newArrayList(new TransformConfig("dateColumn", "toDateTime(timestampColumn, 'yyyy-MM-dd')"));
+    ingestionConfig = new IngestionConfig(null, null, new FilterConfig("Groovy({d1 == \"10\"}, d1)"), transformConfigs);
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema));
     Assert.assertEquals(extract.size(), 6);
     Assert.assertTrue(extract.containsAll(Lists.newArrayList("d1", "d2", "m1", "dateColumn", "xy", "timestampColumn")));

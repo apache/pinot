@@ -22,6 +22,7 @@ import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 
 
 /**
@@ -37,7 +38,7 @@ public class ReplicationUtils {
     TableType tableType = tableConfig.getTableType();
     if (tableType.equals(TableType.REALTIME)) {
       StreamConfig streamConfig = new StreamConfig(tableConfig.getTableName(),
-          tableConfig.getIndexingConfig().getStreamConfigs());
+          IngestionConfigUtils.getStreamConfigMap(tableConfig));
       return streamConfig.hasHighLevelConsumerType();
     }
     return true;
@@ -51,7 +52,7 @@ public class ReplicationUtils {
     TableType tableType = tableConfig.getTableType();
     if (tableType.equals(TableType.REALTIME)) {
       StreamConfig streamConfig = new StreamConfig(tableConfig.getTableName(),
-          tableConfig.getIndexingConfig().getStreamConfigs());
+          IngestionConfigUtils.getStreamConfigMap(tableConfig));
       return streamConfig.hasLowLevelConsumerType();
     }
     return false;

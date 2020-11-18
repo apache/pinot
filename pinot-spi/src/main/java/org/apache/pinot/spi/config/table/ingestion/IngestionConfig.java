@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.config.table;
+package org.apache.pinot.spi.config.table.ingestion;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -24,16 +24,18 @@ import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
-import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
-import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 
 
 /**
- * Class representing table ingestion configuration. For example, configs needed for
- * decoding, data source configs, ingestion transformations (flattening, filtering, transformations etc.)
- * TODO: Move fields from table config which are ingestion related (e.g. streamConfigs, segment push type, append freq etc)
+ * Class representing table ingestion configuration i.e. all configs related to the data source and the ingestion properties and operations
  */
 public class IngestionConfig extends BaseJsonConfig {
+
+  @JsonPropertyDescription("Config related to the batch data sources")
+  private final BatchIngestionConfig _batchIngestionConfig;
+
+  @JsonPropertyDescription("Config related to the stream data sources")
+  private final StreamIngestionConfig _streamIngestionConfig;
 
   @JsonPropertyDescription("Config related to filtering records during ingestion")
   private final FilterConfig _filterConfig;
@@ -42,10 +44,24 @@ public class IngestionConfig extends BaseJsonConfig {
   private final List<TransformConfig> _transformConfigs;
 
   @JsonCreator
-  public IngestionConfig(@JsonProperty("filterConfig") @Nullable FilterConfig filterConfig,
+  public IngestionConfig(@JsonProperty("batchIngestionConfig") @Nullable BatchIngestionConfig batchIngestionConfig,
+      @JsonProperty("streamIngestionConfig") @Nullable StreamIngestionConfig streamIngestionConfig,
+      @JsonProperty("filterConfig") @Nullable FilterConfig filterConfig,
       @JsonProperty("transformConfigs") @Nullable List<TransformConfig> transformConfigs) {
+    _batchIngestionConfig = batchIngestionConfig;
+    _streamIngestionConfig = streamIngestionConfig;
     _filterConfig = filterConfig;
     _transformConfigs = transformConfigs;
+  }
+
+  @Nullable
+  public BatchIngestionConfig getBatchIngestionConfig() {
+    return _batchIngestionConfig;
+  }
+
+  @Nullable
+  public StreamIngestionConfig getStreamIngestionConfig() {
+    return _streamIngestionConfig;
   }
 
   @Nullable

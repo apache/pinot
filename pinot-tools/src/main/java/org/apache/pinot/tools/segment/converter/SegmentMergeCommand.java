@@ -39,6 +39,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.tools.Command;
@@ -238,8 +239,8 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
 
     // Fetch time related configurations from schema and table config.
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-    String pushFrequency = validationConfig.getSegmentPushFrequency();
-    String pushType = validationConfig.getSegmentPushType();
+    String pushFrequency = IngestionConfigUtils.getBatchSegmentPushFrequency(tableConfig);
+    String pushType = IngestionConfigUtils.getBatchSegmentPushType(tableConfig);
     String timeColumnName = validationConfig.getTimeColumnName();
     DateTimeFormatSpec dateTimeFormatSpec = null;
     if (timeColumnName != null) {

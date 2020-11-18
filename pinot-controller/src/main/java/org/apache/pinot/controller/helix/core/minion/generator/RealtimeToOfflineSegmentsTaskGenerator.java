@@ -39,6 +39,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -100,8 +101,8 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
         LOGGER.warn("Skip generating task: {} for non-REALTIME table: {}", taskType, realtimeTableName);
         continue;
       }
-      if (new StreamConfig(realtimeTableName, tableConfig.getIndexingConfig().getStreamConfigs())
-          .hasHighLevelConsumerType()) {
+      StreamConfig streamConfig = new StreamConfig(realtimeTableName, IngestionConfigUtils.getStreamConfigMap(tableConfig));
+      if (streamConfig.hasHighLevelConsumerType()) {
         LOGGER.warn("Skip generating task: {} for HLC REALTIME table: {}", taskType, realtimeTableName);
         continue;
       }

@@ -25,8 +25,8 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.core.data.function.FunctionEvaluator;
 import org.apache.pinot.core.data.function.FunctionEvaluatorFactory;
-import org.apache.pinot.spi.config.table.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -88,7 +88,8 @@ public class IngestionUtils {
           FunctionEvaluator expressionEvaluator =
               FunctionEvaluatorFactory.getExpressionEvaluator(transformConfig.getTransformFunction());
           fields.addAll(expressionEvaluator.getArguments());
-          fields.add(transformConfig.getColumnName()); // add the column itself too, so that if it is already transformed, we won't transform again
+          fields.add(transformConfig
+              .getColumnName()); // add the column itself too, so that if it is already transformed, we won't transform again
         }
       }
     }

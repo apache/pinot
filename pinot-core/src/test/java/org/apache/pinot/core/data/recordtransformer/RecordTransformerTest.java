@@ -19,7 +19,7 @@
 package org.apache.pinot.core.data.recordtransformer;
 
 import java.util.Collections;
-import org.apache.pinot.spi.config.table.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
@@ -79,28 +79,30 @@ public class RecordTransformerTest {
 
     // expression false, not filtered
     GenericRow genericRow = getRecord();
-    tableConfig.setIngestionConfig(new IngestionConfig(new FilterConfig("Groovy({svInt > 123}, svInt)"), null));
+    tableConfig
+        .setIngestionConfig(new IngestionConfig(null, null, new FilterConfig("Groovy({svInt > 123}, svInt)"), null));
     RecordTransformer transformer = new FilterTransformer(tableConfig);
     transformer.transform(genericRow);
     Assert.assertFalse(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
 
     // expression true, filtered
     genericRow = getRecord();
-    tableConfig.setIngestionConfig(new IngestionConfig(new FilterConfig("Groovy({svInt <= 123}, svInt)"), null));
+    tableConfig
+        .setIngestionConfig(new IngestionConfig(null, null, new FilterConfig("Groovy({svInt <= 123}, svInt)"), null));
     transformer = new FilterTransformer(tableConfig);
     transformer.transform(genericRow);
     Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
 
     // value not found
     genericRow = getRecord();
-    tableConfig
-        .setIngestionConfig(new IngestionConfig(new FilterConfig("Groovy({notPresent == 123}, notPresent)"), null));
+    tableConfig.setIngestionConfig(
+        new IngestionConfig(null, null, new FilterConfig("Groovy({notPresent == 123}, notPresent)"), null));
     transformer = new FilterTransformer(tableConfig);
     transformer.transform(genericRow);
     Assert.assertFalse(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
 
     // invalid function
-    tableConfig.setIngestionConfig(new IngestionConfig(new FilterConfig("Groovy(svInt == 123)"), null));
+    tableConfig.setIngestionConfig(new IngestionConfig(null, null, new FilterConfig("Groovy(svInt == 123)"), null));
     try {
       new FilterTransformer(tableConfig);
       Assert.fail("Should have failed constructing FilterTransformer");
@@ -110,8 +112,8 @@ public class RecordTransformerTest {
 
     // multi value column
     genericRow = getRecord();
-    tableConfig
-        .setIngestionConfig(new IngestionConfig(new FilterConfig("Groovy({svFloat.max() < 500}, svFloat)"), null));
+    tableConfig.setIngestionConfig(
+        new IngestionConfig(null, null, new FilterConfig("Groovy({svFloat.max() < 500}, svFloat)"), null));
     transformer = new FilterTransformer(tableConfig);
     transformer.transform(genericRow);
     Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));

@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 
 
 public class IndexingConfig extends BaseJsonConfig {
@@ -33,6 +34,7 @@ public class IndexingConfig extends BaseJsonConfig {
   private List<String> _bloomFilterColumns;
   private Map<String, BloomFilterConfig> _bloomFilterConfigs;
   private String _loadMode;
+  @Deprecated // Moved to {@link IngestionConfig#getStreamIngestionConfig}
   private Map<String, String> _streamConfigs;
   private String _segmentFormatVersion;
   private String _columnMinMaxValueGeneratorMode;
@@ -123,6 +125,9 @@ public class IndexingConfig extends BaseJsonConfig {
     _loadMode = loadMode;
   }
 
+  /**
+   * @deprecated Use <code>List<Map<String, String>> streamConfigs</code> from {@link IngestionConfig#getStreamIngestionConfig()}
+   */
   @Nullable
   public Map<String, String> getStreamConfigs() {
     return _streamConfigs;

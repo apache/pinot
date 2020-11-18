@@ -119,6 +119,7 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
@@ -1142,8 +1143,7 @@ public class PinotHelixResourceManager {
         break;
 
       case REALTIME:
-        IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-        verifyIndexingConfig(tableNameWithType, indexingConfig);
+        verifyStreamConfig(tableNameWithType, tableConfig);
 
         // Ensure that realtime table is not created if schema is not present
         Schema schema =
@@ -1307,9 +1307,10 @@ public class PinotHelixResourceManager {
     _pinotLLCRealtimeSegmentManager = pinotLLCRealtimeSegmentManager;
   }
 
-  private void verifyIndexingConfig(String tableNameWithType, IndexingConfig indexingConfig) {
+  private void verifyStreamConfig(String tableNameWithType, TableConfig tableConfig) {
     // Check if HLC table is allowed.
-    StreamConfig streamConfig = new StreamConfig(tableNameWithType, indexingConfig.getStreamConfigs());
+    StreamConfig streamConfig =
+        new StreamConfig(tableNameWithType, IngestionConfigUtils.getStreamConfigMap(tableConfig));
     if (streamConfig.hasHighLevelConsumerType() && !_allowHLCTables) {
       throw new InvalidTableConfigException(
           "Creating HLC realtime table is not allowed for Table: " + tableNameWithType);
@@ -1319,7 +1320,7 @@ public class PinotHelixResourceManager {
   private void ensureRealtimeClusterIsSetUp(TableConfig realtimeTableConfig) {
     String realtimeTableName = realtimeTableConfig.getTableName();
     StreamConfig streamConfig = new StreamConfig(realtimeTableConfig.getTableName(),
-        realtimeTableConfig.getIndexingConfig().getStreamConfigs());
+        IngestionConfigUtils.getStreamConfigMap(realtimeTableConfig));
     IdealState idealState = getTableIdealState(realtimeTableName);
 
     if (streamConfig.hasHighLevelConsumerType()) {
@@ -1431,8 +1432,7 @@ public class PinotHelixResourceManager {
         break;
 
       case REALTIME:
-        IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-        verifyIndexingConfig(tableNameWithType, indexingConfig);
+        verifyStreamConfig(tableNameWithType, tableConfig);
         ZKMetadataProvider
             .setRealtimeTableConfig(_propertyStore, tableNameWithType, TableConfigUtils.toZNRecord(tableConfig));
 
