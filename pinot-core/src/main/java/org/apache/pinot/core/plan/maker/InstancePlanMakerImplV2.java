@@ -62,20 +62,28 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   public static final String NUM_GROUPS_LIMIT = "num.groups.limit";
   public static final int DEFAULT_NUM_GROUPS_LIMIT = 100_000;
 
+  // set as pinot.server.query.executor.groupby.trim.threshold
+  public static final String GROUPBY_TRIM_THRESHOLD = "groupby.trim.threshold";
+  public static final int DEFAULT_GROUPBY_TRIM_THRESHOLD = 1_000_000;
+
   private final int _maxInitialResultHolderCapacity;
   // Limit on number of groups stored for each segment, beyond which no new group will be created
   private final int _numGroupsLimit;
+  // Used for SQL GROUP BY (server combine)
+  private final int _groupByTrimThreshold;
 
   @VisibleForTesting
   public InstancePlanMakerImplV2() {
     _maxInitialResultHolderCapacity = DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY;
     _numGroupsLimit = DEFAULT_NUM_GROUPS_LIMIT;
+    _groupByTrimThreshold = DEFAULT_GROUPBY_TRIM_THRESHOLD;
   }
 
   @VisibleForTesting
   public InstancePlanMakerImplV2(int maxInitialResultHolderCapacity, int numGroupsLimit) {
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
     _numGroupsLimit = numGroupsLimit;
+    _groupByTrimThreshold = DEFAULT_GROUPBY_TRIM_THRESHOLD;
   }
 
   /**
@@ -91,6 +99,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     _maxInitialResultHolderCapacity = queryExecutorConfig.getConfig()
         .getProperty(MAX_INITIAL_RESULT_HOLDER_CAPACITY_KEY, DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
     _numGroupsLimit = queryExecutorConfig.getConfig().getProperty(NUM_GROUPS_LIMIT, DEFAULT_NUM_GROUPS_LIMIT);
+    _groupByTrimThreshold =
+        queryExecutorConfig.getConfig().getProperty(GROUPBY_TRIM_THRESHOLD, DEFAULT_GROUPBY_TRIM_THRESHOLD);
     Preconditions.checkState(_maxInitialResultHolderCapacity <= _numGroupsLimit,
         "Invalid configuration: maxInitialResultHolderCapacity: %d must be smaller or equal to numGroupsLimit: %d",
         _maxInitialResultHolderCapacity, _numGroupsLimit);
@@ -106,7 +116,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       planNodes.add(makeSegmentPlanNode(indexSegment, queryContext));
     }
     CombinePlanNode combinePlanNode =
-        new CombinePlanNode(planNodes, queryContext, executorService, endTimeMs, _numGroupsLimit, null);
+        new CombinePlanNode(planNodes, queryContext, executorService, endTimeMs, _numGroupsLimit, null,
+            _groupByTrimThreshold);
     return new GlobalPlanImplV0(new InstanceResponsePlanNode(combinePlanNode));
   }
 
@@ -153,7 +164,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       planNodes.add(makeStreamingSegmentPlanNode(indexSegment, queryContext));
     }
     CombinePlanNode combinePlanNode =
-        new CombinePlanNode(planNodes, queryContext, executorService, endTimeMs, _numGroupsLimit, streamObserver);
+        new CombinePlanNode(planNodes, queryContext, executorService, endTimeMs, _numGroupsLimit, streamObserver,
+            _groupByTrimThreshold);
     return new GlobalPlanImplV0(new InstanceResponsePlanNode(combinePlanNode));
   }
 

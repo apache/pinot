@@ -61,6 +61,8 @@ public class CombinePlanNode implements PlanNode {
   private final long _endTimeMs;
   private final int _numGroupsLimit;
   private final StreamObserver<Server.ServerResponse> _streamObserver;
+  // used for SQL GROUP BY during server combine
+  private final int _groupByTrimThreshold;
 
   /**
    * Constructor for the class.
@@ -71,15 +73,18 @@ public class CombinePlanNode implements PlanNode {
    * @param endTimeMs End time in milliseconds for the query
    * @param numGroupsLimit Limit of number of groups stored in each segment
    * @param streamObserver Optional stream observer for streaming query
+   * @param groupByTrimThreshold trim threshold to use for server combine for SQL GROUP BY
    */
   public CombinePlanNode(List<PlanNode> planNodes, QueryContext queryContext, ExecutorService executorService,
-      long endTimeMs, int numGroupsLimit, @Nullable StreamObserver<Server.ServerResponse> streamObserver) {
+      long endTimeMs, int numGroupsLimit, @Nullable StreamObserver<Server.ServerResponse> streamObserver,
+      int groupByTrimThreshold) {
     _planNodes = planNodes;
     _queryContext = queryContext;
     _executorService = executorService;
     _endTimeMs = endTimeMs;
     _numGroupsLimit = numGroupsLimit;
     _streamObserver = streamObserver;
+    _groupByTrimThreshold = groupByTrimThreshold;
   }
 
   @SuppressWarnings({"rawtypes", "unchecked"})
@@ -175,7 +180,8 @@ public class CombinePlanNode implements PlanNode {
         // Aggregation group-by
         QueryOptions queryOptions = new QueryOptions(_queryContext.getQueryOptions());
         if (queryOptions.isGroupByModeSQL()) {
-          return new GroupByOrderByCombineOperator(operators, _queryContext, _executorService, _endTimeMs);
+          return new GroupByOrderByCombineOperator(operators, _queryContext, _executorService, _endTimeMs,
+              _groupByTrimThreshold);
         }
         return new GroupByCombineOperator(operators, _queryContext, _executorService, _endTimeMs, _numGroupsLimit);
       }

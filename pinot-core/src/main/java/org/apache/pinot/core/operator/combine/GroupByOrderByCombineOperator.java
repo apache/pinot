@@ -38,6 +38,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -62,24 +63,27 @@ import org.slf4j.LoggerFactory;
 public class GroupByOrderByCombineOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(GroupByOrderByCombineOperator.class);
   private static final String OPERATOR_NAME = "GroupByOrderByCombineOperator";
+  public static final int MAX_TRIM_THRESHOLD = 1_000_000_000;
 
   private final List<Operator> _operators;
   private final QueryContext _queryContext;
   private final ExecutorService _executorService;
   private final long _endTimeMs;
-  private final int _indexedTableCapacity;
+  private final int _trimSize;
+  private final int _trimThreshold;
   private final Lock _initLock;
   private DataSchema _dataSchema;
   private ConcurrentIndexedTable _indexedTable;
 
   public GroupByOrderByCombineOperator(List<Operator> operators, QueryContext queryContext,
-      ExecutorService executorService, long endTimeMs) {
+      ExecutorService executorService, long endTimeMs, int trimThreshold) {
     _operators = operators;
     _queryContext = queryContext;
     _executorService = executorService;
     _endTimeMs = endTimeMs;
     _initLock = new ReentrantLock();
-    _indexedTableCapacity = GroupByUtils.getTableCapacity(_queryContext);
+    _trimSize = GroupByUtils.getTableCapacity(_queryContext);
+    _trimThreshold = trimThreshold;
   }
 
   /**
@@ -140,7 +144,16 @@ public class GroupByOrderByCombineOperator extends BaseOperator<IntermediateResu
             try {
               if (_dataSchema == null) {
                 _dataSchema = intermediateResultsBlock.getDataSchema();
-                _indexedTable = new ConcurrentIndexedTable(_dataSchema, _queryContext, _indexedTableCapacity);
+                if (_trimThreshold >= MAX_TRIM_THRESHOLD) {
+                  // special case of trim threshold where it is set to max value.
+                  // there won't be any trimming during upsert in this case.
+                  // thus we can avoid the overhead of read-lock and write-lock
+                  // in the upsert method.
+                  _indexedTable = new UnboundedConcurrentIndexedTable(_dataSchema, _queryContext,
+                      _trimSize, _trimThreshold);
+                } else {
+                  _indexedTable = new ConcurrentIndexedTable(_dataSchema, _queryContext, _trimSize, _trimThreshold);
+                }
               }
             } finally {
               _initLock.unlock();
@@ -241,10 +254,10 @@ public class GroupByOrderByCombineOperator extends BaseOperator<IntermediateResu
 
       // Set the execution statistics.
       CombineOperatorUtils.setExecutionStatistics(mergedBlock, _operators);
+      mergedBlock.setNumResizes(_indexedTable.getNumResizes());
+      mergedBlock.setResizeTimeMs(_indexedTable.getResizeTimeMs());
 
-      if (_indexedTable.size() >= _indexedTableCapacity) {
-        mergedBlock.setNumGroupsLimitReached(true);
-      }
+      // TODO - set numGroupsLimitReached
 
       return mergedBlock;
     } catch (Exception e) {

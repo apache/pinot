@@ -42,6 +42,8 @@ public interface DataTable {
   String TIME_USED_MS_METADATA_KEY = "timeUsedMs";
   String TRACE_INFO_METADATA_KEY = "traceInfo";
   String REQUEST_ID_METADATA_KEY = "requestId";
+  String NUM_RESIZES_METADATA_KEY = "numResizes";
+  String RESIZE_TIME_MS_METADATA_KEY = "resizeTimeMs";
 
   void addException(ProcessingException processingException);
 

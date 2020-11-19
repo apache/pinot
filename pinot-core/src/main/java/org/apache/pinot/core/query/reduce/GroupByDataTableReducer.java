@@ -45,6 +45,8 @@ import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.SimpleIndexedTable;
+import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
+import org.apache.pinot.core.operator.combine.GroupByOrderByCombineOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
@@ -124,7 +126,8 @@ public class GroupByDataTableReducer implements DataTableReducer {
         // This is the primary SQL compliant group by
 
         try {
-          setSQLGroupByInResultTable(brokerResponseNative, dataSchema, dataTables, reducerContext);
+          setSQLGroupByInResultTable(brokerResponseNative, dataSchema, dataTables, reducerContext, tableName,
+              brokerMetrics);
         } catch (TimeoutException e) {
           brokerResponseNative.getProcessingExceptions()
               .add(new QueryProcessingException(QueryException.BROKER_TIMEOUT_ERROR_CODE, e.getMessage()));
@@ -181,12 +184,19 @@ public class GroupByDataTableReducer implements DataTableReducer {
    * @param dataSchema data schema
    * @param dataTables Collection of data tables
    * @param reducerContext DataTableReducer context
+   * @param rawTableName table name
+   * @param brokerMetrics broker metrics (meters)
    * @throws TimeoutException If unable complete within timeout.
    */
   private void setSQLGroupByInResultTable(BrokerResponseNative brokerResponseNative, DataSchema dataSchema,
-      Collection<DataTable> dataTables, DataTableReducerContext reducerContext)
+      Collection<DataTable> dataTables, DataTableReducerContext reducerContext, String rawTableName,
+      BrokerMetrics brokerMetrics)
       throws TimeoutException {
     IndexedTable indexedTable = getIndexedTable(dataSchema, dataTables, reducerContext);
+    if (brokerMetrics != null) {
+      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.NUM_RESIZES, indexedTable.getNumResizes());
+      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.RESIZE_TIME_MS, indexedTable.getResizeTimeMs());
+    }
     Iterator<Record> sortedIterator = indexedTable.iterator();
     DataSchema prePostAggregationDataSchema = getPrePostAggregationDataSchema(dataSchema);
     int limit = _queryContext.getLimit();
@@ -262,13 +272,24 @@ public class GroupByDataTableReducer implements DataTableReducer {
     int numDataTables = dataTablesToReduce.size();
 
     // Get the number of threads to use for reducing.
-    int numReduceThreadsToUse = getNumReduceThreadsToUse(numDataTables, reducerContext.getMaxReduceThreadsPerQuery());
-
     // In case of single reduce thread, fall back to SimpleIndexedTable to avoid redundant locking/unlocking calls.
-    int capacity = GroupByUtils.getTableCapacity(_queryContext);
-    IndexedTable indexedTable =
-        (numReduceThreadsToUse > 1) ? new ConcurrentIndexedTable(dataSchema, _queryContext, capacity)
-            : new SimpleIndexedTable(dataSchema, _queryContext, capacity);
+    int numReduceThreadsToUse = getNumReduceThreadsToUse(numDataTables, reducerContext.getMaxReduceThreadsPerQuery());
+    int trimSize = GroupByUtils.getTableCapacity(_queryContext);
+    int trimThreshold = reducerContext.getGroupByTrimThreshold();
+    IndexedTable indexedTable;
+    if (numReduceThreadsToUse <= 1) {
+      indexedTable = new SimpleIndexedTable(dataSchema, _queryContext, trimSize, trimThreshold);
+    } else {
+      if (trimThreshold >= GroupByOrderByCombineOperator.MAX_TRIM_THRESHOLD) {
+        // special case of trim threshold where it is set to max value.
+        // there won't be any trimming during upsert in this case.
+        // thus we can avoid the overhead of read-lock and write-lock
+        // in the upsert method.
+        indexedTable = new UnboundedConcurrentIndexedTable(dataSchema, _queryContext, trimSize, trimThreshold);
+      } else {
+        indexedTable = new ConcurrentIndexedTable(dataSchema, _queryContext, trimSize, trimThreshold);
+      }
+    }
 
     Future[] futures = new Future[numDataTables];
     CountDownLatch countDownLatch = new CountDownLatch(numDataTables);

@@ -40,10 +40,13 @@ import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableImplV2;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.Table;
+import org.apache.pinot.core.operator.combine.GroupByCombineOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -64,6 +67,8 @@ public class IntermediateResultsBlock implements Block {
   private int _numSegmentsProcessed;
   private int _numSegmentsMatched;
   private boolean _numGroupsLimitReached;
+  private int _numResizes;
+  private long _resizeTimeMs;
 
   private Table _table;
 
@@ -218,6 +223,14 @@ public class IntermediateResultsBlock implements Block {
     _numGroupsLimitReached = numGroupsLimitReached;
   }
 
+  public void setNumResizes(int numResizes) {
+    _numResizes = numResizes;
+  }
+
+  public void setResizeTimeMs(long resizeTimeMs) {
+    _resizeTimeMs = resizeTimeMs;
+  }
+
   @VisibleForTesting
   public long getNumDocsScanned() {
     return _numDocsScanned;
@@ -278,17 +291,16 @@ public class IntermediateResultsBlock implements Block {
 
   private DataTable getResultDataTable()
       throws IOException {
-
     DataTableBuilder dataTableBuilder = new DataTableBuilder(_dataSchema);
 
     Iterator<Record> iterator = _table.iterator();
+    ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
     while (iterator.hasNext()) {
       Record record = iterator.next();
       dataTableBuilder.startRow();
       int columnIndex = 0;
       for (Object value : record.getValues()) {
-        ColumnDataType columnDataType = _dataSchema.getColumnDataType(columnIndex);
-        setDataTableColumn(columnDataType, dataTableBuilder, columnIndex, value);
+        setDataTableColumn(columnDataTypes[columnIndex], dataTableBuilder, columnIndex, value);
         columnIndex++;
       }
       dataTableBuilder.finishRow();
@@ -416,6 +428,8 @@ public class IntermediateResultsBlock implements Block {
         .put(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, String.valueOf(_numEntriesScannedPostFilter));
     dataTable.getMetadata().put(DataTable.NUM_SEGMENTS_PROCESSED, String.valueOf(_numSegmentsProcessed));
     dataTable.getMetadata().put(DataTable.NUM_SEGMENTS_MATCHED, String.valueOf(_numSegmentsMatched));
+    dataTable.getMetadata().put(DataTable.NUM_RESIZES_METADATA_KEY, String.valueOf(_numResizes));
+    dataTable.getMetadata().put(DataTable.RESIZE_TIME_MS_METADATA_KEY, String.valueOf(_resizeTimeMs));
 
     dataTable.getMetadata().put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(_numTotalDocs));
     if (_numGroupsLimitReached) {
