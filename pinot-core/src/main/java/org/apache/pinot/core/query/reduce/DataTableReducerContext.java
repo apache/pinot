@@ -38,13 +38,14 @@ public class DataTableReducerContext {
    * @param executorService Executor service to use for DataTableReducer
    * @param maxReduceThreadsPerQuery Max number of threads to use for reduce phase
    * @param reduceTimeOutMs Reduce Phase timeOut in ms
+   * @param groupByTrimThreshold trim threshold for SQL group by
    */
   public DataTableReducerContext(ExecutorService executorService, int maxReduceThreadsPerQuery, long reduceTimeOutMs,
-      int sqlGroupByTrimThreshold) {
+      int groupByTrimThreshold) {
     _executorService = executorService;
     _maxReduceThreadsPerQuery = maxReduceThreadsPerQuery;
     _reduceTimeOutMs = reduceTimeOutMs;
-    _groupByTrimThreshold = sqlGroupByTrimThreshold;
+    _groupByTrimThreshold = groupByTrimThreshold;
   }
 
   public ExecutorService getExecutorService() {

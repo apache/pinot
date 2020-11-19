@@ -94,7 +94,7 @@ public class CombineSlowOperatorsTest {
     List<Operator> operators = getOperators();
     GroupByOrderByCombineOperator combineOperator = new GroupByOrderByCombineOperator(operators,
         QueryContextConverterUtils.getQueryContextFromPQL("SELECT COUNT(*) FROM table GROUP BY column"),
-        _executorService, TIMEOUT_MS, InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT);
+        _executorService, TIMEOUT_MS, InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD);
     testCombineOperator(operators, combineOperator);
   }
 

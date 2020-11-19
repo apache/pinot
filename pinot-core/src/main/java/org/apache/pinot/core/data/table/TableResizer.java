@@ -142,7 +142,7 @@ public class TableResizer {
     int numRecordsToEvict = recordsMap.size() - trimToSize;
     if (numRecordsToEvict > 0) {
       // TODO: compare the performance of converting to IntermediateRecord vs keeping Record, in cases where we do not need to extract final results
-      if (numRecordsToEvict <= trimToSize) {
+      if (numRecordsToEvict < trimToSize) {
         // num records to evict is smaller than num records to retain
         // make PQ of records to evict
         PriorityQueue<IntermediateRecord> priorityQueue =

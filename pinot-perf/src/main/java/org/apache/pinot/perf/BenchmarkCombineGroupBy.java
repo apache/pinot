@@ -135,7 +135,7 @@ public class BenchmarkCombineGroupBy {
 
     // make 1 concurrent table
     IndexedTable concurrentIndexedTable = new ConcurrentIndexedTable(_dataSchema, _queryContext, trimSize,
-        InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT);
+        InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD);
 
     List<Callable<Void>> innerSegmentCallables = new ArrayList<>(NUM_SEGMENTS);
 

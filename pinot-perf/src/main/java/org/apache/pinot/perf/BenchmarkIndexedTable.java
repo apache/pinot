@@ -57,7 +57,7 @@ import org.openjdk.jmh.runner.options.TimeValue;
 @State(Scope.Benchmark)
 public class BenchmarkIndexedTable {
   private static final int TRIM_SIZE = 800;
-  private static final int TRIM_THRESHOLD_FOR_UPSERT = TRIM_SIZE * 4;
+  private static final int TRIM_THRESHOLD = TRIM_SIZE * 4;
   private static final int NUM_RECORDS = 1000;
   private static final Random RANDOM = new Random();
 
@@ -114,7 +114,7 @@ public class BenchmarkIndexedTable {
     int numSegments = 10;
 
     // make 1 concurrent table
-    IndexedTable concurrentIndexedTable = new ConcurrentIndexedTable(_dataSchema, _queryContext, TRIM_SIZE, TRIM_THRESHOLD_FOR_UPSERT);
+    IndexedTable concurrentIndexedTable = new ConcurrentIndexedTable(_dataSchema, _queryContext, TRIM_SIZE, TRIM_THRESHOLD);
 
     // 10 parallel threads putting 10k records into the table
 
@@ -162,7 +162,7 @@ public class BenchmarkIndexedTable {
     for (int i = 0; i < numSegments; i++) {
 
       // make 10 indexed tables
-      IndexedTable simpleIndexedTable = new SimpleIndexedTable(_dataSchema, _queryContext, TRIM_SIZE, TRIM_THRESHOLD_FOR_UPSERT);
+      IndexedTable simpleIndexedTable = new SimpleIndexedTable(_dataSchema, _queryContext, TRIM_SIZE, TRIM_THRESHOLD);
       simpleIndexedTables.add(simpleIndexedTable);
 
       // put 10k records in each indexed table, in parallel
