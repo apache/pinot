@@ -70,7 +70,7 @@ public class MergeWrapper extends DetectionPipeline {
       int res = Long.compare(o1.getStartTime(), o2.getStartTime());
       if (res != 0) return res;
 
-      // order anomalies from earliest startTime to latest, if startTime are the same
+      // order anomalies from earliest createdTime to latest, if startTime are the same
       res = Long.compare(o1.getCreatedTime(), o2.getCreatedTime());
       if (res != 0) return res;
 
