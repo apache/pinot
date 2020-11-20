@@ -26,12 +26,12 @@ Docker image for [Superset](https://github.com/apache/incubator-superset) with P
 
 ## How to build
 
-Pinot Superset image is built on top of [preset/superset](https://hub.docker.com/r/preset/superset) with Pinotdb driver.
+Pinot Superset image is built on top of [apache/incubator-superset](https://hub.docker.com/r/apache/incubator-superset) with Pinotdb driver.
 
-Below command will build Superset image based on `preset/superset:0.37` then tag it as `apachepinot/pinot-superset:0.37`.
+Below command will build Superset image based on `apache/incubator-superset:0.37` then tag it as `apachepinot/pinot-superset:0.37`.
 
 ```bash
-docker build --build-arg PRESET_SUPERSET_IMAGE_TAG=0.37 --tag apachepinot/pinot-superset:0.37 .
+docker build --build-arg SUPERSET_IMAGE_TAG=0.37 --tag apachepinot/pinot-superset:0.37 .
 ```
 
 ## How to push
