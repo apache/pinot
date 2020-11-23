@@ -93,10 +93,11 @@ public class TextSearchQueriesTest extends BaseQueriesTest {  private static fin
   private static final String QUERY_LOG_TEXT_COL_NAME = "QUERY_LOG_TEXT_COL";
   private static final String SKILLS_TEXT_COL_NAME = "SKILLS_TEXT_COL";
   private static final String SKILLS_TEXT_COL_DICT_NAME = "SKILLS_TEXT_COL_DICT";
-  private static final String SKILLS_COPY_TEXT_COL_NAME = "SKILLS_TEXT_COL_1";
+  private static final String SKILLS_TEXT_COL_MULTI_TERM_NAME = "SKILLS_TEXT_COL_1";
+  private static final String SKILLS_TEXT_NO_RAW_NAME = "SKILLS_TEXT_COL_2";
   private static final String INT_COL_NAME = "INT_COL";
-  private static final List<String> RAW_TEXT_INDEX_COLUMNS =
-      Arrays.asList(QUERY_LOG_TEXT_COL_NAME, SKILLS_TEXT_COL_NAME, SKILLS_COPY_TEXT_COL_NAME);
+  private static final List<String> RAW_TEXT_INDEX_COLUMNS = Arrays
+      .asList(QUERY_LOG_TEXT_COL_NAME, SKILLS_TEXT_COL_NAME, SKILLS_TEXT_COL_MULTI_TERM_NAME, SKILLS_TEXT_NO_RAW_NAME);
   private static final List<String> DICT_TEXT_INDEX_COLUMNS = Arrays.asList(SKILLS_TEXT_COL_DICT_NAME);
   private static final int INT_BASE_VALUE = 1000;
 
@@ -135,7 +136,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {  private static fin
     Map<String, Map<String, String>> columnProperties = new HashMap<>();
     Map<String, String> props = new HashMap<>();
     props.put(FieldConfig.TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES, "true");
-    columnProperties.put(SKILLS_COPY_TEXT_COL_NAME, props);
+    columnProperties.put(SKILLS_TEXT_COL_MULTI_TERM_NAME, props);
     indexLoadingConfig.setColumnProperties(columnProperties);
     ImmutableSegment immutableSegment =
         ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
@@ -169,13 +170,19 @@ public class TextSearchQueriesTest extends BaseQueriesTest {  private static fin
         .addSingleValueDimension(QUERY_LOG_TEXT_COL_NAME, FieldSpec.DataType.STRING)
         .addSingleValueDimension(SKILLS_TEXT_COL_NAME, FieldSpec.DataType.STRING)
         .addSingleValueDimension(SKILLS_TEXT_COL_DICT_NAME, FieldSpec.DataType.STRING)
-        .addSingleValueDimension(SKILLS_COPY_TEXT_COL_NAME, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(SKILLS_TEXT_COL_MULTI_TERM_NAME, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(SKILLS_TEXT_NO_RAW_NAME, FieldSpec.DataType.STRING)
         .addMetric(INT_COL_NAME, FieldSpec.DataType.INT).build();
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME);
-
+    Map<String, Map<String, String>> columnProperties = new HashMap<>();
+    Map<String, String> props = new HashMap<>();
+    props.put(FieldConfig.TEXT_INDEX_NO_RAW_DATA, "true");
+    props.put(FieldConfig.TEXT_INDEX_RAW_VALUE, "ILoveCoding");
+    columnProperties.put(SKILLS_TEXT_NO_RAW_NAME, props);
+    config.setColumnProperties(columnProperties);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     try (RecordReader recordReader = new GenericRowRecordReader(rows)) {
       driver.init(config, recordReader);
@@ -209,16 +216,18 @@ public class TextSearchQueriesTest extends BaseQueriesTest {  private static fin
       String line;
       while ((line = reader.readLine()) != null) {
         GenericRow row = new GenericRow();
-        row.putField(INT_COL_NAME, INT_BASE_VALUE + counter);
-        row.putField(QUERY_LOG_TEXT_COL_NAME, line);
+        row.putValue(INT_COL_NAME, INT_BASE_VALUE + counter);
+        row.putValue(QUERY_LOG_TEXT_COL_NAME, line);
         if (counter >= skillCount) {
-          row.putField(SKILLS_TEXT_COL_NAME, "software engineering");
-          row.putField(SKILLS_TEXT_COL_DICT_NAME, "software engineering");
-          row.putField(SKILLS_COPY_TEXT_COL_NAME, "software engineering");
+          row.putValue(SKILLS_TEXT_COL_NAME, "software engineering");
+          row.putValue(SKILLS_TEXT_COL_DICT_NAME, "software engineering");
+          row.putValue(SKILLS_TEXT_COL_MULTI_TERM_NAME, "software engineering");
+          row.putValue(SKILLS_TEXT_COL_MULTI_TERM_NAME, "software engineering");
         } else {
-          row.putField(SKILLS_TEXT_COL_NAME, skills[counter]);
-          row.putField(SKILLS_TEXT_COL_DICT_NAME, skills[counter]);
-          row.putField(SKILLS_COPY_TEXT_COL_NAME, skills[counter]);
+          row.putValue(SKILLS_TEXT_COL_NAME, skills[counter]);
+          row.putValue(SKILLS_TEXT_COL_DICT_NAME, skills[counter]);
+          row.putValue(SKILLS_TEXT_COL_MULTI_TERM_NAME, skills[counter]);
+          row.putValue(SKILLS_TEXT_NO_RAW_NAME, skills[counter]);
         }
         rows.add(row);
         counter++;
@@ -567,6 +576,17 @@ public class TextSearchQueriesTest extends BaseQueriesTest {  private static fin
     testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_1, '\"distributed systems\" AND Java AND C++') LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
+
+    // test for the text index configured to not store the default value
+    // full index is stored
+    query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_2, '\"distributed systems\" AND Java AND C++') LIMIT 50000";
+    testTextSearchAggregationQueryHelper(query, expected.size());
+    // configurable default value is used
+    query = "SELECT INT_COL, SKILLS_TEXT_COL_2 FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_2, '\"distributed systems\" AND Java AND C++') LIMIT 50000";
+    expected = new ArrayList<>();
+    expected.add(new Serializable[]{1005, "ILoveCoding"});
+    expected.add(new Serializable[]{1017, "ILoveCoding"});
+    testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
 
     // TEST 22: composite phrase and term query using boolean operator OR
     // Search in SKILLS_TEXT_COL column to look for documents where each document MUST contain ANY of the following skills:
