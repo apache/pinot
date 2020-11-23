@@ -46,6 +46,7 @@ import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.ConsumptionRateLimiter;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.local.realtime.converter.RealtimeSegmentConverter;
@@ -285,6 +286,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final boolean _isOffHeap;
   private final boolean _nullHandlingEnabled;
   private final SegmentCommitterFactory _segmentCommitterFactory;
+  private final ConsumptionRateLimiter _rateLimiter;
 
   private volatile StreamPartitionMsgOffset _latestStreamOffsetAtStartupTime = null;
 
@@ -458,6 +460,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   private void processStreamEvents(MessageBatch messagesAndOffsets, long idlePipeSleepTimeMillis) {
+
+    int messageCount = messagesAndOffsets.getMessageCount();
+    _rateLimiter.throttle(messageCount);
+
     PinotMeter realtimeRowsConsumedMeter = null;
     PinotMeter realtimeRowsDroppedMeter = null;
 
@@ -466,7 +472,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     boolean canTakeMore = true;
 
     GenericRow reuse = new GenericRow();
-    for (int index = 0; index < messagesAndOffsets.getMessageCount(); index++) {
+    for (int index = 0; index < messageCount; index++) {
       if (_shouldStop || endCriteriaReached()) {
         if (_segmentLogger.isDebugEnabled()) {
           _segmentLogger.debug("stop processing message batch early shouldStop: {}", _shouldStop);
@@ -1250,6 +1256,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _memoryManager = getMemoryManager(realtimeTableDataManager.getConsumerDir(), _segmentNameStr,
         indexLoadingConfig.isRealtimeOffHeapAllocation(), indexLoadingConfig.isDirectRealtimeOffHeapAllocation(),
         serverMetrics);
+
+    _rateLimiter = RealtimeConsumptionRateManager.getInstance()
+        .createRateLimiterForMultiPartitionTopic(_partitionLevelStreamConfig);
 
     List<String> sortedColumns = indexLoadingConfig.getSortedColumns();
     if (sortedColumns.isEmpty()) {
