@@ -46,7 +46,7 @@ public class FieldConfig extends BaseJsonConfig {
   public static String TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES = "useANDForMultiTermTextIndexQueries";
   public static String TEXT_INDEX_NO_RAW_DATA = "noRawDataForTextIndex";
   public static String TEXT_INDEX_RAW_VALUE = "rawValueForTextIndex";
-  public static String TEXT_INDEX_DEFAULT_RAW_VALUE = "null";
+  public static String TEXT_INDEX_DEFAULT_RAW_VALUE = "n";
 
   @JsonCreator
   public FieldConfig(@JsonProperty(value = "name", required = true) String name,

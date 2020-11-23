@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.indexsegment.generator;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.ArrayList;
@@ -299,6 +300,7 @@ public class SegmentGeneratorConfig {
     }
   }
 
+  @VisibleForTesting
   public void setColumnProperties(Map<String, Map<String, String>> columnProperties) {
     _columnProperties = columnProperties;
   }
