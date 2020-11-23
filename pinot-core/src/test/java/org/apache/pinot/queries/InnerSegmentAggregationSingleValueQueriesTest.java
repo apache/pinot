@@ -18,16 +18,19 @@
  */
 package org.apache.pinot.queries;
 
-import java.util.Iterator;
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
-import org.apache.pinot.core.query.aggregation.function.customobject.DistinctTable;
+import org.apache.pinot.core.operator.query.DistinctOperator;
+import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 @SuppressWarnings("ConstantConditions")
@@ -175,26 +178,23 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
   @Test
   public void testSingleColumnDistinct() {
     String query = "SELECT DISTINCT(column1) FROM testTable LIMIT 1000000";
-    AggregationOperator aggregationOperator = getOperatorForPqlQuery(query);
-    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    DistinctOperator distinctOperator = getOperatorForPqlQuery(query);
+    IntermediateResultsBlock resultsBlock = distinctOperator.nextBlock();
     List<Object> operatorResult = resultsBlock.getAggregationResult();
 
-    Assert.assertEquals(operatorResult.size(), 1);
-    Assert.assertTrue(operatorResult.get(0) instanceof DistinctTable);
+    assertEquals(operatorResult.size(), 1);
+    assertTrue(operatorResult.get(0) instanceof DistinctTable);
 
     DistinctTable distinctTable = (DistinctTable) operatorResult.get(0);
-    Assert.assertEquals(distinctTable.size(), 6582);
+    assertEquals(distinctTable.size(), 6582);
 
     DataSchema dataSchema = distinctTable.getDataSchema();
-    Assert.assertEquals(dataSchema.getColumnNames(), new String[]{"column1"});
-    Assert
-        .assertEquals(dataSchema.getColumnDataTypes(), new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+    assertEquals(dataSchema.getColumnNames(), new String[]{"column1"});
+    assertEquals(dataSchema.getColumnDataTypes(), new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
 
-    Iterator<Record> iterator = distinctTable.getFinalResult();
-    while (iterator.hasNext()) {
-      Record record = iterator.next();
+    for (Record record : distinctTable.getRecords()) {
       Assert.assertNotNull(record);
-      Assert.assertEquals(record.getValues().length, 1);
+      assertEquals(record.getValues().length, 1);
     }
   }
 
@@ -207,26 +207,24 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
   @Test
   public void testMultiColumnDistinct() {
     String query = "SELECT DISTINCT(column1, column3) FROM testTable LIMIT 1000000";
-    AggregationOperator aggregationOperator = getOperatorForPqlQuery(query);
-    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    DistinctOperator distinctOperator = getOperatorForPqlQuery(query);
+    IntermediateResultsBlock resultsBlock = distinctOperator.nextBlock();
     List<Object> operatorResult = resultsBlock.getAggregationResult();
 
-    Assert.assertEquals(operatorResult.size(), 1);
-    Assert.assertTrue(operatorResult.get(0) instanceof DistinctTable);
+    assertEquals(operatorResult.size(), 1);
+    assertTrue(operatorResult.get(0) instanceof DistinctTable);
 
     DistinctTable distinctTable = (DistinctTable) operatorResult.get(0);
-    Assert.assertEquals(distinctTable.size(), 21968);
+    assertEquals(distinctTable.size(), 21968);
 
     DataSchema dataSchema = distinctTable.getDataSchema();
-    Assert.assertEquals(dataSchema.getColumnNames(), new String[]{"column1", "column3"});
-    Assert.assertEquals(dataSchema.getColumnDataTypes(),
+    assertEquals(dataSchema.getColumnNames(), new String[]{"column1", "column3"});
+    assertEquals(dataSchema.getColumnDataTypes(),
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT});
 
-    Iterator<Record> iterator = distinctTable.getFinalResult();
-    while (iterator.hasNext()) {
-      Record record = iterator.next();
+    for (Record record : distinctTable.getRecords()) {
       Assert.assertNotNull(record);
-      Assert.assertEquals(record.getValues().length, 2);
+      assertEquals(record.getValues().length, 2);
     }
   }
 }

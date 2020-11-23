@@ -56,8 +56,8 @@ public class SelectionQuerySegmentPruner implements SegmentPruner {
       return segments;
     }
 
-    // Do not prune aggregation queries
-    if (QueryContextUtils.isAggregationQuery(query)) {
+    // Only prune selection queries
+    if (!QueryContextUtils.isSelectionQuery(query)) {
       return segments;
     }
 
