@@ -51,7 +51,7 @@ import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
 import org.apache.pinot.core.segment.index.readers.StringDictionary;
 import org.apache.pinot.core.segment.index.readers.forward.BaseChunkSVForwardIndexReader.ChunkReaderContext;
-import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
 import org.apache.pinot.core.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.sorted.SortedIndexReaderImpl;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
@@ -202,7 +202,7 @@ public class TextIndexHandler {
         return new SortedIndexReaderImpl(buffer, columnMetadata.getCardinality());
       } else {
         // create bit-encoded dictionary based forward index reader
-        return new FixedBitSVForwardIndexReader(buffer, numRows, numBitsPerValue);
+        return new FixedBitSVForwardIndexReaderV2(buffer, numRows, numBitsPerValue);
       }
     }
   }

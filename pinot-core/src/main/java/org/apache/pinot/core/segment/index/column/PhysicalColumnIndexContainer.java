@@ -46,7 +46,7 @@ import org.apache.pinot.core.segment.index.readers.StringDictionary;
 import org.apache.pinot.core.segment.index.readers.TextIndexReader;
 import org.apache.pinot.core.segment.index.readers.bloom.BloomFilterReaderFactory;
 import org.apache.pinot.core.segment.index.readers.forward.FixedBitMVForwardIndexReader;
-import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
 import org.apache.pinot.core.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.sorted.SortedIndexReaderImpl;
@@ -123,7 +123,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
         } else {
           // Unsorted
           _forwardIndex =
-              new FixedBitSVForwardIndexReader(fwdIndexBuffer, metadata.getTotalDocs(), metadata.getBitsPerElement());
+              new FixedBitSVForwardIndexReaderV2(fwdIndexBuffer, metadata.getTotalDocs(), metadata.getBitsPerElement());
         }
       } else {
         // Multi-value

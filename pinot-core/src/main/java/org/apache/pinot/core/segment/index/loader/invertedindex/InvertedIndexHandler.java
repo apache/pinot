@@ -33,7 +33,7 @@ import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
 import org.apache.pinot.core.segment.index.readers.forward.FixedBitMVForwardIndexReader;
-import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
@@ -144,7 +144,7 @@ public class InvertedIndexHandler {
     int numRows = columnMetadata.getTotalDocs();
     int numBitsPerValue = columnMetadata.getBitsPerElement();
     if (columnMetadata.isSingleValue()) {
-      return new FixedBitSVForwardIndexReader(buffer, numRows, numBitsPerValue);
+      return new FixedBitSVForwardIndexReaderV2(buffer, numRows, numBitsPerValue);
     } else {
       return new FixedBitMVForwardIndexReader(buffer, numRows, columnMetadata.getTotalNumberOfEntries(),
           numBitsPerValue);

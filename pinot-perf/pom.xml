@@ -133,6 +133,14 @@
               <name>pinot-BenchmarkDictionaryCreation</name>
             </program>
             <program>
+              <mainClass>org.apache.pinot.perf.BenchmarkFixedBitIntReader</mainClass>
+              <name>pinot-BenchmarkFixedBitIntReader</name>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.BenchmarkFixedBitSVForwardIndexReader</mainClass>
+              <name>pinot-BenchmarkFixedBitSVForwardIndexReader</name>
+            </program>
+            <program>
               <mainClass>org.apache.pinot.perf.BenchmarkFixedIntArrayOffHeapIdMap</mainClass>
               <name>pinot-BenchmarkFixedIntArrayOffHeapIdMap</name>
             </program>
@@ -167,6 +175,10 @@
             <program>
               <mainClass>org.apache.pinot.perf.ForwardIndexWriterBenchmark</mainClass>
               <name>pinot-ForwardIndexWriterBenchmark</name>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.BenchmarkPinotDataBitSet</mainClass>
+              <name>pinot-BenchmarkPinotDataBitSet</name>
             </program>
             <program>
               <mainClass>org.apache.pinot.perf.RawIndexBenchmark</mainClass>
