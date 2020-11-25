@@ -35,19 +35,19 @@ public class BatchIngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Configs for all the batch sources to ingest from")
   private final List<Map<String, String>> _batchConfigMaps;
 
-  @JsonPropertyDescription("Push type APPEND or REFRESH")
-  private final String _segmentPushType;
+  @JsonPropertyDescription("Ingestion type APPEND or REFRESH")
+  private final String _segmentIngestionType;
 
-  @JsonPropertyDescription("Push frequency HOURLY or DAILY")
-  private final String _segmentPushFrequency;
+  @JsonPropertyDescription("Ingestion frequency HOURLY or DAILY")
+  private final String _segmentIngestionFrequency;
 
   @JsonCreator
   public BatchIngestionConfig(@JsonProperty("batchConfigMaps") @Nullable List<Map<String, String>> batchConfigMaps,
-      @JsonProperty("segmentPushType") String segmentPushType,
-      @JsonProperty("segmentPushFrequency") String segmentPushFrequency) {
+      @JsonProperty("segmentIngestionType") String segmentIngestionType,
+      @JsonProperty("segmentIngestionFrequency") String segmentIngestionFrequency) {
     _batchConfigMaps = batchConfigMaps;
-    _segmentPushType = segmentPushType;
-    _segmentPushFrequency = segmentPushFrequency;
+    _segmentIngestionType = segmentIngestionType;
+    _segmentIngestionFrequency = segmentIngestionFrequency;
   }
 
   @Nullable
@@ -55,11 +55,11 @@ public class BatchIngestionConfig extends BaseJsonConfig {
     return _batchConfigMaps;
   }
 
-  public String getSegmentPushType() {
-    return _segmentPushType;
+  public String getSegmentIngestionType() {
+    return _segmentIngestionType;
   }
 
-  public String getSegmentPushFrequency() {
-    return _segmentPushFrequency;
+  public String getSegmentIngestionFrequency() {
+    return _segmentIngestionFrequency;
   }
 }

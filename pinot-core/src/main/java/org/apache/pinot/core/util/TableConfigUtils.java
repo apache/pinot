@@ -116,7 +116,7 @@ public final class TableConfigUtils {
           String.format("Table: %s, \"segmentsConfig\" field is missing in table config", tableName));
     }
 
-    String segmentPushType = IngestionConfigUtils.getBatchSegmentPushType(tableConfig);
+    String segmentPushType = IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig);
     // segmentPushType is not needed for Realtime table
     if (tableConfig.getTableType() == TableType.OFFLINE && segmentPushType != null && !segmentPushType.isEmpty()) {
       if (!segmentPushType.equalsIgnoreCase("REFRESH") && !segmentPushType.equalsIgnoreCase("APPEND")) {

@@ -101,7 +101,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
     // For offline tables, ensure that the segmentPushType is APPEND.
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-    String segmentPushType = IngestionConfigUtils.getBatchSegmentPushType(tableConfig);
+    String segmentPushType = IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig);
     if (tableConfig.getTableType() == TableType.OFFLINE && !"APPEND".equalsIgnoreCase(segmentPushType)) {
       LOGGER.info("Segment push type is not APPEND for table: {}, skip", tableNameWithType);
       return;

@@ -102,7 +102,7 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> 
             .warn("Table: {} has {} segments with invalid interval", offlineTableName, numSegmentsWithInvalidIntervals);
       }
       Duration frequency =
-          SegmentIntervalUtils.convertToDuration(IngestionConfigUtils.getBatchSegmentPushFrequency(tableConfig));
+          SegmentIntervalUtils.convertToDuration(IngestionConfigUtils.getBatchSegmentIngestionFrequency(tableConfig));
       numMissingSegments = computeNumMissingSegments(segmentIntervals, frequency);
     }
     // Update the gauge that contains the number of missing segments

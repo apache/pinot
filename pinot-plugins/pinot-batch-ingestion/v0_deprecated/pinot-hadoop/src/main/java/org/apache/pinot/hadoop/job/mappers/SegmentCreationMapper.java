@@ -163,8 +163,8 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
         _segmentNameGenerator =
             new NormalizedDateSegmentNameGenerator(_rawTableName, _jobConf.get(JobConfigConstants.SEGMENT_NAME_PREFIX),
                 _jobConf.getBoolean(JobConfigConstants.EXCLUDE_SEQUENCE_ID, false),
-                IngestionConfigUtils.getBatchSegmentPushType(_tableConfig),
-                IngestionConfigUtils.getBatchSegmentPushFrequency(_tableConfig), dateTimeFormatSpec);
+                IngestionConfigUtils.getBatchSegmentIngestionType(_tableConfig),
+                IngestionConfigUtils.getBatchSegmentIngestionFrequency(_tableConfig), dateTimeFormatSpec);
         break;
       default:
         throw new UnsupportedOperationException("Unsupported segment name generator type: " + segmentNameGeneratorType);

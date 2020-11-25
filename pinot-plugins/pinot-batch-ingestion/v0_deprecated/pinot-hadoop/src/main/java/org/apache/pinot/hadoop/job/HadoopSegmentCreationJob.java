@@ -143,7 +143,7 @@ public class HadoopSegmentCreationJob extends SegmentCreationJob {
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
 
     // For APPEND use case, timeColumnName and timeType must be set
-    if (APPEND.equalsIgnoreCase(IngestionConfigUtils.getBatchSegmentPushType(tableConfig))) {
+    if (APPEND.equalsIgnoreCase(IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig))) {
       Preconditions.checkState(validationConfig.getTimeColumnName() != null && validationConfig.getTimeType() != null,
           "For APPEND use case, time column and type must be set");
     }

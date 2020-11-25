@@ -368,7 +368,7 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
     // If the use case is an append use case, check that one time unit is contained in one file. If there is more than one,
     // the job should be disabled, as we should not resize for these use cases. Therefore, setting the time column name
     // and value
-    if (IngestionConfigUtils.getBatchSegmentPushType(_tableConfig).equalsIgnoreCase("APPEND")) {
+    if (IngestionConfigUtils.getBatchSegmentIngestionType(_tableConfig).equalsIgnoreCase("APPEND")) {
       job.getConfiguration().set(InternalConfigConstants.IS_APPEND, "true");
       String timeColumnName = validationConfig.getTimeColumnName();
       job.getConfiguration().set(InternalConfigConstants.TIME_COLUMN_CONFIG, timeColumnName);
@@ -385,7 +385,7 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
         }
       }
       job.getConfiguration().set(InternalConfigConstants.SEGMENT_PUSH_FREQUENCY,
-          IngestionConfigUtils.getBatchSegmentPushFrequency(_tableConfig));
+          IngestionConfigUtils.getBatchSegmentIngestionFrequency(_tableConfig));
       try (DataFileStream<GenericRecord> dataStreamReader = getAvroReader(path)) {
         job.getConfiguration()
             .set(InternalConfigConstants.TIME_COLUMN_VALUE, dataStreamReader.next().get(timeColumnName).toString());
