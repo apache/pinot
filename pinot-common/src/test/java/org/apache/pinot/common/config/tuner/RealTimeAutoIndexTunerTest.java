@@ -16,20 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.config.table;
+package org.apache.pinot.common.config.tuner;
 
 import java.util.List;
+import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class AutoTuneIndexingConfigResolverTest {
+public class RealTimeAutoIndexTunerTest {
 
   private static final String TABLE_NAME = "test_table";
+  private static final String TUNER_STRATEGY = "realtimeAutoIndexTuner";
   private Schema schema;
   private String dimensionColumns[] = {"col1", "col2"};
   private String metricColumns[] = {"count"};
@@ -40,16 +44,16 @@ public class AutoTuneIndexingConfigResolverTest {
         .addSingleValueDimension(dimensionColumns[0], FieldSpec.DataType.STRING)
         .addSingleValueDimension(dimensionColumns[1], FieldSpec.DataType.STRING)
         .addMetric(metricColumns[0], FieldSpec.DataType.INT).build();
-    IndexingConfigResolverFactory.register(AutoTuneIndexingConfigResolver.class.getName());
-    IndexingConfigResolverFactory.getResolver().registerSchema(schema);
   }
 
   @Test
   public void testIndexingConfigResolution() {
-    IndexingConfig config = new IndexingConfig();
-    config.setAutoModeEnabled(true);
-    IndexingConfigResolver resolver = IndexingConfigResolverFactory.getResolver();
-    IndexingConfig newConfig = resolver.resolveIndexingConfig(config);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTableConfigTunerStrategy(TUNER_STRATEGY)
+            .build();
+    TableConfig result = TableConfigTunerRegistry.invokeTableConfigTuner(TUNER_STRATEGY, tableConfig, schema);
+
+    IndexingConfig newConfig = result.getIndexingConfig();
     List<String> invertedIndexColumns = newConfig.getInvertedIndexColumns();
     Assert.assertTrue(invertedIndexColumns.size() == 2);
     for (int i = 0; i < dimensionColumns.length; i++) {
@@ -59,10 +63,5 @@ public class AutoTuneIndexingConfigResolverTest {
     List<String> noDictionaryColumns = newConfig.getNoDictionaryColumns();
     Assert.assertTrue(noDictionaryColumns.size() == 1);
     Assert.assertEquals(noDictionaryColumns.get(0), metricColumns[0]);
-  }
-
-  @AfterClass
-  public void destroy() {
-    IndexingConfigResolverFactory.deregister();
   }
 }

@@ -105,6 +105,7 @@ public class TableConfigBuilder {
   private UpsertConfig _upsertConfig;
   private IngestionConfig _ingestionConfig;
   private List<TierConfig> _tierConfigList;
+  private String _tableConfigTunerStrategy;
 
   public TableConfigBuilder(TableType tableType) {
     _tableType = tableType;
@@ -338,6 +339,11 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setTableConfigTunerStrategy(String tableConfigTunerStrategy) {
+    _tableConfigTunerStrategy = tableConfigTunerStrategy;
+    return this;
+  }
+
   public TableConfig build() {
     // Validation config
     SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
@@ -386,6 +392,6 @@ public class TableConfigBuilder {
 
     return new TableConfig(_tableName, _tableType.toString(), validationConfig, tenantConfig, indexingConfig,
         _customConfig, _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap,
-        _fieldConfigList, _upsertConfig, _ingestionConfig, _tierConfigList, _isDimTable);
+        _fieldConfigList, _upsertConfig, _ingestionConfig, _tierConfigList, _isDimTable, _tableConfigTunerStrategy);
   }
 }

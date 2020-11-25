@@ -16,19 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.config.table;
+package org.apache.pinot.common.config.tuner;
 
+import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.tuner.TableConfigTuner;
 import org.apache.pinot.spi.data.Schema;
 
 
-public class NoOpIndexingConfigResolver implements IndexingConfigResolver {
-  @Override
-  public IndexingConfig resolveIndexingConfig(IndexingConfig initialConfig) {
-    return initialConfig;
-  }
+/**
+ * Used to auto-tune the table indexing config. It takes the original table
+ * config, table schema and adds the following to indexing config:
+ * - Inverted indices for all dimensions
+ * - No dictionary index for all metrics
+ */
+public class RealTimeAutoIndexTuner {
 
-  @Override
-  public void registerSchema(Schema schema) {
-    // No-op
+  @TableConfigTuner(name = "realtimeAutoIndexTuner")
+  public static TableConfig tuneTableConfig(TableConfig initialConfig, Schema schema) {
+    IndexingConfig initialIndexingConfig = initialConfig.getIndexingConfig();
+    initialIndexingConfig.setInvertedIndexColumns(schema.getDimensionNames());
+    initialIndexingConfig.setNoDictionaryColumns(schema.getMetricNames());
+    return initialConfig;
   }
 }

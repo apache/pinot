@@ -16,31 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.config.table;
+package org.apache.pinot.common.config.tuner;
 
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.tuner.TableConfigTuner;
 import org.apache.pinot.spi.data.Schema;
 
 
-public interface IndexingConfigResolver {
-  /**
-   * This interface is meant to customize indexing config based on the implementation.
-   *
-   * For instance, an auto-indexing resolver can take an indexing config as shown below:
-   *     "tableIndexConfig": {
-   *        “mode”: “auto”
-   *        "streamConfigs" : {
-   *           "streamType": "kafka",
-   *           ...
-   *         }
-   *      }
-   *
-   * and automatically generate fields within Pinot Indexing config (eg: inverted indices,
-   * no dictionary columns and so on).
-   */
-  public IndexingConfig resolveIndexingConfig(IndexingConfig initialConfig);
-
-  /**
-   * Register the table schema with this resolver.
-   */
-  public void registerSchema(Schema schema);
+public class NoOpTableConfigTuner {
+  @TableConfigTuner(name = "noopConfigTuner")
+  public static TableConfig noopConfigTuner(TableConfig initialConfig, Schema schema) {
+    return initialConfig;
+  }
 }

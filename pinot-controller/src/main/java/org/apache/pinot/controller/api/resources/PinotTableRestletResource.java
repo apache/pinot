@@ -46,6 +46,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
+import org.apache.pinot.common.config.tuner.TableConfigTunerRegistry;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -56,9 +57,6 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.recommender.RecommenderDriver;
 import org.apache.pinot.core.util.ReplicationUtils;
 import org.apache.pinot.core.util.TableConfigUtils;
-import org.apache.pinot.spi.config.table.IndexingConfig;
-import org.apache.pinot.spi.config.table.IndexingConfigResolver;
-import org.apache.pinot.spi.config.table.IndexingConfigResolverFactory;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStats;
@@ -121,11 +119,9 @@ public class PinotTableRestletResource {
       tableConfig = JsonUtils.stringToObject(tableConfigStr, TableConfig.class);
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
 
-      if (_controllerConf.isIndexingConfigResolverConfigured()) {
-        IndexingConfigResolver resolver = IndexingConfigResolverFactory.getResolver();
-        resolver.registerSchema(schema);
-        IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-        tableConfig.setIndexingConfig(resolver.resolveIndexingConfig(indexingConfig));
+      String tableConfigTunerStrategy = tableConfig.getTableConfigTunerStrategy();
+      if (tableConfigTunerStrategy != null && !tableConfigTunerStrategy.isEmpty()) {
+        tableConfig = TableConfigTunerRegistry.invokeTableConfigTuner(tableConfigTunerStrategy, tableConfig, schema);
       }
 
       // TableConfigUtils.validate(...) is used across table create/update.

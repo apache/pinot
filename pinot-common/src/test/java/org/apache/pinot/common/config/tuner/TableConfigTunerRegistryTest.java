@@ -16,18 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.config.table;
+package org.apache.pinot.common.config.tuner;
 
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-public class IndexingConfigResolverFactoryTest {
+public class TableConfigTunerRegistryTest {
+
+  private static final String TUNER_STRATEGY = "noopConfigTuner";
 
   @Test
   public void testNoOpIndexingConfigResolver() {
-    IndexingConfigResolverFactory.register(NoOpIndexingConfigResolver.class.getName());
-    Assert.assertTrue(IndexingConfigResolverFactory.getResolver() instanceof NoOpIndexingConfigResolver);
-    IndexingConfigResolverFactory.deregister();
+    Schema schema = new Schema.SchemaBuilder().build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTableConfigTunerStrategy(TUNER_STRATEGY).build();
+    TableConfig result = TableConfigTunerRegistry.invokeTableConfigTuner(TUNER_STRATEGY, tableConfig, schema);
+    Assert.assertEquals(result, tableConfig);
   }
 }

@@ -139,9 +139,11 @@ public class TableConfigUtils {
       });
     }
 
+    String tableConfigTunerStrategy = simpleFields.get(TableConfig.TABLE_CONFIG_TUNER_STRATEGY);
+
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
         quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList, upsertConfig,
-        ingestionConfig, tierConfigList, isDimTable);
+        ingestionConfig, tierConfigList, isDimTable, tableConfigTunerStrategy);
   }
 
   public static ZNRecord toZNRecord(TableConfig tableConfig)
@@ -195,6 +197,10 @@ public class TableConfigUtils {
     List<TierConfig> tierConfigList = tableConfig.getTierConfigsList();
     if (tierConfigList != null) {
       simpleFields.put(TableConfig.TIER_CONFIGS_LIST_KEY, JsonUtils.objectToString(tierConfigList));
+    }
+    String tableConfigTunerStrategy = tableConfig.getTableConfigTunerStrategy();
+    if (tableConfigTunerStrategy != null && !tableConfigTunerStrategy.isEmpty()) {
+      simpleFields.put(TableConfig.TABLE_CONFIG_TUNER_STRATEGY, tableConfigTunerStrategy);
     }
 
     ZNRecord znRecord = new ZNRecord(tableConfig.getTableName());
