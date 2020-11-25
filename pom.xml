@@ -1334,6 +1334,10 @@
             </systemPropertyVariables>
             <trimStackTrace>false</trimStackTrace>
             <reportFormat>plain</reportFormat>
+            <forkMode>never</forkMode>
+            <suiteXmlFiles>
+              <suiteXmlFile>${basedir}/testng.xml</suiteXmlFile>
+            </suiteXmlFiles>
           </configuration>
         </plugin>
         <plugin>

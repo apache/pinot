@@ -46,7 +46,6 @@ public class ZKOperatorTest extends ControllerTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    startZk();
     startController();
 
     addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
@@ -133,6 +132,5 @@ public class ZKOperatorTest extends ControllerTest {
 
     stopFakeInstances();
     stopController();
-    stopZk();
   }
 }

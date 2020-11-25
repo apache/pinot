@@ -50,7 +50,6 @@ public class TableViewsTest extends ControllerTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    startZk();
     startController();
     addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKER_INSTANCES, true);
     addFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVER_INSTANCES, true);
@@ -173,6 +172,5 @@ public class TableViewsTest extends ControllerTest {
   public void tearDown() {
     stopFakeInstances();
     stopController();
-    stopZk();
   }
 }

@@ -36,7 +36,6 @@ public class ControllerSentinelTestV2 extends ControllerTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    startZk();
     startController();
     addFakeBrokerInstancesToAutoJoinHelixCluster(20, true);
     addFakeServerInstancesToAutoJoinHelixCluster(20, true);
@@ -85,6 +84,5 @@ public class ControllerSentinelTestV2 extends ControllerTest {
   public void tearDown() {
     stopFakeInstances();
     stopController();
-    stopZk();
   }
 }

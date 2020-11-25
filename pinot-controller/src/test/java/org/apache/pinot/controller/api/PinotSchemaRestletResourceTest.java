@@ -37,7 +37,6 @@ public class PinotSchemaRestletResourceTest extends ControllerTest {
 
   @BeforeClass
   public void setUp() {
-    startZk();
     startController();
   }
 
@@ -130,6 +129,5 @@ public class PinotSchemaRestletResourceTest extends ControllerTest {
   @AfterClass
   public void tearDown() {
     stopController();
-    stopZk();
   }
 }

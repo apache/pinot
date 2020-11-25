@@ -69,7 +69,6 @@ public class TableRebalancerClusterTest extends ControllerTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    startZk();
     startController();
     addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
   }
@@ -409,6 +408,5 @@ public class TableRebalancerClusterTest extends ControllerTest {
   public void tearDown() {
     stopFakeInstances();
     stopController();
-    stopZk();
   }
 }

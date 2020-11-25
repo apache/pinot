@@ -60,7 +60,6 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    startZk();
     Map<String, Object> properties = getDefaultControllerConfiguration();
     properties.put(ControllerConf.TABLE_MIN_REPLICAS, MIN_NUM_REPLICAS);
     startController(properties);
@@ -375,6 +374,5 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   public void tearDown() {
     stopFakeInstances();
     stopController();
-    stopZk();
   }
 }

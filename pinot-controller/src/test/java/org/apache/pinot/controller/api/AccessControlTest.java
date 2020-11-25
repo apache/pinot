@@ -27,7 +27,9 @@ import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterSuite;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Test;
 
 
@@ -35,8 +37,6 @@ public class AccessControlTest extends ControllerTest {
 
   @BeforeClass
   public void setUp() {
-    startZk();
-    
     Map<String, Object> properties = getDefaultControllerConfiguration();
     properties.put(ControllerConf.ACCESS_CONTROL_FACTORY_CLASS, DenyAllAccessFactory.class.getName());
 
@@ -57,7 +57,6 @@ public class AccessControlTest extends ControllerTest {
   @AfterClass
   public void tearDown() {
     stopController();
-    stopZk();
   }
 
   public static class DenyAllAccessFactory implements AccessControlFactory {

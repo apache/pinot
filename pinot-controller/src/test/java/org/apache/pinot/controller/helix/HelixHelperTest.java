@@ -38,7 +38,6 @@ public class HelixHelperTest extends ControllerTest {
 
   @BeforeClass
   public void setUp() {
-    startZk();
     startController();
 
     IdealState idealState = new IdealState(RESOURCE_NAME);
@@ -103,6 +102,5 @@ public class HelixHelperTest extends ControllerTest {
   @AfterClass
   public void tearDown() {
     stopController();
-    stopZk();
   }
 }

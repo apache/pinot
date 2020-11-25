@@ -38,7 +38,6 @@ public class PinotBrokerRestletResourceTest extends ControllerTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    startZk();
     startController();
     addFakeServerInstancesToAutoJoinHelixCluster(1, true);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE").size(),
@@ -166,6 +165,5 @@ public class PinotBrokerRestletResourceTest extends ControllerTest {
   public void tearDown() {
     stopFakeInstances();
     stopController();
-    stopZk();
   }
 }

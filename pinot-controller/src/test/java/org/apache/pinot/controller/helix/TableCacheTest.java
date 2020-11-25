@@ -43,7 +43,6 @@ public class TableCacheTest extends ControllerTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    startZk();
     startController();
     addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
     addFakeServerInstancesToAutoJoinHelixCluster(1, true);
@@ -137,6 +136,5 @@ public class TableCacheTest extends ControllerTest {
   @AfterClass
   public void tearDown() {
     stopController();
-    stopZk();
   }
 }

@@ -148,10 +148,10 @@ public class ControllerStarter implements ServiceStartable {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(_config.getZkStr());
     _helixClusterName = _config.getHelixClusterName();
     _listenerConfigs = ListenerConfigUtil.buildListenerConfigs(_config);
-    
+
     String host = conf.getControllerHost();
     int port = inferPort();
-    
+
     _helixControllerInstanceId = host + "_" + port;
     _helixParticipantInstanceId = LeadControllerUtils.generateParticipantInstanceId(host, port);
     _isUpdateStateModel = _config.isUpdateSegmentStateModel();
@@ -193,7 +193,7 @@ public class ControllerStarter implements ServiceStartable {
   private int inferPort() {
     return Optional.ofNullable(_config.getControllerPort()).map(Integer::parseInt)
 
-        // Fall back to protocol listeners if legacy controller.port is undefined. 
+        // Fall back to protocol listeners if legacy controller.port is undefined.
         .orElseGet(() -> _listenerConfigs.stream().findFirst().map(ListenerConfig::getPort).get());
   }
 
@@ -477,7 +477,7 @@ public class ControllerStarter implements ServiceStartable {
 
   private void initPinotFSFactory() {
     LOGGER.info("Initializing PinotFSFactory");
-    
+
     PinotFSFactory.init(_config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY));
   }
 
@@ -606,6 +606,7 @@ public class ControllerStarter implements ServiceStartable {
   private void stopHelixController() {
     LOGGER.info("Disconnecting helix controller zk manager");
     _helixControllerManager.disconnect();
+    _helixControllerManager = null;
   }
 
   private void stopPinotController() {

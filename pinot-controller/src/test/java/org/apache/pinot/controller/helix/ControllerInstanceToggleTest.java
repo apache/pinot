@@ -47,7 +47,6 @@ public class ControllerInstanceToggleTest extends ControllerTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    startZk();
     startController();
     addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_INSTANCES, true);
     addFakeServerInstancesToAutoJoinHelixCluster(NUM_INSTANCES, true);
@@ -139,6 +138,5 @@ public class ControllerInstanceToggleTest extends ControllerTest {
   public void tearDown() {
     stopFakeInstances();
     stopController();
-    stopZk();
   }
 }

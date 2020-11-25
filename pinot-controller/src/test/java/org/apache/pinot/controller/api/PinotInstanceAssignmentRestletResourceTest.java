@@ -63,11 +63,9 @@ public class PinotInstanceAssignmentRestletResourceTest extends ControllerTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    startZk();
-    
     Map<String, Object> properties = getDefaultControllerConfiguration();
     properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
-    
+
     startController(properties);
     addFakeBrokerInstancesToAutoJoinHelixCluster(1, false);
     addFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVER_INSTANCES, false);
@@ -332,6 +330,5 @@ public class PinotInstanceAssignmentRestletResourceTest extends ControllerTest {
   public void tearDown() {
     stopFakeInstances();
     stopController();
-    stopZk();
   }
 }

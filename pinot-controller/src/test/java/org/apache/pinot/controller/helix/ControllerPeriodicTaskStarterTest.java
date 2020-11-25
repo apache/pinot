@@ -31,11 +31,6 @@ import org.testng.annotations.Test;
 
 public class ControllerPeriodicTaskStarterTest extends ControllerTest {
 
-  @BeforeClass
-  public void setup() {
-    startZk();
-  }
-
   /**
    * Test that controller starts up and helixResourceManager is non null before initiating periodic tasks
    */

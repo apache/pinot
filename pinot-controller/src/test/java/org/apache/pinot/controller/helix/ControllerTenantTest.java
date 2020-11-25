@@ -44,7 +44,6 @@ public class ControllerTenantTest extends ControllerTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    startZk();
     startController();
     ZKMetadataProvider.setClusterTenantIsolationEnabled(_propertyStore, false);
     addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_INSTANCES, false);
@@ -183,6 +182,5 @@ public class ControllerTenantTest extends ControllerTest {
   public void tearDown() {
     stopFakeInstances();
     stopController();
-    stopZk();
   }
 }

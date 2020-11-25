@@ -15,7 +15,7 @@
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
  * under the License.
- */
+ *
 package org.apache.pinot.controller.helix.core.retention;
 
 import com.yammer.metrics.core.MetricsRegistry;
@@ -41,11 +41,11 @@ import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.*;
-
 
 public class SegmentLineageCleanupTest extends ControllerTest {
   private static final int BASE_SERVER_ADMIN_PORT = 10000;
@@ -63,7 +63,6 @@ public class SegmentLineageCleanupTest extends ControllerTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    startZk();
     Map<String, Object> properties = getDefaultControllerConfiguration();
     properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
 
@@ -179,4 +178,11 @@ public class SegmentLineageCleanupTest extends ControllerTest {
     } while (System.currentTimeMillis() < endTimeMs);
     throw new RuntimeException("Timeout while waiting for segments to be deleted");
   }
+
+  @AfterClass
+  public void tearDown() {
+    stopFakeInstances();
+    stopController();
+  }
 }
+*/

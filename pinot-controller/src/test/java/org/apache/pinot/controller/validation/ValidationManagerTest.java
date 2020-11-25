@@ -63,7 +63,6 @@ public class ValidationManagerTest extends ControllerTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    startZk();
     startController();
     addFakeBrokerInstancesToAutoJoinHelixCluster(2, true);
     addFakeServerInstancesToAutoJoinHelixCluster(2, true);
@@ -217,6 +216,5 @@ public class ValidationManagerTest extends ControllerTest {
   public void tearDown() {
     stopFakeInstances();
     stopController();
-    stopZk();
   }
 }

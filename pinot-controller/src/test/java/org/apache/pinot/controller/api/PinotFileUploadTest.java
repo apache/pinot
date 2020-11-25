@@ -43,7 +43,6 @@ public class PinotFileUploadTest extends ControllerTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    startZk();
     startController();
     addFakeBrokerInstancesToAutoJoinHelixCluster(5, true);
     addFakeServerInstancesToAutoJoinHelixCluster(5, true);
@@ -71,6 +70,5 @@ public class PinotFileUploadTest extends ControllerTest {
   public void tearDown() {
     stopFakeInstances();
     stopController();
-    stopZk();
   }
 }
