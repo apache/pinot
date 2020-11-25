@@ -28,41 +28,54 @@ import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 public class ParallelRowProcessor {
-    /* bufferSize, Needs to fit L3 cache & must be power of 2 */
+    // bufferSize, Needs to fit L3 cache & must be power of 2
     public static final int RING_SIZE = 64;
-    private RecordReader reader;
-    private Disruptor<GenericRow> disruptor;
+    private RecordReader _reader;
+    private Disruptor<GenericRow> _disruptor;
 
+    /**
+     * Initialize a Single Producer & Single Consumer Ring Buffer
+     * with `RING_SIZE` entries.
+     * 
+     * @param reader {@link org.apache.pinot.spi.data.readers.RecordReader} used by producer to read entries from.
+     * @param handler {@link com.lmax.disruptor.EventHandler<org.apache.pinot.spi.data.readers.GenericRow>} that will consume entries from the ring buffer.
+     */
     public ParallelRowProcessor(RecordReader reader, EventHandler<GenericRow> handler) {
-        this.reader = reader;
+        _reader = reader;
 
-        this.disruptor = new Disruptor<GenericRow>(
+        _disruptor = new Disruptor<GenericRow>(
             GenericRow::new, 
             RING_SIZE, 
             DaemonThreadFactory.INSTANCE,
             ProducerType.SINGLE,
             new BusySpinWaitStrategy());
 
-        this.disruptor.handleEventsWith(handler);
+        _disruptor.handleEventsWith(handler);
     }
 
-    public void Run() throws Exception {
+    /**
+     * Iterates over all elements available in the Reader pushing them into the
+     * Ring Buffer.
+     * 
+     * @throws Exception
+     */
+    public void run() throws Exception {
       // Start the Disruptor, starts all threads running
-      disruptor.start();
+      _disruptor.start();
 
       // Get the ring buffer from the Disruptor to be used for publishing.
-      RingBuffer<GenericRow> ringBuffer = disruptor.getRingBuffer();
+      RingBuffer<GenericRow> ringBuffer = _disruptor.getRingBuffer();
 
       // Iterate over all records pushing them into the ring
-      while (reader.hasNext()) {
+      while (_reader.hasNext()) {
         long bufferIndex = ringBuffer.next();
         GenericRow decodedRow = ringBuffer.get(bufferIndex);
         decodedRow.clear();
-        reader.next(decodedRow);
+        _reader.next(decodedRow);
         ringBuffer.publish(bufferIndex);
       }
 
       // Wait for all entries to be consumed
-      disruptor.shutdown();
+      _disruptor.shutdown();
     }
 }

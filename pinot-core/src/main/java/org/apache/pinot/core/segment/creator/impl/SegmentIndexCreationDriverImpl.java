@@ -83,9 +83,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private int totalDocs = 0;
   private File tempIndexDir;
   private String segmentName;
-  private long totalRecordReadTime = 0;
-  private long totalIndexTime = 0;
-  private long totalStatsCollectorTime = 0;
 
   @Override
   public void init(SegmentGeneratorConfig config)
@@ -190,14 +187,10 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       recordReader.rewind();
       LOGGER.info("Start building IndexCreator!");
 
-      BuildRingBufferConsumer consumer = new BuildRingBufferConsumer(_recordTransformer, indexCreator); 
-      ParallelRowProcessor prp = new ParallelRowProcessor(recordReader, consumer);
+      SegmentIndexRingBufferConsumer consumer = new SegmentIndexRingBufferConsumer(_recordTransformer, indexCreator); 
+      ParallelRowProcessor parallelRowProcessor = new ParallelRowProcessor(recordReader, consumer);
 
-      prp.Run();
-
-      totalIndexTime = consumer.getTotalIndexTime();
-      totalRecordReadTime = consumer.getTotalRecordReadTime();
-      totalStatsCollectorTime = consumer.getTotalStatsCollectorTime();
+      parallelRowProcessor.run();
     } catch (Exception e) {
       indexCreator.close();
       throw e;
@@ -265,10 +258,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
     // Persist creation metadata to disk
     persistCreationMeta(segmentOutputDir, crc, creationTime);
-
-    LOGGER.info("Driver, record read time : {}", totalRecordReadTime);
-    LOGGER.info("Driver, stats collector time : {}", totalStatsCollectorTime);
-    LOGGER.info("Driver, indexing time : {}", totalIndexTime);
   }
 
   private void buildStarTreeV2IfNecessary(File indexDir)

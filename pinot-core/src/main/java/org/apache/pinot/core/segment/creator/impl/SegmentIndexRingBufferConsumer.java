@@ -22,30 +22,35 @@ import java.util.Collection;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import com.lmax.disruptor.EventHandler;
 import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
-import org.apache.pinot.core.segment.creator.SegmentPreIndexStatsCollector;
+import org.apache.pinot.core.segment.creator.SegmentCreator;
 import org.apache.pinot.core.util.IngestionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class InitRingBufferConsumer implements EventHandler<GenericRow> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(InitRingBufferConsumer.class);
-  private RecordTransformer transformer = null;
-  private SegmentPreIndexStatsCollector collector = null;
+public class SegmentIndexRingBufferConsumer implements EventHandler<GenericRow> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentIndexRingBufferConsumer.class);
+  private RecordTransformer recordTransformer = null;
+  private SegmentCreator indexCreator = null;
 
-  public InitRingBufferConsumer(RecordTransformer newTransformer, SegmentPreIndexStatsCollector newCollector) {
-    this.transformer = newTransformer;
-    this.collector = newCollector;
+  public SegmentIndexRingBufferConsumer(RecordTransformer newTransformer, SegmentCreator newSegmentCreator) {
+    recordTransformer = newTransformer;
+    indexCreator = newSegmentCreator;
   }
 
+  /**
+   * Consumes one entry from the ring buffer. Called every time an entry becomes available.
+   * @param row {@link org.apache.pinot.spi.data.readers.GenericRow} entry available in the ring buffer.
+   * @param sequence index of the entry available in the ring buffer.
+   * @param endOfBatch whether we reached the end of a batch processing.
+   */
   public void onEvent(GenericRow row, long sequence, boolean endOfBatch) {
     try {
       if (row.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {
         for (Object singleRow : (Collection) row.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
-          collectRow((GenericRow) singleRow);
+          indexRow((GenericRow) singleRow);
         }
-      } 
-      else {
-        collectRow(row);
+      } else {
+        indexRow(row);
       }
     }
     catch (Exception e) {
@@ -53,10 +58,11 @@ public class InitRingBufferConsumer implements EventHandler<GenericRow> {
     }
   }
 
-  private void collectRow(GenericRow row) throws Exception {
-    GenericRow transformedRow = this.transformer.transform(row);
-    if (transformedRow != null && IngestionUtils.shouldIngestRow(row)) {
-      this.collector.collectRow(transformedRow);
+  private void indexRow(GenericRow row) {
+    GenericRow transformedRow = recordTransformer.transform(row);
+    if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
+      indexCreator.indexRow(transformedRow);
     }
   }
 }
+

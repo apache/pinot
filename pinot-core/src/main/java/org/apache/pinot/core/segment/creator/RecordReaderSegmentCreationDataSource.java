@@ -21,7 +21,7 @@ package org.apache.pinot.core.segment.creator;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
-import org.apache.pinot.core.segment.creator.impl.InitRingBufferConsumer;
+import org.apache.pinot.core.segment.creator.impl.SegmentIndexStatsRingBufferConsumer;
 import org.apache.pinot.core.segment.creator.impl.ParallelRowProcessor;
 import org.apache.pinot.core.segment.creator.impl.stats.SegmentPreIndexStatsCollectorImpl;
 import org.apache.pinot.spi.data.readers.RecordReader;
@@ -51,11 +51,9 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
       SegmentPreIndexStatsCollector collector = new SegmentPreIndexStatsCollectorImpl(statsCollectorConfig);
       collector.init();
 
-      ParallelRowProcessor prp = new ParallelRowProcessor(
-          _recordReader, 
-          new InitRingBufferConsumer(recordTransformer, collector));
+      ParallelRowProcessor parallelRowProcessor = new ParallelRowProcessor(_recordReader, new SegmentIndexStatsRingBufferConsumer(recordTransformer, collector));
 
-      prp.Run();
+      parallelRowProcessor.run();
 
       collector.build();
       return collector;
