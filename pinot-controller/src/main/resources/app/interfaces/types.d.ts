@@ -24,6 +24,14 @@ declare module 'Models' {
     error?: string;
   };
 
+  type SchemaDetails = {
+    schemaName: string,
+    totalColumns: number,
+    dimensions: number,
+    metrics: number,
+    dateTime: number
+  };
+
   export type Tenants = {
     SERVER_TENANTS: Array<string>;
     BROKER_TENANTS: Array<string>;

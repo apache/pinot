@@ -45,6 +45,9 @@ export const getTenantTableDetails = (tableName: string): Promise<AxiosResponse<
 export const putTable = (name: string, params: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.put(`/tables/${name}`, params, { headers });
 
+export const getSchemaList = (): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/schemas`);
+
 export const getSchema = (name: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/schemas/${name}`);
 

@@ -90,3 +90,36 @@ li.CodeMirror-hint-active {
 .CodeMirror-lint-tooltip{
   z-index: 9999 !important;
 }
+
+h3.accordion-subtitle {
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  color: #4285f3;
+  margin: 20px 0 0;
+}
+h3.accordion-subtitle:before, h3.accordion-subtitle:after {
+  content: "";
+  border-top: 2px #bdccd9 solid;
+  margin: 0 20px;
+  flex: 1 0 20px;
+}
+.chip {
+  margin: 2;
+  background-color: rgb(66 133 244 / 0.3) !important;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.MuiListItem-root.Mui-selected, .MuiListItem-root.Mui-selected:hover {
+  background-color: rgb(66 133 244 / 0.3) !important;
+}
+.box-border{
+  border: 1px #ccc solid;
+  border-radius: 5px;
+  margin: 8px;
+}

@@ -49,7 +49,7 @@ type Props = {
   disable:boolean
 };
 
-export default function AddTableComponent({
+export default function AddRealtimeTableComponent({
   tableObj,
   setTableObj,
   dateTimeFieldSpecs,
@@ -124,7 +124,7 @@ export default function AddTableComponent({
             onChange={(e)=> changeHandler('tableName', e.target.value)}
           />
         </FormControl>
-        
+
         <FormControl className={classes.selectFormControl}>
           <InputLabel htmlFor="tableType">Table Type {requiredAstrix}</InputLabel>
           <Select

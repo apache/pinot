@@ -25,8 +25,9 @@ import PinotMethodUtils from '../utils/PinotMethodUtils';
 import CustomizedTables from '../components/Table';
 import CustomButton from '../components/CustomButton';
 import SimpleAccordion from '../components/SimpleAccordion';
-import AddTableSchemaOp from '../components/Homepage/Operations/AddTableSchemaOp';
-import AddTableOp from '../components/Homepage/Operations/AddTableOp';
+import AddSchemaOp from '../components/Homepage/Operations/AddSchemaOp';
+import AddOfflineTableOp from '../components/Homepage/Operations/AddOfflineTableOp';
+import AddRealtimeTableOp from '../components/Homepage/Operations/AddRealtimeTableOp';
 
 const useStyles = makeStyles(() => ({
   gridContainer: {
@@ -46,12 +47,17 @@ const TablesListingPage = () => {
   const classes = useStyles();
 
   const [fetching, setFetching] = useState(true);
+  const [schemaDetails,setSchemaDetails] = useState<TableData>({
+    columns: [],
+    records: []
+  });
   const [tableData, setTableData] = useState<TableData>({
     columns: [],
     records: []
   });
-  const [showAddTableSchemaModal, setShowAddTableSchemaModal] = useState(false);
-  const [showAddTableModal, setShowAddTableModal] = useState(false);
+  const [showSchemaModal, setShowSchemaModal] = useState(false);
+  const [showAddOfflineTableModal, setShowAddOfflineTableModal] = useState(false);
+  const [showAddRealtimeTableModal, setShowAddRealtimeTableModal] = useState(false);
 
   const fetchData = async () => {
     !fetching && setFetching(true);
@@ -61,7 +67,9 @@ const TablesListingPage = () => {
       tablesList.push(...record);
     });
     const tableDetails = await PinotMethodUtils.getAllTableDetails(tablesList);
+    const schemaDetailsData = await PinotMethodUtils.getAllSchemaDetails();
     setTableData(tableDetails);
+    setSchemaDetails(schemaDetailsData)
     setFetching(false);
   };
 
@@ -80,18 +88,25 @@ const TablesListingPage = () => {
         >
           <div>
             <CustomButton
-              onClick={()=>{setShowAddTableSchemaModal(true)}}
-              tooltipTitle="Add Schema & Table"
+              onClick={()=>{setShowSchemaModal(true)}}
+              tooltipTitle="Add Schema"
               enableTooltip={true}
             >
-              Add Schema & Table
+              Add Schema
             </CustomButton>
             <CustomButton
-              onClick={()=>{setShowAddTableModal(true)}}
-              tooltipTitle="Add Table"
+              onClick={()=>{setShowAddOfflineTableModal(true)}}
+              tooltipTitle="Add Offline Table"
               enableTooltip={true}
             >
-              Add Table
+              Add Offline Table
+            </CustomButton>
+            <CustomButton
+              onClick={()=>{setShowAddRealtimeTableModal(true)}}
+              tooltipTitle="Add Realtime Table"
+              enableTooltip={true}
+            >
+              Add Realtime Table
             </CustomButton>
           </div>
         </SimpleAccordion>
@@ -105,18 +120,36 @@ const TablesListingPage = () => {
         showSearchBox={true}
         inAccordionFormat={true}
       />
+      <CustomizedTables
+          title="Schemas"
+          data={schemaDetails}
+          isPagination
+          showSearchBox={true}
+          inAccordionFormat={true}
+          addLinks
+          baseURL="/tenants/schema/"
+      />
       {
-        showAddTableSchemaModal &&
-        <AddTableSchemaOp
-          hideModal={()=>{setShowAddTableSchemaModal(false);}}
+        showSchemaModal &&
+        <AddSchemaOp
+          hideModal={()=>{setShowSchemaModal(false);}}
           fetchData={fetchData}
         />
       }
       {
-        showAddTableModal &&
-        <AddTableOp
-          hideModal={()=>{setShowAddTableModal(false);}}
+        showAddOfflineTableModal &&
+        <AddOfflineTableOp
+          hideModal={()=>{setShowAddOfflineTableModal(false);}}
           fetchData={fetchData}
+          tableType={"OFFLINE"}
+        />
+      }
+      {
+        showAddRealtimeTableModal &&
+        <AddRealtimeTableOp
+          hideModal={()=>{setShowAddRealtimeTableModal(false);}}
+          fetchData={fetchData}
+          tableType={"REALTIME"}
         />
       }
     </Grid>

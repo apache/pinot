@@ -22,6 +22,8 @@ import { createStyles, FormControl, Grid, IconButton, Input, InputLabel, makeSty
 import AddIcon from '@material-ui/icons/Add';
 import ClearIcon from '@material-ui/icons/Clear';
 import { Autocomplete } from '@material-ui/lab';
+import { debug } from 'webpack';
+import _ from 'lodash';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -50,7 +52,7 @@ const useStyles = makeStyles((theme: Theme) =>
     },
     selectFormControl: {
       margin: theme.spacing(1),
-      width: 170
+      width: 220
     },
     MVFFormControl: {
       margin: theme.spacing(1),
@@ -72,12 +74,14 @@ const useStyles = makeStyles((theme: Theme) =>
 
 type Props = {
   schemaName: string,
-  setSchemaObj: Function
+  setSchemaObj: Function,
+  schemaObj? : any
 };
 
 export default function SchemaComponent({
   schemaName = '',
-  setSchemaObj
+  setSchemaObj,
+  schemaObj,
 }: Props) {
   const classes = useStyles();
   const defaultColumnObj = {
@@ -165,9 +169,25 @@ export default function SchemaComponent({
     setColumnList(newColumnList);
   }
 
+  const schemaNameChange = (schemaName) =>{
+    let newSchemaObj = {...schemaObj};
+    newSchemaObj.schemaName = schemaName;
+    setSchemaObj(newSchemaObj);
+  }
+
   const requiredAstrix = <span className={classes.redColor}>*</span>;
   return (
     <Grid container className={classes.rootContainer}>
+        <Grid item xs={12} key={"schemaName"}>
+              <FormControl className={classes.formControl}>
+                <InputLabel htmlFor="schemaName">Schema Name {requiredAstrix}</InputLabel>
+                <Input
+                  id="schemaName"
+                  value={schemaName}
+                  onChange={(e)=> schemaNameChange(e.target.value)}
+                />
+              </FormControl>
+        </Grid>
       {columnList.map((columnObj, index)=>{
         return(
           <Grid item xs={12} key={index} className={classes.gridItem}>
@@ -206,7 +226,7 @@ export default function SchemaComponent({
                   {defaultDataTypeOptions[columnObj.type || 'dimension'].map((dataType, i)=>(<MenuItem key={i} value={dataType}>{dataType}</MenuItem>))}
                 </Select>
               </FormControl>
-
+{/*
               <FormControl className={classes.formControl}>
                 <InputLabel htmlFor="defaultNullValue">Default Null Value</InputLabel>
                 <Input
@@ -214,9 +234,8 @@ export default function SchemaComponent({
                   value={columnObj.defaultNullValue}
                   onChange={(e)=> changeHandler(index, 'defaultNullValue', e.target.value)}
                 />
-              </FormControl>
+              </FormControl> */}
 
-              {columnObj.type === 'dimension' &&
                 <FormControl className={classes.MVFFormControl}>
                   <InputLabel htmlFor="multiValue">Multi Value Field</InputLabel>
                   <Select
@@ -229,10 +248,8 @@ export default function SchemaComponent({
                     <MenuItem value="false">False</MenuItem>
                   </Select>
                 </FormControl>
-              }
-
-              <br/>
-              
+                {columnObj.type !== 'datetime' &&
+                <>
               <FormControl className={classes.formControl}>
                 <InputLabel htmlFor="maxLength">Max Value Length</InputLabel>
                 <Input
@@ -253,10 +270,12 @@ export default function SchemaComponent({
                   )}
                 />
               </FormControl>
-            </div>
+              </>
+              }
+            <br/>
 
             {columnObj.type === 'datetime' &&
-              <div className={classes.dateTimeDiv}>
+              <div>
                 <FormControl className={classes.formControl}>
                   <InputLabel htmlFor="timeUnit">Time Unit {requiredAstrix}</InputLabel>
                   <Select
@@ -296,7 +315,6 @@ export default function SchemaComponent({
                     />
                   </FormControl>
                 }
-                <br/>
                 <FormControl className={classes.formControl}>
                   <InputLabel htmlFor="granularityInterval">Granularity Interval {requiredAstrix}</InputLabel>
                   <Input
@@ -323,6 +341,7 @@ export default function SchemaComponent({
                 </FormControl>
               </div>
             }
+            </div>
             <div className={classes.iconDiv}>
               <FormControl>
                 <IconButton
