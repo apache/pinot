@@ -109,7 +109,7 @@ public class TableRetentionValidator {
         LOGGER.error("Table: {}, \"segmentsConfig\" field is missing in table config", tableName);
         continue;
       }
-      String segmentPushType = IngestionConfigUtils.getBatchSegmentPushType(tableConfig);
+      String segmentPushType = IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig);
       if (segmentPushType == null) {
         LOGGER.error("Table: {}, null push type", tableName);
         continue;

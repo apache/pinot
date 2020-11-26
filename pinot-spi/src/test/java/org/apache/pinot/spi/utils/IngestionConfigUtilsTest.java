@@ -103,23 +103,23 @@ public class IngestionConfigUtilsTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
     tableConfig
         .setIngestionConfig(new IngestionConfig(new BatchIngestionConfig(null, "APPEND", "HOURLY"), null, null, null));
-    Assert.assertEquals(IngestionConfigUtils.getBatchSegmentPushFrequency(tableConfig), "HOURLY");
+    Assert.assertEquals(IngestionConfigUtils.getBatchSegmentIngestionFrequency(tableConfig), "HOURLY");
 
     // get from ingestion config, even if present in segmentsConfig
     SegmentsValidationAndRetentionConfig segmentsValidationAndRetentionConfig =
         new SegmentsValidationAndRetentionConfig();
     segmentsValidationAndRetentionConfig.setSegmentPushFrequency("DAILY");
     tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
-    Assert.assertEquals(IngestionConfigUtils.getBatchSegmentPushFrequency(tableConfig), "HOURLY");
+    Assert.assertEquals(IngestionConfigUtils.getBatchSegmentIngestionFrequency(tableConfig), "HOURLY");
 
     // get from segmentsConfig
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
     tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
-    Assert.assertEquals(IngestionConfigUtils.getBatchSegmentPushFrequency(tableConfig), "DAILY");
+    Assert.assertEquals(IngestionConfigUtils.getBatchSegmentIngestionFrequency(tableConfig), "DAILY");
 
     // present nowhere
     segmentsValidationAndRetentionConfig.setSegmentPushFrequency(null);
-    Assert.assertNull(IngestionConfigUtils.getBatchSegmentPushFrequency(tableConfig));
+    Assert.assertNull(IngestionConfigUtils.getBatchSegmentIngestionFrequency(tableConfig));
   }
 
   @Test
@@ -128,22 +128,22 @@ public class IngestionConfigUtilsTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
     tableConfig
         .setIngestionConfig(new IngestionConfig(new BatchIngestionConfig(null, "APPEND", "HOURLY"), null, null, null));
-    Assert.assertEquals(IngestionConfigUtils.getBatchSegmentPushType(tableConfig), "APPEND");
+    Assert.assertEquals(IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig), "APPEND");
 
     // get from ingestion config, even if present in segmentsConfig
     SegmentsValidationAndRetentionConfig segmentsValidationAndRetentionConfig =
         new SegmentsValidationAndRetentionConfig();
     segmentsValidationAndRetentionConfig.setSegmentPushType("REFRESH");
     tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
-    Assert.assertEquals(IngestionConfigUtils.getBatchSegmentPushType(tableConfig), "APPEND");
+    Assert.assertEquals(IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig), "APPEND");
 
     // get from segmentsConfig
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
     tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
-    Assert.assertEquals(IngestionConfigUtils.getBatchSegmentPushType(tableConfig), "REFRESH");
+    Assert.assertEquals(IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig), "REFRESH");
 
     // present nowhere
     segmentsValidationAndRetentionConfig.setSegmentPushType(null);
-    Assert.assertNull(IngestionConfigUtils.getBatchSegmentPushType(tableConfig));
+    Assert.assertNull(IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig));
   }
 }

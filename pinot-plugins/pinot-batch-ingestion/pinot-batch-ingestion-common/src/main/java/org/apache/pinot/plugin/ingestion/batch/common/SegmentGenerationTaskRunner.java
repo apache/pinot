@@ -137,8 +137,8 @@ public class SegmentGenerationTaskRunner implements Serializable {
         }
         return new NormalizedDateSegmentNameGenerator(tableName, segmentNameGeneratorConfigs.get(SEGMENT_NAME_PREFIX),
             Boolean.parseBoolean(segmentNameGeneratorConfigs.get(EXCLUDE_SEQUENCE_ID)),
-            IngestionConfigUtils.getBatchSegmentPushType(tableConfig),
-            IngestionConfigUtils.getBatchSegmentPushFrequency(tableConfig), dateTimeFormatSpec);
+            IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig),
+            IngestionConfigUtils.getBatchSegmentIngestionFrequency(tableConfig), dateTimeFormatSpec);
       default:
         throw new UnsupportedOperationException("Unsupported segment name generator type: " + segmentNameGeneratorType);
     }

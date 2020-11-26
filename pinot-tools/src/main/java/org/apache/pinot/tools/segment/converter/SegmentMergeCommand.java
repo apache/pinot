@@ -239,8 +239,8 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
 
     // Fetch time related configurations from schema and table config.
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-    String pushFrequency = IngestionConfigUtils.getBatchSegmentPushFrequency(tableConfig);
-    String pushType = IngestionConfigUtils.getBatchSegmentPushType(tableConfig);
+    String pushFrequency = IngestionConfigUtils.getBatchSegmentIngestionFrequency(tableConfig);
+    String pushType = IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig);
     String timeColumnName = validationConfig.getTimeColumnName();
     DateTimeFormatSpec dateTimeFormatSpec = null;
     if (timeColumnName != null) {
