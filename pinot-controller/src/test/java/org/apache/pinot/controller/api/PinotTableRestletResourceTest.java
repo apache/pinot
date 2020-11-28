@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.Set;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
@@ -45,7 +46,7 @@ import static org.apache.pinot.controller.ControllerTestUtils.*;
 public class PinotTableRestletResourceTest {
   private static final int NUM_BROKER_INSTANCES = 2;
   // NOTE: to add HLC realtime table, number of Server instances must be multiple of number of replicas
-  private static final int NUM_SERVER_INSTANCES = 6;
+  //private static final int NUM_SERVER_INSTANCES = 6;
 
   private static final String OFFLINE_TABLE_NAME = "testOfflineTable";
   private static final String REALTIME_TABLE_NAME = "testRealtimeTable";
@@ -57,10 +58,6 @@ public class PinotTableRestletResourceTest {
   public void setUp()
       throws Exception {
     _createTableUrl = getControllerRequestURLBuilder().forTableCreate();
-
-    addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKER_INSTANCES, true);
-    addFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVER_INSTANCES, true);
-
     _offlineBuilder.setTableName(OFFLINE_TABLE_NAME).setTimeColumnName("timeColumn").setTimeType("DAYS")
         .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5");
 
@@ -144,6 +141,18 @@ public class PinotTableRestletResourceTest {
     } catch (IOException e) {
       // Expected 400 Bad Request
       Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+    }
+
+    Set<String> brokerTenants = getHelixResourceManager().getAllBrokerTenantNames();
+    System.out.println("All Broker Tenants: " + brokerTenants);
+    for (String tenant : brokerTenants) {
+      System.out.println("Instances for broker tenant" + tenant + ": " + getHelixResourceManager().getAllInstancesForBrokerTenant(tenant));
+    }
+
+    Set<String> serverTenants = getHelixResourceManager().getAllServerTenantNames();
+    System.out.println("All Server Tenants: " + brokerTenants);
+    for (String tenant : serverTenants) {
+      System.out.println("Instances for server tenant" + tenant + ": " + getHelixResourceManager().getAllInstancesForBrokerTenant(tenant));
     }
 
     // Creating a REALTIME table with a different schema name in the config should succeed (backwards compatibility mode)
@@ -365,6 +374,8 @@ public class PinotTableRestletResourceTest {
 
   @AfterClass
   public void tearDown() {
-    stopFakeInstances();
+    // Clean up tables.
+    getHelixResourceManager().deleteOfflineTable(OFFLINE_TABLE_NAME);
+    getHelixResourceManager().deleteRealtimeTable(REALTIME_TABLE_NAME);
   }
 }

@@ -99,11 +99,40 @@ import com.google.common.base.Preconditions;
 public abstract class ControllerTestUtils {
   public static final String LOCAL_HOST = "localhost";
   protected static final int DEFAULT_CONTROLLER_PORT = 18998;
-  protected static final String DEFAULT_DATA_DIR =
-      new File(FileUtils.getTempDirectoryPath(), "test-controller-" + System.currentTimeMillis()).getAbsolutePath();
+  protected static final String DEFAULT_DATA_DIR = new File(FileUtils.getTempDirectoryPath(),
+      "test-controller-" + System.currentTimeMillis()).getAbsolutePath();
   public static final String BROKER_INSTANCE_ID_PREFIX = "Broker_localhost_";
   public static final String SERVER_INSTANCE_ID_PREFIX = "Server_localhost_";
-  public static final int MIN_NUM_REPLICAS = 3;
+
+  // NUM_BROKER_INSTANCES and NUM_SERVER_INSTANCES must be a multiple of MIN_NUM_REPLICAS.
+  public static final int MIN_NUM_REPLICAS = 2;
+  public static final int NUM_BROKER_INSTANCES = 4;
+  public static final int NUM_SERVER_INSTANCES = 4;
+
+  public static final String TENANT_NAME = "testTenant";
+
+  public static Tenant _brokerTenant;
+
+  public static void createBrokerTenant(Tenant _brokerTenant) {
+    _brokerTenant = _brokerTenant;
+    getHelixResourceManager().createBrokerTenant(_brokerTenant);
+  }
+
+  public static Tenant geBrokerTenant() {
+    return _brokerTenant;
+  }
+
+  public static Tenant _serverTenant;
+
+  public static void createServerTenant(Tenant _serverTenant) {
+    _serverTenant = _serverTenant;
+    getHelixResourceManager().createServerTenant(_serverTenant);
+  }
+
+  public static Tenant getServerTenant() {
+    return _serverTenant;
+  }
+
 
   protected static final List<HelixManager> _fakeInstanceHelixManagers = new ArrayList<>();
   protected static int _controllerPort;
@@ -208,6 +237,11 @@ public abstract class ControllerTestUtils {
     FileUtils.deleteQuietly(new File(_controllerDataDir));
   }
 
+  public static int getFakeBrokerInstanceCount() {
+    return getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size() +
+        getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), UNTAGGED_BROKER_INSTANCE).size();
+  }
+
   public static int getFakeBrokerInstanceCount(boolean isSingleTenant) {
     return isSingleTenant ?
         getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size():
@@ -225,7 +259,7 @@ public abstract class ControllerTestUtils {
       throws Exception {
 
     // get current instance count
-    int currentCount = getFakeBrokerInstanceCount(isSingleTenant);
+    int currentCount = getFakeBrokerInstanceCount();
 
     // Add more instances if current count is less than max instance count.
     if (currentCount < maxCount) {
@@ -302,9 +336,14 @@ public abstract class ControllerTestUtils {
     }
   }
 
+  public static int getFakeServerInstanceCount() {
+    return getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE").size() +
+        getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), UNTAGGED_SERVER_INSTANCE).size();
+  }
+
   public static int getFakeServerInstanceCount(boolean isSingleTenant) {
     return isSingleTenant ?
-        getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_SERVER").size():
+        getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE").size():
         getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), UNTAGGED_SERVER_INSTANCE).size();
   }
 
@@ -326,11 +365,16 @@ public abstract class ControllerTestUtils {
     addFakeServerInstanceToAutoJoinHelixCluster(instanceId, isSingleTenant, DEFAULT_ADMIN_API_PORT);
   }
 
+  public static void addMaxFakeServerInstancesToAutoJoinHelixCluster(int maxCount, boolean isSingleTenant)
+      throws Exception {
+    addMaxFakeServerInstancesToAutoJoinHelixCluster(maxCount, isSingleTenant, DEFAULT_ADMIN_API_PORT);
+  }
+
   public static void addMaxFakeServerInstancesToAutoJoinHelixCluster(int maxCount, boolean isSingleTenant, int baseAdminPort)
       throws Exception {
 
     // get current instance count
-    int currentCount = getFakeServerInstanceCount(isSingleTenant);
+    int currentCount = getFakeServerInstanceCount();
 
     // Add more instances if current count is less than max instance count.
     if (currentCount < maxCount) {

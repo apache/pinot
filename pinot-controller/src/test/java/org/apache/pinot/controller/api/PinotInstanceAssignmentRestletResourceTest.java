@@ -48,7 +48,6 @@ import static org.testng.Assert.*;
 
 
 public class PinotInstanceAssignmentRestletResourceTest {
-  private static final int NUM_SERVER_INSTANCES = 3;
   private static final String TENANT_NAME = "testTenant";
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String TIME_COLUMN_NAME = "daysSinceEpoch";
@@ -56,9 +55,6 @@ public class PinotInstanceAssignmentRestletResourceTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    addFakeBrokerInstancesToAutoJoinHelixCluster(1, false);
-    addFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVER_INSTANCES, false);
-
     // Create broker and server tenant
     Tenant brokerTenant = new Tenant(TenantRole.BROKER, TENANT_NAME, 1, 0, 0);
     getHelixResourceManager().createBrokerTenant(brokerTenant);
@@ -317,6 +313,9 @@ public class PinotInstanceAssignmentRestletResourceTest {
 
   @AfterClass
   public void tearDown() {
-    stopFakeInstances();
+    // cleanup tenants, otherwise other test cases that use tenants may fail.
+    getHelixResourceManager().deleteBrokerTenantFor(TENANT_NAME);
+    getHelixResourceManager().deleteOfflineServerTenantFor(TENANT_NAME);
+    getHelixResourceManager().deleteOfflineServerTenantFor(TENANT_NAME);
   }
 }

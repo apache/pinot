@@ -20,7 +20,6 @@ package org.apache.pinot.controller.api;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -30,7 +29,6 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerTestUtils.*;
@@ -38,27 +36,6 @@ import static org.apache.pinot.controller.ControllerTestUtils.*;
 
 public class PinotSegmentRestletResourceTest {
   private static final String TABLE_NAME = "pinotSegmentRestletResourceTestTable";
-
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    // Get current broker and server counts.
-    int currentBrokerCount = getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size();
-    int currentServerCount = getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE").size();
-
-    System.out.println("Broker Count: " + currentBrokerCount + ", Brokers: " + getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER"));
-    System.out.println("Server Count: " + currentServerCount + ", Server: " + getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE"));
-
-    // Create a new broker and a server.
-    addFakeBrokerInstanceToAutoJoinHelixCluster("Broker_localhost_" + currentBrokerCount, true);
-    addFakeServerInstanceToAutoJoinHelixCluster("Server_localhost_" + currentServerCount, true);
-
-    // Verify that broker and server counts went up by 1.
-    Assert.assertEquals(getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size(),
-        currentBrokerCount+1);
-    Assert.assertEquals(getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE").size(),
-        currentServerCount+1);
-  }
 
   @Test
   public void testSegmentCrcApi()
@@ -119,6 +96,6 @@ public class PinotSegmentRestletResourceTest {
 
   @AfterClass
   public void tearDown() {
-    stopFakeInstances();
+    getHelixResourceManager().deleteOfflineTable(TABLE_NAME);
   }
 }

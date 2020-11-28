@@ -24,7 +24,6 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerTestUtils.*;
@@ -32,16 +31,7 @@ import static org.testng.Assert.*;
 
 
 public class PinotTenantRestletResourceTest {
-  private static final int NUM_BROKER_INSTANCES = 1;
-  private static final int NUM_SERVER_INSTANCES = 3;
-  private static final String TABLE_NAME = "pinotTenantRestletResourceTestTable_OFFLINE";
-
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKER_INSTANCES, true);
-    addFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVER_INSTANCES, true);
-  }
+  private static final String TABLE_NAME = "restletTable_OFFLINE";
 
   @Test
   public void testTableListForTenant()
@@ -71,6 +61,7 @@ public class PinotTenantRestletResourceTest {
 
   @AfterClass
   public void tearDown() {
-    stopFakeInstances();
+    // Cleanup
+    getHelixResourceManager().deleteOfflineTable(TABLE_NAME);
   }
 }

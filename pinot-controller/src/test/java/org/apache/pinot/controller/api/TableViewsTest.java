@@ -20,7 +20,6 @@ package org.apache.pinot.controller.api;
 
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.List;
 import java.util.Map;
 import org.apache.helix.InstanceType;
 import org.apache.pinot.common.utils.CommonConstants;
@@ -34,7 +33,6 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -45,14 +43,10 @@ public class TableViewsTest {
   private static final String OFFLINE_TABLE_NAME = "offlineTable";
   private static final String OFFLINE_SEGMENT_NAME = "offlineSegment";
   private static final String HYBRID_TABLE_NAME = "hybridTable";
-  private static final int NUM_BROKER_INSTANCES = 3;
-  private static final int NUM_SERVER_INSTANCES = 4;
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKER_INSTANCES, true);
-    addFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVER_INSTANCES, true);
 
     // Create the offline table and add one segment
     TableConfig tableConfig =
@@ -166,20 +160,5 @@ public class TableViewsTest {
     return JsonUtils
         .stringToObject(sendGetRequest(getControllerRequestURLBuilder().forTableView(tableName, view, tableType)),
             TableViews.TableView.class);
-  }
-
-  @AfterClass
-  public void tearDown() {
-    List<String>
-        instances3 = getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE");
-    System.out.println("INSTANCES3: " + instances3.toString());
-
-    stopFakeInstances();
-
-    List<String>
-        instances4 = getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE");
-    System.out.println("INSTANCES4: " + instances4.toString());
-
-
   }
 }

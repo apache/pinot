@@ -22,6 +22,7 @@ import java.io.IOException;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerTestUtils.*;

@@ -23,7 +23,10 @@
 <suite name="testng.suite-controller" verbose="10">
   <test name="testng.suite-controller.xml" verbose="10">
     <packages>
-      <package name="org.apache.pinot.controller.*"></package>
+      <package name="org.apache.pinot.controller.api.*"></package>
     </packages>
+    <classes>
+      <class name="org.apache.pinot.controller.ControllerTestSetup"/>
+    </classes>
   </test>
 </suite>

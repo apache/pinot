@@ -2,6 +2,8 @@ package org.apache.pinot.controller;
 
 import java.util.Map;
 import org.apache.pinot.controller.api.AccessControlTest;
+import org.apache.pinot.spi.config.tenant.Tenant;
+import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.testng.annotations.AfterSuite;
 import org.testng.annotations.BeforeSuite;
 
@@ -10,9 +12,22 @@ import static org.apache.pinot.controller.ControllerTestUtils.*;
 
 public class ControllerTestSetup {
   @BeforeSuite
-  public void suiteSetup() {
+  public void suiteSetup() throws Exception {
     startZk();
     startController(getSuiteControllerConfiguration());
+
+    // initial
+    System.out.println(getHelixAdmin().getInstancesInCluster(getHelixClusterName()));
+
+    addMaxFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKER_INSTANCES, true);
+    addMaxFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVER_INSTANCES, true);
+
+    System.out.println(getHelixAdmin().getInstancesInCluster(getHelixClusterName()));
+
+    addMaxFakeBrokerInstancesToAutoJoinHelixCluster(2*NUM_BROKER_INSTANCES, false);
+    addMaxFakeServerInstancesToAutoJoinHelixCluster(2*NUM_SERVER_INSTANCES, false);
+
+    System.out.println(getHelixAdmin().getInstancesInCluster(getHelixClusterName()));
   }
 
   public static Map<String, Object> getSuiteControllerConfiguration() {
@@ -34,6 +49,12 @@ public class ControllerTestSetup {
 
   @AfterSuite
   public void tearDownSuite() {
+    getHelixResourceManager().deleteBrokerTenantFor(TENANT_NAME);
+    getHelixResourceManager().deleteOfflineServerTenantFor(TENANT_NAME);
+    getHelixResourceManager().deleteRealtimeServerTenantFor(TENANT_NAME);
+
+    stopFakeInstances();
+
     stopController();
     stopZk();
   }

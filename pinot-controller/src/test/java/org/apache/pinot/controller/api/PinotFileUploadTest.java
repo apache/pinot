@@ -35,7 +35,6 @@ import static org.apache.pinot.controller.ControllerTestUtils.*;
 
 /**
  * Tests for the file upload restlet.
- *
  */
 public class PinotFileUploadTest {
   private static final String TABLE_NAME = "testTable";
@@ -43,9 +42,6 @@ public class PinotFileUploadTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    addFakeBrokerInstancesToAutoJoinHelixCluster(5, true);
-    addFakeServerInstancesToAutoJoinHelixCluster(5, true);
-
     // Adding table
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setSegmentAssignmentStrategy("RandomAssignmentStrategy").setNumReplicas(2).build();
@@ -67,6 +63,6 @@ public class PinotFileUploadTest {
 
   @AfterClass
   public void tearDown() {
-    stopFakeInstances();
+    getHelixResourceManager().deleteOfflineTable(TABLE_NAME);
   }
 }
