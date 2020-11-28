@@ -18,13 +18,11 @@
  */
 package org.apache.pinot.controller.api;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.Map;
-
 import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.QuotaConfig;
@@ -38,15 +36,13 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import static org.apache.pinot.controller.ControllerTestUtils.*;
 
 
 /**
  * Test for table creation
  */
-public class PinotTableRestletResourceTest extends ControllerTest {
-  private static final int MIN_NUM_REPLICAS = 3;
+public class PinotTableRestletResourceTest {
   private static final int NUM_BROKER_INSTANCES = 2;
   // NOTE: to add HLC realtime table, number of Server instances must be multiple of number of replicas
   private static final int NUM_SERVER_INSTANCES = 6;
@@ -60,10 +56,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    Map<String, Object> properties = getDefaultControllerConfiguration();
-    properties.put(ControllerConf.TABLE_MIN_REPLICAS, MIN_NUM_REPLICAS);
-    startController(properties);
-    _createTableUrl = _controllerRequestURLBuilder.forTableCreate();
+    _createTableUrl = getControllerRequestURLBuilder().forTableCreate();
 
     addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKER_INSTANCES, true);
     addFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVER_INSTANCES, true);
@@ -209,7 +202,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
   private TableConfig getTableConfig(String tableName, String tableType)
       throws Exception {
-    String tableConfigString = sendGetRequest(_controllerRequestURLBuilder.forTableGet(tableName));
+    String tableConfigString = sendGetRequest(getControllerRequestURLBuilder().forTableGet(tableName));
     return JsonUtils.jsonNodeToObject(JsonUtils.stringToJsonNode(tableConfigString).get(tableType), TableConfig.class);
   }
 
@@ -228,7 +221,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     tableConfig.getValidationConfig().setRetentionTimeValue("10");
 
     JsonNode jsonResponse = JsonUtils.stringToJsonNode(
-        sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableName), tableConfig.toJsonString()));
+        sendPutRequest(getControllerRequestURLBuilder().forUpdateTableConfig(tableName), tableConfig.toJsonString()));
     Assert.assertTrue(jsonResponse.has("status"));
 
     TableConfig modifiedConfig = getTableConfig(tableName, "OFFLINE");
@@ -246,7 +239,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     QuotaConfig quota = new QuotaConfig("10G", "100.0");
     tableConfig.setQuotaConfig(quota);
-    sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableName), tableConfig.toJsonString());
+    sendPutRequest(getControllerRequestURLBuilder().forUpdateTableConfig(tableName), tableConfig.toJsonString());
     modifiedConfig = getTableConfig(tableName, "REALTIME");
     Assert.assertNotNull(modifiedConfig.getQuotaConfig());
     Assert.assertEquals(modifiedConfig.getQuotaConfig().getStorage(), "10G");
@@ -257,7 +250,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
       // table does not exist
       ObjectNode tableConfigJson = (ObjectNode) tableConfig.toJsonNode();
       tableConfigJson.put(TableConfig.TABLE_NAME_KEY, "noSuchTable_REALTIME");
-      sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig("noSuchTable"), tableConfigJson.toString());
+      sendPutRequest(getControllerRequestURLBuilder().forUpdateTableConfig("noSuchTable"), tableConfigJson.toString());
     } catch (Exception e) {
       Assert.assertTrue(e instanceof FileNotFoundException);
       notFoundException = true;
@@ -268,7 +261,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   @Test(expectedExceptions = FileNotFoundException.class)
   public void rebalanceNonExistentTable()
       throws Exception {
-    sendPostRequest(_controllerRequestURLBuilder.forTableRebalance(OFFLINE_TABLE_NAME, "realtime"), null);
+    sendPostRequest(getControllerRequestURLBuilder().forTableRebalance(OFFLINE_TABLE_NAME, "realtime"), null);
   }
 
   @Test
@@ -279,7 +272,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // Rebalance should return status NO_OP
     RebalanceResult rebalanceResult = JsonUtils.stringToObject(
-        sendPostRequest(_controllerRequestURLBuilder.forTableRebalance(OFFLINE_TABLE_NAME, "offline"), null),
+        sendPostRequest(getControllerRequestURLBuilder().forTableRebalance(OFFLINE_TABLE_NAME, "offline"), null),
         RebalanceResult.class);
     Assert.assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
   }
@@ -294,7 +287,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // Delete realtime table using REALTIME suffix.
     String deleteResponse =
-        sendDeleteRequest(StringUtil.join("/", this._controllerBaseApiUrl, "tables", "table0_REALTIME"));
+        sendDeleteRequest(StringUtil.join("/", getControllerBaseApiUrl(), "tables", "table0_REALTIME"));
     Assert.assertEquals(deleteResponse, "{\"status\":\"Tables: [table0_REALTIME] deleted\"}");
 
     // Case 2: Create an offline table and delete it directly w/o using query param.
@@ -303,7 +296,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     Assert.assertEquals(creationResponse, "{\"status\":\"Table table0_OFFLINE succesfully added\"}");
 
     // Delete offline table using OFFLINE suffix.
-    deleteResponse = sendDeleteRequest(StringUtil.join("/", this._controllerBaseApiUrl, "tables", "table0_OFFLINE"));
+    deleteResponse = sendDeleteRequest(StringUtil.join("/", getControllerBaseApiUrl(), "tables", "table0_OFFLINE"));
     Assert.assertEquals(deleteResponse, "{\"status\":\"Tables: [table0_OFFLINE] deleted\"}");
 
     // Case 3: Create REALTIME and OFFLINE tables and delete both of them.
@@ -315,7 +308,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     creationResponse = sendPostRequest(_createTableUrl, offlineConfig1.toJsonString());
     Assert.assertEquals(creationResponse, "{\"status\":\"Table table1_OFFLINE succesfully added\"}");
 
-    deleteResponse = sendDeleteRequest(StringUtil.join("/", this._controllerBaseApiUrl, "tables", "table1"));
+    deleteResponse = sendDeleteRequest(StringUtil.join("/", getControllerBaseApiUrl(), "tables", "table1"));
     Assert.assertEquals(deleteResponse, "{\"status\":\"Tables: [table1_OFFLINE, table1_REALTIME] deleted\"}");
 
     // Case 4: Create REALTIME and OFFLINE tables and delete the realtime/offline table using query params.
@@ -329,24 +322,24 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // The conflict between param type and table name suffix causes no table being deleted.
     try {
-      sendDeleteRequest(StringUtil.join("/", this._controllerBaseApiUrl, "tables", "table2_OFFLINE?type=realtime"));
+      sendDeleteRequest(StringUtil.join("/", getControllerBaseApiUrl(), "tables", "table2_OFFLINE?type=realtime"));
       Assert.fail("Deleting a realtime table with OFFLINE suffix.");
     } catch (Exception e) {
       Assert.assertTrue(e instanceof IOException);
     }
 
     deleteResponse =
-        sendDeleteRequest(StringUtil.join("/", this._controllerBaseApiUrl, "tables", "table2?type=realtime"));
+        sendDeleteRequest(StringUtil.join("/", getControllerBaseApiUrl(), "tables", "table2?type=realtime"));
     Assert.assertEquals(deleteResponse, "{\"status\":\"Tables: [table2_REALTIME] deleted\"}");
 
     deleteResponse =
-        sendDeleteRequest(StringUtil.join("/", this._controllerBaseApiUrl, "tables", "table2?type=offline"));
+        sendDeleteRequest(StringUtil.join("/", getControllerBaseApiUrl(), "tables", "table2?type=offline"));
     Assert.assertEquals(deleteResponse, "{\"status\":\"Tables: [table2_OFFLINE] deleted\"}");
 
     // Case 5: Delete a non-existent table and expect a bad request expection.
     try {
       deleteResponse =
-          sendDeleteRequest(StringUtil.join("/", this._controllerBaseApiUrl, "tables", "no_such_table_OFFLINE"));
+          sendDeleteRequest(StringUtil.join("/", getControllerBaseApiUrl(), "tables", "no_such_table_OFFLINE"));
       Assert.fail("Deleting a non-existing table should fail.");
     } catch (Exception e) {
       Assert.assertTrue(e instanceof IOException);
@@ -362,17 +355,16 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     Assert.assertEquals(creationResponse, "{\"status\":\"Table table3_OFFLINE succesfully added\"}");
 
     deleteResponse =
-        sendDeleteRequest(StringUtil.join("/", this._controllerBaseApiUrl, "tables", "table3_REALTIME?type=realtime"));
+        sendDeleteRequest(StringUtil.join("/", getControllerBaseApiUrl(), "tables", "table3_REALTIME?type=realtime"));
     Assert.assertEquals(deleteResponse, "{\"status\":\"Tables: [table3_REALTIME] deleted\"}");
 
     deleteResponse =
-        sendDeleteRequest(StringUtil.join("/", this._controllerBaseApiUrl, "tables", "table3_OFFLINE?type=offline"));
+        sendDeleteRequest(StringUtil.join("/", getControllerBaseApiUrl(), "tables", "table3_OFFLINE?type=offline"));
     Assert.assertEquals(deleteResponse, "{\"status\":\"Tables: [table3_OFFLINE] deleted\"}");
   }
 
   @AfterClass
   public void tearDown() {
     stopFakeInstances();
-    stopController();
   }
 }

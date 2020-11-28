@@ -36,6 +36,7 @@ public class PeriodicTaskScheduler {
   private ScheduledExecutorService _executorService;
   private List<PeriodicTask> _tasksWithValidInterval;
 
+  private volatile int taskCount;
   /**
    * Initializes the periodic task scheduler with a list of periodic tasks.
    */
@@ -49,6 +50,17 @@ public class PeriodicTaskScheduler {
         LOGGER.info("Skipping periodic task: {}", periodicTask);
       }
     }
+
+    taskCount = _tasksWithValidInterval.size();
+  }
+
+  /**
+   * Get number of tasks scheduled. Method is thread safe since task list is not modified after it is
+   * initialized in {@link #init} method.
+   * @return
+   */
+  public int getPeriodicTaskCount() {
+    return taskCount;
   }
 
   /**

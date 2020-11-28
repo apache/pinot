@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.helix;
+package org.apache.pinot.controller;
 
 import static org.apache.pinot.common.utils.CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_ENABLED_KEY;
 import static org.apache.pinot.common.utils.CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME;
@@ -74,6 +74,7 @@ import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
+import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -94,46 +95,45 @@ import com.google.common.base.Preconditions;
 
 /**
  * Base class for controller tests.
- * AKL_TODO: Remove this file once its remaining usage in pinot-broker and pinot-integration-tests go away.
  */
-
-public abstract class ControllerTest {
-  protected static final String LOCAL_HOST = "localhost";
+public abstract class ControllerTestUtils {
+  public static final String LOCAL_HOST = "localhost";
   protected static final int DEFAULT_CONTROLLER_PORT = 18998;
   protected static final String DEFAULT_DATA_DIR =
       new File(FileUtils.getTempDirectoryPath(), "test-controller-" + System.currentTimeMillis()).getAbsolutePath();
-  protected static final String BROKER_INSTANCE_ID_PREFIX = "Broker_localhost_";
-  protected static final String SERVER_INSTANCE_ID_PREFIX = "Server_localhost_";
+  public static final String BROKER_INSTANCE_ID_PREFIX = "Broker_localhost_";
+  public static final String SERVER_INSTANCE_ID_PREFIX = "Server_localhost_";
+  public static final int MIN_NUM_REPLICAS = 3;
 
-  protected final List<HelixManager> _fakeInstanceHelixManagers = new ArrayList<>();
+  protected static final List<HelixManager> _fakeInstanceHelixManagers = new ArrayList<>();
+  protected static int _controllerPort;
+  protected static String _controllerBaseApiUrl;
 
-  protected int _controllerPort;
-  protected String _controllerBaseApiUrl;
-  protected ControllerRequestURLBuilder _controllerRequestURLBuilder;
-  protected String _controllerDataDir;
+  protected static ControllerRequestURLBuilder _controllerRequestURLBuilder;
+  protected static String _controllerDataDir;
+  protected static ControllerStarter _controllerStarter;
+  protected static PinotHelixResourceManager _helixResourceManager;
+  protected static HelixManager _helixManager;
+  protected static HelixAdmin _helixAdmin;
+  protected static HelixDataAccessor _helixDataAccessor;
 
-  protected ControllerStarter _controllerStarter;
-  protected PinotHelixResourceManager _helixResourceManager;
-  protected HelixManager _helixManager;
-  protected HelixAdmin _helixAdmin;
-  protected HelixDataAccessor _helixDataAccessor;
-  protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
+  protected static ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
-  private ZkStarter.ZookeeperInstance _zookeeperInstance;
+  private static ZkStarter.ZookeeperInstance _zookeeperInstance;
 
-  protected String getHelixClusterName() {
-    return getClass().getSimpleName();
+  public static String getHelixClusterName() {
+    return ControllerTestUtils.class.getSimpleName();
   }
 
-  protected void startZk() {
+  protected static void startZk() {
     _zookeeperInstance = ZkStarter.startLocalZkServer();
   }
 
-  protected void startZk(int port) {
+  protected static void startZk(int port) {
     _zookeeperInstance = ZkStarter.startLocalZkServer(port);
   }
 
-  protected void stopZk() {
+  protected static void stopZk() {
     try {
       ZkStarter.stopLocalZkServer(_zookeeperInstance);
     } catch (Exception e) {
@@ -141,7 +141,7 @@ public abstract class ControllerTest {
     }
   }
 
-  public Map<String, Object> getDefaultControllerConfiguration() {
+  public static Map<String, Object> getDefaultControllerConfiguration() {
     Map<String, Object> properties = new HashMap<>();
 
     properties.put(ControllerConf.CONTROLLER_HOST, LOCAL_HOST);
@@ -153,11 +153,11 @@ public abstract class ControllerTest {
     return properties;
   }
 
-  protected void startController() {
+  public static void startController() {
     startController(getDefaultControllerConfiguration());
   }
 
-  protected void startController(Map<String, Object> properties) {
+  public static void startController(Map<String, Object> properties) {
     Preconditions.checkState(_controllerStarter == null);
 
     ControllerConf config = new ControllerConf(properties);
@@ -198,24 +198,44 @@ public abstract class ControllerTest {
     configAccessor.set(scope, CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(12));
   }
 
-  protected ControllerStarter getControllerStarter(ControllerConf config) {
+  protected static ControllerStarter getControllerStarter(ControllerConf config) {
     return new ControllerStarter(config);
   }
 
-  protected void stopController() {
+  public static void stopController() {
     _controllerStarter.stop();
     _controllerStarter = null;
     FileUtils.deleteQuietly(new File(_controllerDataDir));
   }
 
-  protected void addFakeBrokerInstancesToAutoJoinHelixCluster(int numInstances, boolean isSingleTenant)
+  public static int getFakeBrokerInstanceCount(boolean isSingleTenant) {
+    return isSingleTenant ?
+        getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size():
+        getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), UNTAGGED_BROKER_INSTANCE).size();
+  }
+
+  public static void addFakeBrokerInstancesToAutoJoinHelixCluster(int numInstances, boolean isSingleTenant)
       throws Exception {
     for (int i = 0; i < numInstances; i++) {
       addFakeBrokerInstanceToAutoJoinHelixCluster(BROKER_INSTANCE_ID_PREFIX + i, isSingleTenant);
     }
   }
 
-  protected void addFakeBrokerInstanceToAutoJoinHelixCluster(String instanceId, boolean isSingleTenant)
+  public static void addMaxFakeBrokerInstancesToAutoJoinHelixCluster(int maxCount, boolean isSingleTenant)
+      throws Exception {
+
+    // get current instance count
+    int currentCount = getFakeBrokerInstanceCount(isSingleTenant);
+
+    // Add more instances if current count is less than max instance count.
+    if (currentCount < maxCount) {
+      for (int i = currentCount; i < maxCount; i++) {
+        addFakeBrokerInstanceToAutoJoinHelixCluster(BROKER_INSTANCE_ID_PREFIX + i, isSingleTenant);
+      }
+    }
+  }
+
+  public static void addFakeBrokerInstanceToAutoJoinHelixCluster(String instanceId, boolean isSingleTenant)
       throws Exception {
     HelixManager helixManager = HelixManagerFactory
         .getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT, ZkStarter.DEFAULT_ZK_STR);
@@ -282,12 +302,18 @@ public abstract class ControllerTest {
     }
   }
 
-  protected void addFakeServerInstancesToAutoJoinHelixCluster(int numInstances, boolean isSingleTenant)
+  public static int getFakeServerInstanceCount(boolean isSingleTenant) {
+    return isSingleTenant ?
+        getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_SERVER").size():
+        getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), UNTAGGED_SERVER_INSTANCE).size();
+  }
+
+  public static void addFakeServerInstancesToAutoJoinHelixCluster(int numInstances, boolean isSingleTenant)
       throws Exception {
     addFakeServerInstancesToAutoJoinHelixCluster(numInstances, isSingleTenant, DEFAULT_ADMIN_API_PORT);
   }
 
-  protected void addFakeServerInstancesToAutoJoinHelixCluster(int numInstances, boolean isSingleTenant,
+  public static void addFakeServerInstancesToAutoJoinHelixCluster(int numInstances, boolean isSingleTenant,
       int baseAdminPort)
       throws Exception {
     for (int i = 0; i < numInstances; i++) {
@@ -295,12 +321,26 @@ public abstract class ControllerTest {
     }
   }
 
-  protected void addFakeServerInstanceToAutoJoinHelixCluster(String instanceId, boolean isSingleTenant)
+  public static void addFakeServerInstanceToAutoJoinHelixCluster(String instanceId, boolean isSingleTenant)
       throws Exception {
     addFakeServerInstanceToAutoJoinHelixCluster(instanceId, isSingleTenant, DEFAULT_ADMIN_API_PORT);
   }
 
-  protected void addFakeServerInstanceToAutoJoinHelixCluster(String instanceId, boolean isSingleTenant, int adminPort)
+  public static void addMaxFakeServerInstancesToAutoJoinHelixCluster(int maxCount, boolean isSingleTenant, int baseAdminPort)
+      throws Exception {
+
+    // get current instance count
+    int currentCount = getFakeServerInstanceCount(isSingleTenant);
+
+    // Add more instances if current count is less than max instance count.
+    if (currentCount < maxCount) {
+      for (int i = currentCount; i < maxCount; i++) {
+        addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, isSingleTenant, baseAdminPort + i);
+      }
+    }
+  }
+
+  protected static void addFakeServerInstanceToAutoJoinHelixCluster(String instanceId, boolean isSingleTenant, int adminPort)
       throws Exception {
     HelixManager helixManager = HelixManagerFactory
         .getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT, ZkStarter.DEFAULT_ZK_STR);
@@ -392,14 +432,14 @@ public abstract class ControllerTest {
     }
   }
 
-  protected void stopFakeInstances() {
+  public static void stopFakeInstances() {
     for (HelixManager helixManager : _fakeInstanceHelixManagers) {
       helixManager.disconnect();
     }
     _fakeInstanceHelixManagers.clear();
   }
 
-  protected void stopFakeInstance(String instanceId) {
+  public static void stopFakeInstance(String instanceId) {
     for (HelixManager helixManager : _fakeInstanceHelixManagers) {
       if (helixManager.getInstanceName().equalsIgnoreCase(instanceId)) {
         helixManager.disconnect();
@@ -409,7 +449,7 @@ public abstract class ControllerTest {
     }
   }
 
-  protected Schema createDummySchema(String tableName) {
+  public static Schema createDummySchema(String tableName) {
     Schema schema = new Schema();
     schema.setSchemaName(tableName);
     schema.addField(new DimensionFieldSpec("dimA", FieldSpec.DataType.STRING, true, ""));
@@ -420,7 +460,7 @@ public abstract class ControllerTest {
     return schema;
   }
 
-  protected void addDummySchema(String tableName)
+  public static void addDummySchema(String tableName)
       throws IOException {
     addSchema(createDummySchema(tableName));
   }
@@ -428,98 +468,98 @@ public abstract class ControllerTest {
   /**
    * Add a schema to the controller.
    */
-  protected void addSchema(Schema schema)
+  protected static void addSchema(Schema schema)
       throws IOException {
     String url = _controllerRequestURLBuilder.forSchemaCreate();
     PostMethod postMethod = sendMultipartPostRequest(url, schema.toSingleLineJsonString());
     assertEquals(postMethod.getStatusCode(), 200);
   }
 
-  protected Schema getSchema(String schemaName) {
+  protected static Schema getSchema(String schemaName) {
     Schema schema = _helixResourceManager.getSchema(schemaName);
     assertNotNull(schema);
     return schema;
   }
 
-  protected void addTableConfig(TableConfig tableConfig)
+  protected static void addTableConfig(TableConfig tableConfig)
       throws IOException {
     sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString());
   }
 
-  protected void updateTableConfig(TableConfig tableConfig)
+  protected static void updateTableConfig(TableConfig tableConfig)
       throws IOException {
     sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableConfig.getTableName()),
         tableConfig.toJsonString());
   }
 
-  protected TableConfig getOfflineTableConfig(String tableName) {
+  protected static TableConfig getOfflineTableConfig(String tableName) {
     TableConfig offlineTableConfig = _helixResourceManager.getOfflineTableConfig(tableName);
     Assert.assertNotNull(offlineTableConfig);
     return offlineTableConfig;
   }
 
-  protected TableConfig getRealtimeTableConfig(String tableName) {
+  protected static TableConfig getRealtimeTableConfig(String tableName) {
     TableConfig realtimeTableConfig = _helixResourceManager.getRealtimeTableConfig(tableName);
     Assert.assertNotNull(realtimeTableConfig);
     return realtimeTableConfig;
   }
 
-  protected void dropOfflineTable(String tableName)
+  protected static void dropOfflineTable(String tableName)
       throws IOException {
     sendDeleteRequest(
         _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.OFFLINE.tableNameWithType(tableName)));
   }
 
-  protected void dropRealtimeTable(String tableName)
+  protected static void dropRealtimeTable(String tableName)
       throws IOException {
     sendDeleteRequest(
         _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.REALTIME.tableNameWithType(tableName)));
   }
 
-  protected void reloadOfflineTable(String tableName)
+  protected static void reloadOfflineTable(String tableName)
       throws IOException {
     sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, TableType.OFFLINE.name()), null);
   }
 
-  protected void reloadRealtimeTable(String tableName)
+  protected static void reloadRealtimeTable(String tableName)
       throws IOException {
     sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, TableType.REALTIME.name()), null);
   }
 
-  protected String getBrokerTenantRequestPayload(String tenantName, int numBrokers) {
+  protected static String getBrokerTenantRequestPayload(String tenantName, int numBrokers) {
     return new Tenant(TenantRole.BROKER, tenantName, numBrokers, 0, 0).toJsonString();
   }
 
-  protected void createBrokerTenant(String tenantName, int numBrokers)
+  public static void createBrokerTenant(String tenantName, int numBrokers)
       throws IOException {
     sendPostRequest(_controllerRequestURLBuilder.forTenantCreate(),
         getBrokerTenantRequestPayload(tenantName, numBrokers));
   }
 
-  protected void updateBrokerTenant(String tenantName, int numBrokers)
+  public static void updateBrokerTenant(String tenantName, int numBrokers)
       throws IOException {
     sendPutRequest(_controllerRequestURLBuilder.forTenantCreate(),
         getBrokerTenantRequestPayload(tenantName, numBrokers));
   }
 
-  protected String getServerTenantRequestPayload(String tenantName, int numOfflineServers, int numRealtimeServers) {
+  protected static String getServerTenantRequestPayload(String tenantName, int numOfflineServers, int numRealtimeServers) {
     return new Tenant(TenantRole.SERVER, tenantName, numOfflineServers + numRealtimeServers, numOfflineServers,
         numRealtimeServers).toJsonString();
   }
 
-  protected void createServerTenant(String tenantName, int numOfflineServers, int numRealtimeServers)
+  public static void createServerTenant(String tenantName, int numOfflineServers, int numRealtimeServers)
       throws IOException {
     sendPostRequest(_controllerRequestURLBuilder.forTenantCreate(),
         getServerTenantRequestPayload(tenantName, numOfflineServers, numRealtimeServers));
   }
 
-  protected void updateServerTenant(String tenantName, int numOfflineServers, int numRealtimeServers)
+  public static void updateServerTenant(String tenantName, int numOfflineServers, int numRealtimeServers)
       throws IOException {
     sendPutRequest(_controllerRequestURLBuilder.forTenantCreate(),
         getServerTenantRequestPayload(tenantName, numOfflineServers, numRealtimeServers));
   }
 
-  public void enableResourceConfigForLeadControllerResource(boolean enable) {
+  public static void enableResourceConfigForLeadControllerResource(boolean enable) {
     ConfigAccessor configAccessor = _helixManager.getConfigAccessor();
     ResourceConfig resourceConfig =
         configAccessor.getResourceConfig(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME);
@@ -630,5 +670,37 @@ public abstract class ControllerTest {
     putMethod.setRequestEntity(new MultipartRequestEntity(parts, putMethod.getParams()));
     httpClient.executeMethod(putMethod);
     return putMethod;
+  }
+
+  public static ControllerRequestURLBuilder getControllerRequestURLBuilder() {
+    return _controllerRequestURLBuilder;
+  }
+
+  public static HelixAdmin getHelixAdmin() {
+    return _helixAdmin;
+  }
+
+  public static PinotHelixResourceManager getHelixResourceManager() {
+    return _helixResourceManager;
+  }
+
+  public static String getControllerBaseApiUrl() {
+    return _controllerBaseApiUrl;
+  }
+
+  public static HelixManager getHelixManager() {
+    return _helixManager;
+  }
+
+  public static ZkHelixPropertyStore<ZNRecord> getPropertyStore() {
+    return _propertyStore;
+  }
+
+  public static int getControllerPort() {
+    return _controllerPort;
+  }
+
+  public static ControllerStarter getControllerStarter() {
+    return _controllerStarter;
   }
 }

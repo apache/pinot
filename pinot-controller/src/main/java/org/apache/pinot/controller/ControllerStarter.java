@@ -550,7 +550,6 @@ public class ControllerStarter implements ServiceStartable {
     return _controllerMode;
   }
 
-  @VisibleForTesting
   protected List<PeriodicTask> setupControllerPeriodicTasks() {
     LOGGER.info("Setting up periodic tasks");
     List<PeriodicTask> periodicTasks = new ArrayList<>();
@@ -580,6 +579,11 @@ public class ControllerStarter implements ServiceStartable {
     periodicTasks.add(_segmentRelocator);
 
     return periodicTasks;
+  }
+
+  @VisibleForTesting
+  public int getPeriodicTaskCount() {
+    return _periodicTaskScheduler == null ? 0 : _periodicTaskScheduler.getPeriodicTaskCount();
   }
 
   @Override

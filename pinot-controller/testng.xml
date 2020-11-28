@@ -20,9 +20,10 @@
     under the License.
 
 -->
-<suite name="org.pinot.controller.api.suit" verbose="10">
-  <suite-files>
-    <suite-file path="testng.suite-catch-all.xml"/>
-    <suite-file path="testng.suite-zookeeper-based.xml"/>
-  </suite-files>
+<suite name="testng.suite-controller" verbose="10">
+  <test name="testng.suite-controller.xml" verbose="10">
+    <packages>
+      <package name="org.apache.pinot.controller.*"></package>
+    </packages>
+  </test>
 </suite>

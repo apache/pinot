@@ -19,34 +19,21 @@
 package org.apache.pinot.controller.api;
 
 import java.io.IOException;
-import java.util.Map;
-
-import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
-import org.apache.pinot.controller.helix.ControllerTest;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.AfterSuite;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.controller.ControllerTestUtils.*;
 
-public class AccessControlTest extends ControllerTest {
+public class AccessControlTest {
 
-  @BeforeClass
-  public void setUp() {
-    Map<String, Object> properties = getDefaultControllerConfiguration();
-    properties.put(ControllerConf.ACCESS_CONTROL_FACTORY_CLASS, DenyAllAccessFactory.class.getName());
-
-    startController(properties);
-  }
+  private static final String TABLE_NAME = "accessTestTable";
 
   @Test
   public void testAccessDenied() {
     try {
-      sendGetRequest(_controllerRequestURLBuilder.forSegmentDownload("testTable", "testSegment"));
+      sendGetRequest(getControllerRequestURLBuilder().forSegmentDownload(TABLE_NAME, "testSegment"));
     } catch (IOException e) {
       Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 403"));
       return;
@@ -54,13 +41,10 @@ public class AccessControlTest extends ControllerTest {
     Assert.fail("Access not denied");
   }
 
-  @AfterClass
-  public void tearDown() {
-    stopController();
-  }
-
   public static class DenyAllAccessFactory implements AccessControlFactory {
-    private static final AccessControl DENY_ALL_ACCESS = (httpHeaders, tableName) -> false;
+    private static final AccessControl DENY_ALL_ACCESS = (httpHeaders, tableName) -> {
+      return !tableName.equals(TABLE_NAME);
+    };
 
     @Override
     public AccessControl create() {

@@ -20,7 +20,6 @@ package org.apache.pinot.controller.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import org.apache.pinot.common.utils.config.TagNameUtils;
-import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -28,17 +27,18 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
+import static org.apache.pinot.controller.ControllerTestUtils.*;
+import static org.testng.Assert.*;
 
 
-public class PinotTenantRestletResourceTest extends ControllerTest {
+public class PinotTenantRestletResourceTest {
   private static final int NUM_BROKER_INSTANCES = 1;
   private static final int NUM_SERVER_INSTANCES = 3;
+  private static final String TABLE_NAME = "pinotTenantRestletResourceTestTable_OFFLINE";
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    startController();
     addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKER_INSTANCES, true);
     addFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVER_INSTANCES, true);
   }
@@ -46,24 +46,31 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
   @Test
   public void testTableListForTenant()
       throws Exception {
-    // Check that no tables on tenant works
-    String listTablesUrl = _controllerRequestURLBuilder.forTablesFromTenant(TagNameUtils.DEFAULT_TENANT_NAME);
+    // Get current table count
+    String listTablesUrl = getControllerRequestURLBuilder().forTablesFromTenant(TagNameUtils.DEFAULT_TENANT_NAME);
     JsonNode tableList = JsonUtils.stringToJsonNode(sendGetRequest(listTablesUrl));
-    assertEquals(tableList.get("tables").size(), 0);
+    int currentTableCount = tableList.get("tables").size();
 
     // Add a table
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(),
-        new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build().toJsonString());
+    sendPostRequest(getControllerRequestURLBuilder().forTableCreate(),
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build().toJsonString());
 
     // There should be 1 table on the tenant
     tableList = JsonUtils.stringToJsonNode(sendGetRequest(listTablesUrl));
-    assertEquals(tableList.get("tables").size(), 1);
-    assertEquals(tableList.get("tables").get(0).asText(), "testTable_OFFLINE");
+    JsonNode tables = tableList.get("tables");
+    assertEquals(tables.size(), currentTableCount+1);
+
+    // Check to make sure that test table exists.
+    boolean found = false;
+    for (int i = 0; !found && i < tables.size(); i++) {
+      found = tables.get(i).asText().equals(TABLE_NAME);
+    }
+
+    assertTrue(found);
   }
 
   @AfterClass
   public void tearDown() {
     stopFakeInstances();
-    stopController();
   }
 }

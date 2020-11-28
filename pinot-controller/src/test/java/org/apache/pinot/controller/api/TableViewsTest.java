@@ -20,11 +20,11 @@ package org.apache.pinot.controller.api;
 
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.List;
 import java.util.Map;
 import org.apache.helix.InstanceType;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.api.resources.TableViews;
-import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -39,8 +39,9 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.controller.ControllerTestUtils.*;
 
-public class TableViewsTest extends ControllerTest {
+public class TableViewsTest {
   private static final String OFFLINE_TABLE_NAME = "offlineTable";
   private static final String OFFLINE_SEGMENT_NAME = "offlineSegment";
   private static final String HYBRID_TABLE_NAME = "hybridTable";
@@ -50,28 +51,27 @@ public class TableViewsTest extends ControllerTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    startController();
     addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKER_INSTANCES, true);
     addFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVER_INSTANCES, true);
 
     // Create the offline table and add one segment
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(OFFLINE_TABLE_NAME).setNumReplicas(2).build();
-    Assert.assertEquals(_helixManager.getInstanceType(), InstanceType.CONTROLLER);
-    _helixResourceManager.addTable(tableConfig);
-    _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
+    Assert.assertEquals(getHelixManager().getInstanceType(), InstanceType.CONTROLLER);
+    getHelixResourceManager().addTable(tableConfig);
+    getHelixResourceManager().addNewSegment(OFFLINE_TABLE_NAME,
         SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, OFFLINE_SEGMENT_NAME), "downloadUrl");
 
     // Create the hybrid table
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(HYBRID_TABLE_NAME).setNumReplicas(2).build();
-    _helixResourceManager.addTable(tableConfig);
+    getHelixResourceManager().addTable(tableConfig);
 
     // add schema for realtime table
     addDummySchema(HYBRID_TABLE_NAME);
     StreamConfig streamConfig = FakeStreamConfigUtils.getDefaultHighLevelStreamConfigs();
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(HYBRID_TABLE_NAME).setNumReplicas(2)
         .setStreamConfigs(streamConfig.getStreamConfigsMap()).build();
-    _helixResourceManager.addTable(tableConfig);
+    getHelixResourceManager().addTable(tableConfig);
 
     // Wait for external view get updated
     long endTime = System.currentTimeMillis() + 10_000L;
@@ -101,7 +101,7 @@ public class TableViewsTest extends ControllerTest {
   @Test(dataProvider = "viewProvider")
   public void testTableNotFound(String view)
       throws Exception {
-    String url = _controllerRequestURLBuilder.forTableView("unknownTable", view, null);
+    String url = getControllerRequestURLBuilder().forTableView("unknownTable", view, null);
     HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
     Assert.assertEquals(connection.getResponseCode(), 404);
   }
@@ -109,7 +109,7 @@ public class TableViewsTest extends ControllerTest {
   @Test(dataProvider = "viewProvider")
   public void testBadRequest(String view)
       throws Exception {
-    String url = _controllerRequestURLBuilder.forTableView(OFFLINE_TABLE_NAME, view, "no_such_type");
+    String url = getControllerRequestURLBuilder().forTableView(OFFLINE_TABLE_NAME, view, "no_such_type");
     HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
     Assert.assertEquals(connection.getResponseCode(), 400);
   }
@@ -164,13 +164,22 @@ public class TableViewsTest extends ControllerTest {
   private TableViews.TableView getTableView(String tableName, String view, String tableType)
       throws Exception {
     return JsonUtils
-        .stringToObject(sendGetRequest(_controllerRequestURLBuilder.forTableView(tableName, view, tableType)),
+        .stringToObject(sendGetRequest(getControllerRequestURLBuilder().forTableView(tableName, view, tableType)),
             TableViews.TableView.class);
   }
 
   @AfterClass
   public void tearDown() {
+    List<String>
+        instances3 = getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE");
+    System.out.println("INSTANCES3: " + instances3.toString());
+
     stopFakeInstances();
-    stopController();
+
+    List<String>
+        instances4 = getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE");
+    System.out.println("INSTANCES4: " + instances4.toString());
+
+
   }
 }

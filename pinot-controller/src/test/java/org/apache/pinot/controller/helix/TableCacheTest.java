@@ -34,16 +34,22 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.controller.ControllerTestUtils.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 
 
-public class TableCacheTest extends ControllerTest {
+public class TableCacheTest {
 
+  private static final String TABLE_NAME = "cacheTable";
+  private static final String OFFLINE_TABLE_NAME = TABLE_NAME + "_OFFLINE";
+  private static final String REALTIME_TABLE_NAME = TABLE_NAME + "_REALTIME";
+
+  private static final String MANGLED_TABLE_NAME = "cAcHeTaBlE";
+  private static final String MANGLED_OFFLINE_TABLE_NAME = MANGLED_TABLE_NAME + "_oFfLiNe";
   @BeforeClass
   public void setUp()
       throws Exception {
-    startController();
     addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
     addFakeServerInstancesToAutoJoinHelixCluster(1, true);
   }
@@ -51,90 +57,85 @@ public class TableCacheTest extends ControllerTest {
   @Test
   public void testTableCache()
       throws Exception {
-    TableCache tableCache = new TableCache(_propertyStore, true);
+    TableCache tableCache = new TableCache(getPropertyStore(), true);
 
-    assertNull(tableCache.getActualTableName("testTable"));
-    assertNull(tableCache.getColumnNameMap("testTable"));
-    assertNull(tableCache.getTableConfig("testTable_OFFLINE"));
-    assertNull(tableCache.getSchema("testTable"));
+    assertNull(tableCache.getActualTableName(TABLE_NAME));
+    assertNull(tableCache.getColumnNameMap(TABLE_NAME));
+    assertNull(tableCache.getTableConfig(OFFLINE_TABLE_NAME));
+    assertNull(tableCache.getSchema(TABLE_NAME));
 
     // Add a table config
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
-    _helixResourceManager.addTable(tableConfig);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    getHelixResourceManager().addTable(tableConfig);
     // Wait for at most 10 seconds for the callback to add the table config to the cache
-    TestUtils.waitForCondition(aVoid -> tableCache.getTableConfig("testTable_OFFLINE") != null, 10_000L,
+    TestUtils.waitForCondition(aVoid -> tableCache.getTableConfig(OFFLINE_TABLE_NAME) != null, 10_000L,
         "Failed to add the table config to the cache");
-    assertEquals(tableCache.getActualTableName("TeStTaBlE"), "testTable");
-    assertEquals(tableCache.getActualTableName("TeStTaBlE_oFfLiNe"), "testTable_OFFLINE");
-    assertNull(tableCache.getActualTableName("testTable_REALTIME"));
-    assertEquals(tableCache.getTableConfig("testTable_OFFLINE"), tableConfig);
-    assertNull(tableCache.getColumnNameMap("testTable"));
-    assertNull(tableCache.getSchema("testTable"));
+    assertEquals(tableCache.getActualTableName(MANGLED_TABLE_NAME), TABLE_NAME);
+    assertEquals(tableCache.getActualTableName(MANGLED_OFFLINE_TABLE_NAME), OFFLINE_TABLE_NAME);
+    assertNull(tableCache.getActualTableName(REALTIME_TABLE_NAME));
+    assertEquals(tableCache.getTableConfig(OFFLINE_TABLE_NAME), tableConfig);
+    assertNull(tableCache.getColumnNameMap(TABLE_NAME));
+    assertNull(tableCache.getSchema(TABLE_NAME));
 
     // Update the table config
     tableConfig.getIndexingConfig().setCreateInvertedIndexDuringSegmentGeneration(true);
-    _helixResourceManager.updateTableConfig(tableConfig);
+    getHelixResourceManager().updateTableConfig(tableConfig);
     // Wait for at most 10 seconds for the callback to update the table config in the cache
     // NOTE: Table config should never be null during the transitioning
     TestUtils.waitForCondition(
-        aVoid -> Preconditions.checkNotNull(tableCache.getTableConfig("testTable_OFFLINE")).equals(tableConfig),
+        aVoid -> Preconditions.checkNotNull(tableCache.getTableConfig(OFFLINE_TABLE_NAME)).equals(tableConfig),
         10_000L, "Failed to update the table config in the cache");
-    assertEquals(tableCache.getActualTableName("TeStTaBlE"), "testTable");
-    assertEquals(tableCache.getActualTableName("TeStTaBlE_oFfLiNe"), "testTable_OFFLINE");
-    assertNull(tableCache.getActualTableName("testTable_REALTIME"));
-    assertNull(tableCache.getColumnNameMap("testTable"));
-    assertNull(tableCache.getSchema("testTable"));
+    assertEquals(tableCache.getActualTableName(MANGLED_TABLE_NAME), TABLE_NAME);
+    assertEquals(tableCache.getActualTableName(MANGLED_OFFLINE_TABLE_NAME), OFFLINE_TABLE_NAME);
+    assertNull(tableCache.getActualTableName(REALTIME_TABLE_NAME));
+    assertNull(tableCache.getColumnNameMap(TABLE_NAME));
+    assertNull(tableCache.getSchema(TABLE_NAME));
 
     // Remove the table config
-    _helixResourceManager.deleteOfflineTable("testTable");
+    getHelixResourceManager().deleteOfflineTable(TABLE_NAME);
     // Wait for at most 10 seconds for the callback to remove the table config from the cache
-    TestUtils.waitForCondition(aVoid -> tableCache.getTableConfig("testTable_OFFLINE") == null, 10_000L,
+    TestUtils.waitForCondition(aVoid -> tableCache.getTableConfig(OFFLINE_TABLE_NAME) == null, 10_000L,
         "Failed to remove the table config from the cache");
-    assertNull(tableCache.getActualTableName("testTable"));
-    assertNull(tableCache.getColumnNameMap("testTable"));
-    assertNull(tableCache.getSchema("testTable"));
+    assertNull(tableCache.getActualTableName(TABLE_NAME));
+    assertNull(tableCache.getColumnNameMap(TABLE_NAME));
+    assertNull(tableCache.getSchema(TABLE_NAME));
 
     // Add a schema
     Schema schema =
-        new Schema.SchemaBuilder().setSchemaName("testTable").addSingleValueDimension("testColumn", DataType.INT)
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("testColumn", DataType.INT)
             .build();
-    _helixResourceManager.addSchema(schema, false);
+    getHelixResourceManager().addSchema(schema, false);
     // Wait for at most 10 seconds for the callback to add the schema to the cache
-    TestUtils.waitForCondition(aVoid -> tableCache.getSchema("testTable") != null, 10_000L,
+    TestUtils.waitForCondition(aVoid -> tableCache.getSchema(TABLE_NAME) != null, 10_000L,
         "Failed to add the schema to the cache");
-    assertEquals(tableCache.getColumnNameMap("testTable"), Collections.singletonMap("testcolumn", "testColumn"));
-    assertEquals(tableCache.getSchema("testTable"), schema);
+    assertEquals(tableCache.getColumnNameMap(TABLE_NAME), Collections.singletonMap("testcolumn", "testColumn"));
+    assertEquals(tableCache.getSchema(TABLE_NAME), schema);
     // Case-insensitive table name are handled based on the table config instead of the schema
-    assertNull(tableCache.getActualTableName("testTable"));
-    assertNull(tableCache.getTableConfig("testTable_OFFLINE"));
+    assertNull(tableCache.getActualTableName(TABLE_NAME));
+    assertNull(tableCache.getTableConfig(OFFLINE_TABLE_NAME));
 
     // Update the schema
     schema.addField(new DimensionFieldSpec("newColumn", DataType.LONG, true));
-    _helixResourceManager.updateSchema(schema, false);
+    getHelixResourceManager().updateSchema(schema, false);
     // Wait for at most 10 seconds for the callback to update the schema in the cache
     // NOTE: schema should never be null during the transitioning
-    TestUtils.waitForCondition(aVoid -> Preconditions.checkNotNull(tableCache.getSchema("testTable")).equals(schema),
+    TestUtils.waitForCondition(aVoid -> Preconditions.checkNotNull(tableCache.getSchema(TABLE_NAME)).equals(schema),
         10_000L, "Failed to update the schema in the cache");
     Map<String, String> expectedColumnMap = new HashMap<>();
     expectedColumnMap.put("testcolumn", "testColumn");
     expectedColumnMap.put("newcolumn", "newColumn");
-    assertEquals(tableCache.getColumnNameMap("testTable"), expectedColumnMap);
+    assertEquals(tableCache.getColumnNameMap(TABLE_NAME), expectedColumnMap);
     // Case-insensitive table name are handled based on the table config instead of the schema
-    assertNull(tableCache.getActualTableName("testTable"));
-    assertNull(tableCache.getTableConfig("testTable_OFFLINE"));
+    assertNull(tableCache.getActualTableName(TABLE_NAME));
+    assertNull(tableCache.getTableConfig(OFFLINE_TABLE_NAME));
 
     // Remove the schema
-    _helixResourceManager.deleteSchema(schema);
+    getHelixResourceManager().deleteSchema(schema);
     // Wait for at most 10 seconds for the callback to remove the schema from the cache
-    TestUtils.waitForCondition(aVoid -> tableCache.getSchema("testTable") == null, 10_000L,
+    TestUtils.waitForCondition(aVoid -> tableCache.getSchema(TABLE_NAME) == null, 10_000L,
         "Failed to remove the schema from the cache");
-    assertNull(tableCache.getActualTableName("testTable"));
-    assertNull(tableCache.getColumnNameMap("testTable"));
-    assertNull(tableCache.getSchema("testTable"));
-  }
-
-  @AfterClass
-  public void tearDown() {
-    stopController();
+    assertNull(tableCache.getActualTableName(TABLE_NAME));
+    assertNull(tableCache.getColumnNameMap(TABLE_NAME));
+    assertNull(tableCache.getSchema(TABLE_NAME));
   }
 }

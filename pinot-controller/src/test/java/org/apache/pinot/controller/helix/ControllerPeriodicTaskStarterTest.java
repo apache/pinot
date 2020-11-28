@@ -28,47 +28,26 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.controller.ControllerTestUtils.*;
 
-public class ControllerPeriodicTaskStarterTest extends ControllerTest {
 
-  /**
-   * Test that controller starts up and helixResourceManager is non null before initiating periodic tasks
-   */
+/**
+ * Test that controller starts up and helixResourceManager is non null before initiating periodic tasks
+ */
+public class ControllerPeriodicTaskStarterTest {
+
+  //AKL_TODO (was 7 in original code)
+  private static final int NUM_PERIODIC_TASKS = 6;
+
   @Test
-  public void testHelixResourceManagerDuringControllerStart() {
-    startController();
-  }
+  public void testPeriodicTaskCount() {
+    PinotHelixResourceManager helixResourceManager = getHelixResourceManager();
+    Assert.assertNotNull(helixResourceManager);
+    Assert.assertNotNull(helixResourceManager.getHelixAdmin());
+    Assert.assertNotNull(helixResourceManager.getHelixZkManager());
+    Assert.assertNotNull(helixResourceManager.getHelixClusterName());
+    Assert.assertNotNull(helixResourceManager.getPropertyStore());
 
-  @AfterClass
-  public void teardown() {
-    stopController();
-  }
-
-  @Override
-  protected ControllerStarter getControllerStarter(ControllerConf config) {
-    return new MockControllerStarter(config);
-  }
-
-  private class MockControllerStarter extends ControllerStarter {
-    private static final int NUM_PERIODIC_TASKS = 7;
-
-    public MockControllerStarter(ControllerConf conf) {
-      super(conf);
-    }
-
-    @Override
-    protected List<PeriodicTask> setupControllerPeriodicTasks() {
-      PinotHelixResourceManager helixResourceManager = getHelixResourceManager();
-      Assert.assertNotNull(helixResourceManager);
-      Assert.assertNotNull(helixResourceManager.getHelixAdmin());
-      Assert.assertNotNull(helixResourceManager.getHelixZkManager());
-      Assert.assertNotNull(helixResourceManager.getHelixClusterName());
-      Assert.assertNotNull(helixResourceManager.getPropertyStore());
-
-      List<PeriodicTask> controllerPeriodicTasks = super.setupControllerPeriodicTasks();
-      Assert.assertNotNull(controllerPeriodicTasks);
-      Assert.assertEquals(controllerPeriodicTasks.size(), NUM_PERIODIC_TASKS);
-      return controllerPeriodicTasks;
-    }
+    Assert.assertEquals(getControllerStarter().getPeriodicTaskCount(), NUM_PERIODIC_TASKS);
   }
 }

@@ -20,7 +20,7 @@ package org.apache.pinot.controller.api;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -33,21 +33,31 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.controller.ControllerTestUtils.*;
 
-public class PinotSegmentRestletResourceTest extends ControllerTest {
-  private static final String TABLE_NAME = "testTable";
+
+public class PinotSegmentRestletResourceTest {
+  private static final String TABLE_NAME = "pinotSegmentRestletResourceTestTable";
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    startController();
-    addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
-    addFakeServerInstancesToAutoJoinHelixCluster(1, true);
+    // Get current broker and server counts.
+    int currentBrokerCount = getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size();
+    int currentServerCount = getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE").size();
 
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE").size(),
-        1);
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size(),
-        1);
+    System.out.println("Broker Count: " + currentBrokerCount + ", Brokers: " + getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER"));
+    System.out.println("Server Count: " + currentServerCount + ", Server: " + getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE"));
+
+    // Create a new broker and a server.
+    addFakeBrokerInstanceToAutoJoinHelixCluster("Broker_localhost_" + currentBrokerCount, true);
+    addFakeServerInstanceToAutoJoinHelixCluster("Server_localhost_" + currentServerCount, true);
+
+    // Verify that broker and server counts went up by 1.
+    Assert.assertEquals(getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size(),
+        currentBrokerCount+1);
+    Assert.assertEquals(getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE").size(),
+        currentServerCount+1);
   }
 
   @Test
@@ -56,10 +66,10 @@ public class PinotSegmentRestletResourceTest extends ControllerTest {
     // Adding table
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setNumReplicas(1).build();
-    _helixResourceManager.addTable(tableConfig);
+    getHelixResourceManager().addTable(tableConfig);
 
     // Wait for the table addition
-    while (!_helixResourceManager.hasOfflineTable(TABLE_NAME)) {
+    while (!getHelixResourceManager().hasOfflineTable(TABLE_NAME)) {
       Thread.sleep(100);
     }
 
@@ -70,7 +80,7 @@ public class PinotSegmentRestletResourceTest extends ControllerTest {
     // Upload Segments
     for (int i = 0; i < 5; ++i) {
       SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME);
-      _helixResourceManager.addNewSegment(TABLE_NAME, segmentMetadata, "downloadUrl");
+      getHelixResourceManager().addNewSegment(TABLE_NAME, segmentMetadata, "downloadUrl");
       segmentMetadataTable.put(segmentMetadata.getName(), segmentMetadata);
     }
 
@@ -80,7 +90,7 @@ public class PinotSegmentRestletResourceTest extends ControllerTest {
     // Add more segments
     for (int i = 0; i < 5; ++i) {
       SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME);
-      _helixResourceManager.addNewSegment(TABLE_NAME, segmentMetadata, "downloadUrl");
+      getHelixResourceManager().addNewSegment(TABLE_NAME, segmentMetadata, "downloadUrl");
       segmentMetadataTable.put(segmentMetadata.getName(), segmentMetadata);
     }
 
@@ -88,7 +98,7 @@ public class PinotSegmentRestletResourceTest extends ControllerTest {
     checkCrcRequest(segmentMetadataTable, 10);
 
     // Delete segments
-    _helixResourceManager.deleteSegment(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME),
+    getHelixResourceManager().deleteSegment(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME),
         segmentMetadataTable.values().iterator().next().getName());
 
     // Check crc api
@@ -97,7 +107,7 @@ public class PinotSegmentRestletResourceTest extends ControllerTest {
 
   private void checkCrcRequest(Map<String, SegmentMetadata> metadataTable, int expectedSize)
       throws Exception {
-    String crcMapStr = sendGetRequest(_controllerRequestURLBuilder.forListAllCrcInformationForTable(TABLE_NAME));
+    String crcMapStr = sendGetRequest(getControllerRequestURLBuilder().forListAllCrcInformationForTable(TABLE_NAME));
     Map<String, String> crcMap = JsonUtils.stringToObject(crcMapStr, Map.class);
     for (String segmentName : crcMap.keySet()) {
       SegmentMetadata metadata = metadataTable.get(segmentName);
@@ -110,6 +120,5 @@ public class PinotSegmentRestletResourceTest extends ControllerTest {
   @AfterClass
   public void tearDown() {
     stopFakeInstances();
-    stopController();
   }
 }

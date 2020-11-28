@@ -34,28 +34,35 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.controller.ControllerTestUtils.*;
 
-public class PinotResourceManagerTest extends ControllerTest {
-  private static final String TABLE_NAME = "testTable";
+
+public class PinotResourceManagerTest {
+  private static final String TABLE_NAME = "resourceManagerTestTable";
+  private static final String BROKER_NAME = "Broker_localhost_";
+  private static final String SERVER_NAME = "Server_localhost_";
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    startController();
-    addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
-    addFakeServerInstancesToAutoJoinHelixCluster(1, true);
 
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size(),
-        1);
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE").size(),
-        1);
+    int brokerCount = getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size();
+    int serverCount = getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE").size();
+
+    addFakeBrokerInstanceToAutoJoinHelixCluster(BROKER_NAME + ++brokerCount, true);
+    addFakeServerInstanceToAutoJoinHelixCluster(SERVER_NAME + ++serverCount, true);
+
+    Assert.assertEquals(getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size(),
+        brokerCount);
+    Assert.assertEquals(getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE").size(),
+        serverCount);
     Assert
-        .assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_REALTIME").size(),
-            1);
+        .assertEquals(getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_REALTIME").size(),
+            serverCount);
 
     // Adding table
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    _helixResourceManager.addTable(tableConfig);
+    getHelixResourceManager().addTable(tableConfig);
   }
 
   @Test
@@ -64,20 +71,20 @@ public class PinotResourceManagerTest extends ControllerTest {
     segmentZKMetadata.setSegmentName("testSegment");
 
     // Segment ZK metadata does not exist
-    Assert.assertFalse(_helixResourceManager.updateZkMetadata("testTable_OFFLINE", segmentZKMetadata, 0));
+    Assert.assertFalse(getHelixResourceManager().updateZkMetadata(TABLE_NAME + "_OFFLINE", segmentZKMetadata, 0));
 
     // Set segment ZK metadata
-    Assert.assertTrue(_helixResourceManager.updateZkMetadata("testTable_OFFLINE", segmentZKMetadata));
+    Assert.assertTrue(getHelixResourceManager().updateZkMetadata(TABLE_NAME + "_OFFLINE", segmentZKMetadata));
 
     // Update ZK metadata
     Assert
-        .assertEquals(_helixResourceManager.getSegmentMetadataZnRecord("testTable_OFFLINE", "testSegment").getVersion(),
+        .assertEquals(getHelixResourceManager().getSegmentMetadataZnRecord(TABLE_NAME + "_OFFLINE", "testSegment").getVersion(),
             0);
-    Assert.assertTrue(_helixResourceManager.updateZkMetadata("testTable_OFFLINE", segmentZKMetadata, 0));
+    Assert.assertTrue(getHelixResourceManager().updateZkMetadata(TABLE_NAME + "_OFFLINE", segmentZKMetadata, 0));
     Assert
-        .assertEquals(_helixResourceManager.getSegmentMetadataZnRecord("testTable_OFFLINE", "testSegment").getVersion(),
+        .assertEquals(getHelixResourceManager().getSegmentMetadataZnRecord(TABLE_NAME + "_OFFLINE", "testSegment").getVersion(),
             1);
-    Assert.assertFalse(_helixResourceManager.updateZkMetadata("testTable_OFFLINE", segmentZKMetadata, 0));
+    Assert.assertFalse(getHelixResourceManager().updateZkMetadata(TABLE_NAME + "_OFFLINE", segmentZKMetadata, 0));
   }
 
   /**
@@ -95,17 +102,17 @@ public class PinotResourceManagerTest extends ControllerTest {
 
     // Basic add/delete case
     for (int i = 1; i <= 2; i++) {
-      _helixResourceManager
+      getHelixResourceManager()
           .addNewSegment(TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME), "downloadUrl");
     }
-    IdealState idealState = _helixAdmin.getResourceIdealState(getHelixClusterName(), offlineTableName);
+    IdealState idealState = getHelixAdmin().getResourceIdealState(getHelixClusterName(), offlineTableName);
     Set<String> segments = idealState.getPartitionSet();
     Assert.assertEquals(segments.size(), 2);
 
     for (String segmentName : segments) {
-      _helixResourceManager.deleteSegment(offlineTableName, segmentName);
+      getHelixResourceManager().deleteSegment(offlineTableName, segmentName);
     }
-    idealState = _helixAdmin.getResourceIdealState(getHelixClusterName(), offlineTableName);
+    idealState = getHelixAdmin().getResourceIdealState(getHelixClusterName(), offlineTableName);
     Assert.assertEquals(idealState.getPartitionSet().size(), 0);
 
     // Concurrent segment deletion
@@ -115,7 +122,7 @@ public class PinotResourceManagerTest extends ControllerTest {
         @Override
         public void run() {
           for (int i = 0; i < 10; i++) {
-            _helixResourceManager
+            getHelixResourceManager()
                 .addNewSegment(TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME), "downloadUrl");
           }
         }
@@ -124,7 +131,7 @@ public class PinotResourceManagerTest extends ControllerTest {
     addSegmentExecutor.shutdown();
     addSegmentExecutor.awaitTermination(1, TimeUnit.MINUTES);
 
-    idealState = _helixAdmin.getResourceIdealState(getHelixClusterName(), offlineTableName);
+    idealState = getHelixAdmin().getResourceIdealState(getHelixClusterName(), offlineTableName);
     Assert.assertEquals(idealState.getPartitionSet().size(), 30);
 
     ExecutorService deleteSegmentExecutor = Executors.newFixedThreadPool(3);
@@ -132,20 +139,19 @@ public class PinotResourceManagerTest extends ControllerTest {
       deleteSegmentExecutor.execute(new Runnable() {
         @Override
         public void run() {
-          _helixResourceManager.deleteSegment(offlineTableName, segmentName);
+          getHelixResourceManager().deleteSegment(offlineTableName, segmentName);
         }
       });
     }
     deleteSegmentExecutor.shutdown();
     deleteSegmentExecutor.awaitTermination(1, TimeUnit.MINUTES);
 
-    idealState = _helixAdmin.getResourceIdealState(getHelixClusterName(), offlineTableName);
+    idealState = getHelixAdmin().getResourceIdealState(getHelixClusterName(), offlineTableName);
     Assert.assertEquals(idealState.getPartitionSet().size(), 0);
   }
 
   @AfterClass
   public void tearDown() {
     stopFakeInstances();
-    stopController();
   }
 }
