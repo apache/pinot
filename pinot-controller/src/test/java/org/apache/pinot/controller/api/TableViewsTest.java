@@ -33,6 +33,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -42,7 +44,7 @@ import static org.apache.pinot.controller.ControllerTestUtils.*;
 public class TableViewsTest {
   private static final String OFFLINE_TABLE_NAME = "offlineTable";
   private static final String OFFLINE_SEGMENT_NAME = "offlineSegment";
-  private static final String HYBRID_TABLE_NAME = "hybridTable";
+  private static final String HYBRID_TABLE_NAME = "viewsTable";
 
   @BeforeClass
   public void setUp()
@@ -57,13 +59,13 @@ public class TableViewsTest {
         SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, OFFLINE_SEGMENT_NAME), "downloadUrl");
 
     // Create the hybrid table
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(HYBRID_TABLE_NAME).setNumReplicas(2).build();
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(HYBRID_TABLE_NAME).setNumReplicas(MIN_NUM_REPLICAS).build();
     getHelixResourceManager().addTable(tableConfig);
 
     // add schema for realtime table
     addDummySchema(HYBRID_TABLE_NAME);
     StreamConfig streamConfig = FakeStreamConfigUtils.getDefaultHighLevelStreamConfigs();
-    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(HYBRID_TABLE_NAME).setNumReplicas(2)
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(HYBRID_TABLE_NAME).setNumReplicas(MIN_NUM_REPLICAS)
         .setStreamConfigs(streamConfig.getStreamConfigsMap()).build();
     getHelixResourceManager().addTable(tableConfig);
 
@@ -160,5 +162,14 @@ public class TableViewsTest {
     return JsonUtils
         .stringToObject(sendGetRequest(getControllerRequestURLBuilder().forTableView(tableName, view, tableType)),
             TableViews.TableView.class);
+  }
+
+  @AfterClass
+  public void tearDown() {
+    System.out.println("All Tables: " + getHelixResourceManager().getAllTables());
+    getHelixResourceManager().deleteOfflineTable(HYBRID_TABLE_NAME + "_OFFLINE");
+    getHelixResourceManager().deleteRealtimeTable(HYBRID_TABLE_NAME + "_REALTIME");
+
+    getHelixResourceManager().deleteOfflineTable(OFFLINE_TABLE_NAME + "_OFFLINE");
   }
 }

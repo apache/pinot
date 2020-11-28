@@ -36,8 +36,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class OfflineNonReplicaGroupSegmentAssignmentTest {
@@ -50,7 +49,7 @@ public class OfflineNonReplicaGroupSegmentAssignmentTest {
   private static final int NUM_INSTANCES = 10;
   private static final List<String> INSTANCES =
       SegmentAssignmentTestUtils.getNameList(INSTANCE_NAME_PREFIX, NUM_INSTANCES);
-  private static final String RAW_TABLE_NAME = "testTable";
+  private static final String RAW_TABLE_NAME = "assignmentTable";
   private static final String INSTANCE_PARTITIONS_NAME =
       InstancePartitionsType.OFFLINE.getInstancePartitionsName(RAW_TABLE_NAME);
 

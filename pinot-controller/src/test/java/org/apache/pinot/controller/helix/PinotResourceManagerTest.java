@@ -39,27 +39,10 @@ import static org.apache.pinot.controller.ControllerTestUtils.*;
 
 public class PinotResourceManagerTest {
   private static final String TABLE_NAME = "resourceManagerTestTable";
-  private static final String BROKER_NAME = "Broker_localhost_";
-  private static final String SERVER_NAME = "Server_localhost_";
 
   @BeforeClass
   public void setUp()
       throws Exception {
-
-    int brokerCount = getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size();
-    int serverCount = getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE").size();
-
-    addFakeBrokerInstanceToAutoJoinHelixCluster(BROKER_NAME + ++brokerCount, true);
-    addFakeServerInstanceToAutoJoinHelixCluster(SERVER_NAME + ++serverCount, true);
-
-    Assert.assertEquals(getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size(),
-        brokerCount);
-    Assert.assertEquals(getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE").size(),
-        serverCount);
-    Assert
-        .assertEquals(getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_REALTIME").size(),
-            serverCount);
-
     // Adding table
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     getHelixResourceManager().addTable(tableConfig);
@@ -152,6 +135,6 @@ public class PinotResourceManagerTest {
 
   @AfterClass
   public void tearDown() {
-    stopFakeInstances();
+    getHelixResourceManager().deleteOfflineTable(TABLE_NAME);
   }
 }

@@ -27,68 +27,75 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
+import org.testng.annotations.AfterTest;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerTestUtils.*;
 
 
 public class ControllerSentinelTestV2 {
-
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    addFakeBrokerInstancesToAutoJoinHelixCluster(20, true);
-    addFakeServerInstancesToAutoJoinHelixCluster(20, true);
-  }
+  private static final String TABLE_NAME = "sentinalTable";
 
   @Test
   public void testOfflineTableLifeCycle()
       throws IOException {
-
-    int initialPartitionSetSize = getHelixAdmin().getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
-        .getPartitionSet().size();
-
     // Create offline table creation request
-    String tableName = "sentinalTestTable";
+
+    // AKL_TODO
+    // Not sure why segmentTable_OFFLINE is showing up here since it has been explictly deleted in SegmentLineageCleanupTest,
+    // but we cleanup here again.
+    Set<String> existingPartitions = getHelixAdmin().getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
+        .getPartitionSet();
+    for (String partition : existingPartitions) {
+      getHelixResourceManager().deleteOfflineTable(partition);
+    }
+
+    System.out.println(getHelixAdmin().getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
+        .getPartitionSet());
+
+    Assert.assertEquals(getHelixAdmin().getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
+        .getPartitionSet().size(), 0);
+
     TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setNumReplicas(3).build();
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setNumReplicas(MIN_NUM_REPLICAS).build();
     sendPostRequest(getControllerRequestURLBuilder().forTableCreate(), tableConfig.toJsonString());
 
+    System.out.println("Partition Set2: " + getHelixAdmin().getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
+        .getPartitionSet());
+
     Assert.assertEquals(
         getHelixAdmin().getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
-            .getPartitionSet().size(), initialPartitionSetSize + 1);
+            .getPartitionSet().size(), 1);
     Assert.assertEquals(
         getHelixAdmin().getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
-            .getInstanceSet(tableName + "_OFFLINE").size(), 20);
+            .getInstanceSet(TABLE_NAME + "_OFFLINE").size(), NUM_BROKER_INSTANCES);
 
     // Adding segments
     for (int i = 0; i < 10; ++i) {
       Assert.assertEquals(
-          getHelixAdmin().getResourceIdealState(getHelixClusterName(), tableName + "_OFFLINE").getNumPartitions(), i);
+          getHelixAdmin().getResourceIdealState(getHelixClusterName(), TABLE_NAME + "_OFFLINE").getNumPartitions(), i);
       getHelixResourceManager()
-          .addNewSegment(tableName, SegmentMetadataMockUtils.mockSegmentMetadata(tableName), "downloadUrl");
+          .addNewSegment(TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME), "downloadUrl");
       Assert.assertEquals(
-          getHelixAdmin().getResourceIdealState(getHelixClusterName(), tableName + "_OFFLINE").getNumPartitions(), i + 1);
+          getHelixAdmin().getResourceIdealState(getHelixClusterName(), TABLE_NAME + "_OFFLINE").getNumPartitions(), i + 1);
     }
 
     // Delete table
-    sendDeleteRequest(getControllerRequestURLBuilder().forTableDelete(tableName));
+    sendDeleteRequest(getControllerRequestURLBuilder().forTableDelete(TABLE_NAME));
     Assert.assertEquals(
         getHelixAdmin().getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
-            .getPartitionSet().size(), initialPartitionSetSize);
+            .getPartitionSet().size(), 0);
 
     Assert.assertEquals(getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(),
-        TagNameUtils.getBrokerTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME)).size(), 20);
+        TagNameUtils.getBrokerTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME)).size(), NUM_BROKER_INSTANCES);
     Assert.assertEquals(getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(),
-        TagNameUtils.getRealtimeTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME)).size(), 20);
+        TagNameUtils.getRealtimeTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME)).size(), NUM_BROKER_INSTANCES);
     Assert.assertEquals(getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(),
-        TagNameUtils.getOfflineTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME)).size(), 20);
+        TagNameUtils.getOfflineTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME)).size(), NUM_BROKER_INSTANCES);
   }
 
-  @AfterClass
+  @AfterTest
   public void tearDown() {
-    stopFakeInstances();
+    getHelixResourceManager().deleteOfflineTable(TABLE_NAME);
   }
 }

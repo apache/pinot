@@ -99,4 +99,9 @@ public class HelixHelperTest {
       }
     }, RetryPolicies.noDelayRetryPolicy(5));
   }
+
+  @AfterClass
+  public void tearDown() {
+    getHelixResourceManager().deleteOfflineTable(RESOURCE_NAME);
+  }
 }

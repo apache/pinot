@@ -320,7 +320,7 @@ public class TableRebalancerClusterTest {
    * 2. add nodes for tiers and run rebalance - should see no change
    * 3. add tier config and run rebalance - should see changed assignment
    */
-  @Test
+  @Test(enabled = false) // AKL_TODO: This test also needs to be reviewed even though its passing.
   public void testRebalanceWithTiers()
       throws Exception {
     int numServers = 3;

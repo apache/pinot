@@ -48,17 +48,20 @@ import static org.testng.Assert.*;
 
 
 public class PinotInstanceAssignmentRestletResourceTest {
-  private static final String TENANT_NAME = "testTenant";
-  private static final String RAW_TABLE_NAME = "testTable";
+  private static final String BROKER_TENANT_NAME = "resBrokerTenant";
+  private static final String SERVER_TENANT_NAME = "resServerTenant";
+
+  private static final String RAW_TABLE_NAME = "resTable";
   private static final String TIME_COLUMN_NAME = "daysSinceEpoch";
 
   @BeforeClass
   public void setUp()
       throws Exception {
     // Create broker and server tenant
-    Tenant brokerTenant = new Tenant(TenantRole.BROKER, TENANT_NAME, 1, 0, 0);
+    Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 1, 0, 0);
     getHelixResourceManager().createBrokerTenant(brokerTenant);
-    Tenant serverTenant = new Tenant(TenantRole.SERVER, TENANT_NAME, 2, 1, 1);
+
+    Tenant serverTenant = new Tenant(TenantRole.SERVER, SERVER_TENANT_NAME, 2, 1, 1);
     getHelixResourceManager().createServerTenant(serverTenant);
   }
 
@@ -69,12 +72,12 @@ public class PinotInstanceAssignmentRestletResourceTest {
         .addDateTime(TIME_COLUMN_NAME, DataType.INT, "1:DAYS:EPOCH", "1:DAYS").build();
     getHelixResourceManager().addSchema(schema, true);
     TableConfig offlineTableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(TENANT_NAME)
-            .setServerTenant(TENANT_NAME).build();
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
+            .setServerTenant(SERVER_TENANT_NAME).build();
     getHelixResourceManager().addTable(offlineTableConfig);
     TableConfig realtimeTableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setBrokerTenant(TENANT_NAME)
-            .setServerTenant(TENANT_NAME).setLLC(true)
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
+            .setServerTenant(SERVER_TENANT_NAME).setLLC(true)
             .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()).build();
     getHelixResourceManager().addTable(realtimeTableConfig);
 
@@ -96,7 +99,7 @@ public class PinotInstanceAssignmentRestletResourceTest {
 
     // Add OFFLINE instance assignment config to the offline table config
     InstanceAssignmentConfig offlineInstanceAssignmentConfig = new InstanceAssignmentConfig(
-        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(TENANT_NAME), false, 0, null), null,
+        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(SERVER_TENANT_NAME), false, 0, null), null,
         new InstanceReplicaGroupPartitionConfig(false, 0, 0, 0, 0, 0));
     offlineTableConfig.setInstanceAssignmentConfigMap(
         Collections.singletonMap(InstancePartitionsType.OFFLINE, offlineInstanceAssignmentConfig));
@@ -114,7 +117,7 @@ public class PinotInstanceAssignmentRestletResourceTest {
 
     // Add CONSUMING instance assignment config to the real-time table config
     InstanceAssignmentConfig consumingInstanceAssignmentConfig = new InstanceAssignmentConfig(
-        new InstanceTagPoolConfig(TagNameUtils.getRealtimeTagForTenant(TENANT_NAME), false, 0, null), null,
+        new InstanceTagPoolConfig(TagNameUtils.getRealtimeTagForTenant(SERVER_TENANT_NAME), false, 0, null), null,
         new InstanceReplicaGroupPartitionConfig(false, 0, 0, 0, 0, 0));
     realtimeTableConfig.setInstanceAssignmentConfigMap(
         Collections.singletonMap(InstancePartitionsType.CONSUMING, consumingInstanceAssignmentConfig));
@@ -313,9 +316,13 @@ public class PinotInstanceAssignmentRestletResourceTest {
 
   @AfterClass
   public void tearDown() {
+    getHelixResourceManager().deleteOfflineTable(RAW_TABLE_NAME);
+    getHelixResourceManager().deleteRealtimeTable(RAW_TABLE_NAME);
+
     // cleanup tenants, otherwise other test cases that use tenants may fail.
-    getHelixResourceManager().deleteBrokerTenantFor(TENANT_NAME);
-    getHelixResourceManager().deleteOfflineServerTenantFor(TENANT_NAME);
-    getHelixResourceManager().deleteOfflineServerTenantFor(TENANT_NAME);
+    getHelixResourceManager().deleteBrokerTenantFor(BROKER_TENANT_NAME);
+    getHelixResourceManager().deleteOfflineServerTenantFor(SERVER_TENANT_NAME);
+    getHelixResourceManager().deleteOfflineServerTenantFor(SERVER_TENANT_NAME);
+    getHelixResourceManager().deleteRealtimeServerTenantFor(SERVER_TENANT_NAME);
   }
 }

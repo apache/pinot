@@ -37,7 +37,7 @@ import static org.apache.pinot.controller.ControllerTestUtils.*;
  * Tests for the file upload restlet.
  */
 public class PinotFileUploadTest {
-  private static final String TABLE_NAME = "testTable";
+  private static final String TABLE_NAME = "fileTable";
 
   @BeforeClass
   public void setUp()

@@ -30,13 +30,10 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerTestUtils.*;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNull;
+import static org.testng.Assert.*;
 
 
 public class TableCacheTest {
@@ -47,12 +44,6 @@ public class TableCacheTest {
 
   private static final String MANGLED_TABLE_NAME = "cAcHeTaBlE";
   private static final String MANGLED_OFFLINE_TABLE_NAME = MANGLED_TABLE_NAME + "_oFfLiNe";
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
-    addFakeServerInstancesToAutoJoinHelixCluster(1, true);
-  }
 
   @Test
   public void testTableCache()

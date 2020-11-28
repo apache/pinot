@@ -207,6 +207,9 @@ public class PinotTableRestletResourceTest {
     // This test can only be done via integration test
 //    int replicasPerPartition = Integer.valueOf(tableConfig.getValidationConfig().getReplicasPerPartition());
 //    Assert.assertEquals(replicasPerPartition, Math.max(tableReplication, TABLE_MIN_REPLICATION));
+
+    getHelixResourceManager().deleteOfflineTable(tableName);
+    getHelixResourceManager().deleteRealtimeTable(tableName);
   }
 
   private TableConfig getTableConfig(String tableName, String tableType)
@@ -375,6 +378,13 @@ public class PinotTableRestletResourceTest {
   @AfterClass
   public void tearDown() {
     // Clean up tables.
+    getHelixResourceManager().deleteOfflineTable("updateTC");
+    getHelixResourceManager().deleteRealtimeTable("updateTC");
+    getHelixResourceManager().deleteOfflineTable("valid_table_name");
+
+    getHelixResourceManager().deleteOfflineTable("noSchema");
+    getHelixResourceManager().deleteRealtimeTable("noSchema");
+
     getHelixResourceManager().deleteOfflineTable(OFFLINE_TABLE_NAME);
     getHelixResourceManager().deleteRealtimeTable(REALTIME_TABLE_NAME);
   }
