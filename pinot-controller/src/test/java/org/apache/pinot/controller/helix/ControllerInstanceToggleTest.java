@@ -17,7 +17,7 @@
  * under the License.
  *
  *
- * AKL_TODO
+ */
 package org.apache.pinot.controller.helix;
 
 import java.io.IOException;
@@ -26,7 +26,6 @@ import org.apache.helix.model.ExternalView;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
-import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -35,43 +34,34 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerTestUtils.*;
 
 
 public class ControllerInstanceToggleTest {
-  private static final String RAW_TABLE_NAME = "testTable";
+  private static final String RAW_TABLE_NAME = "toggleTable";
   private static final long TIMEOUT_MS = 10_000L;
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
   private static final String SERVER_TAG_NAME = TagNameUtils.getOfflineTagForTenant(null);
   private static final String BROKER_TAG_NAME = TagNameUtils.getBrokerTagForTenant(null);
-  private static final int NUM_INSTANCES = 3;
-
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_INSTANCES, true);
-    addFakeServerInstancesToAutoJoinHelixCluster(NUM_INSTANCES, true);
-  }
 
   @Test
   public void testInstanceToggle()
       throws Exception {
     // Create an offline table
     TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_INSTANCES).build();
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(MIN_NUM_REPLICAS).build();
     sendPostRequest(getControllerRequestURLBuilder().forTableCreate(), tableConfig.toJsonString());
     Assert.assertEquals(
         getHelixAdmin().getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
             .getPartitionSet().size(), 1);
     Assert.assertEquals(
         getHelixAdmin().getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
-            .getInstanceSet(OFFLINE_TABLE_NAME).size(), NUM_INSTANCES);
+            .getInstanceSet(OFFLINE_TABLE_NAME).size(), NUM_BROKER_INSTANCES);
 
     // Add segments
-    for (int i = 0; i < NUM_INSTANCES; i++) {
+    for (int i = 0; i < NUM_SERVER_INSTANCES; i++) {
       getHelixResourceManager()
           .addNewSegment(RAW_TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME), "downloadUrl");
       Assert
@@ -80,7 +70,7 @@ public class ControllerInstanceToggleTest {
     }
 
     // Disable server instances
-    int numEnabledInstances = NUM_INSTANCES;
+    int numEnabledInstances = NUM_SERVER_INSTANCES;
     for (String instanceName : getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), SERVER_TAG_NAME)) {
       toggleInstanceState(instanceName, "disable");
       checkNumOnlineInstancesFromExternalView(OFFLINE_TABLE_NAME, --numEnabledInstances);
@@ -140,8 +130,6 @@ public class ControllerInstanceToggleTest {
 
   @AfterClass
   public void tearDown() {
-    stopFakeInstances();
-    stopController();
+    getHelixResourceManager().deleteOfflineTable(OFFLINE_TABLE_NAME);
   }
 }
-*/

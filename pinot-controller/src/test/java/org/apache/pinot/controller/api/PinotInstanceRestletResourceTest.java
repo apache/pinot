@@ -32,6 +32,8 @@ import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
+import org.aspectj.lang.annotation.After;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerTestUtils.*;
@@ -213,5 +215,16 @@ public class PinotInstanceRestletResourceTest {
         throw new RuntimeException(e);
       }
     }, GET_CALL_TIMEOUT_MS, "Expected " + numInstances + " instances after creation of tagged instances");
+  }
+
+
+  @AfterClass
+  public void tearDown() {
+    getHelixResourceManager().deleteOfflineServerTenantFor("newTag");
+    getHelixResourceManager().deleteRealtimeServerTenantFor("newTag");
+    getHelixResourceManager().deleteOfflineServerTenantFor("tag");
+    getHelixResourceManager().deleteRealtimeServerTenantFor("tag");
+    getHelixResourceManager().deleteBrokerTenantFor("newTag");
+    getHelixResourceManager().deleteBrokerTenantFor("tag");
   }
 }

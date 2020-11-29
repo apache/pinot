@@ -24,8 +24,8 @@ public class ControllerTestSetup {
 
     System.out.println(getHelixAdmin().getInstancesInCluster(getHelixClusterName()));
 
-    addMaxFakeBrokerInstancesToAutoJoinHelixCluster(2*NUM_BROKER_INSTANCES, false);
-    addMaxFakeServerInstancesToAutoJoinHelixCluster(2*NUM_SERVER_INSTANCES, false);
+    addMaxFakeBrokerInstancesToAutoJoinHelixCluster(TOTAL_NUM_BROKER_INSTANCES, false);
+    addMaxFakeServerInstancesToAutoJoinHelixCluster(TOTAL_NUM_SERVER_INSTANCES, false);
 
     System.out.println(getHelixAdmin().getInstancesInCluster(getHelixClusterName()));
   }

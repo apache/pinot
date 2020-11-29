@@ -34,6 +34,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.httpclient.methods.PutMethod;
@@ -100,6 +101,8 @@ public abstract class ControllerTestUtils {
   public static final int MIN_NUM_REPLICAS = 2;
   public static final int NUM_BROKER_INSTANCES = 4;
   public static final int NUM_SERVER_INSTANCES = 4;
+  public static final int TOTAL_NUM_SERVER_INSTANCES = 2*NUM_SERVER_INSTANCES;
+  public static final int TOTAL_NUM_BROKER_INSTANCES = 2*NUM_BROKER_INSTANCES;
 
   public static final String TENANT_NAME = "testTenant";
 
@@ -706,6 +709,13 @@ public abstract class ControllerTestUtils {
     putMethod.setRequestEntity(new MultipartRequestEntity(parts, putMethod.getParams()));
     httpClient.executeMethod(putMethod);
     return putMethod;
+  }
+
+  public static void printAllBrokerTenants() {
+    Set<String> brokerTenants = getHelixResourceManager().getAllBrokerTenantNames();
+    for (String tenant : brokerTenants) {
+      System.out.println("Instances for " + tenant + ": " + getHelixResourceManager().getAllInstancesForBrokerTenant(tenant));
+    }
   }
 
   public static ControllerRequestURLBuilder getControllerRequestURLBuilder() {

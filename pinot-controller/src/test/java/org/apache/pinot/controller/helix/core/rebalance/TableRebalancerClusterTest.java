@@ -42,6 +42,7 @@ import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -62,12 +63,6 @@ public class TableRebalancerClusterTest {
   private static final String TIER_A_NAME = "tierA";
   private static final String TIER_B_NAME = "tierB";
 
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
-  }
-
   /**
    * Dropping instance from cluster requires waiting for live instance gone and removing instance related ZNodes, which
    * are not the purpose of the test, so combine different rebalance scenarios into one test:
@@ -77,8 +72,7 @@ public class TableRebalancerClusterTest {
    * 4. Migrate back to non-replica-group based segment assignment and rebalance
    * 5. Remove (disable) servers and rebalance
    */
-  // AKL_TODO
-  @Test(enabled = false)
+  @Test (enabled = false) //AKL_TODO this test should run last as it does addFakeServerInstanceToAutoJoinHelixCluster call.
   public void testRebalance()
       throws Exception {
 
@@ -400,5 +394,23 @@ public class TableRebalancerClusterTest {
     }
 
     getHelixResourceManager().deleteOfflineTable(TIERED_TABLE_NAME);
+  }
+
+  @AfterClass
+  public void tearDown() {
+    getHelixResourceManager().deleteOfflineTable(OFFLINE_TABLE_NAME);
+    getHelixResourceManager().deleteOfflineTable(OFFLINE_TIERED_TABLE_NAME);
+
+    getHelixResourceManager().deleteOfflineServerTenantFor(NO_TIER_NAME);
+    getHelixResourceManager().deleteRealtimeServerTenantFor(NO_TIER_NAME);
+
+    getHelixResourceManager().deleteOfflineServerTenantFor(TIER_A_NAME);
+    getHelixResourceManager().deleteRealtimeServerTenantFor(TIER_A_NAME);
+
+    getHelixResourceManager().deleteOfflineServerTenantFor(TIER_B_NAME);
+    getHelixResourceManager().deleteRealtimeServerTenantFor(TIER_B_NAME);
+
+    System.out.println("cleanup: " + getHelixResourceManager().getAllTables());
+    System.out.println("cleanup: " + getHelixResourceManager().getAllServerTenantNames() + ", " + getHelixResourceManager().getAllBrokerTenantNames());
   }
 }
