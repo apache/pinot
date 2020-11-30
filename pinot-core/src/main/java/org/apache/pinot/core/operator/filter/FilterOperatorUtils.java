@@ -55,7 +55,7 @@ public class FilterOperatorUtils {
     // operator is used only if the column is sorted and has dictionary.
     Predicate.Type predicateType = predicateEvaluator.getPredicateType();
     if (predicateType == Predicate.Type.RANGE) {
-      if (dataSource.getDataSourceMetadata().isSorted() && (dataSource.getDictionary() != null)) {
+      if (dataSource.getDataSourceMetadata().isSorted() && dataSource.getDictionary() != null) {
         return new SortedIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
       }
       if (dataSource.getRangeIndex() != null) {
@@ -65,7 +65,7 @@ public class FilterOperatorUtils {
     } else if (predicateType == Predicate.Type.REGEXP_LIKE) {
       return new ScanBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
     } else {
-      if (dataSource.getDataSourceMetadata().isSorted() && (dataSource.getDictionary() != null)) {
+      if (dataSource.getDataSourceMetadata().isSorted() && dataSource.getDictionary() != null) {
         return new SortedIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
       }
       if (dataSource.getInvertedIndex() != null) {
