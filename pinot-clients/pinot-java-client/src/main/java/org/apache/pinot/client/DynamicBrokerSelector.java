@@ -45,12 +45,20 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
   private ExternalViewReader evReader;
 
   public DynamicBrokerSelector(String zkServers) {
-    ZkClient zkClient = new ZkClient(zkServers);
+    ZkClient zkClient = getZkClient(zkServers);
     zkClient.setZkSerializer(new BytesPushThroughSerializer());
     zkClient.waitUntilConnected(60, TimeUnit.SECONDS);
     zkClient.subscribeDataChanges(ExternalViewReader.BROKER_EXTERNAL_VIEW_PATH, this);
-    evReader = new ExternalViewReader(zkClient);
+    evReader = getEvReader(zkClient);
     refresh();
+  }
+
+  protected ZkClient getZkClient(String zkServers) {
+    return new ZkClient(zkServers);
+  }
+
+  protected ExternalViewReader getEvReader(ZkClient zkClient) {
+    return new ExternalViewReader(zkClient);
   }
 
   private void refresh() {
@@ -87,6 +95,7 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
       throws Exception {
     refresh();
   }
+
 
   @Override
   public void handleDataDeleted(String dataPath)

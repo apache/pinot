@@ -60,7 +60,7 @@ public class ExternalViewReader {
     try {
       byte[] brokerResourceNodeData = zkClient.readData(BROKER_EXTERNAL_VIEW_PATH, true);
       brokerResourceNodeData = unpackZnodeIfNecessary(brokerResourceNodeData);
-      JsonNode jsonObject = OBJECT_READER.readTree(new ByteArrayInputStream(brokerResourceNodeData));
+      JsonNode jsonObject = OBJECT_READER.readTree(getInputStream(brokerResourceNodeData));
       JsonNode brokerResourceNode = jsonObject.get("mapFields");
 
       Iterator<Entry<String, JsonNode>> resourceEntries = brokerResourceNode.fields();
@@ -84,12 +84,16 @@ public class ExternalViewReader {
     return brokerUrls;
   }
 
+  protected ByteArrayInputStream getInputStream(byte[] brokerResourceNodeData) {
+    return new ByteArrayInputStream(brokerResourceNodeData);
+  }
+
   public Map<String, List<String>> getTableToBrokersMap() {
     Map<String, Set<String>> brokerUrlsMap = new HashMap<>();
     try {
       byte[] brokerResourceNodeData = zkClient.readData("/EXTERNALVIEW/brokerResource", true);
       brokerResourceNodeData = unpackZnodeIfNecessary(brokerResourceNodeData);
-      JsonNode jsonObject = OBJECT_READER.readTree(new ByteArrayInputStream(brokerResourceNodeData));
+      JsonNode jsonObject = OBJECT_READER.readTree(getInputStream(brokerResourceNodeData));
       JsonNode brokerResourceNode = jsonObject.get("mapFields");
 
       Iterator<Entry<String, JsonNode>> resourceEntries = brokerResourceNode.fields();
