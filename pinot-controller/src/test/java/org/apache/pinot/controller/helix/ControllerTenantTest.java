@@ -163,6 +163,7 @@ public class ControllerTenantTest {
       Assert.assertEquals(response.get("tenantName").asText(), serverTag);
     }
 
+    //AKL_TODO: the two for loops below are fail while running under testng.xml.
     // Update server tenants
     // Note: server tenants cannot scale down
     int taggedServerCount = getTaggedServerCount();
