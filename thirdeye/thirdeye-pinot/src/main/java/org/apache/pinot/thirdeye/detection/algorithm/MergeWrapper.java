@@ -66,12 +66,12 @@ public class MergeWrapper extends DetectionPipeline {
   protected static final Comparator<MergedAnomalyResultDTO> COMPARATOR = new Comparator<MergedAnomalyResultDTO>() {
     @Override
     public int compare(MergedAnomalyResultDTO o1, MergedAnomalyResultDTO o2) {
-      // earlier for start time
+      // first order anomalies from earliest startTime to latest
       int res = Long.compare(o1.getStartTime(), o2.getStartTime());
       if (res != 0) return res;
 
-      // later for end time
-      res = Long.compare(o2.getEndTime(), o1.getEndTime());
+      // order anomalies from earliest createdTime to latest, if startTime are the same
+      res = Long.compare(o1.getCreatedTime(), o2.getCreatedTime());
       if (res != 0) return res;
 
       // pre-existing
@@ -190,25 +190,31 @@ public class MergeWrapper extends DetectionPipeline {
         //      parent |-------------------|
         //                                 anomaly |-------------|
         //
-        parent.setEndTime(Math.max(parent.getEndTime(), anomaly.getEndTime()));
-
-        // merge the anomaly's properties into parent
-        ThirdEyeUtils.mergeAnomalyProperties(parent.getProperties(), anomaly.getProperties());
+        // merge new anomaly to existing anomaly
         if (isExistingAnomaly(parent)) {
+          // parent (existing) |---------------------|
+          // anomaly (new)          |-------------------|
+          parent.setEndTime(Math.max(parent.getEndTime(), anomaly.getEndTime()));
+          ThirdEyeUtils.mergeAnomalyProperties(parent.getProperties(), anomaly.getProperties());
+          mergeChildren(parent, anomaly);
           modifiedExistingAnomalies.add(parent);
+        } else if (isExistingAnomaly(anomaly)) {
+          // parent (new)       |---------------------|
+          // anomaly (existing)      |-------------------|
+          anomaly.setStartTime(Math.min(parent.getStartTime(), anomaly.getStartTime()));
+          anomaly.setEndTime(Math.max(parent.getEndTime(), anomaly.getEndTime()));
+          ThirdEyeUtils.mergeAnomalyProperties(anomaly.getProperties(), parent.getProperties());
+          mergeChildren(anomaly, parent);
+          modifiedExistingAnomalies.add(anomaly);
+          retainedNewAnomalies.remove(parent);
+          parents.put(key, anomaly);
         } else {
-          // merge existing anomaly to new anomaly, set id to new anomaly
-          //  parent (new) |-------------------|
-          //         anomaly (existing) |-------------|
-          if (isExistingAnomaly(anomaly)) {
-            parent.setId(anomaly.getId());
-            anomaly.setId(null);
-          }
+          // parent (new)       |---------------------|
+          // anomaly (new)             |-------------------|
+          parent.setEndTime(Math.max(parent.getEndTime(), anomaly.getEndTime()));
+          ThirdEyeUtils.mergeAnomalyProperties(parent.getProperties(), anomaly.getProperties());
+          mergeChildren(parent, anomaly);
         }
-
-        // merge the anomaly's children into the parent
-        mergeChildren(parent, anomaly);
-
       } else if (parent.getEndTime() >= anomaly.getStartTime()) {
         // mergeable but exceeds maxDuration, then truncate
         //      parent |---------------------|

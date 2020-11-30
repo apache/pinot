@@ -49,6 +49,7 @@ public class MergeWrapperTest {
   private List<MockPipeline> runs;
   private List<MockPipelineOutput> outputs;
   private MockPipelineLoader mockLoader;
+  private List<MergedAnomalyResultDTO> existing;
 
   private static final Long PROP_ID_VALUE = 1000L;
   private static final String PROP_NAME_VALUE = "myName";
@@ -99,10 +100,10 @@ public class MergeWrapperTest {
     this.config.setName(PROP_NAME_VALUE);
     this.config.setProperties(this.properties);
 
-    List<MergedAnomalyResultDTO> existing = new ArrayList<>();
+    this.existing = new ArrayList<>();
     // For existing anomalies add ids.
-    existing.add(setAnomalyId(makeAnomaly(100, 1000), 0));
-    existing.add(setAnomalyId(makeAnomaly(1500, 2000), 1));
+    this.existing.add(setAnomalyId(makeAnomaly(100, 1000), 0));
+    this.existing.add(setAnomalyId(makeAnomaly(1500, 2000), 1));
 
     this.outputs = new ArrayList<>();
 
@@ -141,6 +142,12 @@ public class MergeWrapperTest {
     Assert.assertEquals(output.getLastTimestamp(), 3000);
     // anomalies [100, 1000] and [1150,1250] are merged into [50, 1200]
     Assert.assertTrue(output.getAnomalies().contains(setAnomalyId(makeAnomaly(50, 1250), 0)));
+    // ensure that the createdTime of anomalies is not changed
+    Assert.assertEquals(
+        output.getAnomalies().stream()
+            .filter(x -> x.equals(setAnomalyId(makeAnomaly(50, 1250), 0))).findFirst().get().getCreatedTime(),
+        existing.stream()
+            .filter(x -> x.equals(setAnomalyId(makeAnomaly(50, 1250), 0))).findFirst().get().getCreatedTime());
     // anomalies [2200, 2300] and [2400, 2800] are merged
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2200, 2800)));
   }
@@ -156,6 +163,12 @@ public class MergeWrapperTest {
     Assert.assertEquals(output.getAnomalies().size(), 3);
     Assert.assertEquals(output.getLastTimestamp(), 3000);
     Assert.assertTrue(output.getAnomalies().contains(setAnomalyId(makeAnomaly(50, 1250), 0)));
+    // ensure that the createdTime of anomalies is not changed
+    Assert.assertEquals(
+        output.getAnomalies().stream()
+            .filter(x -> x.equals(setAnomalyId(makeAnomaly(50, 1250), 0))).findFirst().get().getCreatedTime(),
+        existing.stream()
+            .filter(x -> x.equals(setAnomalyId(makeAnomaly(50, 1250), 0))).findFirst().get().getCreatedTime());
     Assert.assertTrue(output.getAnomalies().contains(setAnomalyId(makeAnomaly(1500, 2300), 1)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2400, 2800)));
   }

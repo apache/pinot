@@ -1,11 +1,19 @@
 package org.apache.pinot.thirdeye.dashboard.resources;
 
+import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.testng.Assert;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
 public class SummaryResourceTest {
+  private DAOTestBase testDAOProvider;
+
+  @BeforeMethod
+  public void setUp() {
+    testDAOProvider = DAOTestBase.getInstance();
+  }
   @Test
   public void testIsSimpleRatioMetric() {
     // False: null metric config
