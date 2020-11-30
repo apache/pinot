@@ -19,6 +19,7 @@
 package org.apache.pinot.core.segment.index;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -61,6 +62,7 @@ public class SegmentMetadataImplTest {
     // to have the time column values in allowed range. Until then, the check
     // is explicitly disabled
     config.setSkipTimeValueCheck(true);
+    config.setCustomProperties(ImmutableMap.of("custom.k1", "v1", "custom.k2", "v2"));
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
     driver.build();
@@ -88,6 +90,8 @@ public class SegmentMetadataImplTest {
     assertEquals(jsonMeta.get("endTimeMillis").asLong(), metadata.getTimeInterval().getEndMillis());
     assertEquals(jsonMeta.get("pushTimeMillis").asLong(), metadata.getPushTime());
     assertEquals(jsonMeta.get("refreshTimeMillis").asLong(), metadata.getPushTime());
+    assertEquals(jsonMeta.get("custom").get("k1").asText(), metadata.getCustomMap().get("k1"));
+    assertEquals(jsonMeta.get("custom").get("k2").asText(), metadata.getCustomMap().get("k2"));
 
     JsonNode jsonColumnsMeta = jsonMeta.get("columns");
     int numColumns = jsonColumnsMeta.size();

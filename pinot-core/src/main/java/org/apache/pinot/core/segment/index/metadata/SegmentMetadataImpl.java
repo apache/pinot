@@ -44,6 +44,7 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -52,6 +53,7 @@ import java.util.concurrent.TimeUnit;
 
 import javax.annotation.Nullable;
 
+import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
@@ -104,6 +106,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private int _totalDocs;
   private long _segmentStartTime;
   private long _segmentEndTime;
+  private Map<String, String> _customMap;
 
   /**
    * For segments on disk.
@@ -117,6 +120,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _columnMetadataMap = new HashMap<>();
     _allColumns = new HashSet<>();
     _schema = new Schema();
+    _customMap = new HashMap<>();
 
     init(segmentMetadataPropertiesConfiguration);
     File creationMetaFile = SegmentDirectoryPaths.findCreationMetaFile(indexDir);
@@ -160,6 +164,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _allColumns = schema.getColumnNames();
     _schema = schema;
     _totalDocs = segmentMetadataPropertiesConfiguration.getInt(SEGMENT_TOTAL_DOCS);
+    _customMap = new HashMap<>();
   }
 
   public static PropertiesConfiguration getPropertiesConfiguration(File indexDir) {
@@ -262,6 +267,18 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         _starTreeV2MetadataList.add(new StarTreeV2Metadata(
             segmentMetadataPropertiesConfiguration.subset(StarTreeV2Constants.MetadataKey.getStarTreePrefix(i))));
       }
+    }
+
+    // Set custom configs from metadata properties
+    setCustomConfigs(segmentMetadataPropertiesConfiguration, _customMap);
+  }
+
+  private static void setCustomConfigs(Configuration segmentMetadataPropertiesConfiguration, Map<String, String> customConfigsMap) {
+    Configuration customConfigs = segmentMetadataPropertiesConfiguration.subset(V1Constants.MetadataKeys.Segment.CUSTOM_SUBSET);
+    Iterator<String> customKeysIter = customConfigs.getKeys();
+    while (customKeysIter.hasNext()) {
+      String key = customKeysIter.next();
+      customConfigsMap.put(key, customConfigs.getString(key));
     }
   }
 
@@ -427,6 +444,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     return false;
   }
 
+  @Override
+  public Map<String, String> getCustomMap() {
+    return _customMap;
+  }
+
   public List<StarTreeV2Metadata> getStarTreeV2MetadataList() {
     return _starTreeV2MetadataList;
   }
@@ -530,6 +552,12 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     segmentMetadata.put("segmentVersion", _segmentVersion.toString());
     segmentMetadata.put("creatorName", _creatorName);
     segmentMetadata.put("paddingCharacter", String.valueOf(_paddingCharacter));
+
+    ObjectNode customConfigs = JsonUtils.newObjectNode();
+    for (String key : _customMap.keySet()) {
+      customConfigs.put(key, _customMap.get(key));
+    }
+    segmentMetadata.set("custom", customConfigs);
 
     ArrayNode columnsMetadata = JsonUtils.newArrayNode();
     for (String column : _allColumns) {

@@ -95,6 +95,7 @@ public class SegmentGenerationTaskRunner implements Serializable {
     segmentGeneratorConfig.setReaderConfig(recordReaderConfig);
     segmentGeneratorConfig.setRecordReaderPath(_taskSpec.getRecordReaderSpec().getClassName());
     segmentGeneratorConfig.setInputFilePath(_taskSpec.getInputFilePath());
+    segmentGeneratorConfig.setCustomProperties(_taskSpec.getCustomProperties());
 
     //build segment
     SegmentIndexCreationDriverImpl segmentIndexCreationDriver = new SegmentIndexCreationDriverImpl();
