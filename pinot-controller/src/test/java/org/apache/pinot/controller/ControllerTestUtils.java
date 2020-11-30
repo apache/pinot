@@ -718,6 +718,33 @@ public abstract class ControllerTestUtils {
     }
   }
 
+  public static void printAllServerTenants() {
+    Set<String> serverTenants = getHelixResourceManager().getAllServerTenantNames();
+    for (String tenant : serverTenants) {
+      System.out.println("Instances for " + tenant + ": " + getHelixResourceManager().getAllInstancesForServerTenant(tenant));
+    }
+  }
+
+  public static int getTaggedBrokerCount() {
+    int count = 0;
+    Set<String> brokerTenants = getHelixResourceManager().getAllBrokerTenantNames();
+    for (String tenant : brokerTenants) {
+      count += getHelixResourceManager().getAllInstancesForBrokerTenant(tenant).size();
+    }
+
+    return count;
+  }
+
+  public static int getTaggedServerCount() {
+    int count = 0;
+    Set<String> serverTenants = getHelixResourceManager().getAllServerTenantNames();
+    for (String tenant : serverTenants) {
+      count += getHelixResourceManager().getAllInstancesForServerTenant(tenant).size();
+    }
+
+    return count;
+  }
+
   public static ControllerRequestURLBuilder getControllerRequestURLBuilder() {
     return _controllerRequestURLBuilder;
   }

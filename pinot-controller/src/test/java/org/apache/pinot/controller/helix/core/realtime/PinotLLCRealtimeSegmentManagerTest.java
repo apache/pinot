@@ -92,12 +92,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
       RANDOM.nextBoolean() ? SegmentVersion.v1.toString() : SegmentVersion.v3.toString();
   static final int NUM_DOCS = RANDOM.nextInt(Integer.MAX_VALUE) + 1;
 
-  @BeforeClass
-  public void setUp() {
-    // Printing out the random seed to console so that we can use the seed to reproduce failure conditions
-    System.out.println("Using random seed: " + RANDOM_SEED);
-  }
-
   @AfterClass
   public void tearDown()
       throws IOException {

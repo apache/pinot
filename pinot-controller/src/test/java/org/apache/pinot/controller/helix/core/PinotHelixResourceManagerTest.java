@@ -99,7 +99,7 @@ public class PinotHelixResourceManagerTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    // AKL_TODO: This should not be needed, but for some reason tenants are not being cleanup.
+    // This should not be needed, but for some reason tenants are not being cleanup in SegmentLineageCleanupTest
     getHelixResourceManager().deleteOfflineTable("segmentTable_OFFLINE");
     getHelixResourceManager().deleteBrokerTenantFor("brokerTenant");
     getHelixResourceManager().deleteOfflineServerTenantFor("serverTenant");
@@ -309,7 +309,6 @@ public class PinotHelixResourceManagerTest {
 
     // Server tenant is already created during setup.
     Set<String> serverTenantNames = getHelixResourceManager().getAllServerTenantNames();
-    System.out.println("Tenant Names: " + serverTenantNames);
     // Two tenant names expected: [DefaultTenant, serverTenant]
     Assert.assertEquals(serverTenantNames.size(), 2);
     Assert.assertTrue(serverTenantNames.contains(SERVER_TENANT_NAME));
@@ -666,6 +665,7 @@ public class PinotHelixResourceManagerTest {
   public void tearDown() {
     getHelixResourceManager().deleteOfflineTable(OFFLINE_TABLE_NAME);
     getHelixResourceManager().deleteRealtimeTable(REALTIME_TABLE_NAME);
+    getHelixResourceManager().deleteOfflineTable(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
 
     untagBrokers();
 

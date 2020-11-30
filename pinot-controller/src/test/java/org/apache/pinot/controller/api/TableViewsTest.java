@@ -166,7 +166,6 @@ public class TableViewsTest {
 
   @AfterClass
   public void tearDown() {
-    System.out.println("All Tables: " + getHelixResourceManager().getAllTables());
     getHelixResourceManager().deleteOfflineTable(HYBRID_TABLE_NAME + "_OFFLINE");
     getHelixResourceManager().deleteRealtimeTable(HYBRID_TABLE_NAME + "_REALTIME");
 

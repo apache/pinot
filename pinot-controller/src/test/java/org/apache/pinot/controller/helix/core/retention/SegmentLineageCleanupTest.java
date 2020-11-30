@@ -65,12 +65,10 @@ public class SegmentLineageCleanupTest {
   public void setUp()
       throws Exception {
 
-    System.out.println("Server Tenants: " + getHelixResourceManager().getAllServerTenantNames());
     // Create server tenant
     Tenant serverTenant = new Tenant(TenantRole.SERVER, SERVER_TENANT_NAME, NUM_INSTANCES, NUM_INSTANCES, 0);
     getHelixResourceManager().createServerTenant(serverTenant);
 
-    System.out.println("Broker Tenants: " + getHelixResourceManager().getAllBrokerTenantNames());
     // Create broker tenant
     Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, NUM_INSTANCES, 0, 0);
     PinotResourceManagerResponse response = getHelixResourceManager().createBrokerTenant(brokerTenant);

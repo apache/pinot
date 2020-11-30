@@ -78,9 +78,6 @@ public class TableRebalancerClusterTest {
 
 //    int currentBrokerCount = getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size();
     int currentServerCount = getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE").size();
-
-    System.out.println("count: " + currentServerCount + ", servers: " + getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE"));
-
     int numServers = currentServerCount + 3;
     for (int i = currentServerCount; i < numServers; i++) {
       addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, true);
@@ -409,8 +406,5 @@ public class TableRebalancerClusterTest {
 
     getHelixResourceManager().deleteOfflineServerTenantFor(TIER_B_NAME);
     getHelixResourceManager().deleteRealtimeServerTenantFor(TIER_B_NAME);
-
-    System.out.println("cleanup: " + getHelixResourceManager().getAllTables());
-    System.out.println("cleanup: " + getHelixResourceManager().getAllServerTenantNames() + ", " + getHelixResourceManager().getAllBrokerTenantNames());
   }
 }

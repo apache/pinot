@@ -143,18 +143,6 @@ public class PinotTableRestletResourceTest {
       Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
     }
 
-    Set<String> brokerTenants = getHelixResourceManager().getAllBrokerTenantNames();
-    System.out.println("All Broker Tenants: " + brokerTenants);
-    for (String tenant : brokerTenants) {
-      System.out.println("Instances for broker tenant" + tenant + ": " + getHelixResourceManager().getAllInstancesForBrokerTenant(tenant));
-    }
-
-    Set<String> serverTenants = getHelixResourceManager().getAllServerTenantNames();
-    System.out.println("All Server Tenants: " + brokerTenants);
-    for (String tenant : serverTenants) {
-      System.out.println("Instances for server tenant" + tenant + ": " + getHelixResourceManager().getAllInstancesForBrokerTenant(tenant));
-    }
-
     // Creating a REALTIME table with a different schema name in the config should succeed (backwards compatibility mode)
     realtimeTableConfig = _realtimeBuilder.setSchemaName(REALTIME_TABLE_NAME).build();
     sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());

@@ -92,11 +92,6 @@ import org.testng.Assert;
 import com.google.common.base.Preconditions;
 
 
-/**
- * Base class for controller tests.
- * AKL_TODO: Remove this file once its remaining usage in pinot-broker and pinot-integration-tests go away.
- */
-
 public abstract class ControllerTest {
   protected static final String LOCAL_HOST = "localhost";
   protected static final int DEFAULT_CONTROLLER_PORT = 18998;

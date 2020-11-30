@@ -58,9 +58,6 @@ public class PinotBrokerRestletResourceTest {
     Map<String, Map<String, List<String>>> allMap =
         JsonUtils.stringToObject(sendGetRequest(getControllerRequestURLBuilder().forBrokersGet(state)), Map.class);
 
-    System.out.println("Tennants: " + allMap.get("tenants"));
-    System.out.println(expectedBrokers);
-
     for (String expectedBroker : expectedBrokers) {
       Assert.assertTrue(allMap.get("tenants").get("DefaultTenant").contains(expectedBroker));
       Assert.assertTrue(allMap.get("tables").get(TABLE_NAME_1).contains(expectedBroker));
