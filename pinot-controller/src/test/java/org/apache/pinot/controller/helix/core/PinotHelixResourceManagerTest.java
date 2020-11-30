@@ -99,12 +99,6 @@ public class PinotHelixResourceManagerTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    // This should not be needed, but for some reason tenants are not being cleanup in SegmentLineageCleanupTest
-    getHelixResourceManager().deleteOfflineTable("segmentTable_OFFLINE");
-    getHelixResourceManager().deleteBrokerTenantFor("brokerTenant");
-    getHelixResourceManager().deleteOfflineServerTenantFor("serverTenant");
-    getHelixResourceManager().deleteRealtimeServerTenantFor("serverTenant");
-
     // Create server tenant on all Servers
     Tenant serverTenant = new Tenant(TenantRole.SERVER, SERVER_TENANT_NAME, NUM_INSTANCES,
         NUM_INSTANCES, 0);

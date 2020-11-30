@@ -711,6 +711,17 @@ public abstract class ControllerTestUtils {
     return putMethod;
   }
 
+  /**
+   * Utility method for debugging purposes.
+   */
+  public static void printAllTables() {
+    List<String> tables = getHelixResourceManager().getAllTables();
+    System.out.println("All Tables: " + tables);
+  }
+
+  /**
+   * Utility method for debugging purposes.
+   */
   public static void printAllBrokerTenants() {
     Set<String> brokerTenants = getHelixResourceManager().getAllBrokerTenantNames();
     for (String tenant : brokerTenants) {
@@ -718,6 +729,9 @@ public abstract class ControllerTestUtils {
     }
   }
 
+  /**
+   * Utility method for debugging purposes.
+   */
   public static void printAllServerTenants() {
     Set<String> serverTenants = getHelixResourceManager().getAllServerTenantNames();
     for (String tenant : serverTenants) {

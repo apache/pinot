@@ -29,7 +29,6 @@ import org.apache.pinot.common.lineage.LineageEntryState;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
@@ -40,10 +39,9 @@ import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
-import org.testng.annotations.AfterTest;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import xerial.core.log.LogLevel;
 
 import static org.apache.pinot.controller.ControllerTestUtils.*;
 import static org.mockito.Mockito.*;
@@ -174,7 +172,7 @@ public class SegmentLineageCleanupTest {
     throw new RuntimeException("Timeout while waiting for segments to be deleted");
   }
 
-  @AfterTest
+  @AfterClass
   public void tearDown() {
     getHelixResourceManager().deleteOfflineTable(OFFLINE_TABLE_NAME);
     getHelixResourceManager().deleteRealtimeTable(OFFLINE_TABLE_NAME);
