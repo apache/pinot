@@ -1032,25 +1032,26 @@ export default Component.extend({
     edgesLabel,
     color,
     useValue) {
-    // build set of anomalous values (newer of 2 sets of anomalies)
-    if (!_.isEmpty(filteredAnomalies) && timeseries && !_.isEmpty(series.Current)) {
+    if (!_.isEmpty(filteredAnomalies)
+    && timeseries
+    && !_.isEmpty(series.Current)
+    && Array.isArray(series.Current.timestamps)
+    && series.Current.timestamps.length > 0) {
       const valuesCurrent = [];
+      // make sure anomalies ascend by startTime
+      filteredAnomalies.sort((a, b) => a.startTime - b.startTime);
+      let anomalyIndex = 0
+      let currentAnomaly = filteredAnomalies[anomalyIndex];
       // needed because anomalies with startTime before time window are possible
-      let currentAnomaly = filteredAnomalies.find(anomaly => {
-        return anomaly.startTime <= series.Current.timestamps[0];
-      });
-      let inAnomalyRange = currentAnomaly ? true : false;
+      let isInAnomalyRange = currentAnomaly.startTime <= series.Current.timestamps[0];
       let anomalyEdgeValues = [];
       let anomalyEdgeTimestamps = [];
       for (let i = 0; i < series.Current.timestamps.length; ++i) {
         const anomalyValue = useValue ? series.Current.values[i] : 1.0;
         const anomalyValueMinusOne = useValue ? series.Current.values[i-1] : 1.0;
-        if (!inAnomalyRange) {
-          currentAnomaly = filteredAnomalies.find(anomaly => {
-            return anomaly.startTime === series.Current.timestamps[i];
-          });
-          if (currentAnomaly) {
-            inAnomalyRange = true;
+        if (!isInAnomalyRange) {
+          isInAnomalyRange = currentAnomaly ? currentAnomaly.startTime <= series.Current.timestamps[i] : false;
+          if (isInAnomalyRange) {
             valuesCurrent.push(anomalyValue);
             anomalyEdgeValues.push(anomalyValue);
             anomalyEdgeTimestamps.push(series.Current.timestamps[i]);
@@ -1058,13 +1059,16 @@ export default Component.extend({
             valuesCurrent.push(null);
           }
         } else if (currentAnomaly.endTime <= series.Current.timestamps[i]) {
-          inAnomalyRange = false;
+          isInAnomalyRange = false;
+          if (anomalyIndex < filteredAnomalies.length - 1) {
+            anomalyIndex++;
+            currentAnomaly = filteredAnomalies[anomalyIndex];
+          } else {
+            currentAnomaly = null;
+          }
           // we don't want to include the endTime in anomaly range
-          currentAnomaly = filteredAnomalies.find(anomaly => {
-            return anomaly.startTime === series.Current.timestamps[i];
-          });
-          if (currentAnomaly) {
-            inAnomalyRange = true;
+          isInAnomalyRange = currentAnomaly ? currentAnomaly.startTime <= series.Current.timestamps[i] : false;
+          if (isInAnomalyRange) {
             valuesCurrent.push(anomalyValue);
             anomalyEdgeValues.push(anomalyValue);
             anomalyEdgeTimestamps.push(series.Current.timestamps[i]);
