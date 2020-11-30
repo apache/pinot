@@ -59,8 +59,9 @@ public class RangePredicateWithSortedInvertedIndexTest extends BaseQueriesTest {
   private static final String SEGMENT_NAME = "testSegment";
 
   private static final String D1 = "STRING_COL";
-  private static final String M1 = "INT_COL"; // sorted column
+  private static final String M1 = "INT_COL"; // sorted column (dictionary encoded)
   private static final String M2 = "LONG_COL";
+  private static final String M3 = "INT_COL_RAW"; // sorted raw column
 
   private static final int NUM_ROWS = 30000;
   private static final int INT_BASE_VALUE = 0;
@@ -117,13 +118,17 @@ public class RangePredicateWithSortedInvertedIndexTest extends BaseQueriesTest {
       row.putValue(M1, INT_BASE_VALUE + rowIndex);
       _longValues[rowIndex] = RANDOM.nextLong();
       row.putValue(M2, _longValues[rowIndex]);
+      row.putValue(M3, INT_BASE_VALUE + rowIndex);
       rows.add(row);
     }
 
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setNoDictionaryColumns(Arrays.asList(M3))
+            .build();
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension(D1, FieldSpec.DataType.STRING)
-            .addMetric(M1, FieldSpec.DataType.INT).addMetric(M2, FieldSpec.DataType.LONG).build();
+            .addMetric(M1, FieldSpec.DataType.INT).addMetric(M2, FieldSpec.DataType.LONG)
+            .addMetric(M3, FieldSpec.DataType.INT).build();
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
@@ -142,13 +147,34 @@ public class RangePredicateWithSortedInvertedIndexTest extends BaseQueriesTest {
     Pairs.IntPair pair = new Pairs.IntPair(20000, 29999);
     runQuery(query, 10000, Lists.newArrayList(pair), 2);
 
+    // test with sorted column without dictionary
+    // FilterOperatorUtils code should correctly create scan operator for INT_COL_RAW
+    // else this test will fail
+    query = "SELECT STRING_COL, INT_COL FROM testTable WHERE INT_COL >= 20000 AND INT_COL_RAW >= 20000 LIMIT 100000";
+    pair = new Pairs.IntPair(20000, 29999);
+    runQuery(query, 10000, Lists.newArrayList(pair), 2);
+
     query = "SELECT STRING_COL, INT_COL FROM testTable WHERE INT_COL >= 20000 AND INT_COL <= 23666 LIMIT 100000";
+    pair = new Pairs.IntPair(20000, 23666);
+    runQuery(query, 3667, Lists.newArrayList(pair), 2);
+
+    // test with sorted column without dictionary
+    // FilterOperatorUtils code should correctly create scan operator for INT_COL_RAW
+    // else this test will fail
+    query = "SELECT STRING_COL, INT_COL FROM testTable WHERE INT_COL >= 20000 AND INT_COL <= 23666 AND INT_COL_RAW <= 23666 LIMIT 100000";
     pair = new Pairs.IntPair(20000, 23666);
     runQuery(query, 3667, Lists.newArrayList(pair), 2);
 
     query = "SELECT STRING_COL, INT_COL FROM testTable WHERE INT_COL <= 20000 LIMIT 100000";
     pair = new Pairs.IntPair(0, 20000);
     runQuery(query, 20001, Lists.newArrayList(pair), 2);
+
+    // test with sorted column without dictionary
+    // FilterOperatorUtils code should correctly create scan operator for INT_COL_RAW
+    // else this test will fail
+    query = "SELECT STRING_COL, INT_COL FROM testTable WHERE INT_COL_RAW = 20000 LIMIT 100000";
+    pair = new Pairs.IntPair(20000, 20000);
+    runQuery(query, 1, Lists.newArrayList(pair), 2);
 
     String filter = "WHERE (INT_COL >= 15000 AND INT_COL <= 16665) OR (INT_COL >= 18000 AND INT_COL <= 19887)";
     query = "SELECT STRING_COL, INT_COL FROM testTable " + filter + " LIMIT 100000";
