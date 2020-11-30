@@ -45,7 +45,7 @@ public abstract class BaseImmutableDictionary implements Dictionary {
       _valueReader = new VarLengthBytesValueReaderWriter(dataBuffer);
     } else {
       Preconditions.checkState(dataBuffer.size() == length * numBytesPerValue,
-          "Buffer size mismatch: bufferSize = %s, numValues = %s, numByesPerValue = %s", dataBuffer.size(), length,
+          "Buffer size mismatch: bufferSize = %s, numValues = %s, numBytesPerValue = %s", dataBuffer.size(), length,
           numBytesPerValue);
       _valueReader = new FixedByteValueReaderWriter(dataBuffer);
     }
