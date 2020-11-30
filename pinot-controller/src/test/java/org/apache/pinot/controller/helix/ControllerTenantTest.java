@@ -20,11 +20,14 @@ package org.apache.pinot.controller.helix;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
+import java.util.Set;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.aspectj.lang.annotation.After;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -195,6 +198,25 @@ public class ControllerTenantTest {
       Assert.assertEquals(getHelixAdmin()
               .getInstancesInClusterWithTag(getHelixClusterName(), CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE).size(),
           taggedServerCount - i*NUM_SERVERS_PER_TAG);
+    }
+  }
+
+  @AfterClass
+  public void tearDown() {
+    // clean up tenants so that they do not interfere with subsequent test cases.
+    Set<String> brokerTenants = getHelixResourceManager().getAllBrokerTenantNames();
+    for (String tenant : brokerTenants) {
+      if (tenant.startsWith(BROKER_TAG_PREFIX)) {
+        getHelixResourceManager().deleteBrokerTenantFor(tenant);
+      }
+    }
+
+    Set<String> serverTenants = getHelixResourceManager().getAllServerTenantNames();
+    for (String tenant : serverTenants) {
+      if (tenant.startsWith(SERVER_TAG_PREFIX)) {
+        getHelixResourceManager().deleteOfflineServerTenantFor(tenant);
+        getHelixResourceManager().deleteRealtimeServerTenantFor(tenant);
+      }
     }
   }
 }
