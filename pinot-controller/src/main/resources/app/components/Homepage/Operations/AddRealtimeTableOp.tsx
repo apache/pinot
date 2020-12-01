@@ -69,8 +69,6 @@ const defaultTableObj = {
     "replicasPerPartition": "1",
     "retentionTimeUnit": null,
     "retentionTimeValue": null,
-    "segmentPushType": "APPEND",
-    "segmentPushFrequency": "HOURLY",
     "completionConfig": null,
     "crypterClassName": null,
     "peerSegmentDownloadScheme": null
@@ -101,8 +99,6 @@ const defaultTableObj = {
       "stream.kafka.consumer.prop.auto.offset.reset": "smallest",
       "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
       "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
-      "stream.kafka.decoder.prop.schema.registry.rest.url": null,
-      "stream.kafka.decoder.prop.schema.registry.schema.name": null,
       "realtime.segment.flush.threshold.rows": "0",
       "realtime.segment.flush.threshold.time": "24h",
       "realtime.segment.flush.segment.size": "100M"
@@ -122,7 +118,6 @@ const defaultTableObj = {
     "segmentPrunerTypes": null,
     "instanceSelectorType": null
   },
-  "instanceAssignmentConfigMap": null,
   "query": {
     "timeoutMs": null
   },
@@ -183,7 +178,59 @@ export default function AddRealtimeTableOp({
     }
   }
 
+  const returnValue = (data,key) =>{
+    let value = false;
+    Object.keys(data).map(async (o)=>{
+      if(!value){
+      if(!_.isEmpty(data[o]) && typeof data[o] === "object"){
+        value = await returnValue(data[o],key);
+      }
+      else if(!_.isEmpty(data[o]) && _.isArray(data[o])){
+        data[o].map(async (obj)=>{
+          value = await returnValue(obj,key);
+        })
+      }else{
+        if(o === key && (data[key] === null || data[key] === "")){
+          dispatch({
+            type: 'error',
+            message: `${key} cannot be empty`,
+            show: true
+          });
+          value = true;
+        }
+      }
+    }
+    })
+    return value;
+  }
+
+  const checkFields = (tableObj,fields) => {
+    let value = false
+    fields.forEach(async (o:any)=>{
+      if(!value){
+        if(tableObj[o.key] === undefined){
+          value = await returnValue(tableObj,o.key);
+        }else{
+          if(!value && (tableObj[o.key] === null || tableObj[o.key] === "")){
+            dispatch({
+              type: 'error',
+              message: `${o.label} cannot be empty`,
+              show: true
+            });
+            value = true;
+          }
+        }
+      }
+    });
+    return value;
+  }
+
   const validateTableConfig = async () => {
+    const fields = [{key:"tableName",label:"Table Name"},{key:"tableType",label:"Table Type"},{key:"stream.kafka.broker.list",label:"stream.kafka.broker.list"},{key:"stream.kafka.topic.name",label:"stream.kafka.topic.name"},{key:"stream.kafka.consumer.type",label:"stream.kafka.consumer.type"},{key:"stream.kafka.decoder.class.name",label:"stream.kafka.decoder.class.name"}];
+    const error = await checkFields(tableObj,fields);
+    if(error){
+      return false;
+    }
     const validTable = await PinotMethodUtils.validateTableAction(tableObj);
     if(validTable.error || typeof validTable === 'string'){
       dispatch({

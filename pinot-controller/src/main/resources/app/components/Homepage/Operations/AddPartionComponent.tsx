@@ -30,6 +30,9 @@ const useStyles = makeStyles((theme: Theme) =>
     selectFormControl: {
       margin: theme.spacing(1),
       width: 300
+    },
+    redColor: {
+      color: theme.palette.error.main
     }
   })
 );
@@ -61,6 +64,8 @@ export default function AddPartionComponent({
       },
     };
 
+  const [columnNameTemp,setColumnNameTemp] = useState("");
+
   const changeHandler = (fieldName, value) => {
     let newTableObj = {...tableDataObj};
     switch(fieldName){
@@ -68,52 +73,70 @@ export default function AddPartionComponent({
         // newTableObj[fieldName] = value;
         setShowPartition(value);
         if(value){
-            newTableObj.routing.segmentPrunerTypes = ["partition"];
             newTableObj.tableIndexConfig.segmentPartitionConfig = {
                 columnPartitionMap : {
-                    memberId : {
-                        functionName : ["Murmur"]
+                    "" : {
+                        functionName : "Murmur"
                     }
                 }
             }
         }else{
-            delete newTableObj.routing.segmentPrunerTypes;
             newTableObj.tableIndexConfig.segmentPartitionConfig = null;
         }
       break;
       case 'functionName':
-        newTableObj.tableIndexConfig.segmentPartitionConfig.columnPartitionMap.memberId.functionName = value;
+        newTableObj.tableIndexConfig.segmentPartitionConfig.columnPartitionMap[columnNameTemp].functionName = value;
       break;
       case 'numPartitions':
-        newTableObj.tableIndexConfig.segmentPartitionConfig.columnPartitionMap.memberId.numPartitions = value;
+        newTableObj.tableIndexConfig.segmentPartitionConfig.columnPartitionMap[columnNameTemp].numPartitions = value;
       break;
       case 'instanceSelectorType':
           if(value){
             newTableObj.routing.instanceSelectorType = "replicaGroup"
-            newTableObj.instanceAssignmentConfigMap = {
-                 ["OFFLINE"]: {
-                     replicaGroupPartitionConfig: {
-                         replicaGroupBased: true,
-                         numReplicaGroups: null,
-                         numInstancesPerReplicaGroup:null
-                        }
-                    }
-                }
           }
           else{
             delete newTableObj.routing.instanceSelectorType;
-            newTableObj.instanceAssignmentConfigMap = null;
           }
           setShowReplica(value);
         break;
         case 'numReplicaGroups':
+          if(!(newTableObj.instanceAssignmentConfigMap && newTableObj.instanceAssignmentConfigMap["OFFLINE"])){
+            newTableObj.instanceAssignmentConfigMap = {
+              ["OFFLINE"]: {
+                   tagPoolConfig: {
+                     tag: "DefaultTenant_OFFLINE"
+                   },
+                  replicaGroupPartitionConfig: {
+                      replicaGroupBased: true,
+                      numReplicaGroups: null,
+                      numInstancesPerReplicaGroup:null
+                     }
+                 }
+             }
+          }
             newTableObj.instanceAssignmentConfigMap["OFFLINE"].replicaGroupPartitionConfig.numReplicaGroups = value;
         break;
         case 'numInstancesPerReplicaGroup':
+          if(!(newTableObj.instanceAssignmentConfigMap && newTableObj.instanceAssignmentConfigMap["OFFLINE"])){
+            newTableObj.instanceAssignmentConfigMap = {
+              ["OFFLINE"]: {
+                   tagPoolConfig: {
+                     tag: "DefaultTenant_OFFLINE"
+                   },
+                  replicaGroupPartitionConfig: {
+                      replicaGroupBased: true,
+                      numReplicaGroups: null,
+                      numInstancesPerReplicaGroup:null
+                     }
+                 }
+             }
+          }
             newTableObj.instanceAssignmentConfigMap["OFFLINE"].replicaGroupPartitionConfig.numInstancesPerReplicaGroup = value;
         break;
         case 'columnName':
-            newTableObj.tableIndexConfig.segmentPartitionConfig.columnPartitionMap.memberId.columnName = value;
+          newTableObj.tableIndexConfig.segmentPartitionConfig.columnPartitionMap[value] = newTableObj.tableIndexConfig.segmentPartitionConfig.columnPartitionMap[columnNameTemp];
+          delete newTableObj.tableIndexConfig.segmentPartitionConfig.columnPartitionMap[columnNameTemp];
+          setColumnNameTemp(value);
         break;
     };
     setTableDataObj(newTableObj);
@@ -124,6 +147,7 @@ export default function AddPartionComponent({
     setTableDataObj(tableObj);
   }, [tableObj]);
 
+  const requiredAstrix = <span className={classes.redColor}>*</span>;
   return (
     <Grid container spacing={2}>
       <Grid item xs={12}>
@@ -140,14 +164,14 @@ export default function AddPartionComponent({
           </Select>
         </FormControl>
          {
-            tableDataObj.routing.segmentPrunerTypes ?
+            showPartition ?
                 <FormControl className={classes.selectFormControl}>
-                    <InputLabel htmlFor="columnName">Column Name</InputLabel>
+                    <InputLabel htmlFor="columnName">Column Name {requiredAstrix}</InputLabel>
                         <Select
                             labelId="columnName"
                             id="columnName"
                             key="columnName"
-                            value={tableDataObj.tableIndexConfig.segmentPartitionConfig.columnPartitionMap.memberId.columnName || ""}
+                            value={columnNameTemp}
                             onChange={(e)=> changeHandler('columnName', e.target.value)}
                             >
                               {columnName.map((val)=>{
@@ -157,14 +181,14 @@ export default function AddPartionComponent({
                 </FormControl> : null
          }
          {
-            tableDataObj.routing.segmentPrunerTypes ?
+            showPartition ?
                 <FormControl className={classes.selectFormControl}>
-                    <InputLabel htmlFor="functionName">Function Name</InputLabel>
+                    <InputLabel htmlFor="functionName">Function Name {requiredAstrix}</InputLabel>
                         <Select
                             labelId="functionNamePartition"
                             id="functionNamePartition"
                             key="functionName"
-                            value={tableDataObj.tableIndexConfig.segmentPartitionConfig.columnPartitionMap.memberId.functionName}
+                            value={tableDataObj.tableIndexConfig.segmentPartitionConfig.columnPartitionMap[columnNameTemp].functionName}
                             onChange={(e)=> changeHandler('functionName', e.target.value)}
                            >
 
@@ -176,12 +200,12 @@ export default function AddPartionComponent({
                 </FormControl> : null
          }
         {
-            tableDataObj.routing.segmentPrunerTypes ?
+            showPartition ?
                 <FormControl className={classes.formControl} >
-                    <InputLabel htmlFor="numPartitions">Number of partitions​</InputLabel>
+                    <InputLabel htmlFor="numPartitions">Number of partitions​ {requiredAstrix}</InputLabel>
                     <Input
                         id="numPartitions"
-                        value={tableDataObj.tableIndexConfig.segmentPartitionConfig.columnPartitionMap.memberId.numPartitions}
+                        value={tableDataObj.tableIndexConfig.segmentPartitionConfig.columnPartitionMap[columnNameTemp].numPartitions}
                         onChange={(e)=> changeHandler('numPartitions', e.target.value)}
                         type="number"
                     />
@@ -204,7 +228,7 @@ export default function AddPartionComponent({
         {
             tableDataObj.routing.instanceSelectorType ?
                 <FormControl className={classes.formControl} >
-                    <InputLabel htmlFor="numReplicaGroups">Number of replica groups</InputLabel>
+                    <InputLabel htmlFor="numReplicaGroups">Number of replica groups {requiredAstrix}</InputLabel>
                     <Input
                         id="numReplicaGroups"
                         value={tableDataObj.instanceAssignmentConfigMap ? Number(tableDataObj.instanceAssignmentConfigMap["OFFLINE"].replicaGroupPartitionConfig.numReplicaGroups) : null}
@@ -218,7 +242,7 @@ export default function AddPartionComponent({
         {
             tableDataObj.routing.instanceSelectorType ?
                 <FormControl className={classes.formControl} >
-                    <InputLabel htmlFor="numInstancesPerReplicaGroup">Number of instances per replica group​</InputLabel>
+                    <InputLabel htmlFor="numInstancesPerReplicaGroup">Number of instances per replica group​ {requiredAstrix}</InputLabel>
                     <Input
                         id="numInstancesPerReplicaGroup"
                         value={tableDataObj.instanceAssignmentConfigMap ? Number(tableDataObj.instanceAssignmentConfigMap["OFFLINE"].replicaGroupPartitionConfig.numInstancesPerReplicaGroup) : null}

@@ -64,7 +64,7 @@ export default function AddRealTimeIngestionComponent({
         newTableObj.segmentsConfig[fieldName] = value;
       break;
       case 'streamConfigs':
-        newTableObj.streamConfigs = {...value};
+        newTableObj.tableIndexConfig.streamConfigs = {...value};
       break;
       case 'filterFunction':
           if(!newTableObj.ingestionConfig.filterConfig){
@@ -73,10 +73,7 @@ export default function AddRealTimeIngestionComponent({
         newTableObj.ingestionConfig.filterConfig.filterFunction = value;
       break;
       case 'transformConfigs':
-        if(!newTableObj.ingestionConfig.filterConfig){
-            newTableObj.ingestionConfig.filterConfig = {};
-        }
-        tableDataObj.ingestionConfig.filterConfig.transformConfigs = value;
+        tableDataObj.ingestionConfig.transformConfigs = value;
     };
     setTableDataObj(newTableObj);
     setTableObj(newTableObj);
@@ -84,8 +81,8 @@ export default function AddRealTimeIngestionComponent({
 
   useEffect(()=>{
     let newTableObj = {...tableObj};
-      if(newTableObj.tableType === "REALTIME" && !newTableObj.streamConfigs && _.isEmpty(newTableObj.streamConfigs) ){
-        newTableObj.streamConfigs =
+      if(newTableObj.tableType === "REALTIME" && !newTableObj.tableIndexConfig.streamConfigs && _.isEmpty(newTableObj.tableIndexConfig.streamConfigs) ){
+        newTableObj.tableIndexConfig.streamConfigs =
         {
             "streamType": "kafka",
             "stream.kafka.topic.name": "",
@@ -94,15 +91,13 @@ export default function AddRealTimeIngestionComponent({
             "stream.kafka.consumer.prop.auto.offset.reset": "smallest",
             "stream.kafka.consumer.factory.class.name":"org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
             "stream.kafka.decoder.class.name":"org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
-            "stream.kafka.decoder.prop.schema.registry.rest.url": null,
-            "stream.kafka.decoder.prop.schema.registry.schema.name": null,
             "realtime.segment.flush.threshold.rows": "0",
             "realtime.segment.flush.threshold.time": "24h",
             "realtime.segment.flush.segment.size": "100M"
         }
         setTableObj(newTableObj);
-      }else if(newTableObj.tableType !== "REALTIME" && newTableObj.streamConfigs){
-        newTableObj.streamConfigs = null;
+      }else if(newTableObj.tableType !== "REALTIME" && newTableObj.tableIndexConfig.streamConfigs){
+        newTableObj.tableIndexConfig.streamConfigs = null;
         setTableObj(newTableObj);
       }
     setTableDataObj(newTableObj);
@@ -155,14 +150,14 @@ export default function AddRealTimeIngestionComponent({
             </FormControl>
             <MultipleSelectComponent
                 key = {"transformConfigs"}
-                streamConfigsObj = {tableDataObj.ingestionConfig.filterConfig && tableDataObj.ingestionConfig.filterConfig.transformConfigs || []}
+                streamConfigsObj = {tableDataObj.ingestionConfig.transformConfigs || []}
                 changeHandler = {changeHandler}
                 columnName= {columnName}/>
             {
-                tableDataObj.streamConfigs ?
+                tableDataObj.tableIndexConfig.streamConfigs ?
                 <AddDeleteComponent
                     key = {"streamConfigs"}
-                    streamConfigsObj = {{...tableDataObj.streamConfigs}}
+                    streamConfigsObj = {{...tableDataObj.tableIndexConfig.streamConfigs}}
                     changeHandler = {changeHandler}/>
                 : null
             }

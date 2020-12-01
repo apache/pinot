@@ -235,7 +235,7 @@ export default function SchemaComponent({
                   onChange={(e)=> changeHandler(index, 'defaultNullValue', e.target.value)}
                 />
               </FormControl> */}
-
+              {columnObj.type === 'datetime' &&
                 <FormControl className={classes.MVFFormControl}>
                   <InputLabel htmlFor="multiValue">Multi Value Field</InputLabel>
                   <Select
@@ -248,6 +248,7 @@ export default function SchemaComponent({
                     <MenuItem value="false">False</MenuItem>
                   </Select>
                 </FormControl>
+              }
                 {columnObj.type !== 'datetime' &&
                 <>
               <FormControl className={classes.formControl}>
