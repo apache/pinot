@@ -18,12 +18,11 @@
  */
 package org.apache.pinot.core.segment.creator.impl;
 
+import com.lmax.disruptor.*;
 import com.lmax.disruptor.dsl.Disruptor;
-import com.lmax.disruptor.EventHandler;
 import com.lmax.disruptor.dsl.ProducerType;
-import com.lmax.disruptor.BusySpinWaitStrategy;
-import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.util.DaemonThreadFactory;
+import java.util.concurrent.CountDownLatch;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
@@ -59,7 +58,7 @@ public class ParallelRowProcessor {
      * 
      * @throws Exception
      */
-    public void run() throws Exception {
+    public void run(CountDownLatch start) throws Exception {
       // Start the Disruptor, starts all threads running
       _disruptor.start();
 
@@ -74,6 +73,11 @@ public class ParallelRowProcessor {
         _reader.next(decodedRow);
         ringBuffer.publish(bufferIndex);
       }
+
+      // This call is needed to make sure we don't shutdown before the consumer
+      // had a chance to start running. This is a rare corner case that only happens
+      // when just a few entries are pushed to the ring buffer - e.g., during unit tests.
+      start.await();
 
       // Wait for all entries to be consumed
       _disruptor.shutdown();

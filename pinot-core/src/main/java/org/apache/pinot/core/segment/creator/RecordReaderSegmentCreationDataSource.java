@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.creator;
 
+import java.util.concurrent.CountDownLatch;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
@@ -51,9 +52,10 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
       SegmentPreIndexStatsCollector collector = new SegmentPreIndexStatsCollectorImpl(statsCollectorConfig);
       collector.init();
 
-      ParallelRowProcessor parallelRowProcessor = new ParallelRowProcessor(_recordReader, new SegmentIndexStatsRingBufferConsumer(recordTransformer, collector));
+      CountDownLatch startupLatch = new CountDownLatch(1);
 
-      parallelRowProcessor.run();
+      ParallelRowProcessor parallelRowProcessor = new ParallelRowProcessor(_recordReader, new SegmentIndexStatsRingBufferConsumer(recordTransformer, collector, startupLatch));
+      parallelRowProcessor.run(startupLatch);
 
       collector.build();
       return collector;

@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
@@ -187,10 +188,12 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       recordReader.rewind();
       LOGGER.info("Start building IndexCreator!");
 
-      SegmentIndexRingBufferConsumer consumer = new SegmentIndexRingBufferConsumer(_recordTransformer, indexCreator); 
+      CountDownLatch startupLatch = new CountDownLatch(1);
+
+      SegmentIndexRingBufferConsumer consumer = new SegmentIndexRingBufferConsumer(_recordTransformer, indexCreator, startupLatch);
       ParallelRowProcessor parallelRowProcessor = new ParallelRowProcessor(recordReader, consumer);
 
-      parallelRowProcessor.run();
+      parallelRowProcessor.run(startupLatch);
     } catch (Exception e) {
       indexCreator.close();
       throw e;

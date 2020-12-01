@@ -18,23 +18,27 @@
  */
 package org.apache.pinot.core.segment.creator.impl;
 
-import java.util.Collection;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import com.lmax.disruptor.EventHandler;
+import com.lmax.disruptor.LifecycleAware;
+import java.util.Collection;
+import java.util.concurrent.CountDownLatch;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
 import org.apache.pinot.core.segment.creator.SegmentCreator;
 import org.apache.pinot.core.util.IngestionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class SegmentIndexRingBufferConsumer implements EventHandler<GenericRow> {
+public class SegmentIndexRingBufferConsumer implements EventHandler<GenericRow>, LifecycleAware {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentIndexRingBufferConsumer.class);
   private RecordTransformer recordTransformer = null;
   private SegmentCreator indexCreator = null;
+  private CountDownLatch _startupLatch;
 
-  public SegmentIndexRingBufferConsumer(RecordTransformer newTransformer, SegmentCreator newSegmentCreator) {
+  public SegmentIndexRingBufferConsumer(RecordTransformer newTransformer, SegmentCreator newSegmentCreator, CountDownLatch startupLatch) {
     recordTransformer = newTransformer;
     indexCreator = newSegmentCreator;
+    _startupLatch = startupLatch;
   }
 
   /**
@@ -64,5 +68,12 @@ public class SegmentIndexRingBufferConsumer implements EventHandler<GenericRow> 
       indexCreator.indexRow(transformedRow);
     }
   }
-}
 
+  @Override
+  public void onStart() {
+    _startupLatch.countDown();
+  }
+
+  @Override
+  public void onShutdown() { }
+}
