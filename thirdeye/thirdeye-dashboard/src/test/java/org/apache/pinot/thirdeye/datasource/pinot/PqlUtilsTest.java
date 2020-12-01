@@ -77,7 +77,7 @@ public class PqlUtilsTest {
 
   @Test(dataProvider = "betweenClauseArgs")
   public void getBetweenClause(DateTime start, DateTime end, TimeSpec timeSpec, String expected) throws ExecutionException {
-    String betweenClause = PqlUtils.getBetweenClause(start, end, timeSpec, "collection");
+    String betweenClause = SqlUtils.getBetweenClause(start, end, timeSpec, "collection");
     Assert.assertEquals(betweenClause, expected);
   }
 
@@ -138,7 +138,7 @@ public class PqlUtilsTest {
     dimensions.put("key7", "value71\'");
     dimensions.put("key7", "value72\"");
 
-    String output = PqlUtils.getDimensionWhereClause(dimensions);
+    String output = SqlUtils.getDimensionWhereClause(dimensions);
 
     Assert.assertEquals(output, ""
         + "key < \"value\" AND "
@@ -158,15 +158,15 @@ public class PqlUtilsTest {
 
   @Test
   public  void testQuote() {
-    Assert.assertEquals(PqlUtils.quote("123"), "123");
-    Assert.assertEquals(PqlUtils.quote("abc"), "\"abc\"");
-    Assert.assertEquals(PqlUtils.quote("123\'"), "\"123\'\"");
-    Assert.assertEquals(PqlUtils.quote("abc\""), "\'abc\"\'");
+    Assert.assertEquals(SqlUtils.quote("123"), "123");
+    Assert.assertEquals(SqlUtils.quote("abc"), "\"abc\"");
+    Assert.assertEquals(SqlUtils.quote("123\'"), "\"123\'\"");
+    Assert.assertEquals(SqlUtils.quote("abc\""), "\'abc\"\'");
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public  void testQuoteFail() {
-    PqlUtils.quote("123\"\'");
+    SqlUtils.quote("123\"\'");
   }
 
   @Test
@@ -183,9 +183,9 @@ public class PqlUtilsTest {
         .setLimit(12345)
         .build("ref");
 
-    String pql = PqlUtils.getPql(request, metricFunction, ArrayListMultimap.<String, String>create(), timeSpec);
+    String pql = SqlUtils.getSql(request, metricFunction, ArrayListMultimap.<String, String>create(), timeSpec);
 
-    Assert.assertEquals(pql, "SELECT AVG(metric) FROM collection WHERE  metric >= 1 AND metric < 2 GROUP BY dimension TOP 12345");
+    Assert.assertEquals(pql, "SELECT dimension, AVG(metric) FROM collection WHERE  metric >= 1 AND metric < 2 GROUP BY dimension LIMIT 12345");
   }
 
   @Test
@@ -201,8 +201,8 @@ public class PqlUtilsTest {
         .setGroupBy("dimension")
         .build("ref");
 
-    String pql = PqlUtils.getPql(request, metricFunction, ArrayListMultimap.<String, String>create(), timeSpec);
+    String pql = SqlUtils.getSql(request, metricFunction, ArrayListMultimap.<String, String>create(), timeSpec);
 
-    Assert.assertEquals(pql, "SELECT AVG(metric) FROM collection WHERE  metric >= 1 AND metric < 2 GROUP BY dimension TOP 100000");
+    Assert.assertEquals(pql, "SELECT dimension, AVG(metric) FROM collection WHERE  metric >= 1 AND metric < 2 GROUP BY dimension LIMIT 100000");
   }
 }
