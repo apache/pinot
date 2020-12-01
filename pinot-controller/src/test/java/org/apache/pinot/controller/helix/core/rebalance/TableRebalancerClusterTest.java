@@ -43,7 +43,6 @@ import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel.*;
@@ -72,7 +71,7 @@ public class TableRebalancerClusterTest {
    * 4. Migrate back to non-replica-group based segment assignment and rebalance
    * 5. Remove (disable) servers and rebalance
    */
-  @Test (enabled = false) //AKL_TODO this test should run last as it does addFakeServerInstanceToAutoJoinHelixCluster call.
+  @Test (enabled = false) // AKL_TODO calls addFakeServerInstanceToAutoJoinHelixCluster.
   public void testRebalance()
       throws Exception {
 
@@ -311,7 +310,7 @@ public class TableRebalancerClusterTest {
    * 2. add nodes for tiers and run rebalance - should see no change
    * 3. add tier config and run rebalance - should see changed assignment
    */
-  @Test(enabled = false) // AKL_TODO: This test also needs to be reviewed even though its passing.
+  @Test(enabled = false) // AKL_TODO calls addFakeServerInstanceToAutoJoinHelixCluster.
   public void testRebalanceWithTiers()
       throws Exception {
     int numServers = 3;

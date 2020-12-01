@@ -47,7 +47,6 @@ import static org.apache.pinot.controller.ControllerTestUtils.*;
 import static org.mockito.Mockito.*;
 
 public class SegmentLineageCleanupTest {
-  private static final int BASE_SERVER_ADMIN_PORT = 10000;
   private static final int NUM_INSTANCES = 1;
   private static final long MAX_TIMEOUT_IN_MILLISECOND = 10_000L; // 10 seconds
 

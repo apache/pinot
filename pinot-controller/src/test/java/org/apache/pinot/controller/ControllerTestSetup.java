@@ -26,8 +26,6 @@ public class ControllerTestSetup {
 
     addMaxFakeBrokerInstancesToAutoJoinHelixCluster(TOTAL_NUM_BROKER_INSTANCES, false);
     addMaxFakeServerInstancesToAutoJoinHelixCluster(TOTAL_NUM_SERVER_INSTANCES, false);
-
-    System.out.println(getHelixAdmin().getInstancesInCluster(getHelixClusterName()));
   }
 
   public static Map<String, Object> getSuiteControllerConfiguration() {
@@ -49,11 +47,11 @@ public class ControllerTestSetup {
 
   @AfterSuite
   public void tearDownSuite() {
+    stopFakeInstances();
+
     getHelixResourceManager().deleteBrokerTenantFor(TENANT_NAME);
     getHelixResourceManager().deleteOfflineServerTenantFor(TENANT_NAME);
     getHelixResourceManager().deleteRealtimeServerTenantFor(TENANT_NAME);
-
-    stopFakeInstances();
 
     stopController();
     stopZk();
