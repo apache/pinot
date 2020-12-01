@@ -206,6 +206,9 @@ public abstract class ControllerTestUtils {
         getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), UNTAGGED_BROKER_INSTANCE).size();
   }
 
+  /**
+   * Adds fake broker instances until total number of broker instances equals maxCount.
+   */
   public static void addMoreFakeBrokerInstancesToAutoJoinHelixCluster(int maxCount, boolean isSingleTenant)
       throws Exception {
 
@@ -297,11 +300,13 @@ public abstract class ControllerTestUtils {
     addFakeServerInstanceToAutoJoinHelixCluster(instanceId, isSingleTenant, DEFAULT_ADMIN_API_PORT);
   }
 
+  /** Add fake server instances until total number of server instances reaches maxCount */
   public static void addMoreFakeServerInstancesToAutoJoinHelixCluster(int maxCount, boolean isSingleTenant)
       throws Exception {
     addMoreFakeServerInstancesToAutoJoinHelixCluster(maxCount, isSingleTenant, DEFAULT_ADMIN_API_PORT);
   }
 
+  /** Add fake server instances until total number of server instances reaches maxCount */
   public static void addMoreFakeServerInstancesToAutoJoinHelixCluster(int maxCount, boolean isSingleTenant, int baseAdminPort)
       throws Exception {
 
@@ -673,7 +678,7 @@ public abstract class ControllerTestUtils {
   }
 
   /**
-   * Initialize common state for the TestNG suite.
+   * Initialize shared state for the TestNG suite.
    */
   public static void startSuiteRun() throws Exception {
     startZk();
@@ -687,7 +692,7 @@ public abstract class ControllerTestUtils {
   }
 
   /**
-   * Cleanup common state used in TestNG suite.
+   * Cleanup shared state used in the TestNG suite.
    */
   public static void stopSuiteRun() {
     cleanup();
@@ -698,13 +703,14 @@ public abstract class ControllerTestUtils {
   }
 
   /**
-   * Validate common state before each test case is run. Initialize common state if {@link #_helixManager} is null which
-   * will happen when test cases are running individually one at a time outside of the TestNG suite.
+   * Validate shared state before each test case class is run. Initialize shared state if {@link #_zookeeperInstance} or
+   * {@link #_helixResourceManager} are null (this will happen when test cases are running individually one at a time
+   * outside of the TestNG suite).
    */
   public static void validate() throws Exception {
-    if (_helixManager == null) {
-      // this is expected to happen only while running a single test case outside of testNG suite, i.e when test
-      // cases are run individually within IntelliJ or one a time through maven command line.
+    if (_zookeeperInstance == null || _helixResourceManager == null) {
+      // this is expected to happen only when running a single test case outside of testNG suite, i.e when test
+      // cases are run one at a time within IntelliJ or through maven command line.
       startSuiteRun();
     }
 
@@ -720,8 +726,10 @@ public abstract class ControllerTestUtils {
     Assert.assertEquals(getHelixResourceManager().getAllTables().size(), 0);
 
     // Check if tenants have right number of instances.
-    Assert.assertEquals(getHelixResourceManager().getAllInstancesForBrokerTenant("DefaultBroker").size(), 0);
-    Assert.assertEquals(getHelixResourceManager().getAllInstancesForServerTenant("DefaultServer").size(), 0);
+    Assert.assertEquals(
+        getHelixResourceManager().getAllInstancesForBrokerTenant("DefaultBroker").size(), 0);
+    Assert.assertEquals(
+        getHelixResourceManager().getAllInstancesForServerTenant("DefaultServer").size(), 0);
 
     // Check number of untagged instances.
     Assert.assertEquals(getHelixResourceManager().getOnlineUnTaggedBrokerInstanceList().size(), NUM_BROKER_INSTANCES);
@@ -729,8 +737,8 @@ public abstract class ControllerTestUtils {
   }
 
   /**
-   * Cleaning up common state after a test case has run. Individual test cases may have to do additional cleanup
-   * depending upon their setup.
+   * Clean shared state after a test case class has completed running. Additional cleanup may be needed depending upon
+   * test functionality.
    */
   public static void cleanup() {
 

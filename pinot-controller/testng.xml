@@ -23,8 +23,7 @@
 <suite name="testng.suite-controller" verbose="10">
   <!--
       All test cases in pinot-controller are run as part of a testNG
-      Suite. The @BeforeSuite and @AfterSuite methods are defined in
-      ControllerTestSetup class.
+      Suite. See ControllerTestSetup class for details.
   -->
   <test name="testng.suite-controller.xml" verbose="10">
     <packages>

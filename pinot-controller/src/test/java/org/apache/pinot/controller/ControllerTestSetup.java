@@ -24,7 +24,12 @@ import org.testng.annotations.BeforeSuite;
 import static org.apache.pinot.controller.ControllerTestUtils.*;
 
 /**
- * All test cases in {@link org.apache.pinot.controller} package are run as part the Default TestNG suite.
+ * All test cases in {@link org.apache.pinot.controller} package are run as part the a TestNG suite (see testng.xml).
+ * This helps to setup (see {@link #suiteSetup()} and tear down (see {@link #tearDownSuite()} the shared state before
+ * and after all tests are run. Each test case class should implement a @BeforeClass method, which would call
+ * @link ControllerTestUtils#validate()} method to validate shared state. Each test case class should also implement
+ * @AfterClass method where {@link ControllerTestUtils#cleanup()} would be called to cleanup shared state. Additional
+ * cleanup may be needed depending upon test functionality.
  */
 public class ControllerTestSetup {
   /**
