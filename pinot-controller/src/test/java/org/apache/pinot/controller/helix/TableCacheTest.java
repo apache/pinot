@@ -53,7 +53,7 @@ public class TableCacheTest {
     validate();
   }
 
-    @Test
+  @Test
   public void testTableCache()
       throws Exception {
     TableCache tableCache = new TableCache(getPropertyStore(), true);

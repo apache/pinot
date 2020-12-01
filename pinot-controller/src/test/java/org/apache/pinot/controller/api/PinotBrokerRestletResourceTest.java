@@ -33,7 +33,7 @@ import static org.apache.pinot.controller.ControllerTestUtils.*;
 
 public class PinotBrokerRestletResourceTest {
   private static final String TABLE_NAME_1 = "testTable1";
-  private static final String TABLE_NAME_2 = "tableTable2";
+  private static final String TABLE_NAME_2 = "testTable2";
 
   @BeforeClass
   public void setUp()
