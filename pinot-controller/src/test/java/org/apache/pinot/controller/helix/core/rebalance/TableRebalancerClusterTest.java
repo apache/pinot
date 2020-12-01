@@ -71,7 +71,11 @@ public class TableRebalancerClusterTest {
    * 4. Migrate back to non-replica-group based segment assignment and rebalance
    * 5. Remove (disable) servers and rebalance
    */
-  @Test (enabled = false) // AKL_TODO calls addFakeServerInstanceToAutoJoinHelixCluster.
+
+  // TODO:
+  // This test case is disabled because it adds a new server instance, but does not remove it after the test. Hence,
+  // enabling this test case will cause problems with test cases that run after this test case.
+  @Test (enabled = false)
   public void testRebalance()
       throws Exception {
 
@@ -310,7 +314,10 @@ public class TableRebalancerClusterTest {
    * 2. add nodes for tiers and run rebalance - should see no change
    * 3. add tier config and run rebalance - should see changed assignment
    */
-  @Test(enabled = false) // AKL_TODO calls addFakeServerInstanceToAutoJoinHelixCluster.
+  // TODO:
+  // This test case is disabled because it adds a new server instance, but does not remove it after the test. Hence,
+  // enabling this test case will cause problems with test cases that run after this test case.
+  @Test(enabled = false)
   public void testRebalanceWithTiers()
       throws Exception {
     int numServers = 3;

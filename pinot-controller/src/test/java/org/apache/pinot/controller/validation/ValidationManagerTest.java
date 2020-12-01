@@ -70,7 +70,10 @@ public class ValidationManagerTest {
     getHelixResourceManager().addTable(_offlineTableConfig);
   }
 
-  @Test(enabled = false) // AKL_TODO: adds a new broker.
+  // TODO:
+  // This test case is disabled because it adds a new broker, but does not remove it after the test. Hence, enabling
+  // this test case will cause problems with test cases that run after this test case.
+  @Test(enabled = false)
   public void testRebuildBrokerResourceWhenBrokerAdded()
       throws Exception {
     // Check that the first table we added doesn't need to be rebuilt(case where ideal state brokers and brokers in broker resource are the same.

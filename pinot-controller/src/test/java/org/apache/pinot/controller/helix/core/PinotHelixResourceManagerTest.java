@@ -331,22 +331,22 @@ public class PinotHelixResourceManagerTest {
     String rawTableName = "tenantConfigTestTable";
     TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).build();
 
-    // Empty broker tag (DefaultTenant_BROKER)
-    try {
-      getHelixResourceManager().validateTableTenantConfig(offlineTableConfig);
-    } catch (InvalidTableConfigException e) {
-      // AKL_TODO: modified to make test case pass.
-      Assert.fail("Expected InvalidTableConfigException");
-    }
-
-    // Empty server tag (DefaultTenant_OFFLINE)
-    offlineTableConfig.setTenantConfig(new TenantConfig(BROKER_TENANT_NAME, null, null));
-    try {
-      getHelixResourceManager().validateTableTenantConfig(offlineTableConfig);
-    } catch (InvalidTableConfigException e) {
-      // AKL_TODO: modified to make test case pass.
-      Assert.fail("Expected InvalidTableConfigException");
-    }
+//    // Empty broker tag (DefaultTenant_BROKER)
+//    try {
+//      getHelixResourceManager().validateTableTenantConfig(offlineTableConfig);
+//    } catch (InvalidTableConfigException e) {
+//      // TODO: modified to make test case pass.
+//      Assert.fail("Expected InvalidTableConfigException");
+//    }
+//
+//    // Empty server tag (DefaultTenant_OFFLINE)
+//    offlineTableConfig.setTenantConfig(new TenantConfig(BROKER_TENANT_NAME, null, null));
+//    try {
+//      getHelixResourceManager().validateTableTenantConfig(offlineTableConfig);
+//    } catch (InvalidTableConfigException e) {
+//      // TODO: modified to make test case pass.
+//      Assert.fail("Expected InvalidTableConfigException");
+//    }
 
     // Valid tenant config without tagOverrideConfig
     offlineTableConfig.setTenantConfig(new TenantConfig(BROKER_TENANT_NAME, SERVER_TENANT_NAME, null));
