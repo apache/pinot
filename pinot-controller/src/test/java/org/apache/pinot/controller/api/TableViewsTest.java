@@ -49,6 +49,7 @@ public class TableViewsTest {
   @BeforeClass
   public void setUp()
       throws Exception {
+    validate();
 
     // Create the offline table and add one segment
     TableConfig tableConfig =
@@ -166,9 +167,6 @@ public class TableViewsTest {
 
   @AfterClass
   public void tearDown() {
-    getHelixResourceManager().deleteOfflineTable(HYBRID_TABLE_NAME + "_OFFLINE");
-    getHelixResourceManager().deleteRealtimeTable(HYBRID_TABLE_NAME + "_REALTIME");
-
-    getHelixResourceManager().deleteOfflineTable(OFFLINE_TABLE_NAME + "_OFFLINE");
+    cleanup();
   }
 }

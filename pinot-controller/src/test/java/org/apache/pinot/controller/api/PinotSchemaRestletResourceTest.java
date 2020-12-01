@@ -27,12 +27,20 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerTestUtils.*;
 
 
 public class PinotSchemaRestletResourceTest {
+
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+    validate();
+  }
 
   @Test
   public void testBadContentType() {
@@ -118,5 +126,10 @@ public class PinotSchemaRestletResourceTest {
     putMethod = sendMultipartPutRequest(getControllerRequestURLBuilder().forSchemaUpdate(schemaName),
         schema.toSingleLineJsonString());
     Assert.assertEquals(putMethod.getStatusCode(), 400);
+  }
+
+  @AfterClass
+  public void tearDown() {
+    cleanup();
   }
 }

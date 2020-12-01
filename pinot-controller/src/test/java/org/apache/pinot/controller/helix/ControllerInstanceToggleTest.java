@@ -34,6 +34,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerTestUtils.*;
@@ -45,6 +46,12 @@ public class ControllerInstanceToggleTest {
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
   private static final String SERVER_TAG_NAME = TagNameUtils.getOfflineTagForTenant(null);
   private static final String BROKER_TAG_NAME = TagNameUtils.getBrokerTagForTenant(null);
+
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+    validate();
+  }
 
   @Test
   public void testInstanceToggle()
@@ -130,6 +137,6 @@ public class ControllerInstanceToggleTest {
 
   @AfterClass
   public void tearDown() {
-    getHelixResourceManager().deleteOfflineTable(OFFLINE_TABLE_NAME);
+    cleanup();
   }
 }

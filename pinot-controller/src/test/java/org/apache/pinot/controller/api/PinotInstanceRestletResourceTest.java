@@ -34,6 +34,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
 import org.aspectj.lang.annotation.After;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerTestUtils.*;
@@ -46,6 +47,12 @@ import static org.testng.Assert.*;
 public class PinotInstanceRestletResourceTest {
 
   private static final long GET_CALL_TIMEOUT_MS = 10000;
+
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+    validate();
+  }
 
   @Test
   public void testInstanceListingAndCreation()
@@ -220,11 +227,6 @@ public class PinotInstanceRestletResourceTest {
 
   @AfterClass
   public void tearDown() {
-    getHelixResourceManager().deleteOfflineServerTenantFor("newTag");
-    getHelixResourceManager().deleteRealtimeServerTenantFor("newTag");
-    getHelixResourceManager().deleteOfflineServerTenantFor("tag");
-    getHelixResourceManager().deleteRealtimeServerTenantFor("tag");
-    getHelixResourceManager().deleteBrokerTenantFor("newTag");
-    getHelixResourceManager().deleteBrokerTenantFor("tag");
+    cleanup();
   }
 }

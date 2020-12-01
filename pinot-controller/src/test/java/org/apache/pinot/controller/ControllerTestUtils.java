@@ -64,6 +64,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.controller.api.AccessControlTest;
 import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -90,6 +91,7 @@ import static org.testng.Assert.*;
  * Base class for controller tests.
  */
 public abstract class ControllerTestUtils {
+  public static final String DEFAULT_TENANT = "DefaultTenant";
   public static final String LOCAL_HOST = "localhost";
   protected static final int DEFAULT_CONTROLLER_PORT = 18998;
   protected static final String DEFAULT_DATA_DIR = new File(FileUtils.getTempDirectoryPath(),
@@ -103,31 +105,6 @@ public abstract class ControllerTestUtils {
   public static final int NUM_SERVER_INSTANCES = 4;
   public static final int TOTAL_NUM_SERVER_INSTANCES = 2*NUM_SERVER_INSTANCES;
   public static final int TOTAL_NUM_BROKER_INSTANCES = 2*NUM_BROKER_INSTANCES;
-
-  public static final String TENANT_NAME = "testTenant";
-
-  public static Tenant _brokerTenant;
-
-  public static void createBrokerTenant(Tenant _brokerTenant) {
-    _brokerTenant = _brokerTenant;
-    getHelixResourceManager().createBrokerTenant(_brokerTenant);
-  }
-
-  public static Tenant geBrokerTenant() {
-    return _brokerTenant;
-  }
-
-  public static Tenant _serverTenant;
-
-  public static void createServerTenant(Tenant _serverTenant) {
-    _serverTenant = _serverTenant;
-    getHelixResourceManager().createServerTenant(_serverTenant);
-  }
-
-  public static Tenant getServerTenant() {
-    return _serverTenant;
-  }
-
 
   protected static final List<HelixManager> _fakeInstanceHelixManagers = new ArrayList<>();
   protected static int _controllerPort;
@@ -153,10 +130,6 @@ public abstract class ControllerTestUtils {
     _zookeeperInstance = ZkStarter.startLocalZkServer();
   }
 
-  protected static void startZk(int port) {
-    _zookeeperInstance = ZkStarter.startLocalZkServer(port);
-  }
-
   protected static void stopZk() {
     try {
       ZkStarter.stopLocalZkServer(_zookeeperInstance);
@@ -175,10 +148,6 @@ public abstract class ControllerTestUtils {
     properties.put(ControllerConf.HELIX_CLUSTER_NAME, getHelixClusterName());
 
     return properties;
-  }
-
-  public static void startController() {
-    startController(getDefaultControllerConfiguration());
   }
 
   public static void startController(Map<String, Object> properties) {
@@ -237,20 +206,7 @@ public abstract class ControllerTestUtils {
         getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), UNTAGGED_BROKER_INSTANCE).size();
   }
 
-  public static int getFakeBrokerInstanceCount(boolean isSingleTenant) {
-    return isSingleTenant ?
-        getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size():
-        getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), UNTAGGED_BROKER_INSTANCE).size();
-  }
-
-  public static void addFakeBrokerInstancesToAutoJoinHelixCluster(int numInstances, boolean isSingleTenant)
-      throws Exception {
-    for (int i = 0; i < numInstances; i++) {
-      addFakeBrokerInstanceToAutoJoinHelixCluster(BROKER_INSTANCE_ID_PREFIX + i, isSingleTenant);
-    }
-  }
-
-  public static void addMaxFakeBrokerInstancesToAutoJoinHelixCluster(int maxCount, boolean isSingleTenant)
+  public static void addMoreFakeBrokerInstancesToAutoJoinHelixCluster(int maxCount, boolean isSingleTenant)
       throws Exception {
 
     // get current instance count
@@ -336,36 +292,17 @@ public abstract class ControllerTestUtils {
         getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), UNTAGGED_SERVER_INSTANCE).size();
   }
 
-  public static int getFakeServerInstanceCount(boolean isSingleTenant) {
-    return isSingleTenant ?
-        getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE").size():
-        getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), UNTAGGED_SERVER_INSTANCE).size();
-  }
-
-  public static void addFakeServerInstancesToAutoJoinHelixCluster(int numInstances, boolean isSingleTenant)
-      throws Exception {
-    addFakeServerInstancesToAutoJoinHelixCluster(numInstances, isSingleTenant, DEFAULT_ADMIN_API_PORT);
-  }
-
-  public static void addFakeServerInstancesToAutoJoinHelixCluster(int numInstances, boolean isSingleTenant,
-      int baseAdminPort)
-      throws Exception {
-    for (int i = 0; i < numInstances; i++) {
-      addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, isSingleTenant, baseAdminPort + i);
-    }
-  }
-
   public static void addFakeServerInstanceToAutoJoinHelixCluster(String instanceId, boolean isSingleTenant)
       throws Exception {
     addFakeServerInstanceToAutoJoinHelixCluster(instanceId, isSingleTenant, DEFAULT_ADMIN_API_PORT);
   }
 
-  public static void addMaxFakeServerInstancesToAutoJoinHelixCluster(int maxCount, boolean isSingleTenant)
+  public static void addMoreFakeServerInstancesToAutoJoinHelixCluster(int maxCount, boolean isSingleTenant)
       throws Exception {
-    addMaxFakeServerInstancesToAutoJoinHelixCluster(maxCount, isSingleTenant, DEFAULT_ADMIN_API_PORT);
+    addMoreFakeServerInstancesToAutoJoinHelixCluster(maxCount, isSingleTenant, DEFAULT_ADMIN_API_PORT);
   }
 
-  public static void addMaxFakeServerInstancesToAutoJoinHelixCluster(int maxCount, boolean isSingleTenant, int baseAdminPort)
+  public static void addMoreFakeServerInstancesToAutoJoinHelixCluster(int maxCount, boolean isSingleTenant, int baseAdminPort)
       throws Exception {
 
     // get current instance count
@@ -525,46 +462,6 @@ public abstract class ControllerTestUtils {
     sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString());
   }
 
-  protected static void updateTableConfig(TableConfig tableConfig)
-      throws IOException {
-    sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableConfig.getTableName()),
-        tableConfig.toJsonString());
-  }
-
-  protected static TableConfig getOfflineTableConfig(String tableName) {
-    TableConfig offlineTableConfig = _helixResourceManager.getOfflineTableConfig(tableName);
-    Assert.assertNotNull(offlineTableConfig);
-    return offlineTableConfig;
-  }
-
-  protected static TableConfig getRealtimeTableConfig(String tableName) {
-    TableConfig realtimeTableConfig = _helixResourceManager.getRealtimeTableConfig(tableName);
-    Assert.assertNotNull(realtimeTableConfig);
-    return realtimeTableConfig;
-  }
-
-  protected static void dropOfflineTable(String tableName)
-      throws IOException {
-    sendDeleteRequest(
-        _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.OFFLINE.tableNameWithType(tableName)));
-  }
-
-  protected static void dropRealtimeTable(String tableName)
-      throws IOException {
-    sendDeleteRequest(
-        _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.REALTIME.tableNameWithType(tableName)));
-  }
-
-  protected static void reloadOfflineTable(String tableName)
-      throws IOException {
-    sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, TableType.OFFLINE.name()), null);
-  }
-
-  protected static void reloadRealtimeTable(String tableName)
-      throws IOException {
-    sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, TableType.REALTIME.name()), null);
-  }
-
   protected static String getBrokerTenantRequestPayload(String tenantName, int numBrokers) {
     return new Tenant(TenantRole.BROKER, tenantName, numBrokers, 0, 0).toJsonString();
   }
@@ -589,12 +486,6 @@ public abstract class ControllerTestUtils {
   public static void createServerTenant(String tenantName, int numOfflineServers, int numRealtimeServers)
       throws IOException {
     sendPostRequest(_controllerRequestURLBuilder.forTenantCreate(),
-        getServerTenantRequestPayload(tenantName, numOfflineServers, numRealtimeServers));
-  }
-
-  public static void updateServerTenant(String tenantName, int numOfflineServers, int numRealtimeServers)
-      throws IOException {
-    sendPutRequest(_controllerRequestURLBuilder.forTenantCreate(),
         getServerTenantRequestPayload(tenantName, numOfflineServers, numRealtimeServers));
   }
 
@@ -712,33 +603,8 @@ public abstract class ControllerTestUtils {
   }
 
   /**
-   * Utility method for debugging purposes.
+   * @return Number of instances used by all the broker tenants
    */
-  public static void printAllTables() {
-    List<String> tables = getHelixResourceManager().getAllTables();
-    System.out.println("All Tables: " + tables);
-  }
-
-  /**
-   * Utility method for debugging purposes.
-   */
-  public static void printAllBrokerTenants() {
-    Set<String> brokerTenants = getHelixResourceManager().getAllBrokerTenantNames();
-    for (String tenant : brokerTenants) {
-      System.out.println("Instances for " + tenant + ": " + getHelixResourceManager().getAllInstancesForBrokerTenant(tenant));
-    }
-  }
-
-  /**
-   * Utility method for debugging purposes.
-   */
-  public static void printAllServerTenants() {
-    Set<String> serverTenants = getHelixResourceManager().getAllServerTenantNames();
-    for (String tenant : serverTenants) {
-      System.out.println("Instances for " + tenant + ": " + getHelixResourceManager().getAllInstancesForServerTenant(tenant));
-    }
-  }
-
   public static int getTaggedBrokerCount() {
     int count = 0;
     Set<String> brokerTenants = getHelixResourceManager().getAllBrokerTenantNames();
@@ -749,6 +615,9 @@ public abstract class ControllerTestUtils {
     return count;
   }
 
+  /**
+   * @return Number of instances used by all the server tenants
+   */
   public static int getTaggedServerCount() {
     int count = 0;
     Set<String> serverTenants = getHelixResourceManager().getAllServerTenantNames();
@@ -789,5 +658,106 @@ public abstract class ControllerTestUtils {
 
   public static ControllerStarter getControllerStarter() {
     return _controllerStarter;
+  }
+
+  public static Map<String, Object> getSuiteControllerConfiguration() {
+    Map<String, Object> properties = getDefaultControllerConfiguration();
+
+    // Used in AccessControlTest
+    properties.put(ControllerConf.ACCESS_CONTROL_FACTORY_CLASS, AccessControlTest.DenyAllAccessFactory.class.getName());
+
+    // Used in PinotTableRestletResourceTest
+    properties.put(ControllerConf.TABLE_MIN_REPLICAS, MIN_NUM_REPLICAS);
+
+    return properties;
+  }
+
+  /**
+   * Used to initialize state when test cases are run together as part of the testNG suite. The function will be
+   * called only once by TestNG @BeforeSuite function.
+   */
+  public static void startSuiteRun() throws Exception {
+    startZk();
+    startController(getSuiteControllerConfiguration());
+
+    addMoreFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKER_INSTANCES, true);
+    addMoreFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVER_INSTANCES, true);
+
+    addMoreFakeBrokerInstancesToAutoJoinHelixCluster(TOTAL_NUM_BROKER_INSTANCES, false);
+    addMoreFakeServerInstancesToAutoJoinHelixCluster(TOTAL_NUM_SERVER_INSTANCES, false);
+  }
+
+  /**
+   * This function is used to cleanup state after the testNG suite is done running. The function will be called only
+   * once by the TestNG @AfterSuite function.
+   */
+  public static void stopSuiteRun() {
+    cleanup();
+
+    stopFakeInstances();
+    stopController();
+    stopZk();
+  }
+
+  /**
+   * Used to initialize state when a single test case is run by itself; otherwise, used to validate state. This function
+   * will usually assert if a prior test case failed to cleanup state properly.
+   */
+  public static void validate() throws Exception {
+    if (_helixManager == null) {
+      // this is expected to happen only while running a single test case outside of testNG suite.
+      startSuiteRun();
+    }
+
+    // Check number of tenants
+    Assert.assertEquals(getHelixResourceManager().getAllBrokerTenantNames().size(), 1);
+    Assert.assertEquals(getHelixResourceManager().getAllServerTenantNames().size(), 1);
+
+    // Check number of tagged broker and server instances
+    Assert.assertEquals(getTaggedBrokerCount(), NUM_BROKER_INSTANCES);
+    Assert.assertEquals(getTaggedServerCount(), NUM_SERVER_INSTANCES);
+
+    // No pre-existing tables
+    Assert.assertEquals(getHelixResourceManager().getAllTables().size(), 0);
+
+    // Check if tenants have right number of instances.
+    Assert.assertEquals(getHelixResourceManager().getAllInstancesForBrokerTenant("DefaultBroker").size(), 0);
+    Assert.assertEquals(getHelixResourceManager().getAllInstancesForServerTenant("DefaultServer").size(), 0);
+
+    // Check number of untagged instances.
+    Assert.assertEquals(getHelixResourceManager().getOnlineUnTaggedBrokerInstanceList().size(), NUM_BROKER_INSTANCES);
+    Assert.assertEquals(getHelixResourceManager().getOnlineUnTaggedServerInstanceList().size(), NUM_SERVER_INSTANCES);
+  }
+
+  /**
+   * Utility function for cleaning up state after a test case has run. Depending upon your test case, you may have
+   * to do additional test case. Since we are running as part of a suite with shared state, each test class should
+   * clean up after itself to avoid conflict with subsequent test cases.
+   */
+  public static void cleanup() {
+
+    // Delete all tables.
+    List<String> tables = getHelixResourceManager().getAllTables();
+    for (String table : tables) {
+      getHelixResourceManager().deleteOfflineTable(table);
+      getHelixResourceManager().deleteRealtimeTable(table);
+    }
+
+    // Delete broker tenants except default tenant
+    Set<String> brokerTenants = getHelixResourceManager().getAllBrokerTenantNames();
+    for (String tenant : brokerTenants) {
+      if (!tenant.startsWith(DEFAULT_TENANT)) {
+        getHelixResourceManager().deleteBrokerTenantFor(tenant);
+      }
+    }
+
+    // Delete server tenants except default tenant
+    Set<String> serverTenants = getHelixResourceManager().getAllServerTenantNames();
+    for (String tenant : serverTenants) {
+      if (!tenant.startsWith(DEFAULT_TENANT)) {
+        getHelixResourceManager().deleteOfflineServerTenantFor(tenant);
+        getHelixResourceManager().deleteRealtimeServerTenantFor(tenant);
+      }
+    }
   }
 }

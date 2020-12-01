@@ -28,6 +28,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterTest;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerTestUtils.*;
@@ -35,6 +36,12 @@ import static org.apache.pinot.controller.ControllerTestUtils.*;
 
 public class ControllerSentinelTestV2 {
   private static final String TABLE_NAME = "sentinalTable";
+
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+    validate();
+  }
 
   @Test
   public void testOfflineTableLifeCycle()
@@ -96,6 +103,6 @@ public class ControllerSentinelTestV2 {
 
   @AfterTest
   public void tearDown() {
-    getHelixResourceManager().deleteOfflineTable(TABLE_NAME);
+    cleanup();
   }
 }

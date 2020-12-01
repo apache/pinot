@@ -29,6 +29,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerTestUtils.*;
@@ -36,6 +37,12 @@ import static org.apache.pinot.controller.ControllerTestUtils.*;
 
 public class PinotSegmentRestletResourceTest {
   private static final String TABLE_NAME = "pinotSegmentRestletResourceTestTable";
+
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+    validate();
+  }
 
   @Test
   public void testSegmentCrcApi()
@@ -96,6 +103,6 @@ public class PinotSegmentRestletResourceTest {
 
   @AfterClass
   public void tearDown() {
-    getHelixResourceManager().deleteOfflineTable(TABLE_NAME);
+    cleanup();
   }
 }

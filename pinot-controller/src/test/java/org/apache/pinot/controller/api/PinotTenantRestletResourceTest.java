@@ -24,6 +24,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerTestUtils.*;
@@ -32,6 +33,12 @@ import static org.testng.Assert.*;
 
 public class PinotTenantRestletResourceTest {
   private static final String TABLE_NAME = "restletTable_OFFLINE";
+
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+    validate();
+  }
 
   @Test
   public void testTableListForTenant()
@@ -61,7 +68,6 @@ public class PinotTenantRestletResourceTest {
 
   @AfterClass
   public void tearDown() {
-    // Cleanup
-    getHelixResourceManager().deleteOfflineTable(TABLE_NAME);
+    cleanup();
   }
 }

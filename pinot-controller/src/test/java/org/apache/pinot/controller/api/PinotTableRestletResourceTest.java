@@ -57,6 +57,8 @@ public class PinotTableRestletResourceTest {
   @BeforeClass
   public void setUp()
       throws Exception {
+    validate();
+
     _createTableUrl = getControllerRequestURLBuilder().forTableCreate();
     _offlineBuilder.setTableName(OFFLINE_TABLE_NAME).setTimeColumnName("timeColumn").setTimeType("DAYS")
         .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5");
@@ -365,15 +367,6 @@ public class PinotTableRestletResourceTest {
 
   @AfterClass
   public void tearDown() {
-    // Clean up tables.
-    getHelixResourceManager().deleteOfflineTable("updateTC");
-    getHelixResourceManager().deleteRealtimeTable("updateTC");
-    getHelixResourceManager().deleteOfflineTable("valid_table_name");
-
-    getHelixResourceManager().deleteOfflineTable("noSchema");
-    getHelixResourceManager().deleteRealtimeTable("noSchema");
-
-    getHelixResourceManager().deleteOfflineTable(OFFLINE_TABLE_NAME);
-    getHelixResourceManager().deleteRealtimeTable(REALTIME_TABLE_NAME);
+    cleanup();
   }
 }

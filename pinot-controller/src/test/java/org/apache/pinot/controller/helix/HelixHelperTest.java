@@ -39,7 +39,9 @@ public class HelixHelperTest {
   public static final String INSTANCE_NAME = "Server_1.2.3.4_1234";
 
   @BeforeClass
-  public void setUp() {
+  public void setUp()
+      throws Exception {
+    validate();
 
     IdealState idealState = new IdealState(RESOURCE_NAME);
     idealState.setStateModelDefRef("OnlineOffline");
@@ -102,6 +104,6 @@ public class HelixHelperTest {
 
   @AfterClass
   public void tearDown() {
-    getHelixResourceManager().deleteOfflineTable(RESOURCE_NAME);
+    cleanup();
   }
 }

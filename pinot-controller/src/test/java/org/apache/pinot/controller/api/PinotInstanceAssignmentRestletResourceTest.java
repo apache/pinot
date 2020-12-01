@@ -57,6 +57,8 @@ public class PinotInstanceAssignmentRestletResourceTest {
   @BeforeClass
   public void setUp()
       throws Exception {
+    validate();
+
     // Create broker and server tenant
     Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 1, 0, 0);
     getHelixResourceManager().createBrokerTenant(brokerTenant);
@@ -316,13 +318,6 @@ public class PinotInstanceAssignmentRestletResourceTest {
 
   @AfterClass
   public void tearDown() {
-    getHelixResourceManager().deleteOfflineTable(RAW_TABLE_NAME);
-    getHelixResourceManager().deleteRealtimeTable(RAW_TABLE_NAME);
-
-    // cleanup tenants, otherwise other test cases that use tenants may fail.
-    getHelixResourceManager().deleteBrokerTenantFor(BROKER_TENANT_NAME);
-    getHelixResourceManager().deleteOfflineServerTenantFor(SERVER_TENANT_NAME);
-    getHelixResourceManager().deleteOfflineServerTenantFor(SERVER_TENANT_NAME);
-    getHelixResourceManager().deleteRealtimeServerTenantFor(SERVER_TENANT_NAME);
+    cleanup();
   }
 }

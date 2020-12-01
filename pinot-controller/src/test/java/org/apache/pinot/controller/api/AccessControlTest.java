@@ -23,6 +23,7 @@ import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerTestUtils.*;
@@ -30,6 +31,12 @@ import static org.apache.pinot.controller.ControllerTestUtils.*;
 public class AccessControlTest {
 
   private static final String TABLE_NAME = "accessTestTable";
+
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+    validate();
+  }
 
   @Test
   public void testAccessDenied() {

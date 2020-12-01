@@ -63,6 +63,8 @@ public class ValidationManagerTest {
   @BeforeClass
   public void setUp()
       throws Exception {
+    validate();
+
     _offlineTableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TEST_TABLE_NAME).setNumReplicas(2).build();
     getHelixResourceManager().addTable(_offlineTableConfig);
@@ -213,9 +215,6 @@ public class ValidationManagerTest {
 
   @AfterClass
   public void tearDown() {
-    getHelixResourceManager().deleteOfflineTable(TEST_TABLE_NAME);
-    getHelixResourceManager().deleteRealtimeTable(TEST_TABLE_NAME);
-    getHelixResourceManager().deleteOfflineTable(TEST_TABLE_TWO);
-    getHelixResourceManager().deleteRealtimeTable(TEST_TABLE_TWO);
+    cleanup();
   }
 }

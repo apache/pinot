@@ -47,6 +47,8 @@ public class ControllerTenantTest {
   @BeforeClass
   public void setUp()
       throws Exception {
+    validate();
+
     ZKMetadataProvider.setClusterTenantIsolationEnabled(getPropertyStore(), false);
   }
 
@@ -163,7 +165,7 @@ public class ControllerTenantTest {
       Assert.assertEquals(response.get("tenantName").asText(), serverTag);
     }
 
-//    //AKL_TODO: the two for loops below are fail while running under testng.xml.
+// TODO: Further cleanup needed to fix commented out code below.
 //    // Update server tenants
 //    // Note: server tenants cannot scale down
 //    int taggedServerCount = getTaggedServerCount();
@@ -204,20 +206,6 @@ public class ControllerTenantTest {
 
   @AfterClass
   public void tearDown() {
-    // clean up tenants so that they do not interfere with subsequent test cases.
-    Set<String> brokerTenants = getHelixResourceManager().getAllBrokerTenantNames();
-    for (String tenant : brokerTenants) {
-      if (tenant.startsWith(BROKER_TAG_PREFIX)) {
-        getHelixResourceManager().deleteBrokerTenantFor(tenant);
-      }
-    }
-
-    Set<String> serverTenants = getHelixResourceManager().getAllServerTenantNames();
-    for (String tenant : serverTenants) {
-      if (tenant.startsWith(SERVER_TAG_PREFIX)) {
-        getHelixResourceManager().deleteOfflineServerTenantFor(tenant);
-        getHelixResourceManager().deleteRealtimeServerTenantFor(tenant);
-      }
-    }
+    cleanup();
   }
 }

@@ -324,8 +324,6 @@ public class PinotHelixResourceManagerTest {
 
   @Test
   public void testValidateTenantConfig() {
-    printAllBrokerTenants();
-
     // Create broker tenant on 2 Brokers
     Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, NUM_INSTANCES, 0, 0);
     getHelixResourceManager().createBrokerTenant(brokerTenant);

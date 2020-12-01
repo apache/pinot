@@ -43,6 +43,8 @@ public class PinotResourceManagerTest {
   @BeforeClass
   public void setUp()
       throws Exception {
+    validate();
+
     // Adding table
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     getHelixResourceManager().addTable(tableConfig);
@@ -135,6 +137,6 @@ public class PinotResourceManagerTest {
 
   @AfterClass
   public void tearDown() {
-    getHelixResourceManager().deleteOfflineTable(TABLE_NAME);
+    cleanup();
   }
 }

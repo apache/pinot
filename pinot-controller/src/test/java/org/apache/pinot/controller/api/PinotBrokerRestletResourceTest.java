@@ -26,6 +26,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerTestUtils.*;
@@ -33,6 +34,12 @@ import static org.apache.pinot.controller.ControllerTestUtils.*;
 public class PinotBrokerRestletResourceTest {
   private static final String TABLE_NAME_1 = "testTable1";
   private static final String TABLE_NAME_2 = "tableTable2";
+
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+    validate();
+  }
 
   public void testGetBrokersHelper(String state, int onlineServers, int offlineServers)
       throws Exception {
@@ -152,7 +159,6 @@ public class PinotBrokerRestletResourceTest {
 
   @AfterClass
   public void tearDown() {
-    getHelixResourceManager().deleteOfflineTable(TABLE_NAME_1);
-    getHelixResourceManager().deleteOfflineTable(TABLE_NAME_2);
+    cleanup();
   }
 }

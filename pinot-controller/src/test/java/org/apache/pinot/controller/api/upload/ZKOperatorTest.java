@@ -41,6 +41,8 @@ public class ZKOperatorTest {
   @BeforeClass
   public void setUp()
       throws Exception {
+    validate();
+
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     getHelixResourceManager().addTable(tableConfig);
   }
@@ -118,6 +120,6 @@ public class ZKOperatorTest {
 
   @AfterClass
   public void tearDown() {
-    getHelixResourceManager().deleteOfflineTable(TABLE_NAME);
+    cleanup();
   }
 }

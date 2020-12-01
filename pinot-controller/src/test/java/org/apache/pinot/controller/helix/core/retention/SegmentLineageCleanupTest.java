@@ -61,6 +61,7 @@ public class SegmentLineageCleanupTest {
   @BeforeClass
   public void setUp()
       throws Exception {
+    validate();
 
     // Create server tenant
     Tenant serverTenant = new Tenant(TenantRole.SERVER, SERVER_TENANT_NAME, NUM_INSTANCES, NUM_INSTANCES, 0);
@@ -173,11 +174,6 @@ public class SegmentLineageCleanupTest {
 
   @AfterClass
   public void tearDown() {
-    getHelixResourceManager().deleteOfflineTable(OFFLINE_TABLE_NAME);
-    getHelixResourceManager().deleteRealtimeTable(OFFLINE_TABLE_NAME);
-
-    getHelixResourceManager().deleteOfflineServerTenantFor(SERVER_TENANT_NAME);
-    getHelixResourceManager().deleteRealtimeServerTenantFor(SERVER_TENANT_NAME);
-    getHelixResourceManager().deleteBrokerTenantFor(BROKER_TENANT_NAME);
+    cleanup();
   }
 }

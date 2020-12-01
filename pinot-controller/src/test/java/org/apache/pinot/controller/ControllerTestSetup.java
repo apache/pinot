@@ -1,59 +1,24 @@
 package org.apache.pinot.controller;
 
-import java.util.Map;
-import org.apache.pinot.controller.api.AccessControlTest;
-import org.apache.pinot.spi.config.tenant.Tenant;
-import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.testng.annotations.AfterSuite;
 import org.testng.annotations.BeforeSuite;
 
 import static org.apache.pinot.controller.ControllerTestUtils.*;
 
 
+/**
+ * All test cases in {@link org.apache.pinot.controller} package are run as part the Default TestNG suite. This class
+ * is used to initialize the test state in the beginning (before any test cases have run) and to deinitialize the state
+ * in the end (after all the test cases have run).
+ */
 public class ControllerTestSetup {
   @BeforeSuite
   public void suiteSetup() throws Exception {
-    startZk();
-    startController(getSuiteControllerConfiguration());
-
-    // initial
-    System.out.println(getHelixAdmin().getInstancesInCluster(getHelixClusterName()));
-
-    addMaxFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKER_INSTANCES, true);
-    addMaxFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVER_INSTANCES, true);
-
-    System.out.println(getHelixAdmin().getInstancesInCluster(getHelixClusterName()));
-
-    addMaxFakeBrokerInstancesToAutoJoinHelixCluster(TOTAL_NUM_BROKER_INSTANCES, false);
-    addMaxFakeServerInstancesToAutoJoinHelixCluster(TOTAL_NUM_SERVER_INSTANCES, false);
+    startSuiteRun();
   }
-
-  public static Map<String, Object> getSuiteControllerConfiguration() {
-    Map<String, Object> properties = getDefaultControllerConfiguration();
-
-    // Used in AccessControlTest
-    properties.put(ControllerConf.ACCESS_CONTROL_FACTORY_CLASS, AccessControlTest.DenyAllAccessFactory.class.getName());
-
-    // AKL_TODO
-    // Used in PinotInstanceAssignmentRestletResourceTest.
-    //properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
-
-    // Used in PinotTableRestletResourceTest
-    properties.put(ControllerConf.TABLE_MIN_REPLICAS, MIN_NUM_REPLICAS);
-
-    return properties;
-  }
-
 
   @AfterSuite
   public void tearDownSuite() {
-    stopFakeInstances();
-
-    getHelixResourceManager().deleteBrokerTenantFor(TENANT_NAME);
-    getHelixResourceManager().deleteOfflineServerTenantFor(TENANT_NAME);
-    getHelixResourceManager().deleteRealtimeServerTenantFor(TENANT_NAME);
-
-    stopController();
-    stopZk();
+    stopSuiteRun();
   }
 }
