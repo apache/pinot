@@ -47,29 +47,9 @@ public class ControllerSentinelTestV2 {
   public void testOfflineTableLifeCycle()
       throws IOException {
     // Create offline table creation request
-
-    // AKL_TODO
-    // Not sure why segmentTable_OFFLINE is showing up here since it has been explictly deleted in SegmentLineageCleanupTest,
-    // but we cleanup here again.
-    Set<String> existingPartitions = getHelixAdmin().getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
-        .getPartitionSet();
-    for (String partition : existingPartitions) {
-      getHelixResourceManager().deleteOfflineTable(partition);
-    }
-
-    System.out.println(getHelixAdmin().getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
-        .getPartitionSet());
-
-    Assert.assertEquals(getHelixAdmin().getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
-        .getPartitionSet().size(), 0);
-
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setNumReplicas(MIN_NUM_REPLICAS).build();
     sendPostRequest(getControllerRequestURLBuilder().forTableCreate(), tableConfig.toJsonString());
-
-    System.out.println("Partition Set2: " + getHelixAdmin().getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
-        .getPartitionSet());
-
     Assert.assertEquals(
         getHelixAdmin().getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
             .getPartitionSet().size(), 1);

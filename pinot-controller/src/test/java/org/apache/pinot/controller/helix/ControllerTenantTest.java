@@ -39,7 +39,7 @@ public class ControllerTenantTest {
   private static final int NUM_INSTANCES = 4;
   private static final int NUM_BROKER_TAGS = 2;
   private static final int NUM_BROKERS_PER_TAG = 2;
-  private static final int NUM_SERVER_TAGS = 1;
+  private static final int NUM_SERVER_TAGS = 2;
   private static final int NUM_OFFLINE_SERVERS_PER_TAG = 1;
   private static final int NUM_REALTIME_SERVERS_PER_TAG = 1;
   private static final int NUM_SERVERS_PER_TAG = NUM_OFFLINE_SERVERS_PER_TAG + NUM_REALTIME_SERVERS_PER_TAG;

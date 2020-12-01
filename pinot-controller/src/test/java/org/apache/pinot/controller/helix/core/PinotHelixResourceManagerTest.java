@@ -79,7 +79,6 @@ import static org.apache.pinot.controller.helix.core.PinotHelixResourceManager.I
 
 
 public class PinotHelixResourceManagerTest {
-  //private static final int BASE_SERVER_ADMIN_PORT = 10000;
   private static final int NUM_INSTANCES = 2;
   private static final String BROKER_TENANT_NAME = "rBrokerTenant";
   private static final String SERVER_TENANT_NAME = "rServerTenant";
@@ -655,14 +654,6 @@ public class PinotHelixResourceManagerTest {
 
   @AfterClass
   public void tearDown() {
-    getHelixResourceManager().deleteOfflineTable(OFFLINE_TABLE_NAME);
-    getHelixResourceManager().deleteRealtimeTable(REALTIME_TABLE_NAME);
-    getHelixResourceManager().deleteOfflineTable(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
-
-    untagBrokers();
-
-    getHelixResourceManager().deleteOfflineServerTenantFor(SERVER_TENANT_NAME);
-    getHelixResourceManager().deleteRealtimeServerTenantFor(SERVER_TENANT_NAME);
-    getHelixResourceManager().deleteBrokerTenantFor(BROKER_TENANT_NAME);
+    cleanup();
   }
 }
