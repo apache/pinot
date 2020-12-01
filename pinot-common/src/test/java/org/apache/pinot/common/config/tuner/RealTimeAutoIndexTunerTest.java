@@ -18,10 +18,15 @@
  */
 package org.apache.pinot.common.config.tuner;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TunerConfig;
+import org.apache.pinot.spi.config.table.tuner.TableConfigTuner;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -33,7 +38,8 @@ import org.testng.annotations.Test;
 public class RealTimeAutoIndexTunerTest {
 
   private static final String TABLE_NAME = "test_table";
-  private static final String TUNER_STRATEGY = "realtimeAutoIndexTuner";
+  private static final String TUNER_NAME = "realtimeAutoIndexTuner";
+  private TunerConfig _tunerConfig;
   private Schema schema;
   private String dimensionColumns[] = {"col1", "col2"};
   private String metricColumns[] = {"count"};
@@ -44,14 +50,18 @@ public class RealTimeAutoIndexTunerTest {
         .addSingleValueDimension(dimensionColumns[0], FieldSpec.DataType.STRING)
         .addSingleValueDimension(dimensionColumns[1], FieldSpec.DataType.STRING)
         .addMetric(metricColumns[0], FieldSpec.DataType.INT).build();
+    Map<String, String> props = new HashMap<>();
+    props.put("name", TUNER_NAME);
+    _tunerConfig = new TunerConfig(props);
   }
 
   @Test
   public void testIndexingConfigResolution() {
     TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTableConfigTunerStrategy(TUNER_STRATEGY)
-            .build();
-    TableConfig result = TableConfigTunerRegistry.invokeTableConfigTuner(TUNER_STRATEGY, tableConfig, schema);
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTunerConfig(_tunerConfig).build();
+    TableConfigTuner tuner = TableConfigTunerRegistry.getTuner(TUNER_NAME);
+    tuner.init(new TunerConfig(new HashMap<>()), schema);
+    TableConfig result = tuner.apply(tableConfig);
 
     IndexingConfig newConfig = result.getIndexingConfig();
     List<String> invertedIndexColumns = newConfig.getInvertedIndexColumns();

@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
@@ -61,6 +62,8 @@ import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStats;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TunerConfig;
+import org.apache.pinot.spi.config.table.tuner.TableConfigTuner;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -119,9 +122,11 @@ public class PinotTableRestletResource {
       tableConfig = JsonUtils.stringToObject(tableConfigStr, TableConfig.class);
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
 
-      String tableConfigTunerStrategy = tableConfig.getTableConfigTunerStrategy();
-      if (tableConfigTunerStrategy != null && !tableConfigTunerStrategy.isEmpty()) {
-        tableConfig = TableConfigTunerRegistry.invokeTableConfigTuner(tableConfigTunerStrategy, tableConfig, schema);
+      TunerConfig tunerConfig = tableConfig.getTunerConfig();
+      if (tunerConfig != null && tunerConfig.name() != null && !tunerConfig.name().isEmpty()) {
+        TableConfigTuner tuner = TableConfigTunerRegistry.getTuner(tunerConfig.name());
+        tuner.init(tunerConfig, schema);
+        tableConfig = tuner.apply(tableConfig);
       }
 
       // TableConfigUtils.validate(...) is used across table create/update.

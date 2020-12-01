@@ -18,23 +18,24 @@
  */
 package org.apache.pinot.spi.config.table.tuner;
 
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TunerConfig;
-import org.apache.pinot.spi.data.Schema;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 
 /**
- * Interface for Table Config Tuner.
+ * Annotation class for TableConfigTuner implementations. The corresponding classes
+ * are auto-registered during startup.
+ *
+ * NOTE:
+ * 1. The annotated class must be under the package of name 'org.apache.pinot.*.tuner.*'
+ * to be auto-registered.
  */
-public interface TableConfigTuner {
-  /**
-   * Used to initialize underlying implementation with Schema
-   * and custom properties (eg: metrics end point)
-   */
-  void init(TunerConfig props, Schema schema);
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+public @interface Tuner {
+  boolean enabled() default true;
 
-  /**
-   * Takes the original TableConfig and returns a tuned one
-   */
-  TableConfig apply(TableConfig initialConfig);
+  String name() default "";
 }

@@ -20,7 +20,9 @@ package org.apache.pinot.common.config.tuner;
 
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TunerConfig;
 import org.apache.pinot.spi.config.table.tuner.TableConfigTuner;
+import org.apache.pinot.spi.config.table.tuner.Tuner;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -30,13 +32,20 @@ import org.apache.pinot.spi.data.Schema;
  * - Inverted indices for all dimensions
  * - No dictionary index for all metrics
  */
-public class RealTimeAutoIndexTuner {
+@Tuner(name = "realtimeAutoIndexTuner")
+public class RealTimeAutoIndexTuner implements TableConfigTuner {
+  private Schema _schema;
 
-  @TableConfigTuner(name = "realtimeAutoIndexTuner")
-  public static TableConfig tuneTableConfig(TableConfig initialConfig, Schema schema) {
+  @Override
+  public void init(TunerConfig props, Schema schema) {
+    _schema = schema;
+  }
+
+  @Override
+  public TableConfig apply(TableConfig initialConfig) {
     IndexingConfig initialIndexingConfig = initialConfig.getIndexingConfig();
-    initialIndexingConfig.setInvertedIndexColumns(schema.getDimensionNames());
-    initialIndexingConfig.setNoDictionaryColumns(schema.getMetricNames());
+    initialIndexingConfig.setInvertedIndexColumns(_schema.getDimensionNames());
+    initialIndexingConfig.setNoDictionaryColumns(_schema.getMetricNames());
     return initialConfig;
   }
 }

@@ -19,13 +19,20 @@
 package org.apache.pinot.common.config.tuner;
 
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TunerConfig;
 import org.apache.pinot.spi.config.table.tuner.TableConfigTuner;
+import org.apache.pinot.spi.config.table.tuner.Tuner;
 import org.apache.pinot.spi.data.Schema;
 
 
-public class NoOpTableConfigTuner {
-  @TableConfigTuner(name = "noopConfigTuner")
-  public static TableConfig noopConfigTuner(TableConfig initialConfig, Schema schema) {
+@Tuner(name = "noopConfigTuner")
+public class NoOpTableTableConfigTuner implements TableConfigTuner {
+  @Override
+  public void init(TunerConfig props, Schema schema) {
+  }
+
+  @Override
+  public TableConfig apply(TableConfig initialConfig) {
     return initialConfig;
   }
 }

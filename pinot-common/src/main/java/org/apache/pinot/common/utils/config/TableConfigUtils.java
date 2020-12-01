@@ -38,6 +38,7 @@ import org.apache.pinot.spi.config.table.TableCustomConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
+import org.apache.pinot.spi.config.table.TunerConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
@@ -139,11 +140,15 @@ public class TableConfigUtils {
       });
     }
 
-    String tableConfigTunerStrategy = simpleFields.get(TableConfig.TABLE_CONFIG_TUNER_STRATEGY);
+    TunerConfig tunerConfig = null;
+    String tunerConfigString = simpleFields.get(TableConfig.TUNER_CONFIG);
+    if (tunerConfigString != null) {
+      tunerConfig = JsonUtils.stringToObject(tunerConfigString, TunerConfig.class);
+    }
 
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
         quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList, upsertConfig,
-        ingestionConfig, tierConfigList, isDimTable, tableConfigTunerStrategy);
+        ingestionConfig, tierConfigList, isDimTable, tunerConfig);
   }
 
   public static ZNRecord toZNRecord(TableConfig tableConfig)
@@ -198,9 +203,9 @@ public class TableConfigUtils {
     if (tierConfigList != null) {
       simpleFields.put(TableConfig.TIER_CONFIGS_LIST_KEY, JsonUtils.objectToString(tierConfigList));
     }
-    String tableConfigTunerStrategy = tableConfig.getTableConfigTunerStrategy();
-    if (tableConfigTunerStrategy != null && !tableConfigTunerStrategy.isEmpty()) {
-      simpleFields.put(TableConfig.TABLE_CONFIG_TUNER_STRATEGY, tableConfigTunerStrategy);
+    TunerConfig tunerConfig = tableConfig.getTunerConfig();
+    if (tunerConfig != null) {
+      simpleFields.put(TableConfig.TUNER_CONFIG, JsonUtils.objectToString(tunerConfig));
     }
 
     ZNRecord znRecord = new ZNRecord(tableConfig.getTableName());

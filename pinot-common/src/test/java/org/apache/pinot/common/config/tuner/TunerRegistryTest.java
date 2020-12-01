@@ -18,24 +18,40 @@
  */
 package org.apache.pinot.common.config.tuner;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TunerConfig;
+import org.apache.pinot.spi.config.table.tuner.TableConfigTuner;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class TableConfigTunerRegistryTest {
+public class TunerRegistryTest {
 
-  private static final String TUNER_STRATEGY = "noopConfigTuner";
+  private static final String TUNER_NAME = "noopConfigTuner";
+  private static TunerConfig tunerConfig;
+
+  @BeforeClass
+  public void setup() {
+    Map<String, String> props = new HashMap<>();
+    props.put("name", TUNER_NAME);
+    tunerConfig = new TunerConfig(props);
+  }
 
   @Test
-  public void testNoOpIndexingConfigResolver() {
+  public void testNoOpTableConfigTuner() {
     Schema schema = new Schema.SchemaBuilder().build();
     TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTableConfigTunerStrategy(TUNER_STRATEGY).build();
-    TableConfig result = TableConfigTunerRegistry.invokeTableConfigTuner(TUNER_STRATEGY, tableConfig, schema);
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTunerConfig(tunerConfig).build();
+    TableConfigTuner tuner = TableConfigTunerRegistry.getTuner(TUNER_NAME);
+    tuner.init(new TunerConfig(new HashMap<>()), schema);
+    TableConfig result = tuner.apply(tableConfig);
     Assert.assertEquals(result, tableConfig);
   }
 }
