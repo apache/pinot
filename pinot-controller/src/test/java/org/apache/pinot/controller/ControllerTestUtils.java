@@ -673,8 +673,7 @@ public abstract class ControllerTestUtils {
   }
 
   /**
-   * Used to initialize state when test cases are run together as part of the testNG suite. The function will be
-   * called only once by TestNG @BeforeSuite function.
+   * Initialize common state for the TestNG suite.
    */
   public static void startSuiteRun() throws Exception {
     startZk();
@@ -688,8 +687,7 @@ public abstract class ControllerTestUtils {
   }
 
   /**
-   * This function is used to cleanup state after the testNG suite is done running. The function will be called only
-   * once by the TestNG @AfterSuite function.
+   * Cleanup common state used in TestNG suite.
    */
   public static void stopSuiteRun() {
     cleanup();
@@ -700,12 +698,13 @@ public abstract class ControllerTestUtils {
   }
 
   /**
-   * Used to initialize state when a single test case is run by itself; otherwise, used to validate state. This function
-   * will usually assert if a prior test case failed to cleanup state properly.
+   * Validate common state before each test case is run. Initialize common state if {@link #_helixManager} is null which
+   * will happen when test cases are running individually one at a time outside of the TestNG suite.
    */
   public static void validate() throws Exception {
     if (_helixManager == null) {
-      // this is expected to happen only while running a single test case outside of testNG suite.
+      // this is expected to happen only while running a single test case outside of testNG suite, i.e when test
+      // cases are run individually within IntelliJ or one a time through maven command line.
       startSuiteRun();
     }
 
@@ -730,9 +729,8 @@ public abstract class ControllerTestUtils {
   }
 
   /**
-   * Utility function for cleaning up state after a test case has run. Depending upon your test case, you may have
-   * to do additional test case. Since we are running as part of a suite with shared state, each test class should
-   * clean up after itself to avoid conflict with subsequent test cases.
+   * Cleaning up common state after a test case has run. Individual test cases may have to do additional cleanup
+   * depending upon their setup.
    */
   public static void cleanup() {
 

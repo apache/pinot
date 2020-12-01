@@ -98,6 +98,8 @@ public class PinotHelixResourceManagerTest {
   @BeforeClass
   public void setUp()
       throws Exception {
+    validate();
+
     // Create server tenant on all Servers
     Tenant serverTenant = new Tenant(TenantRole.SERVER, SERVER_TENANT_NAME, NUM_INSTANCES,
         NUM_INSTANCES, 0);

@@ -23,18 +23,23 @@ import org.testng.annotations.BeforeSuite;
 
 import static org.apache.pinot.controller.ControllerTestUtils.*;
 
-
 /**
- * All test cases in {@link org.apache.pinot.controller} package are run as part the Default TestNG suite. This class
- * is used to initialize the test state in the beginning (before any test cases have run) and to deinitialize the state
- * in the end (after all the test cases have run).
+ * All test cases in {@link org.apache.pinot.controller} package are run as part the Default TestNG suite.
  */
 public class ControllerTestSetup {
+  /**
+   * TestNG will run this method once before all the test cases are run. We use this method to initialize
+   * common state for all the test cases.
+   */
   @BeforeSuite
   public void suiteSetup() throws Exception {
     startSuiteRun();
   }
 
+  /**
+   * TestNG will run this method once after all the test cases have run. We use this method to de-initialize
+   * common state used by all the test cases.
+   */
   @AfterSuite
   public void tearDownSuite() {
     stopSuiteRun();
