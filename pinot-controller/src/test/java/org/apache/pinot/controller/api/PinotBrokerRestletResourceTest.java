@@ -129,7 +129,7 @@ public class PinotBrokerRestletResourceTest {
   }
 
   /**
-   * Enabling this test will cause random failures in other test cases, because this test calls stopFakeInstance.
+   * TODO: Enabling this test will cause random failures in other test cases, because this test calls stopFakeInstance.
    */
   @Test(enabled = false)
   public void testGetBrokers()
