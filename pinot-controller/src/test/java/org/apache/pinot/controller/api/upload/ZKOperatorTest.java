@@ -103,8 +103,8 @@ public class ZKOperatorTest {
     when(segmentMetadata.getCrc()).thenReturn("23456");
     when(segmentMetadata.getIndexCreationTime()).thenReturn(789L);
     // Add a tiny sleep to guarantee that refresh time is different from the previous round
-    // TODO: Check why we need this delay. Increased delay to 1 second, to allow EXTERNALVIEW to get updated and
-    // avoid "org.apache.helix.HelixException: Specified EXTERNALVIEW operatorTestTable_OFFLINE is not found!" exception
+    // 1 second delay to avoid "org.apache.helix.HelixException: Specified EXTERNALVIEW operatorTestTable_OFFLINE is
+    // not found!" exception from being thrown sporadically.
     Thread.sleep(1000L);
     zkOperator
         .completeSegmentOperations(TABLE_NAME, segmentMetadata, null, null, false, httpHeaders, "otherDownloadUrl",
