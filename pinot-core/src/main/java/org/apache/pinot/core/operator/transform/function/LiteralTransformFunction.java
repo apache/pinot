@@ -147,7 +147,7 @@ public class LiteralTransformFunction implements TransformFunction {
 
   @Override
   public byte[][] transformToBytesValuesSV(ProjectionBlock projectionBlock) {
-    if(_bytesResult==null) {
+    if (_bytesResult == null) {
       _bytesResult = new byte[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
       Arrays.fill(_bytesResult, BytesUtils.toBytes(_literal));
     }

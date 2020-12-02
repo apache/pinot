@@ -127,7 +127,6 @@ public class StDistanceFunction extends BaseTransformFunction {
     Point leftPoint = (Point) leftGeometry;
     Point rightPoint = (Point) rightGeometry;
 
-//    return greatCircleDistance(leftPoint.getY(), leftPoint.getX(), rightPoint.getY(), rightPoint.getX());
     return greatCircleDistance(leftPoint.getX(), leftPoint.getY(), rightPoint.getX(), rightPoint.getY());
   }
 
