@@ -20,15 +20,12 @@ package org.apache.pinot.core.geospatial.transform.function;
 
 import com.google.common.base.Preconditions;
 import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.geospatial.GeometryUtils;
-import org.apache.pinot.core.geospatial.serde.GeometrySerializer;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
+import org.apache.pinot.core.operator.transform.function.LiteralTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
-import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.Point;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,6 +43,7 @@ public class StPointFunction extends BaseTransformFunction {
   private TransformFunction _firstArgument;
   private TransformFunction _secondArgument;
   private byte[][] _results;
+  private int _isGeography = 0;
 
   @Override
   public String getName() {
@@ -54,8 +52,8 @@ public class StPointFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-    Preconditions
-        .checkArgument(arguments.size() == 2, "2 arguments are required for transform function: %s", getName());
+    Preconditions.checkArgument(arguments.size() == 2 || arguments.size() == 3,
+        "2 or 3 arguments are required for transform function: %s", getName());
     TransformFunction transformFunction = arguments.get(0);
     Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
         "First argument must be single-valued for transform function: %s", getName());
@@ -64,6 +62,12 @@ public class StPointFunction extends BaseTransformFunction {
     Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
         "Second argument must be single-valued for transform function: %s", getName());
     _secondArgument = transformFunction;
+    if (arguments.size() == 3) {
+      transformFunction = arguments.get(2);
+      Preconditions.checkArgument(transformFunction instanceof LiteralTransformFunction,
+          "Third argument must be a literal of integer: %s", getName());
+      _isGeography = Integer.parseInt(((LiteralTransformFunction) transformFunction).getLiteral());
+    }
   }
 
   @Override
@@ -79,7 +83,7 @@ public class StPointFunction extends BaseTransformFunction {
     double[] firstValues = _firstArgument.transformToDoubleValuesSV(projectionBlock);
     double[] secondValues = _secondArgument.transformToDoubleValuesSV(projectionBlock);
     for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      _results[i] = ScalarFunctions.stPoint(firstValues[i], secondValues[i]);
+      _results[i] = ScalarFunctions.stPoint(firstValues[i], secondValues[i], _isGeography);
     }
     return _results;
   }

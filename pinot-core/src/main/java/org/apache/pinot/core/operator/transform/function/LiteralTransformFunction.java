@@ -29,6 +29,7 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /**
@@ -42,6 +43,7 @@ public class LiteralTransformFunction implements TransformFunction {
   private float[] _floatResult;
   private double[] _doubleResult;
   private String[] _stringResult;
+  private byte[][] _bytesResult;
 
   public LiteralTransformFunction(String literal) {
     _literal = literal;
@@ -145,7 +147,11 @@ public class LiteralTransformFunction implements TransformFunction {
 
   @Override
   public byte[][] transformToBytesValuesSV(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException();
+    if(_bytesResult==null) {
+      _bytesResult = new byte[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+      Arrays.fill(_bytesResult, BytesUtils.toBytes(_literal));
+    }
+    return _bytesResult;
   }
 
   @Override

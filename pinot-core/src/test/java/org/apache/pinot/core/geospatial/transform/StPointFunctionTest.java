@@ -36,15 +36,36 @@ import org.testng.annotations.Test;
 
 public class StPointFunctionTest extends BaseTransformFunctionTest {
   @Test
-  public void testStPointFunction() {
-    ExpressionContext expression =
-        QueryContextConverterUtils.getExpression(String.format("ST_Point(%s,%s)", DOUBLE_SV_COLUMN, DOUBLE_SV_COLUMN));
+  public void testStPointGeogFunction() {
+    testStPointFunction(0);
+    testStPointFunction(1);
+  }
+
+  @Test
+  public void testStPointLiteralFunction() {
+    ExpressionContext expression = QueryContextConverterUtils.getExpression(String.format("ST_Point(20,10, 1)"));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    byte[][] expectedValues = new byte[NUM_ROWS][];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(20, 10));
+      GeometryUtils.setGeography(point);
+      expectedValues[i] = GeometrySerializer.serialize(point);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  private void testStPointFunction(int isGeography) {
+    ExpressionContext expression = QueryContextConverterUtils
+        .getExpression(String.format("ST_Point(%s,%s, %d)", DOUBLE_SV_COLUMN, DOUBLE_SV_COLUMN, isGeography));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof StPointFunction);
     Assert.assertEquals(transformFunction.getName(), StPointFunction.FUNCTION_NAME);
     byte[][] expectedValues = new byte[NUM_ROWS][];
     for (int i = 0; i < NUM_ROWS; i++) {
       Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(_doubleSVValues[i], _doubleSVValues[i]));
+      if (isGeography > 0) {
+        GeometryUtils.setGeography(point);
+      }
       expectedValues[i] = GeometrySerializer.serialize(point);
     }
     testTransformFunction(transformFunction, expectedValues);
