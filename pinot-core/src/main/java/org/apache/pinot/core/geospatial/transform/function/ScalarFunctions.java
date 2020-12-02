@@ -53,7 +53,7 @@ public class ScalarFunctions {
    * @return the created point
    */
   @ScalarFunction
-  public static byte[] stPoint(double x, double y, double isGeography) {
+  public static byte[] stPoint(double x, double y, int isGeography) {
     Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(x, y));
     if (isGeography > 0) {
       GeometryUtils.setGeography(point);
