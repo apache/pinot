@@ -66,7 +66,9 @@ public class BrokerRequestToQueryContextConverterTest {
         assertEquals(queryContext.getLimit(), 10);
         assertEquals(queryContext.getOffset(), 0);
         assertTrue(queryContext.getColumns().isEmpty());
+        assertTrue(QueryContextUtils.isSelectionQuery(queryContext));
         assertFalse(QueryContextUtils.isAggregationQuery(queryContext));
+        assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
       }
     }
 
@@ -90,7 +92,9 @@ public class BrokerRequestToQueryContextConverterTest {
         assertEquals(queryContext.getLimit(), 10);
         assertEquals(queryContext.getOffset(), 0);
         assertTrue(queryContext.getColumns().isEmpty());
+        assertFalse(QueryContextUtils.isSelectionQuery(queryContext));
         assertTrue(QueryContextUtils.isAggregationQuery(queryContext));
+        assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
       }
     }
 
@@ -119,7 +123,9 @@ public class BrokerRequestToQueryContextConverterTest {
         assertEquals(queryContext.getLimit(), 100);
         assertEquals(queryContext.getOffset(), 50);
         assertEquals(queryContext.getColumns(), new HashSet<>(Arrays.asList("foo", "bar")));
+        assertTrue(QueryContextUtils.isSelectionQuery(queryContext));
         assertFalse(QueryContextUtils.isAggregationQuery(queryContext));
+        assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
       }
     }
 
@@ -153,7 +159,9 @@ public class BrokerRequestToQueryContextConverterTest {
         assertEquals(queryContext.getLimit(), 15);
         assertEquals(queryContext.getOffset(), 0);
         assertEquals(queryContext.getColumns(), new HashSet<>(Arrays.asList("foo", "bar", "foobar")));
-        assertTrue(QueryContextUtils.isAggregationQuery(queryContext));
+        assertFalse(QueryContextUtils.isSelectionQuery(queryContext));
+        assertFalse(QueryContextUtils.isAggregationQuery(queryContext));
+        assertTrue(QueryContextUtils.isDistinctQuery(queryContext));
       }
     }
 
@@ -190,7 +198,9 @@ public class BrokerRequestToQueryContextConverterTest {
         assertEquals(queryContext.getLimit(), 20);
         assertEquals(queryContext.getOffset(), 30);
         assertEquals(queryContext.getColumns(), new HashSet<>(Arrays.asList("foo", "bar", "foobar")));
+        assertTrue(QueryContextUtils.isSelectionQuery(queryContext));
         assertFalse(QueryContextUtils.isAggregationQuery(queryContext));
+        assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
       }
     }
 
@@ -249,7 +259,9 @@ public class BrokerRequestToQueryContextConverterTest {
         assertEquals(queryContext.getLimit(), 20);
         assertEquals(queryContext.getOffset(), 0);
         assertEquals(queryContext.getColumns(), new HashSet<>(Arrays.asList("foo", "bar")));
+        assertFalse(QueryContextUtils.isSelectionQuery(queryContext));
         assertTrue(QueryContextUtils.isAggregationQuery(queryContext));
+        assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
       }
     }
 
@@ -289,7 +301,9 @@ public class BrokerRequestToQueryContextConverterTest {
         assertEquals(queryContext.getLimit(), 10);
         assertEquals(queryContext.getOffset(), 0);
         assertEquals(queryContext.getColumns(), new HashSet<>(Arrays.asList("foo", "bar", "foobar")));
+        assertTrue(QueryContextUtils.isSelectionQuery(queryContext));
         assertFalse(QueryContextUtils.isAggregationQuery(queryContext));
+        assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
       }
     }
 
@@ -335,7 +349,9 @@ public class BrokerRequestToQueryContextConverterTest {
       assertEquals(queryContext.getLimit(), 10);
       assertEquals(queryContext.getOffset(), 0);
       assertEquals(queryContext.getColumns(), new HashSet<>(Arrays.asList("foo", "bar")));
+      assertFalse(QueryContextUtils.isSelectionQuery(queryContext));
       assertTrue(QueryContextUtils.isAggregationQuery(queryContext));
+      assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
     }
 
     // Having (only supported in SQL format)
@@ -368,7 +384,9 @@ public class BrokerRequestToQueryContextConverterTest {
       assertEquals(queryContext.getLimit(), 10);
       assertEquals(queryContext.getOffset(), 0);
       assertEquals(queryContext.getColumns(), new HashSet<>(Arrays.asList("foo", "bar")));
+      assertFalse(QueryContextUtils.isSelectionQuery(queryContext));
       assertTrue(QueryContextUtils.isAggregationQuery(queryContext));
+      assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
     }
 
     // Post-aggregation (only supported in SQL format)
@@ -436,7 +454,9 @@ public class BrokerRequestToQueryContextConverterTest {
               Collections.singletonList(ExpressionContext.forIdentifier("col4")))));
 
       assertEquals(queryContext.getColumns(), new HashSet<>(Arrays.asList("col1", "col2", "col3", "col4")));
+      assertFalse(QueryContextUtils.isSelectionQuery(queryContext));
       assertTrue(QueryContextUtils.isAggregationQuery(queryContext));
+      assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
 
       // Expected: SUM(col1), MAX(col2), MIN(col2), SUM(col4), MAX(col4), MAX(col1)
       //noinspection rawtypes
@@ -482,7 +502,9 @@ public class BrokerRequestToQueryContextConverterTest {
         assertEquals(arguments.get(3), ExpressionContext.forLiteral("bar='b'"));
         assertEquals(arguments.get(4), ExpressionContext.forLiteral("SET_INTERSECT($1, $2)"));
         assertEquals(queryContext.getColumns(), new HashSet<>(Arrays.asList("foo", "bar")));
+        assertFalse(QueryContextUtils.isSelectionQuery(queryContext));
         assertTrue(QueryContextUtils.isAggregationQuery(queryContext));
+        assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
       }
     }
 
@@ -513,7 +535,9 @@ public class BrokerRequestToQueryContextConverterTest {
           new FunctionContext(FunctionContext.Type.AGGREGATION, "sum",
               Collections.singletonList(ExpressionContext.forIdentifier("bar")))));
       assertEquals(selectExpressions.get(1).toString(), "sum(bar)");
+      assertFalse(QueryContextUtils.isSelectionQuery(queryContext));
       assertTrue(QueryContextUtils.isAggregationQuery(queryContext));
+      assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
     }
     // Use string literal as identifier for aggregation
     {
@@ -523,7 +547,9 @@ public class BrokerRequestToQueryContextConverterTest {
           new FunctionContext(FunctionContext.Type.AGGREGATION, "sum",
               Collections.singletonList(ExpressionContext.forIdentifier("foo")))));
       assertEquals(queryContext.getSelectExpressions().get(0).toString(), "sum(foo)");
+      assertFalse(QueryContextUtils.isSelectionQuery(queryContext));
       assertTrue(QueryContextUtils.isAggregationQuery(queryContext));
+      assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
     }
   }
 
@@ -554,7 +580,9 @@ public class BrokerRequestToQueryContextConverterTest {
     assertEquals(queryContext.getLimit(), 100);
     assertEquals(queryContext.getOffset(), 50);
     assertEquals(queryContext.getColumns(), new HashSet<>(Arrays.asList("foo", "bar")));
+    assertTrue(QueryContextUtils.isSelectionQuery(queryContext));
     assertFalse(QueryContextUtils.isAggregationQuery(queryContext));
+    assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
   }
 
   @Test

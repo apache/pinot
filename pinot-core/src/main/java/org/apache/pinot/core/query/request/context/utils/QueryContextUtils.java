@@ -18,17 +18,38 @@
  */
 package org.apache.pinot.core.query.request.context.utils;
 
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
+@SuppressWarnings("rawtypes")
 public class QueryContextUtils {
   private QueryContextUtils() {
+  }
+
+  /**
+   * Returns {@code true} if the given query is a selection query, {@code false} otherwise.
+   */
+  public static boolean isSelectionQuery(QueryContext query) {
+    return query.getAggregationFunctions() == null;
   }
 
   /**
    * Returns {@code true} if the given query is an aggregation query, {@code false} otherwise.
    */
   public static boolean isAggregationQuery(QueryContext query) {
-    return query.getAggregationFunctions() != null;
+    AggregationFunction[] aggregationFunctions = query.getAggregationFunctions();
+    return aggregationFunctions != null && (aggregationFunctions.length != 1
+        || !(aggregationFunctions[0] instanceof DistinctAggregationFunction));
+  }
+
+  /**
+   * Returns {@code true} if the given query is a distinct query, {@code false} otherwise.
+   */
+  public static boolean isDistinctQuery(QueryContext query) {
+    AggregationFunction[] aggregationFunctions = query.getAggregationFunctions();
+    return aggregationFunctions != null && aggregationFunctions.length == 1
+        && aggregationFunctions[0] instanceof DistinctAggregationFunction;
   }
 }

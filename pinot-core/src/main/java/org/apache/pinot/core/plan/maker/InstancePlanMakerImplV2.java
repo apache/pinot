@@ -32,6 +32,7 @@ import org.apache.pinot.core.plan.AggregationGroupByPlanNode;
 import org.apache.pinot.core.plan.AggregationPlanNode;
 import org.apache.pinot.core.plan.CombinePlanNode;
 import org.apache.pinot.core.plan.DictionaryBasedAggregationPlanNode;
+import org.apache.pinot.core.plan.DistinctPlanNode;
 import org.apache.pinot.core.plan.GlobalPlanImplV0;
 import org.apache.pinot.core.plan.InstanceResponsePlanNode;
 import org.apache.pinot.core.plan.MetadataBasedAggregationPlanNode;
@@ -124,7 +125,6 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   @Override
   public PlanNode makeSegmentPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
     if (QueryContextUtils.isAggregationQuery(queryContext)) {
-      // Aggregation query
       List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
       if (groupByExpressions != null) {
         // Aggregation group-by query
@@ -150,9 +150,11 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         }
         return new AggregationPlanNode(indexSegment, queryContext);
       }
-    } else {
-      // Selection query
+    } else if (QueryContextUtils.isSelectionQuery(queryContext)) {
       return new SelectionPlanNode(indexSegment, queryContext);
+    } else {
+      assert QueryContextUtils.isDistinctQuery(queryContext);
+      return new DistinctPlanNode(indexSegment, queryContext);
     }
   }
 
@@ -171,8 +173,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
   @Override
   public PlanNode makeStreamingSegmentPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
-    if (QueryContextUtils.isAggregationQuery(queryContext)) {
-      throw new UnsupportedOperationException("Queries with aggregations are not supported");
+    if (!QueryContextUtils.isSelectionQuery(queryContext)) {
+      throw new UnsupportedOperationException("Only selection queries are supported");
     } else {
       // Selection query
       return new StreamingSelectionPlanNode(indexSegment, queryContext);
