@@ -21,7 +21,9 @@ package org.apache.pinot.controller.api.upload;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -43,13 +45,18 @@ public class ZKOperatorTest {
       throws Exception {
     validate();
 
+    System.out.println("X0: " + getHelixResourceManager().getAllTables());
+
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     getHelixResourceManager().addTable(tableConfig);
+
+    System.out.println("X1: " + getHelixResourceManager().getAllTables());
   }
 
   @Test
   public void testCompleteSegmentOperations()
       throws Exception {
+    System.out.println("X2: " + getHelixResourceManager().getAllTables());
     ZKOperator zkOperator =
         new ZKOperator(getHelixResourceManager(), mock(ControllerConf.class), mock(ControllerMetrics.class));
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
@@ -59,6 +66,8 @@ public class ZKOperatorTest {
     HttpHeaders httpHeaders = mock(HttpHeaders.class);
     zkOperator.completeSegmentOperations(TABLE_NAME, segmentMetadata, null, null, false, httpHeaders, "downloadUrl",
         false, "crypter");
+
+    System.out.println("X3: " + getHelixResourceManager().getAllTables());
 
     OfflineSegmentZKMetadata segmentZKMetadata =
         getHelixResourceManager().getOfflineSegmentZKMetadata(TABLE_NAME, SEGMENT_NAME);
@@ -70,6 +79,8 @@ public class ZKOperatorTest {
     assertEquals(segmentZKMetadata.getDownloadUrl(), "downloadUrl");
     assertEquals(segmentZKMetadata.getCrypterName(), "crypter");
 
+    System.out.println("X4: " + getHelixResourceManager().getAllTables());
+
     // Refresh the segment with unmatched IF_MATCH field
     when(httpHeaders.getHeaderString(HttpHeaders.IF_MATCH)).thenReturn("123");
     try {
@@ -80,6 +91,7 @@ public class ZKOperatorTest {
       // Expected
     }
 
+    System.out.println("X5: " + getHelixResourceManager().getAllTables());
     // Refresh the segment with the same segment (same CRC) with matched IF_MATCH field but different creation time,
     // downloadURL and crypter
     when(httpHeaders.getHeaderString(HttpHeaders.IF_MATCH)).thenReturn("12345");
@@ -99,11 +111,12 @@ public class ZKOperatorTest {
     assertEquals(segmentZKMetadata.getDownloadUrl(), "downloadUrl");
     assertEquals(segmentZKMetadata.getCrypterName(), "crypter");
 
+    System.out.println("X6: " + getHelixResourceManager().getAllTables());
     // Refresh the segment with a different segment (different CRC)
     when(segmentMetadata.getCrc()).thenReturn("23456");
     when(segmentMetadata.getIndexCreationTime()).thenReturn(789L);
     // Add a tiny sleep to guarantee that refresh time is different from the previous round
-    Thread.sleep(10L);
+    Thread.sleep(2000L);
     zkOperator
         .completeSegmentOperations(TABLE_NAME, segmentMetadata, null, null, false, httpHeaders, "otherDownloadUrl",
             false, "otherCrypter");
