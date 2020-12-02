@@ -61,6 +61,7 @@ public class ZKOperatorTest {
     HttpHeaders httpHeaders = mock(HttpHeaders.class);
     zkOperator.completeSegmentOperations(TABLE_NAME, segmentMetadata, null, null, false, httpHeaders, "downloadUrl",
         false, "crypter");
+
     OfflineSegmentZKMetadata segmentZKMetadata =
         getHelixResourceManager().getOfflineSegmentZKMetadata(TABLE_NAME, SEGMENT_NAME);
     assertEquals(segmentZKMetadata.getCrc(), 12345L);
@@ -70,6 +71,7 @@ public class ZKOperatorTest {
     assertEquals(segmentZKMetadata.getRefreshTime(), Long.MIN_VALUE);
     assertEquals(segmentZKMetadata.getDownloadUrl(), "downloadUrl");
     assertEquals(segmentZKMetadata.getCrypterName(), "crypter");
+
     // Refresh the segment with unmatched IF_MATCH field
     when(httpHeaders.getHeaderString(HttpHeaders.IF_MATCH)).thenReturn("123");
     try {
