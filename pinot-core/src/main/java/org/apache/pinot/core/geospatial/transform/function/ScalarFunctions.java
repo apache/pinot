@@ -22,6 +22,7 @@ import org.apache.pinot.core.geospatial.GeometryUtils;
 import org.apache.pinot.core.geospatial.serde.GeometrySerializer;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.io.WKTWriter;
 
 
@@ -41,6 +42,23 @@ public class ScalarFunctions {
   public static byte[] stPoint(double x, double y) {
     return GeometrySerializer
         .serialize(GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(x, y)));
+  }
+
+  /**
+   * Creates a point.
+   *
+   * @param x x
+   * @param y y
+   * @param isGeography if it's geography
+   * @return the created point
+   */
+  @ScalarFunction
+  public static byte[] stPoint(double x, double y, int isGeography) {
+    Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(x, y));
+    if (isGeography > 0) {
+      GeometryUtils.setGeography(point);
+    }
+    return GeometrySerializer.serialize(point);
   }
 
   /**

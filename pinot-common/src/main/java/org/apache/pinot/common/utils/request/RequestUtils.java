@@ -41,6 +41,7 @@ import org.apache.pinot.pql.parsers.pql2.ast.IntegerLiteralAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.LiteralAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.PredicateAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.StringLiteralAstNode;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 
 
@@ -131,6 +132,12 @@ public class RequestUtils {
     return expression;
   }
 
+  public static Expression getLiteralExpression(byte[] value) {
+    Expression expression = createNewLiteralExpression();
+    expression.getLiteral().setStringValue(BytesUtils.toHexString(value));
+    return expression;
+  }
+
   public static Expression getLiteralExpression(Integer value) {
     return getLiteralExpression(value.longValue());
   }
@@ -169,6 +176,9 @@ public class RequestUtils {
     }
     if (object instanceof SqlLiteral) {
       return RequestUtils.getLiteralExpression((SqlLiteral) object);
+    }
+    if (object instanceof byte[]) {
+      return RequestUtils.getLiteralExpression((byte[]) object);
     }
     throw new SqlCompilationException(
         new IllegalArgumentException("Unsupported Literal value type - " + object.getClass()));

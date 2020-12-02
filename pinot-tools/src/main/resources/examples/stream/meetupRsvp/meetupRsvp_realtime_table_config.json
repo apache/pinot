@@ -7,7 +7,9 @@
     "segmentPushType": "APPEND",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "schemaName": "meetupRsvp",
-    "replication": "1"
+    "replication": "1",
+    "retentionTimeUnit": "DAYS",
+    "retentionTimeValue": "1"
   },
   "tenants": {},
   "tableIndexConfig": {

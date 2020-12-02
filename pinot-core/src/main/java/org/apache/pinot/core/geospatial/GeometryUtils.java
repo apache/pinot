@@ -53,4 +53,20 @@ public class GeometryUtils {
   public static boolean isGeography(Geometry geometry) {
     return geometry.getSRID() == GEOGRAPHY_SRID;
   }
+
+  /**
+   * Sets the geometry to geography.
+   * @param geometry the geometry to set
+   */
+  public static void setGeography(Geometry geometry) {
+    geometry.setSRID(GEOGRAPHY_SRID);
+  }
+
+  /**
+   * Sets to geometry.
+   * @param geometry the geometry to set
+   */
+  public static void setGeometry(Geometry geometry) {
+    geometry.setSRID(0);
+  }
 }
