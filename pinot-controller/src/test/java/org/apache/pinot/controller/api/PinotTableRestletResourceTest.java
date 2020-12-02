@@ -380,16 +380,16 @@ public class PinotTableRestletResourceTest {
     Assert.assertEquals(creationResponse, "{\"status\":\"Table testTable_OFFLINE succesfully added\"}");
 
     // Case 1: Check table state with specifying tableType as realtime should return 1 [enabled]
-    String realtimeStateResponse = sendGetRequest(StringUtil.join("/", this._controllerBaseApiUrl, "tables", "testTable", "state?type=realtime"));
+    String realtimeStateResponse = sendGetRequest(StringUtil.join("/", getControllerBaseApiUrl(), "tables", "testTable", "state?type=realtime"));
     Assert.assertEquals(realtimeStateResponse, "{\"state\":\"enabled\"}");
 
     // Case 2: Check table state with specifying tableType as offline should return 1 [enabled]
-    String offlineStateResponse = sendGetRequest(StringUtil.join("/", this._controllerBaseApiUrl, "tables", "testTable", "state?type=offline"));
+    String offlineStateResponse = sendGetRequest(StringUtil.join("/", getControllerBaseApiUrl(), "tables", "testTable", "state?type=offline"));
     Assert.assertEquals(offlineStateResponse, "{\"state\":\"enabled\"}");
 
     // Case 3: Request table state with invalid type should return bad request
     try {
-      sendGetRequest(StringUtil.join("/", this._controllerBaseApiUrl, "tables", "testTable", "state?type=non_valid_type"));
+      sendGetRequest(StringUtil.join("/", getControllerBaseApiUrl(), "tables", "testTable", "state?type=non_valid_type"));
       Assert.fail("Requesting with invalid type should fail");
     } catch (Exception e) {
       // Expected 400 Bad Request
@@ -399,7 +399,7 @@ public class PinotTableRestletResourceTest {
     // Case 4: Request state for non-existent table should return not found
     boolean notFoundException = false;
     try {
-      sendGetRequest(StringUtil.join("/", this._controllerBaseApiUrl, "tables", "table_not_exist", "state?type=offline"));
+      sendGetRequest(StringUtil.join("/", getControllerBaseApiUrl(), "tables", "table_not_exist", "state?type=offline"));
       Assert.fail("Requesting state for non-existent table should fail");
     } catch (Exception e) {
       // Expected 404 Not Found
