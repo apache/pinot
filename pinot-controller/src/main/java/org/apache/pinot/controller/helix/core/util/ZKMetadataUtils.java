@@ -23,6 +23,7 @@ import java.util.Map;
 import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
@@ -48,6 +49,10 @@ public class ZKMetadataUtils {
     offlineSegmentZKMetadata.setTotalDocs(segmentMetadata.getTotalDocs());
     offlineSegmentZKMetadata.setCreationTime(segmentMetadata.getIndexCreationTime());
     offlineSegmentZKMetadata.setCrc(Long.parseLong(segmentMetadata.getCrc()));
+    SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier =
+        new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE,
+            offlineSegmentZKMetadata.getCustomMap());
+    offlineSegmentZKMetadata.setCustomMap(segmentZKMetadataCustomMapModifier.modifyMap(segmentMetadata.getCustomMap()));
 
     // Extract column partition metadata (if any), and set it into segment ZK metadata.
     Map<String, ColumnPartitionMetadata> columnPartitionMap = new HashMap<>();

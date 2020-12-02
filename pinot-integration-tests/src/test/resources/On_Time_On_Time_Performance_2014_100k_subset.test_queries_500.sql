@@ -513,7 +513,7 @@
 {"sql":"SELECT WheelsOn, AVG(CRSArrTime), COUNT(Distance) FROM mytable WHERE WheelsOn > 1550 GROUP BY WheelsOn  ORDER BY WheelsOn LIMIT 21","hsqls":["SELECT WheelsOn, AVG(CRSArrTime), COUNT(Distance) FROM mytable WHERE WheelsOn > 1550 GROUP BY WheelsOn  ORDER BY WheelsOn LIMIT 21"]}
 {"sql":"SELECT WheelsOn, MIN(OriginStateFips), AVG(DivArrDelay), MAX(ActualElapsedTime) FROM mytable WHERE DestStateName BETWEEN 'Alabama' AND 'Rhode Island' AND DayofMonth BETWEEN 24 AND 25 OR WheelsOn BETWEEN 1823 AND 1723 GROUP BY WheelsOn  ORDER BY WheelsOn LIMIT 29","hsqls":["SELECT WheelsOn, MIN(OriginStateFips), AVG(DivArrDelay), MAX(ActualElapsedTime) FROM mytable WHERE DestStateName BETWEEN 'Alabama' AND 'Rhode Island' AND DayofMonth BETWEEN 24 AND 25 OR WheelsOn BETWEEN 1823 AND 1723 GROUP BY WheelsOn  ORDER BY WheelsOn LIMIT 29"]}
 
-# Selection
+# Selection & Order by
 {"sql":"SELECT ActualElapsedTime, ActualElapsedTime, DestCityName FROM mytable ORDER BY ActualElapsedTime, DestCityName LIMIT 25"}
 {"sql":"SELECT ActualElapsedTime, TaxiOut, SecurityDelay, DestCityMarketID FROM mytable WHERE \"Month\" IN (1) OR OriginStateName BETWEEN 'Connecticut' AND 'Pennsylvania' OR ArrTime < 2123 ORDER BY TaxiOut, SecurityDelay, DestCityMarketID LIMIT 11","hsqls":["SELECT ActualElapsedTime, TaxiOut, SecurityDelay, DestCityMarketID FROM mytable WHERE Month IN (1) OR OriginStateName BETWEEN 'Connecticut' AND 'Pennsylvania' OR ArrTime < 2123 ORDER BY TaxiOut, SecurityDelay, DestCityMarketID LIMIT 11"]}
 {"sql":"SELECT AirTime, OriginWac, CRSElapsedTime FROM mytable WHERE TotalAddGTime <= 21 ORDER BY OriginWac, CRSElapsedTime LIMIT 16"}
@@ -555,3 +555,11 @@
 {"sql":"SELECT WheelsOff, TotalAddGTime, \"Month\", OriginState FROM mytable ORDER BY OriginState LIMIT 24","hsqls":["SELECT WheelsOff, TotalAddGTime, Month, OriginState FROM mytable ORDER BY OriginState LIMIT 24"]}
 {"sql":"SELECT WheelsOn, OriginState FROM mytable WHERE DepartureDelayGroups > -2 ORDER BY OriginState LIMIT 20"}
 {"sql":"SELECT \"Year\", DepTime FROM mytable WHERE CRSArrTime BETWEEN 1237 AND 1534 AND Cancelled BETWEEN 0 AND 1 ORDER BY DepTime LIMIT 3","hsqls":["SELECT Year, DepTime FROM mytable WHERE CRSArrTime BETWEEN 1237 AND 1534 AND Cancelled BETWEEN 0 AND 1 ORDER BY DepTime LIMIT 3"]}
+
+# Selection
+{"sql":"SELECT DivDistance, ActualElapsedTime FROM mytable LIMIT 29"}
+{"sql":"SELECT DayOfWeek FROM mytable WHERE TotalAddGTime IN (128, 148, 4, 34) LIMIT 8"}
+{"sql":"SELECT WheelsOff FROM mytable WHERE DivDistance < 436 LIMIT 12"}
+{"sql":"SELECT DivDistance, DepTime FROM mytable WHERE NASDelay IN (45, 55, 31, 9) LIMIT 26"}
+{"sql":"SELECT DepDelay FROM mytable WHERE DepDelayMinutes BETWEEN 292.0 AND 237.0 AND DestState IN ('DE', 'AZ') LIMIT 18"}
+{"sql":"SELECT DestStateFips FROM mytable LIMIT 27"}

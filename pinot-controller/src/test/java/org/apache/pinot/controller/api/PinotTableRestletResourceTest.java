@@ -365,6 +365,50 @@ public class PinotTableRestletResourceTest {
     Assert.assertEquals(deleteResponse, "{\"status\":\"Tables: [table3_OFFLINE] deleted\"}");
   }
 
+  @Test
+  public void testCheckTableState()
+      throws IOException {
+
+    // Create a valid REALTIME table
+    TableConfig realtimeTableConfig = _realtimeBuilder.setTableName("testTable").build();
+    String creationResponse = sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
+    Assert.assertEquals(creationResponse, "{\"status\":\"Table testTable_REALTIME succesfully added\"}");
+
+    // Create a valid OFFLINE table
+    TableConfig offlineTableConfig = _offlineBuilder.setTableName("testTable").build();
+    creationResponse = sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
+    Assert.assertEquals(creationResponse, "{\"status\":\"Table testTable_OFFLINE succesfully added\"}");
+
+    // Case 1: Check table state with specifying tableType as realtime should return 1 [enabled]
+    String realtimeStateResponse = sendGetRequest(StringUtil.join("/", this._controllerBaseApiUrl, "tables", "testTable", "state?type=realtime"));
+    Assert.assertEquals(realtimeStateResponse, "{\"state\":\"enabled\"}");
+
+    // Case 2: Check table state with specifying tableType as offline should return 1 [enabled]
+    String offlineStateResponse = sendGetRequest(StringUtil.join("/", this._controllerBaseApiUrl, "tables", "testTable", "state?type=offline"));
+    Assert.assertEquals(offlineStateResponse, "{\"state\":\"enabled\"}");
+
+    // Case 3: Request table state with invalid type should return bad request
+    try {
+      sendGetRequest(StringUtil.join("/", this._controllerBaseApiUrl, "tables", "testTable", "state?type=non_valid_type"));
+      Assert.fail("Requesting with invalid type should fail");
+    } catch (Exception e) {
+      // Expected 400 Bad Request
+      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+    }
+
+    // Case 4: Request state for non-existent table should return not found
+    boolean notFoundException = false;
+    try {
+      sendGetRequest(StringUtil.join("/", this._controllerBaseApiUrl, "tables", "table_not_exist", "state?type=offline"));
+      Assert.fail("Requesting state for non-existent table should fail");
+    } catch (Exception e) {
+      // Expected 404 Not Found
+      notFoundException = true;
+    }
+
+    Assert.assertTrue(notFoundException);
+  }
+
   @AfterClass
   public void tearDown() {
     cleanup();

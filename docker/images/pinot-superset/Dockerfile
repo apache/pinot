@@ -17,8 +17,8 @@
 # under the License.
 #
 
-ARG PRESET_SUPERSET_IMAGE_TAG=latest
-FROM preset/superset:${PRESET_SUPERSET_IMAGE_TAG}
+ARG SUPERSET_IMAGE_TAG=latest
+FROM apache/incubator-superset:${SUPERSET_IMAGE_TAG}
 
 # Switching to root to install the required packages
 USER root
@@ -30,4 +30,5 @@ RUN pip install --no-cache -r requirements-db.txt
 
 COPY examples /etc/examples/pinot
 
+# Switching back to using the `superset` user
 USER superset

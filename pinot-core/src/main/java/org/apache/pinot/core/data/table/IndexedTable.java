@@ -36,40 +36,43 @@ public abstract class IndexedTable extends BaseTable {
   protected final AggregationFunction[] _aggregationFunctions;
   protected final boolean _hasOrderBy;
   protected final TableResizer _tableResizer;
+  protected List<Record> _sortedRecords;
+  // The size we need to trim to
+  protected final int _trimSize;
+  // The size with added buffer, in order to collect more records than capacity for better precision
+  protected final int _trimThreshold;
 
-  // The capacity we need to trim to
-  protected final int _capacity;
-  // The capacity with added buffer, in order to collect more records than capacity for better precision
-  protected final int _maxCapacity;
-
-  protected IndexedTable(DataSchema dataSchema, QueryContext queryContext, int capacity) {
+  protected IndexedTable(DataSchema dataSchema, QueryContext queryContext, int trimSize, int trimThreshold) {
     super(dataSchema);
-
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     assert groupByExpressions != null;
     _numKeyColumns = groupByExpressions.size();
-
     _aggregationFunctions = queryContext.getAggregationFunctions();
-
     List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
     if (orderByExpressions != null) {
+      // SQL GROUP BY with ORDER BY
+      // trimSize = max (limit N * 5, 5000) (see GroupByUtils.getTableCapacity).
+      // trimSize is also bound by trimThreshold/2 to protect the server in case
+      // when user specifies a very high value of LIMIT N.
+      // trimThreshold is configurable. to keep parity with PQL for some use
+      // cases with infinitely large group by, trimThreshold will be >= 1B
+      // (exactly same as PQL). This essentially implies there will be no
+      // resizing/trimming during upsert and exactly one trim during finish.
       _hasOrderBy = true;
       _tableResizer = new TableResizer(dataSchema, queryContext);
-      _capacity = capacity;
-
-      // TODO: tune these numbers and come up with a better formula (github ISSUE-4801)
-      // Based on the capacity and maxCapacity, the resizer will smartly choose to evict/retain recors from the PQ
-      if (capacity
-          <= 100_000) { // Capacity is small, make a very large buffer. Make PQ of records to retain, during resize
-        _maxCapacity = 1_000_000;
-      } else { // Capacity is large, make buffer only slightly bigger. Make PQ of records to evict, during resize
-        _maxCapacity = (int) (capacity * 1.2);
-      }
+      _trimSize = Math.min(trimSize, trimThreshold / 2);
+      _trimThreshold = trimThreshold;
     } else {
+      // SQL GROUP BY without ORDER BY
+      // trimSize = LIMIT N (see GroupByUtils.getTableCapacity)
+      // trimThreshold is same as trimSize since indexed table stops
+      // accepting records once map size reaches trimSize. there is no
+      // resize/trim during upsert since the results can be arbitrary
+      // and are truncated once they reach trimSize
       _hasOrderBy = false;
       _tableResizer = null;
-      _capacity = capacity;
-      _maxCapacity = capacity;
+      _trimSize = trimSize;
+      _trimThreshold = trimSize;
     }
   }
 
@@ -80,4 +83,8 @@ public abstract class IndexedTable extends BaseTable {
     Object[] keyValues = Arrays.copyOf(record.getValues(), _numKeyColumns);
     return upsert(new Key(keyValues), record);
   }
+
+  public abstract int getNumResizes();
+
+  public abstract long getResizeTimeMs();
 }

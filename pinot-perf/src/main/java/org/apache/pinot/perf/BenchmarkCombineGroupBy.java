@@ -40,6 +40,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
@@ -130,10 +131,11 @@ public class BenchmarkCombineGroupBy {
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
   public void concurrentIndexedTableForCombineGroupBy()
       throws InterruptedException, ExecutionException, TimeoutException {
-    int capacity = GroupByUtils.getTableCapacity(_queryContext);
+    int trimSize = GroupByUtils.getTableCapacity(_queryContext);
 
     // make 1 concurrent table
-    IndexedTable concurrentIndexedTable = new ConcurrentIndexedTable(_dataSchema, _queryContext, capacity);
+    IndexedTable concurrentIndexedTable = new ConcurrentIndexedTable(_dataSchema, _queryContext, trimSize,
+        InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD);
 
     List<Callable<Void>> innerSegmentCallables = new ArrayList<>(NUM_SEGMENTS);
 

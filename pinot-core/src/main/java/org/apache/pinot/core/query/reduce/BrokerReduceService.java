@@ -66,10 +66,13 @@ public class BrokerReduceService {
 
   private final ExecutorService _reduceExecutorService;
   private final int _maxReduceThreadsPerQuery;
+  private final int _groupByTrimThreshold;
 
   public BrokerReduceService(PinotConfiguration config) {
     _maxReduceThreadsPerQuery = config.getProperty(CommonConstants.Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY,
         CommonConstants.Broker.DEFAULT_MAX_REDUCE_THREADS_PER_QUERY);
+    _groupByTrimThreshold = config.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_GROUPBY_TRIM_THRESHOLD,
+        CommonConstants.Broker.DEFAULT_BROKER_GROUPBY_TRIM_THRESHOLD);
 
     int numThreadsInExecutorService = Runtime.getRuntime().availableProcessors();
     LOGGER.info("Initializing BrokerReduceService with {} threads, and {} max reduce threads.",
@@ -225,8 +228,9 @@ public class BrokerReduceService {
 
     QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
     DataTableReducer dataTableReducer = ResultReducerFactory.getResultReducer(queryContext);
-    dataTableReducer.reduceAndSetResults(tableName, cachedDataSchema, dataTableMap, brokerResponseNative,
-        new DataTableReducerContext(_reduceExecutorService, _maxReduceThreadsPerQuery, reduceTimeOutMs), brokerMetrics);
+    dataTableReducer.reduceAndSetResults(rawTableName, cachedDataSchema, dataTableMap, brokerResponseNative,
+        new DataTableReducerContext(_reduceExecutorService, _maxReduceThreadsPerQuery, reduceTimeOutMs,
+            _groupByTrimThreshold), brokerMetrics);
     updateAlias(queryContext, brokerResponseNative);
     return brokerResponseNative;
   }

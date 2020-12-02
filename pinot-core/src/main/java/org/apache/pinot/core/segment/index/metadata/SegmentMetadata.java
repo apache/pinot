@@ -19,6 +19,7 @@
 package org.apache.pinot.core.segment.index.metadata;
 
 import java.io.File;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.data.Schema;
@@ -107,4 +108,6 @@ public interface SegmentMetadata {
   char getPaddingCharacter();
 
   boolean close();
+
+  Map<String, String> getCustomMap();
 }

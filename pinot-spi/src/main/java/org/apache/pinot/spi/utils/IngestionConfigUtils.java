@@ -57,39 +57,39 @@ public final class IngestionConfigUtils {
   }
 
   /**
-   * Fetches the configured segmentPushType (APPEND/REFRESH) from the table config
+   * Fetches the configured segmentIngestionType (APPEND/REFRESH) from the table config
    * First checks in the ingestionConfig. If not found, checks in the segmentsConfig (has been deprecated from here in favor of ingestion config)
    */
-  public static String getBatchSegmentPushType(TableConfig tableConfig) {
-    String segmentPushType = null;
+  public static String getBatchSegmentIngestionType(TableConfig tableConfig) {
+    String segmentIngestionType = null;
     if (tableConfig.getIngestionConfig() != null) {
       BatchIngestionConfig batchIngestionConfig = tableConfig.getIngestionConfig().getBatchIngestionConfig();
       if (batchIngestionConfig != null) {
-        segmentPushType = batchIngestionConfig.getSegmentPushType();
+        segmentIngestionType = batchIngestionConfig.getSegmentIngestionType();
       }
     }
-    if (segmentPushType == null) {
-      segmentPushType = tableConfig.getValidationConfig().getSegmentPushType();
+    if (segmentIngestionType == null) {
+      segmentIngestionType = tableConfig.getValidationConfig().getSegmentPushType();
     }
-    return segmentPushType;
+    return segmentIngestionType;
   }
 
   /**
-   * Fetches the configured segmentPushFrequency from the table config
+   * Fetches the configured segmentIngestionFrequency from the table config
    * First checks in the ingestionConfig. If not found, checks in the segmentsConfig (has been deprecated from here in favor of ingestion config)
    */
-  public static String getBatchSegmentPushFrequency(TableConfig tableConfig) {
-    String segmentPushFrequency = null;
+  public static String getBatchSegmentIngestionFrequency(TableConfig tableConfig) {
+    String segmentIngestionFrequency = null;
     if (tableConfig.getIngestionConfig() != null) {
       BatchIngestionConfig batchIngestionConfig = tableConfig.getIngestionConfig().getBatchIngestionConfig();
       if (batchIngestionConfig != null) {
-        segmentPushFrequency = batchIngestionConfig.getSegmentPushFrequency();
+        segmentIngestionFrequency = batchIngestionConfig.getSegmentIngestionFrequency();
       }
     }
-    if (segmentPushFrequency == null) {
-      segmentPushFrequency = tableConfig.getValidationConfig().getSegmentPushFrequency();
+    if (segmentIngestionFrequency == null) {
+      segmentIngestionFrequency = tableConfig.getValidationConfig().getSegmentPushFrequency();
     }
-    return segmentPushFrequency;
+    return segmentIngestionFrequency;
   }
 
 }

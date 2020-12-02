@@ -39,6 +39,7 @@ public class BatchConfigProperties {
   public static final String RECORD_READER_CONFIG_CLASS = "recordReader.config.className";
   public static final String RECORD_READER_PROP_PREFIX = "recordReader.prop";
 
+  public static final String INPUT_DATA_FILE_URI_KEY = "input.data.file.uri";
   /**
    * Helper method to create a batch config property
    */

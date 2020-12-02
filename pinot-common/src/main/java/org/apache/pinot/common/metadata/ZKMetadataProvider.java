@@ -36,6 +36,8 @@ import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
+import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.config.ConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
@@ -219,7 +221,8 @@ public class ZKMetadataProvider {
       return null;
     }
     try {
-      return TableConfigUtils.fromZNRecord(znRecord);
+      TableConfig tableConfig = TableConfigUtils.fromZNRecord(znRecord);
+      return (TableConfig) ConfigUtils.applyConfigWithEnvVariables(tableConfig);
     } catch (Exception e) {
       LOGGER.error("Caught exception while getting table configuration for table: {}", tableNameWithType, e);
       return null;

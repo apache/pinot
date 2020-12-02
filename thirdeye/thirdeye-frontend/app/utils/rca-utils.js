@@ -184,11 +184,15 @@ export function appendTail(urn, tail) {
  * @see appendTail(urn, tail)
  *
  * @param {string} urn entity urn
- * @param {Array} filters array of filter tuples [key, value]
+ * @param {Array} filters array of strings ["key", "=", "value"]
  * @returns {string} merged metric urn
  */
 export function appendFilters(urn, filters) {
-  const tail = filters.map(t => encodeURIComponent(`${t[0]}${t[1]}${t[2]}`));
+  const tail = filters.map(t => {
+    // protects against special characters being in value string
+    const encodedValue = encodeURIComponent(t[2]);
+    return encodeURIComponent(`${t[0]}${t[1]}${encodedValue}`);
+  });
   return appendTail(urn, tail);
 }
 

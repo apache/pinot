@@ -30,8 +30,6 @@ import org.apache.pinot.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 import org.apache.pinot.thirdeye.datasource.pinot.resultset.ThirdEyeResultSet;
 import org.apache.pinot.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetGroup;
 import org.apache.pinot.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetSerializer;
-import java.io.UnsupportedEncodingException;
-import java.net.URLDecoder;
 import java.util.concurrent.ExecutionException;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -67,14 +65,10 @@ public class PinotDataSourceResource {
    */
   @GET
   @Path("/query")
-  public String executePQL(@QueryParam("pql") String pql, @QueryParam("tableName") String tableName)
-      throws UnsupportedEncodingException {
+  public String executePQL(@QueryParam("pql") String pql, @QueryParam("tableName") String tableName) {
     initPinotDataSource();
-
     String resultString;
-    String decodedPql = URLDecoder.decode(pql, URL_ENCODING);
-    String decodedTableName = URLDecoder.decode(tableName, URL_ENCODING);
-    PinotQuery pinotQuery = new PinotQuery(decodedPql, decodedTableName);
+    PinotQuery pinotQuery = new PinotQuery(pql, tableName);
     try {
       ThirdEyeResultSetGroup thirdEyeResultSetGroup = pinotDataSource.executePQL(pinotQuery);
       resultString = OBJECT_MAPPER.writeValueAsString(thirdEyeResultSetGroup);

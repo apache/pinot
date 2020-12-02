@@ -182,13 +182,19 @@ fi
 
 if [ -z "$JAVA_OPTS" ] ; then
   ALL_JAVA_OPTS="@EXTRA_JVM_ARGUMENTS@"
-
-  # For java 8, we set jvm system property `plugins.dir` to load Pinot plugins
-  if [ "$JAVA_VER" -eq 8 ] ; then
-    ALL_JAVA_OPTS="$ALL_JAVA_OPTS -Dplugins.dir=$BASEDIR/plugins"
-  fi
 else
   ALL_JAVA_OPTS=$JAVA_OPTS
+fi
+
+# For java 8, we set jvm system property `plugins.dir` to load Pinot plugins
+if [ "$JAVA_VER" -eq 8 ] ; then
+  if [ -z "$PLUGINS_DIR" ] ; then
+    PLUGINS_DIR=$BASEDIR/plugins
+  fi
+  ALL_JAVA_OPTS="$ALL_JAVA_OPTS -Dplugins.dir=$PLUGINS_DIR"
+  if [ -n "$PLUGINS_INCLUDE" ] ; then
+    ALL_JAVA_OPTS="$ALL_JAVA_OPTS -Dplugins.include=$PLUGINS_INCLUDE"
+  fi
 fi
 
 # For java 9 and later, we need to set extra java options to access JDK’s internal APIs.

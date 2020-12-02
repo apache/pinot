@@ -417,8 +417,8 @@ public class TableConfigSerDeTest {
     assertNotNull(ingestionConfig.getBatchIngestionConfig().getBatchConfigMaps());
     assertEquals(ingestionConfig.getBatchIngestionConfig().getBatchConfigMaps().size(), 1);
     assertEquals(ingestionConfig.getBatchIngestionConfig().getBatchConfigMaps().get(0).get("batchType"), "s3");
-    assertEquals(ingestionConfig.getBatchIngestionConfig().getSegmentPushType(), "APPEND");
-    assertEquals(ingestionConfig.getBatchIngestionConfig().getSegmentPushFrequency(), "HOURLY");
+    assertEquals(ingestionConfig.getBatchIngestionConfig().getSegmentIngestionType(), "APPEND");
+    assertEquals(ingestionConfig.getBatchIngestionConfig().getSegmentIngestionFrequency(), "HOURLY");
     assertNotNull(ingestionConfig.getStreamIngestionConfig());
     assertNotNull(ingestionConfig.getStreamIngestionConfig().getStreamConfigMaps());
     assertEquals(ingestionConfig.getStreamIngestionConfig().getStreamConfigMaps().size(), 1);

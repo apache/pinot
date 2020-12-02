@@ -173,6 +173,10 @@ public class CommonConstants {
     public static final int DEFAULT_MAX_REDUCE_THREADS_PER_QUERY =
         Math.max(1, Math.min(10, Runtime.getRuntime().availableProcessors() / 2)); // Same logic as CombineOperatorUtils
 
+    // used for SQL GROUP BY during broker reduce
+    public static final String CONFIG_OF_BROKER_GROUPBY_TRIM_THRESHOLD = "pinot.broker.groupby.trim.threshold";
+    public static final int DEFAULT_BROKER_GROUPBY_TRIM_THRESHOLD = 1_000_000;
+
     public static class Request {
       public static final String PQL = "pql";
       public static final String SQL = "sql";
