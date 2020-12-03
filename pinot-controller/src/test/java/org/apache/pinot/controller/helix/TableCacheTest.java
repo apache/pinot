@@ -48,14 +48,12 @@ public class TableCacheTest {
   private static final String MANGLED_OFFLINE_TABLE_NAME = MANGLED_TABLE_NAME + "_oFfLiNe";
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     validate();
   }
 
   @Test
-  public void testTableCache()
-      throws Exception {
+  public void testTableCache() throws Exception {
     TableCache tableCache = new TableCache(getPropertyStore(), true);
 
     assertNull(tableCache.getActualTableName(TABLE_NAME));
@@ -82,8 +80,8 @@ public class TableCacheTest {
     // Wait for at most 10 seconds for the callback to update the table config in the cache
     // NOTE: Table config should never be null during the transitioning
     TestUtils.waitForCondition(
-        aVoid -> Preconditions.checkNotNull(tableCache.getTableConfig(OFFLINE_TABLE_NAME)).equals(tableConfig),
-        10_000L, "Failed to update the table config in the cache");
+        aVoid -> Preconditions.checkNotNull(tableCache.getTableConfig(OFFLINE_TABLE_NAME)).equals(tableConfig), 10_000L,
+        "Failed to update the table config in the cache");
     assertEquals(tableCache.getActualTableName(MANGLED_TABLE_NAME), TABLE_NAME);
     assertEquals(tableCache.getActualTableName(MANGLED_OFFLINE_TABLE_NAME), OFFLINE_TABLE_NAME);
     assertNull(tableCache.getActualTableName(REALTIME_TABLE_NAME));
@@ -100,9 +98,9 @@ public class TableCacheTest {
     assertNull(tableCache.getSchema(TABLE_NAME));
 
     // Add a schema
-    Schema schema =
-        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("testColumn", DataType.INT)
-            .build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("testColumn", DataType.INT)
+        .build();
     getHelixResourceManager().addSchema(schema, false);
     // Wait for at most 10 seconds for the callback to add the schema to the cache
     TestUtils.waitForCondition(aVoid -> tableCache.getSchema(TABLE_NAME) != null, 10_000L,

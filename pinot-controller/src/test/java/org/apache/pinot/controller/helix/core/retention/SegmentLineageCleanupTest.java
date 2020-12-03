@@ -46,6 +46,7 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.controller.ControllerTestUtils.*;
 import static org.mockito.Mockito.*;
 
+
 public class SegmentLineageCleanupTest {
   private static final int NUM_INSTANCES = 1;
   private static final long MAX_TIMEOUT_IN_MILLISECOND = 10_000L; // 10 seconds
@@ -59,8 +60,7 @@ public class SegmentLineageCleanupTest {
   private RetentionManager _retentionManager;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     validate();
 
     // Create server tenant
@@ -85,16 +85,18 @@ public class SegmentLineageCleanupTest {
     _retentionManager = new RetentionManager(getHelixResourceManager(), leadControllerManager, conf, controllerMetrics);
 
     // Update table config
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(OFFLINE_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
-            .setServerTenant(SERVER_TENANT_NAME).setNumReplicas(1).setRetentionTimeUnit(RETENTION_TIME_UNIT)
-            .setRetentionTimeValue(RETENTION_TIME_VALUE).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(OFFLINE_TABLE_NAME)
+        .setBrokerTenant(BROKER_TENANT_NAME)
+        .setServerTenant(SERVER_TENANT_NAME)
+        .setNumReplicas(1)
+        .setRetentionTimeUnit(RETENTION_TIME_UNIT)
+        .setRetentionTimeValue(RETENTION_TIME_VALUE)
+        .build();
     getHelixResourceManager().addTable(tableConfig);
   }
 
   @Test
-  public void testSegmentLineageCleanup()
-      throws IOException, InterruptedException {
+  public void testSegmentLineageCleanup() throws IOException, InterruptedException {
     // Create metadata for original segments
     for (int i = 0; i < 5; ++i) {
       getHelixResourceManager().addNewSegment(OFFLINE_TABLE_NAME,

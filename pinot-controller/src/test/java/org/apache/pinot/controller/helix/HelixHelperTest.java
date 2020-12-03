@@ -39,8 +39,7 @@ public class HelixHelperTest {
   public static final String INSTANCE_NAME = "Server_1.2.3.4_1234";
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     validate();
 
     IdealState idealState = new IdealState(RESOURCE_NAME);

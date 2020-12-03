@@ -21,9 +21,7 @@ package org.apache.pinot.controller.api.upload;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -36,13 +34,13 @@ import static org.apache.pinot.controller.ControllerTestUtils.*;
 import static org.mockito.Mockito.*;
 import static org.testng.Assert.*;
 
+
 public class ZKOperatorTest {
   private static final String TABLE_NAME = "operatorTestTable";
   private static final String SEGMENT_NAME = "testSegment";
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     validate();
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
@@ -50,8 +48,7 @@ public class ZKOperatorTest {
   }
 
   @Test
-  public void testCompleteSegmentOperations()
-      throws Exception {
+  public void testCompleteSegmentOperations() throws Exception {
     ZKOperator zkOperator =
         new ZKOperator(getHelixResourceManager(), mock(ControllerConf.class), mock(ControllerMetrics.class));
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
@@ -86,9 +83,8 @@ public class ZKOperatorTest {
     // downloadURL and crypter
     when(httpHeaders.getHeaderString(HttpHeaders.IF_MATCH)).thenReturn("12345");
     when(segmentMetadata.getIndexCreationTime()).thenReturn(456L);
-    zkOperator
-        .completeSegmentOperations(TABLE_NAME, segmentMetadata, null, null, false, httpHeaders, "otherDownloadUrl",
-            false, "otherCrypter");
+    zkOperator.completeSegmentOperations(TABLE_NAME, segmentMetadata, null, null, false, httpHeaders,
+        "otherDownloadUrl", false, "otherCrypter");
     segmentZKMetadata = getHelixResourceManager().getOfflineSegmentZKMetadata(TABLE_NAME, SEGMENT_NAME);
     assertEquals(segmentZKMetadata.getCrc(), 12345L);
     // Push time should not change
@@ -108,9 +104,8 @@ public class ZKOperatorTest {
     // 1 second delay to avoid "org.apache.helix.HelixException: Specified EXTERNALVIEW operatorTestTable_OFFLINE is
     // not found!" exception from being thrown sporadically.
     Thread.sleep(1000L);
-    zkOperator
-        .completeSegmentOperations(TABLE_NAME, segmentMetadata, null, null, false, httpHeaders, "otherDownloadUrl",
-            false, "otherCrypter");
+    zkOperator.completeSegmentOperations(TABLE_NAME, segmentMetadata, null, null, false, httpHeaders,
+        "otherDownloadUrl", false, "otherCrypter");
     segmentZKMetadata = getHelixResourceManager().getOfflineSegmentZKMetadata(TABLE_NAME, SEGMENT_NAME);
     assertEquals(segmentZKMetadata.getCrc(), 23456L);
     // Push time should not change

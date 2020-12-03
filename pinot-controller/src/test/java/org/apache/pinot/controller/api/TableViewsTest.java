@@ -41,14 +41,14 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerTestUtils.*;
 
+
 public class TableViewsTest {
   private static final String OFFLINE_TABLE_NAME = "offlineTable";
   private static final String OFFLINE_SEGMENT_NAME = "offlineSegment";
   private static final String HYBRID_TABLE_NAME = "viewsTable";
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     validate();
 
     // Create the offline table and add one segment
@@ -60,14 +60,18 @@ public class TableViewsTest {
         SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, OFFLINE_SEGMENT_NAME), "downloadUrl");
 
     // Create the hybrid table
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(HYBRID_TABLE_NAME).setNumReplicas(MIN_NUM_REPLICAS).build();
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(HYBRID_TABLE_NAME)
+        .setNumReplicas(MIN_NUM_REPLICAS)
+        .build();
     getHelixResourceManager().addTable(tableConfig);
 
     // add schema for realtime table
     addDummySchema(HYBRID_TABLE_NAME);
     StreamConfig streamConfig = FakeStreamConfigUtils.getDefaultHighLevelStreamConfigs();
-    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(HYBRID_TABLE_NAME).setNumReplicas(MIN_NUM_REPLICAS)
-        .setStreamConfigs(streamConfig.getStreamConfigsMap()).build();
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(HYBRID_TABLE_NAME)
+        .setNumReplicas(MIN_NUM_REPLICAS)
+        .setStreamConfigs(streamConfig.getStreamConfigsMap())
+        .build();
     getHelixResourceManager().addTable(tableConfig);
 
     // Wait for external view get updated
@@ -96,24 +100,21 @@ public class TableViewsTest {
   }
 
   @Test(dataProvider = "viewProvider")
-  public void testTableNotFound(String view)
-      throws Exception {
+  public void testTableNotFound(String view) throws Exception {
     String url = getControllerRequestURLBuilder().forTableView("unknownTable", view, null);
     HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
     Assert.assertEquals(connection.getResponseCode(), 404);
   }
 
   @Test(dataProvider = "viewProvider")
-  public void testBadRequest(String view)
-      throws Exception {
+  public void testBadRequest(String view) throws Exception {
     String url = getControllerRequestURLBuilder().forTableView(OFFLINE_TABLE_NAME, view, "no_such_type");
     HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
     Assert.assertEquals(connection.getResponseCode(), 400);
   }
 
   @Test(dataProvider = "viewProvider")
-  public void testOfflineTableState(String view)
-      throws Exception {
+  public void testOfflineTableState(String view) throws Exception {
     TableViews.TableView tableView = getTableView(OFFLINE_TABLE_NAME, view, null);
     Assert.assertNotNull(tableView.offline);
     Assert.assertEquals(tableView.offline.size(), 1);
@@ -129,8 +130,7 @@ public class TableViewsTest {
   }
 
   @Test(dataProvider = "viewProvider")
-  public void testHybridTableState(String state)
-      throws Exception {
+  public void testHybridTableState(String state) throws Exception {
     TableViews.TableView tableView = getTableView(HYBRID_TABLE_NAME, state, "realtime");
     Assert.assertNull(tableView.offline);
     Assert.assertNotNull(tableView.realtime);
@@ -158,11 +158,10 @@ public class TableViewsTest {
     Assert.assertEquals(tableView.realtime.size(), NUM_SERVER_INSTANCES);
   }
 
-  private TableViews.TableView getTableView(String tableName, String view, String tableType)
-      throws Exception {
-    return JsonUtils
-        .stringToObject(sendGetRequest(getControllerRequestURLBuilder().forTableView(tableName, view, tableType)),
-            TableViews.TableView.class);
+  private TableViews.TableView getTableView(String tableName, String view, String tableType) throws Exception {
+    return JsonUtils.stringToObject(
+        sendGetRequest(getControllerRequestURLBuilder().forTableView(tableName, view, tableType)),
+        TableViews.TableView.class);
   }
 
   @AfterClass

@@ -47,7 +47,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerTestUtils.*;
-import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.*;
 
 
 /**
@@ -61,8 +61,7 @@ public class ValidationManagerTest {
   private TableConfig _offlineTableConfig;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     validate();
 
     _offlineTableConfig =
@@ -74,8 +73,7 @@ public class ValidationManagerTest {
   // This test case is disabled because it adds a new broker, but does not remove it after the test. Hence, enabling
   // this test case will cause problems with test cases that run after this test case.
   @Test(enabled = false)
-  public void testRebuildBrokerResourceWhenBrokerAdded()
-      throws Exception {
+  public void testRebuildBrokerResourceWhenBrokerAdded() throws Exception {
     // Check that the first table we added doesn't need to be rebuilt(case where ideal state brokers and brokers in broker resource are the same.
     String partitionName = _offlineTableConfig.getTableName();
     HelixAdmin helixAdmin = getHelixManager().getClusterManagmentTool();
@@ -91,7 +89,8 @@ public class ValidationManagerTest {
     getHelixResourceManager().addTable(offlineTableConfigTwo);
     String partitionNameTwo = offlineTableConfigTwo.getTableName();
 
-    List<String> brokersList = getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER");
+    List<String> brokersList =
+        getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER");
     int brokerCount = brokersList == null ? 0 : brokersList.size();
 
     // Add a new broker manually such that the ideal state is not updated and ensure that rebuild broker resource is called
@@ -135,10 +134,11 @@ public class ValidationManagerTest {
       return externalView != null && externalView.getPartitionSet().contains(TEST_SEGMENT_NAME);
     }, 30_000L, "Failed to find the segment in the ExternalView");
     Mockito.when(segmentMetadata.getCrc()).thenReturn(Long.toString(System.nanoTime()));
-    getHelixResourceManager()
-        .refreshSegment(offlineTableName, segmentMetadata, offlineSegmentZKMetadata, "downloadUrl", null);
+    getHelixResourceManager().refreshSegment(offlineTableName, segmentMetadata, offlineSegmentZKMetadata, "downloadUrl",
+        null);
 
-    offlineSegmentZKMetadata = getHelixResourceManager().getOfflineSegmentZKMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);
+    offlineSegmentZKMetadata =
+        getHelixResourceManager().getOfflineSegmentZKMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);
     // Check that the segment still has the same push time
     assertEquals(offlineSegmentZKMetadata.getPushTime(), pushTime);
     // Check that the refresh time is in the last 30 seconds
@@ -146,8 +146,7 @@ public class ValidationManagerTest {
   }
 
   @Test
-  public void testTotalDocumentCountRealTime()
-      throws Exception {
+  public void testTotalDocumentCountRealTime() throws Exception {
     // Create a bunch of dummy segments
     final String group1 = TEST_TABLE_NAME + "_REALTIME_1466446700000_34";
     final String group2 = TEST_TABLE_NAME + "_REALTIME_1466446700000_17";
@@ -157,15 +156,15 @@ public class ValidationManagerTest {
     String segmentName4 = new HLCSegmentName(group2, "0", "3").getSegmentName();
 
     List<RealtimeSegmentZKMetadata> segmentZKMetadataList = new ArrayList<>();
-    segmentZKMetadataList
-        .add(SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName1, 10));
-    segmentZKMetadataList
-        .add(SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName2, 20));
-    segmentZKMetadataList
-        .add(SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName3, 30));
+    segmentZKMetadataList.add(
+        SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName1, 10));
+    segmentZKMetadataList.add(
+        SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName2, 20));
+    segmentZKMetadataList.add(
+        SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName3, 30));
     // This should get ignored in the count as it belongs to a different group id
-    segmentZKMetadataList
-        .add(SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName4, 20));
+    segmentZKMetadataList.add(
+        SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName4, 20));
 
     assertEquals(RealtimeSegmentValidationManager.computeRealtimeTotalDocumentInSegments(segmentZKMetadataList, true),
         60);
@@ -173,8 +172,8 @@ public class ValidationManagerTest {
     // Now add some low level segment names
     String segmentName5 = new LLCSegmentName(TEST_TABLE_NAME, 1, 0, 1000).getSegmentName();
     String segmentName6 = new LLCSegmentName(TEST_TABLE_NAME, 2, 27, 10000).getSegmentName();
-    segmentZKMetadataList
-        .add(SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName5, 10));
+    segmentZKMetadataList.add(
+        SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName5, 10));
     segmentZKMetadataList.add(SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName6, 5));
 
     // Only the LLC segments should get counted.

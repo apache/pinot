@@ -31,18 +31,17 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerTestUtils.*;
 
+
 public class PinotBrokerRestletResourceTest {
   private static final String TABLE_NAME_1 = "testTable1";
   private static final String TABLE_NAME_2 = "testTable2";
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     validate();
   }
 
-  public void testGetBrokersHelper(String state, int onlineServers, int offlineServers)
-      throws Exception {
+  public void testGetBrokersHelper(String state, int onlineServers, int offlineServers) throws Exception {
     List<String> expectedBrokers = new ArrayList<>();
     if (state == null) {
       for (int i = 0; i < onlineServers + offlineServers; i++) {
@@ -72,14 +71,14 @@ public class PinotBrokerRestletResourceTest {
     }
 
     Map<String, List<String>> tenantsMap =
-        JsonUtils.stringToObject(sendGetRequest(getControllerRequestURLBuilder().forBrokerTenantsGet(state)), Map.class);
+        JsonUtils.stringToObject(sendGetRequest(getControllerRequestURLBuilder().forBrokerTenantsGet(state)),
+            Map.class);
     for (String expectedBroker : expectedBrokers) {
       Assert.assertTrue(tenantsMap.get("DefaultTenant").contains(expectedBroker));
     }
 
-    List<String> tenantBrokers = JsonUtils
-        .stringToObject(sendGetRequest(getControllerRequestURLBuilder().forBrokerTenantGet("DefaultTenant", state)),
-            List.class);
+    List<String> tenantBrokers = JsonUtils.stringToObject(
+        sendGetRequest(getControllerRequestURLBuilder().forBrokerTenantGet("DefaultTenant", state)), List.class);
     for (String expectedBroker : expectedBrokers) {
       Assert.assertTrue(tenantBrokers.contains(expectedBroker));
     }
@@ -97,27 +96,23 @@ public class PinotBrokerRestletResourceTest {
       Assert.assertTrue(tablesMap.get(TABLE_NAME_2).contains(expectedBroker));
     }
 
-    List<String> tableBrokers = JsonUtils
-        .stringToObject(sendGetRequest(getControllerRequestURLBuilder().forBrokerTableGet(TABLE_NAME_1, "OFFLINE", state)),
-            List.class);
+    List<String> tableBrokers = JsonUtils.stringToObject(
+        sendGetRequest(getControllerRequestURLBuilder().forBrokerTableGet(TABLE_NAME_1, "OFFLINE", state)), List.class);
     for (String expectedBroker : expectedBrokers) {
       Assert.assertTrue(tableBrokers.contains(expectedBroker));
     }
-    tableBrokers = JsonUtils
-        .stringToObject(sendGetRequest(getControllerRequestURLBuilder().forBrokerTableGet(TABLE_NAME_1, null, state)),
-            List.class);
+    tableBrokers = JsonUtils.stringToObject(
+        sendGetRequest(getControllerRequestURLBuilder().forBrokerTableGet(TABLE_NAME_1, null, state)), List.class);
     for (String expectedBroker : expectedBrokers) {
       Assert.assertTrue(tableBrokers.contains(expectedBroker));
     }
-    tableBrokers = JsonUtils
-        .stringToObject(sendGetRequest(getControllerRequestURLBuilder().forBrokerTableGet(TABLE_NAME_2, "OFFLINE", state)),
-            List.class);
+    tableBrokers = JsonUtils.stringToObject(
+        sendGetRequest(getControllerRequestURLBuilder().forBrokerTableGet(TABLE_NAME_2, "OFFLINE", state)), List.class);
     for (String expectedBroker : expectedBrokers) {
       Assert.assertTrue(tableBrokers.contains(expectedBroker));
     }
-    tableBrokers = JsonUtils
-        .stringToObject(sendGetRequest(getControllerRequestURLBuilder().forBrokerTableGet(TABLE_NAME_2, null, state)),
-            List.class);
+    tableBrokers = JsonUtils.stringToObject(
+        sendGetRequest(getControllerRequestURLBuilder().forBrokerTableGet(TABLE_NAME_2, null, state)), List.class);
     for (String expectedBroker : expectedBrokers) {
       Assert.assertTrue(tableBrokers.contains(expectedBroker));
     }
@@ -132,17 +127,16 @@ public class PinotBrokerRestletResourceTest {
    * TODO: Enabling this test will cause random failures in other test cases, because this test calls stopFakeInstance.
    */
   @Test(enabled = false)
-  public void testGetBrokers()
-      throws Exception {
+  public void testGetBrokers() throws Exception {
     // Adding table
-    getHelixResourceManager()
-        .addTable(new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_1).setNumReplicas(1).build());
-    getHelixResourceManager()
-        .addTable(new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_2).setNumReplicas(1).build());
+    getHelixResourceManager().addTable(
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_1).setNumReplicas(1).build());
+    getHelixResourceManager().addTable(
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_2).setNumReplicas(1).build());
 
     // Wait for the table addition
-    while (!getHelixResourceManager().hasOfflineTable(TABLE_NAME_1) && !getHelixResourceManager()
-        .hasOfflineTable(TABLE_NAME_2)) {
+    while (!getHelixResourceManager().hasOfflineTable(TABLE_NAME_1) && !getHelixResourceManager().hasOfflineTable(
+        TABLE_NAME_2)) {
       Thread.sleep(1000);
     }
 

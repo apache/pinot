@@ -55,8 +55,7 @@ public class PinotInstanceAssignmentRestletResourceTest {
   private static final String TIME_COLUMN_NAME = "daysSinceEpoch";
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     validate();
 
     // Create broker and server tenant
@@ -68,19 +67,22 @@ public class PinotInstanceAssignmentRestletResourceTest {
   }
 
   @Test
-  public void testInstanceAssignment()
-      throws Exception {
+  public void testInstanceAssignment() throws Exception {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
-        .addDateTime(TIME_COLUMN_NAME, DataType.INT, "1:DAYS:EPOCH", "1:DAYS").build();
+        .addDateTime(TIME_COLUMN_NAME, DataType.INT, "1:DAYS:EPOCH", "1:DAYS")
+        .build();
     getHelixResourceManager().addSchema(schema, true);
-    TableConfig offlineTableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
-            .setServerTenant(SERVER_TENANT_NAME).build();
+    TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setBrokerTenant(BROKER_TENANT_NAME)
+        .setServerTenant(SERVER_TENANT_NAME)
+        .build();
     getHelixResourceManager().addTable(offlineTableConfig);
-    TableConfig realtimeTableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
-            .setServerTenant(SERVER_TENANT_NAME).setLLC(true)
-            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()).build();
+    TableConfig realtimeTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+        .setBrokerTenant(BROKER_TENANT_NAME)
+        .setServerTenant(SERVER_TENANT_NAME)
+        .setLLC(true)
+        .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
+        .build();
     getHelixResourceManager().addTable(realtimeTableConfig);
 
     // There should be no instance partitions
@@ -141,8 +143,8 @@ public class PinotInstanceAssignmentRestletResourceTest {
     String consumingInstanceId = consumingInstancePartitions.getInstances(0, 0).get(0);
 
     // Use OFFLINE instance assignment config as the COMPLETED instance assignment config
-    realtimeTableConfig
-        .setInstanceAssignmentConfigMap(new TreeMap<InstancePartitionsType, InstanceAssignmentConfig>() {{
+    realtimeTableConfig.setInstanceAssignmentConfigMap(
+        new TreeMap<InstancePartitionsType, InstanceAssignmentConfig>() {{
           put(InstancePartitionsType.CONSUMING, consumingInstanceAssignmentConfig);
           put(InstancePartitionsType.COMPLETED, offlineInstanceAssignmentConfig);
         }});
@@ -167,20 +169,22 @@ public class PinotInstanceAssignmentRestletResourceTest {
     assertEquals(completedInstancePartitions.getInstances(0, 0), Collections.singletonList(offlineInstanceId));
 
     // Test fetching instance partitions by table name with type suffix
-    instancePartitionsMap = deserializeInstancePartitionsMap(sendGetRequest(getControllerRequestURLBuilder()
-        .forInstancePartitions(TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME), null)));
+    instancePartitionsMap = deserializeInstancePartitionsMap(sendGetRequest(
+        getControllerRequestURLBuilder().forInstancePartitions(
+            TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME), null)));
     assertEquals(instancePartitionsMap.size(), 1);
     assertTrue(instancePartitionsMap.containsKey(InstancePartitionsType.OFFLINE));
-    instancePartitionsMap = deserializeInstancePartitionsMap(sendGetRequest(getControllerRequestURLBuilder()
-        .forInstancePartitions(TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME), null)));
+    instancePartitionsMap = deserializeInstancePartitionsMap(sendGetRequest(
+        getControllerRequestURLBuilder().forInstancePartitions(
+            TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME), null)));
     assertEquals(instancePartitionsMap.size(), 2);
     assertTrue(instancePartitionsMap.containsKey(InstancePartitionsType.CONSUMING));
     assertTrue(instancePartitionsMap.containsKey(InstancePartitionsType.COMPLETED));
 
     // Test fetching instance partitions by table name and instance partitions type
     for (InstancePartitionsType instancePartitionsType : InstancePartitionsType.values()) {
-      instancePartitionsMap = deserializeInstancePartitionsMap(
-          sendGetRequest(getControllerRequestURLBuilder().forInstancePartitions(RAW_TABLE_NAME, instancePartitionsType)));
+      instancePartitionsMap = deserializeInstancePartitionsMap(sendGetRequest(
+          getControllerRequestURLBuilder().forInstancePartitions(RAW_TABLE_NAME, instancePartitionsType)));
       assertEquals(instancePartitionsMap.size(), 1);
       assertEquals(instancePartitionsMap.get(instancePartitionsType).getInstancePartitionsName(),
           instancePartitionsType.getInstancePartitionsName(RAW_TABLE_NAME));
@@ -230,15 +234,16 @@ public class PinotInstanceAssignmentRestletResourceTest {
     assertEquals(instancePartitionsMap.size(), 3);
 
     // Remove the instance partitions for real-time table
-    sendDeleteRequest(getControllerRequestURLBuilder()
-        .forInstancePartitions(TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME), null));
+    sendDeleteRequest(getControllerRequestURLBuilder().forInstancePartitions(
+        TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME), null));
     instancePartitionsMap = getInstancePartitionsMap();
     assertEquals(instancePartitionsMap.size(), 1);
     assertTrue(instancePartitionsMap.containsKey(InstancePartitionsType.OFFLINE));
 
     // Assign instances for COMPLETED segments
     instancePartitionsMap = deserializeInstancePartitionsMap(sendPostRequest(
-        getControllerRequestURLBuilder().forInstanceAssign(RAW_TABLE_NAME, InstancePartitionsType.COMPLETED, false), null));
+        getControllerRequestURLBuilder().forInstanceAssign(RAW_TABLE_NAME, InstancePartitionsType.COMPLETED, false),
+        null));
     assertEquals(instancePartitionsMap.size(), 1);
     assertTrue(instancePartitionsMap.containsKey(InstancePartitionsType.COMPLETED));
 
@@ -249,18 +254,18 @@ public class PinotInstanceAssignmentRestletResourceTest {
     assertTrue(instancePartitionsMap.containsKey(InstancePartitionsType.COMPLETED));
 
     // Replace OFFLINE instance with CONSUMING instance for COMPLETED instance partitions
-    instancePartitionsMap = deserializeInstancePartitionsMap(sendPostRequest(getControllerRequestURLBuilder()
-            .forInstanceReplace(RAW_TABLE_NAME, InstancePartitionsType.COMPLETED, offlineInstanceId, consumingInstanceId),
-        null));
+    instancePartitionsMap = deserializeInstancePartitionsMap(sendPostRequest(
+        getControllerRequestURLBuilder().forInstanceReplace(RAW_TABLE_NAME, InstancePartitionsType.COMPLETED,
+            offlineInstanceId, consumingInstanceId), null));
     assertEquals(instancePartitionsMap.size(), 1);
     assertEquals(instancePartitionsMap.get(InstancePartitionsType.COMPLETED).getInstances(0, 0),
         Collections.singletonList(consumingInstanceId));
 
     // Replace the instance again using real-time table name (old instance does not exist)
     try {
-      sendPostRequest(getControllerRequestURLBuilder()
-          .forInstanceReplace(TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME), null, offlineInstanceId,
-              consumingInstanceId), null);
+      sendPostRequest(getControllerRequestURLBuilder().forInstanceReplace(
+          TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME), null, offlineInstanceId, consumingInstanceId),
+          null);
       fail();
     } catch (FileNotFoundException e) {
       // Expected
@@ -302,15 +307,13 @@ public class PinotInstanceAssignmentRestletResourceTest {
     }
   }
 
-  private Map<InstancePartitionsType, InstancePartitions> getInstancePartitionsMap()
-      throws Exception {
+  private Map<InstancePartitionsType, InstancePartitions> getInstancePartitionsMap() throws Exception {
     return deserializeInstancePartitionsMap(
         sendGetRequest(getControllerRequestURLBuilder().forInstancePartitions(RAW_TABLE_NAME, null)));
   }
 
   private Map<InstancePartitionsType, InstancePartitions> deserializeInstancePartitionsMap(
-      String instancePartitionsMapString)
-      throws Exception {
+      String instancePartitionsMapString) throws Exception {
     return JsonUtils.stringToObject(instancePartitionsMapString,
         new TypeReference<Map<InstancePartitionsType, InstancePartitions>>() {
         });

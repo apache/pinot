@@ -28,13 +28,13 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerTestUtils.*;
 
+
 public class AccessControlTest {
 
   private static final String TABLE_NAME = "accessTestTable";
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     validate();
   }
 

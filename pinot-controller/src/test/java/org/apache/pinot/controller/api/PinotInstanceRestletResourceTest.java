@@ -49,19 +49,17 @@ public class PinotInstanceRestletResourceTest {
   private static final long GET_CALL_TIMEOUT_MS = 10000;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     validate();
   }
 
   @Test
-  public void testInstanceListingAndCreation()
-      throws Exception {
+  public void testInstanceListingAndCreation() throws Exception {
     // Check that there is only one CONTROLLER instance in the cluster
     String listInstancesUrl = getControllerRequestURLBuilder().forInstanceList();
 
     // Determine number of instances and controllers. count[0]: number of instances, count[1]: number of controllers;
-    int[] counts = {0,0};
+    int[] counts = {0, 0};
     TestUtils.waitForCondition(aVoid -> {
       try {
         String getResponse = sendGetRequest(listInstancesUrl);
@@ -95,7 +93,8 @@ public class PinotInstanceRestletResourceTest {
     checkNumInstances(listInstancesUrl, counts[0] + 2);
 
     // Create broker and server instances with tags and pools
-    brokerInstance = new Instance("2.3.4.5", 1234, InstanceType.BROKER, Collections.singletonList("tag_BROKER"), null, 0);
+    brokerInstance =
+        new Instance("2.3.4.5", 1234, InstanceType.BROKER, Collections.singletonList("tag_BROKER"), null, 0);
     sendPostRequest(createInstanceUrl, brokerInstance.toJsonString());
 
     Map<String, Integer> serverPools = new TreeMap<>();
@@ -153,13 +152,14 @@ public class PinotInstanceRestletResourceTest {
     checkInstanceInfo(serverInstanceId, "Server_1.2.3.4", 2345, new String[]{newServerTag}, null, null, 28090);
 
     // Test Instance updateTags API
-    String brokerInstanceUpdateTagsUrl = getControllerRequestURLBuilder()
-        .forInstanceUpdateTags(brokerInstanceId, Lists.newArrayList("tag_BROKER", "newTag_BROKER"));
+    String brokerInstanceUpdateTagsUrl = getControllerRequestURLBuilder().forInstanceUpdateTags(brokerInstanceId,
+        Lists.newArrayList("tag_BROKER", "newTag_BROKER"));
     sendPutRequest(brokerInstanceUpdateTagsUrl);
     String serverInstanceUpdateTagsUrl = getControllerRequestURLBuilder().forInstanceUpdateTags(serverInstanceId,
         Lists.newArrayList("tag_REALTIME", "newTag_OFFLINE", "newTag_REALTIME"));
     sendPutRequest(serverInstanceUpdateTagsUrl);
-    checkInstanceInfo(brokerInstanceId, "Broker_1.2.3.4", 1234, new String[]{"tag_BROKER", "newTag_BROKER"}, null, null);
+    checkInstanceInfo(brokerInstanceId, "Broker_1.2.3.4", 1234, new String[]{"tag_BROKER", "newTag_BROKER"}, null,
+        null);
     checkInstanceInfo(serverInstanceId, "Server_1.2.3.4", 2345,
         new String[]{"tag_REALTIME", "newTag_OFFLINE", "newTag_REALTIME"}, null, null, 28090);
   }
@@ -183,7 +183,8 @@ public class PinotInstanceRestletResourceTest {
                   && (instance.get("hostName") != null) && (instance.get("hostName").asText().equals(hostName)) && (
                   instance.get("port") != null) && (instance.get("port").asText().equals(String.valueOf(port)))
                   && (instance.get("enabled").asBoolean()) && (instance.get("tags") != null) && (
-                  instance.get("tags").size() == tags.length) && (instance.get("grpcPort").asText()
+                  instance.get("tags").size() == tags.length) && (instance.get("grpcPort")
+                  .asText()
                   .equals(String.valueOf(grpcPort)));
 
           for (int i = 0; i < tags.length; i++) {
@@ -223,7 +224,6 @@ public class PinotInstanceRestletResourceTest {
       }
     }, GET_CALL_TIMEOUT_MS, "Expected " + numInstances + " instances after creation of tagged instances");
   }
-
 
   @AfterClass
   public void tearDown() {

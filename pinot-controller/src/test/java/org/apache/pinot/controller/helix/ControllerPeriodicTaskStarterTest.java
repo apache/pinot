@@ -18,11 +18,7 @@
  */
 package org.apache.pinot.controller.helix;
 
-import java.util.List;
-import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.core.periodictask.PeriodicTask;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -40,8 +36,7 @@ public class ControllerPeriodicTaskStarterTest {
   private static final int NUM_PERIODIC_TASKS = 6;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     validate();
   }
 

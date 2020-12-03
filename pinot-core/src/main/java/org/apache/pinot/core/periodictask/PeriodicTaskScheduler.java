@@ -35,8 +35,8 @@ public class PeriodicTaskScheduler {
 
   private ScheduledExecutorService _executorService;
   private List<PeriodicTask> _tasksWithValidInterval;
+  private volatile int _taskCount;
 
-  private volatile int taskCount;
   /**
    * Initializes the periodic task scheduler with a list of periodic tasks.
    */
@@ -51,7 +51,7 @@ public class PeriodicTaskScheduler {
       }
     }
 
-    taskCount = _tasksWithValidInterval.size();
+    _taskCount = _tasksWithValidInterval.size();
   }
 
   /**
@@ -60,7 +60,7 @@ public class PeriodicTaskScheduler {
    * @return
    */
   public int getPeriodicTaskCount() {
-    return taskCount;
+    return _taskCount;
   }
 
   /**

@@ -41,8 +41,7 @@ public class PinotResourceManagerTest {
   private static final String TABLE_NAME = "resourceManagerTestTable";
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     validate();
 
     // Adding table
@@ -62,13 +61,11 @@ public class PinotResourceManagerTest {
     Assert.assertTrue(getHelixResourceManager().updateZkMetadata(TABLE_NAME + "_OFFLINE", segmentZKMetadata));
 
     // Update ZK metadata
-    Assert
-        .assertEquals(getHelixResourceManager().getSegmentMetadataZnRecord(TABLE_NAME + "_OFFLINE", "testSegment").getVersion(),
-            0);
+    Assert.assertEquals(
+        getHelixResourceManager().getSegmentMetadataZnRecord(TABLE_NAME + "_OFFLINE", "testSegment").getVersion(), 0);
     Assert.assertTrue(getHelixResourceManager().updateZkMetadata(TABLE_NAME + "_OFFLINE", segmentZKMetadata, 0));
-    Assert
-        .assertEquals(getHelixResourceManager().getSegmentMetadataZnRecord(TABLE_NAME + "_OFFLINE", "testSegment").getVersion(),
-            1);
+    Assert.assertEquals(
+        getHelixResourceManager().getSegmentMetadataZnRecord(TABLE_NAME + "_OFFLINE", "testSegment").getVersion(), 1);
     Assert.assertFalse(getHelixResourceManager().updateZkMetadata(TABLE_NAME + "_OFFLINE", segmentZKMetadata, 0));
   }
 
@@ -81,14 +78,13 @@ public class PinotResourceManagerTest {
    */
 
   @Test
-  public void testBasicAndConcurrentAddingAndDeletingSegments()
-      throws Exception {
+  public void testBasicAndConcurrentAddingAndDeletingSegments() throws Exception {
     final String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
 
     // Basic add/delete case
     for (int i = 1; i <= 2; i++) {
-      getHelixResourceManager()
-          .addNewSegment(TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME), "downloadUrl");
+      getHelixResourceManager().addNewSegment(TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME),
+          "downloadUrl");
     }
     IdealState idealState = getHelixAdmin().getResourceIdealState(getHelixClusterName(), offlineTableName);
     Set<String> segments = idealState.getPartitionSet();
@@ -107,8 +103,8 @@ public class PinotResourceManagerTest {
         @Override
         public void run() {
           for (int i = 0; i < 10; i++) {
-            getHelixResourceManager()
-                .addNewSegment(TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME), "downloadUrl");
+            getHelixResourceManager().addNewSegment(TABLE_NAME,
+                SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME), "downloadUrl");
           }
         }
       });

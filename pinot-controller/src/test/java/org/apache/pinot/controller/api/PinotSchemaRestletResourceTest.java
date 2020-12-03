@@ -37,8 +37,7 @@ import static org.apache.pinot.controller.ControllerTestUtils.*;
 public class PinotSchemaRestletResourceTest {
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     validate();
   }
 
@@ -85,8 +84,7 @@ public class PinotSchemaRestletResourceTest {
   }
 
   @Test
-  public void testCreateUpdateSchema()
-      throws IOException {
+  public void testCreateUpdateSchema() throws IOException {
     String schemaName = "testSchema";
     Schema schema = createDummySchema(schemaName);
     String url = getControllerRequestURLBuilder().forSchemaCreate();

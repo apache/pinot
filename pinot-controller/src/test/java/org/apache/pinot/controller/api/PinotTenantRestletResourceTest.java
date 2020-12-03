@@ -35,14 +35,12 @@ public class PinotTenantRestletResourceTest {
   private static final String TABLE_NAME = "restletTable_OFFLINE";
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     validate();
   }
 
   @Test
-  public void testTableListForTenant()
-      throws Exception {
+  public void testTableListForTenant() throws Exception {
     // Check that no tables on tenant works
     String listTablesUrl = getControllerRequestURLBuilder().forTablesFromTenant(TagNameUtils.DEFAULT_TENANT_NAME);
     JsonNode tableList = JsonUtils.stringToJsonNode(sendGetRequest(listTablesUrl));

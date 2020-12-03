@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.helix;
 
 import java.io.IOException;
-import java.util.Set;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
@@ -38,40 +37,42 @@ public class ControllerSentinelTestV2 {
   private static final String TABLE_NAME = "sentinalTable";
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     validate();
   }
 
   @Test
-  public void testOfflineTableLifeCycle()
-      throws IOException {
+  public void testOfflineTableLifeCycle() throws IOException {
     // Create offline table creation request
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setNumReplicas(MIN_NUM_REPLICAS).build();
     sendPostRequest(getControllerRequestURLBuilder().forTableCreate(), tableConfig.toJsonString());
     Assert.assertEquals(
         getHelixAdmin().getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
-            .getPartitionSet().size(), 1);
+            .getPartitionSet()
+            .size(), 1);
     Assert.assertEquals(
         getHelixAdmin().getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
-            .getInstanceSet(TABLE_NAME + "_OFFLINE").size(), NUM_BROKER_INSTANCES);
+            .getInstanceSet(TABLE_NAME + "_OFFLINE")
+            .size(), NUM_BROKER_INSTANCES);
 
     // Adding segments
     for (int i = 0; i < 10; ++i) {
       Assert.assertEquals(
           getHelixAdmin().getResourceIdealState(getHelixClusterName(), TABLE_NAME + "_OFFLINE").getNumPartitions(), i);
-      getHelixResourceManager()
-          .addNewSegment(TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME), "downloadUrl");
+      getHelixResourceManager().addNewSegment(TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME),
+          "downloadUrl");
       Assert.assertEquals(
-          getHelixAdmin().getResourceIdealState(getHelixClusterName(), TABLE_NAME + "_OFFLINE").getNumPartitions(), i + 1);
+          getHelixAdmin().getResourceIdealState(getHelixClusterName(), TABLE_NAME + "_OFFLINE").getNumPartitions(),
+          i + 1);
     }
 
     // Delete table
     sendDeleteRequest(getControllerRequestURLBuilder().forTableDelete(TABLE_NAME));
     Assert.assertEquals(
         getHelixAdmin().getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
-            .getPartitionSet().size(), 0);
+            .getPartitionSet()
+            .size(), 0);
 
     Assert.assertEquals(getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(),
         TagNameUtils.getBrokerTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME)).size(), NUM_BROKER_INSTANCES);

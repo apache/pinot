@@ -46,32 +46,31 @@ public class ControllerInstanceToggleTest {
   private static final String BROKER_TAG_NAME = TagNameUtils.getBrokerTagForTenant(null);
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     validate();
   }
 
   @Test
-  public void testInstanceToggle()
-      throws Exception {
+  public void testInstanceToggle() throws Exception {
     // Create an offline table
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(MIN_NUM_REPLICAS).build();
     sendPostRequest(getControllerRequestURLBuilder().forTableCreate(), tableConfig.toJsonString());
     Assert.assertEquals(
         getHelixAdmin().getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
-            .getPartitionSet().size(), 1);
+            .getPartitionSet()
+            .size(), 1);
     Assert.assertEquals(
         getHelixAdmin().getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
-            .getInstanceSet(OFFLINE_TABLE_NAME).size(), NUM_BROKER_INSTANCES);
+            .getInstanceSet(OFFLINE_TABLE_NAME)
+            .size(), NUM_BROKER_INSTANCES);
 
     // Add segments
     for (int i = 0; i < NUM_SERVER_INSTANCES; i++) {
-      getHelixResourceManager()
-          .addNewSegment(RAW_TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME), "downloadUrl");
-      Assert
-          .assertEquals(getHelixAdmin().getResourceIdealState(getHelixClusterName(), OFFLINE_TABLE_NAME).getNumPartitions(),
-              i + 1);
+      getHelixResourceManager().addNewSegment(RAW_TABLE_NAME,
+          SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME), "downloadUrl");
+      Assert.assertEquals(
+          getHelixAdmin().getResourceIdealState(getHelixClusterName(), OFFLINE_TABLE_NAME).getNumPartitions(), i + 1);
     }
 
     // Disable server instances
@@ -103,7 +102,8 @@ public class ControllerInstanceToggleTest {
     sendDeleteRequest(getControllerRequestURLBuilder().forTableDelete(RAW_TABLE_NAME));
     Assert.assertEquals(
         getHelixAdmin().getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
-            .getPartitionSet().size(), 0);
+            .getPartitionSet()
+            .size(), 0);
   }
 
   private void toggleInstanceState(String instanceName, String state) {

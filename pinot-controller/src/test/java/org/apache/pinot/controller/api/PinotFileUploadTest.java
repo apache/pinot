@@ -33,6 +33,7 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerTestUtils.*;
 
+
 /**
  * Tests for the file upload restlet.
  */
@@ -40,19 +41,19 @@ public class PinotFileUploadTest {
   private static final String TABLE_NAME = "fileTable";
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     validate();
 
     // Adding table
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setSegmentAssignmentStrategy("RandomAssignmentStrategy").setNumReplicas(2).build();
+        .setSegmentAssignmentStrategy("RandomAssignmentStrategy")
+        .setNumReplicas(2)
+        .build();
     getHelixResourceManager().addTable(tableConfig);
   }
 
   @Test
-  public void testUploadBogusData()
-      throws Exception {
+  public void testUploadBogusData() throws Exception {
     org.apache.http.client.HttpClient httpClient = new DefaultHttpClient();
     HttpPost httpPost = new HttpPost(getControllerRequestURLBuilder().forDataFileUpload());
     HttpEntity entity = new StringEntity("blah");

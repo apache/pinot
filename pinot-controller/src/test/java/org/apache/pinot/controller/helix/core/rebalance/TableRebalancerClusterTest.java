@@ -64,8 +64,7 @@ public class TableRebalancerClusterTest {
   private static final String TIER_B_NAME = "tierB";
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     validate();
   }
 
@@ -81,12 +80,12 @@ public class TableRebalancerClusterTest {
   // TODO:
   // This test case is disabled because it adds a new server instance, but does not remove it after the test. Hence,
   // enabling this test case will cause problems with test cases that run after this test case.
-  @Test (enabled = false)
-  public void testRebalance()
-      throws Exception {
+  @Test(enabled = false)
+  public void testRebalance() throws Exception {
 
 //    int currentBrokerCount = getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size();
-    int currentServerCount = getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE").size();
+    int currentServerCount =
+        getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE").size();
     int numServers = currentServerCount + 3;
     for (int i = currentServerCount; i < numServers; i++) {
       addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, true);
@@ -186,8 +185,8 @@ public class TableRebalancerClusterTest {
 
     // ExternalView should match the new segment assignment
     assertTrue(TableRebalancer.isExternalViewConverged(OFFLINE_TABLE_NAME,
-        getHelixResourceManager().getTableExternalView(OFFLINE_TABLE_NAME).getRecord().getMapFields(), newSegmentAssignment,
-        false));
+        getHelixResourceManager().getTableExternalView(OFFLINE_TABLE_NAME).getRecord().getMapFields(),
+        newSegmentAssignment, false));
 
     // Update the table config to use replica-group based assignment
     InstanceTagPoolConfig tagPoolConfig =
@@ -242,8 +241,8 @@ public class TableRebalancerClusterTest {
 
     // ExternalView should match the segment assignment
     assertTrue(TableRebalancer.isExternalViewConverged(OFFLINE_TABLE_NAME,
-        getHelixResourceManager().getTableExternalView(OFFLINE_TABLE_NAME).getRecord().getMapFields(), newSegmentAssignment,
-        false));
+        getHelixResourceManager().getTableExternalView(OFFLINE_TABLE_NAME).getRecord().getMapFields(),
+        newSegmentAssignment, false));
 
     // Update the table config to use non-replica-group based assignment
     tableConfig.setInstanceAssignmentConfigMap(null);
@@ -270,8 +269,8 @@ public class TableRebalancerClusterTest {
     assertEquals(instancePartitions.getNumReplicaGroups(), 1);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     // Math.abs("testTable_OFFLINE".hashCode()) % 6 = 2
-    assertEquals(instancePartitions.getInstances(0, 0), Arrays
-        .asList(SERVER_INSTANCE_ID_PREFIX + 2, SERVER_INSTANCE_ID_PREFIX + 3, SERVER_INSTANCE_ID_PREFIX + 4,
+    assertEquals(instancePartitions.getInstances(0, 0),
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 2, SERVER_INSTANCE_ID_PREFIX + 3, SERVER_INSTANCE_ID_PREFIX + 4,
             SERVER_INSTANCE_ID_PREFIX + 5, SERVER_INSTANCE_ID_PREFIX + 0, SERVER_INSTANCE_ID_PREFIX + 1));
 
     // Segment assignment should not change as it is already balanced
@@ -324,17 +323,18 @@ public class TableRebalancerClusterTest {
   // This test case is disabled because it adds a new server instance, but does not remove it after the test. Hence,
   // enabling this test case will cause problems with test cases that run after this test case.
   @Test(enabled = false)
-  public void testRebalanceWithTiers()
-      throws Exception {
+  public void testRebalanceWithTiers() throws Exception {
     int numServers = 3;
     for (int i = 0; i < numServers; i++) {
       addFakeServerInstanceToAutoJoinHelixCluster(NO_TIER_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + i, false);
     }
-    getHelixResourceManager().createServerTenant(new Tenant(TenantRole.SERVER, NO_TIER_NAME, numServers, numServers, 0));
+    getHelixResourceManager().createServerTenant(
+        new Tenant(TenantRole.SERVER, NO_TIER_NAME, numServers, numServers, 0));
 
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(TIERED_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
-            .setServerTenant(NO_TIER_NAME).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TIERED_TABLE_NAME)
+        .setNumReplicas(NUM_REPLICAS)
+        .setServerTenant(NO_TIER_NAME)
+        .build();
     // Create the table
     getHelixResourceManager().addTable(tableConfig);
 
@@ -343,8 +343,9 @@ public class TableRebalancerClusterTest {
     long nowInDays = TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis());
     // keep decreasing end time from today in steps of 3. 3 segments don't move. 3 segment on tierA. 4 segments on tierB
     for (int i = 0; i < numSegments; i++) {
-      getHelixResourceManager().addNewSegment(TIERED_TABLE_NAME, SegmentMetadataMockUtils
-          .mockSegmentMetadataWithEndTimeInfo(TIERED_TABLE_NAME, SEGMENT_NAME_PREFIX + i, nowInDays), null);
+      getHelixResourceManager().addNewSegment(TIERED_TABLE_NAME,
+          SegmentMetadataMockUtils.mockSegmentMetadataWithEndTimeInfo(TIERED_TABLE_NAME, SEGMENT_NAME_PREFIX + i,
+              nowInDays), null);
       nowInDays -= 3;
     }
     Map<String, Map<String, String>> oldSegmentAssignment =
@@ -374,10 +375,9 @@ public class TableRebalancerClusterTest {
 
     // add tier config
     tableConfig.setTierConfigsList(Lists.newArrayList(
-        new TierConfig(TIER_A_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "7d",
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, TIER_A_NAME + "_OFFLINE"),
-        new TierConfig(TIER_B_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "15d",
-            TierFactory.PINOT_SERVER_STORAGE_TYPE,  TIER_B_NAME + "_OFFLINE")));
+        new TierConfig(TIER_A_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "7d", TierFactory.PINOT_SERVER_STORAGE_TYPE,
+            TIER_A_NAME + "_OFFLINE"), new TierConfig(TIER_B_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "15d",
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, TIER_B_NAME + "_OFFLINE")));
     getHelixResourceManager().updateTableConfig(tableConfig);
 
     // rebalance should change assignment

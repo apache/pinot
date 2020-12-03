@@ -20,18 +20,17 @@ package org.apache.pinot.controller.helix;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
-import java.util.Set;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.aspectj.lang.annotation.After;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerTestUtils.*;
+
 
 public class ControllerTenantTest {
   private static final String BROKER_TAG_PREFIX = "brokerTag_";
@@ -45,30 +44,26 @@ public class ControllerTenantTest {
   private static final int NUM_SERVERS_PER_TAG = NUM_OFFLINE_SERVERS_PER_TAG + NUM_REALTIME_SERVERS_PER_TAG;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     validate();
 
     ZKMetadataProvider.setClusterTenantIsolationEnabled(getPropertyStore(), false);
   }
 
   @Test
-  public void testBrokerTenant()
-      throws IOException {
+  public void testBrokerTenant() throws IOException {
     // Initial number of untagged broker instances.
-    int untaggedBrokerCount = getHelixAdmin()
-        .getInstancesInClusterWithTag(getHelixClusterName(), CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE).size();
+    int untaggedBrokerCount = getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(),
+        CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE).size();
 
     // Create broker tenants
     for (int i = 1; i <= NUM_BROKER_TAGS; i++) {
       String brokerTenant = BROKER_TAG_PREFIX + i;
       createBrokerTenant(brokerTenant, NUM_BROKERS_PER_TAG);
-      Assert.assertEquals(getHelixAdmin()
-              .getInstancesInClusterWithTag(getHelixClusterName(), TagNameUtils.getBrokerTagForTenant(brokerTenant)).size(),
-          NUM_BROKERS_PER_TAG);
-      Assert.assertEquals(getHelixAdmin()
-              .getInstancesInClusterWithTag(getHelixClusterName(), CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE).size(),
-          untaggedBrokerCount - i * NUM_BROKERS_PER_TAG);
+      Assert.assertEquals(getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(),
+          TagNameUtils.getBrokerTagForTenant(brokerTenant)).size(), NUM_BROKERS_PER_TAG);
+      Assert.assertEquals(getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(),
+          CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE).size(), untaggedBrokerCount - i * NUM_BROKERS_PER_TAG);
     }
 
     // Get broker tenants
@@ -78,7 +73,8 @@ public class ControllerTenantTest {
     // Check that all the new broker names exist.
     for (int i = 1; i <= NUM_BROKER_TAGS; i++) {
       String brokerTag = BROKER_TAG_PREFIX + i;
-      response = JsonUtils.stringToJsonNode(sendGetRequest(getControllerRequestURLBuilder().forBrokerTenantGet(brokerTag)));
+      response =
+          JsonUtils.stringToJsonNode(sendGetRequest(getControllerRequestURLBuilder().forBrokerTenantGet(brokerTag)));
       Assert.assertEquals(response.get("BrokerInstances").size(), NUM_BROKERS_PER_TAG);
       Assert.assertEquals(response.get("tenantName").asText(), brokerTag);
       response = JsonUtils.stringToJsonNode(sendGetRequest(getControllerRequestURLBuilder().forTenantGet(brokerTag)));
@@ -88,35 +84,32 @@ public class ControllerTenantTest {
     }
 
     // Initial number of untagged broker instances.
-    untaggedBrokerCount = getHelixAdmin()
-        .getInstancesInClusterWithTag(getHelixClusterName(), CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE).size();
+    untaggedBrokerCount = getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(),
+        CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE).size();
     // Update broker tenants
     for (int i = 0; i <= NUM_INSTANCES - (NUM_BROKER_TAGS - 1) * NUM_BROKERS_PER_TAG; i++) {
       String brokerTenant = BROKER_TAG_PREFIX + 1;
       updateBrokerTenant(brokerTenant, i);
-      Assert.assertEquals(getHelixAdmin()
-              .getInstancesInClusterWithTag(getHelixClusterName(), TagNameUtils.getBrokerTagForTenant(brokerTenant)).size(),
-          i);
+      Assert.assertEquals(getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(),
+          TagNameUtils.getBrokerTagForTenant(brokerTenant)).size(), i);
 
-      Assert.assertEquals(getHelixAdmin()
-              .getInstancesInClusterWithTag(getHelixClusterName(), CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE).size(),
+      Assert.assertEquals(getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(),
+          CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE).size(),
           untaggedBrokerCount + (NUM_BROKER_TAGS - 1) * NUM_BROKERS_PER_TAG - i);
     }
 
     // Initial number of untagged broker instances.
-    untaggedBrokerCount = getHelixAdmin()
-        .getInstancesInClusterWithTag(getHelixClusterName(), CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE).size();
+    untaggedBrokerCount = getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(),
+        CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE).size();
     // Delete broker tenants
     for (int i = 1; i <= NUM_BROKER_TAGS; i++) {
       String brokerTenant = BROKER_TAG_PREFIX + i;
       String url = getControllerRequestURLBuilder().forBrokerTenantDelete(brokerTenant);
       sendDeleteRequest(url);
-      Assert.assertEquals(getHelixAdmin()
-              .getInstancesInClusterWithTag(getHelixClusterName(), TagNameUtils.getBrokerTagForTenant(brokerTenant)).size(),
-          0);
-      Assert.assertEquals(getHelixAdmin()
-              .getInstancesInClusterWithTag(getHelixClusterName(), CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE).size(),
-          untaggedBrokerCount + i * NUM_BROKERS_PER_TAG);
+      Assert.assertEquals(getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(),
+          TagNameUtils.getBrokerTagForTenant(brokerTenant)).size(), 0);
+      Assert.assertEquals(getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(),
+          CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE).size(), untaggedBrokerCount + i * NUM_BROKERS_PER_TAG);
     }
   }
 
@@ -131,24 +124,20 @@ public class ControllerTenantTest {
   }
 
   @Test
-  public void testServerTenant()
-      throws IOException {
+  public void testServerTenant() throws IOException {
     // Initial number of untagged server instances.
-    int untaggedServerCount = getHelixAdmin()
-        .getInstancesInClusterWithTag(getHelixClusterName(), CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE).size();
+    int untaggedServerCount = getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(),
+        CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE).size();
     // Create server tenants
     for (int i = 1; i <= NUM_SERVER_TAGS; i++) {
       String serverTenant = SERVER_TAG_PREFIX + i;
       createServerTenant(serverTenant, NUM_OFFLINE_SERVERS_PER_TAG, NUM_REALTIME_SERVERS_PER_TAG);
-      Assert.assertEquals(getHelixAdmin()
-          .getInstancesInClusterWithTag(getHelixClusterName(), TagNameUtils.getOfflineTagForTenant(serverTenant))
-          .size(), NUM_OFFLINE_SERVERS_PER_TAG);
-      Assert.assertEquals(getHelixAdmin()
-          .getInstancesInClusterWithTag(getHelixClusterName(), TagNameUtils.getRealtimeTagForTenant(serverTenant))
-          .size(), NUM_REALTIME_SERVERS_PER_TAG);
-      Assert.assertEquals(getHelixAdmin()
-              .getInstancesInClusterWithTag(getHelixClusterName(), CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE).size(),
-          untaggedServerCount - i * NUM_SERVERS_PER_TAG);
+      Assert.assertEquals(getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(),
+          TagNameUtils.getOfflineTagForTenant(serverTenant)).size(), NUM_OFFLINE_SERVERS_PER_TAG);
+      Assert.assertEquals(getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(),
+          TagNameUtils.getRealtimeTagForTenant(serverTenant)).size(), NUM_REALTIME_SERVERS_PER_TAG);
+      Assert.assertEquals(getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(),
+          CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE).size(), untaggedServerCount - i * NUM_SERVERS_PER_TAG);
     }
 
     // Get server tenants
@@ -156,7 +145,8 @@ public class ControllerTenantTest {
     Assert.assertEquals(response.get("SERVER_TENANTS").size(), NUM_SERVER_TAGS + 1);
     for (int i = 1; i <= NUM_SERVER_TAGS; i++) {
       String serverTag = SERVER_TAG_PREFIX + i;
-      response = JsonUtils.stringToJsonNode(sendGetRequest(getControllerRequestURLBuilder().forServerTenantGet(serverTag)));
+      response =
+          JsonUtils.stringToJsonNode(sendGetRequest(getControllerRequestURLBuilder().forServerTenantGet(serverTag)));
       Assert.assertEquals(response.get("ServerInstances").size(), NUM_SERVERS_PER_TAG);
       Assert.assertEquals(response.get("tenantName").asText(), serverTag);
       response = JsonUtils.stringToJsonNode(sendGetRequest(getControllerRequestURLBuilder().forTenantGet(serverTag)));
