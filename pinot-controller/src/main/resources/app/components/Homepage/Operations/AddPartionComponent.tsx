@@ -25,11 +25,11 @@ const useStyles = makeStyles((theme: Theme) =>
     formControl: {
       margin: theme.spacing(1),
       minWidth: 120,
-      width: 300
+      width: 320
     },
     selectFormControl: {
       margin: theme.spacing(1),
-      width: 300
+      width: 320
     },
     redColor: {
       color: theme.palette.error.main
@@ -73,6 +73,7 @@ export default function AddPartionComponent({
         // newTableObj[fieldName] = value;
         setShowPartition(value);
         if(value){
+          newTableObj.routing.segmentPrunerTypes = ["partition"];
             newTableObj.tableIndexConfig.segmentPartitionConfig = {
                 columnPartitionMap : {
                     "" : {

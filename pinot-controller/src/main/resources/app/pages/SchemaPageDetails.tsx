@@ -20,7 +20,7 @@
 import React, { useState, useEffect } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
 import { Grid } from '@material-ui/core';
-import { RouteComponentProps } from 'react-router-dom';
+import { RouteComponentProps, useHistory } from 'react-router-dom';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
 import { TableData } from 'Models';
 import _ from 'lodash';
@@ -35,6 +35,8 @@ import PinotMethodUtils from '../utils/PinotMethodUtils';
 import EditConfigOp from '../components/Homepage/Operations/EditConfigOp';
 import { NotificationContext } from '../components/Notification/NotificationContext';
 import Utils from '../utils/Utils';
+import CustomButton from '../components/CustomButton';
+import Confirm from '../components/Confirm';
 
 const useStyles = makeStyles(() => ({
   root: {
@@ -94,6 +96,7 @@ type Summary = {
 const SchemaPageDetails = ({ match }: RouteComponentProps<Props>) => {
   const { schemaName } = match.params;
   const classes = useStyles();
+  const history = useHistory();
   const [fetching, setFetching] = useState(true);
   const [] = useState<Summary>({
     schemaName: match.params.schemaName,
@@ -105,8 +108,8 @@ const SchemaPageDetails = ({ match }: RouteComponentProps<Props>) => {
     enabled: true,
   });
 
-  const [, setConfirmDialog] = React.useState(false);
-  const [, setDialogDetails] = React.useState(null);
+  const [confirmDialog, setConfirmDialog] = React.useState(false);
+  const [dialogDetails, setDialogDetails] = React.useState(null);
   const {dispatch} = React.useContext(NotificationContext);
 
   const [showEditConfig, setShowEditConfig] = useState(false);
@@ -118,7 +121,7 @@ const SchemaPageDetails = ({ match }: RouteComponentProps<Props>) => {
   });
   const [tableConfig, setTableConfig] = useState('');
   const [schemaJSON, setSchemaJSON] = useState(null);
-  const [actionType] = useState(null);
+  const [actionType,setActionType] = useState(null);
   const [schemaJSONFormat, setSchemaJSONFormat] = useState(false);
 
   const fetchTableSchema = async () => {
@@ -169,9 +172,30 @@ const SchemaPageDetails = ({ match }: RouteComponentProps<Props>) => {
     if(result.status){
       dispatch({type: 'success', message: result.status, show: true});
       setShowEditConfig(false);
+      fetchTableJSON();
     } else {
       dispatch({type: 'error', message: result.error, show: true});
     }
+  };
+
+  const handleDeleteSchemaAction = () => {
+    setDialogDetails({
+      title: 'Delete Schema',
+      content: 'Are you sure want to delete this schema? Any tables using this schema might not function correctly.',
+      successCb: () => deleteSchema()
+    });
+    setConfirmDialog(true);
+  };
+
+  const deleteSchema = async () => {
+    const result = await PinotMethodUtils.deleteSchemaOp(schemaJSON.schemaName);
+    syncResponse(result);
+    history.push('/tables');
+  };
+
+  const closeDialog = () => {
+    setConfirmDialog(false);
+    setDialogDetails(null);
   };
 
   return fetching ? (
@@ -187,6 +211,33 @@ const SchemaPageDetails = ({ match }: RouteComponentProps<Props>) => {
         overflowY: 'auto',
       }}
     >
+      <div className={classes.operationDiv}>
+        <SimpleAccordion
+          headerTitle="Operations"
+          showSearchBox={false}
+        >
+          <div>
+      <CustomButton
+              onClick={()=>{
+                setActionType('editSchema');
+                setConfig(JSON.stringify(schemaJSON, null, 2));
+                setShowEditConfig(true);
+              }}
+              tooltipTitle="Edit Schema"
+              enableTooltip={true}
+            >
+              Edit Schema
+            </CustomButton>
+            <CustomButton
+              isDisabled={!schemaJSON} onClick={handleDeleteSchemaAction}
+              tooltipTitle="Delete Schema"
+              enableTooltip={true}
+            >
+              Delete Schema
+            </CustomButton>
+            </div>
+        </SimpleAccordion>
+      </div>
       <Grid container spacing={2}>
         <Grid item xs={6}>
           <div className={classes.sqlDiv}>
@@ -241,6 +292,15 @@ const SchemaPageDetails = ({ match }: RouteComponentProps<Props>) => {
         config={config}
         handleConfigChange={handleConfigChange}
       />
+      {confirmDialog && dialogDetails && <Confirm
+        openDialog={confirmDialog}
+        dialogTitle={dialogDetails.title}
+        dialogContent={dialogDetails.content}
+        successCallback={dialogDetails.successCb}
+        closeDialog={closeDialog}
+        dialogYesLabel='Yes'
+        dialogNoLabel='No'
+      />}
     </Grid>
   );
 };

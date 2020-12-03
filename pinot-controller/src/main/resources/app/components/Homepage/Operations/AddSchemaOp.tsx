@@ -54,6 +54,58 @@ export default function AddSchemaOp({
   const classes = useStyles();
   const [schemaObj, setSchemaObj] = useState({schemaName:'', dateTimeFieldSpecs: []});
   const {dispatch} = React.useContext(NotificationContext);
+  let isError = false
+
+    const returnValue = (data,key) =>{
+        Object.keys(data).map(async (o)=>{
+          if(!_.isEmpty(data[o]) && typeof data[o] === "object"){
+            await returnValue(data[o],key);
+          }
+          else if(!_.isEmpty(data[o]) && _.isArray(data[o])){
+            data[o].map(async (obj)=>{
+              await returnValue(obj,key);
+            })
+          }else{
+            if(o === key && (data[key] === null || data[key] === "")){
+              dispatch({
+                type: 'error',
+                message: `${key} cannot be empty`,
+                show: true
+              });
+              isError = true;
+            }
+          }
+        })
+      }
+
+      const checkFields = (tableObj,fields) => {
+        fields.forEach(async (o:any)=>{
+            if(tableObj[o.key] === undefined){
+              await returnValue(tableObj,o.key);
+            }else{
+              if((tableObj[o.key] === null || tableObj[o.key] === "")){
+                dispatch({
+                  type: 'error',
+                  message: `${o.label} cannot be empty`,
+                  show: true
+                });
+                isError = true;
+              }
+            }
+        });
+      }
+
+      const isObjEmpty = () =>{
+        const types = ["dimensionFieldSpecs","metricFieldSpecs","dateTimeFieldSpecs"];
+        let notEmpty = true;
+        types.map((t)=>{
+          if(schemaObj[t].length)
+          {
+            notEmpty = false
+          }
+        })
+        return notEmpty;
+      }
 
   const validateSchema = async () => {
     const validSchema = await PinotMethodUtils.validateSchemaAction(schemaObj);
@@ -69,6 +121,13 @@ export default function AddSchemaOp({
   };
 
   const handleSave = async () => {
+    const fields = [{key:"schemaName",label:"schema Name"},{key:"name",label:"Column Name"},{key:"dataType",label:"Data Type"}];
+    await checkFields(schemaObj,fields);
+    if(isError){
+      isError = false;
+      return false;
+    }
+    if(!isObjEmpty()){
     if(await validateSchema()){
       const schemaCreationResp = await PinotMethodUtils.saveSchemaAction(schemaObj);
       dispatch({
@@ -81,6 +140,13 @@ export default function AddSchemaOp({
         hideModal(null);
       }
     }
+    }else{
+        dispatch({
+          type: 'error',
+          message: "Please Enter atleast one Type",
+          show: true
+        });
+      }
   };
 
   return (

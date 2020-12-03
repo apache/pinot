@@ -30,6 +30,9 @@ const useStyles = makeStyles((theme: Theme) =>
     selectFormControl: {
       margin: theme.spacing(1),
       width: 300
+    },
+    redColor: {
+      color: theme.palette.error.main
     }
   })
 );
@@ -69,6 +72,7 @@ export default function AddRealTimePartionComponent({
         // newTableObj[fieldName] = value;
         setShowPartition(value);
         if(value){
+          newTableObj.routing.segmentPrunerTypes = ["partition"];
             newTableObj.tableIndexConfig.segmentPartitionConfig = {
                 columnPartitionMap : {
                     "" : {
@@ -143,6 +147,8 @@ export default function AddRealTimePartionComponent({
     setTableDataObj(tableObj);
   }, [tableObj]);
 
+  const requiredAstrix = <span className={classes.redColor}>*</span>;
+
   return (
     <Grid container spacing={2}>
       <Grid item xs={12}>
@@ -161,7 +167,7 @@ export default function AddRealTimePartionComponent({
          {
             showPartition ?
                 <FormControl className={classes.selectFormControl}>
-                    <InputLabel htmlFor="columnName">Column Name</InputLabel>
+                    <InputLabel htmlFor="columnName">Column Name {requiredAstrix}</InputLabel>
                         <Select
                             labelId="columnName"
                             id="columnName"
@@ -178,7 +184,7 @@ export default function AddRealTimePartionComponent({
          {
             showPartition ?
                 <FormControl className={classes.selectFormControl}>
-                    <InputLabel htmlFor="functionName">Function Name</InputLabel>
+                    <InputLabel htmlFor="functionName">Function Name {requiredAstrix}</InputLabel>
                         <Select
                             labelId="functionNamePartition"
                             id="functionNamePartition"
@@ -196,7 +202,7 @@ export default function AddRealTimePartionComponent({
         {
             showPartition ?
                 <FormControl className={classes.formControl} >
-                    <InputLabel htmlFor="numPartitions">Number of partitions​</InputLabel>
+                    <InputLabel htmlFor="numPartitions">Number of partitions​ {requiredAstrix}</InputLabel>
                     <Input
                         id="numPartitions"
                         value={tableDataObj.tableIndexConfig.segmentPartitionConfig.columnPartitionMap[columnNameTemp].numPartitions}
