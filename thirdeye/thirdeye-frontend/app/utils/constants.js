@@ -9,7 +9,10 @@ export const toastOptions = {
   timeOut: 10000
 };
 
+export const BREADCRUMB_TIME_DISPLAY_FORMAT = 'MMM D HH:mm';
+
 export default {
   deleteProps,
-  toastOptions
+  toastOptions,
+  BREADCRUMB_TIME_DISPLAY_FORMAT
 };
