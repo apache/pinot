@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNumericLiteral;
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.mutable.MutableInt;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
@@ -113,7 +114,7 @@ public class RequestUtils {
         literal.setDoubleValue(node.bigDecimalValue().doubleValue());
       }
     } else {
-      literal.setStringValue(node.toValue().replace("''", "'"));
+      literal.setStringValue(StringUtils.replace(node.toValue(), "''", "'"));
     }
     expression.setLiteral(literal);
     return expression;
