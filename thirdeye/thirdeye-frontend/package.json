@@ -18,6 +18,22 @@
     "eslint-app": "npm run eslint app/",
     "eslint-tests": "npm run eslint tests/"
   },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
+  },
+  "lint-staged": {
+    "**/*.{js,scss,css}": [
+      "./node_modules/.bin/eslint --fix",
+      "./node_modules/.bin/prettier --write",
+      "git add"
+    ],
+    "**/*.hbs": [
+      "./node_modules/.bin/ember-template-lint",
+      "git add"
+    ]
+  },
   "devDependencies": {
     "autosize": "^4.0.0",
     "babel-plugin-transform-object-rest-spread": "^6.26.0",
@@ -74,14 +90,20 @@
     "ember-toggle": "6.0.0",
     "ember-tooltips": "^2.9.0-beta.0",
     "ember-truth-helpers": "^2.1.0",
+    "eslint": "^7.12.1",
+    "eslint-config-prettier": "^6.15.0",
     "eslint-plugin-ember": "~5.0.0",
+    "eslint-plugin-prettier": "^3.1.4",
     "html2canvas": "^1.0.0-rc.5",
+    "husky": "^4.3.0",
     "jspdf": "^1.5.3",
     "keyevent": "^1.1.0",
+    "lint-staged": "^10.5.1",
     "liquid-fire": "^0.30.0",
     "liquid-tether": "^2.0.6",
     "liquid-wormhole": "^2.1.1",
     "loader.js": "^4.2.3",
+    "prettier": "^2.1.2",
     "sass": "^1.23.0",
     "toastr": "^2.1.4"
   },

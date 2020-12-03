@@ -7,13 +7,16 @@ module.exports = {
     ecmaVersion: 2018,
     sourceType: 'module'
   },
-  plugins: ['ember'],
-  extends: ['eslint:recommended', 'plugin:ember/recommended'],
+  plugins: ['prettier', 'ember'],
+  extends: ['eslint:recommended', 'plugin:ember/recommended', "plugin:prettier/recommended"],
   env: {
     browser: true,
-    es6: true
+    es6: true,
+    node: true
   },
   rules: {
+    'no-console': 'error',
+    'no-debugger': 'error',
     'eol-last': ['warn', 'always'],
     indent: ['warn', 2, { SwitchCase: 1 }],
     'space-in-parens': ['warn', 'never'],
@@ -22,23 +25,16 @@ module.exports = {
     'comma-spacing': ['warn', { before: false, after: true }],
     semi: ['warn', 'always'],
     'comma-style': ['warn', 'last'],
-    'no-unused-vars': [
-      'warn',
-      { vars: 'all', args: 'after-used', ignoreRestSiblings: false },
-    ],
-    // TODO: fix all warnings and change rules back to 'error'
+    'no-unused-vars': ['warn', { vars: 'all', args: 'after-used', ignoreRestSiblings: false }],
+    // TODO: fix all warnings and change rules back to "error"
     'ember/avoid-leaking-state-in-ember-objects': ['warn'],
-    'ember/no-attrs-in-components': ['warn']
+    'ember/no-attrs-in-components': ['warn'],
+    'prettier/prettier': ['warn']
   },
   overrides: [
     // node files
     {
-      files: [
-        'testem.js',
-        'ember-cli-build.js',
-        'config/**/*.js',
-        'lib/*/index.js'
-      ],
+      files: ['testem.js', 'ember-cli-build.js', 'config/**/*.js', 'lib/*/index.js'],
       parserOptions: {
         sourceType: 'script',
         ecmaVersion: 2015
@@ -54,8 +50,10 @@ module.exports = {
       files: ['tests/**/*.js'],
       excludedFiles: ['tests/dummy/**/*.js'],
       env: {
-        embertest: true
+        embertest: true,
+        browser: false,
+        node: true
       }
-    },
-  ],
+    }
+  ]
 };
