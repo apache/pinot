@@ -49,7 +49,7 @@ type Props = {
   disable:boolean
 };
 
-export default function AddTableComponent({
+export default function AddRealtimeTableComponent({
   tableObj,
   setTableObj,
   dateTimeFieldSpecs,
@@ -124,7 +124,7 @@ export default function AddTableComponent({
             onChange={(e)=> changeHandler('tableName', e.target.value)}
           />
         </FormControl>
-        
+
         <FormControl className={classes.selectFormControl}>
           <InputLabel htmlFor="tableType">Table Type {requiredAstrix}</InputLabel>
           <Select
@@ -138,6 +138,7 @@ export default function AddTableComponent({
             <MenuItem value="REALTIME">REALTIME</MenuItem>
           </Select>
         </FormControl>
+
         <FormControl className={classes.selectFormControl}>
           <Autocomplete
             className={classes.autoCompleteControl}
@@ -157,7 +158,7 @@ export default function AddTableComponent({
         </FormControl>
 
         <FormControl className={classes.selectFormControl}>
-          <InputLabel htmlFor="replication">Replication</InputLabel>
+          <InputLabel htmlFor="replication">Replication {requiredAstrix}</InputLabel>
           <Select
             labelId="replication"
             id="replication"
