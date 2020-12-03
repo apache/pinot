@@ -152,7 +152,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
     const result = await PinotMethodUtils.getSegmentList(tableName);
     const {columns, records, externalViewObj} = result;
     const instanceObj = {};
-    Object.keys(externalViewObj).map((segmentName)=>{
+    externalViewObj && Object.keys(externalViewObj).map((segmentName)=>{
       const instanceKeys = Object.keys(externalViewObj[segmentName]);
       instanceKeys.map((instanceName)=>{
         if(!instanceObj[instanceName]){

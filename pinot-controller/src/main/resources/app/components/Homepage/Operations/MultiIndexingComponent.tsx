@@ -229,7 +229,6 @@ export default function MultiIndexingComponent({
     }
 
     useEffect(() => {
-        debugger;
         if(jsonUpdated){
             setJsonUpdated(false);
         }

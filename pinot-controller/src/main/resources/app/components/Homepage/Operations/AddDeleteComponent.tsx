@@ -55,6 +55,8 @@ type Props = {
   streamConfigsObj: Object
 };
 
+const compulsoryKeys = ["stream.kafka.broker.list","stream.kafka.topic.name","stream.kafka.consumer.type","stream.kafka.decoder.class.name"];
+
 export default function AddDeleteComponent({
     changeHandler,
     streamConfigsObj
@@ -105,6 +107,9 @@ export default function AddDeleteComponent({
         setValue(Object.values(streamConfigObj));
     }, [streamConfigsObj]);
 
+
+  const requiredAstrix = <span className={classes.redColor}>*</span>;
+
   return (
     <Grid container>
         <h3 className="accordion-subtitle">Stream Config</h3>
@@ -116,7 +121,7 @@ export default function AddDeleteComponent({
                                 <Grid container spacing={2}>
                                     <Grid item xs={6}>
                                         <FormControl className={classes.formControl}>
-                                            <InputLabel htmlFor={o}>Key</InputLabel>
+                                            <InputLabel htmlFor={o}>Key { compulsoryKeys.includes(o) && requiredAstrix }</InputLabel>
                                             <Input
                                                 id={o}
                                                 value={o}
