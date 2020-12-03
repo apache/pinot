@@ -87,6 +87,11 @@ body {
   }
 }
 
+.te-range-picker {
+  input {
+    border-radius: 20px;
+  }
+}
 .te-icon {
   &__inline-link {
     color: $te-link-blue;
@@ -206,7 +211,6 @@ body {
       width: 600px;
       float: left;
       margin-left: -15px;
-      display: inline-block;
       color: app-shade(black, 7);
     }
 
@@ -240,28 +244,42 @@ body {
   background: white;
   padding: 24px;
 
+  &__date-picker-section {
+    display:flex;
+    flex-direction: row;
+    align-items: center;
+
+    .te-range-picker {
+      margin-left: 10px;
+      flex-basis: 35%;
+
+      display: flex;
+      align-items: center;
+    }
+  }
+
+  &__date-picker-label {
+    margin-bottom: 15px;
+    
+    color: rgba(0, 0, 0, 0.9);
+    font-weight: 500;
+    font-size: 14px;
+  }
+
   &__alert-performance {
-    display: inline-block;
-    width: calc(80% - 20px);
-    margin-right: 10px;
     font-family: "Source Sans Pro", sans-serif;
     background: white;
     padding: 24px;
-    padding-bottom: 100%;
-    margin-bottom: -100%;
+    flex-basis: 75%;
     border-right: 2px solid app-shade(black, 1);
   }
 
   &__detection-health {
-    width: 20%;
-    display: inline-block;
-    float: right;
     margin-left: 10px;
     font-family: "Source Sans Pro", sans-serif;
     background: white;
     padding: 24px;
-    padding-bottom: 100%;
-    margin-bottom: -100%;
+    flex-basis: 25%
   }
 
   &__performance-health-wrapper {
@@ -269,6 +287,7 @@ body {
     border-radius: 5px;
     border: 2px solid app-shade(black, 1);
     background: white;
+    display: flex;
   }
 }
 
@@ -367,6 +386,10 @@ body {
     background: white;
     width: 100%;
     border-top: 1px app-shade(black, 1) solid;
+  }
+
+  &__middle {
+    background: white;
   }
 }
 
@@ -782,9 +805,6 @@ body {
     &--details-block {
       padding: 0;
     }
-  }
-
-  &__header {
   }
 
   &__row {

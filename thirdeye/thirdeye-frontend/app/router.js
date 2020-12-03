@@ -26,7 +26,10 @@ Router.map(function() {
     this.route('alerts', function() {
       this.route('index', { path: '/' });
     });
-    this.route('explore', { path: 'explore/:alert_id'});
+    this.route('explore', { path: 'explore/:alert_id'}, function() {
+      this.route('single-metric-anomalies');
+      this.route('composite-anomalies');
+    });
     this.route('yaml', { path: 'yaml/:alert_id' });
   });
 

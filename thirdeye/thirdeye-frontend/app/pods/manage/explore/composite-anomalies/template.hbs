@@ -1,0 +1,28 @@
+<section class="te-page__middle">
+  <section class="container">
+    <section class="te-content-block__date-picker-section">   
+      <span class="te-content-block__date-picker-label">Showing</span>
+      {{date-range-picker
+        class="te-range-picker"
+        timePicker=datePicker.TIME_PICKER
+        timePicker24Hour=datePicker.TIME_PICKER_24_HOUR
+        timePickerIncrement=datePicker.TIME_PICKER_INCREMENT
+        start=datePicker.RANGE_START
+        end=datePicker.RANGE_END
+        ranges=datePicker.PREDEFINED_RANGES
+        showCustomRangeLabel=datePicker.SHOW_CUSTOM_RANGE_LABEL
+        format=datePicker.UI_DATE_FORMAT
+        serverFormat=datePicker.SERVER_FORMAT
+        applyAction=(action "onRangeSelection")
+      }}
+    </section>
+  
+    <section class="te-content-block__performance-health-wrapper">
+      {{detection-health
+        health=model.detectionHealth
+      }}       
+    </section>
+  </section>
+</section>
+
+{{outlet}}

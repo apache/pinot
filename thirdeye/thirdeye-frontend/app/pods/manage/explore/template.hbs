@@ -1,4 +1,4 @@
-<section class="te-page__top te-search-results {{if isEditModeActive "te-search-results--slim"}}">
+<section class="te-page__top {{if isEditModeActive "te-search-results--slim"}}">
   <div class="container">
     {{#self-serve-alert-yaml-details
       alertData=model.alertData
@@ -15,30 +15,4 @@
   </div>
 </section>
 
-<section class="te-page__bottom">
-  <div class="container">
-    {{#if isLoadError}}
-    <div class="te-alert-page-pending">
-      <img src="{{rootURL}}assets/images/te-alert-error.png"
-        class="te-alert-page-pending__image te-alert-page-pending__image--error" alt="error">
-      <h2 class="te-alert-page-pending__title">Oops, something went wrong</h2>
-      <p class="te-alert-page-pending__text">{{errorText}}</p>
-    </div>
-    {{else}}
-    {{alert-details
-        isPreviewMode=false
-        alertYaml=model.detectionYaml
-        showDetails=true
-        dataIsCurrent=true
-        alertId=model.alertId
-        alertData=model.alertData
-        metricUrnRoute=model.metricUrn
-        metricUrnListRoute=model.metricUrnList
-        granularity=model.granularity
-        dimensionExploration=model.alertData.dimensionExploration
-        detectionHealth=model.detectionHealth
-        timeWindowSize=model.timeWindowSize
-      }}
-    {{/if}}
-  </div>
-</section>
+{{outlet}}
