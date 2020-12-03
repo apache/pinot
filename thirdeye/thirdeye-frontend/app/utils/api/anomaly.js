@@ -45,6 +45,17 @@ export function getAnomaliesByAlertIdUrl(alertId, startTime, endTime) {
 }
 
 /**
+ * Returns the url for getting Peformance Stats for a given detection id over the specified time range
+ * @param {Number} alertId - the alert id aka detection config id
+ * @param {Number} startTime - the anomaly start time
+ * @param {Number} endTime - the anomaly end time
+ * @example getPerformanceStatsByAlertId(99999999,1508472700000, 1508472800000) // yields => /detection/99999999/performance?start=1508472700000&end=1508472800000
+ */
+export function getPerformanceStatsByAlertIdUrl(alertId, startTime, endTime) {
+  return `/detection/${alertId}/performance?start=${startTime}&end=${endTime}`;
+}
+
+/**
  * Returns the url for getting anomaly filters of all anomalies over the specified time range
  * @param {Number} startTime - beginning of time range of interest
  * @param {Number} endTime - end of time range of interest
@@ -79,6 +90,7 @@ export const anomalyApiUrls = {
   getAnomalyDataUrl,
   getAnomaliesForYamlPreviewUrl,
   getAnomaliesByAlertIdUrl,
+  getPerformanceStatsByAlertIdUrl,
   getAnomalyFiltersByTimeRangeUrl,
   getAnomalyFiltersByAnomalyIdUrl,
   getBoundsUrl,
