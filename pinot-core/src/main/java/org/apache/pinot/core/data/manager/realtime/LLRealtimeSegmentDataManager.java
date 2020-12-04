@@ -701,6 +701,18 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
+  @Override
+  public Map<String, String> getPartitionToCurrentOffset() {
+    Map<String, String> partitionToCurrentOffset = new HashMap<>();
+    partitionToCurrentOffset.put(String.valueOf(_streamPartitionId), _currentOffset.toString());
+    return partitionToCurrentOffset;
+  }
+
+  @Override
+  public ConsumerState getConsumerState() {
+    return _state == State.ERROR ? ConsumerState.NOT_CONSUMING : ConsumerState.CONSUMING;
+  }
+
   @VisibleForTesting
   protected StreamPartitionMsgOffset getCurrentOffset() {
     return _currentOffset;

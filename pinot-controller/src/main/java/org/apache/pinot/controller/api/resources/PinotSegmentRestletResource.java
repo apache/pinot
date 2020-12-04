@@ -23,6 +23,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -34,6 +36,7 @@ import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -58,7 +61,9 @@ import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
+import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.controller.util.TableMetadataReader;
+import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -541,5 +546,29 @@ public class PinotSegmentRestletResource {
         new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
     return tableMetadataReader.getSegmentsMetadata(tableNameWithType,
         _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+  }
+
+  @GET
+  @Path("/tables/{realtimeTableName}/consumingSegmentsInfo")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Returns state of consuming segments", notes = "Gets the status of consumers from all servers")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Table not found"), @ApiResponse(code = 500, message = "Internal server error")})
+  public ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap getConsumingSegmentsInfo(
+      @ApiParam(value = "Realtime table name with or without type", required = true, example = "myTable | myTable_REALTIME") @PathParam("realtimeTableName") String realtimeTableName) {
+    try {
+      TableType tableType = TableNameBuilder.getTableTypeFromTableName(realtimeTableName);
+      if (TableType.OFFLINE == tableType) {
+        throw new IllegalStateException("Cannot get consuming segments info for OFFLINE table: " + realtimeTableName);
+      }
+      String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(realtimeTableName);
+      ConsumingSegmentInfoReader consumingSegmentInfoReader =
+          new ConsumingSegmentInfoReader(_executor, _connectionManager, _pinotHelixResourceManager);
+      return consumingSegmentInfoReader
+          .getConsumingSegmentsInfo(tableNameWithType, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Failed to get consuming segments info for table %s. %s", realtimeTableName, e.getMessage()),
+          Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
   }
 }

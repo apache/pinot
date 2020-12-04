@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
+import java.util.Map;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegment;
@@ -27,6 +28,14 @@ import org.apache.pinot.core.io.writer.impl.MmapMemoryManager;
 
 
 public abstract class RealtimeSegmentDataManager extends SegmentDataManager {
+
+  /**
+   * The state of the consumer of this segment
+   */
+  public enum ConsumerState {
+    CONSUMING,
+    NOT_CONSUMING // In error state
+  }
 
   @Override
   public abstract MutableSegment getSegment();
@@ -41,4 +50,14 @@ public abstract class RealtimeSegmentDataManager extends SegmentDataManager {
       return new DirectMemoryManager(segmentName, serverMetrics);
     }
   }
+
+  /**
+   * Get the current offsets for all partitions of this consumer
+   */
+  public abstract Map<String, String> getPartitionToCurrentOffset();
+
+  /**
+   * Get the state of the consumer
+   */
+  public abstract ConsumerState getConsumerState();
 }
