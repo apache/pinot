@@ -29,7 +29,6 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
@@ -123,8 +122,8 @@ public class PinotTableRestletResource {
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
 
       TunerConfig tunerConfig = tableConfig.getTunerConfig();
-      if (tunerConfig != null && tunerConfig.name() != null && !tunerConfig.name().isEmpty()) {
-        TableConfigTuner tuner = TableConfigTunerRegistry.getTuner(tunerConfig.name());
+      if (tunerConfig != null && tunerConfig.getName() != null && !tunerConfig.getName().isEmpty()) {
+        TableConfigTuner tuner = TableConfigTunerRegistry.getTuner(tunerConfig.getName());
         tuner.init(tunerConfig, schema);
         tableConfig = tuner.apply(tableConfig);
       }

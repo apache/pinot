@@ -43,6 +43,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
+import org.apache.pinot.spi.config.table.TunerConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceConstraintConfig;
@@ -307,6 +308,27 @@ public class TableConfigSerDeTest {
       tableConfigToCompare = TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig));
       assertEquals(tableConfigToCompare, tableConfig);
       checkTierConfigList(tableConfigToCompare);
+    }
+    {
+      // With tuner config
+      String name = "testTuner";
+      Map<String, String> props = new HashMap<>();
+      props.put("key", "value");
+      TunerConfig tunerConfig = new TunerConfig(name, props);
+      TableConfig tableConfig = tableConfigBuilder.setTunerConfig(tunerConfig).build();
+
+      // Serialize then de-serialize
+      TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class);
+      assertEquals(tableConfigToCompare, tableConfig);
+      TunerConfig tunerConfigToCompare = tableConfigToCompare.getTunerConfig();
+      assertEquals(tunerConfigToCompare.getName(), name);
+      assertEquals(tunerConfigToCompare.getTunerProperties(), props);
+
+      tableConfigToCompare = TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig));
+      assertEquals(tableConfigToCompare, tableConfig);
+      tunerConfigToCompare = tableConfigToCompare.getTunerConfig();
+      assertEquals(tunerConfigToCompare.getName(), name);
+      assertEquals(tunerConfigToCompare.getTunerProperties(), props);
     }
   }
 

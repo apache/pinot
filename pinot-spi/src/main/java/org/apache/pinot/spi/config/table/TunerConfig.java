@@ -24,25 +24,34 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
-import static org.apache.pinot.spi.config.table.TableConfig.TUNER_CONFIG;
-
 
 /**
  * Encapsulates custom config for {@link org.apache.pinot.spi.config.table.tuner.TableConfigTuner}
- * The specified properties must have a 'name' field which specifies the exact type of tuner used
- * for this table.
+ * The 'name' field specifies the exact type of tuner used for this table. This is used by the
+ * controller to retrieve the specific implementation during table creation.
  */
 public class TunerConfig extends BaseJsonConfig {
-  private static final String NAME = "name";
-  private final Map<String, String> _tunerProperties;
+
+  private String _name;
+  private Map<String, String> _tunerProperties;
 
   @JsonCreator
-  public TunerConfig(@JsonProperty(TUNER_CONFIG) @Nullable Map<String, String> tunerProperties) {
+  public TunerConfig(@JsonProperty(value = "name", required = true) String name,
+      @JsonProperty("properties") @Nullable Map<String, String> tunerProperties) {
+    _name = name;
     _tunerProperties = tunerProperties;
   }
 
-  public String name() {
-    return _tunerProperties.get(NAME);
+  public void setName(String name) {
+    _name = name;
+  }
+
+  public String getName() {
+    return _name;
+  }
+
+  public void setTunerProperties(Map<String, String> tunerProperties) {
+    _tunerProperties = tunerProperties;
   }
 
   @Nullable

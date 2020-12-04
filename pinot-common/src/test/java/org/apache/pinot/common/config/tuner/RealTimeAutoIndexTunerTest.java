@@ -51,16 +51,15 @@ public class RealTimeAutoIndexTunerTest {
         .addSingleValueDimension(dimensionColumns[1], FieldSpec.DataType.STRING)
         .addMetric(metricColumns[0], FieldSpec.DataType.INT).build();
     Map<String, String> props = new HashMap<>();
-    props.put("name", TUNER_NAME);
-    _tunerConfig = new TunerConfig(props);
+    _tunerConfig = new TunerConfig(TUNER_NAME, props);
   }
 
   @Test
-  public void testIndexingConfigResolution() {
+  public void testTuner() {
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTunerConfig(_tunerConfig).build();
     TableConfigTuner tuner = TableConfigTunerRegistry.getTuner(TUNER_NAME);
-    tuner.init(new TunerConfig(new HashMap<>()), schema);
+    tuner.init(_tunerConfig, schema);
     TableConfig result = tuner.apply(tableConfig);
 
     IndexingConfig newConfig = result.getIndexingConfig();

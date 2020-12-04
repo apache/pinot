@@ -20,7 +20,6 @@ package org.apache.pinot.common.config.tuner;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Properties;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TunerConfig;
@@ -35,22 +34,21 @@ import org.testng.annotations.Test;
 public class TunerRegistryTest {
 
   private static final String TUNER_NAME = "noopConfigTuner";
-  private static TunerConfig tunerConfig;
+  private static TunerConfig _tunerConfig;
 
   @BeforeClass
   public void setup() {
     Map<String, String> props = new HashMap<>();
-    props.put("name", TUNER_NAME);
-    tunerConfig = new TunerConfig(props);
+    _tunerConfig = new TunerConfig(TUNER_NAME, props);
   }
 
   @Test
   public void testNoOpTableConfigTuner() {
     Schema schema = new Schema.SchemaBuilder().build();
     TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTunerConfig(tunerConfig).build();
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTunerConfig(_tunerConfig).build();
     TableConfigTuner tuner = TableConfigTunerRegistry.getTuner(TUNER_NAME);
-    tuner.init(new TunerConfig(new HashMap<>()), schema);
+    tuner.init(_tunerConfig, schema);
     TableConfig result = tuner.apply(tableConfig);
     Assert.assertEquals(result, tableConfig);
   }
