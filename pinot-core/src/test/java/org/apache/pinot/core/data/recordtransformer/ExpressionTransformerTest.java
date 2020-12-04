@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.recordtransformer;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -228,5 +229,56 @@ public class ExpressionTransformerTest {
     // no transformation
     expressionTransformer.transform(genericRow);
     Assert.assertEquals(genericRow.getValue("outgoing"), "123");
+  }
+
+  /**
+   * Reorder transformations so that all dependencies can be pre-evaluated.
+   * https://github.com/apache/incubator-pinot/issues/5351
+   */
+  @Test
+  public void testReorderBasedOnDependencies() {
+    Schema pinotSchema = new Schema.SchemaBuilder()
+        .addMultiValueDimension("expenses", FieldSpec.DataType.INT)
+        .addMultiValueDimension("headCounts", FieldSpec.DataType.INT)
+        .build();
+
+
+    List<TransformConfig> transformConfigs = new ArrayList<>();
+    transformConfigs.add(new TransformConfig("averageExpense", "Groovy({totalExpense / totalHeadCount}, totalExpense, totalHeadCount)"));
+    transformConfigs.add(new TransformConfig("totalExpense", "Groovy({expenses.sum()}, expenses)"));
+    transformConfigs.add(new TransformConfig("totalHeadCount", "Groovy({headCounts.sum()}, headCounts)"));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTransformFunctions")
+        .setIngestionConfig(new IngestionConfig(null, transformConfigs)).build();
+
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
+
+    GenericRow genericRow = new GenericRow();
+    genericRow.putValue("expenses", Arrays.asList(1, 1, 1));
+    genericRow.putValue("headCounts", Arrays.asList(2, 2, 2));
+
+    expressionTransformer.transform(genericRow);
+    Assert.assertEquals(genericRow.getValue("totalExpense"), 3);
+    Assert.assertEquals(genericRow.getValue("averageExpense"), BigDecimal.valueOf(.5));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testCyclicDependencies() {
+    Schema pinotSchema = new Schema.SchemaBuilder()
+        .addMultiValueDimension("a", FieldSpec.DataType.INT)
+        .build();
+
+    List<TransformConfig> transformConfigs = new ArrayList<>();
+    transformConfigs.add(new TransformConfig("b", "Groovy({a + d}, a, d)"));
+    transformConfigs.add(new TransformConfig("c", "Groovy({b}, b)"));
+    transformConfigs.add(new TransformConfig("d", "Groovy({c}, c)"));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTransformFunctions")
+        .setIngestionConfig(new IngestionConfig(null, transformConfigs)).build();
+
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
+
+    GenericRow genericRow = new GenericRow();
+    genericRow.putValue("a", 1);
+
+    expressionTransformer.transform(genericRow);
   }
 }
