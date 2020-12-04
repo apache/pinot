@@ -28,6 +28,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.Executor;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
@@ -71,7 +72,7 @@ public class ConsumingSegmentInfoReader {
     // Gets info for segments with LLRealtimeSegmentDataManager found in the table data manager
     Map<String, List<SegmentConsumerInfo>> serverToSegmentConsumerInfoMap =
         getConsumingSegmentsInfoFromServers(tableNameWithType, serverToEndpoints, timeoutMs);
-    Map<String, List<ConsumingSegmentInfo>> consumingSegmentInfoMap = new HashMap<>();
+    TreeMap<String, List<ConsumingSegmentInfo>> consumingSegmentInfoMap = new TreeMap<>();
     for (Map.Entry<String, List<SegmentConsumerInfo>> entry : serverToSegmentConsumerInfoMap.entrySet()) {
       String serverName = entry.getKey();
       for (SegmentConsumerInfo info : entry.getValue()) {
@@ -133,10 +134,10 @@ public class ConsumingSegmentInfoReader {
    */
   @JsonIgnoreProperties(ignoreUnknown = true)
   static public class ConsumingSegmentsInfoMap {
-    public Map<String, List<ConsumingSegmentInfo>> _segmentToConsumingInfoMap;
+    public TreeMap<String, List<ConsumingSegmentInfo>> _segmentToConsumingInfoMap;
 
     public ConsumingSegmentsInfoMap(
-        @JsonProperty("segmentToConsumingInfoMap") Map<String, List<ConsumingSegmentInfo>> segmentToConsumingInfoMap) {
+        @JsonProperty("segmentToConsumingInfoMap") TreeMap<String, List<ConsumingSegmentInfo>> segmentToConsumingInfoMap) {
       this._segmentToConsumingInfoMap = segmentToConsumingInfoMap;
     }
   }
