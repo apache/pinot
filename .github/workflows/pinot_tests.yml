@@ -22,6 +22,12 @@ name: Pinot Tests
 on:
   pull_request:
     branches: [ master ]
+    paths-ignore:
+      - "docs/**"
+      - "licenses/**"
+      - "licenses-binary/**"
+      - "website/**"
+      - "**.md"
 
 jobs:
   unit-test:
