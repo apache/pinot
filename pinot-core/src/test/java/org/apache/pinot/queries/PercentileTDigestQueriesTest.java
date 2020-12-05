@@ -270,9 +270,10 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
   }
 
   protected String getAggregationQuery(int percentile) {
-    return String
-        .format("SELECT PERCENTILE%1$d(%2$s), PERCENTILETDIGEST%1$d(%2$s), PERCENTILETDIGEST%1$d(%3$s), PERCENTILE(%2$s, %1$d), PERCENTILETDIGEST(%2$s, %1$d), PERCENTILETDIGEST(%3$s, %1$d) FROM %4$s",
-            percentile, DOUBLE_COLUMN, TDIGEST_COLUMN, TABLE_NAME);
+    return String.format(
+        "SELECT PERCENTILE%1$d(%2$s), PERCENTILETDIGEST%1$d(%2$s), PERCENTILETDIGEST%1$d(%3$s), PERCENTILE(%2$s, %1$d), "
+            + "PERCENTILETDIGEST(%2$s, %1$d), PERCENTILETDIGEST(%3$s, %1$d) FROM %4$s", percentile, DOUBLE_COLUMN,
+        TDIGEST_COLUMN, TABLE_NAME);
   }
 
   private String getGroupByQuery(int percentile) {

@@ -437,19 +437,26 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
 
   @Test
   public void testPercentile50MV() {
-    List<String> queries = Arrays.asList("SELECT PERCENTILE50MV(column6) FROM testTable",
-        "SELECT PERCENTILEMV(column6, 50) FROM testTable", "SELECT PERCENTILEMV(column6, '50') FROM testTable",
-        "SELECT PERCENTILEMV(column6, \"50\") FROM testTable");
+    List<String> queries = Arrays
+        .asList("SELECT PERCENTILE50MV(column6) FROM testTable", "SELECT PERCENTILEMV(column6, 50) FROM testTable",
+            "SELECT PERCENTILEMV(column6, '50') FROM testTable", "SELECT PERCENTILEMV(column6, \"50\") FROM testTable");
 
     DataSchema dataSchema;
     List<Object[]> rows;
     int expectedResultsSize;
     Map<String, String> queryOptions = new HashMap<>(2);
     queryOptions.put(CommonConstants.Broker.Request.QueryOptionKey.RESPONSE_FORMAT, CommonConstants.Broker.Request.SQL);
-    for (String query : queries) {
+    for (int i = 0; i < queries.size(); i++) {
+      String query = queries.get(i);
       BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
-      dataSchema = new DataSchema(new String[]{"percentile50mv(column6)"},
-          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE});
+
+      // Schema for first query is different from schema of the rest of the queries because the second query is using PERCENTILEEMV
+      // function that works off decimal values.
+      dataSchema = i == 0 ? new DataSchema(new String[]{"percentile50mv(column6)"},
+          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE})
+          : new DataSchema(new String[]{"percentilemv(column6, 50.0)"},
+              new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE});
+
       rows = new ArrayList<>();
       rows.add(new Object[]{2147483647.0});
       expectedResultsSize = 1;
@@ -463,8 +470,14 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
           expectedResultsSize, dataSchema);
 
       brokerResponse = getBrokerResponseForPqlQuery(query + FILTER + SV_GROUP_BY, queryOptions);
-      dataSchema = new DataSchema(new String[]{"column8", "percentile50mv(column6)"},
-          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
+
+      // Schema for first query is different from schema of the rest of the queries because the second query is using PERCENTILEEMV
+      // function that works off decimal values.
+      dataSchema = i == 0 ? new DataSchema(new String[]{"column8", "percentile50mv(column6)"},
+          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE})
+          : new DataSchema(new String[]{"column8", "percentilemv(column6, 50.0)"},
+              new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
+
       rows = new ArrayList<>();
       rows.add(new Object[]{"118380643", 5392989.0});
       expectedResultsSize = 10;
@@ -472,8 +485,14 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
           expectedResultsSize, dataSchema);
 
       brokerResponse = getBrokerResponseForPqlQuery(query + FILTER + MV_GROUP_BY, queryOptions);
-      dataSchema = new DataSchema(new String[]{"column7", "percentile50mv(column6)"},
-          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
+
+      // Schema for first query is different from schema of the rest of the queries because the second query is using PERCENTILEEMV
+      // function that works off decimal values.
+      dataSchema = i == 0 ? new DataSchema(new String[]{"column7", "percentile50mv(column6)"},
+          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE})
+          : new DataSchema(new String[]{"column7", "percentilemv(column6, 50.0)"},
+              new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
+
       rows = new ArrayList<>();
       rows.add(new Object[]{"341", 5084850.0});
       QueriesTestUtils.testInterSegmentResultTable(brokerResponse, 174560L, 426752L, 349120L, 400000L, rows,
