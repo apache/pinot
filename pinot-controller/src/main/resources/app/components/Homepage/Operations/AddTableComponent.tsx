@@ -46,12 +46,14 @@ type Props = {
   tableObj: any,
   setTableObj: Function,
   dateTimeFieldSpecs: Array<any>
+  disable:boolean
 };
 
 export default function AddTableComponent({
   tableObj,
   setTableObj,
-  dateTimeFieldSpecs
+  dateTimeFieldSpecs,
+  disable
 }: Props) {
   const classes = useStyles();
 
@@ -130,12 +132,12 @@ export default function AddTableComponent({
             id="tableType"
             value={tableDataObj.tableType}
             onChange={(e)=> changeHandler('tableType', e.target.value)}
+            disabled={disable}
           >
             <MenuItem value="OFFLINE">OFFLINE</MenuItem>
             <MenuItem value="REALTIME">REALTIME</MenuItem>
           </Select>
         </FormControl>
-
         <FormControl className={classes.selectFormControl}>
           <Autocomplete
             className={classes.autoCompleteControl}
@@ -155,7 +157,7 @@ export default function AddTableComponent({
         </FormControl>
 
         <FormControl className={classes.selectFormControl}>
-          <InputLabel htmlFor="replication">Replication {requiredAstrix}</InputLabel>
+          <InputLabel htmlFor="replication">Replication</InputLabel>
           <Select
             labelId="replication"
             id="replication"

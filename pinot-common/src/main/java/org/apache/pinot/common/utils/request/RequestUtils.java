@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNumericLiteral;
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.mutable.MutableInt;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
@@ -41,6 +42,7 @@ import org.apache.pinot.pql.parsers.pql2.ast.IntegerLiteralAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.LiteralAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.PredicateAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.StringLiteralAstNode;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 
 
@@ -112,7 +114,7 @@ public class RequestUtils {
         literal.setDoubleValue(node.bigDecimalValue().doubleValue());
       }
     } else {
-      literal.setStringValue(node.toValue().replace("''", "'"));
+      literal.setStringValue(StringUtils.replace(node.toValue(), "''", "'"));
     }
     expression.setLiteral(literal);
     return expression;
@@ -128,6 +130,12 @@ public class RequestUtils {
   public static Expression getLiteralExpression(String value) {
     Expression expression = createNewLiteralExpression();
     expression.getLiteral().setStringValue(value);
+    return expression;
+  }
+
+  public static Expression getLiteralExpression(byte[] value) {
+    Expression expression = createNewLiteralExpression();
+    expression.getLiteral().setStringValue(BytesUtils.toHexString(value));
     return expression;
   }
 
@@ -169,6 +177,9 @@ public class RequestUtils {
     }
     if (object instanceof SqlLiteral) {
       return RequestUtils.getLiteralExpression((SqlLiteral) object);
+    }
+    if (object instanceof byte[]) {
+      return RequestUtils.getLiteralExpression((byte[]) object);
     }
     throw new SqlCompilationException(
         new IllegalArgumentException("Unsupported Literal value type - " + object.getClass()));

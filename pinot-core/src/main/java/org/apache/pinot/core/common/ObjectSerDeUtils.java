@@ -54,9 +54,9 @@ import org.apache.pinot.common.function.scalar.DataTypeConversionFunctions;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.geospatial.serde.GeometrySerializer;
 import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
-import org.apache.pinot.core.query.aggregation.function.customobject.DistinctTable;
 import org.apache.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
 import org.apache.pinot.core.query.aggregation.function.customobject.QuantileDigest;
+import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -356,7 +356,7 @@ public class ObjectSerDeUtils {
     @Override
     public DistinctTable deserialize(byte[] bytes) {
       try {
-        return new DistinctTable(ByteBuffer.wrap(bytes));
+        return DistinctTable.fromByteBuffer(ByteBuffer.wrap(bytes));
       } catch (IOException e) {
         throw new IllegalStateException("Caught exception while de-serializing DistinctTable", e);
       }
@@ -365,7 +365,7 @@ public class ObjectSerDeUtils {
     @Override
     public DistinctTable deserialize(ByteBuffer byteBuffer) {
       try {
-        return new DistinctTable(byteBuffer);
+        return DistinctTable.fromByteBuffer(byteBuffer);
       } catch (IOException e) {
         throw new IllegalStateException("Caught exception while de-serializing DistinctTable", e);
       }

@@ -66,22 +66,29 @@ public class HelixSetupUtils {
   }
 
   private static void setupHelixClusterIfNeeded(String helixClusterName, String zkPath) {
-    HelixAdmin admin = new ZKHelixAdmin(zkPath);
-    if (admin.getClusters().contains(helixClusterName)) {
-      LOGGER.info("Helix cluster: {} already exists", helixClusterName);
-    } else {
-      LOGGER.info("Creating a new Helix cluster: {}", helixClusterName);
-      admin.addCluster(helixClusterName, false);
-      // Enable Auto-Join for the cluster
-      HelixConfigScope configScope =
-          new HelixConfigScopeBuilder(ConfigScopeProperty.CLUSTER).forCluster(helixClusterName).build();
-      Map<String, String> configMap = new HashMap<>();
-      configMap.put(ZKHelixManager.ALLOW_PARTICIPANT_AUTO_JOIN, Boolean.toString(true));
-      configMap.put(ENABLE_CASE_INSENSITIVE_KEY, Boolean.toString(false));
-      configMap.put(DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(DEFAULT_HYPERLOGLOG_LOG2M));
-      configMap.put(CommonConstants.Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, Boolean.toString(false));
-      admin.setConfig(configScope, configMap);
-      LOGGER.info("New Helix cluster: {} created", helixClusterName);
+    HelixAdmin admin = null;
+    try {
+      admin = new ZKHelixAdmin(zkPath);
+      if (admin.getClusters().contains(helixClusterName)) {
+        LOGGER.info("Helix cluster: {} already exists", helixClusterName);
+      } else {
+        LOGGER.info("Creating a new Helix cluster: {}", helixClusterName);
+        admin.addCluster(helixClusterName, false);
+        // Enable Auto-Join for the cluster
+        HelixConfigScope configScope =
+            new HelixConfigScopeBuilder(ConfigScopeProperty.CLUSTER).forCluster(helixClusterName).build();
+        Map<String, String> configMap = new HashMap<>();
+        configMap.put(ZKHelixManager.ALLOW_PARTICIPANT_AUTO_JOIN, Boolean.toString(true));
+        configMap.put(ENABLE_CASE_INSENSITIVE_KEY, Boolean.toString(false));
+        configMap.put(DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(DEFAULT_HYPERLOGLOG_LOG2M));
+        configMap.put(CommonConstants.Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, Boolean.toString(false));
+        admin.setConfig(configScope, configMap);
+        LOGGER.info("New Helix cluster: {} created", helixClusterName);
+      }
+    } finally {
+      if (admin != null) {
+        admin.close();
+      }
     }
   }
 

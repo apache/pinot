@@ -390,7 +390,7 @@ public class PinotTableRestletResource {
       }
       return tableConfigValidateStr.toString();
     } catch (Exception e) {
-      String msg = String.format("Invalid table config: %s", tableConfig.getTableName());
+      String msg = String.format("Invalid table config: %s. %s", tableConfig.getTableName(), e.getMessage());
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
   }

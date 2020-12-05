@@ -38,6 +38,7 @@ export default Component.extend({
   slider: null,
   sliderOptionsCache: null,
   showBaselineModal: false,
+  showForecastTimeRanges: false,
   customBaselineValue: 'wo1w',
 
   rangeOptions: {
@@ -54,7 +55,7 @@ export default Component.extend({
     },
     {
       groupName: 'Algorithm',
-      options: [ 'predicted' ]
+      options: [ 'predicted', 'forecast' ]
     },
     {
       groupName: 'Custom Baseline Selector',
@@ -90,7 +91,11 @@ export default Component.extend({
     return makeTime(this.get('anomalyRange')[1]).format(serverDateFormat);
   }),
 
-  maxDateFormatted: computed(function() {
+  maxDateFormatted: computed('compareMode', function() {
+    const compareMode = this.get('compareMode');
+    if (compareMode === 'forecast') {
+      return null;
+    }
     return makeTime().startOf('hour').add(1, 'hours').format(serverDateFormat);
   }),
 
@@ -196,6 +201,7 @@ export default Component.extend({
       if (compareMode === 'custom') {
         set(this, 'showBaselineModal', true);
       } else {
+        set(this, 'showForecastTimeRanges', compareMode === 'forecast');
         const { anomalyRange, onChange } = this.getProperties('anomalyRange', 'onChange');
         onChange(anomalyRange[0], anomalyRange[1], compareMode);
       }

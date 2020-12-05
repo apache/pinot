@@ -21,11 +21,18 @@ import React, { useEffect, useState } from 'react';
 import { createStyles, DialogContent, Grid, makeStyles, Theme} from '@material-ui/core';
 import Dialog from '../../CustomDialog';
 import SimpleAccordion from '../../SimpleAccordion';
-import SchemaComponent from './SchemaComponent';
 import AddTableComponent from './AddTableComponent';
 import CustomCodemirror from '../../CustomCodemirror';
 import PinotMethodUtils from '../../../utils/PinotMethodUtils';
 import { NotificationContext } from '../../Notification/NotificationContext';
+import AddTenantComponent from './AddTenantComponent';
+import AddIngestionComponent from './AddIngestionComponent';
+import AddIndexingComponent from './AddIndexingComponent';
+import AddPartionComponent from './AddPartionComponent';
+import AddStorageComponent from './AddStorageComponent';
+import AddQueryComponent from './AddQueryComponent';
+import _ from 'lodash';
+import AddOfflineTenantComponent from './AddOfflineTenantComponent';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -42,7 +49,8 @@ const useStyles = makeStyles((theme: Theme) =>
 
 type Props = {
   hideModal: (event: React.MouseEvent<HTMLElement, MouseEvent>) => void,
-  fetchData: Function
+  fetchData: Function,
+  tableType: String
 };
 
 const defaultTableObj = {
@@ -50,8 +58,7 @@ const defaultTableObj = {
   "tableType": "",
   "tenants": {
     "broker": "DefaultTenant",
-    "server": "DefaultTenant",
-    "tagOverrideConfig": {}
+    "server": "DefaultTenant"
   },
   "segmentsConfig": {
     "schemaName": "",
@@ -62,7 +69,6 @@ const defaultTableObj = {
     "retentionTimeValue": null,
     "segmentPushType": "APPEND",
     "segmentPushFrequency": "HOURLY",
-    "completionConfig": null,
     "crypterClassName": null,
     "peerSegmentDownloadScheme": null
   },
@@ -82,22 +88,7 @@ const defaultTableObj = {
     "enableDynamicStarTreeCreation": false,
     "segmentPartitionConfig": null,
     "columnMinMaxValueGeneratorMode": null,
-    "aggregateMetrics": false,
-    "nullHandlingEnabled": false,
-    "streamConfigs": {
-      "streamType": "kafka",
-      "stream.kafka.topic.name": "",
-      "stream.kafka.broker.list": "",
-      "stream.kafka.consumer.type": "lowlevel",
-      "stream.kafka.consumer.prop.auto.offset.reset": "smallest",
-      "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
-      "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
-      "stream.kafka.decoder.prop.schema.registry.rest.url": null,
-      "stream.kafka.decoder.prop.schema.registry.schema.name": null,
-      "realtime.segment.flush.threshold.rows": "0",
-      "realtime.segment.flush.threshold.time": "24h",
-      "realtime.segment.flush.segment.size": "100M"
-    }
+    "nullHandlingEnabled": false
   },
   "metadata": {},
   "ingestionConfig": {
@@ -122,37 +113,106 @@ const defaultTableObj = {
   "tierConfigs": null
 };
 
-export default function AddTableSchemaOp({
+const defaultSchemaObj = {
+  schemaName: '',
+  dimensionFieldSpecs: [],
+  metricFieldSpecs: [],
+  dateTimeFieldSpecs: []
+};
+
+let timerId = null;
+
+const tableNamekey = ["dimensionFieldSpecs","metricFieldSpecs","dateTimeFieldSpecs"];
+
+export default function AddOfflineTableOp({
   hideModal,
-  fetchData
+  fetchData,
+  tableType
 }: Props) {
   const classes = useStyles();
-  const [schemaObj, setSchemaObj] = useState({schemaName:'', dateTimeFieldSpecs: []});
-  const [schemaName, setSchemaName] = useState("");
   const [tableObj, setTableObj] = useState(JSON.parse(JSON.stringify(defaultTableObj)));
+  const [schemaObj, setSchemaObj] = useState(JSON.parse(JSON.stringify(defaultSchemaObj)));
+  const [tableName, setTableName] = useState('');
+  const [columnName, setColumnName] = useState([]);
   const {dispatch} = React.useContext(NotificationContext);
+  let isError = false;
 
-  useEffect(() => {
-    let newSchemaObj = {...schemaObj};
-    newSchemaObj.schemaName = tableObj.tableName;
-    setSchemaObj(newSchemaObj);
-    setTimeout(()=>{setSchemaName(tableObj.tableName);},0);
-  }, [tableObj])
+  useEffect(()=>{
+    if(tableName !== tableObj.tableName){
+      setTableName(tableObj.tableName);
+      clearTimeout(timerId);
+      timerId = setTimeout(()=>{
+        updateSchemaObj(tableObj.tableName);
+      }, 1000);
+    }
+  }, [tableObj]);
 
-  const validateSchema = async () => {
-    const validSchema = await PinotMethodUtils.validateSchemaAction(schemaObj);
-    if(validSchema.error || typeof validSchema === 'string'){
+  useEffect(()=>{
+    setTableObj({...tableObj,"tableType":tableType})
+  },[])
+
+  const updateSchemaObj = async (tableName) => {
+    //table name is same as schema name
+    const schemaObj = await PinotMethodUtils.getSchemaData(tableName);
+    if(schemaObj.error || typeof schemaObj === 'string'){
       dispatch({
         type: 'error',
-        message: validSchema.error || validSchema,
+        message: schemaObj.error || schemaObj,
         show: true
       });
-      return false;
+      setSchemaObj(defaultSchemaObj)
+    } else {
+      setSchemaObj({...defaultSchemaObj, ...schemaObj});
     }
-    return true;
-  };
+  }
+
+  const returnValue = (data,key) =>{
+    Object.keys(data).map(async (o)=>{
+    if(!_.isEmpty(data[o]) && typeof data[o] === "object"){
+        await returnValue(data[o],key);
+      }
+      else if(!_.isEmpty(data[o]) && _.isArray(data[o])){
+        data[o].map(async (obj)=>{
+          await returnValue(obj,key);
+        })
+     }else{
+        if(o === key && (data[key] === null || data[key] === "")){
+          dispatch({
+            type: 'error',
+            message: `${key} cannot be empty`,
+            show: true
+          });
+          isError = true;
+        }
+      }
+    })
+  }
+
+const checkFields = (tableObj,fields) => {
+    fields.forEach(async (o:any)=>{
+        if(tableObj[o.key] === undefined){
+          await returnValue(tableObj,o.key);
+        }else{
+          if((tableObj[o.key] === null || tableObj[o.key] === "")){
+            dispatch({
+              type: 'error',
+              message: `${o.label} cannot be empty`,
+              show: true
+            });
+            isError = true;
+          }
+        }
+    });
+  }
+
 
   const validateTableConfig = async () => {
+    const fields = [{key:"tableName",label:"Table Name"}];
+    await checkFields(tableObj,fields);
+    if(isError){
+      isError = false;
+      return false;
+    }
     const validTable = await PinotMethodUtils.validateTableAction(tableObj);
     if(validTable.error || typeof validTable === 'string'){
       dispatch({
@@ -166,47 +226,42 @@ export default function AddTableSchemaOp({
   };
 
   const handleSave = async () => {
-    if(await validateSchema() && await validateTableConfig()){
-      const schemaCreationResp = await PinotMethodUtils.saveSchemaAction(schemaObj);
-      dispatch({
-        type: (schemaCreationResp.error || typeof schemaCreationResp === 'string') ? 'error' : 'success',
-        message: schemaCreationResp.error || schemaCreationResp.status || schemaCreationResp,
-        show: true
-      });
+    if(await validateTableConfig()){
       const tableCreationResp = await PinotMethodUtils.saveTableAction(tableObj);
       dispatch({
         type: (tableCreationResp.error || typeof tableCreationResp === 'string') ? 'error' : 'success',
         message: tableCreationResp.error || tableCreationResp.status || tableCreationResp,
         show: true
       });
-      fetchData();
-      hideModal(null);
+      tableCreationResp.status && fetchData();
+      tableCreationResp.status && hideModal(null);
     }
   };
+
+  useEffect(()=>{
+    let columnName = [];
+    if(!_.isEmpty(schemaObj)){
+      tableNamekey.map((o)=>{
+        schemaObj[o] && schemaObj[o].map((obj)=>{
+          columnName.push(obj.name);
+        })
+      })
+    }
+    setColumnName(columnName);
+  },[schemaObj])
 
   return (
     <Dialog
       open={true}
       handleClose={hideModal}
       handleSave={handleSave}
-      title="Add Schema & Table"
+      title={`Add ${tableType} Table`}
       size="xl"
       disableBackdropClick={true}
       disableEscapeKeyDown={true}
     >
       <DialogContent>
         <Grid container spacing={2}>
-          <Grid item xs={12}>
-            <SimpleAccordion
-              headerTitle="Add Schema"
-              showSearchBox={false}
-            >
-              <SchemaComponent
-                schemaName={schemaName}
-                setSchemaObj={(o)=>{setSchemaObj(o);}}
-              />
-            </SimpleAccordion>
-          </Grid>
           <Grid item xs={12}>
             <SimpleAccordion
               headerTitle="Add Table"
@@ -216,6 +271,76 @@ export default function AddTableSchemaOp({
                 tableObj={tableObj}
                 setTableObj={setTableObj}
                 dateTimeFieldSpecs={schemaObj.dateTimeFieldSpecs}
+                disable={tableType !== ""}
+              />
+            </SimpleAccordion>
+          </Grid>
+          <Grid item xs={12}>
+            <SimpleAccordion
+              headerTitle="Tenants"
+              showSearchBox={false}
+            >
+              <AddOfflineTenantComponent
+                tableObj={{...tableObj}}
+                setTableObj={setTableObj}
+              />
+            </SimpleAccordion>
+          </Grid>
+          <Grid item xs={12}>
+            <SimpleAccordion
+              headerTitle="Ingestion"
+              showSearchBox={false}
+            >
+              <AddIngestionComponent
+                tableObj={{...tableObj}}
+                setTableObj={setTableObj}
+                columnName={columnName}
+              />
+            </SimpleAccordion>
+          </Grid>
+          <Grid item xs={12}>
+            <SimpleAccordion
+              headerTitle="Indexing & encoding"
+              showSearchBox={false}
+            >
+              <AddIndexingComponent
+                tableObj={tableObj}
+                setTableObj={setTableObj}
+                columnName={columnName}
+              />
+            </SimpleAccordion>
+          </Grid>
+          <Grid item xs={12}>
+            <SimpleAccordion
+              headerTitle="Partitioning & Routing"
+              showSearchBox={false}
+            >
+              <AddPartionComponent
+                tableObj={tableObj}
+                setTableObj={setTableObj}
+                columnName={columnName}
+              />
+            </SimpleAccordion>
+          </Grid>
+          <Grid item xs={12}>
+            <SimpleAccordion
+              headerTitle="Storage & Data retention"
+              showSearchBox={false}
+            >
+              <AddStorageComponent
+                tableObj={tableObj}
+                setTableObj={setTableObj}
+              />
+            </SimpleAccordion>
+          </Grid>
+          <Grid item xs={12}>
+            <SimpleAccordion
+              headerTitle="Query"
+              showSearchBox={false}
+            >
+              <AddQueryComponent
+                tableObj={tableObj}
+                setTableObj={setTableObj}
               />
             </SimpleAccordion>
           </Grid>

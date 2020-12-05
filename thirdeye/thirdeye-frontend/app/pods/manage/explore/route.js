@@ -134,6 +134,21 @@ export default Route.extend(AuthenticatedRouteMixin, {
     });
   },
 
+  /**
+   * Ember lifecycle hook. Redirect to the subroute depending on the type of the alert
+   *
+   * @override
+   */
+  redirect() {
+    /**
+     * We will be temporarily redirecting to single-metric-anomalies route for all alerts.
+     * Once the new route is ready for composite anomalies, extract model.alertData.type and
+     * subsequenty navigate to composite-anomalies route if type is 'COMPOSITE_ALERT', else
+     * navigate to single-metric-anomalies route.
+     */
+    this.transitionTo('manage.explore.single-metric-anomalies');
+  },
+
   actions: {
     /**
      * save session url for transition on login

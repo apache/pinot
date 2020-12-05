@@ -1,0 +1,20 @@
+<section class="te-page__bottom">
+  <section class="container">
+    {{alert-details
+      isPreviewMode=false
+      alertYaml=model.detectionYaml
+      showDetails=true
+      dataIsCurrent=true
+      alertId=model.alertId
+      alertData=model.alertData
+      metricUrnRoute=model.metricUrn
+      metricUrnListRoute=model.metricUrnList
+      granularity=model.granularity
+      dimensionExploration=model.alertData.dimensionExploration
+      detectionHealth=model.detectionHealth
+      timeWindowSize=model.timeWindowSize
+    }}
+  </section>
+</section>
+
+{{outlet}}
