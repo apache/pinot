@@ -56,31 +56,32 @@ public class AggregationFunctionFactory {
           // Single argument percentile (e.g. Percentile99(foo), PercentileTDigest95(bar), etc.)
           if (remainingFunctionName.matches("\\d+")) {
             // Percentile
-            return new PercentileAggregationFunction(firstArgument, parsePercentile(remainingFunctionName));
+            return new PercentileAggregationFunction(firstArgument, parsePercentileToInt(remainingFunctionName));
           } else if (remainingFunctionName.matches("EST\\d+")) {
             // PercentileEst
             String percentileString = remainingFunctionName.substring(3);
-            return new PercentileEstAggregationFunction(firstArgument, parsePercentile(percentileString));
+            return new PercentileEstAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
           } else if (remainingFunctionName.matches("TDIGEST\\d+")) {
             // PercentileTDigest
             String percentileString = remainingFunctionName.substring(7);
-            return new PercentileTDigestAggregationFunction(firstArgument, parsePercentile(percentileString));
+            return new PercentileTDigestAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
           } else if (remainingFunctionName.matches("\\d+MV")) {
             // PercentileMV
             String percentileString = remainingFunctionName.substring(0, remainingFunctionName.length() - 2);
-            return new PercentileMVAggregationFunction(firstArgument, parsePercentile(percentileString));
+            return new PercentileMVAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
           } else if (remainingFunctionName.matches("EST\\d+MV")) {
             // PercentileEstMV
             String percentileString = remainingFunctionName.substring(3, remainingFunctionName.length() - 2);
-            return new PercentileEstMVAggregationFunction(firstArgument, parsePercentile(percentileString));
+            return new PercentileEstMVAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
           } else if (remainingFunctionName.matches("TDIGEST\\d+MV")) {
             // PercentileTDigestMV
             String percentileString = remainingFunctionName.substring(7, remainingFunctionName.length() - 2);
-            return new PercentileTDigestMVAggregationFunction(firstArgument, parsePercentile(percentileString));
+            return new PercentileTDigestMVAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
           }
         } else if (numArguments == 2) {
-          // Double arguments percentile (e.g. percentile(foo, 99), percentileTDigest(bar, 95), etc.)
-          int percentile = parsePercentile(arguments.get(1).getLiteral());
+          // Double arguments percentile (e.g. percentile(foo, 99), percentileTDigest(bar, 95), etc.) where the
+          // second argument is a decimal number from 0.0 to 100.0.
+          double percentile = parsePercentileToDouble(arguments.get(1).getLiteral());
           if (remainingFunctionName.isEmpty()) {
             // Percentile
             return new PercentileAggregationFunction(firstArgument, percentile);
@@ -175,9 +176,15 @@ public class AggregationFunctionFactory {
     }
   }
 
-  private static int parsePercentile(String percentileString) {
+  private static int parsePercentileToInt(String percentileString) {
     int percentile = Integer.parseInt(percentileString);
     Preconditions.checkArgument(percentile >= 0 && percentile <= 100, "Invalid percentile: %s", percentile);
+    return percentile;
+  }
+
+  private static double parsePercentileToDouble(String percentileString) {
+    double percentile = Double.parseDouble(percentileString);
+    Preconditions.checkArgument(percentile >= 0d && percentile <= 100d, "Invalid percentile: %s", percentile);
     return percentile;
   }
 }

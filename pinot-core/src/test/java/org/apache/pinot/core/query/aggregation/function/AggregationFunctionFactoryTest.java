@@ -135,6 +135,48 @@ public class AggregationFunctionFactoryTest {
     assertEquals(aggregationFunction.getColumnName(), "percentileTDigest99_column");
     assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
+    function = getFunction("PeRcEnTiLe", "(column, 5)");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof PercentileAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILE);
+    assertEquals(aggregationFunction.getColumnName(), "percentile5.0_column");
+    assertEquals(aggregationFunction.getResultColumnName(), "percentile(column, 5.0)");
+
+    function = getFunction("PeRcEnTiLe", "(column, 5.5)");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof PercentileAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILE);
+    assertEquals(aggregationFunction.getColumnName(), "percentile5.5_column");
+    assertEquals(aggregationFunction.getResultColumnName(), "percentile(column, 5.5)");
+
+    function = getFunction("PeRcEnTiLeEsT", "(column, 50)");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof PercentileEstAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILEEST);
+    assertEquals(aggregationFunction.getColumnName(), "percentileEst50.0_column");
+    assertEquals(aggregationFunction.getResultColumnName(), "percentileest(column, 50.0)");
+
+    function = getFunction("PeRcEnTiLeEsT", "(column, 55.555)");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof PercentileEstAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILEEST);
+    assertEquals(aggregationFunction.getColumnName(), "percentileEst55.555_column");
+    assertEquals(aggregationFunction.getResultColumnName(), "percentileest(column, 55.555)");
+
+    function = getFunction("PeRcEnTiLeTdIgEsT", "(column, 99)");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof PercentileTDigestAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILETDIGEST);
+    assertEquals(aggregationFunction.getColumnName(), "percentileTDigest99.0_column");
+    assertEquals(aggregationFunction.getResultColumnName(), "percentiletdigest(column, 99.0)");
+
+    function = getFunction("PeRcEnTiLeTdIgEsT", "(column, 99.9999)");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof PercentileTDigestAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILETDIGEST);
+    assertEquals(aggregationFunction.getColumnName(), "percentileTDigest99.9999_column");
+    assertEquals(aggregationFunction.getResultColumnName(), "percentiletdigest(column, 99.9999)");
+
     function = getFunction("CoUnTmV");
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
     assertTrue(aggregationFunction instanceof CountMVAggregationFunction);
@@ -239,10 +281,42 @@ public class AggregationFunctionFactoryTest {
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILETDIGESTMV);
     assertEquals(aggregationFunction.getColumnName(), "percentileTDigest95MV_column");
     assertEquals(aggregationFunction.getResultColumnName(), "percentiletdigest95mv(column)");
+
+    function = getFunction("PeRcEnTiLeMv", "(column, 10)");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof PercentileMVAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILEMV);
+    assertEquals(aggregationFunction.getColumnName(), "percentile10.0MV_column");
+    assertEquals(aggregationFunction.getResultColumnName(), "percentilemv(column, 10.0)");
+
+    function = getFunction("PeRcEnTiLeEsTmV", "(column, 90)");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof PercentileEstMVAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILEESTMV);
+    assertEquals(aggregationFunction.getColumnName(), "percentileEst90.0MV_column");
+    assertEquals(aggregationFunction.getResultColumnName(), "percentileestmv(column, 90.0)");
+
+    function = getFunction("PeRcEnTiLeTdIgEsTmV", "(column, 95)");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof PercentileTDigestMVAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILETDIGESTMV);
+    assertEquals(aggregationFunction.getColumnName(), "percentileTDigest95.0MV_column");
+    assertEquals(aggregationFunction.getResultColumnName(), "percentiletdigestmv(column, 95.0)");
+
+    function = getFunction("PeRcEnTiLe_TdIgEsT_mV", "(column, 95)");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof PercentileTDigestMVAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILETDIGESTMV);
+    assertEquals(aggregationFunction.getColumnName(), "percentileTDigest95.0MV_column");
+    assertEquals(aggregationFunction.getResultColumnName(), "percentiletdigestmv(column, 95.0)");
   }
 
   private FunctionContext getFunction(String functionName) {
-    return QueryContextConverterUtils.getExpression(functionName + ARGUMENT).getFunction();
+    return getFunction(functionName, ARGUMENT);
+  }
+
+  private FunctionContext getFunction(String functionName, String args) {
+    return QueryContextConverterUtils.getExpression(functionName + args).getFunction();
   }
 
   @Test

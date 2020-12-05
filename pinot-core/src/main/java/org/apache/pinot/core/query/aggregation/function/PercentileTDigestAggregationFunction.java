@@ -38,10 +38,20 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 public class PercentileTDigestAggregationFunction extends BaseSingleInputAggregationFunction<TDigest, Double> {
   public static final int DEFAULT_TDIGEST_COMPRESSION = 100;
 
-  protected final int _percentile;
+  //version 0 functions specified in the of form PERCENTILETDIGEST<2-digits>(column)
+  //version 1 functions of form PERCENTILETDIGEST(column, <2-digits>.<16-digits>)
+  protected final int _version;
+  protected final double _percentile;
 
   public PercentileTDigestAggregationFunction(ExpressionContext expression, int percentile) {
     super(expression);
+    _version = 0;
+    _percentile = percentile;
+  }
+
+  public PercentileTDigestAggregationFunction(ExpressionContext expression, double percentile) {
+    super(expression);
+    _version = 1;
     _percentile = percentile;
   }
 
@@ -52,12 +62,16 @@ public class PercentileTDigestAggregationFunction extends BaseSingleInputAggrega
 
   @Override
   public String getColumnName() {
-    return AggregationFunctionType.PERCENTILETDIGEST.getName() + _percentile + "_" + _expression;
+    return _version == 0 ?
+        AggregationFunctionType.PERCENTILETDIGEST.getName() + (int)_percentile + "_" + _expression:
+        AggregationFunctionType.PERCENTILETDIGEST.getName() + _percentile + "_" + _expression;
   }
 
   @Override
   public String getResultColumnName() {
-    return AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase() + _percentile + "(" + _expression + ")";
+    return _version == 0 ?
+        AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase() + (int)_percentile + "(" + _expression + ")" :
+        AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase() + "(" + _expression + ", " + _percentile + ")";
   }
 
   @Override

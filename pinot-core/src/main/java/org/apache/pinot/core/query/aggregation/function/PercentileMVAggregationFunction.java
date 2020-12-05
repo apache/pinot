@@ -33,6 +33,10 @@ public class PercentileMVAggregationFunction extends PercentileAggregationFuncti
     super(expression, percentile);
   }
 
+  public PercentileMVAggregationFunction(ExpressionContext expression, double percentile) {
+    super(expression, percentile);
+  }
+
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.PERCENTILEMV;
@@ -40,12 +44,16 @@ public class PercentileMVAggregationFunction extends PercentileAggregationFuncti
 
   @Override
   public String getColumnName() {
-    return AggregationFunctionType.PERCENTILE.getName() + _percentile + "MV_" + _expression;
+    return _version == 0 ?
+        AggregationFunctionType.PERCENTILE.getName() + (int)_percentile + "MV_" + _expression:
+        AggregationFunctionType.PERCENTILE.getName()  + _percentile + "MV_" + _expression;
   }
 
   @Override
   public String getResultColumnName() {
-    return AggregationFunctionType.PERCENTILE.getName().toLowerCase() + _percentile + "mv(" + _expression + ")";
+    return _version == 0 ?
+        AggregationFunctionType.PERCENTILE.getName().toLowerCase() + (int)_percentile + "mv(" + _expression + ")":
+        AggregationFunctionType.PERCENTILE.getName().toLowerCase() + "mv(" + _expression + ", " + _percentile + ")";
   }
 
   @Override

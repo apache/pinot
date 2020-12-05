@@ -34,10 +34,20 @@ import org.apache.pinot.core.query.request.context.ExpressionContext;
 public class PercentileAggregationFunction extends BaseSingleInputAggregationFunction<DoubleArrayList, Double> {
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
 
-  protected final int _percentile;
+  //version 0 functions specified in the of form PERCENTILE<2-digits>(column)
+  //version 1 functions of form PERCENTILE(column, <2-digits>.<16-digits>)
+  protected final int _version;
+  protected final double _percentile;
 
   public PercentileAggregationFunction(ExpressionContext expression, int percentile) {
     super(expression);
+    _version = 0;
+    _percentile = percentile;
+  }
+
+  public PercentileAggregationFunction(ExpressionContext expression, double percentile) {
+    super(expression);
+    _version = 1;
     _percentile = percentile;
   }
 
@@ -48,12 +58,16 @@ public class PercentileAggregationFunction extends BaseSingleInputAggregationFun
 
   @Override
   public String getColumnName() {
-    return AggregationFunctionType.PERCENTILE.getName() + _percentile + "_" + _expression;
+    return _version == 0 ?
+        AggregationFunctionType.PERCENTILE.getName() + (int)_percentile + "_" + _expression :
+        AggregationFunctionType.PERCENTILE.getName() + _percentile + "_" + _expression;
   }
 
   @Override
   public String getResultColumnName() {
-    return AggregationFunctionType.PERCENTILE.getName().toLowerCase() + _percentile + "(" + _expression + ")";
+    return _version == 0 ?
+        AggregationFunctionType.PERCENTILE.getName().toLowerCase() + (int)_percentile + "(" + _expression + ")" :
+        AggregationFunctionType.PERCENTILE.getName().toLowerCase() + "(" + _expression + ", " + _percentile + ")";
   }
 
   @Override
