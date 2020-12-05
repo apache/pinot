@@ -30,13 +30,14 @@ import java.util.Map;
 public class SegmentConsumerInfo {
   private final String _segmentName;
   private final String _consumerState;
-  private final Map<String, String> _partitionToOffset;
+  private final Map<String, String> _partitionToOffsetMap;
 
   public SegmentConsumerInfo(@JsonProperty("segmentName") String segmentName,
-      @JsonProperty("consumerState") String consumerState, @JsonProperty("partitionToOffset") Map<String, String> partitionToOffset) {
+      @JsonProperty("consumerState") String consumerState,
+      @JsonProperty("partitionToOffsetMap") Map<String, String> partitionToOffsetMap) {
     _segmentName = segmentName;
     _consumerState = consumerState;
-    _partitionToOffset = partitionToOffset;
+    _partitionToOffsetMap = partitionToOffsetMap;
   }
 
   public String getSegmentName() {
@@ -47,7 +48,7 @@ public class SegmentConsumerInfo {
     return _consumerState;
   }
 
-  public Map<String, String> getPartitionToOffset() {
-    return _partitionToOffset;
+  public Map<String, String> getPartitionToOffsetMap() {
+    return _partitionToOffsetMap;
   }
 }

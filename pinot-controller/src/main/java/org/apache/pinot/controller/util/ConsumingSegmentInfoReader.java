@@ -28,6 +28,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.Executor;
 import org.apache.commons.httpclient.HttpConnectionManager;
@@ -77,11 +78,11 @@ public class ConsumingSegmentInfoReader {
       String serverName = entry.getKey();
       for (SegmentConsumerInfo info : entry.getValue()) {
         consumingSegmentInfoMap.computeIfAbsent(info.getSegmentName(), k -> new ArrayList<>())
-            .add(new ConsumingSegmentInfo(serverName, info.getConsumerState(), info.getPartitionToOffset()));
+            .add(new ConsumingSegmentInfo(serverName, info.getConsumerState(), info.getPartitionToOffsetMap()));
       }
     }
     // Segments which are in CONSUMING state but found no consumer on the server
-    List<String> consumingSegments = _pinotHelixResourceManager.getConsumingSegments(tableNameWithType);
+    Set<String> consumingSegments = _pinotHelixResourceManager.getConsumingSegments(tableNameWithType);
     consumingSegments.forEach(c -> consumingSegmentInfoMap.putIfAbsent(c, Collections.emptyList()));
     return new ConsumingSegmentsInfoMap(consumingSegmentInfoMap);
   }
@@ -149,14 +150,14 @@ public class ConsumingSegmentInfoReader {
   static public class ConsumingSegmentInfo {
     public String _serverName;
     public String _consumerState;
-    public Map<String, String> _partitionToOffset;
+    public Map<String, String> _partitionToOffsetMap;
 
     public ConsumingSegmentInfo(@JsonProperty("serverName") String serverName,
         @JsonProperty("consumerState") String consumerState,
-        @JsonProperty("partitionToOffset") Map<String, String> partitionToOffset) {
+        @JsonProperty("partitionToOffsetMap") Map<String, String> partitionToOffsetMap) {
       _serverName = serverName;
       _consumerState = consumerState;
-      _partitionToOffset = partitionToOffset;
+      _partitionToOffsetMap = partitionToOffsetMap;
     }
   }
 }
