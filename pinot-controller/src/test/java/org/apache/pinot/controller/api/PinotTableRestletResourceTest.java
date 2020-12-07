@@ -46,7 +46,6 @@ import static org.apache.pinot.controller.ControllerTestUtils.*;
 public class PinotTableRestletResourceTest {
   private static final int NUM_BROKER_INSTANCES = 2;
   // NOTE: to add HLC realtime table, number of Server instances must be multiple of number of replicas
-  //private static final int NUM_SERVER_INSTANCES = 6;
 
   private static final String OFFLINE_TABLE_NAME = "testOfflineTable";
   private static final String REALTIME_TABLE_NAME = "testRealtimeTable";
