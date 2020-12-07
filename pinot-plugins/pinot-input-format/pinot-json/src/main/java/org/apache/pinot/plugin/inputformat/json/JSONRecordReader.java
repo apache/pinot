@@ -22,12 +22,14 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.MappingIterator;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -36,6 +38,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
  */
 public class JSONRecordReader implements RecordReader {
   private File _dataFile;
+  private InputStream _inputStream;
   private JSONRecordExtractor _recordExtractor;
 
   private MappingIterator<Map<String, Object>> _iterator;
@@ -45,12 +48,16 @@ public class JSONRecordReader implements RecordReader {
 
   private void init()
       throws IOException {
+    _inputStream = RecordReaderUtils.getBufferedInputStream(_dataFile);
     try {
       _iterator = JsonUtils.DEFAULT_READER.forType(new TypeReference<Map<String, Object>>() {
-      }).readValues(_dataFile);
+      }).readValues(_inputStream);
     } catch (Exception e) {
       if (_iterator != null) {
         _iterator.close();
+      }
+      if (_inputStream != null) {
+        _inputStream.close();
       }
       throw e;
     }
@@ -86,6 +93,7 @@ public class JSONRecordReader implements RecordReader {
   public void rewind()
       throws IOException {
     _iterator.close();
+    _inputStream.close();
     init();
   }
 
@@ -93,5 +101,6 @@ public class JSONRecordReader implements RecordReader {
   public void close()
       throws IOException {
     _iterator.close();
+    _inputStream.close();
   }
 }
