@@ -15,7 +15,7 @@ const DISPLAY_DATE_FORMAT = 'YYYY-MM-DD HH:mm'; // format used consistently acro
 const TIME_RANGE_OPTIONS = ['today', '1d', '2d', '1w'];
 
 export default Controller.extend({
-  toggleCollapsed: false, /* hide/show accordians */
+  toggleCollapsed: false /* hide/show accordians */,
   isReportAnomalyEnabled: false,
   store: service('store'),
   anomaliesByOptions: ['Application', 'Subscription Group'],
@@ -47,200 +47,165 @@ export default Controller.extend({
    * flag for anomalies loading
    * @type {Boolean}
    */
-  isLoading: computed(
-    'model.getAnomaliesTask.isIdle',
-    function() {
-      return !get(this, 'model.getAnomaliesTask.isIdle');
-    }
-  ),
+  isLoading: computed('model.getAnomaliesTask.isIdle', function () {
+    return !get(this, 'model.getAnomaliesTask.isIdle');
+  }),
 
   /**
    * flag for showing anomalies or not
    * @type {Boolean}
    */
-  areAnomaliesCurrent: computed(
-    'isLoading',
-    'anomaliesCount',
-    function() {
-      return (!get(this, 'isLoading') && (get(this, 'anomaliesCount') > 0));
-    }
-  ),
+  areAnomaliesCurrent: computed('isLoading', 'anomaliesCount', function () {
+    return !get(this, 'isLoading') && get(this, 'anomaliesCount') > 0;
+  }),
 
   /**
    * Flag for showing appropriate dropdown
    * @type {Boolean}
    */
-  byApplication: computed(
-    'anomaliesBySelected',
-    function() {
-      return (get(this, 'anomaliesBySelected') === 'Application');
-    }
-  ),
+  byApplication: computed('anomaliesBySelected', function () {
+    return get(this, 'anomaliesBySelected') === 'Application';
+  }),
 
   /**
    * Flag for showing share button
    * @type {Boolean}
    */
-  appOrSubGroup: computed(
-    'appName',
-    'subGroup',
-    function() {
-      return (get(this, 'appName') || get(this, 'subGroup'));
-    }
-  ),
+  appOrSubGroup: computed('appName', 'subGroup', function () {
+    return get(this, 'appName') || get(this, 'subGroup');
+  }),
 
   /**
    * Grabs Ember Data objects from the application collection - peekAll will look at what's in the store without requesting from the backend
    * Sorts the array of application objects by the field "application" and returns it
    * @type {Array}
    */
-  sortedApplications: computed(
-    'model.applications',
-    function() {
-      // Iterate through each anomaly
-      let applications =  this.get('store').peekAll('application').sortBy('application');
-      return applications;
-    }
-  ),
+  sortedApplications: computed('model.applications', function () {
+    // Iterate through each anomaly
+    let applications = this.get('store').peekAll('application').sortBy('application');
+    return applications;
+  }),
 
   /**
    * Grabs Ember Data objects from the subscription-groups collection - peekAll will look at what's in the store without requesting from the backend
    * Sorts the array of application objects by the field "application", filters objects that are inactive or lack yaml fields and returns it
    * @type {Array}
    */
-  sortedSubscriptionGroups: computed(
-    'subscriptionGroups',
-    function() {
+  sortedSubscriptionGroups: computed('subscriptionGroups', function () {
+    // Iterate through each anomaly
+    let groups = this.get('store')
+      .peekAll('subscription-groups')
+      .sortBy('name')
+      .filter((group) => group.get('active') && group.get('yaml'));
+    return groups;
+  }),
+
+  filteredAnomalyMapping: computed('model.{anomalyMapping,feedbackType}', function () {
+    let filteredAnomalyMapping = get(this, 'model.anomalyMapping');
+    const feedbackType = get(this, 'model.feedbackType');
+    const feedbackItem = this._checkFeedback(feedbackType);
+
+    if (feedbackItem.value !== 'ALL' && !isBlank(filteredAnomalyMapping)) {
+      let map = {};
       // Iterate through each anomaly
-      let groups = this.get('store').peekAll('subscription-groups')
-        .sortBy('name')
-        .filter(group => (group.get('active') && group.get('yaml')));
-      return groups;
-    }
-  ),
-
-  filteredAnomalyMapping: computed(
-    'model.{anomalyMapping,feedbackType}',
-    function() {
-      let filteredAnomalyMapping = get(this, 'model.anomalyMapping');
-      const feedbackType = get(this, 'model.feedbackType');
-      const feedbackItem = this._checkFeedback(feedbackType);
-
-      if (feedbackItem.value !== 'ALL' && !isBlank(filteredAnomalyMapping)) {
-        let map = {};
-        // Iterate through each anomaly
-        Object.keys(filteredAnomalyMapping).some(function(key) {
-          filteredAnomalyMapping[key].forEach(attr => {
-            if (attr.anomaly.data.feedback === feedbackItem.value) {
-              if (!map[key]) {
-                map[key] = [];
-              }
-              map[key].push(attr);
+      Object.keys(filteredAnomalyMapping).some(function (key) {
+        filteredAnomalyMapping[key].forEach((attr) => {
+          if (attr.anomaly.data.feedback === feedbackItem.value) {
+            if (!map[key]) {
+              map[key] = [];
             }
-          });
+            map[key].push(attr);
+          }
         });
-        return map;
-      } else {
-        return filteredAnomalyMapping;
-      }
-
+      });
+      return map;
+    } else {
+      return filteredAnomalyMapping;
     }
-  ),
+  }),
 
   /**
    * Date types to display in the pills
    * @type {Object[]} - array of objects, each of which represents each date pill
    */
-  pill: computed(
-    'model.{appName,startDate,endDate,duration}',
-    function() {
-      const appName = get(this, 'model.appName');
-      const startDate = Number(get(this, 'model.startDate'));
-      const endDate = Number(get(this, 'model.endDate'));
-      const duration = get(this, 'model.duration') || DEFAULT_ACTIVE_DURATION;
-      const predefinedRanges = {
-        'Today': [moment().startOf('day'), moment().startOf('day').add(1, 'day')],
-        'Last 24 hours': [moment().subtract(1, 'day'), moment()],
-        'Yesterday': [moment().subtract(1, 'day').startOf('day'), moment().startOf('day')],
-        'Last Week': [moment().subtract(1, 'week'), moment()]
-      };
+  pill: computed('model.{appName,startDate,endDate,duration}', function () {
+    const appName = get(this, 'model.appName');
+    const startDate = Number(get(this, 'model.startDate'));
+    const endDate = Number(get(this, 'model.endDate'));
+    const duration = get(this, 'model.duration') || DEFAULT_ACTIVE_DURATION;
+    const predefinedRanges = {
+      Today: [moment().startOf('day'), moment().startOf('day').add(1, 'day')],
+      'Last 24 hours': [moment().subtract(1, 'day'), moment()],
+      Yesterday: [moment().subtract(1, 'day').startOf('day'), moment().startOf('day')],
+      'Last Week': [moment().subtract(1, 'week'), moment()]
+    };
 
-      return {
-        appName,
-        uiDateFormat: UI_DATE_FORMAT,
-        activeRangeStart: moment(startDate).format(DISPLAY_DATE_FORMAT),
-        activeRangeEnd: moment(endDate).format(DISPLAY_DATE_FORMAT),
-        timeRangeOptions: setUpTimeRangeOptions(TIME_RANGE_OPTIONS, duration),
-        timePickerIncrement: TIME_PICKER_INCREMENT,
-        predefinedRanges
-      };
-    }
-  ),
+    return {
+      appName,
+      uiDateFormat: UI_DATE_FORMAT,
+      activeRangeStart: moment(startDate).format(DISPLAY_DATE_FORMAT),
+      activeRangeEnd: moment(endDate).format(DISPLAY_DATE_FORMAT),
+      timeRangeOptions: setUpTimeRangeOptions(TIME_RANGE_OPTIONS, duration),
+      timePickerIncrement: TIME_PICKER_INCREMENT,
+      predefinedRanges
+    };
+  }),
 
   /**
    * Stats to display in cards
    * @type {Object[]} - array of objects, each of which represents a stats card
    */
-  stats: computed(
-    'model.anomalyMapping',
-    function() {
-      const anomalyMapping = get(this, 'model.anomalyMapping');
-      if (!anomalyMapping) {
-        return {};
-      }
-      let respondedAnomaliesCount = 0;
-      let truePositives = 0;
-      let falsePositives = 0;
-      let falseNegatives = 0;
-      Object.keys(anomalyMapping).forEach(function (key) {
-        anomalyMapping[key].forEach(function (attr) {
-          const classification = ((attr.anomaly || {}).data || {}).classification;
-          if (classification != 'NONE') {
-            respondedAnomaliesCount++;
-            if (classification == 'TRUE_POSITIVE') {
-              truePositives++;
-            } else if (classification == 'FALSE_POSITIVE') {
-              falsePositives++;
-            } else if (classification == 'FALSE_NEGATIVE') {
-              falseNegatives++;
-            }
-          }
-        });
-      });
-
-      const totalAnomaliesCount = get(this, 'anomaliesCount');
-      const responseRate = respondedAnomaliesCount / totalAnomaliesCount;
-      const precision = truePositives / (truePositives + falsePositives);
-      const recall = truePositives / (truePositives + falseNegatives);
-      const totalAlertsDescription = 'Total number of anomalies that occured over a period of time';
-      const responseRateDescription = '% of anomalies that are reviewed';
-      const precisionDescription = '% of all anomalies detected by the system that are true';
-      const recallDescription = '% of all anomalies detected by the system';
-      //TODO: Since totalAlerts is not correct here. We will use anomaliesCount for now till backend api is fixed. - lohuynh
-      const statsArray = [
-        ['Number of anomalies', totalAlertsDescription, totalAnomaliesCount, 'digit'],
-        ['Response Rate', responseRateDescription, floatToPercent(responseRate), 'percent'],
-        ['Precision', precisionDescription, floatToPercent(precision), 'percent'],
-        ['Recall', recallDescription, floatToPercent(recall), 'percent']
-      ];
-
-      return statsArray;
+  stats: computed('model.anomalyMapping', function () {
+    const anomalyMapping = get(this, 'model.anomalyMapping');
+    if (!anomalyMapping) {
+      return {};
     }
-  ),
+    let respondedAnomaliesCount = 0;
+    let truePositives = 0;
+    let falsePositives = 0;
+    let falseNegatives = 0;
+    Object.keys(anomalyMapping).forEach(function (key) {
+      anomalyMapping[key].forEach(function (attr) {
+        const classification = ((attr.anomaly || {}).data || {}).classification;
+        if (classification != 'NONE') {
+          respondedAnomaliesCount++;
+          if (classification == 'TRUE_POSITIVE') {
+            truePositives++;
+          } else if (classification == 'FALSE_POSITIVE') {
+            falsePositives++;
+          } else if (classification == 'FALSE_NEGATIVE') {
+            falseNegatives++;
+          }
+        }
+      });
+    });
+
+    const totalAnomaliesCount = get(this, 'anomaliesCount');
+    const responseRate = respondedAnomaliesCount / totalAnomaliesCount;
+    const precision = truePositives / (truePositives + falsePositives);
+    const recall = truePositives / (truePositives + falseNegatives);
+    //TODO: Since totalAlerts is not correct here. We will use anomaliesCount for now till backend api is fixed. - lohuynh
+
+    return {
+      totalAnomalies: { value: totalAnomaliesCount },
+      responseRate: { value: floatToPercent(responseRate) },
+      precision: { value: floatToPercent(precision) },
+      recall: { value: floatToPercent(recall) }
+    };
+  }),
 
   /**
    * Helper for getting the matching selected response feedback object
    * @param {string} selected - selected filter by value
    * @return {string}
    */
-  _checkFeedback: function(selected) {
+  _checkFeedback: function (selected) {
     return get(this, 'anomalyResponseFilterTypes').find((type) => {
       return type.name === selected;
     });
   },
 
   actions: {
-
     /**
      * Sets the selected metric alert if user triggers power-select
      * @param {String} metric - the metric group for the selection
@@ -250,7 +215,9 @@ export default Controller.extend({
     onSelectAlert(metric, alertName) {
       const targetMetricRecord = get(this.model, 'alertsByMetric')[metric];
       if (targetMetricRecord.names.length > 1) {
-        targetMetricRecord.selectedIndex = targetMetricRecord.names.findIndex(alert => { return alert === alertName; });
+        targetMetricRecord.selectedIndex = targetMetricRecord.names.findIndex((alert) => {
+          return alert === alertName;
+        });
       }
     },
 
@@ -268,12 +235,14 @@ export default Controller.extend({
       const endDate = anomalyList[0].humanizedObject.queryEnd;
       // Navigate to alert page for selected alert
       if (targetId) {
-        this.transitionToRoute('manage.alert', targetId, { queryParams: {
-          duration,
-          startDate,
-          endDate,
-          openReport: true
-        }});
+        this.transitionToRoute('manage.alert', targetId, {
+          queryParams: {
+            duration,
+            startDate,
+            endDate,
+            openReport: true
+          }
+        });
       }
     },
 
@@ -316,18 +285,14 @@ export default Controller.extend({
      * @param {Object} rangeOption - the user-selected time range to load
      */
     onRangeSelection(timeRangeOptions) {
-      const {
-        start,
-        end,
-        value: duration
-      } = timeRangeOptions;
+      const { start, end, value: duration } = timeRangeOptions;
 
       const startDate = moment(start).valueOf();
       const endDate = moment(end).valueOf();
       const appName = get(this, 'appName');
       //Update the time range option selected
       this.set('timeRangeOptions', setUpTimeRangeOptions(TIME_RANGE_OPTIONS, duration));
-      this.transitionToRoute({ queryParams: { appName, duration, startDate, endDate }});
+      this.transitionToRoute({ queryParams: { appName, duration, startDate, endDate } });
     },
 
     /**

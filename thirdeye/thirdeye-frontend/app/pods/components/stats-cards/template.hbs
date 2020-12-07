@@ -30,13 +30,13 @@
         {{else}}
           <!-- Only one anomaly count -->
           <li class="te-horizontal-cards__card-number">
-            {{card.value}}{{#if (eq card.unit 'percent')}}%{{/if}}
+            {{card.value}}{{#if (eq card.type 'PERCENT')}}%{{/if}}
           </li>
         {{/if}}
       {{else}}
         <!-- Not Anomalies -->
         <li class="te-horizontal-cards__card-number">
-          {{card.value}}{{#if (eq card.unit 'percent')}}%{{/if}}
+          {{card.value}}{{#if (eq card.type 'PERCENT')}}%{{/if}}
         </li>
       {{/if}}
     </li>

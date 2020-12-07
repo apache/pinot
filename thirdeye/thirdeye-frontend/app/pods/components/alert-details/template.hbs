@@ -88,11 +88,17 @@
                 </label>
               </h4>
               {{!-- Alert anomaly stats cards --}}
-              {{stats-cards
-                stats=stats
-                areTwoSetsOfAnomalies=areTwoSetsOfAnomalies
-                isEditMode=isEditMode
-              }}
+              {{#if performanceStatsTaskInstance.isRunning }}
+                <div class="spinner-wrapper spinner-wrapper--card">
+                  {{ember-spinner lines=30 radius=20 length=0 width=10 opacity=0 trail=75 color='blue'}}
+                </div>
+              {{else}}  
+                {{stats-cards
+                  stats=computedStats
+                  areTwoSetsOfAnomalies=areTwoSetsOfAnomalies
+                  isEditMode=isEditMode
+                }}
+              {{/if}}
             </div>
 
             {{detection-health
@@ -115,11 +121,17 @@
                 </label>
               </h4>
               {{!-- Alert anomaly stats cards --}}
-              {{stats-cards
-                stats=stats
-                areTwoSetsOfAnomalies=areTwoSetsOfAnomalies
-                isEditMode=isEditMode
-              }}
+              {{#if performanceStatsTaskInstance.isRunning }}
+                <div class="spinner-wrapper spinner-wrapper--card">
+                  {{ember-spinner lines=30 radius=20 length=0 width=10 opacity=0 trail=75 color='blue'}}
+                </div>
+              {{else}}  
+                {{stats-cards
+                  stats=computedStats
+                  areTwoSetsOfAnomalies=areTwoSetsOfAnomalies
+                  isEditMode=isEditMode
+                }}
+              {{/if}}
             </div>
 
           {{/if}}

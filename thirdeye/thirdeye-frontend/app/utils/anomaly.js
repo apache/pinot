@@ -13,6 +13,7 @@ import {
   anomalyApiUrls,
   getAnomaliesForYamlPreviewUrl,
   getAnomaliesByAlertIdUrl,
+  getPerformanceStatsByAlertIdUrl,
   getAnomalyFiltersByTimeRangeUrl,
   getAnomalyFiltersByAnomalyIdUrl,
   getBoundsUrl,
@@ -198,6 +199,19 @@ export function getAnomalyFiltersByTimeRange(startTime, endTime) {
  */
 export function getAnomalyFiltersByAnomalyId(startTime, endTime, anomalyIds) {
   const url = getAnomalyFiltersByAnomalyIdUrl(startTime, endTime, anomalyIds);
+  return fetch(url).then(checkStatus);
+}
+
+/**
+ * Get performance stats for a given detection id over a specified time range
+ * @method getPerformanceStatsByAlertId
+ * @param {Number} alertId - the alert id aka detection config id
+ * @param {Number} startTime - start time of analysis range
+ * @param {Number} endTime - end time of analysis range
+ * @return {Ember.RSVP.Promise}
+ */
+export function getPerformanceStatsByAlertId(alertId, startTime, endTime) {
+  const url = getPerformanceStatsByAlertIdUrl(alertId, startTime, endTime);
   return fetch(url).then(checkStatus);
 }
 
