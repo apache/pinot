@@ -69,50 +69,6 @@ public class ValidationManagerTest {
     getHelixResourceManager().addTable(_offlineTableConfig);
   }
 
-  // TODO:
-  // This test case is disabled because it adds a new broker, but does not remove it after the test. Hence, enabling
-  // this test case will cause problems with test cases that run after this test case.
-  @Test(enabled = false)
-  public void testRebuildBrokerResourceWhenBrokerAdded() throws Exception {
-    // Check that the first table we added doesn't need to be rebuilt(case where ideal state brokers and brokers in broker resource are the same.
-    String partitionName = _offlineTableConfig.getTableName();
-    HelixAdmin helixAdmin = getHelixManager().getClusterManagmentTool();
-
-    IdealState idealState = HelixHelper.getBrokerIdealStates(helixAdmin, getHelixClusterName());
-    // Ensure that the broker resource is not rebuilt.
-    Assert.assertTrue(idealState.getInstanceSet(partitionName)
-        .equals(getHelixResourceManager().getAllInstancesForBrokerTenant(TagNameUtils.DEFAULT_TENANT_NAME)));
-    getHelixResourceManager().rebuildBrokerResourceFromHelixTags(partitionName);
-
-    // Add another table that needs to be rebuilt
-    TableConfig offlineTableConfigTwo = new TableConfigBuilder(TableType.OFFLINE).setTableName(TEST_TABLE_TWO).build();
-    getHelixResourceManager().addTable(offlineTableConfigTwo);
-    String partitionNameTwo = offlineTableConfigTwo.getTableName();
-
-    List<String> brokersList =
-        getHelixAdmin().getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER");
-    int brokerCount = brokersList == null ? 0 : brokersList.size();
-
-    // Add a new broker manually such that the ideal state is not updated and ensure that rebuild broker resource is called
-    final String brokerId = "Broker_localhost_" + brokerCount;
-    InstanceConfig instanceConfig = new InstanceConfig(brokerId);
-    instanceConfig.setInstanceEnabled(true);
-    instanceConfig.setHostName("Broker_localhost");
-    instanceConfig.setPort("2");
-    helixAdmin.addInstance(getHelixClusterName(), instanceConfig);
-    helixAdmin.addInstanceTag(getHelixClusterName(), instanceConfig.getInstanceName(),
-        TagNameUtils.getBrokerTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME));
-    idealState = HelixHelper.getBrokerIdealStates(helixAdmin, getHelixClusterName());
-    // Assert that the two don't equal before the call to rebuild the broker resource.
-    Assert.assertTrue(!idealState.getInstanceSet(partitionNameTwo)
-        .equals(getHelixResourceManager().getAllInstancesForBrokerTenant(TagNameUtils.DEFAULT_TENANT_NAME)));
-    getHelixResourceManager().rebuildBrokerResourceFromHelixTags(partitionNameTwo);
-    idealState = HelixHelper.getBrokerIdealStates(helixAdmin, getHelixClusterName());
-    // Assert that the two do equal after being rebuilt.
-    Assert.assertTrue(idealState.getInstanceSet(partitionNameTwo)
-        .equals(getHelixResourceManager().getAllInstancesForBrokerTenant(TagNameUtils.DEFAULT_TENANT_NAME)));
-  }
-
   @Test
   public void testPushTimePersistence() {
     SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);

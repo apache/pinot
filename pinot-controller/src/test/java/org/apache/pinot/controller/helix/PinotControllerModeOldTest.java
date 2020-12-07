@@ -16,13 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
-/*
- * TODO:
- * This class changes state by setting _helixManager and _helixAdmin and starting and stoping controllers; hence, it
- * no longer fits well with other test cases which are now working off a common shared state. Commenting out this
- * test until it can be further cleaned up.
- *
 package org.apache.pinot.controller.helix;
 
 import java.util.Map;
@@ -51,8 +44,13 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class PinotControllerModeTest extends ControllerTest {
+public class PinotControllerModeOldTest extends ControllerTest {
   private static long TIMEOUT_IN_MS = 10_000L;
+
+  @BeforeClass
+  public void setUp() {
+    startZk();
+  }
 
   @Test
   public void testHelixOnlyController() {
@@ -299,5 +297,9 @@ public class PinotControllerModeTest extends ControllerTest {
     }
     zkClient.close();
   }
+
+  @AfterClass
+  public void tearDown() {
+    stopZk();
+  }
 }
-*/

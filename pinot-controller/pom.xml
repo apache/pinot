@@ -275,10 +275,11 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-        <version>2.19</version>
-        <configuration>
+        <version>3.0.0-M5</version>
+        <configuration combine.children="override">
           <suiteXmlFiles>
             <suiteXmlFile>testng.xml</suiteXmlFile>
+            <suiteXmlFile>testng-old-tests.xml</suiteXmlFile>
           </suiteXmlFiles>
         </configuration>
       </plugin>
