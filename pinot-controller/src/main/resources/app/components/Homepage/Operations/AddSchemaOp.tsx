@@ -28,6 +28,7 @@ import { NotificationContext } from '../../Notification/NotificationContext';
 import _ from 'lodash';
 import SchemaNameComponent from './SchemaNameComponent';
 import CustomizedTables from '../../Table';
+import InfoIcon from '@material-ui/icons/Info';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -154,7 +155,7 @@ export default function AddSchemaOp({
       open={true}
       handleClose={hideModal}
       handleSave={handleSave}
-      title="Add Schema"
+      title={(<>Add Schema <a href="https://docs.pinot.apache.org/configuration-reference/schema" target="_blank"><InfoIcon></InfoIcon></a></>)}
       size="xl"
       disableBackdropClick={true}
       disableEscapeKeyDown={true}

@@ -19,7 +19,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
-import { FormControlLabel, Grid, Switch } from '@material-ui/core';
+import { FormControlLabel, Grid, Switch, Tooltip } from '@material-ui/core';
 import { RouteComponentProps, useHistory, useLocation } from 'react-router-dom';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
 import { TableData } from 'Models';
@@ -40,6 +40,7 @@ import RebalanceServerTableOp from '../components/Homepage/Operations/RebalanceS
 import Confirm from '../components/Confirm';
 import { NotificationContext } from '../components/Notification/NotificationContext';
 import Utils from '../utils/Utils';
+import InfoIcon from '@material-ui/icons/Info';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -194,8 +195,15 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
     const tableObj:any = result.OFFLINE || result.REALTIME;
     setTableType(tableObj.tableType);
     setTableConfig(JSON.stringify(result, null, 2));
+    fetchTableState(tableObj.tableType);
+  };
+
+  const fetchTableState = async (type) => {
+    const stateResponse = await PinotMethodUtils.getTableState(tableName, type);
+    setState({enabled: stateResponse.state === 'enabled'});
     setFetching(false);
   };
+
   useEffect(() => {
     fetchTableData();
   }, []);
@@ -311,7 +319,6 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   };
 
   const handleReloadStatus = async () => {
-    setShowReloadStatusModal(true);
     const result = await PinotMethodUtils.reloadStatusOp(tableName, tableType);
     if(result.error){
       setShowReloadStatusModal(false);
@@ -319,12 +326,13 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
       setShowReloadStatusModal(false);
       return;
     }
+    setShowReloadStatusModal(true);
     setReloadStatusData(result);
   };
 
   const handleRebalanceBrokers = () => {
     setDialogDetails({
-      title: 'Rebalance brokers',
+      title: (<>Rebalance brokers <a href="https://docs.pinot.apache.org/operators/operating-pinot/rebalance/rebalance-brokers" target="_blank"><InfoIcon></InfoIcon></a></>),
       content: 'Are you sure want to rebalance the brokers?',
       successCb: () => rebalanceBrokers()
     });
@@ -405,32 +413,33 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
             </CustomButton>
             <CustomButton
               onClick={handleReloadSegments}
-              tooltipTitle="Reload All Segments"
+              tooltipTitle="Reloads all segments of the table to apply changes such as indexing, column default values, etc"
               enableTooltip={true}
             >
               Reload All Segments
             </CustomButton>
             <CustomButton
               onClick={handleReloadStatus}
-              tooltipTitle="Reload Status"
+              tooltipTitle="The status of all indexes for each column"
               enableTooltip={true}
             >
               Reload Status
             </CustomButton>
             <CustomButton
               onClick={()=>{setShowRebalanceServerModal(true);}}
-              tooltipTitle="Rebalance Servers"
+              tooltipTitle="Recalculates the segment to server mapping for this table"
               enableTooltip={true}
             >
               Rebalance Servers
             </CustomButton>
             <CustomButton
               onClick={handleRebalanceBrokers}
-              tooltipTitle="Rebalance Brokers"
+              tooltipTitle="Rebuilds brokerResource mapping for this table"
               enableTooltip={true}
             >
               Rebalance Brokers
             </CustomButton>
+            <Tooltip title="Disabling will disable the table for queries, consumption and data push" arrow placement="top">
             <FormControlLabel
               control={
                 <Switch
@@ -438,11 +447,11 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
                   onChange={handleSwitchChange}
                   name="enabled"
                   color="primary"
-                  disabled={true}
                 />
               }
               label="Enable"
             />
+            </Tooltip>
           </div>
         </SimpleAccordion>
       </div>
@@ -452,9 +461,11 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
           <Grid item xs={4}>
             <strong>Table Name:</strong> {tableSummary.tableName}
           </Grid>
+          <Tooltip title="Uncompressed size of all data segments"  arrow placement="top-start">
           <Grid item xs={4}>
             <strong>Reported Size:</strong> {tableSummary.reportedSize}
           </Grid>
+          </Tooltip>
           <Grid item xs={4}>
             <strong>Estimated Size: </strong>
             {tableSummary.estimatedSize}
@@ -483,7 +494,9 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
             isPagination={false}
             noOfRows={segmentList.records.length}
             baseURL={
-              tenantName ? `/tenants/${tenantName}/table/${tableName}/` :  `/instance/${instanceName}/table/${tableName}/`
+              tenantName && `/tenants/${tenantName}/table/${tableName}/` ||
+              instanceName && `/instance/${instanceName}/table/${tableName}/` ||
+              `/tenants/table/${tableName}/`
             }
             addLinks
             showSearchBox={true}

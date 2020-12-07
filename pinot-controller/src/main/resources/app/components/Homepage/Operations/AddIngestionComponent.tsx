@@ -18,7 +18,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { createStyles, FormControl, Grid, Input, InputLabel, makeStyles, MenuItem, Select, Theme} from '@material-ui/core';
+import { createStyles, FormControl, Grid, Input, InputLabel, makeStyles, MenuItem, Select, Theme, Tooltip} from '@material-ui/core';
 import AddDeleteComponent from './AddDeleteComponent';
 import MultipleSelectComponent from './MultipleSelectComponent';
 import _ from 'lodash';
@@ -142,6 +142,7 @@ export default function AddIngestionComponent({
             }
             </Grid>
             <Grid item xs={12}>
+            <Tooltip interactive title={(<>Filter out rows which match condition.<a href="https://docs.pinot.apache.org/developers/advanced/ingestion-level-transformations#filtering" className={"tooltip-link"}>(Click here for more Details)</a></>)} arrow placement="top-start" disableHoverListener={tableDataObj.tableType === "REALTIME"}>
             <FormControl className={classes.formControl}>
                 <InputLabel htmlFor="filterFunction">Filter function</InputLabel>
                 <Input
@@ -150,6 +151,7 @@ export default function AddIngestionComponent({
                     onChange={(e)=> changeHandler('filterFunction', e.target.value)}
                 />
             </FormControl>
+            </Tooltip>
             {
                 tableDataObj.tableIndexConfig.streamConfigs ?
                 <AddDeleteComponent
@@ -158,11 +160,13 @@ export default function AddIngestionComponent({
                     changeHandler = {changeHandler}/>
                 : null
             }
+            <Tooltip interactive title={(<>Transform the data values using Groovy or other inbuilt functions.<a href="https://docs.pinot.apache.org/developers/advanced/ingestion-level-transformations#column-transformation" className={"tooltip-link"}>(Click here for more Details)</a></>)} arrow placement="top-start" disableHoverListener={tableDataObj.tableType === "REALTIME"}>
             <MultipleSelectComponent
                 key = {"transformConfigs"}
                 streamConfigsObj = {tableDataObj.ingestionConfig.transformConfigs || []}
                 changeHandler = {changeHandler}
                 columnName= {columnName}/>
+            </Tooltip>
           </Grid>
     </Grid>
   );

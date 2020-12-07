@@ -18,7 +18,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { createStyles, FormControl, Grid, Input, InputLabel, makeStyles, MenuItem, Select, TextField, Theme, IconButton, Fab, Button, Chip} from '@material-ui/core';
+import { createStyles, FormControl, Grid, Input, InputLabel, makeStyles, MenuItem, Select, TextField, Theme, IconButton, Fab, Button, Chip, Tooltip} from '@material-ui/core';
 import AddCircleIcon from '@material-ui/icons/AddCircle';
 import ClearIcon from '@material-ui/icons/Clear';
 
@@ -51,7 +51,8 @@ type Props = {
     changeHandler: any,
     streamConfigsObj: Object,
     columnName:Array<string>,
-    textDataObj: Array<TextObj>
+    textDataObj: Array<TextObj>,
+    tableDataObj:any
 };
 
 type TextObj = {
@@ -64,6 +65,7 @@ export default function MultiIndexingComponent({
     changeHandler,
     streamConfigsObj,
     columnName,
+    tableDataObj,
     textDataObj
 }: Props) {
     const classes = useStyles();
@@ -267,6 +269,7 @@ export default function MultiIndexingComponent({
                                         </FormControl>
                                     </Grid>
                                     <Grid item xs={4}>
+                                    <Tooltip title="Select a column encoding. By default, all columns are dictionary encoded." arrow placement="top-start" disableHoverListener={tableDataObj.tableType === "REALTIME"}>
                                         <FormControl className={classes.formControl}>
                                         <InputLabel htmlFor={o.Encoding}>Encoding</InputLabel>
                                              <Select
@@ -283,8 +286,10 @@ export default function MultiIndexingComponent({
                                                 <MenuItem value="heapDictionary">On Heap Dictionary</MenuItem>
                                             </Select>
                                         </FormControl>
+                                    </Tooltip>
                                     </Grid>
                                     <Grid item xs={4}>
+                                    <Tooltip title="Select indexes to apply. By default, no indexing is applied." arrow placement="top-start" disableHoverListener={tableDataObj.tableType === "REALTIME"}>
                                         <FormControl className={classes.formControl}>
                                         <InputLabel htmlFor={i+"keymulti"}>Indexing</InputLabel>
                                                 <Select
@@ -312,6 +317,7 @@ export default function MultiIndexingComponent({
                                                 <MenuItem value="bloomFilter">Bloom filter</MenuItem>
                                             </Select>
                                         </FormControl>
+                                    </Tooltip>
                                     </Grid>
                                     <Grid item xs={1}>
                                         <FormControl>

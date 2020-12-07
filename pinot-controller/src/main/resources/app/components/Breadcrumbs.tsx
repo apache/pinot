@@ -108,6 +108,12 @@ const BreadcrumbsComponent = ({ ...props }) => {
           )
         );
       }
+      if((tableName && segmentName && !tenantName && !instanceName)){
+        breadcrumbs.push(
+          getClickableLabel('Tables', '/tables'),
+          getClickableLabel(tableName, `/tenants/table/${tableName}`),
+        );
+      }
       if(paramsKeys.length === 1 && tableName){
         breadcrumbs.push(
           getClickableLabel('Tables', '/tables')

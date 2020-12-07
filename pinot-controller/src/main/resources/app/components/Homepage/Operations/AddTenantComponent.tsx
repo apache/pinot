@@ -18,8 +18,9 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { createStyles, FormControl, Grid, Input, InputLabel, makeStyles, MenuItem, Select, TextField, Theme} from '@material-ui/core';
+import { createStyles, FormControl, Grid, Input, InputLabel, makeStyles, MenuItem, Select, TextField, Theme, Tooltip} from '@material-ui/core';
 import { Autocomplete } from '@material-ui/lab';
+import InfoIcon from '@material-ui/icons/Info';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -158,6 +159,7 @@ export default function AddTenantComponent({
           </Select>
         </FormControl>
         { showRealtimeCompleted ?
+        <Tooltip interactive title={(<><a href="https://docs.pinot.apache.org/operators/operating-pinot/tuning/realtime#moving-completed-segments-to-different-hosts" target="_blank" className={"tooltip-link"}>(Click here for more Details)</a></>)} arrow placement="top-start" disableHoverListener={tableDataObj.tableType === "REALTIME"}>
         <FormControl className={classes.formControl}>
           <InputLabel htmlFor="realtimeCompleted">Relocate to tag</InputLabel>
           <Input
@@ -165,7 +167,8 @@ export default function AddTenantComponent({
             value={tableDataObj.tenants.tagOverrideConfig.realtimeCompleted}
             onChange={(e)=> changeHandler('showRealtimeCompleted', e.target.value)}
           />
-        </FormControl> : null}
+        </FormControl>
+        </Tooltip> : null}
       </Grid>
     </Grid>
   );

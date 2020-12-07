@@ -201,7 +201,7 @@ const SegmentDetails = ({ match }: RouteComponentProps<Props>) => {
             </CustomButton>
             <CustomButton
               onClick={()=>{handleReloadSegmentClick()}}
-              tooltipTitle="Reload Segment"
+              tooltipTitle="Reload the segment to apply changes such as indexing, column default values, etc"
               enableTooltip={true}
             >
               Reload Segment

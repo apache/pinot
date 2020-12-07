@@ -18,7 +18,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { createStyles, FormControl, Grid, Input, InputLabel, makeStyles, MenuItem, Select, Theme, Chip} from '@material-ui/core';
+import { createStyles, FormControl, Grid, Input, InputLabel, makeStyles, MenuItem, Select, Theme, Chip, Tooltip} from '@material-ui/core';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -152,6 +152,7 @@ export default function AddPartionComponent({
   return (
     <Grid container spacing={2}>
       <Grid item xs={12}>
+      <Tooltip interactive title={(<>Data has to be pre-partitioned using the same logic, when creating segments.<a href="https://docs.pinot.apache.org/operators/operating-pinot/tuning/routing#partitioning"  target="_blank"  className={"tooltip-link"}>(Click here for more Details)</a></>)} arrow placement="top-start" disableHoverListener={tableDataObj.tableType === "REALTIME"}>
       <FormControl className={classes.selectFormControl}>
           <InputLabel htmlFor="segmentPrunerTypes">Enable partitioning</InputLabel>
           <Select
@@ -164,6 +165,7 @@ export default function AddPartionComponent({
             <MenuItem value={0}>False</MenuItem>
           </Select>
         </FormControl>
+        </Tooltip>
          {
             showPartition ?
                 <FormControl className={classes.selectFormControl}>
@@ -213,6 +215,7 @@ export default function AddPartionComponent({
                 </FormControl> : null }
             </Grid>
         <Grid item xs={12}>
+        <Tooltip title={(<>Creates sets of servers that contain a complete set of segments.<a href="https://docs.pinot.apache.org/operators/operating-pinot/tuning/routing#replica-group-segment-assignment-and-query-routing"  target="_blank" className={"tooltip-link"}>(Click here for more Details)</a></>)} arrow placement="top-start" interactive disableHoverListener={tableDataObj.tableType === "REALTIME"}>
         <FormControl className={classes.selectFormControl}>
             <InputLabel htmlFor="instanceSelectorType">Enable replica groups</InputLabel>
             <Select
@@ -225,6 +228,7 @@ export default function AddPartionComponent({
                 <MenuItem value={0}>False</MenuItem>
             </Select>
         </FormControl>
+        </Tooltip>
 
         {
             tableDataObj.routing.instanceSelectorType ?

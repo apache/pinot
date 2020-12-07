@@ -161,3 +161,6 @@ export const saveSchema = (schemaObject: string): Promise<AxiosResponse<Operatio
 
 export const saveTable = (tableObject: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.post(`/tables`, JSON.stringify(tableObject), {headers});
+
+export const getState = (tableName: string, tableType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/tables/${tableName}/state?type=${tableType}`);

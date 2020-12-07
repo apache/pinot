@@ -18,7 +18,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { createStyles, FormControl, Grid, Input, InputLabel, makeStyles, MenuItem, Select, Theme, Chip} from '@material-ui/core';
+import { createStyles, FormControl, Grid, Input, InputLabel, makeStyles, MenuItem, Select, Theme, Chip, Tooltip} from '@material-ui/core';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -152,6 +152,7 @@ export default function AddRealTimePartionComponent({
   return (
     <Grid container spacing={2}>
       <Grid item xs={12}>
+      <Tooltip interactive title="The partitioning logic in the stream should match the partitioning config in Pinot." arrow placement="top-start">
       <FormControl className={classes.selectFormControl}>
           <InputLabel htmlFor="segmentPrunerTypes">Enable partitioning</InputLabel>
           <Select
@@ -164,6 +165,7 @@ export default function AddRealTimePartionComponent({
             <MenuItem value={0}>False</MenuItem>
           </Select>
         </FormControl>
+        </Tooltip>
          {
             showPartition ?
                 <FormControl className={classes.selectFormControl}>
@@ -212,6 +214,7 @@ export default function AddRealTimePartionComponent({
                 </FormControl> : null }
             </Grid>
         <Grid item xs={12}>
+        <Tooltip interactive title={(<>number of servers should be a multiple of number of replicas.<a href="https://docs.pinot.apache.org/basics/getting-started/frequent-questions/operations-faq#docs-internal-guid-3eddb872-7fff-0e2a-b4e3-b1b43454add3" className={"tooltip-link"}>(Click here for more Details)</a></>)} arrow placement="top-start">
         <FormControl className={classes.selectFormControl}>
             <InputLabel htmlFor="instanceSelectorType">Enable replica groups</InputLabel>
             <Select
@@ -224,6 +227,7 @@ export default function AddRealTimePartionComponent({
                 <MenuItem value={0}>False</MenuItem>
             </Select>
         </FormControl>
+        </Tooltip>
       </Grid>
     </Grid>
   );

@@ -18,11 +18,12 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { createStyles, FormControl, Grid, Input, InputLabel, makeStyles, MenuItem, Select, TextField, Theme, IconButton, Fab, Button, Chip} from '@material-ui/core';
+import { createStyles, FormControl, Grid, Input, InputLabel, makeStyles, MenuItem, Select, TextField, Theme, IconButton, Fab, Button, Chip, Tooltip} from '@material-ui/core';
 import AddIcon from '@material-ui/icons/Add';
 import AddCircleIcon from '@material-ui/icons/AddCircle';
 import ClearIcon from '@material-ui/icons/Clear';
 import DeleteIcon from '@material-ui/icons/Delete';
+import InfoIcon from '@material-ui/icons/Info';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -100,7 +101,9 @@ export default function AddDeleteComponent({
 
   return (
     <Grid container spacing={2}>
-        <h3 className="accordion-subtitle">Transform functions</h3>
+        <Tooltip interactive title={(<>Transform the data values using Groovy or other inbuilt functions.<a className = {"tooltip-link"} href={"https://docs.pinot.apache.org/developers/adv anced/ingestion-level-transformations#colum n-transformation"}>(click here for more details)</a></>)} arrow placement="top">
+            <h3 className="accordion-subtitle">Transform functions</h3>
+        </Tooltip>
                 {
                     streamConfigObj.map((o,i)=>{
                         return(

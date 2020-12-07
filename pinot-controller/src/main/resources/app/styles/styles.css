@@ -123,3 +123,7 @@ h3.accordion-subtitle:before, h3.accordion-subtitle:after {
   border-radius: 5px;
   margin: 8px;
 }
+.tooltip-link{
+  color:white;
+  font-weight: bold;
+}

@@ -22,6 +22,7 @@ import { DialogContent, DialogContentText, FormControl, FormControlLabel, Grid, 
 import Dialog from '../../CustomDialog';
 import PinotMethodUtils from '../../../utils/PinotMethodUtils';
 import CustomCodemirror from '../../CustomCodemirror';
+import InfoIcon from '@material-ui/icons/Info';
 
 type Props = {
   tableType: string,
@@ -61,7 +62,7 @@ export default function RebalanceServerTableOp({
     <Dialog
       open={true}
       handleClose={hideModal}
-      title="Rebalance Server"
+      title={(<>Rebalance Server <a href="https://docs.pinot.apache.org/operators/operating-pinot/rebalance/rebalance-servers" target="_blank"><InfoIcon fontSize={"small"}></InfoIcon></a></>)}
       handleSave={handleSave}
       showOkBtn={!rebalanceResponse}
     >

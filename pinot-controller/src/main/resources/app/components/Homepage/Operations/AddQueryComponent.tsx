@@ -18,7 +18,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { createStyles, FormControl, Grid, Input, InputLabel, makeStyles, Theme} from '@material-ui/core';
+import { createStyles, FormControl, Grid, Input, InputLabel, makeStyles, Theme, Tooltip} from '@material-ui/core';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -73,6 +73,7 @@ export default function AddQueryComponent({
             type="number"
           />
         </FormControl>
+        <Tooltip title="Queries exceeding this QPS will be rejected." arrow placement="top-start" disableHoverListener={tableDataObj.tableType === "REALTIME"}>
         <FormControl className={classes.formControl} >
           <InputLabel htmlFor="maxQueriesPerSecond">Queries Per Second</InputLabel>
           <Input
@@ -83,6 +84,7 @@ export default function AddQueryComponent({
             type="number"
           />
         </FormControl>
+        </Tooltip>
       </Grid>
     </Grid>
   );

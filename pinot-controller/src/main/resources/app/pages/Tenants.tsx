@@ -77,16 +77,16 @@ const TenantPage = ({ match }: RouteComponentProps<Props>) => {
           <div>
             <CustomButton
               onClick={()=>{console.log('rebalance');}}
-              // tooltipTitle="Rebalance Server Tenant - Coming soon"
-              // enableTooltip={true}
+              tooltipTitle="Recalculates the segment to server mapping for all tables in this tenant"
+              enableTooltip={true}
               isDisabled={true}
             >
               Rebalance Server Tenant
             </CustomButton>
             <CustomButton
               onClick={()=>{console.log('rebuild');}}
-              // tooltipTitle="Rebuild Broker Resource - Coming soon"
-              // enableTooltip={true}
+              tooltipTitle="Rebuilds brokerResource mappings for all tables in this tenant"
+              enableTooltip={true}
               isDisabled={true}
             >
               Rebuild Broker Resource

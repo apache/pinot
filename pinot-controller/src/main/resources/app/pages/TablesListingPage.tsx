@@ -89,21 +89,21 @@ const TablesListingPage = () => {
           <div>
             <CustomButton
               onClick={()=>{setShowSchemaModal(true)}}
-              tooltipTitle="Add Schema"
+              tooltipTitle="Define the dimensions, metrics and date time columns of your data"
               enableTooltip={true}
             >
               Add Schema
             </CustomButton>
             <CustomButton
               onClick={()=>{setShowAddOfflineTableModal(true)}}
-              tooltipTitle="Add Offline Table"
+              tooltipTitle="Create a Pinot table to ingest from batch data sources, such as S3"
               enableTooltip={true}
             >
               Add Offline Table
             </CustomButton>
             <CustomButton
               onClick={()=>{setShowAddRealtimeTableModal(true)}}
-              tooltipTitle="Add Realtime Table"
+              tooltipTitle="Create a Pinot table to ingest from stream data sources, such as Kafka"
               enableTooltip={true}
             >
               Add Realtime Table

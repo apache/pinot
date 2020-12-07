@@ -150,6 +150,7 @@ export default function AddIndexingComponent({
             streamConfigsObj = {{...tableDataObj.tableIndexConfig}}
             textDataObj={tableDataObj.fieldConfigList ? [...tableDataObj.fieldConfigList] : []}
             changeHandler = {changeHandler}
+            tableDataObj = {tableDataObj}
             columnName={columnName}/>
         {/* <MultiMetricComponent
             key={"multiMetrix"}
