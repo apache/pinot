@@ -581,7 +581,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
 
   @Test
   public void testPercentile50() {
-    List<String> queries = Arrays.asList("SELECT PERCENTILE50(column1), PERCENTILE50(column3) FROM testTable",
+    List<String> queries = Arrays.asList("SELECT PERCENTILE50(column1),PERCENTILE50(column3) FROM testTable",
         "SELECT PERCENTILE(column1, 50), PERCENTILE(column3, 50) FROM testTable",
         "SELECT PERCENTILE(column1, '50'), PERCENTILE(column3, '50') FROM testTable",
         "SELECT PERCENTILE(column1, \"50\"), PERCENTILE(column3, \"50\") FROM testTable");
@@ -591,10 +591,13 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     int expectedResultsSize;
     Map<String, String> queryOptions = new HashMap<>(2);
     queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
-    for (String query : queries) {
+    for (int i = 0; i < queries.size(); i++) {
+      String query = queries.get(i);
       BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
-      dataSchema = new DataSchema(new String[]{"percentile50(column1)", "percentile50(column3)"},
-          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
+      dataSchema = i == 0 ? new DataSchema(new String[]{"percentile50(column1)", "percentile50(column3)"},
+          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE})
+          : new DataSchema(new String[]{"percentile(column1, 50.0)", "percentile(column3, 50.0)"},
+              new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
       rows = new ArrayList<>();
       rows.add(new Object[]{1107310944.0, 1080136306.0});
       expectedResultsSize = 1;
