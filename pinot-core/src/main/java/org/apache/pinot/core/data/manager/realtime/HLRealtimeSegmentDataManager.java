@@ -25,6 +25,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
@@ -414,6 +415,21 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   @Override
   public MutableSegment getSegment() {
     return _realtimeSegment;
+  }
+
+  @Override
+  public Map<String, String> getPartitionToCurrentOffset() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public ConsumerState getConsumerState() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public long getLastConsumedTimestamp() {
+    throw new UnsupportedOperationException();
   }
 
   @Override
