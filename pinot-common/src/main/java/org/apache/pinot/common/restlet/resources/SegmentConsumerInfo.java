@@ -30,13 +30,16 @@ import java.util.Map;
 public class SegmentConsumerInfo {
   private final String _segmentName;
   private final String _consumerState;
+  private final long _lastConsumedTimestamp;
   private final Map<String, String> _partitionToOffsetMap;
 
   public SegmentConsumerInfo(@JsonProperty("segmentName") String segmentName,
       @JsonProperty("consumerState") String consumerState,
+      @JsonProperty("lastConsumedTimestamp") long lastConsumedTimestamp,
       @JsonProperty("partitionToOffsetMap") Map<String, String> partitionToOffsetMap) {
     _segmentName = segmentName;
     _consumerState = consumerState;
+    _lastConsumedTimestamp = lastConsumedTimestamp;
     _partitionToOffsetMap = partitionToOffsetMap;
   }
 
@@ -46,6 +49,10 @@ public class SegmentConsumerInfo {
 
   public String getConsumerState() {
     return _consumerState;
+  }
+
+  public long getLastConsumedTimestamp() {
+    return _lastConsumedTimestamp;
   }
 
   public Map<String, String> getPartitionToOffsetMap() {

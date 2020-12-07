@@ -713,6 +713,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     return _state == State.ERROR ? ConsumerState.NOT_CONSUMING : ConsumerState.CONSUMING;
   }
 
+  @Override
+  public long getLastConsumedTimestamp() {
+    return _lastLogTime;
+  }
+
   @VisibleForTesting
   protected StreamPartitionMsgOffset getCurrentOffset() {
     return _currentOffset;

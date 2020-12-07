@@ -428,6 +428,11 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   @Override
+  public long getLastConsumedTimestamp() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public String getSegmentName() {
     return _segmentName;
   }

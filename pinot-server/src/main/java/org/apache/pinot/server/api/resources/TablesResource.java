@@ -267,6 +267,7 @@ public class TablesResource {
           String segmentName = segmentDataManager.getSegmentName();
           segmentConsumerInfoList.add(
               new SegmentConsumerInfo(segmentName, realtimeSegmentDataManager.getConsumerState().toString(),
+                  realtimeSegmentDataManager.getLastConsumedTimestamp(),
                   realtimeSegmentDataManager.getPartitionToCurrentOffset()));
         }
       }

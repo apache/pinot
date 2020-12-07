@@ -77,8 +77,9 @@ public class ConsumingSegmentInfoReader {
     for (Map.Entry<String, List<SegmentConsumerInfo>> entry : serverToSegmentConsumerInfoMap.entrySet()) {
       String serverName = entry.getKey();
       for (SegmentConsumerInfo info : entry.getValue()) {
-        consumingSegmentInfoMap.computeIfAbsent(info.getSegmentName(), k -> new ArrayList<>())
-            .add(new ConsumingSegmentInfo(serverName, info.getConsumerState(), info.getPartitionToOffsetMap()));
+        consumingSegmentInfoMap.computeIfAbsent(info.getSegmentName(), k -> new ArrayList<>()).add(
+            new ConsumingSegmentInfo(serverName, info.getConsumerState(), info.getLastConsumedTimestamp(),
+                info.getPartitionToOffsetMap()));
       }
     }
     // Segments which are in CONSUMING state but found no consumer on the server
@@ -150,13 +151,16 @@ public class ConsumingSegmentInfoReader {
   static public class ConsumingSegmentInfo {
     public String _serverName;
     public String _consumerState;
+    public long _lastConsumedTimestamp;
     public Map<String, String> _partitionToOffsetMap;
 
     public ConsumingSegmentInfo(@JsonProperty("serverName") String serverName,
         @JsonProperty("consumerState") String consumerState,
+        @JsonProperty("lastConsumedTimestamp") long lastConsumedTimestamp,
         @JsonProperty("partitionToOffsetMap") Map<String, String> partitionToOffsetMap) {
       _serverName = serverName;
       _consumerState = consumerState;
+      _lastConsumedTimestamp = lastConsumedTimestamp;
       _partitionToOffsetMap = partitionToOffsetMap;
     }
   }

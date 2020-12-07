@@ -60,4 +60,6 @@ public abstract class RealtimeSegmentDataManager extends SegmentDataManager {
    * Get the state of the consumer
    */
   public abstract ConsumerState getConsumerState();
+
+  public abstract long getLastConsumedTimestamp();
 }
