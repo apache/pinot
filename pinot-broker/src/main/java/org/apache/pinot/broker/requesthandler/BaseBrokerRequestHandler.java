@@ -1002,7 +1002,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         columnName = splits[1];
       }
       if (columnNameMap != null) {
-        return columnNameMap.getOrDefault(columnName, columnName);
+        return columnNameMap.getOrDefault(columnName.toLowerCase(), columnName);
       } else {
         return columnName;
       }

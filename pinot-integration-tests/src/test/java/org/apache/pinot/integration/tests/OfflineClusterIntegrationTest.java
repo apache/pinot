@@ -1307,7 +1307,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     for (String query : queries) {
       try {
-        postQuery(query);
+        JsonNode response = postQuery(query);
+        assertTrue(response.get("numSegmentsProcessed").asLong() >= 1L, "PQL: " + query + " failed");
+
+        response = postSqlQuery(query);
+        assertTrue(response.get("numSegmentsProcessed").asLong() >= 1L, "SQL: " + query + " failed");
       } catch (Exception e) {
         // Fail the test when exception caught
         throw new RuntimeException("Got Exceptions from query - " + query);
@@ -1334,7 +1338,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     for (String query : queries) {
       try {
-        postQuery(query);
+        JsonNode response = postQuery(query);
+        assertTrue(response.get("numSegmentsProcessed").asLong() >= 1L, "PQL: " + query + " failed");
+
+        response = postSqlQuery(query);
+        assertTrue(response.get("numSegmentsProcessed").asLong() >= 1L, "SQL: " + query + " failed");
       } catch (Exception e) {
         // Fail the test when exception caught
         throw new RuntimeException("Got Exceptions from query - " + query);
@@ -1363,7 +1371,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     for (String query : queries) {
       try {
-        postQuery(query);
+        JsonNode response = postQuery(query);
+        assertTrue(response.get("numSegmentsProcessed").asLong() >= 1L, "PQL: " + query + " failed");
+
+        response = postSqlQuery(query);
+        assertTrue(response.get("numSegmentsProcessed").asLong() >= 1L, "SQL: " + query + " failed");
       } catch (Exception e) {
         // Fail the test when exception caught
         throw new RuntimeException("Got Exceptions from query - " + query);

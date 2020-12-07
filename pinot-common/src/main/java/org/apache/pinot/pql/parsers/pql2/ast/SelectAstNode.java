@@ -106,7 +106,7 @@ public class SelectAstNode extends BaseAstNode {
   public void updateBrokerRequest(BrokerRequest brokerRequest) {
     // Set the query source
     QuerySource querySource = new QuerySource();
-    querySource.setTableName(_resourceName);
+    querySource.setTableName(_tableName);
     brokerRequest.setQuerySource(querySource);
 
     sendBrokerRequestUpdateToChildren(brokerRequest);
@@ -169,7 +169,7 @@ public class SelectAstNode extends BaseAstNode {
   public void updatePinotQuery(PinotQuery pinotQuery) {
     // Set data source
     DataSource dataSource = new DataSource();
-    dataSource.setTableName(_resourceName);
+    dataSource.setTableName(_tableName);
     pinotQuery.setDataSource(dataSource);
     sendPinotQueryUpdateToChildren(pinotQuery);
     if (_offset != -1) {
