@@ -113,7 +113,7 @@ export default function AddDeleteComponent({
 
   return (
     <Grid container>
-        <Tooltip interactive title={(<>Configure the properties of your stream.<a target="_blank" href={"https://docs.pinot.apache.org/developers/advanced/ingestion-level-transformations#column-transformation"} className={"tooltip-link"}>(Click here for more details)</a></>)} arrow placement="top">
+        <Tooltip title="Configure the properties of your stream." arrow placement="top">
         <h3 className="accordion-subtitle">Stream Config</h3>
         </Tooltip>
                 {
