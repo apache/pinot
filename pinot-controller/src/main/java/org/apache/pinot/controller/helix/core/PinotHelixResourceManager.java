@@ -25,6 +25,7 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -45,6 +46,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.AccessOption;
@@ -1775,6 +1777,63 @@ public class PinotHelixResourceManager {
       LOGGER.warn("No reload message sent for segment: {} in table: {}", segmentName, tableNameWithType);
     }
     return numMessagesSent;
+  }
+
+  /**
+   * Resets a segment by disabling and then enabling the segment
+   */
+  public void resetSegment(String tableNameWithType, String segmentName) {
+    IdealState idealState = getTableIdealState(tableNameWithType);
+    Preconditions.checkState(idealState != null, "Could not find ideal state for table: %s", tableNameWithType);
+    ExternalView externalView = getTableExternalView(tableNameWithType);
+    Preconditions.checkState(externalView != null, "Could not find external view for table: %s", tableNameWithType);
+    Set<String> instanceSet = idealState.getInstanceSet(segmentName);
+    Preconditions
+        .checkState(CollectionUtils.isNotEmpty(instanceSet), "Could not find segment: %s in ideal state for table: %s");
+    Map<String, String> externalViewStateMap = externalView.getStateMap(segmentName);
+    List<String> partitions = Lists.newArrayList(segmentName);
+    for (String instance : instanceSet) {
+      if (externalViewStateMap == null || SegmentStateModel.ERROR.equals(externalViewStateMap.get(instance))) {
+        _helixAdmin.resetPartition(_helixClusterName, instance, tableNameWithType, partitions);
+      } else {
+        _helixAdmin.enablePartition(false, _helixClusterName, instance, tableNameWithType, partitions);
+      }
+      _helixAdmin.enablePartition(true, _helixClusterName, instance, tableNameWithType, partitions);
+    }
+  }
+
+
+  /**
+   * Resets all segments of a table by disabling and then enabling the segments
+   */
+  public void resetAllSegments(String tableNameWithType) {
+    IdealState idealState = getTableIdealState(tableNameWithType);
+    Preconditions.checkState(idealState != null, "Could not find ideal state for table: %s", tableNameWithType);
+    ExternalView externalView = getTableExternalView(tableNameWithType);
+    Preconditions.checkState(externalView != null, "Could not find external view for table: %s", tableNameWithType);
+
+    Map<String, Set<String>> resetInstanceToPartitionsMap = new HashMap<>();
+    Map<String, Set<String>> disableInstanceToPartitionsMap = new HashMap<>();
+    for (String partition : idealState.getPartitionSet()) {
+      Map<String, String> externalViewStateMap = externalView.getStateMap(partition);
+      for (String instance : idealState.getInstanceSet(partition)) {
+        if (externalViewStateMap == null || SegmentStateModel.ERROR.equals(externalViewStateMap.get(instance))) {
+          resetInstanceToPartitionsMap.computeIfAbsent(instance, i -> new HashSet<>()).add(partition);
+        } else {
+          disableInstanceToPartitionsMap.computeIfAbsent(instance, i -> new HashSet<>()).add(partition);
+        }
+      }
+    }
+    for (Map.Entry<String, Set<String>> entry : resetInstanceToPartitionsMap.entrySet()) {
+      ArrayList<String> partitions = Lists.newArrayList(entry.getValue());
+      _helixAdmin.resetPartition(_helixClusterName, entry.getKey(), tableNameWithType, partitions);
+      _helixAdmin.enablePartition(true, _helixClusterName, entry.getKey(), tableNameWithType, partitions);
+    }
+    for (Map.Entry<String, Set<String>> entry : disableInstanceToPartitionsMap.entrySet()) {
+      ArrayList<String> partitions = Lists.newArrayList(entry.getValue());
+      _helixAdmin.enablePartition(false, _helixClusterName, entry.getKey(), tableNameWithType, partitions);
+      _helixAdmin.enablePartition(true, _helixClusterName, entry.getKey(), tableNameWithType, partitions);
+    }
   }
 
   /**
