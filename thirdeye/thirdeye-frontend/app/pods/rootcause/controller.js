@@ -25,9 +25,9 @@ const ROOTCAUSE_TAB_DIMENSIONS = 'dimensions';
 const ROOTCAUSE_TAB_METRICS = 'metrics';
 const ROOTCAUSE_TAB_TREND = 'trend';
 
-const ROOTCAUSE_SETUP_MODE_CONTEXT = "context";
-const ROOTCAUSE_SETUP_MODE_SELECTED = "selected";
-const ROOTCAUSE_SETUP_MODE_NONE = "none";
+const ROOTCAUSE_SETUP_MODE_CONTEXT = 'context';
+const ROOTCAUSE_SETUP_MODE_SELECTED = 'selected';
+const ROOTCAUSE_SETUP_MODE_NONE = 'none';
 
 const ROOTCAUSE_SETUP_EVENTS_SCORE_THRESHOLD = Number.POSITIVE_INFINITY;
 const ROOTCAUSE_SETUP_METRICS_SCORE_THRESHOLD = Number.POSITIVE_INFINITY;
@@ -100,7 +100,7 @@ export default Controller.extend({
 
   callgraphService: service('services/rootcause-callgraph-cache'),
 
-  sessionTemplateService:  service('services/rootcause-template'),
+  sessionTemplateService: service('services/rootcause-template'),
 
   //
   // user details
@@ -162,9 +162,7 @@ export default Controller.extend({
    * displayed investigation sub-tabs
    * @type {Object}
    */
-  activeSubTabs: {
-    dimensions: 'algorithm'
-  },
+  activeSubTabs: null,
 
   /**
    * display mode for timeseries chart
@@ -269,7 +267,10 @@ export default Controller.extend({
       invisibleUrns: new Set(),
       hoverUrns: new Set(),
       filteredUrns: new Set(),
-      secondaryUrns: new Set()
+      secondaryUrns: new Set(),
+      activeSubTabs: {
+        dimensions: 'algorithm'
+      }
     });
     // This is a flag for the acceptance test for rootcause to prevent it from timing out because of this run loop
     if (config.environment !== 'test') {
@@ -305,140 +306,153 @@ export default Controller.extend({
    * callgraph:        service call graph edges as ranked by the backend
    *                   (typically displayed in call graph table)
    */
-  _contextObserver: observer(
-    'context',
-    'entities',
-    'selectedUrns',
-    'sizeMetricUrns',
-    'activeTab',
-    function () {
-      const { context, selectedUrns, sizeMetricUrns, entitiesService, timeseriesService, aggregatesService, breakdownsService, scoresService, anomalyFunctionService, callgraphService, activeTab, setupMode } =
-        getProperties(this, 'context', 'selectedUrns', 'sizeMetricUrns', 'entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService', 'scoresService', 'anomalyFunctionService', 'callgraphService', 'activeTab', 'setupMode');
-      if (!context || !selectedUrns) {
-        return;
-      }
-
-      if (setupMode === ROOTCAUSE_SETUP_MODE_CONTEXT) {
-        return;
-      }
-
-      //
-      // entities
-      //
-      const entitiesUrns = new Set([...selectedUrns, ...context.urns, ...context.anomalyUrns]);
-      entitiesService.request(context, entitiesUrns);
-
-      //
-      // related metrics
-      //
-      const anomalyMetricUrns = new Set();
-      const relatedMetricUrns = new Set();
-
-      if (activeTab === ROOTCAUSE_TAB_METRICS
-          || activeTab === ROOTCAUSE_TAB_TREND) {
-        const entities = get(this, 'entitiesService.entities'); // cache may be stale, fetch directly
-        filterPrefix(Object.keys(entities), 'thirdeye:metric:').forEach(urn => relatedMetricUrns.add(urn));
-      }
-
-      if (context.anomalyUrns.size > 0) {
-        filterPrefix(context.anomalyUrns, 'thirdeye:metric:').forEach(urn => anomalyMetricUrns.add(urn));
-      }
-
-      //
-      // timeseries
-      //
-      const timeseriesUrns = new Set(selectedUrns);
-
-      if (activeTab === ROOTCAUSE_TAB_TREND) {
-        [...relatedMetricUrns].forEach(urn => {
-          timeseriesUrns.add(toCurrentUrn(urn));
-          timeseriesUrns.add(toBaselineUrn(urn));
-        });
-      }
-
-      timeseriesService.request(context, timeseriesUrns);
-
-      //
-      // anomaly function baselines
-      //
-      const anomalyFunctionUrns = filterPrefix(context.anomalyUrns, 'thirdeye:event:anomaly');
-      anomalyFunctionService.request(context, new Set(anomalyFunctionUrns));
-
-      //
-      // breakdowns
-      //
-      if (activeTab === ROOTCAUSE_TAB_DIMENSIONS) {
-        const metricUrns = new Set(filterPrefix(context.urns, 'thirdeye:metric:'));
-        const currentUrns = [...metricUrns].map(toCurrentUrn);
-        const baselineUrns = [...metricUrns].map(toBaselineUrn);
-        const sizeMetricCurrentUrns = [...sizeMetricUrns].map(toCurrentUrn);
-        breakdownsService.request(context, new Set(currentUrns.concat(baselineUrns).concat(sizeMetricCurrentUrns)));
-      }
-
-      //
-      // scores
-      //
-      if (activeTab === ROOTCAUSE_TAB_METRICS) {
-        const scoresUrns = new Set(relatedMetricUrns);
-        scoresService.request(context, new Set(scoresUrns));
-      }
-
-      //
-      // aggregates
-      //
-      const offsets = ['current', 'baseline', 'wo1w', 'wo2w'];
-      const offsetUrns = [...relatedMetricUrns]
-        .map(urn => [].concat(offsets.map(offset => toOffsetUrn(urn, offset))))
-        .reduce((agg, l) => agg.concat(l), []);
-
-      const anomalyOffsets = ['current', 'baseline', 'wo1w', 'wo2w', 'wo3w', 'wo4w'];
-      const anomalyOffsetUrns = [...anomalyMetricUrns]
-        .map(urn => [].concat(anomalyOffsets.map(offset => toOffsetUrn(urn, offset))))
-        .reduce((agg, l) => agg.concat(l), []);
-
-      //
-      // call graph
-      //
-      if (activeTab === ROOTCAUSE_SERVICE_CALLGRAPH) {
-        callgraphService.request(context, [...context.urns]);
-      }
-
-      aggregatesService.request(context, new Set([...offsetUrns, ...anomalyOffsetUrns]));
-
+  _contextObserver: observer('context', 'entities', 'selectedUrns', 'sizeMetricUrns', 'activeTab', function () {
+    const {
+      context,
+      selectedUrns,
+      sizeMetricUrns,
+      entitiesService,
+      timeseriesService,
+      aggregatesService,
+      breakdownsService,
+      scoresService,
+      anomalyFunctionService,
+      callgraphService,
+      activeTab,
+      setupMode
+    } = getProperties(
+      this,
+      'context',
+      'selectedUrns',
+      'sizeMetricUrns',
+      'entitiesService',
+      'timeseriesService',
+      'aggregatesService',
+      'breakdownsService',
+      'scoresService',
+      'anomalyFunctionService',
+      'callgraphService',
+      'activeTab',
+      'setupMode'
+    );
+    if (!context || !selectedUrns) {
+      return;
     }
-  ),
+
+    if (setupMode === ROOTCAUSE_SETUP_MODE_CONTEXT) {
+      return;
+    }
+
+    //
+    // entities
+    //
+    const entitiesUrns = new Set([...selectedUrns, ...context.urns, ...context.anomalyUrns]);
+    entitiesService.request(context, entitiesUrns);
+
+    //
+    // related metrics
+    //
+    const anomalyMetricUrns = new Set();
+    const relatedMetricUrns = new Set();
+
+    if (activeTab === ROOTCAUSE_TAB_METRICS || activeTab === ROOTCAUSE_TAB_TREND) {
+      const entities = get(this, 'entitiesService.entities'); // cache may be stale, fetch directly
+      filterPrefix(Object.keys(entities), 'thirdeye:metric:').forEach((urn) => relatedMetricUrns.add(urn));
+    }
+
+    if (context.anomalyUrns.size > 0) {
+      filterPrefix(context.anomalyUrns, 'thirdeye:metric:').forEach((urn) => anomalyMetricUrns.add(urn));
+    }
+
+    //
+    // timeseries
+    //
+    const timeseriesUrns = new Set(selectedUrns);
+
+    if (activeTab === ROOTCAUSE_TAB_TREND) {
+      [...relatedMetricUrns].forEach((urn) => {
+        timeseriesUrns.add(toCurrentUrn(urn));
+        timeseriesUrns.add(toBaselineUrn(urn));
+      });
+    }
+
+    timeseriesService.request(context, timeseriesUrns);
+
+    //
+    // anomaly function baselines
+    //
+    const anomalyFunctionUrns = filterPrefix(context.anomalyUrns, 'thirdeye:event:anomaly');
+    anomalyFunctionService.request(context, new Set(anomalyFunctionUrns));
+
+    //
+    // breakdowns
+    //
+    if (activeTab === ROOTCAUSE_TAB_DIMENSIONS) {
+      const metricUrns = new Set(filterPrefix(context.urns, 'thirdeye:metric:'));
+      const currentUrns = [...metricUrns].map(toCurrentUrn);
+      const baselineUrns = [...metricUrns].map(toBaselineUrn);
+      const sizeMetricCurrentUrns = [...sizeMetricUrns].map(toCurrentUrn);
+      breakdownsService.request(context, new Set(currentUrns.concat(baselineUrns).concat(sizeMetricCurrentUrns)));
+    }
+
+    //
+    // scores
+    //
+    if (activeTab === ROOTCAUSE_TAB_METRICS) {
+      const scoresUrns = new Set(relatedMetricUrns);
+      scoresService.request(context, new Set(scoresUrns));
+    }
+
+    //
+    // aggregates
+    //
+    const offsets =
+      context.compareMode === 'forecast'
+        ? ['current', 'baseline', 'yo1y', 'upper', 'lower']
+        : ['current', 'baseline', 'wo1w', 'wo2w'];
+    const offsetUrns = [...relatedMetricUrns]
+      .map((urn) => [].concat(offsets.map((offset) => toOffsetUrn(urn, offset))))
+      .reduce((agg, l) => agg.concat(l), []);
+
+    const anomalyOffsets = ['current', 'baseline', 'wo1w', 'wo2w', 'wo3w', 'wo4w'];
+    const anomalyOffsetUrns = [...anomalyMetricUrns]
+      .map((urn) => [].concat(anomalyOffsets.map((offset) => toOffsetUrn(urn, offset))))
+      .reduce((agg, l) => agg.concat(l), []);
+
+    //
+    // call graph
+    //
+    if (activeTab === ROOTCAUSE_SERVICE_CALLGRAPH) {
+      callgraphService.request(context, [...context.urns]);
+    }
+
+    aggregatesService.request(context, new Set([...offsetUrns, ...anomalyOffsetUrns]));
+  }),
 
   /**
    * Setup observer for context and default selection
    * May run multiple times while entities are loading.
    */
-  _setupObserver: observer(
-    'context',
-    'entities',
-    'scores',
-    'setupMode',
-    function () {
-      const { setupMode } =
-        getProperties(this, 'setupMode');
+  _setupObserver: observer('context', 'entities', 'scores', 'setupMode', function () {
+    const { setupMode } = getProperties(this, 'setupMode');
 
-      switch (setupMode) {
-        case ROOTCAUSE_SETUP_MODE_NONE:
-          // left blank
-          break;
+    switch (setupMode) {
+      case ROOTCAUSE_SETUP_MODE_NONE:
+        // left blank
+        break;
 
-        case ROOTCAUSE_SETUP_MODE_CONTEXT:
-          this._setupContext();
-          break;
+      case ROOTCAUSE_SETUP_MODE_CONTEXT:
+        this._setupContext();
+        break;
 
-        case ROOTCAUSE_SETUP_MODE_SELECTED:
-          this._setupSelected();
-          break;
+      case ROOTCAUSE_SETUP_MODE_SELECTED:
+        this._setupSelected();
+        break;
 
-        default:
-          throw new Error(`Unknown setup mode '${setupMode}'`);
-      }
+      default:
+        throw new Error(`Unknown setup mode '${setupMode}'`);
     }
-  ),
+  }),
 
   //
   // Public properties (computed)
@@ -454,31 +468,30 @@ export default Controller.extend({
    * Subscribed timeseries cache (metrics, anomaly baselines)
    * @type {object}
    */
-  timeseries: computed(
-    'timeseriesService.timeseries',
-    'anomalyFunctionService.timeseries',
-    'context',
-    function () {
-      const { timeseriesService, anomalyFunctionService, context } =
-        getProperties(this, 'timeseriesService', 'anomalyFunctionService', 'context');
+  timeseries: computed('timeseriesService.timeseries', 'anomalyFunctionService.timeseries', 'context', function () {
+    const { timeseriesService, anomalyFunctionService, context } = getProperties(
+      this,
+      'timeseriesService',
+      'anomalyFunctionService',
+      'context'
+    );
 
-      const timeseries = Object.assign({}, timeseriesService.timeseries);
+    const timeseries = Object.assign({}, timeseriesService.timeseries);
 
-      if (context.compareMode !== 'predicted') {
-        return timeseries;
-      }
-
-      // NOTE: only supports a single anomaly function baseline
-      const anomalyFunctionUrns = filterPrefix(context.anomalyUrns, 'thirdeye:event:anomaly:');
-      const anomalyFunctionUrn = anomalyFunctionUrns[0];
-
-      filterPrefix(context.anomalyUrns, 'thirdeye:metric:').forEach(urn => {
-        timeseries[toBaselineUrn(urn)] = anomalyFunctionService.timeseries[anomalyFunctionUrn];
-      });
-
+    if (context.compareMode !== 'predicted') {
       return timeseries;
     }
-  ),
+
+    // NOTE: only supports a single anomaly function baseline
+    const anomalyFunctionUrns = filterPrefix(context.anomalyUrns, 'thirdeye:event:anomaly:');
+    const anomalyFunctionUrn = anomalyFunctionUrns[0];
+
+    filterPrefix(context.anomalyUrns, 'thirdeye:metric:').forEach((urn) => {
+      timeseries[toBaselineUrn(urn)] = anomalyFunctionService.timeseries[anomalyFunctionUrn];
+    });
+
+    return timeseries;
+  }),
 
   /**
    * Subscribed aggregates cache
@@ -508,93 +521,76 @@ export default Controller.extend({
    * Primary metric urn for rootcause search
    * @type {string}
    */
-  metricUrn: computed(
-    'context',
-    function () {
-      const { context } = getProperties(this, 'context');
-      const metricUrns = filterPrefix(context.urns, 'thirdeye:metric:');
-      if (!metricUrns) { return false; }
-      return metricUrns[0];
+  metricUrn: computed('context', function () {
+    const { context } = getProperties(this, 'context');
+    const metricUrns = filterPrefix(context.urns, 'thirdeye:metric:');
+    if (!metricUrns) {
+      return false;
     }
-  ),
+    return metricUrns[0];
+  }),
 
   /**
    * Number of data point remaining in service queue for metrics table
    * @type {int}
    */
-  metricsPendingCount: computed(
-    'aggregatesService.pending',
-    'scoresService.pending',
-    function () {
-      const nAggregates = get(this, 'aggregatesService.pending').size;
-      const nScores = get(this, 'scoresService.pending').size;
+  metricsPendingCount: computed('aggregatesService.pending', 'scoresService.pending', function () {
+    const nAggregates = get(this, 'aggregatesService.pending').size;
+    const nScores = get(this, 'scoresService.pending').size;
 
-      return nAggregates + nScores;
-    }
-  ),
+    return nAggregates + nScores;
+  }),
 
   /**
    * Primary metric urn for rootcause search
    * @type {string}
    */
-  sizeMetricUrn: computed(
-    'sizeMetricUrns',
-    function () {
-      const { sizeMetricUrns } = getProperties(this, 'sizeMetricUrns');
-      const metricUrns = filterPrefix(sizeMetricUrns, 'thirdeye:metric:');
-      if (!metricUrns) { return false; }
-      return metricUrns[0];
+  sizeMetricUrn: computed('sizeMetricUrns', function () {
+    const { sizeMetricUrns } = getProperties(this, 'sizeMetricUrns');
+    const metricUrns = filterPrefix(sizeMetricUrns, 'thirdeye:metric:');
+    if (!metricUrns) {
+      return false;
     }
-  ),
+    return metricUrns[0];
+  }),
 
   /**
    * Primary anomaly urn for anomaly header
    * @type {string}
    */
-  anomalyUrn: computed(
-    'anomalyUrns',
-    function () {
-      const { context } = getProperties(this, 'context');
+  anomalyUrn: computed('anomalyUrns', function () {
+    const { context } = getProperties(this, 'context');
 
-      const anomalyEventUrn = filterPrefix(context.anomalyUrns, 'thirdeye:event:anomaly:');
+    const anomalyEventUrn = filterPrefix(context.anomalyUrns, 'thirdeye:event:anomaly:');
 
-      if (!anomalyEventUrn) { return; }
-
-      return anomalyEventUrn[0];
+    if (!anomalyEventUrn) {
+      return;
     }
-  ),
+
+    return anomalyEventUrn[0];
+  }),
 
   /**
    * Visible series and events in timeseries chart
    * @type {array}
    */
-  chartSelectedUrns: computed(
-    'entities',
-    'selectedUrns',
-    'invisibleUrns',
-    function () {
-      const { selectedUrns, invisibleUrns } =
-        getProperties(this, 'selectedUrns', 'invisibleUrns');
+  chartSelectedUrns: computed('entities', 'selectedUrns', 'invisibleUrns', function () {
+    const { selectedUrns, invisibleUrns } = getProperties(this, 'selectedUrns', 'invisibleUrns');
 
-      const urns = new Set(selectedUrns);
-      [...invisibleUrns].forEach(urn => urns.delete(urn));
+    const urns = new Set(selectedUrns);
+    [...invisibleUrns].forEach((urn) => urns.delete(urn));
 
-      return urns;
-    }
-  ),
+    return urns;
+  }),
 
   /**
    * (Event) entities for event table as filtered by the side bar
    * @type {object}
    */
-  eventTableEntities: computed(
-    'entities',
-    'filteredUrns',
-    function () {
-      const { entities, filteredUrns } = getProperties(this, 'entities', 'filteredUrns');
-      return filterObject(entities, (e) => filteredUrns.has(e.urn));
-    }
-  ),
+  eventTableEntities: computed('entities', 'filteredUrns', function () {
+    const { entities, filteredUrns } = getProperties(this, 'entities', 'filteredUrns');
+    return filterObject(entities, (e) => filteredUrns.has(e.urn));
+  }),
 
   /**
    * Columns config for event table
@@ -606,13 +602,10 @@ export default Controller.extend({
    * (Event) entities for filtering in the side bar
    * @type {object}
    */
-  eventFilterEntities: computed(
-    'entities',
-    function () {
-      const { entities } = getProperties(this, 'entities');
-      return filterObject(entities, (e) => e.type == 'event');
-    }
-  ),
+  eventFilterEntities: computed('entities', function () {
+    const { entities } = getProperties(this, 'entities');
+    return filterObject(entities, (e) => e.type == 'event');
+  }),
 
   //
   // loading indicators
@@ -664,41 +657,45 @@ export default Controller.extend({
   //
   // session handling
   //
-  sessionCanSave: computed(
-    'sessionPermissions',
-    'sessionOwner',
-    'username',
-    function () {
-      const { sessionOwner, sessionPermissions, username } =
-        getProperties(this, 'sessionOwner', 'sessionPermissions', 'username');
+  sessionCanSave: computed('sessionPermissions', 'sessionOwner', 'username', function () {
+    const { sessionOwner, sessionPermissions, username } = getProperties(
+      this,
+      'sessionOwner',
+      'sessionPermissions',
+      'username'
+    );
 
-      if (sessionPermissions === ROOTCAUSE_SESSION_PERMISSIONS_READ_WRITE) {
-        return true;
-      }
-      return sessionOwner === username;
+    if (sessionPermissions === ROOTCAUSE_SESSION_PERMISSIONS_READ_WRITE) {
+      return true;
     }
-  ),
+    return sessionOwner === username;
+  }),
 
-  sessionCanCopy: computed(
-    'sessionId',
-    'sessionPermissions',
-    'sessionOwner',
-    'username',
-    function () {
-      const { sessionId, sessionOwner, sessionPermissions, username } =
-        getProperties(this, 'sessionId', 'sessionOwner', 'sessionPermissions', 'username');
+  sessionCanCopy: computed('sessionId', 'sessionPermissions', 'sessionOwner', 'username', function () {
+    const { sessionId, sessionOwner, sessionPermissions, username } = getProperties(
+      this,
+      'sessionId',
+      'sessionOwner',
+      'sessionPermissions',
+      'username'
+    );
 
-      // NOTE: these conditions are temporary until full design for session copy is available
+    // NOTE: these conditions are temporary until full design for session copy is available
 
-      if (_.isEmpty(sessionId)) { return false; }
-
-      if (sessionOwner === username) { return false; } // temporary
-
-      if (sessionPermissions === ROOTCAUSE_SESSION_PERMISSIONS_READ) { return true; }
-
-      return false; // temporary
+    if (_.isEmpty(sessionId)) {
+      return false;
     }
-  ), // Ember.computed.bool('sessionId') - when enabled
+
+    if (sessionOwner === username) {
+      return false;
+    } // temporary
+
+    if (sessionPermissions === ROOTCAUSE_SESSION_PERMISSIONS_READ) {
+      return true;
+    }
+
+    return false; // temporary
+  }), // Ember.computed.bool('sessionId') - when enabled
 
   /**
    * Sets the transient rca session properties after saving
@@ -737,11 +734,28 @@ export default Controller.extend({
    * @private
    */
   _makeSession() {
-    const { context, selectedUrns, sessionId, sessionName, sessionText, sessionOwner,
-      sessionPermissions, isUserCustomizingRequest, customTableSettings } =
-      getProperties(this, 'context', 'selectedUrns', 'sessionId', 'sessionName',
-      'sessionText', 'sessionOwner', 'sessionPermissions', 'isUserCustomizingRequest',
-      'customTableSettings');
+    const {
+      context,
+      selectedUrns,
+      sessionId,
+      sessionName,
+      sessionText,
+      sessionOwner,
+      sessionPermissions,
+      isUserCustomizingRequest,
+      customTableSettings
+    } = getProperties(
+      this,
+      'context',
+      'selectedUrns',
+      'sessionId',
+      'sessionName',
+      'sessionText',
+      'sessionOwner',
+      'sessionPermissions',
+      'isUserCustomizingRequest',
+      'customTableSettings'
+    );
 
     return {
       id: sessionId,
@@ -769,17 +783,25 @@ export default Controller.extend({
    * @private
    */
   _checkSession() {
-    const { sessionId, sessionUpdatedTime, sessionService } =
-      getProperties(this, 'sessionId', 'sessionUpdatedTime', 'sessionService');
+    const { sessionId, sessionUpdatedTime, sessionService } = getProperties(
+      this,
+      'sessionId',
+      'sessionUpdatedTime',
+      'sessionService'
+    );
 
-    if (!sessionId) { return; }
+    if (!sessionId) {
+      return;
+    }
 
     sessionService
       .loadAsync(sessionId)
       .then((res) => {
         if (res.updated > sessionUpdatedTime) {
           setProperties(this, {
-            sessionUpdateWarning: `This investigation (${sessionId}) was updated by ${res.updatedBy} on ${makeTime(res.updated).format(dateFormatFull)}. Please refresh the page.`
+            sessionUpdateWarning: `This investigation (${sessionId}) was updated by ${res.updatedBy} on ${makeTime(
+              res.updated
+            ).format(dateFormatFull)}. Please refresh the page.`
           });
         }
       })
@@ -792,16 +814,22 @@ export default Controller.extend({
    * @private
    */
   _onCheckSessionTimer() {
-    const { sessionId, context, sessionTemplateService } = getProperties(this, 'sessionId', 'context', 'sessionTemplateService');
+    const sessionId = get(this, 'sessionId');
 
-    if (!sessionId) { return; }
+    if (!sessionId) {
+      return;
+    }
 
     // debounce: do not run if destroyed
-    if (this.isDestroyed) { return; }
+    if (this.isDestroyed) {
+      return;
+    }
 
     debounce(this, this._onCheckSessionTimer, ROOTCAUSE_SESSION_TIMER_INTERVAL);
 
-    if (!sessionId) { return; }
+    if (!sessionId) {
+      return;
+    }
 
     this._checkSession();
   },
@@ -821,13 +849,21 @@ export default Controller.extend({
    * @private
    */
   _updateAnomalyFeedbackDebounce() {
-    const { anomalyUrn, anomalyFeedback, sessionText } =
-      getProperties(this, 'anomalyUrn', 'anomalyFeedback', 'sessionText');
+    const { anomalyUrn, anomalyFeedback, sessionText } = getProperties(
+      this,
+      'anomalyUrn',
+      'anomalyFeedback',
+      'sessionText'
+    );
 
-    if (!anomalyUrn) { return; }
+    if (!anomalyUrn) {
+      return;
+    }
 
     // debounce: do not run if destroyed
-    if (this.isDestroyed) { return; }
+    if (this.isDestroyed) {
+      return;
+    }
 
     const id = anomalyUrn.split(':')[3];
     const jsonString = JSON.stringify({ feedbackType: anomalyFeedback, comment: sessionText });
@@ -844,12 +880,13 @@ export default Controller.extend({
    * @private
    */
   _setupContext() {
-    const { context } =
-      getProperties(this, 'context');
+    const { context } = getProperties(this, 'context');
 
     const contextMetricUrns = filterPrefix(context.urns, 'thirdeye:metric:');
 
-    if (_.isEmpty(contextMetricUrns)) { return; }
+    if (_.isEmpty(contextMetricUrns)) {
+      return;
+    }
 
     const metricUrn = contextMetricUrns[0];
     const metricId = metricUrn.split(':')[2];
@@ -864,21 +901,27 @@ export default Controller.extend({
    * @private
    */
   _setupSelected() {
-    const { context, entities, scores, selectedUrns, loadingFrameworks, isLoadingScores } =
-      getProperties(this, 'context', 'entities', 'scores', 'selectedUrns', 'loadingFrameworks', 'isLoadingScores');
+    const { context, entities, scores, selectedUrns, loadingFrameworks, isLoadingScores } = getProperties(
+      this,
+      'context',
+      'entities',
+      'scores',
+      'selectedUrns',
+      'loadingFrameworks',
+      'isLoadingScores'
+    );
 
     const newSelectedUrns = new Set(selectedUrns);
 
-    filterPrefix(context.urns, 'thirdeye:metric:')
-      .forEach(urn => {
-        newSelectedUrns.add(urn);
-        newSelectedUrns.add(toCurrentUrn(urn));
-        newSelectedUrns.add(toBaselineUrn(urn));
-      });
+    filterPrefix(context.urns, 'thirdeye:metric:').forEach((urn) => {
+      newSelectedUrns.add(urn);
+      newSelectedUrns.add(toCurrentUrn(urn));
+      newSelectedUrns.add(toBaselineUrn(urn));
+    });
 
     // events
     const groupedEvents = Object.values(entities)
-      .filter(e => e.type === 'event')
+      .filter((e) => e.type === 'event')
       .reduce((agg, e) => {
         const type = e.eventType;
         agg[type] = agg[type] || [];
@@ -887,17 +930,14 @@ export default Controller.extend({
       }, {});
 
     // add events passing threshold
-    Object.values(groupedEvents)
-      .forEach(arr => {
-        arr
-          .filter(e => e.score >= ROOTCAUSE_SETUP_EVENTS_SCORE_THRESHOLD)
-          .forEach(e => newSelectedUrns.add(e.urn));
-      });
+    Object.values(groupedEvents).forEach((arr) => {
+      arr.filter((e) => e.score >= ROOTCAUSE_SETUP_EVENTS_SCORE_THRESHOLD).forEach((e) => newSelectedUrns.add(e.urn));
+    });
 
     // metrics
     filterPrefix(Object.keys(entities), 'thirdeye:metric:')
-      .filter(urn => (urn in scores) && (scores[urn] >= ROOTCAUSE_SETUP_METRICS_SCORE_THRESHOLD))
-      .forEach(urn => {
+      .filter((urn) => urn in scores && scores[urn] >= ROOTCAUSE_SETUP_METRICS_SCORE_THRESHOLD)
+      .forEach((urn) => {
         newSelectedUrns.add(urn);
         newSelectedUrns.add(toCurrentUrn(urn));
         newSelectedUrns.add(toBaselineUrn(urn));
@@ -912,7 +952,8 @@ export default Controller.extend({
 
     setProperties(this, {
       selectedUrns: newSelectedUrns,
-      setupMode: (loadingFrameworks.size > 0 || isLoadingScores) ? ROOTCAUSE_SETUP_MODE_SELECTED : ROOTCAUSE_SETUP_MODE_NONE
+      setupMode:
+        loadingFrameworks.size > 0 || isLoadingScores ? ROOTCAUSE_SETUP_MODE_SELECTED : ROOTCAUSE_SETUP_MODE_NONE
     });
   },
 
@@ -929,8 +970,12 @@ export default Controller.extend({
      */
     onSelection(updates) {
       const { selectedUrns } = getProperties(this, 'selectedUrns');
-      Object.keys(updates).filter(urn => updates[urn]).forEach(urn => selectedUrns.add(urn));
-      Object.keys(updates).filter(urn => !updates[urn]).forEach(urn => selectedUrns.delete(urn));
+      Object.keys(updates)
+        .filter((urn) => updates[urn])
+        .forEach((urn) => selectedUrns.add(urn));
+      Object.keys(updates)
+        .filter((urn) => !updates[urn])
+        .forEach((urn) => selectedUrns.delete(urn));
       setProperties(this, {
         selectedUrns: new Set(selectedUrns),
         sessionModified: true
@@ -946,7 +991,7 @@ export default Controller.extend({
     onLegendHover(urns) {
       const focusUrns = new Set(urns);
 
-      filterPrefix(focusUrns, 'thirdeye:metric:').forEach(urn => {
+      filterPrefix(focusUrns, 'thirdeye:metric:').forEach((urn) => {
         focusUrns.add(toCurrentUrn(urn));
         focusUrns.add(toBaselineUrn(urn));
       });
@@ -962,8 +1007,12 @@ export default Controller.extend({
      */
     onVisibility(updates) {
       const { invisibleUrns } = getProperties(this, 'invisibleUrns');
-      Object.keys(updates).filter(urn => updates[urn]).forEach(urn => invisibleUrns.delete(urn));
-      Object.keys(updates).filter(urn => !updates[urn]).forEach(urn => invisibleUrns.add(urn));
+      Object.keys(updates)
+        .filter((urn) => updates[urn])
+        .forEach((urn) => invisibleUrns.delete(urn));
+      Object.keys(updates)
+        .filter((urn) => !updates[urn])
+        .forEach((urn) => invisibleUrns.add(urn));
 
       setProperties(this, { invisibleUrns: new Set(invisibleUrns) });
     },
@@ -1034,24 +1083,30 @@ export default Controller.extend({
      * @returns {undefined}
      */
     onSessionSave() {
-      const { sessionService, sessionCanSave, sessionTemplateService, context} = getProperties(this, 'sessionService', 'sessionCanSave', 'sessionTemplateService', 'context');
+      const { sessionService, sessionCanSave, sessionTemplateService, context } = getProperties(
+        this,
+        'sessionService',
+        'sessionCanSave',
+        'sessionTemplateService',
+        'context'
+      );
 
       if (sessionCanSave) {
         const session = this._makeSession();
         const contextMetricUrns = filterPrefix(context.urns, 'thirdeye:metric:');
-        const metricUrn = contextMetricUrns[0]
+        const metricUrn = contextMetricUrns[0];
         sessionTemplateService.saveDimensionAnalysisAsync(
           metricUrn,
           session.customTableSettings.dimensions,
           session.customTableSettings.excludedDimensions,
-          session.customTableSettings.orderType == "manual",
+          session.customTableSettings.orderType == 'manual',
           session.customTableSettings.oneSideError,
           session.customTableSettings.summarySize,
           session.customTableSettings.depth
         );
         return sessionService
           .saveAsync(session)
-          .then(sessionId => this._updateSession(sessionId))
+          .then((sessionId) => this._updateSession(sessionId))
           .catch(() => {
             const { routeErrors } = getProperties(this, 'routeErrors');
             routeErrors.add('Could not save investigation');
@@ -1066,7 +1121,13 @@ export default Controller.extend({
      * @returns {undefined}
      */
     onSessionCopy() {
-      const { sessionId, sessionName, sessionService, sessionCanCopy } = getProperties(this, 'sessionId', 'sessionName', 'sessionService', 'sessionCanCopy');
+      const { sessionId, sessionName, sessionService, sessionCanCopy } = getProperties(
+        this,
+        'sessionId',
+        'sessionName',
+        'sessionService',
+        'sessionCanCopy'
+      );
 
       if (sessionCanCopy) {
         set(this, 'sessionName', `Copy of ${sessionName}`);
@@ -1079,7 +1140,7 @@ export default Controller.extend({
 
         return sessionService
           .saveAsync(session)
-          .then(sessionId => this._updateSession(sessionId))
+          .then((sessionId) => this._updateSession(sessionId))
           .catch(() => {
             const { routeErrors } = getProperties(this, 'routeErrors');
             routeErrors.add('Could not copy investigation');
@@ -1110,29 +1171,29 @@ export default Controller.extend({
 
       // NOTE: updates here do not conform to standard. Only newly selected urns are passed in, removed are omitted.
 
-      const addedUrns = Object.keys(updates).filter(urn => updates[urn]);
-      const removedUrns = [...context.urns].filter(urn => !addedUrns.includes(urn));
+      const addedUrns = Object.keys(updates).filter((urn) => updates[urn]);
+      const removedUrns = [...context.urns].filter((urn) => !addedUrns.includes(urn));
 
       // primary metrics
       const urns = new Set(context.urns);
-      addedUrns.forEach(urn => urns.add(urn));
-      removedUrns.forEach(urn => urns.delete(urn));
+      addedUrns.forEach((urn) => urns.add(urn));
+      removedUrns.forEach((urn) => urns.delete(urn));
 
       // secondary metrics
       const newSizeMetricUrns = new Set();
-      const addedBaseUrns = filterPrefix(addedUrns, 'thirdeye:metric:').map(urn => stripTail(urn));
-      const removedBaseUrns = filterPrefix(removedUrns, 'thirdeye:metric:').map(urn => stripTail(urn));
+      const addedBaseUrns = filterPrefix(addedUrns, 'thirdeye:metric:').map((urn) => stripTail(urn));
+      const removedBaseUrns = filterPrefix(removedUrns, 'thirdeye:metric:').map((urn) => stripTail(urn));
 
       const metricUrns = filterPrefix(addedUrns, 'thirdeye:metric:');
 
       if (_.isEqual(addedBaseUrns, removedBaseUrns)) {
         // only filter changed
-        const tails = metricUrns.map(urn => extractTail(urn));
-        tails.forEach(tail => {
-          sizeMetricUrns.forEach(urn => newSizeMetricUrns.add(appendTail(stripTail(urn), tail)));
+        const tails = metricUrns.map((urn) => extractTail(urn));
+        tails.forEach((tail) => {
+          sizeMetricUrns.forEach((urn) => newSizeMetricUrns.add(appendTail(stripTail(urn), tail)));
         });
       } else {
-        metricUrns.forEach(urn => newSizeMetricUrns.add(urn));
+        metricUrns.forEach((urn) => newSizeMetricUrns.add(urn));
       }
 
       set(this, 'sizeMetricUrns', newSizeMetricUrns);
@@ -1176,7 +1237,8 @@ export default Controller.extend({
       if (analysisRange[0] >= start) {
         analysisRange[0] = makeTime(start).startOf('day').valueOf();
       }
-      if (analysisRange[1] <= end) {//not sure we need this now? -lohuynh
+      if (analysisRange[1] <= end) {
+        //not sure we need this now? -lohuynh
         analysisRange[1] = makeTime(end).startOf('day').add(1, 'days').valueOf();
       }
 
@@ -1198,10 +1260,24 @@ export default Controller.extend({
      * Clears error logs of data services and/or route
      */
     clearErrors(type) {
-      const { entitiesService, timeseriesService, aggregatesService, breakdownsService, anomalyFunctionService, callgraphService } =
-        getProperties(this, 'entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService', 'anomalyFunctionService', 'callgraphService');
+      const {
+        entitiesService,
+        timeseriesService,
+        aggregatesService,
+        breakdownsService,
+        anomalyFunctionService,
+        callgraphService
+      } = getProperties(
+        this,
+        'entitiesService',
+        'timeseriesService',
+        'aggregatesService',
+        'breakdownsService',
+        'anomalyFunctionService',
+        'callgraphService'
+      );
 
-      switch(type) {
+      switch (type) {
         case ROOTCAUSE_SERVICE_ENTITIES:
           entitiesService.clearErrors();
           break;
@@ -1238,13 +1314,12 @@ export default Controller.extend({
           anomalyFunctionService.clearErrors();
           callgraphService.clearErrors();
           break;
-
       }
     },
 
     /**
      * Toggles the modal view
-    */
+     */
     onEntityMappingClick() {
       set(this, 'showEntityMappingModal', true);
     },
@@ -1252,7 +1327,7 @@ export default Controller.extend({
     /**
      * Handles the modal submit action
      * Flushes the cache to reload the related entities
-    */
+     */
     onModalSubmit() {
       get(this, 'entitiesService').flushCache();
       this.notifyPropertyChange('context');
