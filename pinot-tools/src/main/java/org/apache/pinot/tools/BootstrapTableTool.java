@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.tools;
 
+import com.google.common.base.Preconditions;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -40,6 +41,8 @@ public class BootstrapTableTool {
   private final String _tableDir;
 
   public BootstrapTableTool(String controllerHost, int controllerPort, String tableDir) {
+    Preconditions.checkNotNull(controllerHost);
+    Preconditions.checkNotNull(tableDir);
     _controllerHost = controllerHost;
     _controllerPort = controllerPort;
     _tableDir = tableDir;
