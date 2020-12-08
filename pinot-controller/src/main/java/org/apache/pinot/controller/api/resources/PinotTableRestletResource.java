@@ -509,14 +509,8 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Whether to allow downtime for the rebalance") @DefaultValue("false") @QueryParam("downtime") boolean downtime,
       @ApiParam(value = "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or maximum number of replicas allowed to be unavailable if value is negative") @DefaultValue("1") @QueryParam("minAvailableReplicas") int minAvailableReplicas,
       @ApiParam(value = "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime contract cannot be achieved)") @DefaultValue("false") @QueryParam("bestEfforts") boolean bestEfforts) {
-    TableType tableType;
-    try {
-      tableType = TableType.valueOf(tableTypeStr.toUpperCase());
-    } catch (IllegalArgumentException e) {
-      throw new ControllerApplicationException(LOGGER, "Illegal table type: " + tableTypeStr,
-          Response.Status.BAD_REQUEST);
-    }
-    String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
+
+    String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
 
     Configuration rebalanceConfig = new BaseConfiguration();
     rebalanceConfig.addProperty(RebalanceConfigConstants.DRY_RUN, dryRun);
@@ -567,15 +561,7 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Name of the table to get its state", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline", required = true) @QueryParam("type") String tableTypeStr
   ) {
-    TableType tableType;
-    try {
-      tableType = TableType.valueOf(tableTypeStr.toUpperCase());
-    } catch (IllegalArgumentException e) {
-      throw new ControllerApplicationException(LOGGER, "Illegal table type: " + tableTypeStr,
-          Response.Status.BAD_REQUEST);
-    }
-
-    String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
+    String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
     try {
       ObjectNode data = JsonUtils.newObjectNode();
       data.put("state", _pinotHelixResourceManager.isTableEnabled(tableNameWithType) ? "enabled" : "disabled");
@@ -584,5 +570,29 @@ public class PinotTableRestletResource {
       throw new ControllerApplicationException(LOGGER, "Failed to find table: " + tableNameWithType,
           Response.Status.NOT_FOUND);
     }
+  }
+
+  @GET
+  @Path("/tables/{tableName}/creationTime")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "table creation time", notes = "Provides table creation time in milliseconds from EPOCH.")
+  public long getTableCreationTime(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "realtime|offline", required = true) @QueryParam("type") String tableTypeStr) {
+
+    String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
+
+    return _pinotHelixResourceManager.getTableCreationTimeInMillisFromEpoch(tableNameWithType);
+  }
+
+  private String constructTableNameWithType(String tableName, String tableTypeStr) {
+    TableType tableType;
+    try {
+      tableType = TableType.valueOf(tableTypeStr.toUpperCase());
+    } catch (IllegalArgumentException e) {
+      throw new ControllerApplicationException(LOGGER, "Illegal table type: " + tableTypeStr,
+          Response.Status.BAD_REQUEST);
+    }
+    return TableNameBuilder.forType(tableType).tableNameWithType(tableName);
   }
 }

@@ -2573,6 +2573,12 @@ public class PinotHelixResourceManager {
     return onlineSegments;
   }
 
+  public long getTableCreationTimeInMillisFromEpoch(String tableNameWithType) {
+    String zkPath = ZKMetadataProvider.constructPropertyStorePathForResourceConfig(tableNameWithType);
+    ZNRecord znRecord = ZKMetadataProvider.getZnRecord(_propertyStore, zkPath);
+    return znRecord.getCreationTime();
+  }
+
   /*
    * Uncomment and use for testing on a real cluster
   public static void main(String[] args) throws Exception {
