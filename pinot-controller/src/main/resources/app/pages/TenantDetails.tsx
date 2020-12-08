@@ -40,7 +40,7 @@ import RebalanceServerTableOp from '../components/Homepage/Operations/RebalanceS
 import Confirm from '../components/Confirm';
 import { NotificationContext } from '../components/Notification/NotificationContext';
 import Utils from '../utils/Utils';
-import InfoIcon from '@material-ui/icons/Info';
+import InfoOutlinedIcon from '@material-ui/icons/InfoOutlined';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -332,7 +332,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
 
   const handleRebalanceBrokers = () => {
     setDialogDetails({
-      title: (<>Rebalance brokers <a href="https://docs.pinot.apache.org/operators/operating-pinot/rebalance/rebalance-brokers" target="_blank"><InfoIcon></InfoIcon></a></>),
+      title: (<>Rebalance brokers <Tooltip interactive title={(<a className={"tooltip-link"} target="_blank" href="https://docs.pinot.apache.org/operators/operating-pinot/rebalance/rebalance-brokers">Click here for more details</a>)} arrow placement="top"><InfoOutlinedIcon/></Tooltip></>),
       content: 'Are you sure want to rebalance the brokers?',
       successCb: () => rebalanceBrokers()
     });
@@ -462,14 +462,18 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
             <strong>Table Name:</strong> {tableSummary.tableName}
           </Grid>
           <Tooltip title="Uncompressed size of all data segments"  arrow placement="top-start">
-          <Grid item xs={4}>
+          <Grid item xs={2}>
             <strong>Reported Size:</strong> {tableSummary.reportedSize}
           </Grid>
           </Tooltip>
-          <Grid item xs={4}>
-            <strong>Estimated Size: </strong>
-            {tableSummary.estimatedSize}
-          </Grid>
+          <Grid item xs={2}></Grid>
+          <Tooltip title="Estimated size of all data segments, in case any servers are not reachable for actual size" arrow placement="top-start">
+            <Grid item xs={2}>
+              <strong>Estimated Size: </strong>
+              {tableSummary.estimatedSize}
+            </Grid>
+          </Tooltip>
+          <Grid item xs={2}></Grid>
         </Grid>
       </div>
 

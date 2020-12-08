@@ -142,7 +142,7 @@ export default function AddIngestionComponent({
             }
             </Grid>
             <Grid item xs={12}>
-            <Tooltip interactive title={(<>Filter out rows which match condition.<a href="https://docs.pinot.apache.org/developers/advanced/ingestion-level-transformations#filtering" className={"tooltip-link"}>(Click here for more Details)</a></>)} arrow placement="top-start" disableHoverListener={tableDataObj.tableType === "REALTIME"}>
+            <Tooltip interactive title={(<>Filter out rows which match condition.<a target="_blank" href="https://docs.pinot.apache.org/developers/advanced/ingestion-level-transformations#filtering" className={"tooltip-link"}>(Click here for more details)</a></>)} arrow placement="top-start">
             <FormControl className={classes.formControl}>
                 <InputLabel htmlFor="filterFunction">Filter function</InputLabel>
                 <Input
@@ -160,7 +160,7 @@ export default function AddIngestionComponent({
                     changeHandler = {changeHandler}/>
                 : null
             }
-            <Tooltip interactive title={(<>Transform the data values using Groovy or other inbuilt functions.<a href="https://docs.pinot.apache.org/developers/advanced/ingestion-level-transformations#column-transformation" className={"tooltip-link"}>(Click here for more Details)</a></>)} arrow placement="top-start" disableHoverListener={tableDataObj.tableType === "REALTIME"}>
+            <Tooltip interactive title={(<>Transform the data values using Groovy or other inbuilt functions.<a target="_blank" href="https://docs.pinot.apache.org/developers/advanced/ingestion-level-transformations#column-transformation" className={"tooltip-link"}>(Click here for more details)</a></>)} arrow placement="top-start">
             <MultipleSelectComponent
                 key = {"transformConfigs"}
                 streamConfigsObj = {tableDataObj.ingestionConfig.transformConfigs || []}

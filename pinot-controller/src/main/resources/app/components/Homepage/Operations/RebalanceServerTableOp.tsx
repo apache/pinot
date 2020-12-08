@@ -18,11 +18,11 @@
  */
 
 import React from 'react';
-import { DialogContent, DialogContentText, FormControl, FormControlLabel, Grid, Input, InputLabel, Switch} from '@material-ui/core';
+import { DialogContent, DialogContentText, FormControl, FormControlLabel, Grid, Input, InputLabel, Switch, Tooltip} from '@material-ui/core';
 import Dialog from '../../CustomDialog';
 import PinotMethodUtils from '../../../utils/PinotMethodUtils';
 import CustomCodemirror from '../../CustomCodemirror';
-import InfoIcon from '@material-ui/icons/Info';
+import InfoOutlinedIcon from '@material-ui/icons/InfoOutlined';
 
 type Props = {
   tableType: string,
@@ -62,7 +62,7 @@ export default function RebalanceServerTableOp({
     <Dialog
       open={true}
       handleClose={hideModal}
-      title={(<>Rebalance Server <a href="https://docs.pinot.apache.org/operators/operating-pinot/rebalance/rebalance-servers" target="_blank"><InfoIcon fontSize={"small"}></InfoIcon></a></>)}
+      title={(<>Rebalance Server <Tooltip interactive title={(<a className={"tooltip-link"} target="_blank" href="https://docs.pinot.apache.org/operators/operating-pinot/rebalance/rebalance-servers">Click here for more details</a>)} arrow placement="top"><InfoOutlinedIcon/></Tooltip></>)}
       handleSave={handleSave}
       showOkBtn={!rebalanceResponse}
     >

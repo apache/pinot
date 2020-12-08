@@ -73,7 +73,7 @@ export default function AddQueryComponent({
             type="number"
           />
         </FormControl>
-        <Tooltip title="Queries exceeding this QPS will be rejected." arrow placement="top-start" disableHoverListener={tableDataObj.tableType === "REALTIME"}>
+        <Tooltip title="Queries exceeding this QPS will be rejected." arrow placement="top-start">
         <FormControl className={classes.formControl} >
           <InputLabel htmlFor="maxQueriesPerSecond">Queries Per Second</InputLabel>
           <Input

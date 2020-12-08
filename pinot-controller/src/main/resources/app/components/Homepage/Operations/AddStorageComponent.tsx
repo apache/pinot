@@ -70,7 +70,7 @@ export default function AddStorageComponent({
   return (
     <Grid container spacing={2}>
       <Grid item xs={12}>
-      <Tooltip title="Data will be deleted after this time period." arrow placement="top-start" disableHoverListener={tableDataObj.tableType === "REALTIME"}>
+      <Tooltip title="Data will be deleted after this time period." arrow placement="top-start">
       <FormControl className={classes.formControl} >
           <InputLabel htmlFor="retentionTimeValue">Retention Value</InputLabel>
           <Input
@@ -99,7 +99,7 @@ export default function AddStorageComponent({
             <MenuItem value="DAYS">DAYS</MenuItem>
           </Select>
         </FormControl>
-        <Tooltip title="Data pushes which exceed this size will fail." arrow placement="top-start" disableHoverListener={tableDataObj.tableType === "REALTIME"}>
+        <Tooltip title="Data pushes which exceed this size will fail." arrow placement="top-start">
         <FormControl className={classes.formControl} >
           <InputLabel htmlFor="maxQueriesPerSecond">Storage Quota</InputLabel>
           <Input

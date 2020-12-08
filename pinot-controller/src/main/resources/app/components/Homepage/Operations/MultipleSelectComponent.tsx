@@ -101,7 +101,7 @@ export default function AddDeleteComponent({
 
   return (
     <Grid container spacing={2}>
-        <Tooltip interactive title={(<>Transform the data values using Groovy or other inbuilt functions.<a className = {"tooltip-link"} href={"https://docs.pinot.apache.org/developers/adv anced/ingestion-level-transformations#colum n-transformation"}>(click here for more details)</a></>)} arrow placement="top">
+        <Tooltip interactive title={(<>Transform the data values using Groovy or other inbuilt functions.<a className={"tooltip-link"} target="_blank" href={"https://docs.pinot.apache.org/developers/advanced/ingestion-level-transformations#column-transformation"}>(Click here for more details)</a></>)} arrow placement="top">
             <h3 className="accordion-subtitle">Transform functions</h3>
         </Tooltip>
                 {

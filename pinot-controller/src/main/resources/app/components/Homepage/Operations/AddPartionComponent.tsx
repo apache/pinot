@@ -152,7 +152,7 @@ export default function AddPartionComponent({
   return (
     <Grid container spacing={2}>
       <Grid item xs={12}>
-      <Tooltip interactive title={(<>Data has to be pre-partitioned using the same logic, when creating segments.<a href="https://docs.pinot.apache.org/operators/operating-pinot/tuning/routing#partitioning"  target="_blank"  className={"tooltip-link"}>(Click here for more Details)</a></>)} arrow placement="top-start" disableHoverListener={tableDataObj.tableType === "REALTIME"}>
+      <Tooltip interactive title={(<>Data has to be pre-partitioned using the same logic, when creating segments.<a href="https://docs.pinot.apache.org/operators/operating-pinot/tuning/routing#partitioning" target="_blank" className={"tooltip-link"}>(Click here for more details)</a></>)} arrow placement="top-start" disableHoverListener={tableDataObj.tableType === "REALTIME"}>
       <FormControl className={classes.selectFormControl}>
           <InputLabel htmlFor="segmentPrunerTypes">Enable partitioning</InputLabel>
           <Select
@@ -215,7 +215,7 @@ export default function AddPartionComponent({
                 </FormControl> : null }
             </Grid>
         <Grid item xs={12}>
-        <Tooltip title={(<>Creates sets of servers that contain a complete set of segments.<a href="https://docs.pinot.apache.org/operators/operating-pinot/tuning/routing#replica-group-segment-assignment-and-query-routing"  target="_blank" className={"tooltip-link"}>(Click here for more Details)</a></>)} arrow placement="top-start" interactive disableHoverListener={tableDataObj.tableType === "REALTIME"}>
+        <Tooltip title={(<>Creates sets of servers that contain a complete set of segments.<a href="https://docs.pinot.apache.org/operators/operating-pinot/tuning/routing#replica-group-segment-assignment-and-query-routing"  target="_blank" className={"tooltip-link"}>(Click here for more details)</a></>)} arrow placement="top-start" interactive disableHoverListener={tableDataObj.tableType === "REALTIME"}>
         <FormControl className={classes.selectFormControl}>
             <InputLabel htmlFor="instanceSelectorType">Enable replica groups</InputLabel>
             <Select

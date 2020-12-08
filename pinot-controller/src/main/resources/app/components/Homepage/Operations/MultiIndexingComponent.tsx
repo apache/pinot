@@ -269,7 +269,7 @@ export default function MultiIndexingComponent({
                                         </FormControl>
                                     </Grid>
                                     <Grid item xs={4}>
-                                    <Tooltip title="Select a column encoding. By default, all columns are dictionary encoded." arrow placement="top-start" disableHoverListener={tableDataObj.tableType === "REALTIME"}>
+                                    <Tooltip title="Select a column encoding. By default, all columns are dictionary encoded." arrow placement="top-start">
                                         <FormControl className={classes.formControl}>
                                         <InputLabel htmlFor={o.Encoding}>Encoding</InputLabel>
                                              <Select
@@ -289,7 +289,7 @@ export default function MultiIndexingComponent({
                                     </Tooltip>
                                     </Grid>
                                     <Grid item xs={4}>
-                                    <Tooltip title="Select indexes to apply. By default, no indexing is applied." arrow placement="top-start" disableHoverListener={tableDataObj.tableType === "REALTIME"}>
+                                    <Tooltip title="Select indexes to apply. By default, no indexing is applied." arrow placement="top-start">
                                         <FormControl className={classes.formControl}>
                                         <InputLabel htmlFor={i+"keymulti"}>Indexing</InputLabel>
                                                 <Select

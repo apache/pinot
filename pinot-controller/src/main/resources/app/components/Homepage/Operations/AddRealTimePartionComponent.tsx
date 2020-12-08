@@ -214,7 +214,7 @@ export default function AddRealTimePartionComponent({
                 </FormControl> : null }
             </Grid>
         <Grid item xs={12}>
-        <Tooltip interactive title={(<>number of servers should be a multiple of number of replicas.<a href="https://docs.pinot.apache.org/basics/getting-started/frequent-questions/operations-faq#docs-internal-guid-3eddb872-7fff-0e2a-b4e3-b1b43454add3" className={"tooltip-link"}>(Click here for more Details)</a></>)} arrow placement="top-start">
+        <Tooltip interactive title={(<>Number of servers should be a multiple of number of replicas.<a target="_blank" href="https://docs.pinot.apache.org/basics/getting-started/frequent-questions/operations-faq#docs-internal-guid-3eddb872-7fff-0e2a-b4e3-b1b43454add3" className={"tooltip-link"}>(Click here for more details)</a></>)} arrow placement="top-start">
         <FormControl className={classes.selectFormControl}>
             <InputLabel htmlFor="instanceSelectorType">Enable replica groups</InputLabel>
             <Select

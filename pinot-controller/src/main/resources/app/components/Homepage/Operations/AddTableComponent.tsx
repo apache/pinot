@@ -138,7 +138,7 @@ export default function AddTableComponent({
             <MenuItem value="REALTIME">REALTIME</MenuItem>
           </Select>
         </FormControl>
-        <Tooltip title="Pick a primary time column from all the DateTime columns" arrow placement="top-start" disableHoverListener={tableDataObj.tableType === "REALTIME"}>
+        <Tooltip title="Pick a primary time column from all the DateTime columns" arrow placement="top-start">
         <FormControl className={classes.selectFormControl}>
           <Autocomplete
             className={classes.autoCompleteControl}
@@ -157,7 +157,7 @@ export default function AddTableComponent({
           />
         </FormControl>
         </Tooltip>
-        <Tooltip title="Number of copies to create per segment" arrow placement="top-start" disableHoverListener={tableDataObj.tableType === "REALTIME"}>
+        <Tooltip title="Number of copies to create per segment" arrow placement="top-start">
         <FormControl className={classes.selectFormControl}>
           <InputLabel htmlFor="replication">Replication</InputLabel>
           <Select

@@ -43,6 +43,14 @@ const useStyles = makeStyles(() => ({
   }
 }));
 
+const TableTooltipData = [
+  null,
+  "Uncompressed size of all data segments",
+  "Estimated size of all data segments, in case any servers are not reachable for actual size",
+  null,
+  "GOOD if all replicas of all segments are up"
+];
+
 const TablesListingPage = () => {
   const classes = useStyles();
 
@@ -119,6 +127,7 @@ const TablesListingPage = () => {
         baseURL="/tenants/table/"
         showSearchBox={true}
         inAccordionFormat={true}
+        tooltipData={TableTooltipData}
       />
       <CustomizedTables
           title="Schemas"

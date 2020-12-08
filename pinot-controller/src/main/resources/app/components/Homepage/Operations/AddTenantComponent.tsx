@@ -159,7 +159,7 @@ export default function AddTenantComponent({
           </Select>
         </FormControl>
         { showRealtimeCompleted ?
-        <Tooltip interactive title={(<><a href="https://docs.pinot.apache.org/operators/operating-pinot/tuning/realtime#moving-completed-segments-to-different-hosts" target="_blank" className={"tooltip-link"}>(Click here for more Details)</a></>)} arrow placement="top-start" disableHoverListener={tableDataObj.tableType === "REALTIME"}>
+        <Tooltip interactive title={(<><a href="https://docs.pinot.apache.org/operators/operating-pinot/tuning/realtime#moving-completed-segments-to-different-hosts" target="_blank" className={"tooltip-link"}>Click here for more details</a></>)} arrow placement="top-start">
         <FormControl className={classes.formControl}>
           <InputLabel htmlFor="realtimeCompleted">Relocate to tag</InputLabel>
           <Input

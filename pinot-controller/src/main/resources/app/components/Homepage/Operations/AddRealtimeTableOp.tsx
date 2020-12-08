@@ -313,6 +313,7 @@ const checkFields = (tableObj,fields) => {
           <Grid item xs={12}>
             <SimpleAccordion
               headerTitle="Indexing & encoding"
+              tooltipContent={<a className = {"tooltip-link"} target="_blank" href={"https://docs.pinot.apache.org/basics/indexing"}>Click here for more details</a>}
               showSearchBox={false}
             >
               <AddIndexingComponent

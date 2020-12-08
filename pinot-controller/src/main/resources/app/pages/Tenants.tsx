@@ -39,6 +39,14 @@ type Props = {
   tenantName: string
 };
 
+const TableTooltipData = [
+  null,
+  "Uncompressed size of all data segments",
+  "Estimated size of all data segments, in case any servers are not reachable for actual size",
+  null,
+  "GOOD if all replicas of all segments are up"
+];
+
 const TenantPage = ({ match }: RouteComponentProps<Props>) => {
 
   const {tenantName} = match.params;
@@ -97,6 +105,7 @@ const TenantPage = ({ match }: RouteComponentProps<Props>) => {
       <CustomizedTables
         title={tenantName}
         data={tableData}
+        tooltipData={TableTooltipData}
         isPagination
         addLinks
         baseURL={`/tenants/${tenantName}/table/`}
