@@ -29,9 +29,11 @@ import CustomNotification from './components/CustomNotification';
 import { NotificationContextProvider } from './components/Notification/NotificationContextProvider';
 
 const App = () => {
+  const [clusterName, setClusterName] = React.useState('');
   const fetchClusterName = async () => {
     const clusterNameResponse = await PinotMethodUtils.getClusterName();
     localStorage.setItem('pinot_ui:clusterName', clusterNameResponse);
+    setClusterName(clusterNameResponse);
   };
   React.useEffect(()=>{
     fetchClusterName();
@@ -50,7 +52,7 @@ const App = () => {
                 render={props => {
                   return (
                     <div className="p-8">
-                      <Layout {...props}>
+                      <Layout clusterName={clusterName} {...props}>
                         <Component {...props} />
                       </Layout>
                     </div>
