@@ -36,134 +36,59 @@ public class BatchConfigTest {
   public void testBatchConfig() {
     Map<String, String> batchConfigMap = new HashMap<>();
     String tableName = "foo_REALTIME";
-    String batchType = "s3";
     String inputDir = "s3://foo/input";
     String outputDir = "s3://foo/output";
-    String fsClass = "org.apache.S3FS";
+    String inputFsClass = "org.apache.S3FS";
+    String outputFsClass = "org.apache.GcsGS";
     String region = "us-west";
     String username = "foo";
+    String accessKey = "${ACCESS_KEY}";
+    String secretKey = "${SECRET_KEY}";
     String inputFormat = "csv";
     String recordReaderClass = "org.foo.CSVRecordReader";
     String recordReaderConfigClass = "org.foo.CSVRecordReaderConfig";
     String separator = "|";
-    batchConfigMap.put(BatchConfigProperties.BATCH_TYPE, batchType);
-    batchConfigMap
-        .put(BatchConfigProperties.constructBatchProperty(batchType, BatchConfigProperties.INPUT_DIR_URI), inputDir);
-    batchConfigMap
-        .put(BatchConfigProperties.constructBatchProperty(batchType, BatchConfigProperties.OUTPUT_DIR_URI), outputDir);
-    batchConfigMap
-        .put(BatchConfigProperties.constructBatchProperty(batchType, BatchConfigProperties.FS_CLASS), fsClass);
-    batchConfigMap
-        .put(BatchConfigProperties.constructBatchProperty(batchType, BatchConfigProperties.INPUT_FORMAT), inputFormat);
-    batchConfigMap
-        .put(BatchConfigProperties.constructBatchProperty(batchType, BatchConfigProperties.RECORD_READER_CLASS),
-            recordReaderClass);
-    batchConfigMap
-        .put(BatchConfigProperties.constructBatchProperty(batchType, BatchConfigProperties.RECORD_READER_CONFIG_CLASS),
-            recordReaderConfigClass);
-    batchConfigMap
-        .put(BatchConfigProperties.constructBatchProperty(batchType, BatchConfigProperties.FS_PROP_PREFIX) + ".region",
-            region);
-    batchConfigMap.put(
-        BatchConfigProperties.constructBatchProperty(batchType, BatchConfigProperties.FS_PROP_PREFIX) + ".username",
-        username);
-    batchConfigMap.put(
-        BatchConfigProperties.constructBatchProperty(batchType, BatchConfigProperties.RECORD_READER_PROP_PREFIX)
-            + ".separator", separator);
+    batchConfigMap.put(BatchConfigProperties.INPUT_DIR_URI, inputDir);
+    batchConfigMap.put(BatchConfigProperties.OUTPUT_DIR_URI, outputDir);
+    batchConfigMap.put(BatchConfigProperties.INPUT_FS_CLASS, inputFsClass);
+    batchConfigMap.put(BatchConfigProperties.OUTPUT_FS_CLASS, outputFsClass);
+    batchConfigMap.put(BatchConfigProperties.INPUT_FORMAT, inputFormat);
+    batchConfigMap.put(BatchConfigProperties.RECORD_READER_CLASS, recordReaderClass);
+    batchConfigMap.put(BatchConfigProperties.RECORD_READER_CONFIG_CLASS, recordReaderConfigClass);
+    batchConfigMap.put(BatchConfigProperties.INPUT_FS_PROP_PREFIX + ".region", region);
+    batchConfigMap.put(BatchConfigProperties.INPUT_FS_PROP_PREFIX + ".username", username);
+    batchConfigMap.put(BatchConfigProperties.OUTPUT_FS_PROP_PREFIX + ".region", region);
+    batchConfigMap.put(BatchConfigProperties.OUTPUT_FS_PROP_PREFIX + ".accessKey", accessKey);
+    batchConfigMap.put(BatchConfigProperties.OUTPUT_FS_PROP_PREFIX + ".secretKey", secretKey);
+    batchConfigMap.put(BatchConfigProperties.RECORD_READER_PROP_PREFIX + ".separator", separator);
 
     // config with all the right properties
     BatchConfig batchConfig = new BatchConfig(tableName, batchConfigMap);
-    assertEquals(batchConfig.getType(), batchType);
     assertEquals(batchConfig.getInputDirURI(), inputDir);
     assertEquals(batchConfig.getOutputDirURI(), outputDir);
-    assertEquals(batchConfig.getFsClassName(), fsClass);
+    assertEquals(batchConfig.getInputFsClassName(), inputFsClass);
+    assertEquals(batchConfig.getOutputFsClassName(), outputFsClass);
     assertEquals(batchConfig.getInputFormat(), FileFormat.CSV);
     assertEquals(batchConfig.getRecordReaderClassName(), recordReaderClass);
     assertEquals(batchConfig.getRecordReaderConfigClassName(), recordReaderConfigClass);
-    assertEquals(batchConfig.getFsProps().size(), 2);
-    assertEquals(batchConfig.getFsProps().get(
-        BatchConfigProperties.constructBatchProperty(batchType, BatchConfigProperties.FS_PROP_PREFIX) + ".region"),
-        region);
-    assertEquals(batchConfig.getFsProps().get(
-        BatchConfigProperties.constructBatchProperty(batchType, BatchConfigProperties.FS_PROP_PREFIX) + ".username"),
-        username);
+    assertEquals(batchConfig.getInputFsProps().size(), 2);
+    assertEquals(batchConfig.getInputFsProps().get(BatchConfigProperties.INPUT_FS_PROP_PREFIX + ".region"), region);
+    assertEquals(batchConfig.getInputFsProps().get(BatchConfigProperties.INPUT_FS_PROP_PREFIX + ".username"), username);
+    assertEquals(batchConfig.getOutputFsProps().size(), 3);
+    assertEquals(batchConfig.getOutputFsProps().get(BatchConfigProperties.OUTPUT_FS_PROP_PREFIX + ".region"), region);
+    assertEquals(batchConfig.getOutputFsProps().get(BatchConfigProperties.OUTPUT_FS_PROP_PREFIX + ".accessKey"), accessKey);
+    assertEquals(batchConfig.getOutputFsProps().get(BatchConfigProperties.OUTPUT_FS_PROP_PREFIX + ".secretKey"), secretKey);
     assertEquals(batchConfig.getRecordReaderProps().size(), 1);
-    assertEquals(batchConfig.getRecordReaderProps().get(
-        BatchConfigProperties.constructBatchProperty(batchType, BatchConfigProperties.RECORD_READER_PROP_PREFIX)
-            + ".separator"), separator);
+    assertEquals(batchConfig.getRecordReaderProps().get(BatchConfigProperties.RECORD_READER_PROP_PREFIX + ".separator"),
+        separator);
     assertEquals(batchConfig.getTableNameWithType(), tableName);
 
     // Missing props
     Map<String, String> testBatchConfigMap = new HashMap<>(batchConfigMap);
-    testBatchConfigMap.remove(BatchConfigProperties.BATCH_TYPE);
-    try {
-      new BatchConfig(tableName, testBatchConfigMap);
-      Assert.fail("Should fail for missing 'batchType");
-    } catch (IllegalStateException e) {
-      // expected
-    }
-
-    testBatchConfigMap = new HashMap<>(batchConfigMap);
-    testBatchConfigMap
-        .remove(BatchConfigProperties.constructBatchProperty(batchType, BatchConfigProperties.INPUT_DIR_URI));
-    try {
-      new BatchConfig(tableName, testBatchConfigMap);
-      Assert.fail("Should fail for missing 'inputDirURI");
-    } catch (IllegalStateException e) {
-      // expected
-    }
-
-    testBatchConfigMap = new HashMap<>(batchConfigMap);
-    testBatchConfigMap
-        .remove(BatchConfigProperties.constructBatchProperty(batchType, BatchConfigProperties.OUTPUT_DIR_URI));
-    try {
-      new BatchConfig(tableName, testBatchConfigMap);
-      Assert.fail("Should fail for missing 'outputDirURI");
-    } catch (IllegalStateException e) {
-      // expected
-    }
-
-    testBatchConfigMap = new HashMap<>(batchConfigMap);
-    testBatchConfigMap
-        .remove(BatchConfigProperties.constructBatchProperty(batchType, BatchConfigProperties.INPUT_FORMAT));
+    testBatchConfigMap.remove(BatchConfigProperties.INPUT_FORMAT);
     try {
       new BatchConfig(tableName, testBatchConfigMap);
       Assert.fail("Should fail for missing 'inputFormat");
-    } catch (IllegalStateException e) {
-      // expected
-    }
-
-    testBatchConfigMap = new HashMap<>(batchConfigMap);
-    testBatchConfigMap
-        .put(BatchConfigProperties.constructBatchProperty(batchType, BatchConfigProperties.INPUT_FORMAT), "moo");
-    try {
-      new BatchConfig(tableName, testBatchConfigMap);
-      Assert.fail("Should fail for incorrect 'inputFormat");
-    } catch (IllegalArgumentException e) {
-      // expected
-    }
-
-    testBatchConfigMap = new HashMap<>(batchConfigMap);
-    testBatchConfigMap
-        .remove(BatchConfigProperties.constructBatchProperty(batchType, BatchConfigProperties.RECORD_READER_CLASS));
-    try {
-      new BatchConfig(tableName, testBatchConfigMap);
-      Assert.fail("Should fail for missing 'recordReaderClassName");
-    } catch (IllegalStateException e) {
-      // expected
-    }
-
-    testBatchConfigMap = new HashMap<>(batchConfigMap);
-    testBatchConfigMap
-        .remove(BatchConfigProperties.constructBatchProperty(batchType, BatchConfigProperties.RECORD_READER_CONFIG_CLASS));
-    new BatchConfig(tableName, testBatchConfigMap);
-
-    testBatchConfigMap = new HashMap<>(batchConfigMap);
-    testBatchConfigMap
-        .remove(BatchConfigProperties.constructBatchProperty(batchType, BatchConfigProperties.FS_CLASS));
-    try {
-      new BatchConfig(tableName, testBatchConfigMap);
-      Assert.fail("Should fail for missing 'fsClassName");
     } catch (IllegalStateException e) {
       // expected
     }

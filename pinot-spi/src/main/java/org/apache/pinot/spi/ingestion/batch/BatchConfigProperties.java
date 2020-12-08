@@ -18,33 +18,52 @@
  */
 package org.apache.pinot.spi.ingestion.batch;
 
-import org.apache.commons.lang3.StringUtils;
-
-
 /**
  * Defines all the keys used in the batch configs map
  */
 public class BatchConfigProperties {
 
-  public static final String DOT_SEPARATOR = ".";
-  public static final String BATCH_PREFIX = "batch";
+  public static final String TABLE_CONFIGS = "tableConfigs";
+  public static final String TABLE_NAME = "tableName";
 
-  public static final String BATCH_TYPE = "batchType";
   public static final String INPUT_DIR_URI = "inputDirURI";
   public static final String OUTPUT_DIR_URI = "outputDirURI";
-  public static final String FS_CLASS = "fs.className";
-  public static final String FS_PROP_PREFIX = "fs.prop";
+  public static final String INPUT_FS_CLASS = "input.fs.className";
+  public static final String INPUT_FS_PROP_PREFIX = "input.fs.prop";
+  public static final String OUTPUT_FS_CLASS = "output.fs.className";
+  public static final String OUTPUT_FS_PROP_PREFIX = "output.fs.prop";
   public static final String INPUT_FORMAT = "inputFormat";
+  public static final String INCLUDE_FILE_NAME_PATTERN = "includeFileNamePattern";
+  public static final String EXCLUDE_FILE_NAME_PATTERN = "excludeFileNamePattern";
   public static final String RECORD_READER_CLASS = "recordReader.className";
-  public static final String RECORD_READER_CONFIG_CLASS = "recordReader.config.className";
+  public static final String RECORD_READER_CONFIG_CLASS = "recordReader.configClassName";
   public static final String RECORD_READER_PROP_PREFIX = "recordReader.prop";
-
+  public static final String SCHEMA = "schema";
+  public static final String SCHEMA_URI = "schemaURI";
+  public static final String SEQUENCE_ID = "sequenceId";
+  public static final String SEGMENT_NAME_GENERATOR_TYPE = "segmentNameGenerator.type";
+  public static final String SEGMENT_NAME_GENERATOR_CONFIGS = "segmentNameGenerator.configs";
+  public static final String OVERWRITE_OUTPUT = "overwriteOutput";
   public static final String INPUT_DATA_FILE_URI_KEY = "input.data.file.uri";
-  /**
-   * Helper method to create a batch config property
-   */
-  public static String constructBatchProperty(String batchType, String property) {
-    return StringUtils.join(BATCH_PREFIX, batchType, property, DOT_SEPARATOR);
+  public static final String PUSH_MODE = "push.mode";
+  public static final String PUSH_CONTROLLER_URI = "push.controllerUri";
+  public static final String PUSH_SEGMENT_URI_PREFIX = "push.segmentUriPrefix";
+  public static final String PUSH_SEGMENT_URI_SUFFIX = "push.segmentUriSuffix";
+
+  public static final String INPUT_FILE_URI = "input.file.uri";
+  public static final String OUTPUT_SEGMENT_DIR_URI = "output.segment.dir.uri";
+
+  public enum SegmentIngestionType {
+    APPEND, REPLACE
   }
 
+  public class SegmentNameGeneratorType {
+    public static final String SIMPLE = "simple";
+    public static final String NORMALIZED_DATE = "normalizedDate";
+    public static final String FIXED = "fixed";
+  }
+
+  public enum SegmentPushType {
+    TAR, URI, METADATA
+  }
 }

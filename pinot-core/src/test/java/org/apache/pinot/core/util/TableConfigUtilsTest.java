@@ -377,16 +377,12 @@ public class TableConfigUtilsTest {
   @Test
   public void ingestionBatchConfigsTest() {
     Map<String, String> batchConfigMap = new HashMap<>();
-    batchConfigMap.put(BatchConfigProperties.BATCH_TYPE, "s3");
-    batchConfigMap
-        .put(BatchConfigProperties.constructBatchProperty("s3", BatchConfigProperties.INPUT_DIR_URI), "s3://foo");
-    batchConfigMap
-        .put(BatchConfigProperties.constructBatchProperty("s3", BatchConfigProperties.OUTPUT_DIR_URI), "s3://bar");
-    batchConfigMap
-        .put(BatchConfigProperties.constructBatchProperty("s3", BatchConfigProperties.FS_CLASS), "org.foo.S3FS");
-    batchConfigMap.put(BatchConfigProperties.constructBatchProperty("s3", BatchConfigProperties.INPUT_FORMAT), "avro");
-    batchConfigMap.put(BatchConfigProperties.constructBatchProperty("s3", BatchConfigProperties.RECORD_READER_CLASS),
-        "org.foo.Reader");
+    batchConfigMap.put(BatchConfigProperties.INPUT_DIR_URI, "s3://foo");
+    batchConfigMap.put(BatchConfigProperties.OUTPUT_DIR_URI, "gs://bar");
+    batchConfigMap.put(BatchConfigProperties.INPUT_FS_CLASS, "org.foo.S3FS");
+    batchConfigMap.put(BatchConfigProperties.OUTPUT_FS_CLASS, "org.foo.GcsFS");
+    batchConfigMap.put(BatchConfigProperties.INPUT_FORMAT, "avro");
+    batchConfigMap.put(BatchConfigProperties.RECORD_READER_CLASS, "org.foo.Reader");
 
     IngestionConfig ingestionConfig =
         new IngestionConfig(new BatchIngestionConfig(Lists.newArrayList(batchConfigMap, batchConfigMap), null, null),
@@ -395,8 +391,7 @@ public class TableConfigUtilsTest {
         new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable_OFFLINE").setIngestionConfig(ingestionConfig)
             .build();
     TableConfigUtils.validateIngestionConfig(tableConfig, null);
-
-    batchConfigMap.remove(BatchConfigProperties.BATCH_TYPE);
+    batchConfigMap.remove(BatchConfigProperties.INPUT_FORMAT);
     try {
       TableConfigUtils.validateIngestionConfig(tableConfig, null);
       Assert.fail("Should fail for invalid batch config map");

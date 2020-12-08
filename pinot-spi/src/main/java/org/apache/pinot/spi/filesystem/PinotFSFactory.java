@@ -38,8 +38,8 @@ public class PinotFSFactory {
   private PinotFSFactory() {
   }
 
+  public static final String LOCAL_PINOT_FS_SCHEME = "file";
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotFSFactory.class);
-  private static final String LOCAL_PINOT_FS_SCHEME = "file";
   private static final String CLASS = "class";
   private static final Map<String, PinotFS> PINOT_FS_MAP = new HashMap<String, PinotFS>() {
     {
