@@ -26,7 +26,7 @@ const useStyles = makeStyles((theme: Theme) =>
   createStyles({
     root: {
       position: 'fixed',
-      right: '30px',
+      right: '200px',
       top: '15px',
       zIndex: 1200,
       '& svg > circle': {

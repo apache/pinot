@@ -19,7 +19,7 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { AppBar, Box } from '@material-ui/core';
+import { AppBar, Box, makeStyles, Paper } from '@material-ui/core';
 import MenuIcon from '@material-ui/icons/Menu';
 import Logo from './SvgIcons/Logo';
 import BreadcrumbsComponent from './Breadcrumbs';
@@ -28,22 +28,57 @@ type Props = {
   highlightSidebarLink: (id: number) => void;
   showHideSideBarHandler: () => void;
   openSidebar: boolean;
+  clusterName: string;
 };
 
-const Header = ({ highlightSidebarLink, showHideSideBarHandler, openSidebar, ...props }: Props) => (
-  <AppBar position="static">
-    <Box display="flex">
-      <Box textAlign="center" marginY="12.5px" width={openSidebar ? 250 : 90} borderRight="1px solid rgba(255,255,255,0.5)">
-        <Link to="/" style={{color: '#ffffff'}}><Logo onClick={() => highlightSidebarLink(1)} fulllogo={openSidebar.toString()} /></Link>
-      </Box>
-      <Box display="flex" alignItems="center">
-        <Box marginY="auto" padding="0.25rem 0 0.25rem 1.5rem" display="flex" style={{cursor: 'pointer'}}>
-          <MenuIcon onClick={() => showHideSideBarHandler()} />
+const useStyles = makeStyles((theme) => ({
+  breadcrumbRoot:{
+    flexGrow: 1
+  },
+  paper:{
+    padding: '0 0.5rem',
+    color: '#fff',
+    textAlign: 'center',
+    backgroundColor: 'rgba(66, 133, 244, 0.1)',
+    boxShadow: 'none',
+    fontSize: 'smaller',
+    '& h2, h4': {
+      margin: 0,
+    },
+    '& h2':{
+      fontWeight: 600
+    },
+    '& h4':{
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+      fontWeight: 500
+    }
+  }
+}));
+
+const Header = ({ highlightSidebarLink, showHideSideBarHandler, openSidebar, clusterName, ...props }: Props) => {
+  const classes = useStyles();
+  return (
+    <AppBar position="static">
+      <Box display="flex">
+        <Box textAlign="center" marginY="12.5px" width={openSidebar ? 250 : 90} borderRight="1px solid rgba(255,255,255,0.5)">
+          <Link to="/" style={{color: '#ffffff'}}><Logo onClick={() => highlightSidebarLink(1)} fulllogo={openSidebar.toString()} /></Link>
         </Box>
-        <BreadcrumbsComponent {...props} />
+        <Box display="flex" alignItems="center" className={classes.breadcrumbRoot}>
+          <Box marginY="auto" padding="0.25rem 0 0.25rem 1.5rem" display="flex" style={{cursor: 'pointer'}}>
+            <MenuIcon onClick={() => showHideSideBarHandler()} />
+          </Box>
+          <BreadcrumbsComponent {...props} />
+        </Box>
+        <Box textAlign="center" marginY="11.5px" borderLeft="1px solid rgba(255,255,255,0.5)">
+          <Paper className={classes.paper}>
+            <h4>Cluster Name</h4>
+            <h2>{clusterName}</h2>
+          </Paper>
+        </Box>
       </Box>
-    </Box>
-  </AppBar>
-);
+    </AppBar>
+  )
+};
 
 export default Header;
