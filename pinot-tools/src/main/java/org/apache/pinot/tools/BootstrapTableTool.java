@@ -27,7 +27,6 @@ import java.io.FileReader;
 import java.io.Reader;
 import java.net.URI;
 import java.net.URL;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -212,15 +211,14 @@ public class BootstrapTableTool {
       }
       try {
         boolean allCompleted = true;
-        final Iterator<String> taskNameIterator = scheduledTasks.keySet().iterator();
-        while (taskNameIterator.hasNext()) {
-          String taskName = taskNameIterator.next();
+        for (String taskType: scheduledTasks.keySet()) {
+          String taskName = scheduledTasks.get(taskType);
           String taskState = _minionClient.getTaskState(taskName);
           if (!COMPLETED.equalsIgnoreCase(taskState)) {
             allCompleted = false;
             break;
           } else {
-            taskNameIterator.remove();
+            scheduledTasks.remove(taskType);
           }
         }
         if (allCompleted) {

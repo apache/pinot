@@ -31,8 +31,6 @@
           "excludeFileNamePattern": "glob:**/*.tmp",
           "inputFormat": "csv",
           "outputDirURI": "examples/minions/batch/baseballStats/segments",
-          "recordReader.className": "org.apache.pinot.plugin.inputformat.csv.CSVRecordReader",
-          "recordReader.configClassName": "org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig",
           "push.mode": "tar"
         }
       ],

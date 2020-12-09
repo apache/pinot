@@ -45,6 +45,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
@@ -111,6 +112,7 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
           URI inputDirURI = getDirectoryUri(batchConfigMap.get(BatchConfigProperties.INPUT_DIR_URI));
           URI outputDirURI = getDirectoryUri(batchConfigMap.get(BatchConfigProperties.OUTPUT_DIR_URI));
 
+          updateRecordReaderConfigs(batchConfigMap);
           List<OfflineSegmentZKMetadata> offlineSegmentsMetadata = Collections.emptyList();
           // For append mode, we don't create segments for input file URIs already created.
           if (BatchConfigProperties.SegmentIngestionType.APPEND.name().equalsIgnoreCase(batchSegmentIngestionType)) {
@@ -150,6 +152,18 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
       }
     }
     return pinotTaskConfigs;
+  }
+
+  private void updateRecordReaderConfigs(Map<String, String> batchConfigMap) {
+    String inputFormat = batchConfigMap.get(BatchConfigProperties.INPUT_FORMAT);
+    String recordReaderClassName = PluginManager.get().getRecordReaderClassName(inputFormat);
+    if (recordReaderClassName != null) {
+      batchConfigMap.putIfAbsent(BatchConfigProperties.RECORD_READER_CLASS, recordReaderClassName);
+    }
+    String recordReaderConfigClassName = PluginManager.get().getRecordReaderConfigClassName(inputFormat);
+    if (recordReaderConfigClassName != null) {
+      batchConfigMap.putIfAbsent(BatchConfigProperties.RECORD_READER_CONFIG_CLASS, recordReaderConfigClassName);
+    }
   }
 
   private List<URI> getInputFilesFromDirectory(Map<String, String> batchConfigMap, URI inputDirURI,
