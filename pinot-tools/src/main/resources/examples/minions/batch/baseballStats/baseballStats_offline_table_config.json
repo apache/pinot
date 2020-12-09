@@ -1,0 +1,49 @@
+{
+  "tableName": "baseballStats",
+  "tableType": "OFFLINE",
+  "segmentsConfig": {
+    "segmentPushType": "APPEND",
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+    "schemaName": "baseball",
+    "replication": "1"
+  },
+  "tenants": {
+  },
+  "tableIndexConfig": {
+    "loadMode": "HEAP",
+    "invertedIndexColumns": [
+      "playerID",
+      "teamID"
+    ]
+  },
+  "metadata": {
+    "customConfigs": {
+    }
+  },
+  "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "APPEND",
+      "segmentIngestionFrequency": "DAILY",
+      "batchConfigMaps": [
+        {
+          "inputDirURI": "examples/minions/batch/baseballStats/rawdata",
+          "includeFileNamePattern": "glob:**/*.csv",
+          "excludeFileNamePattern": "glob:**/*.tmp",
+          "inputFormat": "csv",
+          "outputDirURI": "examples/minions/batch/baseballStats/segments",
+          "recordReader.className": "org.apache.pinot.plugin.inputformat.csv.CSVRecordReader",
+          "recordReader.configClassName": "org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig",
+          "push.mode": "tar"
+        }
+      ],
+      "segmentNameSpec": {},
+      "pushSpec": {}
+    }
+  },
+  "task": {
+    "taskTypeConfigsMap": {
+      "SegmentGenerationAndPushTask": {
+      }
+    }
+  }
+}

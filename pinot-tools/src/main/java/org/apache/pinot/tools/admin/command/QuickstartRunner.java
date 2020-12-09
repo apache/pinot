@@ -60,6 +60,8 @@ public class QuickstartRunner {
   private static final int DEFAULT_SERVER_ADMIN_API_PORT = 7500;
   private static final int DEFAULT_BROKER_PORT = 8000;
   private static final int DEFAULT_CONTROLLER_PORT = 9000;
+  private static final int DEFAULT_MINION_PORT = 6000;
+
 
   private static final String DEFAULT_ZK_DIR = "PinotZkDir";
   private static final String DEFAULT_CONTROLLER_DIR = "PinotControllerDir";
@@ -70,6 +72,7 @@ public class QuickstartRunner {
   private final int _numServers;
   private final int _numBrokers;
   private final int _numControllers;
+  private final int _numMinions;
   private final File _tempDir;
   private final boolean _enableTenantIsolation;
 
@@ -81,10 +84,17 @@ public class QuickstartRunner {
   public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numServers, int numBrokers,
       int numControllers, File tempDir, boolean enableIsolation)
       throws Exception {
+    this(tableRequests, numServers, numBrokers, numControllers, 1, tempDir, enableIsolation);
+  }
+
+  public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numServers, int numBrokers,
+      int numControllers, int numMinions, File tempDir, boolean enableIsolation)
+      throws Exception {
     _tableRequests = tableRequests;
     _numServers = numServers;
     _numBrokers = numBrokers;
     _numControllers = numControllers;
+    _numMinions = numMinions;
     _tempDir = tempDir;
     _enableTenantIsolation = enableIsolation;
     clean();
@@ -138,6 +148,16 @@ public class QuickstartRunner {
     }
   }
 
+  private void startMinions()
+      throws Exception {
+    for (int i = 0; i < _numMinions; i++) {
+      StartMinionCommand minionStarter = new StartMinionCommand();
+      minionStarter.setMinionPort(DEFAULT_MINION_PORT + i)
+          .setZkAddress(ZK_ADDRESS).setClusterName(CLUSTER_NAME);
+      minionStarter.execute();
+    }
+  }
+
   private void clean()
       throws Exception {
     FileUtils.cleanDirectory(_tempDir);
@@ -150,6 +170,7 @@ public class QuickstartRunner {
     startControllers();
     startBrokers();
     startServers();
+    startMinions();
   }
 
   public void stop()

@@ -36,6 +36,7 @@ public class TaskGeneratorRegistry {
   public TaskGeneratorRegistry(@Nonnull ClusterInfoAccessor clusterInfoAccessor) {
     registerTaskGenerator(new ConvertToRawIndexTaskGenerator(clusterInfoAccessor));
     registerTaskGenerator(new RealtimeToOfflineSegmentsTaskGenerator(clusterInfoAccessor));
+    registerTaskGenerator(new SegmentGenerationAndPushTaskGenerator(clusterInfoAccessor));
   }
 
   /**

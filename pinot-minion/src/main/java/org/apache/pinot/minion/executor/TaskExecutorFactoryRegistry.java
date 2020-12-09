@@ -38,6 +38,7 @@ public class TaskExecutorFactoryRegistry {
     registerTaskExecutorFactory(MinionConstants.MergeRollupTask.TASK_TYPE, new MergeRollupTaskExecutorFactory());
     registerTaskExecutorFactory(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE,
         new RealtimeToOfflineSegmentsTaskExecutorFactory(minionTaskZkMetadataManager));
+    registerTaskExecutorFactory(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE, new SegmentGenerationAndPushTaskExecutorFactory());
   }
 
   /**

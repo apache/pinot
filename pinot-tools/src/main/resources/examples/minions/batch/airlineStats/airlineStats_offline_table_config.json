@@ -1,0 +1,45 @@
+{
+  "tableName": "airlineStats",
+  "tableType": "OFFLINE",
+  "segmentsConfig": {
+    "timeColumnName": "DaysSinceEpoch",
+    "timeType": "DAYS",
+    "segmentPushType": "APPEND",
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+    "replication": "1"
+  },
+  "tenants": {},
+  "tableIndexConfig": {
+    "loadMode": "MMAP"
+  },
+  "metadata": {
+    "customConfigs": {}
+  },
+  "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "APPEND",
+      "segmentIngestionFrequency": "DAILY",
+      "batchConfigMaps": [
+        {
+          "inputDirURI": "s3://my.s3.bucket/batch/airlineStats/rawdata/",
+          "fs.className": "org.apache.pinot.plugin.filesystem.S3PinotFS",
+          "fs.prop.region": "us-west-2",
+          "includeFileNamePattern": "glob:**/*.avro",
+          "excludeFileNamePattern": "glob:**/*.tmp",
+          "inputFormat": "avro",
+          "outputDirURI": "s3://my.s3.bucket/batch/airlineStats/segments",
+          "recordReader.className": "org.apache.pinot.plugin.inputformat.avro.AvroRecordReader",
+          "pushMode": "metadata"
+        }
+      ],
+      "segmentNameSpec": {},
+      "pushSpec": {}
+    }
+  },
+  "task": {
+    "taskTypeConfigsMap": {
+      "SegmentGenerationAndPushTask": {
+      }
+    }
+  }
+}
