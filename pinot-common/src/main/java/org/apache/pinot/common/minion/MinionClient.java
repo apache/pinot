@@ -27,6 +27,8 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.pinot.spi.annotations.InterfaceAudience;
+import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +36,11 @@ import org.slf4j.LoggerFactory;
 
 /**
  * MinionClient is the client-side APIs for Pinot Controller tasks APIs.
+ * Minion feature is still in beta development mode, so those APIs may change frequently.
+ * Please use this client in caution.
  */
+@InterfaceAudience.Private
+@InterfaceStability.Evolving
 public class MinionClient {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(MinionClient.class);
