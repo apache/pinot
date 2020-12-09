@@ -18,11 +18,12 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { createStyles, FormControl, Grid, Input, InputLabel, makeStyles, MenuItem, Select, TextField, Theme, IconButton, Fab, Button} from '@material-ui/core';
+import { createStyles, FormControl, Grid, Input, InputLabel, makeStyles, MenuItem, Select, TextField, Theme, IconButton, Fab, Button, Tooltip} from '@material-ui/core';
 import AddIcon from '@material-ui/icons/Add';
 import AddCircleIcon from '@material-ui/icons/AddCircle';
 import ClearIcon from '@material-ui/icons/Clear';
 import DeleteIcon from '@material-ui/icons/Delete';
+import InfoIcon from '@material-ui/icons/Info';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -112,7 +113,9 @@ export default function AddDeleteComponent({
 
   return (
     <Grid container>
+        <Tooltip title="Configure the properties of your stream." arrow placement="top">
         <h3 className="accordion-subtitle">Stream Config</h3>
+        </Tooltip>
                 {
                     keys.map((o,i)=>{
                         return(

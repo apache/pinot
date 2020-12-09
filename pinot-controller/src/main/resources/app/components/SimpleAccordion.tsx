@@ -25,7 +25,7 @@ import AccordionDetails from '@material-ui/core/AccordionDetails';
 import Typography from '@material-ui/core/Typography';
 import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 import SearchBar from './SearchBar';
-import { FormControlLabel, Switch } from '@material-ui/core';
+import { FormControlLabel, Switch, Tooltip } from '@material-ui/core';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -58,6 +58,7 @@ const useStyles = makeStyles((theme: Theme) =>
 
 type Props = {
   headerTitle: string;
+  tooltipContent?: any;
   showSearchBox: boolean;
   searchValue?: string;
   handleSearch?: Function;
@@ -72,6 +73,7 @@ type Props = {
 
 export default function SimpleAccordion({
   headerTitle,
+  tooltipContent,
   showSearchBox,
   searchValue,
   handleSearch,
@@ -91,7 +93,13 @@ export default function SimpleAccordion({
         id={`panel1a-header-${headerTitle}`}
         className={classes.root}
       >
-        <Typography className={classes.heading}>{`${headerTitle.toUpperCase()} ${recordCount !== undefined ? ` - (${recordCount})` : ''}`}</Typography>
+        {tooltipContent ?
+          <Tooltip interactive title={tooltipContent} arrow placement="top">
+            <Typography className={classes.heading}>{`${headerTitle.toUpperCase()} ${recordCount !== undefined ? ` - (${recordCount})` : ''}`}</Typography>
+          </Tooltip>
+        :
+          <Typography className={classes.heading}>{`${headerTitle.toUpperCase()} ${recordCount !== undefined ? ` - (${recordCount})` : ''}`}</Typography>
+        }
         {accordionToggleObject &&
           <FormControlLabel
             className={classes.formControl}

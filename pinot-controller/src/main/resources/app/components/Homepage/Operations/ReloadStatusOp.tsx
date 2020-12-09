@@ -18,7 +18,7 @@
  */
 
 import React from 'react';
-import { CircularProgress, createStyles, DialogContent, makeStyles, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Theme, withStyles} from '@material-ui/core';
+import { CircularProgress, createStyles, DialogContent, DialogContentText, makeStyles, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Theme, withStyles} from '@material-ui/core';
 import Dialog from '../../CustomDialog';
 import CloseIcon from '@material-ui/icons/Close';
 import CheckIcon from '@material-ui/icons/Check';
@@ -63,7 +63,7 @@ export default function ReloadStatusOp({
   const segmentNames = data && Object.keys(data);
   const indexes = data && data[segmentNames[0]]?.indexes;
   const indexesKeys = indexes && Object.keys(indexes);
-  const indexObjKeys = indexes && indexes[indexesKeys[0]] && Object.keys(indexes[indexesKeys[0]]);
+  const indexObjKeys = indexes && indexes[indexesKeys[0]] && Object.keys(indexes[indexesKeys[0]]) || [];
   return (
     <Dialog
       open={true}
@@ -76,47 +76,51 @@ export default function ReloadStatusOp({
         <div className={classes.root}><CircularProgress/></div>
       :
         <DialogContent>
-          <TableContainer component={Paper} className={classes.container}>
-            <Table stickyHeader aria-label="sticky table" size="small">
-              <TableHead>
-                <TableRow>
-                  <StyledTableCell></StyledTableCell>
-                  {indexObjKeys.map((o, i)=>{
+          {indexes && indexesKeys && indexObjKeys ?
+            <TableContainer component={Paper} className={classes.container}>
+              <Table stickyHeader aria-label="sticky table" size="small">
+                <TableHead>
+                  <TableRow>
+                    <StyledTableCell></StyledTableCell>
+                    {indexObjKeys.map((o, i)=>{
+                      return (
+                        <StyledTableCell key={i} align="right">{o}</StyledTableCell>
+                      );
+                    })}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {indexesKeys.map((indexName, i) => {
+                    const indexObj = indexes[indexName];
                     return (
-                      <StyledTableCell key={i} align="right">{o}</StyledTableCell>
-                    );
+                      <TableRow key={i}>
+                        <StyledTableCell component="th" scope="row">
+                          {indexName}
+                        </StyledTableCell>
+                        {indexObjKeys.map((o, i)=>{
+                          let iconElement = null;
+                          if(indexObj[o].toLowerCase() === 'yes'){
+                            iconElement = <CheckIcon className={classes.greenColor}/>;
+                          } else if(indexObj[o].toLowerCase() === 'no'){
+                            iconElement = <CloseIcon className={classes.redColor}/>;
+                          } else {
+                            iconElement = indexObj[o];
+                          }
+                          return (
+                            <StyledTableCell align="center" key={i}>
+                              {iconElement}
+                            </StyledTableCell>
+                          )
+                        })}
+                      </TableRow>
+                    )
                   })}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {indexesKeys.map((indexName, i) => {
-                  const indexObj = indexes[indexName];
-                  return (
-                    <TableRow key={i}>
-                      <StyledTableCell component="th" scope="row">
-                        {indexName}
-                      </StyledTableCell>
-                      {indexObjKeys.map((o, i)=>{
-                        let iconElement = null;
-                        if(indexObj[o].toLowerCase() === 'yes'){
-                          iconElement = <CheckIcon className={classes.greenColor}/>;
-                        } else if(indexObj[o].toLowerCase() === 'no'){
-                          iconElement = <CloseIcon className={classes.redColor}/>;
-                        } else {
-                          iconElement = indexObj[o];
-                        }
-                        return (
-                          <StyledTableCell align="center" key={i}>
-                            {iconElement}
-                          </StyledTableCell>
-                        )
-                      })}
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                </TableBody>
+              </Table>
+            </TableContainer>
+          : 
+            <DialogContentText>No segment found in table.</DialogContentText>
+          }
         </DialogContent>
       }
     </Dialog>

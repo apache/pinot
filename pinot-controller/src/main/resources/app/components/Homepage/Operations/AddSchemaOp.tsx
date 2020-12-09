@@ -18,7 +18,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { createStyles, DialogContent, Grid, makeStyles, Theme} from '@material-ui/core';
+import { createStyles, DialogContent, Grid, makeStyles, Theme, Tooltip} from '@material-ui/core';
 import Dialog from '../../CustomDialog';
 import SimpleAccordion from '../../SimpleAccordion';
 import SchemaComponent from './SchemaComponent';
@@ -26,8 +26,7 @@ import CustomCodemirror from '../../CustomCodemirror';
 import PinotMethodUtils from '../../../utils/PinotMethodUtils';
 import { NotificationContext } from '../../Notification/NotificationContext';
 import _ from 'lodash';
-import SchemaNameComponent from './SchemaNameComponent';
-import CustomizedTables from '../../Table';
+import InfoOutlinedIcon from '@material-ui/icons/InfoOutlined';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -154,7 +153,7 @@ export default function AddSchemaOp({
       open={true}
       handleClose={hideModal}
       handleSave={handleSave}
-      title="Add Schema"
+      title={(<>Add Schema <Tooltip interactive title={(<a className={"tooltip-link"} target="_blank" href="https://docs.pinot.apache.org/configuration-reference/schema">Click here for more details</a>)} arrow placement="top"><InfoOutlinedIcon/></Tooltip></>)}
       size="xl"
       disableBackdropClick={true}
       disableEscapeKeyDown={true}

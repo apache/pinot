@@ -18,7 +18,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { createStyles, FormControl, Grid, Input, InputLabel, makeStyles, MenuItem, Select, Theme} from '@material-ui/core';
+import { createStyles, FormControl, Grid, Input, InputLabel, makeStyles, MenuItem, Select, Theme, Tooltip} from '@material-ui/core';
 import AddDeleteComponent from './AddDeleteComponent';
 import MultipleSelectComponent from './MultipleSelectComponent';
 import _ from 'lodash';
@@ -140,19 +140,24 @@ export default function AddRealTimeIngestionComponent({
                         </Select>
                     </FormControl> : null
             }
-            <FormControl className={classes.formControl}>
-                <InputLabel htmlFor="filterFunction">Filter function</InputLabel>
-                <Input
-                    id="filterFunction"
-                    value={tableObj.ingestionConfig.filterConfig && tableObj.ingestionConfig.filterConfig.filterFunction || ""}
-                    onChange={(e)=> changeHandler('filterFunction', e.target.value)}
-                />
-            </FormControl>
-            <MultipleSelectComponent
+            <Tooltip interactive title={(<>Filter out rows which match condition.<a target="_blank" href="https://docs.pinot.apache.org/developers/advanced/ingestion-level-transformations#filtering" className={"tooltip-link"}>(Click here for more details)</a></>)} arrow placement="top-start">
+              <FormControl className={classes.formControl}>
+                  <InputLabel htmlFor="filterFunction">Filter function</InputLabel>
+                  <Input
+                      id="filterFunction"
+                      value={tableObj.ingestionConfig.filterConfig && tableObj.ingestionConfig.filterConfig.filterFunction || ""}
+                      onChange={(e)=> changeHandler('filterFunction', e.target.value)}
+                  />
+              </FormControl>
+            </Tooltip>
+            <Tooltip interactive title={(<>Transform the data values using Groovy or other inbuilt functions.<a target="_blank" href="https://docs.pinot.apache.org/developers/advanced/ingestion-level-transformations#column-transformation" className={"tooltip-link"}>(Click here for more details)</a></>)} arrow placement="top-start">
+              <MultipleSelectComponent
                 key = {"transformConfigs"}
                 streamConfigsObj = {tableDataObj.ingestionConfig.transformConfigs || []}
                 changeHandler = {changeHandler}
-                columnName= {columnName}/>
+                columnName= {columnName}
+              />
+            </Tooltip>
             {
                 tableDataObj.tableIndexConfig.streamConfigs ?
                 <AddDeleteComponent

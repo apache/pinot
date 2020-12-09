@@ -63,7 +63,8 @@ import {
   saveSchema,
   saveTable,
   getSchema,
-  getSchemaList
+  getSchemaList,
+  getState
 } from '../requests';
 import Utils from './Utils';
 
@@ -729,6 +730,12 @@ const getSchemaData = (schemaName) => {
   });
 };
 
+const getTableState = (tableName, tableType) => {
+  return getState(tableName, tableType).then((response)=>{
+    return response.data;
+  });
+};
+
 export default {
   getTenantsData,
   getAllInstances,
@@ -774,5 +781,6 @@ export default {
   saveSchemaAction,
   saveTableAction,
   getSchemaData,
-  getAllSchemaDetails
+  getAllSchemaDetails,
+  getTableState
 };

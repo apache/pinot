@@ -43,6 +43,14 @@ const useStyles = makeStyles(() => ({
   }
 }));
 
+const TableTooltipData = [
+  null,
+  "Uncompressed size of all data segments",
+  "Estimated size of all data segments, in case any servers are not reachable for actual size",
+  null,
+  "GOOD if all replicas of all segments are up"
+];
+
 const TablesListingPage = () => {
   const classes = useStyles();
 
@@ -89,21 +97,21 @@ const TablesListingPage = () => {
           <div>
             <CustomButton
               onClick={()=>{setShowSchemaModal(true)}}
-              tooltipTitle="Add Schema"
+              tooltipTitle="Define the dimensions, metrics and date time columns of your data"
               enableTooltip={true}
             >
               Add Schema
             </CustomButton>
             <CustomButton
               onClick={()=>{setShowAddOfflineTableModal(true)}}
-              tooltipTitle="Add Offline Table"
+              tooltipTitle="Create a Pinot table to ingest from batch data sources, such as S3"
               enableTooltip={true}
             >
               Add Offline Table
             </CustomButton>
             <CustomButton
               onClick={()=>{setShowAddRealtimeTableModal(true)}}
-              tooltipTitle="Add Realtime Table"
+              tooltipTitle="Create a Pinot table to ingest from stream data sources, such as Kafka"
               enableTooltip={true}
             >
               Add Realtime Table
@@ -119,6 +127,7 @@ const TablesListingPage = () => {
         baseURL="/tenants/table/"
         showSearchBox={true}
         inAccordionFormat={true}
+        tooltipData={TableTooltipData}
       />
       <CustomizedTables
           title="Schemas"

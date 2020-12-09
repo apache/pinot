@@ -18,7 +18,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { createStyles, FormControl, Grid, Input, InputLabel, makeStyles, MenuItem, Select, Theme} from '@material-ui/core';
+import { createStyles, FormControl, Grid, Input, InputLabel, makeStyles, MenuItem, Select, Theme, Tooltip} from '@material-ui/core';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -70,7 +70,7 @@ export default function AddStorageComponent({
   return (
     <Grid container spacing={2}>
       <Grid item xs={12}>
-
+      <Tooltip title="Data will be deleted after this time period." arrow placement="top-start">
       <FormControl className={classes.formControl} >
           <InputLabel htmlFor="retentionTimeValue">Retention Value</InputLabel>
           <Input
@@ -83,7 +83,7 @@ export default function AddStorageComponent({
             type="number"
         />
         </FormControl>
-
+        </Tooltip>
         <FormControl className={classes.selectFormControl}>
           <InputLabel htmlFor="retentionTimeUnit">Retention unit</InputLabel>
           <Select
@@ -99,7 +99,7 @@ export default function AddStorageComponent({
             <MenuItem value="DAYS">DAYS</MenuItem>
           </Select>
         </FormControl>
-
+        <Tooltip title="Data pushes which exceed this size will fail." arrow placement="top-start">
         <FormControl className={classes.formControl} >
           <InputLabel htmlFor="maxQueriesPerSecond">Storage Quota</InputLabel>
           <Input
@@ -111,6 +111,7 @@ export default function AddStorageComponent({
             }
           />
         </FormControl>
+        </Tooltip>
       </Grid>
     </Grid>
   );

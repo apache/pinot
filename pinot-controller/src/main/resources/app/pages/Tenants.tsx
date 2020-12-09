@@ -39,6 +39,14 @@ type Props = {
   tenantName: string
 };
 
+const TableTooltipData = [
+  null,
+  "Uncompressed size of all data segments",
+  "Estimated size of all data segments, in case any servers are not reachable for actual size",
+  null,
+  "GOOD if all replicas of all segments are up"
+];
+
 const TenantPage = ({ match }: RouteComponentProps<Props>) => {
 
   const {tenantName} = match.params;
@@ -77,16 +85,16 @@ const TenantPage = ({ match }: RouteComponentProps<Props>) => {
           <div>
             <CustomButton
               onClick={()=>{console.log('rebalance');}}
-              // tooltipTitle="Rebalance Server Tenant - Coming soon"
-              // enableTooltip={true}
+              tooltipTitle="Recalculates the segment to server mapping for all tables in this tenant"
+              enableTooltip={true}
               isDisabled={true}
             >
               Rebalance Server Tenant
             </CustomButton>
             <CustomButton
               onClick={()=>{console.log('rebuild');}}
-              // tooltipTitle="Rebuild Broker Resource - Coming soon"
-              // enableTooltip={true}
+              tooltipTitle="Rebuilds brokerResource mappings for all tables in this tenant"
+              enableTooltip={true}
               isDisabled={true}
             >
               Rebuild Broker Resource
@@ -97,6 +105,7 @@ const TenantPage = ({ match }: RouteComponentProps<Props>) => {
       <CustomizedTables
         title={tenantName}
         data={tableData}
+        tooltipData={TableTooltipData}
         isPagination
         addLinks
         baseURL={`/tenants/${tenantName}/table/`}

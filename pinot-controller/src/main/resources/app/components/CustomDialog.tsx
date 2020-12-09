@@ -46,7 +46,7 @@ type Props = {
   open: boolean,
   handleClose: (event: React.MouseEvent<HTMLElement, MouseEvent>) => void,
   handleSave?: (event: React.MouseEvent<HTMLElement, MouseEvent>) => void,
-  title: string,
+  title: any,
   children: any,
   btnCancelText?: string,
   btnOkText?: string,

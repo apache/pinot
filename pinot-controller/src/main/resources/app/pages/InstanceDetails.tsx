@@ -18,7 +18,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Button, FormControlLabel, Grid, makeStyles, Switch } from '@material-ui/core';
+import { Button, FormControlLabel, Grid, makeStyles, Switch, Tooltip } from '@material-ui/core';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
 import 'codemirror/lib/codemirror.css';
 import 'codemirror/theme/material.css';
@@ -292,7 +292,7 @@ const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
                   setTagsList(JSON.parse(instanceConfig)?.listFields?.TAG_LIST || []);
                   setShowEditTag(true);
                 }}
-                tooltipTitle="Edit Tags"
+                tooltipTitle="Add/remove tags from this node"
                 enableTooltip={true}
               >
                 Edit Tags
@@ -302,18 +302,18 @@ const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
                   setConfig(instanceDetails);
                   setShowEditConfig(true);
                 }}
-                tooltipTitle="Edit Config"
                 enableTooltip={true}
               >
                 Edit Config
               </CustomButton>
               <CustomButton
                 onClick={handleDropAction}
-                tooltipTitle="Drop"
+                tooltipTitle="Removes the node from the cluster. Untag & rebalance (to ensure node is not being used by any table), and shutdown instance, before dropping."
                 enableTooltip={true}
               >
                 Drop
               </CustomButton>
+              <Tooltip title="Disabling will disable the node for queries." arrow placement="top-start" >
               <FormControlLabel
                 control={
                   <Switch
@@ -325,6 +325,7 @@ const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
                 }
                 label="Enable"
               />
+              </Tooltip>
             </div>
           </SimpleAccordion>
         </div>}

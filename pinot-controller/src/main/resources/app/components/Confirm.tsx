@@ -55,7 +55,7 @@ const useStyles = makeStyles((theme) => ({
 
 type Props = {
   openDialog: boolean,
-  dialogTitle?: string,
+  dialogTitle?: any,
   dialogContent: string,
   successCallback: (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => void;
   closeDialog: (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => void;

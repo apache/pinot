@@ -32,7 +32,7 @@ import TableCell from '@material-ui/core/TableCell';
 import TableContainer from '@material-ui/core/TableContainer';
 import TableHead from '@material-ui/core/TableHead';
 import TableRow from '@material-ui/core/TableRow';
-import { TablePagination } from '@material-ui/core';
+import { TablePagination, Tooltip } from '@material-ui/core';
 import { TableData } from 'Models';
 import IconButton from '@material-ui/core/IconButton';
 import FirstPageIcon from '@material-ui/icons/FirstPage';
@@ -67,7 +67,8 @@ type Props = {
     toggleChangeHandler: (event: React.ChangeEvent<HTMLInputElement>) => void;
     toggleName: string;
     toggleValue: boolean;
-  }
+  },
+  tooltipData?: string[]
 };
 
 const StyledTableRow = withStyles((theme) =>
@@ -257,7 +258,8 @@ export default function CustomizedTables({
   showSearchBox,
   inAccordionFormat,
   regexReplace,
-  accordionToggleObject
+  accordionToggleObject,
+  tooltipData
 }: Props) {
   const [finalData, setFinalData] = React.useState(Utils.tableFormat(data));
 
@@ -363,18 +365,25 @@ export default function CustomizedTables({
                       setColumnClicked(column);
                     }}
                   >
-                    {column}
-                    {column === columnClicked ? order ? (
-                      <ArrowDropDownIcon
-                        color="primary"
-                        style={{ verticalAlign: 'middle' }}
-                      />
-                    ) : (
-                      <ArrowDropUpIcon
-                        color="primary"
-                        style={{ verticalAlign: 'middle' }}
-                      />
-                    ) : null}
+                    <>
+                      {
+                      tooltipData && tooltipData[index] ?
+                        (<Tooltip title={tooltipData[index]} placement="top" arrow><span>{column}</span></Tooltip>)
+                      :
+                        column
+                      }
+                      {column === columnClicked ? order ? (
+                        <ArrowDropDownIcon
+                          color="primary"
+                          style={{ verticalAlign: 'middle' }}
+                        />
+                      ) : (
+                        <ArrowDropUpIcon
+                          color="primary"
+                          style={{ verticalAlign: 'middle' }}
+                        />
+                      ) : null}
+                    </>
                   </StyledTableCell>
                 ))}
               </TableRow>

@@ -18,7 +18,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { createStyles, FormControl, Grid, Input, InputLabel, makeStyles, MenuItem, Select, TextField, Theme} from '@material-ui/core';
+import { createStyles, FormControl, Grid, Input, InputLabel, makeStyles, MenuItem, Select, TextField, Theme, Tooltip} from '@material-ui/core';
 import { Autocomplete } from '@material-ui/lab';
 
 const useStyles = makeStyles((theme: Theme) =>
@@ -138,6 +138,7 @@ export default function AddTableComponent({
             <MenuItem value="REALTIME">REALTIME</MenuItem>
           </Select>
         </FormControl>
+        <Tooltip title="Pick a primary time column from all the DateTime columns" arrow placement="top-start">
         <FormControl className={classes.selectFormControl}>
           <Autocomplete
             className={classes.autoCompleteControl}
@@ -155,7 +156,8 @@ export default function AddTableComponent({
             )}
           />
         </FormControl>
-
+        </Tooltip>
+        <Tooltip title="Number of copies to create per segment" arrow placement="top-start">
         <FormControl className={classes.selectFormControl}>
           <InputLabel htmlFor="replication">Replication</InputLabel>
           <Select
@@ -167,6 +169,7 @@ export default function AddTableComponent({
             {[ ...Array(20).keys() ].map((num, index)=>(<MenuItem key={index} value={`${num+1}`}>{`${num+1}`}</MenuItem>))}
           </Select>
         </FormControl>
+        </Tooltip>
       </Grid>
     </Grid>
   );
