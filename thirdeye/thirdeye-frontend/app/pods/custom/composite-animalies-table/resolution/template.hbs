@@ -1,0 +1,12 @@
+
+{{#power-select
+  triggerId=record.anomalyId
+  triggerClass="te-anomaly-table__select te-anomaly-table__select--margin-left"
+  options=record.feedback.options
+  searchEnabled=false
+  selected=record.feedback.selected
+  onchange=(action "onChangeAnomalyResponse" record)
+  as |response|
+}}
+  {{response}}
+{{/power-select}}

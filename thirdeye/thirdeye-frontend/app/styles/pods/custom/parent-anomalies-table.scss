@@ -1,0 +1,20 @@
+.parent-anomalies-table {
+    width: 100%;
+    border: 1px solid #ccc;
+    tr {
+        border-bottom: 1px solid #ccc;
+    }
+    td, th {
+        padding: 10px 10px 10px 20px;
+
+        p {
+            margin: 0;
+        } 
+    }
+    margin-bottom: 20px;
+}
+
+.composite-anomalies-no-records {
+    padding: 10px 10px 10px 20px;
+    font-size: 16px;
+}
