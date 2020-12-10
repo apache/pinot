@@ -37,6 +37,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 public class TableConfig extends BaseJsonConfig {
   public static final String TABLE_NAME_KEY = "tableName";
   public static final String TABLE_TYPE_KEY = "tableType";
+  public static final String IS_DIM_TABLE_KEY = "isDimTable";
   public static final String VALIDATION_CONFIG_KEY = "segmentsConfig";
   public static final String TENANT_CONFIG_KEY = "tenants";
   public static final String INDEXING_CONFIG_KEY = "tableIndexConfig";
@@ -61,6 +62,9 @@ public class TableConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription(value = "The type of the table (OFFLINE|REALTIME) (mandatory)")
   private final TableType _tableType;
+
+  @JsonPropertyDescription("Indicates whether the table is a dimension table or not")
+  private final boolean _dimTable;
 
   private SegmentsValidationAndRetentionConfig _validationConfig;
   private TenantConfig _tenantConfig;
@@ -104,7 +108,8 @@ public class TableConfig extends BaseJsonConfig {
       @JsonProperty(FIELD_CONFIG_LIST_KEY) @Nullable List<FieldConfig> fieldConfigList,
       @JsonProperty(UPSERT_CONFIG_KEY) @Nullable UpsertConfig upsertConfig,
       @JsonProperty(INGESTION_CONFIG_KEY) @Nullable IngestionConfig ingestionConfig,
-      @JsonProperty(TIER_CONFIGS_LIST_KEY) @Nullable List<TierConfig> tierConfigsList) {
+      @JsonProperty(TIER_CONFIGS_LIST_KEY) @Nullable List<TierConfig> tierConfigsList,
+      @JsonProperty(IS_DIM_TABLE_KEY) boolean dimTable) {
     Preconditions.checkArgument(tableName != null, "'tableName' must be configured");
     Preconditions.checkArgument(!tableName.contains(TABLE_NAME_FORBIDDEN_SUBSTRING),
         "'tableName' cannot contain double underscore ('__')");
@@ -130,6 +135,7 @@ public class TableConfig extends BaseJsonConfig {
     _upsertConfig = upsertConfig;
     _ingestionConfig = ingestionConfig;
     _tierConfigsList = tierConfigsList;
+    _dimTable = dimTable;
   }
 
   @JsonProperty(TABLE_NAME_KEY)
@@ -140,6 +146,11 @@ public class TableConfig extends BaseJsonConfig {
   @JsonProperty(TABLE_TYPE_KEY)
   public TableType getTableType() {
     return _tableType;
+  }
+
+  @JsonProperty(IS_DIM_TABLE_KEY)
+  public boolean isDimTable() {
+    return _dimTable;
   }
 
   @JsonProperty(VALIDATION_CONFIG_KEY)

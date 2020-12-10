@@ -33,7 +33,7 @@ public class SegmentAssignmentFactory {
   public static SegmentAssignment getSegmentAssignment(HelixManager helixManager, TableConfig tableConfig) {
     SegmentAssignment segmentAssignment;
     if (tableConfig.getTableType() == TableType.OFFLINE) {
-      segmentAssignment = new OfflineSegmentAssignment();
+      segmentAssignment = tableConfig.isDimTable() ? new OfflineDimTableSegmentAssignment() : new OfflineSegmentAssignment();
     } else {
       segmentAssignment = new RealtimeSegmentAssignment();
     }

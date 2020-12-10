@@ -58,6 +58,7 @@ public class TableConfigUtils {
     String tableName = znRecord.getId();
 
     String tableType = simpleFields.get(TableConfig.TABLE_TYPE_KEY);
+    boolean isDimTable = Boolean.parseBoolean(simpleFields.get(TableConfig.IS_DIM_TABLE_KEY));
     Preconditions.checkState(tableType != null, FIELD_MISSING_MESSAGE_TEMPLATE, TableConfig.TABLE_TYPE_KEY);
 
     String validationConfigString = simpleFields.get(TableConfig.VALIDATION_CONFIG_KEY);
@@ -140,7 +141,7 @@ public class TableConfigUtils {
 
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
         quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList, upsertConfig,
-        ingestionConfig, tierConfigList);
+        ingestionConfig, tierConfigList, isDimTable);
   }
 
   public static ZNRecord toZNRecord(TableConfig tableConfig)
@@ -154,6 +155,7 @@ public class TableConfigUtils {
     simpleFields.put(TableConfig.TENANT_CONFIG_KEY, tableConfig.getTenantConfig().toJsonString());
     simpleFields.put(TableConfig.INDEXING_CONFIG_KEY, tableConfig.getIndexingConfig().toJsonString());
     simpleFields.put(TableConfig.CUSTOM_CONFIG_KEY, tableConfig.getCustomConfig().toJsonString());
+    simpleFields.put(TableConfig.IS_DIM_TABLE_KEY, Boolean.toString(tableConfig.isDimTable()));
 
     // Optional fields
     QuotaConfig quotaConfig = tableConfig.getQuotaConfig();
