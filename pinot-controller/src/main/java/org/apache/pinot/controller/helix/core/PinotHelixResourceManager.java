@@ -37,6 +37,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
@@ -199,6 +200,7 @@ public class PinotHelixResourceManager {
     for (int i = 0; i < _tableUpdaterLocks.length; i++) {
       _tableUpdaterLocks[i] = new Object();
     }
+    SIMPLE_DATE_FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf) {
