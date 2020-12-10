@@ -58,6 +58,7 @@ import org.apache.pinot.core.util.ReplicationUtils;
 import org.apache.pinot.core.util.TableConfigUtils;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableStats;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -573,16 +574,26 @@ public class PinotTableRestletResource {
   }
 
   @GET
-  @Path("/tables/{tableName}/creationTime")
+  @Path("/tables/{tableName}/stats")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "table creation time", notes = "Provides table creation time in milliseconds from EPOCH.")
-  public long getTableCreationTime(
+  @ApiOperation(value = "table stats", notes = "Provides metadata info/stats about the table.")
+  public String getTableStats(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "realtime|offline", required = true) @QueryParam("type") String tableTypeStr) {
-
-    String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
-
-    return _pinotHelixResourceManager.getTableCreationTimeInMillisFromEpoch(tableNameWithType);
+      @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
+    ObjectNode ret = JsonUtils.newObjectNode();
+    if ((tableTypeStr == null || TableType.OFFLINE.name().equalsIgnoreCase(tableTypeStr))
+        && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
+      String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
+      TableStats tableStats = _pinotHelixResourceManager.getTableStats(tableNameWithType);
+      ret.set(TableType.OFFLINE.name(), JsonUtils.objectToJsonNode(tableStats));
+    }
+    if ((tableTypeStr == null || TableType.REALTIME.name().equalsIgnoreCase(tableTypeStr))
+        && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
+      String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
+      TableStats tableStats = _pinotHelixResourceManager.getTableStats(tableNameWithType);
+      ret.set(TableType.REALTIME.name(), JsonUtils.objectToJsonNode(tableStats));
+    }
+    return ret.toString();
   }
 
   private String constructTableNameWithType(String tableName, String tableTypeStr) {

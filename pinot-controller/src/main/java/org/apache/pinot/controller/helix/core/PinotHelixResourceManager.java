@@ -26,6 +26,7 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -113,6 +114,7 @@ import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableCustomConfig;
+import org.apache.pinot.spi.config.table.TableStats;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
@@ -139,6 +141,8 @@ public class PinotHelixResourceManager {
   // TODO: make this configurable
   public static final long EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS = 10 * 60_000L; // 10 minutes
   public static final long EXTERNAL_VIEW_CHECK_INTERVAL_MS = 1_000L; // 1 second
+
+  private static final SimpleDateFormat SIMPLE_DATE_FORMAT = new SimpleDateFormat("yyyyMMdd'T'HHmm'Z'");
 
   private final Map<String, Map<String, Long>> _segmentCrcMap = new HashMap<>();
   private final Map<String, Map<String, Integer>> _lastKnownSegmentMetadataVersionMap = new HashMap<>();
@@ -2573,10 +2577,11 @@ public class PinotHelixResourceManager {
     return onlineSegments;
   }
 
-  public long getTableCreationTimeInMillisFromEpoch(String tableNameWithType) {
+  public TableStats getTableStats(String tableNameWithType) {
     String zkPath = ZKMetadataProvider.constructPropertyStorePathForResourceConfig(tableNameWithType);
     ZNRecord znRecord = ZKMetadataProvider.getZnRecord(_propertyStore, zkPath);
-    return znRecord.getCreationTime();
+    String creationTime = SIMPLE_DATE_FORMAT.format(znRecord.getCreationTime());
+    return new TableStats(creationTime);
   }
 
   /*
