@@ -2,7 +2,21 @@ language: java
 os: linux
 dist: trusty
 
+# Prevent test build of a documentation-only change.
+#
+# if: conditions are preferred as they obviate job creation. However, they can only use
+# pre-defined env variables or globals that can be evaluated statically. The other way to skip
+# is to exit early. We do that here to prevent overhead of running tests that only include Markdown
+# (documentation) updates.
+_terminate_if_only_docs: &terminate_if_only_docs
+  - |
+    if [ -n "${TRAVIS_COMMIT_RANGE}" ] && ! git diff --name-only "${TRAVIS_COMMIT_RANGE}" -- | grep -qv '\.md$'; then
+      echo "Stopping job as changes only affect documentation (ex. README.md)"
+      travis_terminate 0
+    fi
+
 before_install:
+  - *terminate_if_only_docs
   - sudo apt-get update && sudo apt-get install -y --no-install-recommends gdb
   - mkdir -p ~/bin && curl -sSL -o ~/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64 && chmod +x ~/bin/jq
   - export PATH=$PATH:~/bin
