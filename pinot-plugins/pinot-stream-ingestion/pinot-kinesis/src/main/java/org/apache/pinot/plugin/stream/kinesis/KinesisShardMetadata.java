@@ -8,6 +8,7 @@ import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 
 
 public class KinesisShardMetadata extends KinesisConnectionHandler implements PartitionGroupMetadata {
+  String _shardId;
   Checkpoint _startCheckpoint;
   Checkpoint _endCheckpoint;
 
@@ -16,6 +17,11 @@ public class KinesisShardMetadata extends KinesisConnectionHandler implements Pa
         ShardIteratorType.LATEST).streamName(streamName).build());
     _startCheckpoint = new KinesisCheckpoint(getShardIteratorResponse.shardIterator());
     _endCheckpoint = null;
+    _shardId = shardId;
+  }
+
+  public String getShardId() {
+    return _shardId;
   }
 
   @Override
