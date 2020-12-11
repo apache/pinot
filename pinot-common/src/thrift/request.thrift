@@ -34,7 +34,8 @@ enum FilterOperator {
   IN,
   IS_NULL,
   IS_NOT_NULL,
-  TEXT_MATCH
+  TEXT_MATCH,
+  JSON_MATCH
 }
 
 /**

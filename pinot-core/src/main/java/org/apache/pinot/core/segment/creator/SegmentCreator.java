@@ -51,7 +51,8 @@ public interface SegmentCreator extends Closeable {
    *
    * @param row The row to index.
    */
-  void indexRow(GenericRow row);
+  void indexRow(GenericRow row)
+      throws IOException;
 
   /**
    * Sets the name of the segment.

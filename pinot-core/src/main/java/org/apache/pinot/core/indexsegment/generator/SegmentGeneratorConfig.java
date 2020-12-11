@@ -65,13 +65,14 @@ public class SegmentGeneratorConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGeneratorConfig.class);
 
   private TableConfig _tableConfig;
-  private Map<String, String> _customProperties = new HashMap<>();
-  private Set<String> _rawIndexCreationColumns = new HashSet<>();
-  private Map<String, ChunkCompressorFactory.CompressionType> _rawIndexCompressionType = new HashMap<>();
-  private List<String> _invertedIndexCreationColumns = new ArrayList<>();
-  private List<String> _textIndexCreationColumns = new ArrayList<>();
-  private List<String> _fstIndexCreationColumns = new ArrayList<>();
-  private List<String> _columnSortOrder = new ArrayList<>();
+  private final Map<String, String> _customProperties = new HashMap<>();
+  private final Set<String> _rawIndexCreationColumns = new HashSet<>();
+  private final Map<String, ChunkCompressorFactory.CompressionType> _rawIndexCompressionType = new HashMap<>();
+  private final List<String> _invertedIndexCreationColumns = new ArrayList<>();
+  private final List<String> _textIndexCreationColumns = new ArrayList<>();
+  private final List<String> _fstIndexCreationColumns = new ArrayList<>();
+  private final List<String> _jsonIndexCreationColumns = new ArrayList<>();
+  private final List<String> _columnSortOrder = new ArrayList<>();
   private List<String> _varLengthDictionaryColumns = new ArrayList<>();
   private String _inputFilePath = null;
   private FileFormat _format = FileFormat.AVRO;
@@ -147,7 +148,7 @@ public class SegmentGeneratorConfig {
         if (noDictionaryColumnMap != null) {
           Map<String, ChunkCompressorFactory.CompressionType> serializedNoDictionaryColumnMap =
               noDictionaryColumnMap.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
-                  e -> (ChunkCompressorFactory.CompressionType) ChunkCompressorFactory.CompressionType
+                  e -> ChunkCompressorFactory.CompressionType
                       .valueOf(e.getValue())));
           this.setRawIndexCompressionType(serializedNoDictionaryColumnMap);
         }
@@ -165,10 +166,16 @@ public class SegmentGeneratorConfig {
       //       - Set 'generate.inverted.index.before.push' to 'true' in custom config (deprecated)
       //       - Enable 'createInvertedIndexDuringSegmentGeneration' in indexing config
       // TODO: Clean up the table configs with the deprecated settings, and always use the one in the indexing config
-      Map<String, String> customConfigs = tableConfig.getCustomConfig().getCustomConfigs();
-      if ((customConfigs != null && Boolean.parseBoolean(customConfigs.get("generate.inverted.index.before.push")))
-          || indexingConfig.isCreateInvertedIndexDuringSegmentGeneration()) {
-        _invertedIndexCreationColumns = indexingConfig.getInvertedIndexColumns();
+      if (indexingConfig.getInvertedIndexColumns() != null) {
+        Map<String, String> customConfigs = tableConfig.getCustomConfig().getCustomConfigs();
+        if ((customConfigs != null && Boolean.parseBoolean(customConfigs.get("generate.inverted.index.before.push")))
+            || indexingConfig.isCreateInvertedIndexDuringSegmentGeneration()) {
+          _invertedIndexCreationColumns.addAll(indexingConfig.getInvertedIndexColumns());
+        }
+      }
+
+      if (indexingConfig.getJsonIndexColumns() != null) {
+        _jsonIndexCreationColumns.addAll(indexingConfig.getJsonIndexColumns());
       }
 
       List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
@@ -288,6 +295,10 @@ public class SegmentGeneratorConfig {
 
   public List<String> getFSTIndexCreationColumns() {
     return _fstIndexCreationColumns;
+  }
+
+  public List<String> getJsonIndexCreationColumns() {
+    return _jsonIndexCreationColumns;
   }
 
   public List<String> getColumnSortOrder() {

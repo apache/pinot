@@ -118,7 +118,8 @@ public abstract class SegmentDirectory implements Closeable {
     return SegmentLocalFSDirectory.loadSegmentMetadata(directory);
   }
 
-  public abstract void reloadMetadata() throws Exception;
+  public abstract void reloadMetadata()
+      throws Exception;
 
   /**
    * Get the path/URL for the directory
@@ -183,30 +184,8 @@ public abstract class SegmentDirectory implements Closeable {
      */
     public abstract void removeIndex(String columnName, ColumnIndexType indexType);
 
-    /**
-     * Save all the write and delete operations and close writer
-     * @throws Exception
-     */
-    public void saveAndClose()
-        throws IOException {
-      save();
-      close();
-    }
-
-    /**
-     * Discard all recorded writes and deletes and close the writer.
-     * @throws Exception
-     */
-    public void abortAndClose()
-        throws Exception {
-      abort();
-      close();
-    }
-
     public abstract void save()
         throws IOException;
-
-    abstract void abort();
 
     public SegmentDirectory toSegmentDirectory() {
       return SegmentDirectory.this;

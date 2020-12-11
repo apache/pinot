@@ -57,6 +57,7 @@ public class ParserUtils {
     FILTER_OPERATOR_MAP.put(FilterKind.IS_NULL, FilterOperator.IS_NULL);
     FILTER_OPERATOR_MAP.put(FilterKind.IS_NOT_NULL, FilterOperator.IS_NOT_NULL);
     FILTER_OPERATOR_MAP.put(FilterKind.TEXT_MATCH, FilterOperator.TEXT_MATCH);
+    FILTER_OPERATOR_MAP.put(FilterKind.JSON_MATCH, FilterOperator.JSON_MATCH);
   }
 
   /**
