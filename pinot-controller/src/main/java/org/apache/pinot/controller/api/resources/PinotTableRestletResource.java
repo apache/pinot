@@ -58,6 +58,7 @@ import org.apache.pinot.core.util.ReplicationUtils;
 import org.apache.pinot.core.util.TableConfigUtils;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableStats;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -509,14 +510,8 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Whether to allow downtime for the rebalance") @DefaultValue("false") @QueryParam("downtime") boolean downtime,
       @ApiParam(value = "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or maximum number of replicas allowed to be unavailable if value is negative") @DefaultValue("1") @QueryParam("minAvailableReplicas") int minAvailableReplicas,
       @ApiParam(value = "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime contract cannot be achieved)") @DefaultValue("false") @QueryParam("bestEfforts") boolean bestEfforts) {
-    TableType tableType;
-    try {
-      tableType = TableType.valueOf(tableTypeStr.toUpperCase());
-    } catch (IllegalArgumentException e) {
-      throw new ControllerApplicationException(LOGGER, "Illegal table type: " + tableTypeStr,
-          Response.Status.BAD_REQUEST);
-    }
-    String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
+
+    String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
 
     Configuration rebalanceConfig = new BaseConfiguration();
     rebalanceConfig.addProperty(RebalanceConfigConstants.DRY_RUN, dryRun);
@@ -567,15 +562,7 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Name of the table to get its state", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline", required = true) @QueryParam("type") String tableTypeStr
   ) {
-    TableType tableType;
-    try {
-      tableType = TableType.valueOf(tableTypeStr.toUpperCase());
-    } catch (IllegalArgumentException e) {
-      throw new ControllerApplicationException(LOGGER, "Illegal table type: " + tableTypeStr,
-          Response.Status.BAD_REQUEST);
-    }
-
-    String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
+    String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
     try {
       ObjectNode data = JsonUtils.newObjectNode();
       data.put("state", _pinotHelixResourceManager.isTableEnabled(tableNameWithType) ? "enabled" : "disabled");
@@ -584,5 +571,39 @@ public class PinotTableRestletResource {
       throw new ControllerApplicationException(LOGGER, "Failed to find table: " + tableNameWithType,
           Response.Status.NOT_FOUND);
     }
+  }
+
+  @GET
+  @Path("/tables/{tableName}/stats")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "table stats", notes = "Provides metadata info/stats about the table.")
+  public String getTableStats(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
+    ObjectNode ret = JsonUtils.newObjectNode();
+    if ((tableTypeStr == null || TableType.OFFLINE.name().equalsIgnoreCase(tableTypeStr))
+        && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
+      String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
+      TableStats tableStats = _pinotHelixResourceManager.getTableStats(tableNameWithType);
+      ret.set(TableType.OFFLINE.name(), JsonUtils.objectToJsonNode(tableStats));
+    }
+    if ((tableTypeStr == null || TableType.REALTIME.name().equalsIgnoreCase(tableTypeStr))
+        && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
+      String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
+      TableStats tableStats = _pinotHelixResourceManager.getTableStats(tableNameWithType);
+      ret.set(TableType.REALTIME.name(), JsonUtils.objectToJsonNode(tableStats));
+    }
+    return ret.toString();
+  }
+
+  private String constructTableNameWithType(String tableName, String tableTypeStr) {
+    TableType tableType;
+    try {
+      tableType = TableType.valueOf(tableTypeStr.toUpperCase());
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, "Illegal table type: " + tableTypeStr,
+          Response.Status.BAD_REQUEST);
+    }
+    return TableNameBuilder.forType(tableType).tableNameWithType(tableName);
   }
 }
