@@ -1,7 +1,10 @@
 package org.apache.pinot.spi.stream.v2;
 
-public interface FetchResult {
+import java.util.List;
+
+
+public interface FetchResult<T> {
   Checkpoint getLastCheckpoint();
-  byte[] getMessages();
+  List<T> getMessages();
 }
 
