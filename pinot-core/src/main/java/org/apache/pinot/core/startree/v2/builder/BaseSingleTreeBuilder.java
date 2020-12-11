@@ -314,7 +314,7 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
         numRecordsUnderStarNode);
 
     createAggregatedDocs(_rootNode);
-    int numAggregatedRecords = _numDocs - numSegmentRecords - numRecordsUnderStarNode;
+    int numAggregatedRecords = _numDocs - numStarTreeRecords - numRecordsUnderStarNode;
     LOGGER.info("Finished creating aggregated documents, got {} aggregated records", numAggregatedRecords);
 
     createForwardIndexes();
