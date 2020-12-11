@@ -40,6 +40,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
+import org.apache.pinot.spi.config.table.TunerConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
@@ -105,6 +106,7 @@ public class TableConfigBuilder {
   private UpsertConfig _upsertConfig;
   private IngestionConfig _ingestionConfig;
   private List<TierConfig> _tierConfigList;
+  private TunerConfig _tunerConfig;
 
   public TableConfigBuilder(TableType tableType) {
     _tableType = tableType;
@@ -338,6 +340,11 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setTunerConfig(TunerConfig tunerConfig) {
+    _tunerConfig = tunerConfig;
+    return this;
+  }
+
   public TableConfig build() {
     // Validation config
     SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
@@ -386,6 +393,6 @@ public class TableConfigBuilder {
 
     return new TableConfig(_tableName, _tableType.toString(), validationConfig, tenantConfig, indexingConfig,
         _customConfig, _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap,
-        _fieldConfigList, _upsertConfig, _ingestionConfig, _tierConfigList, _isDimTable);
+        _fieldConfigList, _upsertConfig, _ingestionConfig, _tierConfigList, _isDimTable, _tunerConfig);
   }
 }

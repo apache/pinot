@@ -46,6 +46,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
+import org.apache.pinot.common.config.tuner.TableConfigTunerRegistry;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -60,6 +61,8 @@ import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStats;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TunerConfig;
+import org.apache.pinot.spi.config.table.tuner.TableConfigTuner;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -117,6 +120,14 @@ public class PinotTableRestletResource {
     try {
       tableConfig = JsonUtils.stringToObject(tableConfigStr, TableConfig.class);
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
+
+      TunerConfig tunerConfig = tableConfig.getTunerConfig();
+      if (tunerConfig != null && tunerConfig.getName() != null && !tunerConfig.getName().isEmpty()) {
+        TableConfigTuner tuner = TableConfigTunerRegistry.getTuner(tunerConfig.getName());
+        tuner.init(tunerConfig, schema);
+        tableConfig = tuner.apply(tableConfig);
+      }
+
       // TableConfigUtils.validate(...) is used across table create/update.
       TableConfigUtils.validate(tableConfig, schema);
       // TableConfigUtils.validateTableName(...) checks table name rules.
