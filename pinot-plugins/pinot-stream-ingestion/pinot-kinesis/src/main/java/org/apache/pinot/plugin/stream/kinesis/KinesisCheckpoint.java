@@ -1,23 +1,22 @@
 package org.apache.pinot.plugin.stream.kinesis;
 
 import org.apache.pinot.spi.stream.v2.Checkpoint;
-import software.amazon.awssdk.services.kinesis.model.GetShardIteratorResponse;
 
 
 public class KinesisCheckpoint implements Checkpoint {
-  String _shardIterator;
+  String _sequenceNumber;
 
-  public KinesisCheckpoint(String shardIterator){
-    _shardIterator = shardIterator;
+  public KinesisCheckpoint(String sequenceNumber){
+    _sequenceNumber = sequenceNumber;
   }
 
-  public String getShardIterator() {
-    return _shardIterator;
+  public String getSequenceNumber() {
+    return _sequenceNumber;
   }
 
   @Override
   public byte[] serialize() {
-    return _shardIterator.getBytes();
+    return _sequenceNumber.getBytes();
   }
 
   @Override
