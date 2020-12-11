@@ -53,6 +53,11 @@ public class TableDataManagerProvider {
     TableDataManager tableDataManager;
     switch (TableType.valueOf(tableDataManagerConfig.getTableDataManagerType())) {
       case OFFLINE:
+        if (tableDataManagerConfig.isDimTable()) {
+          tableDataManager =
+              DimensionTableDataManager.createInstanceByTableName(tableDataManagerConfig.getTableName());
+          break;
+        }
         tableDataManager = new OfflineTableDataManager();
         break;
       case REALTIME:

@@ -1,0 +1,14 @@
+{
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "STRING",
+      "name": "teamID"
+    },
+    {
+      "dataType": "STRING",
+      "name": "teamName"
+    }
+  ],
+  "schemaName": "dimBaseballTeams",
+  "primaryKeyColumns": ["teamID"]
+}
