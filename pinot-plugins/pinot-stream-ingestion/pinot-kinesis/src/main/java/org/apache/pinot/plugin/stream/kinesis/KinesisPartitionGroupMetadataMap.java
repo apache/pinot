@@ -1,8 +1,7 @@
 package org.apache.pinot.plugin.stream.kinesis;
 
-import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import org.apache.pinot.spi.stream.v2.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.v2.PartitionGroupMetadataMap;
 import software.amazon.awssdk.services.kinesis.model.ListShardsRequest;
@@ -11,7 +10,7 @@ import software.amazon.awssdk.services.kinesis.model.Shard;
 
 
 public class KinesisPartitionGroupMetadataMap extends KinesisConnectionHandler implements PartitionGroupMetadataMap {
-  private Map<String, PartitionGroupMetadata> _stringPartitionGroupMetadataMap = new HashMap<>();
+  private final List<PartitionGroupMetadata> _stringPartitionGroupMetadataIndex = new ArrayList<>();
 
   public KinesisPartitionGroupMetadataMap(String stream, String awsRegion){
     super(awsRegion);
@@ -20,12 +19,19 @@ public class KinesisPartitionGroupMetadataMap extends KinesisConnectionHandler i
     for(Shard shard : shardList){
       String endingSequenceNumber = shard.sequenceNumberRange().endingSequenceNumber();
       KinesisShardMetadata shardMetadata = new KinesisShardMetadata(shard.shardId(), stream);
-      shardMetadata.setEndCheckpoint(new KinesisCheckpoint(endingSequenceNumber));
-      _stringPartitionGroupMetadataMap.put(shard.shardId(), shardMetadata);
+      shardMetadata.setStartCheckpoint(new KinesisCheckpoint(endingSequenceNumber));
+      _stringPartitionGroupMetadataIndex.add(shardMetadata);
     }
   }
 
-  public Map<String, PartitionGroupMetadata> getPartitionMetadata(){
-      return _stringPartitionGroupMetadataMap;
+  @Override
+  public List<PartitionGroupMetadata> getMetadataList() {
+    return _stringPartitionGroupMetadataIndex;
   }
+
+  @Override
+  public PartitionGroupMetadata getPartitionGroupMetadata(int index) {
+    return _stringPartitionGroupMetadataIndex.get(index);
+  }
+
 }
