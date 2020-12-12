@@ -19,6 +19,7 @@
 package org.apache.pinot.common.function.scalar;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.jayway.jsonpath.JsonPath;
 import java.util.Map;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -55,5 +56,43 @@ public class JsonFunctions {
   public static String jsonFormat(Object object)
       throws JsonProcessingException {
     return JsonUtils.objectToString(object);
+  }
+
+  /**
+   * Extract object based on Json path
+   */
+  @ScalarFunction
+  public static Object jsonPath(Object object, String jsonPath) {
+    if (object instanceof String) {
+      return JsonPath.read((String) object, jsonPath);
+    }
+    return JsonPath.read(object, jsonPath);
+  }
+
+  /**
+   * Extract from Json with path to String
+   */
+  @ScalarFunction
+  public static String jsonPathString(Object object, String jsonPath)
+      throws JsonProcessingException {
+    return JsonUtils.objectToString(jsonPath(object, jsonPath));
+  }
+
+  /**
+   * Extract from Json with path to Long
+   */
+  @ScalarFunction
+  public static long jsonPathLong(Object object, String jsonPath)
+      throws JsonProcessingException {
+    return Long.parseLong(jsonPathString(object, jsonPath));
+  }
+
+  /**
+   * Extract from Json with path to Double
+   */
+  @ScalarFunction
+  public static double jsonPathDouble(Object object, String jsonPath)
+      throws JsonProcessingException {
+    return Double.parseDouble(jsonPathString(object, jsonPath));
   }
 }

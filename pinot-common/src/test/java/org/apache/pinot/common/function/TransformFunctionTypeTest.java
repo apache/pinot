@@ -36,6 +36,13 @@ public class TransformFunctionTypeTest {
   }
 
   @Test
+  public void testJsonScalarFunction() {
+    assertEquals(TransformFunctionType.getTransformFunctionType("jsonpath"), TransformFunctionType.SCALAR);
+    assertEquals(TransformFunctionType.getTransformFunctionType("jsonpathString"), TransformFunctionType.SCALAR);
+    assertEquals(TransformFunctionType.getTransformFunctionType("json_path_LONG"), TransformFunctionType.SCALAR);
+  }
+
+  @Test
   public void testSnakeCaseLookupFunction() {
     assertEquals(TransformFunctionType.getTransformFunctionType("json_extract_scalar"), TransformFunctionType.JSONEXTRACTSCALAR);
   }

@@ -238,7 +238,8 @@ public final class TableConfigUtils {
           String columnName = transformConfig.getColumnName();
           if (schema != null) {
             Preconditions.checkState(schema.getFieldSpecFor(columnName) != null,
-                "The destination column of the transform function must be present in the schema");
+                "The destination column '" + columnName
+                    + "' of the transform function must be present in the schema");
           }
           String transformFunction = transformConfig.getTransformFunction();
           if (columnName == null || transformFunction == null) {
