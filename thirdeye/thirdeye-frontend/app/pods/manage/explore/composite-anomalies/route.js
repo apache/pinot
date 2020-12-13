@@ -1,5 +1,5 @@
-import Route from "@ember/routing/route";
-import AuthenticatedRouteMixin from "ember-simple-auth/mixins/authenticated-route-mixin";
+import Route from '@ember/routing/route';
+import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
 
 export default Route.extend(AuthenticatedRouteMixin, {
   /**
@@ -19,7 +19,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
    *
    * @override
    */
-  setupController(controller, model){
+  setupController(controller, model) {
     this._super(controller, model);
 
     //Cannot rely on the native `init` callback of the controller because the model is not available before controller initialization

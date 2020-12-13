@@ -24,13 +24,9 @@
     }
   },
   "lint-staged": {
-    "**/*.{js,scss,css}": [
+    "**/*.js": [
       "./node_modules/.bin/eslint --fix",
       "./node_modules/.bin/prettier --write",
-      "git add"
-    ],
-    "**/*.hbs": [
-      "./node_modules/.bin/ember-template-lint",
       "git add"
     ]
   },
