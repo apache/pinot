@@ -22,6 +22,7 @@ import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -30,7 +31,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.controller.ControllerTestUtils.*;
 import static org.mockito.Mockito.*;
 import static org.testng.Assert.*;
 
@@ -41,16 +41,16 @@ public class ZKOperatorTest {
 
   @BeforeClass
   public void setUp() throws Exception {
-    validate();
+    ControllerTestUtils.setupClusterAndValidate();
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    getHelixResourceManager().addTable(tableConfig);
+    ControllerTestUtils.getHelixResourceManager().addTable(tableConfig);
   }
 
   @Test
   public void testCompleteSegmentOperations() throws Exception {
     ZKOperator zkOperator =
-        new ZKOperator(getHelixResourceManager(), mock(ControllerConf.class), mock(ControllerMetrics.class));
+        new ZKOperator(ControllerTestUtils.getHelixResourceManager(), mock(ControllerConf.class), mock(ControllerMetrics.class));
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
     when(segmentMetadata.getName()).thenReturn(SEGMENT_NAME);
     when(segmentMetadata.getCrc()).thenReturn("12345");
@@ -60,7 +60,7 @@ public class ZKOperatorTest {
         false, "crypter");
 
     OfflineSegmentZKMetadata segmentZKMetadata =
-        getHelixResourceManager().getOfflineSegmentZKMetadata(TABLE_NAME, SEGMENT_NAME);
+        ControllerTestUtils.getHelixResourceManager().getOfflineSegmentZKMetadata(TABLE_NAME, SEGMENT_NAME);
     assertEquals(segmentZKMetadata.getCrc(), 12345L);
     assertEquals(segmentZKMetadata.getCreationTime(), 123L);
     long pushTime = segmentZKMetadata.getPushTime();
@@ -85,7 +85,8 @@ public class ZKOperatorTest {
     when(segmentMetadata.getIndexCreationTime()).thenReturn(456L);
     zkOperator.completeSegmentOperations(TABLE_NAME, segmentMetadata, null, null, false, httpHeaders,
         "otherDownloadUrl", false, "otherCrypter");
-    segmentZKMetadata = getHelixResourceManager().getOfflineSegmentZKMetadata(TABLE_NAME, SEGMENT_NAME);
+    segmentZKMetadata = ControllerTestUtils
+        .getHelixResourceManager().getOfflineSegmentZKMetadata(TABLE_NAME, SEGMENT_NAME);
     assertEquals(segmentZKMetadata.getCrc(), 12345L);
     // Push time should not change
     assertEquals(segmentZKMetadata.getPushTime(), pushTime);
@@ -106,7 +107,8 @@ public class ZKOperatorTest {
     Thread.sleep(1000L);
     zkOperator.completeSegmentOperations(TABLE_NAME, segmentMetadata, null, null, false, httpHeaders,
         "otherDownloadUrl", false, "otherCrypter");
-    segmentZKMetadata = getHelixResourceManager().getOfflineSegmentZKMetadata(TABLE_NAME, SEGMENT_NAME);
+    segmentZKMetadata = ControllerTestUtils
+        .getHelixResourceManager().getOfflineSegmentZKMetadata(TABLE_NAME, SEGMENT_NAME);
     assertEquals(segmentZKMetadata.getCrc(), 23456L);
     // Push time should not change
     assertEquals(segmentZKMetadata.getPushTime(), pushTime);
@@ -119,6 +121,6 @@ public class ZKOperatorTest {
 
   @AfterClass
   public void tearDown() {
-    cleanup();
+    ControllerTestUtils.cleanup();
   }
 }

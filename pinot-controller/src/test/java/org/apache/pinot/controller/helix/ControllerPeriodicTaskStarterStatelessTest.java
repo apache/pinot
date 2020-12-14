@@ -29,7 +29,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class ControllerPeriodicTaskStarterOldTest extends ControllerTest {
+public class ControllerPeriodicTaskStarterStatelessTest extends ControllerTest {
 
   @BeforeClass
   public void setup() {

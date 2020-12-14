@@ -78,7 +78,7 @@ import static org.apache.pinot.common.utils.CommonConstants.Helix.UNTAGGED_SERVE
 import static org.apache.pinot.controller.helix.core.PinotHelixResourceManager.InvalidTableConfigException;
 
 
-public class PinotHelixResourceManagerOldTest extends ControllerTest {
+public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   private static final int BASE_SERVER_ADMIN_PORT = 10000;
   private static final int NUM_INSTANCES = 5;
   private static final String BROKER_TENANT_NAME = "brokerTenant";

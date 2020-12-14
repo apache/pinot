@@ -20,11 +20,13 @@
     under the License.
 
 -->
-<suite name="testng.suite-controller">
+<suite name="testng.suite.controller.statefull">
   <!--
-      These test cases are run as part of a testNG Suite. See ControllerTestSetup class for details.
+      Test cases listed here share state with each other (see ControllerTestSetup.java). This allows
+      the test suite to run faster becuase individual test cases don't have to waste time setting up
+      and destroying their own individual state.
   -->
-  <test name="testng.suite-controller">
+  <test name="testng.suite.controller.statefull">
     <packages>
       <package name="org.apache.pinot.controller.api.resources.*"/>
       <package name="org.apache.pinot.controller.api.upload.*"/>

@@ -20,6 +20,7 @@ package org.apache.pinot.controller.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -27,7 +28,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.controller.ControllerTestUtils.*;
 import static org.testng.Assert.*;
 
 
@@ -36,22 +36,22 @@ public class PinotTenantRestletResourceTest {
 
   @BeforeClass
   public void setUp() throws Exception {
-    validate();
+    ControllerTestUtils.setupClusterAndValidate();
   }
 
   @Test
   public void testTableListForTenant() throws Exception {
     // Check that no tables on tenant works
-    String listTablesUrl = getControllerRequestURLBuilder().forTablesFromTenant(TagNameUtils.DEFAULT_TENANT_NAME);
-    JsonNode tableList = JsonUtils.stringToJsonNode(sendGetRequest(listTablesUrl));
+    String listTablesUrl = ControllerTestUtils.getControllerRequestURLBuilder().forTablesFromTenant(TagNameUtils.DEFAULT_TENANT_NAME);
+    JsonNode tableList = JsonUtils.stringToJsonNode(ControllerTestUtils.sendGetRequest(listTablesUrl));
     assertEquals(tableList.get("tables").size(), 0);
 
     // Add a table
-    sendPostRequest(getControllerRequestURLBuilder().forTableCreate(),
+    ControllerTestUtils.sendPostRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableCreate(),
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build().toJsonString());
 
     // There should be 1 table on the tenant
-    tableList = JsonUtils.stringToJsonNode(sendGetRequest(listTablesUrl));
+    tableList = JsonUtils.stringToJsonNode(ControllerTestUtils.sendGetRequest(listTablesUrl));
     JsonNode tables = tableList.get("tables");
     assertEquals(tables.size(), 1);
 
@@ -66,6 +66,6 @@ public class PinotTenantRestletResourceTest {
 
   @AfterClass
   public void tearDown() {
-    cleanup();
+    ControllerTestUtils.cleanup();
   }
 }

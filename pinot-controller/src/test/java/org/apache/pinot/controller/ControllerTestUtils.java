@@ -691,14 +691,13 @@ public abstract class ControllerTestUtils {
   }
 
   /**
-   * Validate shared state before each test case class is run. Initialize shared state if {@link #_zookeeperInstance} or
-   * {@link #_helixResourceManager} are null (this will happen when test cases are running individually one at a time
-   * outside of the TestNG suite).
+   * Make sure shared state is setup and valid before each test case class is run.
    */
-  public static void validate() throws Exception {
+  public static void setupClusterAndValidate() throws Exception {
     if (_zookeeperInstance == null || _helixResourceManager == null) {
       // this is expected to happen only when running a single test case outside of testNG suite, i.e when test
-      // cases are run one at a time within IntelliJ or through maven command line.
+      // cases are run one at a time within IntelliJ or through maven command line. When running under a testNG
+      // suite, state will have already been setup by @BeforeSuite method in ControllerTestSetup.
       startSuiteRun();
     }
 

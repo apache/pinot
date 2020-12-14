@@ -54,7 +54,7 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
-public class TableRebalancerClusterOldTest extends ControllerTest {
+public class TableRebalancerClusterStatelessTest extends ControllerTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
   private static final int NUM_REPLICAS = 3;

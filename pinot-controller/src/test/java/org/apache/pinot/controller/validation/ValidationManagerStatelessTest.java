@@ -53,7 +53,7 @@ import static org.testng.Assert.assertEquals;
 /**
  * Tests for the ValidationManagers.
  */
-public class ValidationManagerOldTest extends ControllerTest {
+public class ValidationManagerStatelessTest extends ControllerTest {
   private static final String TEST_TABLE_NAME = "testTable";
   private static final String TEST_TABLE_TWO = "testTable2";
   private static final String TEST_SEGMENT_NAME = "testSegment";

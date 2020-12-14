@@ -28,16 +28,15 @@ import java.util.Map;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
+import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
-import org.aspectj.lang.annotation.After;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.controller.ControllerTestUtils.*;
 import static org.testng.Assert.*;
 
 
@@ -50,19 +49,19 @@ public class PinotInstanceRestletResourceTest {
 
   @BeforeClass
   public void setUp() throws Exception {
-    validate();
+    ControllerTestUtils.setupClusterAndValidate();
   }
 
   @Test
   public void testInstanceListingAndCreation() throws Exception {
     // Check that there is only one CONTROLLER instance in the cluster
-    String listInstancesUrl = getControllerRequestURLBuilder().forInstanceList();
+    String listInstancesUrl = ControllerTestUtils.getControllerRequestURLBuilder().forInstanceList();
 
     // Determine number of instances and controllers. count[0]: number of instances, count[1]: number of controllers;
     int[] counts = {0, 0};
     TestUtils.waitForCondition(aVoid -> {
       try {
-        String getResponse = sendGetRequest(listInstancesUrl);
+        String getResponse = ControllerTestUtils.sendGetRequest(listInstancesUrl);
         JsonNode jsonNode = JsonUtils.stringToJsonNode(getResponse);
 
         if (jsonNode != null && jsonNode.get("instances") != null && jsonNode.get("instances").size() > 0) {
@@ -82,12 +81,12 @@ public class PinotInstanceRestletResourceTest {
     }, GET_CALL_TIMEOUT_MS, "Expected one controller instance");
 
     // Create untagged broker and server instances
-    String createInstanceUrl = getControllerRequestURLBuilder().forInstanceCreate();
+    String createInstanceUrl = ControllerTestUtils.getControllerRequestURLBuilder().forInstanceCreate();
     Instance brokerInstance = new Instance("1.2.3.4", 1234, InstanceType.BROKER, null, null, 0);
-    sendPostRequest(createInstanceUrl, brokerInstance.toJsonString());
+    ControllerTestUtils.sendPostRequest(createInstanceUrl, brokerInstance.toJsonString());
 
     Instance serverInstance = new Instance("1.2.3.4", 2345, InstanceType.SERVER, null, null, 8090);
-    sendPostRequest(createInstanceUrl, serverInstance.toJsonString());
+    ControllerTestUtils.sendPostRequest(createInstanceUrl, serverInstance.toJsonString());
 
     // Check that we have added two more instances
     checkNumInstances(listInstancesUrl, counts[0] + 2);
@@ -95,7 +94,7 @@ public class PinotInstanceRestletResourceTest {
     // Create broker and server instances with tags and pools
     brokerInstance =
         new Instance("2.3.4.5", 1234, InstanceType.BROKER, Collections.singletonList("tag_BROKER"), null, 0);
-    sendPostRequest(createInstanceUrl, brokerInstance.toJsonString());
+    ControllerTestUtils.sendPostRequest(createInstanceUrl, brokerInstance.toJsonString());
 
     Map<String, Integer> serverPools = new TreeMap<>();
     serverPools.put("tag_OFFLINE", 0);
@@ -103,21 +102,21 @@ public class PinotInstanceRestletResourceTest {
     serverInstance =
         new Instance("2.3.4.5", 2345, InstanceType.SERVER, Arrays.asList("tag_OFFLINE", "tag_REALTIME"), serverPools,
             18090);
-    sendPostRequest(createInstanceUrl, serverInstance.toJsonString());
+    ControllerTestUtils.sendPostRequest(createInstanceUrl, serverInstance.toJsonString());
 
     // Check that we have added four instances so far
     checkNumInstances(listInstancesUrl, counts[0] + 4);
 
     // Create duplicate broker and server instances should fail
     try {
-      sendPostRequest(createInstanceUrl, brokerInstance.toJsonString());
+      ControllerTestUtils.sendPostRequest(createInstanceUrl, brokerInstance.toJsonString());
       fail("Duplicate broker instance creation did not fail");
     } catch (IOException e) {
       // Expected
     }
 
     try {
-      sendPostRequest(createInstanceUrl, serverInstance.toJsonString());
+      ControllerTestUtils.sendPostRequest(createInstanceUrl, serverInstance.toJsonString());
       fail("Duplicate server instance creation did not fail");
     } catch (IOException e) {
       // Expected
@@ -138,26 +137,26 @@ public class PinotInstanceRestletResourceTest {
     Instance newBrokerInstance =
         new Instance("1.2.3.4", 1234, InstanceType.BROKER, Collections.singletonList(newBrokerTag), null, 0);
     String brokerInstanceId = "Broker_1.2.3.4_1234";
-    String brokerInstanceUrl = getControllerRequestURLBuilder().forInstance(brokerInstanceId);
-    sendPutRequest(brokerInstanceUrl, newBrokerInstance.toJsonString());
+    String brokerInstanceUrl = ControllerTestUtils.getControllerRequestURLBuilder().forInstance(brokerInstanceId);
+    ControllerTestUtils.sendPutRequest(brokerInstanceUrl, newBrokerInstance.toJsonString());
 
     String newServerTag = "new-server-tag";
     Instance newServerInstance =
         new Instance("1.2.3.4", 2345, InstanceType.SERVER, Collections.singletonList(newServerTag), null, 28090);
     String serverInstanceId = "Server_1.2.3.4_2345";
-    String serverInstanceUrl = getControllerRequestURLBuilder().forInstance(serverInstanceId);
-    sendPutRequest(serverInstanceUrl, newServerInstance.toJsonString());
+    String serverInstanceUrl = ControllerTestUtils.getControllerRequestURLBuilder().forInstance(serverInstanceId);
+    ControllerTestUtils.sendPutRequest(serverInstanceUrl, newServerInstance.toJsonString());
 
     checkInstanceInfo(brokerInstanceId, "Broker_1.2.3.4", 1234, new String[]{newBrokerTag}, null, null);
     checkInstanceInfo(serverInstanceId, "Server_1.2.3.4", 2345, new String[]{newServerTag}, null, null, 28090);
 
     // Test Instance updateTags API
-    String brokerInstanceUpdateTagsUrl = getControllerRequestURLBuilder().forInstanceUpdateTags(brokerInstanceId,
+    String brokerInstanceUpdateTagsUrl = ControllerTestUtils.getControllerRequestURLBuilder().forInstanceUpdateTags(brokerInstanceId,
         Lists.newArrayList("tag_BROKER", "newTag_BROKER"));
-    sendPutRequest(brokerInstanceUpdateTagsUrl);
-    String serverInstanceUpdateTagsUrl = getControllerRequestURLBuilder().forInstanceUpdateTags(serverInstanceId,
+    ControllerTestUtils.sendPutRequest(brokerInstanceUpdateTagsUrl);
+    String serverInstanceUpdateTagsUrl = ControllerTestUtils.getControllerRequestURLBuilder().forInstanceUpdateTags(serverInstanceId,
         Lists.newArrayList("tag_REALTIME", "newTag_OFFLINE", "newTag_REALTIME"));
-    sendPutRequest(serverInstanceUpdateTagsUrl);
+    ControllerTestUtils.sendPutRequest(serverInstanceUpdateTagsUrl);
     checkInstanceInfo(brokerInstanceId, "Broker_1.2.3.4", 1234, new String[]{"tag_BROKER", "newTag_BROKER"}, null,
         null);
     checkInstanceInfo(serverInstanceId, "Server_1.2.3.4", 2345,
@@ -176,7 +175,7 @@ public class PinotInstanceRestletResourceTest {
       @Override
       public Boolean apply(@Nullable Void aVoid) {
         try {
-          String getResponse = sendGetRequest(getControllerRequestURLBuilder().forInstance(instanceName));
+          String getResponse = ControllerTestUtils.sendGetRequest(ControllerTestUtils.getControllerRequestURLBuilder().forInstance(instanceName));
           JsonNode instance = JsonUtils.stringToJsonNode(getResponse);
           boolean result =
               (instance.get("instanceName") != null) && (instance.get("instanceName").asText().equals(instanceName))
@@ -215,7 +214,7 @@ public class PinotInstanceRestletResourceTest {
   private void checkNumInstances(String listInstancesUrl, int numInstances) {
     TestUtils.waitForCondition(aVoid -> {
       try {
-        String getResponse = sendGetRequest(listInstancesUrl);
+        String getResponse = ControllerTestUtils.sendGetRequest(listInstancesUrl);
         JsonNode jsonNode = JsonUtils.stringToJsonNode(getResponse);
         return jsonNode != null && jsonNode.get("instances") != null
             && jsonNode.get("instances").size() == numInstances;
@@ -227,6 +226,6 @@ public class PinotInstanceRestletResourceTest {
 
   @AfterClass
   public void tearDown() {
-    cleanup();
+    ControllerTestUtils.cleanup();
   }
 }

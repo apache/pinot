@@ -21,8 +21,6 @@ package org.apache.pinot.controller;
 import org.testng.annotations.AfterSuite;
 import org.testng.annotations.BeforeSuite;
 
-import static org.apache.pinot.controller.ControllerTestUtils.*;
-
 
 /**
  * All test cases in {@link org.apache.pinot.controller} package are run as part the a TestNG suite (see testng.xml).
@@ -39,7 +37,7 @@ public class ControllerTestSetup {
    */
   @BeforeSuite
   public void suiteSetup() throws Exception {
-    startSuiteRun();
+    ControllerTestUtils.startSuiteRun();
   }
 
   /**
@@ -48,6 +46,6 @@ public class ControllerTestSetup {
    */
   @AfterSuite
   public void tearDownSuite() {
-    stopSuiteRun();
+    ControllerTestUtils.stopSuiteRun();
   }
 }

@@ -278,8 +278,8 @@
         <version>3.0.0-M5</version>
         <configuration combine.children="override">
           <suiteXmlFiles>
-            <suiteXmlFile>testng.xml</suiteXmlFile>
-            <suiteXmlFile>testng-old-tests.xml</suiteXmlFile>
+            <suiteXmlFile>testng-statefull.xml</suiteXmlFile>
+            <suiteXmlFile>testng-stateless.xml</suiteXmlFile>
           </suiteXmlFiles>
         </configuration>
       </plugin>

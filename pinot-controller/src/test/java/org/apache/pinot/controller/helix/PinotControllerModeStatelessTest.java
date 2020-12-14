@@ -44,7 +44,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class PinotControllerModeOldTest extends ControllerTest {
+public class PinotControllerModeStatelessTest extends ControllerTest {
   private static long TIMEOUT_IN_MS = 10_000L;
 
   @BeforeClass

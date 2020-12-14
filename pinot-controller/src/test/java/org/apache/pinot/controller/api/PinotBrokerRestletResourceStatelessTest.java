@@ -31,7 +31,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class PinotBrokerRestletResourceOldTest extends ControllerTest {
+public class PinotBrokerRestletResourceStatelessTest extends ControllerTest {
   private static final String TABLE_NAME_1 = "testTable1";
   private static final String TABLE_NAME_2 = "testTable2";
 

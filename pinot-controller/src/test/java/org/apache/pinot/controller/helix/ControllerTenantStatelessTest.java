@@ -30,7 +30,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class ControllerTenantOldTest extends ControllerTest {
+public class ControllerTenantStatelessTest extends ControllerTest {
   private static final String BROKER_TAG_PREFIX = "brokerTag_";
   private static final String SERVER_TAG_PREFIX = "serverTag_";
   private static final int NUM_INSTANCES = 10;

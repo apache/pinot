@@ -19,14 +19,12 @@
 package org.apache.pinot.controller.api;
 
 import java.io.IOException;
+import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
-import static org.apache.pinot.controller.ControllerTestUtils.*;
 
 
 public class AccessControlTest {
@@ -35,13 +33,14 @@ public class AccessControlTest {
 
   @BeforeClass
   public void setUp() throws Exception {
-    validate();
+    ControllerTestUtils.setupClusterAndValidate();
   }
 
   @Test
   public void testAccessDenied() {
     try {
-      sendGetRequest(getControllerRequestURLBuilder().forSegmentDownload(TABLE_NAME, "testSegment"));
+      ControllerTestUtils.sendGetRequest(
+          ControllerTestUtils.getControllerRequestURLBuilder().forSegmentDownload(TABLE_NAME, "testSegment"));
     } catch (IOException e) {
       Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 403"));
       return;

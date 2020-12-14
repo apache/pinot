@@ -20,16 +20,12 @@ package org.apache.pinot.controller.validation;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.IdealState;
-import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.utils.HLCSegmentName;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.config.TagNameUtils;
-import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -46,7 +42,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.controller.ControllerTestUtils.*;
 import static org.testng.Assert.*;
 
 
@@ -62,20 +57,20 @@ public class ValidationManagerTest {
 
   @BeforeClass
   public void setUp() throws Exception {
-    validate();
+    ControllerTestUtils.setupClusterAndValidate();
 
     _offlineTableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TEST_TABLE_NAME).setNumReplicas(2).build();
-    getHelixResourceManager().addTable(_offlineTableConfig);
+    ControllerTestUtils.getHelixResourceManager().addTable(_offlineTableConfig);
   }
 
   @Test
   public void testPushTimePersistence() {
     SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);
 
-    getHelixResourceManager().addNewSegment(TEST_TABLE_NAME, segmentMetadata, "downloadUrl");
+    ControllerTestUtils.getHelixResourceManager().addNewSegment(TEST_TABLE_NAME, segmentMetadata, "downloadUrl");
     OfflineSegmentZKMetadata offlineSegmentZKMetadata =
-        getHelixResourceManager().getOfflineSegmentZKMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);
+        ControllerTestUtils.getHelixResourceManager().getOfflineSegmentZKMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);
     long pushTime = offlineSegmentZKMetadata.getPushTime();
     // Check that the segment has been pushed in the last 30 seconds
     Assert.assertTrue(System.currentTimeMillis() - pushTime < 30_000);
@@ -86,15 +81,17 @@ public class ValidationManagerTest {
     // NOTE: In order to send the refresh message, the segment need to be in the ExternalView
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(TEST_TABLE_NAME);
     TestUtils.waitForCondition(aVoid -> {
-      ExternalView externalView = getHelixAdmin().getResourceExternalView(getHelixClusterName(), offlineTableName);
+      ExternalView externalView = ControllerTestUtils
+          .getHelixAdmin().getResourceExternalView(ControllerTestUtils.getHelixClusterName(), offlineTableName);
       return externalView != null && externalView.getPartitionSet().contains(TEST_SEGMENT_NAME);
     }, 30_000L, "Failed to find the segment in the ExternalView");
     Mockito.when(segmentMetadata.getCrc()).thenReturn(Long.toString(System.nanoTime()));
-    getHelixResourceManager().refreshSegment(offlineTableName, segmentMetadata, offlineSegmentZKMetadata, "downloadUrl",
+    ControllerTestUtils
+        .getHelixResourceManager().refreshSegment(offlineTableName, segmentMetadata, offlineSegmentZKMetadata, "downloadUrl",
         null);
 
     offlineSegmentZKMetadata =
-        getHelixResourceManager().getOfflineSegmentZKMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);
+        ControllerTestUtils.getHelixResourceManager().getOfflineSegmentZKMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);
     // Check that the segment still has the same push time
     assertEquals(offlineSegmentZKMetadata.getPushTime(), pushTime);
     // Check that the refresh time is in the last 30 seconds
@@ -173,6 +170,6 @@ public class ValidationManagerTest {
 
   @AfterClass
   public void tearDown() {
-    cleanup();
+    ControllerTestUtils.cleanup();
   }
 }
