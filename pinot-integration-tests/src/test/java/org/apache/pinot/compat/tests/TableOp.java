@@ -19,6 +19,15 @@
 package org.apache.pinot.compat.tests;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import java.io.File;
+import java.io.IOException;
+import org.apache.commons.io.FileUtils;
+import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
+import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -44,6 +53,8 @@ public class TableOp extends BaseOp {
   private String _schemaFileName;
   private Op _op;
   private String _tableConfigFileName;
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(TableOp.class);
 
   public TableOp() {
     super(OpType.TABLE_OP);
@@ -77,12 +88,10 @@ public class TableOp extends BaseOp {
   boolean runOp() {
     switch (_op) {
       case CREATE:
-        System.out.println("Creating table from table config " + _tableConfigFileName  + " and schema " +
-            _schemaFileName);
-        break;
+        createSchema();
+        return createTable();
       case DELETE:
-        System.out.println("Deleting table that has  table config " + _tableConfigFileName);
-        break;
+        return deleteTable();
       case UPDATE_CONFIG:
         System.out.println("Updating table config to " + _tableConfigFileName);
         break;
@@ -91,5 +100,41 @@ public class TableOp extends BaseOp {
         break;
     }
     return true;
+  }
+
+  private boolean createSchema() {
+    try {
+      ControllerTest.sendPostRequest(
+          ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL).forSchemaCreate(),
+          FileUtils.readFileToString(new File(_schemaFileName)));
+      return true;
+    } catch (IOException e) {
+      LOGGER.error("Failed to create schema with file: {}", _schemaFileName, e);
+      return false;
+    }
+  }
+
+  private boolean createTable() {
+    try {
+      ControllerTest.sendPostRequest(
+          ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL).forTableCreate(),
+          FileUtils.readFileToString(new File(_tableConfigFileName)));
+      return true;
+    } catch (IOException e) {
+      LOGGER.error("Failed to create table with file: {}", _tableConfigFileName, e);
+      return false;
+    }
+  }
+
+  private boolean deleteTable() {
+    try {
+      TableConfig tableConfig = JsonUtils.fileToObject(new File(_tableConfigFileName), TableConfig.class);
+      ControllerTest.sendDeleteRequest(
+          ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL).forTableDelete(tableConfig.getTableName()));
+      return true;
+    } catch (IOException e) {
+      LOGGER.error("Failed to delete table with file: {}", _tableConfigFileName, e);
+      return false;
+    }
   }
 }
