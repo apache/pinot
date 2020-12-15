@@ -142,8 +142,4 @@ public class PinotIngestionRestletResource {
     FileIngestionHelper fileIngestionHelper = new FileIngestionHelper(tableConfig, schema, batchConfig, _controllerConf);
     return fileIngestionHelper.buildSegmentAndPush(payload);
   }
-
-
-
-
 }
