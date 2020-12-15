@@ -48,10 +48,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 /**
@@ -109,15 +106,16 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     HOLD.set(true);
 
     // Should create the task queues and generate a task
-    assertTrue(_taskManager.scheduleTasks().containsKey(TestTaskGenerator.TASK_TYPE));
+    assertNotNull(_taskManager.scheduleTasks().get(TestTaskGenerator.TASK_TYPE));
     assertTrue(_helixTaskResourceManager.getTaskQueues()
         .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(TestTaskGenerator.TASK_TYPE)));
 
     // Should generate one more task
-    assertTrue(_taskManager.scheduleTasks().containsKey(TestTaskGenerator.TASK_TYPE));
+    assertNotNull(_taskManager.scheduleTask(TestTaskGenerator.TASK_TYPE));
 
     // Should not generate more tasks
-    assertFalse(_taskManager.scheduleTasks().containsKey(TestTaskGenerator.TASK_TYPE));
+    assertNull(_taskManager.scheduleTasks().get(TestTaskGenerator.TASK_TYPE));
+    assertNull(_taskManager.scheduleTask(TestTaskGenerator.TASK_TYPE));
 
     // Wait at most 60 seconds for all tasks IN_PROGRESS
     TestUtils.waitForCondition(input -> {
@@ -178,9 +176,8 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     _helixTaskResourceManager.deleteTaskQueue(TestTaskGenerator.TASK_TYPE, false);
 
     // Wait at most 60 seconds for task queue to be deleted
-    TestUtils.waitForCondition(input -> {
-      return !_helixTaskResourceManager.getTaskTypes().contains(TestTaskGenerator.TASK_TYPE);
-    }, STATE_TRANSITION_TIMEOUT_MS, "Failed to delete the task queue");
+    TestUtils.waitForCondition(input -> !_helixTaskResourceManager.getTaskTypes().contains(TestTaskGenerator.TASK_TYPE),
+        STATE_TRANSITION_TIMEOUT_MS, "Failed to delete the task queue");
   }
 
   @AfterClass

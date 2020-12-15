@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.common.minion;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.httpclient.HttpException;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpResponse;
@@ -30,8 +32,6 @@ import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -42,8 +42,6 @@ import org.slf4j.LoggerFactory;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class MinionClient {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(MinionClient.class);
   private static final CloseableHttpClient HTTP_CLIENT = HttpClientBuilder.create().build();
   private static final String ACCEPT = "accept";
   private static final String APPLICATION_JSON = "application/json";
@@ -67,9 +65,10 @@ public class MinionClient {
     return _controllerUrl;
   }
 
-  public Map<String, String> scheduleMinionTasks()
+  public Map<String, String> scheduleMinionTasks(@Nullable String taskType, @Nullable String tableNameWithType)
       throws IOException {
-    HttpPost httpPost = createHttpPostRequest(MinionRequestURLBuilder.baseUrl(getControllerUrl()).forTaskSchedule());
+    HttpPost httpPost = createHttpPostRequest(
+        MinionRequestURLBuilder.baseUrl(getControllerUrl()).forTaskSchedule(taskType, tableNameWithType));
     HttpResponse response = HTTP_CLIENT.execute(httpPost);
     int statusCode = response.getStatusLine().getStatusCode();
     final String responseString = IOUtils.toString(response.getEntity().getContent());
@@ -77,7 +76,8 @@ public class MinionClient {
       throw new HttpException(String
           .format("Unable to schedule minion tasks. Error code %d, Error message: %s", statusCode, responseString));
     }
-    return JsonUtils.stringToObject(responseString, Map.class);
+    return JsonUtils.stringToObject(responseString, new TypeReference<Map<String, String>>() {
+    });
   }
 
   public Map<String, String> getTasksStates(String taskType)
@@ -91,7 +91,8 @@ public class MinionClient {
       throw new HttpException(String
           .format("Unable to get tasks states map. Error code %d, Error message: %s", statusCode, responseString));
     }
-    return JsonUtils.stringToObject(responseString, Map.class);
+    return JsonUtils.stringToObject(responseString, new TypeReference<Map<String, String>>() {
+    });
   }
 
   public String getTaskState(String taskName)

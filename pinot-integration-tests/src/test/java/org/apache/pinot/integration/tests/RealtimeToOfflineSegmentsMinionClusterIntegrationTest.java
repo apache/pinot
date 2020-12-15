@@ -106,13 +106,11 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
     long offlineSegmentTime = _dateSmallestDays;
     for (int i = 0; i < 3; i++) {
       // Schedule task
-      Assert.assertTrue(
-          _taskManager.scheduleTasks().containsKey(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
+      Assert.assertNotNull(_taskManager.scheduleTasks().get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
       Assert.assertTrue(_helixTaskResourceManager.getTaskQueues().contains(
           PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE)));
       // Should not generate more tasks
-      Assert.assertFalse(
-          _taskManager.scheduleTasks().containsKey(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
+      Assert.assertNull(_taskManager.scheduleTasks().get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
 
       expectedWatermark = expectedWatermark + 86400000;
       // Wait at most 600 seconds for all tasks COMPLETED
