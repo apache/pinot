@@ -63,7 +63,7 @@
     <mrunit.version>1.1.0</mrunit.version>
     <slf4j-api.version>1.7.12</slf4j-api.version>
     <jodatime.version>2.7</jodatime.version>
-    <javassist.version>3.12.1.GA</javassist.version>
+    <javassist.version>3.27.0-GA</javassist.version>
     <guava.version>20.0</guava.version>
     <evalex.version>1.0</evalex.version>
     <parsii.version>1.5</parsii.version>
@@ -564,7 +564,7 @@
         <version>${swagger-annotation.version}</version>
       </dependency>
       <dependency>
-        <groupId>javassist</groupId>
+        <groupId>org.javassist</groupId>
         <artifactId>javassist</artifactId>
         <version>${javassist.version}</version>
       </dependency>
