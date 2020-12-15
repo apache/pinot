@@ -79,6 +79,7 @@
     "ember-radio-button": "^2.0.1",
     "ember-resolver": "^4.0.0",
     "ember-simple-auth": "^1.9.2",
+    "ember-sinon": "^5.0.0",
     "ember-source": "~2.18.0",
     "ember-symbol-observable": "^1.0.6",
     "ember-tether": "^1.0.0-beta.0",
