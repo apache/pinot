@@ -33,13 +33,14 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
-import org.apache.pinot.core.data.readers.MultiplePinotSegmentRecordReader;
+import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
+
 
 /**
  * Dimension Table is a special type of OFFLINE table which is assigned to all servers
@@ -55,15 +56,21 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
   // Storing singletons per table in a HashMap
   private static final Map<String, DimensionTableDataManager> _instances = new ConcurrentHashMap<>();
 
-  private DimensionTableDataManager() {}
-
-  public static DimensionTableDataManager createInstanceByTableName(String tableName) {
-    _instances.putIfAbsent(tableName, new DimensionTableDataManager());
-    return _instances.get(tableName);
+  private DimensionTableDataManager() {
   }
 
-  public static DimensionTableDataManager getInstanceByTableName(String tableName) {
-    return _instances.get(tableName);
+  /*
+   * `createInstanceByTableName` should only be used by the `TableDataManagerProvider` and the returned instance
+   * should be properly initialized via `TableDataManager::init` method before using.
+   */
+  public static DimensionTableDataManager createInstanceByTableName(String tableNameWithType) {
+    DimensionTableDataManager instance = new DimensionTableDataManager();
+    _instances.put(tableNameWithType, instance);
+    return instance;
+  }
+
+  public static DimensionTableDataManager getInstanceByTableName(String tableNameWithType) {
+    return _instances.get(tableNameWithType);
   }
 
   /*
@@ -97,10 +104,9 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     super.addSegment(indexDir, indexLoadingConfig);
     try {
       loadLookupTable();
-      _logger.info("Successfully loaded lookup table for {}", getTableName());
+      _logger.info("Successfully loaded lookup table: {}", getTableName());
     } catch (Exception e) {
-      throw new RuntimeException(
-          String.format("Error loading lookup table: %s", getTableName()),e);
+      throw new RuntimeException(String.format("Error loading lookup table: %s", getTableName()), e);
     }
   }
 
@@ -109,36 +115,33 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     super.removeSegment(segmentName);
     try {
       loadLookupTable();
-      _logger.info("Successfully removed segment and reloaded lookup table for {}", getTableName());
+      _logger.info("Successfully removed segment and reloaded lookup table: {}", getTableName());
     } catch (Exception e) {
-      _logger.error("Error reloading lookup table after segment remove for table {}", getTableName());
+      throw new RuntimeException(
+          String.format("Error reloading lookup table after segment remove for table: {}", getTableName()), e);
     }
   }
 
   /*
    * `loadLookupTable()` reads contents of the DimensionTable into _lookupTable HashMap for fast lookup.
    */
-  private void loadLookupTable() throws Exception {
+  private void loadLookupTable()
+      throws Exception {
     _lookupTableWriteLock.lock();
     try {
+      _lookupTable.clear();
       List<SegmentDataManager> segmentManagers = acquireAllSegments();
       if (segmentManagers.size() == 0) {
-        _lookupTable.clear();
         return;
       }
 
-      List<File> indexDirs = new ArrayList<>();
-      for (SegmentDataManager segmentManager: segmentManagers) {
+      for (SegmentDataManager segmentManager : segmentManagers) {
         IndexSegment indexSegment = segmentManager.getSegment();
-        System.out.println(indexSegment.getSegmentName());
-        indexDirs.add(indexSegment.getSegmentMetadata().getIndexDir());
-      }
-      MultiplePinotSegmentRecordReader reader = new MultiplePinotSegmentRecordReader(indexDirs);
-
-      _lookupTable.clear();
-      while (reader.hasNext()) {
-        GenericRow row = reader.next();
-        _lookupTable.put(row.getPrimaryKey(_primaryKeyColumns), row);
+        PinotSegmentRecordReader reader = new PinotSegmentRecordReader(indexSegment.getSegmentMetadata().getIndexDir());
+        while (reader.hasNext()) {
+          GenericRow row = reader.next();
+          _lookupTable.put(row.getPrimaryKey(_primaryKeyColumns), row);
+        }
       }
     } finally {
       _lookupTableWriteLock.unlock();

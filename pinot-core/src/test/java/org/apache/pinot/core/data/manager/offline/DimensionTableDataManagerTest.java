@@ -42,8 +42,8 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.testng.Assert;
-import org.testng.annotations.AfterSuite;
-import org.testng.annotations.BeforeSuite;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.*;
@@ -57,7 +57,7 @@ public class DimensionTableDataManagerTest {
   private File _indexDir;
   private IndexLoadingConfig _indexLoadingConfig;
 
-  @BeforeSuite
+  @BeforeClass
   public void setUp()
       throws Exception {
     // prepare segment data
@@ -79,7 +79,7 @@ public class DimensionTableDataManagerTest {
     _indexLoadingConfig.setSegmentVersion(SegmentVersion.v3);
   }
 
-  @AfterSuite
+  @AfterClass
   public void tearDown() {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
