@@ -51,6 +51,8 @@ import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.annotations.VisibleForTesting;
+
 
 public class SegmentGenerationJobRunner implements IngestionJobRunner {
 
@@ -172,7 +174,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
       CountDownLatch segmentCreationTaskCountDownLatch = new CountDownLatch(numInputFiles);
       //iterate on the file list, for each
       for (int i = 0; i < numInputFiles; i++) {
-        final URI inputFileURI = getFileURI(filteredFiles.get(i), inputDirURI.getScheme());
+        final URI inputFileURI = getFileURI(filteredFiles.get(i), inputDirURI);
 
         //copy input path to local
         File localInputDataFile = new File(localInputTempDir, new File(inputFileURI.getPath()).getName());
@@ -244,11 +246,13 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
     return uri;
   }
 
-  private URI getFileURI(String uriStr, String fallbackScheme)
+  @VisibleForTesting
+  protected static URI getFileURI(String uriStr, URI fullUriForPathOnlyUriStr)
       throws URISyntaxException {
     URI fileURI = URI.create(uriStr);
     if (fileURI.getScheme() == null) {
-      return new URI(fallbackScheme, fileURI.getSchemeSpecificPart(), fileURI.getFragment());
+      return new URI(fullUriForPathOnlyUriStr.getScheme(), fullUriForPathOnlyUriStr.getAuthority(),
+              fileURI.getPath(), fileURI.getQuery(), fileURI.getFragment());
     }
     return fileURI;
   }
