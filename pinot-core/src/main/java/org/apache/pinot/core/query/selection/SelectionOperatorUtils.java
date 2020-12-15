@@ -179,7 +179,7 @@ public class SelectionOperatorUtils {
     int numColumns = selectionColumns.size();
     Map<String, DataSchema.ColumnDataType> columnNameToDataType = new HashMap<>();
     DataSchema.ColumnDataType[] finalColumnDataTypes = new DataSchema.ColumnDataType[numColumns];
-    for (int i = 0; i < numColumns; i++) {
+    for (int i = 0; i < dataSchema.size(); i++) {
       columnNameToDataType.put(dataSchema.getColumnName(i), dataSchema.getColumnDataType(i));
     }
     for (int i = 0; i < numColumns; i++) {
