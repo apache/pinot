@@ -85,7 +85,8 @@ public class DimensionTableDataManagerTest {
   }
 
   private ZkHelixPropertyStore mockPropertyStore() {
-    String baseballTeamsSchemaStr = "{\"schemaName\":\"dimBaseballTeams\",\"dimensionFieldSpecs\":[{\"name\":\"teamID\",\"dataType\":\"STRING\"},{\"name\":\"teamName\",\"dataType\":\"STRING\"}],\"primaryKeyColumns\":[\"teamID\"]}";
+    String baseballTeamsSchemaStr =
+        "{\"schemaName\":\"dimBaseballTeams\",\"dimensionFieldSpecs\":[{\"name\":\"teamID\",\"dataType\":\"STRING\"},{\"name\":\"teamName\",\"dataType\":\"STRING\"}],\"primaryKeyColumns\":[\"teamID\"]}";
     ZNRecord zkSchemaRec = new ZNRecord("dimBaseballTeams");
     zkSchemaRec.setSimpleField("schemaJSON", baseballTeamsSchemaStr);
 
@@ -104,16 +105,16 @@ public class DimensionTableDataManagerTest {
       when(config.getTableName()).thenReturn(TABLE_NAME);
       when(config.getDataDir()).thenReturn(INDEX_DIR.getAbsolutePath());
     }
-    tableDataManager
-        .init(config, "dummyInstance", mockPropertyStore(), new ServerMetrics(new MetricsRegistry()), mock(
-            HelixManager.class));
+    tableDataManager.init(config, "dummyInstance", mockPropertyStore(), new ServerMetrics(new MetricsRegistry()),
+        mock(HelixManager.class));
     tableDataManager.start();
 
-   return tableDataManager;
+    return tableDataManager;
   }
 
   @Test
-  public void instantiationTests() throws Exception {
+  public void instantiationTests()
+      throws Exception {
     DimensionTableDataManager mgr = makeTestableManager();
     Assert.assertEquals(mgr.getTableName(), TABLE_NAME);
 
@@ -122,13 +123,23 @@ public class DimensionTableDataManagerTest {
     Assert.assertNotNull(returnedManager, "Manager should find instance");
     Assert.assertEquals(mgr, returnedManager, "Manager should return already created instance");
 
+    // assert that segments are released after loading data
+    mgr.addSegment(_indexDir, _indexLoadingConfig);
+    for (SegmentDataManager segmentManager : returnedManager.acquireAllSegments()) {
+      Assert.assertEquals(segmentManager.getReferenceCount() - 1, // Subtract this acquisition
+          1, // Default ref count
+          "Reference counts should be same before and after segment loading.");
+      returnedManager.releaseSegment(segmentManager);
+    }
+
     // try fetching non-existent table
     returnedManager = DimensionTableDataManager.getInstanceByTableName("doesNotExist");
     Assert.assertNull(returnedManager, "Manager should return null for non-existent table");
   }
 
   @Test
-  public void lookupTests() throws Exception {
+  public void lookupTests()
+      throws Exception {
     DimensionTableDataManager mgr = makeTestableManager();
 
     // try fetching data BEFORE loading segment
@@ -145,7 +156,8 @@ public class DimensionTableDataManagerTest {
     // Confirm we can get FieldSpec for loaded tables columns.
     FieldSpec spec = mgr.getColumnFieldSpec("teamName");
     Assert.assertNotNull(spec, "Should return spec for existing column");
-    Assert.assertEquals(spec.getDataType(), FieldSpec.DataType.STRING, "Should return correct data type for teamName column");
+    Assert.assertEquals(spec.getDataType(), FieldSpec.DataType.STRING,
+        "Should return correct data type for teamName column");
 
     // Remove the segment
     List<SegmentDataManager> segmentManagers = mgr.acquireAllSegments();

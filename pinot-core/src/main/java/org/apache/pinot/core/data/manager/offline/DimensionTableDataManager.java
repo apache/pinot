@@ -142,6 +142,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
             _lookupTable.put(row.getPrimaryKey(_primaryKeyColumns), row);
           }
         }
+        releaseSegment(segmentManager);
       }
     } finally {
       _lookupTableWriteLock.unlock();
