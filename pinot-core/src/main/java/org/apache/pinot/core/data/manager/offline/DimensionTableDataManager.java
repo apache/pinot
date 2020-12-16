@@ -63,9 +63,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
    * instance should be properly initialized via {@link #init} method before using.
    */
   public static DimensionTableDataManager createInstanceByTableName(String tableNameWithType) {
-    DimensionTableDataManager instance = new DimensionTableDataManager();
-    _instances.put(tableNameWithType, instance);
-    return instance;
+    return _instances.computeIfAbsent(tableNameWithType, k -> new DimensionTableDataManager());
   }
 
   public static DimensionTableDataManager getInstanceByTableName(String tableNameWithType) {
