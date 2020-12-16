@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.controller.helix;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -288,5 +291,19 @@ public class ControllerRequestURLBuilder {
       url += "&type=" + instancePartitionsType;
     }
     return url;
+  }
+
+  public String forIngestFromFile(String tableNameWithType, String batchConfigMapStr)
+      throws UnsupportedEncodingException {
+    return String.format("%s?tableName=%s&batchConfigMapStr=%s", StringUtil.join("/", _baseUrl, "ingestFromFile"),
+        tableNameWithType, URLEncoder.encode(batchConfigMapStr, StandardCharsets.UTF_8.toString()));
+  }
+
+  public String forIngestFromURI(String tableNameWithType, String batchConfigMapStr, String sourceURIStr)
+      throws UnsupportedEncodingException {
+    return String.format("%s?tableName=%s&batchConfigMapStr=%s&sourceURIStr=%s",
+        StringUtil.join("/", _baseUrl, "ingestFromURI"), tableNameWithType,
+        URLEncoder.encode(batchConfigMapStr, StandardCharsets.UTF_8.toString()),
+        URLEncoder.encode(sourceURIStr, StandardCharsets.UTF_8.toString()));
   }
 }

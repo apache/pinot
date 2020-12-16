@@ -100,6 +100,13 @@ public final class IngestionConfigUtils {
     return segmentIngestionFrequency;
   }
 
+  /**
+   * Fetch the properties which belong to record reader, by removing the identifier prefix
+   */
+  public static Map<String, String> getRecordReaderProps(Map<String, String> batchConfigMap) {
+    return getConfigMapWithPrefix(batchConfigMap, BatchConfigProperties.RECORD_READER_PROP_PREFIX + DOT_SEPARATOR);
+  }
+
   public static PinotConfiguration getFsProps(Map<String, String> batchConfigMap) {
     return new PinotConfiguration(getPropsWithPrefix(batchConfigMap, BatchConfigProperties.INPUT_FS_PROP_PREFIX + DOT_SEPARATOR));
   }

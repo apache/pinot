@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -120,9 +121,9 @@ public final class FileIngestionUtils {
     if (readerConfigClassName != null) {
       Map<String, String> configs = batchConfig.getRecordReaderProps();
       if (configs == null) {
-        configs = new HashMap<>();
+        configs = Collections.emptyMap();
       }
-      JsonNode jsonNode = new ObjectMapper().valueToTree(configs);
+      JsonNode jsonNode = new ObjectMapper().valueToTree(IngestionConfigUtils.getRecordReaderProps(configs));
       Class<?> clazz = PluginManager.get().loadClass(readerConfigClassName);
       RecordReaderConfig recordReaderConfig = (RecordReaderConfig) JsonUtils.jsonNodeToObject(jsonNode, clazz);
       segmentGeneratorConfig.setReaderConfig(recordReaderConfig);
