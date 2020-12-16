@@ -130,6 +130,7 @@ public class DimensionTableDataManagerTest {
           1, // Default ref count
           "Reference counts should be same before and after segment loading.");
       returnedManager.releaseSegment(segmentManager);
+      returnedManager.removeSegment(segmentManager.getSegmentName());
     }
 
     // try fetching non-existent table
