@@ -623,8 +623,10 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         JsonNode testQueryResponse = postQuery(testQuery);
         // Should not throw exception during reload
         assertEquals(testQueryResponse.get("exceptions").size(), 0);
-        // Total docs should not change during reload
-        assertEquals(testQueryResponse.get("totalDocs").asLong(), numTotalDocs);
+        // Total docs should eventually match
+        if (testQueryResponse.get("totalDocs").asLong() != numTotalDocs) {
+          return false;
+        }
         return testQueryResponse.get("aggregationResults").get(0).get("value").asLong() == countStarResult;
       } catch (Exception e) {
         throw new RuntimeException(e);

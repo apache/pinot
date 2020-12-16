@@ -132,6 +132,7 @@ public class BrokerReduceService {
     long offlineThreadCpuTimeNs = 0L;
     long realtimeThreadCpuTimeNs = 0L;
     boolean numGroupsLimitReached = false;
+    String invalidColumnNames = null;
 
     // Cache a data schema from data tables (try to cache one with data rows associated with it).
     DataSchema cachedDataSchema = null;
@@ -208,6 +209,11 @@ public class BrokerReduceService {
       }
       numGroupsLimitReached |= Boolean.parseBoolean(metadata.get(MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName()));
 
+      String invalidColumnNamesString = metadata.get(DataTable.INVALID_COLUMN_IN_QUERY_KEY);
+      if (invalidColumnNamesString != null) {
+        invalidColumnNames = invalidColumnNames == null ? invalidColumnNamesString : invalidColumnNames;
+      }
+
       // After processing the metadata, remove data tables without data rows inside.
       DataSchema dataSchema = dataTable.getDataSchema();
       if (dataSchema == null) {
@@ -256,6 +262,10 @@ public class BrokerReduceService {
       if (numConsumingSegmentsProcessed > 0 && minConsumingFreshnessTimeMs > 0) {
         brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.FRESHNESS_LAG_MS,
             System.currentTimeMillis() - minConsumingFreshnessTimeMs, TimeUnit.MILLISECONDS);
+      }
+
+      if (invalidColumnNames != null) {
+        brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.INVALID_COLUMN_NAME_IN_QUERY, 1L);
       }
     }
 

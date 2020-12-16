@@ -113,6 +113,11 @@ public interface InstanceDataManager {
   List<SegmentMetadata> getAllSegmentsMetadata(String tableNameWithType);
 
   /**
+   * Returns the set of column names given the table name.
+   */
+  Set<String> getColumnNamesByTable(String tableNameWithType);
+
+  /**
    * Returns the directory for un-tarred segment data.
    */
   String getSegmentDataDirectory();

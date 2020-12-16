@@ -23,6 +23,7 @@ import io.grpc.stub.StreamObserver;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -260,6 +261,18 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       ExecutorService executorService, @Nullable StreamObserver<Server.ServerResponse> responseObserver, long endTimeMs,
       boolean enableStreaming)
       throws Exception {
+
+    // Validate whether column names in the query are valid
+    Set<String> columnNamesFromSchema = _instanceDataManager.getColumnNamesByTable(queryContext.getTableName());
+    Set<String> columnNamesFromQuery = queryContext.getColumns();
+    if (!columnNamesFromSchema.isEmpty() && !columnNamesFromSchema.containsAll(columnNamesFromQuery)) {
+      columnNamesFromQuery.removeAll(columnNamesFromSchema);
+      DataTable dataTable = enableStreaming ? new DataTableImplV2() : DataTableUtils.buildEmptyDataTable(queryContext);
+      setDefaultValuesForEmptyDataTable(dataTable, 0L);
+      dataTable.getMetadata().put(DataTable.INVALID_COLUMN_IN_QUERY_KEY, columnNamesFromQuery.toString());
+      return dataTable;
+    }
+
     handleSubquery(queryContext, indexSegments, timerContext, executorService, endTimeMs);
 
     // Compute total docs for the table before pruning the segments
@@ -275,15 +288,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     LOGGER.debug("Matched {} segments after pruning", numSelectedSegments);
     if (numSelectedSegments == 0) {
       // Only return metadata for streaming query
-      DataTable dataTable =
-          enableStreaming ? DataTableBuilder.getEmptyDataTable() : DataTableUtils.buildEmptyDataTable(queryContext);
-      Map<String, String> metadata = dataTable.getMetadata();
-      metadata.put(MetadataKey.TOTAL_DOCS.getName(), String.valueOf(numTotalDocs));
-      metadata.put(MetadataKey.NUM_DOCS_SCANNED.getName(), "0");
-      metadata.put(MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER.getName(), "0");
-      metadata.put(MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER.getName(), "0");
-      metadata.put(MetadataKey.NUM_SEGMENTS_PROCESSED.getName(), "0");
-      metadata.put(MetadataKey.NUM_SEGMENTS_MATCHED.getName(), "0");
+      DataTable dataTable = enableStreaming ? DataTableBuilder.getEmptyDataTable() : DataTableUtils.buildEmptyDataTable(queryContext);
+      setDefaultValuesForEmptyDataTable(dataTable, numTotalDocs);
       return dataTable;
     } else {
       TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
@@ -301,6 +307,16 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
       return dataTable;
     }
+  }
+
+  private void setDefaultValuesForEmptyDataTable(DataTable dataTable, long numTotalDocs) {
+    Map<String, String> metadata = dataTable.getMetadata();
+    metadata.put(MetadataKey.TOTAL_DOCS.getName(), String.valueOf(numTotalDocs));
+    metadata.put(MetadataKey.NUM_DOCS_SCANNED.getName(), "0");
+    metadata.put(MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER.getName(), "0");
+    metadata.put(MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER.getName(), "0");
+    metadata.put(MetadataKey.NUM_SEGMENTS_PROCESSED.getName(), "0");
+    metadata.put(MetadataKey.NUM_SEGMENTS_MATCHED.getName(), "0");
   }
 
   /**
