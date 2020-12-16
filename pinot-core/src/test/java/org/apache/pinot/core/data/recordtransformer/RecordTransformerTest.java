@@ -74,7 +74,7 @@ public class RecordTransformerTest {
   }
 
   @Test
-  public void testFilterTransformer() {
+  public void testFilterTransformer() throws Exception {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
 
     // expression false, not filtered
@@ -120,7 +120,7 @@ public class RecordTransformerTest {
   }
 
   @Test
-  public void testDataTypeTransformer() {
+  public void testDataTypeTransformer() throws Exception {
     RecordTransformer transformer = new DataTypeTransformer(SCHEMA);
     GenericRow record = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {
@@ -143,7 +143,7 @@ public class RecordTransformerTest {
   }
 
   @Test
-  public void testSanitationTransformer() {
+  public void testSanitationTransformer() throws Exception {
     RecordTransformer transformer = new SanitizationTransformer(SCHEMA);
     GenericRow record = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {
@@ -157,7 +157,7 @@ public class RecordTransformerTest {
   }
 
   @Test
-  public void testNullValueTransformer() {
+  public void testNullValueTransformer() throws Exception {
     RecordTransformer transformer = new NullValueTransformer(SCHEMA);
     GenericRow record = new GenericRow();
     for (int i = 0; i < NUM_ROUNDS; i++) {
@@ -199,7 +199,7 @@ public class RecordTransformerTest {
   }
 
   @Test
-  public void testDefaultTransformer() {
+  public void testDefaultTransformer() throws Exception {
     RecordTransformer transformer = CompositeTransformer.getDefaultTransformer(TABLE_CONFIG, SCHEMA);
     GenericRow record = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {
@@ -243,7 +243,7 @@ public class RecordTransformerTest {
   }
 
   @Test
-  public void testPassThroughTransformer() {
+  public void testPassThroughTransformer() throws Exception {
     RecordTransformer transformer = CompositeTransformer.getPassThroughTransformer();
     GenericRow record = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {

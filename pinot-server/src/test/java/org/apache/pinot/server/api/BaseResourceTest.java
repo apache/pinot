@@ -33,9 +33,11 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.data.manager.OfflineSegmentFetcherAndLoader;
 import org.apache.pinot.core.data.manager.TableDataManager;
 import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
 import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
+import org.apache.pinot.core.data.manager.offline.SegmentCacheManager;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
@@ -147,7 +149,8 @@ public abstract class BaseResourceTest {
     when(tableDataManagerConfig.getDataDir()).thenReturn(INDEX_DIR.getAbsolutePath());
     // NOTE: Use OfflineTableDataManager for both OFFLINE and REALTIME table because RealtimeTableDataManager requires
     //       table config.
-    TableDataManager tableDataManager = new OfflineTableDataManager();
+    TableDataManager tableDataManager =
+        new OfflineTableDataManager(mock(OfflineSegmentFetcherAndLoader.class), mock(SegmentCacheManager.class));
     tableDataManager
         .init(tableDataManagerConfig, "testInstance", mock(ZkHelixPropertyStore.class), mock(ServerMetrics.class),
             mock(HelixManager.class));

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.manager.offline;
+package org.apache.pinot.core.data.manager.realtime;
 
 import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;

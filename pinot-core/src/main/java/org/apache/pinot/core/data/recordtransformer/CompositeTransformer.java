@@ -77,7 +77,7 @@ public class CompositeTransformer implements RecordTransformer {
 
   @Nullable
   @Override
-  public GenericRow transform(GenericRow record) {
+  public GenericRow transform(GenericRow record) throws Exception {
     for (RecordTransformer transformer : _transformers) {
       record = transformer.transform(record);
       if (record == null) {

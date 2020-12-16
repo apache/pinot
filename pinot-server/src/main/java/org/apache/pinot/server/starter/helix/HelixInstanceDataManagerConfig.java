@@ -19,7 +19,6 @@
 package org.apache.pinot.server.starter.helix;
 
 import java.util.Optional;
-
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.utils.CommonConstants.Server;
@@ -60,6 +59,20 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public static final String SEGMENT_FORMAT_VERSION = "segment.format.version";
   // Key of whether to enable reloading consuming segments
   public static final String INSTANCE_RELOAD_CONSUMING_SEGMENT = "reload.consumingSegment";
+
+  // Whether or not to lazy load segments
+  public static final String LAZY_LOAD_SEGMENTS = "lazyLoadSegments";
+  // When lazy loading segments, to watch disc space, you may want to automatically clear the segments dir when
+  // a server boots back up. That way you don't accidentally use more disc space than maxSegmentDiscUsageMb
+  public static final String PURGE_ON_START = "purgeOnStart";
+  // Only when lazy loading
+  public static final String MAX_SEGMENT_DISC_USAGE_MB = "maxSegmentDiscUsageMb";
+  public static final int DEFAULT_MAX_SEGMENT_DISC_USAGE_MB = 1000;
+  // Causes the server to lazily pull segments from the controller.
+  public static final boolean DEFAULT_LAZY_LOAD_SEGMENTS = false;
+  // Purging the segment directory on start is a dangerous operation, so it should be explicitly enabled
+  public static final boolean DEFAULT_PURGE_ON_START = false;
+
 
   // Key of how many parallel realtime segments can be built.
   // A value of <= 0 indicates unlimited.
@@ -157,6 +170,21 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   }
 
   @Override
+  public boolean shouldLazyLoadSegments() {
+    return _instanceDataManagerConfiguration.getProperty(LAZY_LOAD_SEGMENTS, DEFAULT_LAZY_LOAD_SEGMENTS);
+  }
+
+  @Override
+  public boolean shouldPurgeOnStart() {
+    return _instanceDataManagerConfiguration.getProperty(PURGE_ON_START, DEFAULT_PURGE_ON_START);
+  }
+
+  @Override
+  public int maxSegmentDiscUsageMb() {
+    return _instanceDataManagerConfiguration.getProperty(MAX_SEGMENT_DISC_USAGE_MB, DEFAULT_MAX_SEGMENT_DISC_USAGE_MB);
+  }
+
+  @Override
   public boolean isEnableSplitCommit() {
     return _instanceDataManagerConfiguration.getProperty(ENABLE_SPLIT_COMMIT, false);
   }
@@ -193,6 +221,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public int getMaxParallelSegmentBuilds() {
     return _instanceDataManagerConfiguration.getProperty(MAX_PARALLEL_SEGMENT_BUILDS, 0);
   }
+
 
   @Override
   public String toString() {

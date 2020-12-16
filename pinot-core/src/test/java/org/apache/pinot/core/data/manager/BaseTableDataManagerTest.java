@@ -34,8 +34,9 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
-import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
+import org.apache.pinot.core.data.manager.offline.SegmentCacheManager;
+import org.apache.pinot.core.data.manager.realtime.ImmutableSegmentDataManager;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.testng.Assert;
@@ -101,7 +102,8 @@ public class BaseTableDataManagerTest {
 
   private TableDataManager makeTestableManager()
       throws Exception {
-    TableDataManager tableDataManager = new OfflineTableDataManager();
+    TableDataManager tableDataManager =
+        new OfflineTableDataManager(mock(OfflineSegmentFetcherAndLoader.class), mock(SegmentCacheManager.class));
     TableDataManagerConfig config;
     {
       config = mock(TableDataManagerConfig.class);

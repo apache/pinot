@@ -41,6 +41,12 @@ public interface InstanceDataManagerConfig {
 
   String getAvgMultiValueCount();
 
+  boolean shouldLazyLoadSegments();
+
+  boolean shouldPurgeOnStart();
+
+  int maxSegmentDiscUsageMb();
+
   boolean isEnableSplitCommit();
 
   boolean isEnableSplitCommitEndWithMetadata();

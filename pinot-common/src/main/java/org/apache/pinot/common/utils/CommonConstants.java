@@ -152,6 +152,9 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT = "pinot.broker.query.response.limit";
     public static final int DEFAULT_BROKER_QUERY_RESPONSE_LIMIT = Integer.MAX_VALUE;
+    // Limit the number of segments allowed to be accessed in a single query. -1 will disable this check
+    public static final String CONFIG_OF_QUERY_SEGMENT_LIMIT = "pinot.broker.query.segment.limit";
+    public static final int DEFAULT_CONFIG_OF_QUERY_SEGMENT_LIMIT = -1;
     public static final String CONFIG_OF_BROKER_QUERY_LOG_LENGTH = "pinot.broker.query.log.length";
     public static final int DEFAULT_BROKER_QUERY_LOG_LENGTH = Integer.MAX_VALUE;
     public static final String CONFIG_OF_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND =

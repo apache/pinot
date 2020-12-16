@@ -18,13 +18,10 @@
  */
 package org.apache.pinot.core.data.manager;
 
-import java.io.File;
 import java.util.List;
 import java.util.Set;
-
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
@@ -48,6 +45,8 @@ public interface InstanceDataManager {
   void init(PinotConfiguration config, HelixManager helixManager, ServerMetrics serverMetrics)
       throws ConfigurationException;
 
+  void setFetcherAndLoader(OfflineSegmentFetcherAndLoader segmentFetcherAndLoader);
+
   /**
    * Starts the data manager.
    * <p>Should be called only once after data manager gets initialized but before calling any other method.
@@ -63,7 +62,7 @@ public interface InstanceDataManager {
   /**
    * Adds a segment from local disk into an OFFLINE table.
    */
-  void addOfflineSegment(String offlineTableName, String segmentName, File indexDir)
+  void addOrReplaceOfflineSegment(String offlineTableName, String segmentName)
       throws Exception;
 
   /**
@@ -109,8 +108,14 @@ public interface InstanceDataManager {
   SegmentMetadata getSegmentMetadata(String tableNameWithType, String segmentName);
 
   /**
-   * Returns the metadata for all segments in the given table.
+   * Returns the segment data manager for the given table, or <code>null</code> if it does not exist.
    */
+  @Nullable
+  public SegmentDataManager getSegmentDataManager(String tableNameWithType, String segmentName);
+
+    /**
+     * Returns the metadata for all segments in the given table.
+     */
   List<SegmentMetadata> getAllSegmentsMetadata(String tableNameWithType);
 
   /**
@@ -122,6 +127,8 @@ public interface InstanceDataManager {
    * Returns the directory for tarred segment files.
    */
   String getSegmentFileDirectory();
+
+  int maxSegmentDiscUsageMb();
 
   /**
    * Returns the maximum number of segments allowed to refresh in parallel.

@@ -123,6 +123,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private final int _defaultHllLog2m;
   private final boolean _enableQueryLimitOverride;
   private final boolean _enableDistinctCountBitmapOverride;
+  private final int _querySegmentLimit;
 
   public BaseBrokerRequestHandler(PinotConfiguration config, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
@@ -144,6 +145,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _brokerTimeoutMs = config.getProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, Broker.DEFAULT_BROKER_TIMEOUT_MS);
     _queryResponseLimit =
         config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT, Broker.DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
+    _querySegmentLimit =
+        config.getProperty(Broker.CONFIG_OF_QUERY_SEGMENT_LIMIT, Broker.DEFAULT_CONFIG_OF_QUERY_SEGMENT_LIMIT);
     _queryLogLength =
         config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_LOG_LENGTH, Broker.DEFAULT_BROKER_QUERY_LOG_LENGTH);
     _queryLogRateLimiter = RateLimiter.create(config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND,
@@ -399,6 +402,16 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return new BrokerResponseNative(QueryException.getException(QueryException.BROKER_TIMEOUT_ERROR, errorMessage));
     }
 
+    // Validate the request
+    try {
+      validateNumSegments(offlineRoutingTable, realtimeRoutingTable, _querySegmentLimit);
+    } catch (Exception e) {
+      LOGGER.info("Caught exception while validating request {}: {}, {}", requestId, query, e.getMessage());
+      requestStatistics.setErrorCode(QueryException.QUERY_VALIDATION_ERROR_CODE);
+      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1);
+      return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e));
+    }
+
     // Execute the query
     ServerStats serverStats = new ServerStats();
     BrokerResponse brokerResponse =
@@ -454,6 +467,19 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       _numDroppedLog.incrementAndGet();
     }
     return brokerResponse;
+  }
+
+  private void validateNumSegments(Map<ServerInstance, List<String>> offlineRoutingTable,
+      Map<ServerInstance, List<String>> realtimeRoutingTable, int querySegmentLimit) {
+    if (_querySegmentLimit > 0) {
+      int numOffline = offlineRoutingTable == null ? 0 : offlineRoutingTable.values().stream().mapToInt(List::size).sum();
+      int numRealtime =
+          realtimeRoutingTable == null ? 0 : realtimeRoutingTable.values().stream().mapToInt(List::size).sum();
+      int numSegments = numOffline + numRealtime;
+      if (numSegments > querySegmentLimit) {
+        throw new IllegalStateException(String.format("Query exceeds segment limit of %d", querySegmentLimit));
+      }
+    }
   }
 
   /**

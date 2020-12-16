@@ -62,6 +62,15 @@ public abstract class SegmentDataManager {
     }
   }
 
+  /**
+   * Indicates whether this segment is downloaded to local disc
+   *
+   * @return Whether the segment is present on the local disc
+   */
+  public boolean hasLocalData() {
+    return true;
+  }
+
   public abstract String getSegmentName();
 
   public abstract IndexSegment getSegment();

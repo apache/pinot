@@ -58,6 +58,7 @@ import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.data.manager.OfflineSegmentFetcherAndLoader;
 import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.server.api.access.AccessControlFactory;
@@ -311,14 +312,6 @@ public class HelixServerStarter implements ServiceStartable {
         .init(_serverConf.subset(SegmentCompletionProtocol.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
     ServerConf serverInstanceConfig = DefaultHelixStarterServerConfig.getDefaultHelixServerConfig(_serverConf);
     _serverInstance = new ServerInstance(serverInstanceConfig, _helixManager);
-    ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
-    InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
-    SegmentFetcherAndLoader fetcherAndLoader =
-        new SegmentFetcherAndLoader(_serverConf, instanceDataManager, serverMetrics);
-    StateModelFactory<?> stateModelFactory =
-        new SegmentOnlineOfflineStateModelFactory(_instanceId, instanceDataManager, fetcherAndLoader);
-    _helixManager.getStateMachineEngine()
-        .registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelName(), stateModelFactory);
     // Start the server instance as a pre-connect callback so that it starts after connecting to the ZK in order to
     // access the property store, but before receiving state transitions
     _helixManager.addPreConnectCallback(_serverInstance::start);
@@ -327,6 +320,18 @@ public class HelixServerStarter implements ServiceStartable {
     _helixManager.connect();
     _helixAdmin = _helixManager.getClusterManagmentTool();
     updateInstanceConfigIfNeeded(_host, _port);
+
+    LOGGER.info("Setting up fetcher and loader");
+    ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
+    InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
+    OfflineSegmentFetcherAndLoader fetcherAndLoader =
+        new OfflineSegmentFetcherAndLoader(_serverConf, instanceDataManager, serverMetrics,
+            _helixManager.getHelixPropertyStore());
+    _serverInstance.setFetcherAndLoader(fetcherAndLoader);
+    StateModelFactory<?> stateModelFactory =
+        new SegmentOnlineOfflineStateModelFactory(_instanceId, instanceDataManager, fetcherAndLoader);
+    _helixManager.getStateMachineEngine()
+        .registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelName(), stateModelFactory);
 
     // Start restlet server for admin API endpoint
     String accessControlFactoryClass =

@@ -34,7 +34,9 @@ import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.data.manager.OfflineSegmentFetcherAndLoader;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
+import org.apache.pinot.core.data.manager.SegmentLocks;
 import org.apache.pinot.core.data.manager.TableDataManager;
 import org.apache.pinot.core.data.manager.realtime.LLRealtimeSegmentDataManager;
 import org.apache.pinot.spi.config.table.TableType;
@@ -52,10 +54,10 @@ import org.slf4j.LoggerFactory;
 public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<StateModel> {
   private final String _instanceId;
   private final InstanceDataManager _instanceDataManager;
-  private final SegmentFetcherAndLoader _fetcherAndLoader;
+  private final OfflineSegmentFetcherAndLoader _fetcherAndLoader;
 
   public SegmentOnlineOfflineStateModelFactory(String instanceId, InstanceDataManager instanceDataManager,
-      SegmentFetcherAndLoader fetcherAndLoader) {
+      OfflineSegmentFetcherAndLoader fetcherAndLoader) {
     _instanceId = instanceId;
     _instanceDataManager = instanceDataManager;
     _fetcherAndLoader = fetcherAndLoader;
@@ -159,7 +161,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         TableType tableType = TableNameBuilder.getTableTypeFromTableName(message.getResourceName());
         Preconditions.checkNotNull(tableType);
         if (tableType == TableType.OFFLINE) {
-          _fetcherAndLoader.addOrReplaceOfflineSegment(tableNameWithType, segmentName);
+          _instanceDataManager.addOrReplaceOfflineSegment(tableNameWithType, segmentName);
         } else {
           _instanceDataManager.addRealtimeSegment(tableNameWithType, segmentName);
         }

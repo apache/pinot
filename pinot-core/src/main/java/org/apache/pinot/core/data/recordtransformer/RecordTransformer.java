@@ -34,5 +34,5 @@ public interface RecordTransformer {
    * @return Transformed record, or {@code null} if the record does not follow certain rules.
    */
   @Nullable
-  GenericRow transform(GenericRow record);
+  GenericRow transform(GenericRow record) throws Exception;
 }
