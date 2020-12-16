@@ -22,6 +22,7 @@ package org.apache.pinot.plugin.ingestion.batch.common;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 import java.net.URI;
+import java.net.URISyntaxException;
 
 public class SegmentGenerationUtilsTest {
 
@@ -37,4 +38,19 @@ public class SegmentGenerationUtilsTest {
     Assert.assertEquals(SegmentGenerationUtils.getFileName(URI.create("hdfs://var/data/myTable/2020/04/06/input.data")),
         "input.data");
   }
+  
+  // Confirm output path generation works with URIs that have authority/userInfo.
+  
+  @Test
+  public void testRelativeURIs() throws URISyntaxException {
+    URI inputDirURI = new URI("hdfs://namenode1:9999/path/to/");
+    URI inputFileURI = new URI("hdfs://namenode1:9999/path/to/subdir/file");
+    URI outputDirURI = new URI("hdfs://namenode2/output/dir/");
+    URI segmentTarFileName = new URI("file.tar.gz");
+    URI outputSegmentTarURI = SegmentGenerationUtils
+        .getRelativeOutputPath(inputDirURI, inputFileURI, outputDirURI).resolve(segmentTarFileName);
+    Assert.assertEquals(outputSegmentTarURI.toString(),
+        "hdfs://namenode2/output/dir/subdir/file.tar.gz");
+  }
+  
 }
