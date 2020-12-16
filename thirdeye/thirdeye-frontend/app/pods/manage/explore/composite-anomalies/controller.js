@@ -1,13 +1,11 @@
-import Controller from "@ember/controller";
-import { get, set } from "@ember/object";
-import { task } from "ember-concurrency";
+import Controller from '@ember/controller';
+import { get, set, getProperties } from '@ember/object';
+import { task } from 'ember-concurrency';
 
-import { getAnomaliesByAlertId } from "thirdeye-frontend/utils/anomaly";
-import {
-  getDatePickerSpec
-} from "thirdeye-frontend/utils/date-picker-utils";
+import { getAnomaliesByAlertId } from 'thirdeye-frontend/utils/anomaly';
+import { getDatePickerSpec } from 'thirdeye-frontend/utils/date-picker-utils';
 
-import moment from "moment";
+import moment from 'moment';
 
 export default Controller.extend({
   /** Internal States */
@@ -34,6 +32,13 @@ export default Controller.extend({
    * @type {Number}
    */
   endDate: undefined,
+  /**
+   * Tracks whether the anomalies are explored on root level
+   *
+   * @private
+   * @type {Boolean}
+   */
+  rootLevel: true,
 
   /** Helper functions */
 
@@ -43,22 +48,8 @@ export default Controller.extend({
    * @private
    */
   initializeDates() {
-    set(
-      this,
-      "startDate",
-      moment()
-        .subtract(this.timeWindowSize, "milliseconds")
-        .startOf("day")
-        .valueOf()
-    );
-    set(
-      this,
-      "endDate",
-      moment()
-        .add(1, "day")
-        .startOf("day")
-        .valueOf()
-    );
+    set(this, 'startDate', moment().subtract(this.timeWindowSize, 'milliseconds').startOf('day').valueOf());
+    set(this, 'endDate', moment().add(1, 'day').startOf('day').valueOf());
   },
 
   /**
@@ -71,7 +62,7 @@ export default Controller.extend({
   initializeDatePicker() {
     const { startDate, endDate } = this;
 
-    set(this, "datePicker", getDatePickerSpec(startDate, endDate));
+    set(this, 'datePicker', getDatePickerSpec(startDate, endDate));
   },
 
   /**
@@ -79,17 +70,12 @@ export default Controller.extend({
    *
    * @private
    */
-  fetchAnomaliesTask: task(function*() {
+  fetchAnomaliesTask: task(function* () {
     try {
-      const { alertId } = get(this, "model");
+      const { alertId } = get(this, 'model');
       const { startDate, endDate } = this;
-      const applicationAnomalies = yield getAnomaliesByAlertId(
-        alertId,
-        startDate,
-        endDate
-      );
 
-      return applicationAnomalies;
+      this.set('anomalies', yield getAnomaliesByAlertId(alertId, startDate, endDate));
     } catch (reason) {
       /* eslint-disable no-console */
       console.error(reason);
@@ -106,9 +92,10 @@ export default Controller.extend({
    * @public
    */
   activate() {
-    let { timeWindowSize } = get(this, "model");
+    const { timeWindowSize } = getProperties(this.model, 'timeWindowSize');
+
     if (timeWindowSize) {
-      set(this, "timeWindowSize", timeWindowSize);
+      set(this, 'timeWindowSize', timeWindowSize);
     }
 
     this.initializeDates();
@@ -129,13 +116,24 @@ export default Controller.extend({
      *   The new end date for the anomalies exploration
      */
     onRangeSelection(start, end) {
-      set(this, "startDate", moment(start).valueOf());
-      set(this, "endDate", moment(end).valueOf());
+      set(this, 'startDate', moment(start).valueOf());
+      set(this, 'endDate', moment(end).valueOf());
 
-      set(this, "datePicker.RANGE_START", start);
-      set(this, "datePicker.RANGE_END", end);
+      set(this, 'datePicker.RANGE_START', start);
+      set(this, 'datePicker.RANGE_END', end);
 
       this.fetchAnomaliesTask.perform();
+    },
+
+    /**
+     * Function to set date picker state variable depending on breadcrumb state
+     * We disable the ability to select dates if user is not on root level
+     *
+     * @param {Boolean} isRoot
+     *   Tracks if we are working on root level of the tree
+     */
+    onBreadcrumbClick(isRoot = false) {
+      this.set('rootLevel', isRoot);
     }
   }
 });

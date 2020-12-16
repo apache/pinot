@@ -256,6 +256,11 @@ body {
       display: flex;
       align-items: center;
     }
+
+    &--disabled {
+      opacity: 0.5;
+      pointer-events: none;
+    }
   }
 
   &__date-picker-label {
@@ -390,6 +395,11 @@ body {
 
   &__middle {
     background: white;
+    padding-bottom: 25px;
+  }
+
+  &__bottom {
+    padding-top: 25px;
   }
 }
 

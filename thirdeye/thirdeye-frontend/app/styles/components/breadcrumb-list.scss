@@ -1,0 +1,19 @@
+.breadcrumb {
+  &__bar {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  &__title,
+  &__separator {
+    display: inline;
+    padding-left: 10px;
+    font-size: 14px;
+    font-weight: 400;
+  }
+
+  &__title:last-of-type {
+    font-weight: 700;
+  }
+}
