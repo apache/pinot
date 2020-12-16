@@ -47,7 +47,7 @@ export default Component.extend({
   title: 'Composite Anomalies', // Default Header if no title is passed in.
   noRecords: 'No Composite Anomalies found',
   tableData: computed('data', function () {
-    let computedTableData = [];
+    const computedTableData = [];
 
     if (this.data && this.data.length > 0) {
       this.data.map((d) => {
@@ -108,10 +108,10 @@ export default Component.extend({
     const selectedFeedback = feedback
       ? anomalyUtil.anomalyResponseObj.find((f) => f.value === feedback)
       : anomalyUtil.anomalyResponseObj[0];
-    const feedbackObject = {
+
+    return {
       options: anomalyUtil.anomalyResponseObj.mapBy('name'),
       selected: selectedFeedback ? selectedFeedback.name : anomalyUtil.anomalyResponseObj[0].name
     };
-    return feedbackObject;
   }
 });
