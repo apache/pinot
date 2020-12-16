@@ -1,4 +1,4 @@
-.parent-anomalies-table {
+.composite-anomalies-table {
     width: 100%;
     border: 1px solid #ccc;
     tr {
@@ -7,7 +7,7 @@
     td, th {
         padding: 10px 10px 10px 20px;
 
-        p {
+        .details, .duration {
             margin: 0;
         } 
     }
