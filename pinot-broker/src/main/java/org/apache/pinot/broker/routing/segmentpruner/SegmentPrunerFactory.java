@@ -28,6 +28,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.slf4j.Logger;
@@ -57,8 +58,15 @@ public class SegmentPrunerFactory {
               segmentPruners.add(partitionSegmentPruner);
             }
           }
+
+          if (RoutingConfig.TIME_SEGMENT_PRUNER_TYPE.equalsIgnoreCase(segmentPrunerType)) {
+            TimeSegmentPruner timeSegmentPruner = getTimeSegmentPruner(tableConfig, propertyStore);
+            if (timeSegmentPruner != null) {
+              segmentPruners.add(timeSegmentPruner);
+            }
+          }
         }
-        return segmentPruners;
+        return sortSegmentPruners(segmentPruners);
       } else {
         // Handle legacy configs for backward-compatibility
         TableType tableType = tableConfig.getTableType();
@@ -96,5 +104,45 @@ public class SegmentPrunerFactory {
           tableNameWithType);
       return new PartitionSegmentPruner(tableNameWithType, partitionColumn, propertyStore);
     }
+  }
+
+  @Nullable
+  private static TimeSegmentPruner getTimeSegmentPruner(TableConfig tableConfig,
+      ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    String tableNameWithType = tableConfig.getTableName();
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+    if (validationConfig == null) {
+      LOGGER.warn("Cannot enable time range pruning without validation config for table: {}",
+          tableNameWithType);
+      return null;
+    }
+    String timeColumn = validationConfig.getTimeColumnName();
+    if (timeColumn == null) {
+      LOGGER.warn("Cannot enable time range pruning without time column for table: {}",
+          tableNameWithType);
+      return null;
+    }
+
+    LOGGER.info("Using TimeRangePruner on time column: {} for table: {}", timeColumn,
+        tableNameWithType);
+    return new TimeSegmentPruner(tableConfig, propertyStore);
+  }
+
+  private static List<SegmentPruner> sortSegmentPruners(List<SegmentPruner> pruners) {
+    // If there's multiple pruners, move time range pruners to the front。
+    // Partition pruner run time is proportional to input # of segments while time range pruner is not,
+    // Prune based on time range first will have a smaller input size for partition pruners, so have better performance.
+    List<SegmentPruner> sortedPruners = new ArrayList<>();
+    for (SegmentPruner pruner : pruners) {
+      if (pruner instanceof TimeSegmentPruner) {
+        sortedPruners.add(pruner);
+      }
+    }
+    for (SegmentPruner pruner: pruners) {
+      if (!(pruner instanceof TimeSegmentPruner)) {
+        sortedPruners.add(pruner);
+      }
+    }
+    return sortedPruners;
   }
 }

@@ -114,7 +114,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
 
     startController(properties);
-    
+
     startBroker();
     startServers(2);
 

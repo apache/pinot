@@ -570,14 +570,14 @@ public class RoutingManager implements ClusterChangeHandler {
     }
 
     InstanceSelector.SelectionResult calculateRouting(BrokerRequest brokerRequest) {
-      List<String> selectedSegments = _segmentSelector.select(brokerRequest);
+      Set<String> selectedSegments = _segmentSelector.select(brokerRequest);
       if (!selectedSegments.isEmpty()) {
         for (SegmentPruner segmentPruner : _segmentPruners) {
           selectedSegments = segmentPruner.prune(brokerRequest, selectedSegments);
         }
       }
       if (!selectedSegments.isEmpty()) {
-        return _instanceSelector.select(brokerRequest, selectedSegments);
+        return _instanceSelector.select(brokerRequest, new ArrayList<>(selectedSegments));
       } else {
         return new InstanceSelector.SelectionResult(Collections.emptyMap(), Collections.emptyList());
       }

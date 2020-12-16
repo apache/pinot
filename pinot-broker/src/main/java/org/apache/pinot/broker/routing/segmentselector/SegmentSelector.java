@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.broker.routing.segmentselector;
 
-import java.util.List;
 import java.util.Set;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
@@ -60,5 +59,5 @@ public interface SegmentSelector {
    * Selects the segments queried by the given broker request. The segments selected should cover the whole dataset
    * (table) without overlap.
    */
-  List<String> select(BrokerRequest brokerRequest);
+  Set<String> select(BrokerRequest brokerRequest);
 }

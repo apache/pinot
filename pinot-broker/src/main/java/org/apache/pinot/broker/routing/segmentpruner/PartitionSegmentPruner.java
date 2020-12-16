@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.routing.segmentpruner;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -68,7 +69,7 @@ public class PartitionSegmentPruner implements SegmentPruner {
   public void init(ExternalView externalView, IdealState idealState, Set<String> onlineSegments) {
     // Bulk load partition info for all online segments
     int numSegments = onlineSegments.size();
-    List<String> segments = new ArrayList<>(onlineSegments);
+    List<String> segments = new ArrayList<>(numSegments);
     List<String> segmentZKMetadataPaths = new ArrayList<>(numSegments);
     for (String segment : onlineSegments) {
       segments.add(segment);
@@ -148,12 +149,12 @@ public class PartitionSegmentPruner implements SegmentPruner {
   }
 
   @Override
-  public List<String> prune(BrokerRequest brokerRequest, List<String> segments) {
+  public Set<String> prune(BrokerRequest brokerRequest, Set<String> segments) {
     FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
     if (filterQueryTree == null) {
       return segments;
     }
-    List<String> selectedSegments = new ArrayList<>();
+    Set<String> selectedSegments = new HashSet<>();
     for (String segment : segments) {
       PartitionInfo partitionInfo = _partitionInfoMap.get(segment);
       if (partitionInfo == null || partitionInfo == INVALID_PARTITION_INFO || isPartitionMatch(filterQueryTree,

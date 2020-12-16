@@ -21,6 +21,7 @@ package org.apache.pinot.broker.routing.segmentselector;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -52,8 +53,8 @@ public class RealtimeSegmentSelector implements SegmentSelector {
   public static final String FORCE_HLC = "FORCE_HLC";
 
   private final AtomicLong _requestId = new AtomicLong();
-  private volatile List<List<String>> _hlcSegments;
-  private volatile List<String> _llcSegments;
+  private volatile List<Set<String>> _hlcSegments;
+  private volatile Set<String> _llcSegments;
 
   @Override
   public void init(ExternalView externalView, IdealState idealState, Set<String> onlineSegments) {
@@ -64,7 +65,7 @@ public class RealtimeSegmentSelector implements SegmentSelector {
   public void onExternalViewChange(ExternalView externalView, IdealState idealState, Set<String> onlineSegments) {
     // Group HLC segments by their group id
     // NOTE: Use TreeMap so that group ids are sorted and the result is deterministic
-    Map<String, List<String>> groupIdToHLCSegmentsMap = new TreeMap<>();
+    Map<String, Set<String>> groupIdToHLCSegmentsMap = new TreeMap<>();
 
     List<String> completedLLCSegments = new ArrayList<>();
     // Store the first CONSUMING segment for each partition
@@ -89,7 +90,7 @@ public class RealtimeSegmentSelector implements SegmentSelector {
       Map<String, String> instanceStateMap = entry.getValue();
       if (SegmentName.isHighLevelConsumerSegmentName(segment)) {
         HLCSegmentName hlcSegmentName = new HLCSegmentName(segment);
-        groupIdToHLCSegmentsMap.computeIfAbsent(hlcSegmentName.getGroupId(), k -> new ArrayList<>()).add(segment);
+        groupIdToHLCSegmentsMap.computeIfAbsent(hlcSegmentName.getGroupId(), k -> new HashSet<>()).add(segment);
       } else {
         if (instanceStateMap.containsValue(SegmentStateModel.CONSUMING)) {
           // Keep the first CONSUMING segment for each partition
@@ -113,9 +114,9 @@ public class RealtimeSegmentSelector implements SegmentSelector {
 
     int numHLCGroups = groupIdToHLCSegmentsMap.size();
     if (numHLCGroups != 0) {
-      List<List<String>> hlcSegments = new ArrayList<>(numHLCGroups);
-      for (List<String> hlcSegmentsForGroup : groupIdToHLCSegmentsMap.values()) {
-        hlcSegments.add(Collections.unmodifiableList(hlcSegmentsForGroup));
+      List<Set<String>> hlcSegments = new ArrayList<>(numHLCGroups);
+      for (Set<String> hlcSegmentsForGroup : groupIdToHLCSegmentsMap.values()) {
+        hlcSegments.add(Collections.unmodifiableSet(hlcSegmentsForGroup));
       }
       _hlcSegments = hlcSegments;
     } else {
@@ -123,22 +124,22 @@ public class RealtimeSegmentSelector implements SegmentSelector {
     }
 
     if (!completedLLCSegments.isEmpty() || !partitionIdToFirstConsumingLLCSegmentMap.isEmpty()) {
-      List<String> llcSegments =
-          new ArrayList<>(completedLLCSegments.size() + partitionIdToFirstConsumingLLCSegmentMap.size());
+      Set<String> llcSegments =
+          new HashSet<>(completedLLCSegments.size() + partitionIdToFirstConsumingLLCSegmentMap.size());
       llcSegments.addAll(completedLLCSegments);
       for (LLCSegmentName llcSegmentName : partitionIdToFirstConsumingLLCSegmentMap.values()) {
         llcSegments.add(llcSegmentName.getSegmentName());
       }
-      _llcSegments = Collections.unmodifiableList(llcSegments);
+      _llcSegments = Collections.unmodifiableSet(llcSegments);
     } else {
       _llcSegments = null;
     }
   }
 
   @Override
-  public List<String> select(BrokerRequest brokerRequest) {
+  public Set<String> select(BrokerRequest brokerRequest) {
     if (_hlcSegments == null && _llcSegments == null) {
-      return Collections.emptyList();
+      return Collections.emptySet();
     }
     if (_hlcSegments == null) {
       return selectLLCSegments();
@@ -158,12 +159,12 @@ public class RealtimeSegmentSelector implements SegmentSelector {
     return selectLLCSegments();
   }
 
-  private List<String> selectHLCSegments() {
-    List<List<String>> hlcSegments = _hlcSegments;
+  private Set<String> selectHLCSegments() {
+    List<Set<String>> hlcSegments = _hlcSegments;
     return hlcSegments.get((int) (_requestId.getAndIncrement() % hlcSegments.size()));
   }
 
-  private List<String> selectLLCSegments() {
+  private Set<String> selectLLCSegments() {
     return _llcSegments;
   }
 }
