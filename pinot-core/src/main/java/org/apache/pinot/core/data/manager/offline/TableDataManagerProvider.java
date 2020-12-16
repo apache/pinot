@@ -56,9 +56,9 @@ public class TableDataManagerProvider {
         if (tableDataManagerConfig.isDimTable()) {
           tableDataManager =
               DimensionTableDataManager.createInstanceByTableName(tableDataManagerConfig.getTableName());
-          break;
+        } else {
+          tableDataManager = new OfflineTableDataManager();
         }
-        tableDataManager = new OfflineTableDataManager();
         break;
       case REALTIME:
         tableDataManager = new RealtimeTableDataManager(_segmentBuildSemaphore);

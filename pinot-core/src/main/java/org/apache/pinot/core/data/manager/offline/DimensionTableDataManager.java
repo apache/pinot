@@ -20,7 +20,6 @@ package org.apache.pinot.core.data.manager.offline;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,7 +48,7 @@ import org.apache.pinot.spi.data.readers.PrimaryKey;
  * enough to easily fit in memory.
  *
  * DimensionTableDataManager uses Registry of Singletons pattern to store one instance per table
- * which can be accessed via `getInstanceByTableName` static method.
+ * which can be accessed via {@link #getInstanceByTableName} static method.
  */
 @ThreadSafe
 public class DimensionTableDataManager extends OfflineTableDataManager {
@@ -59,9 +58,9 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
   private DimensionTableDataManager() {
   }
 
-  /*
-   * `createInstanceByTableName` should only be used by the `TableDataManagerProvider` and the returned instance
-   * should be properly initialized via `TableDataManager::init` method before using.
+  /**
+   * `createInstanceByTableName` should only be used by the {@link TableDataManagerProvider} and the returned
+   * instance should be properly initialized via {@link #init} method before using.
    */
   public static DimensionTableDataManager createInstanceByTableName(String tableNameWithType) {
     DimensionTableDataManager instance = new DimensionTableDataManager();
@@ -73,10 +72,9 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     return _instances.get(tableNameWithType);
   }
 
-  /*
-   * DimensionTableDataManager Instance Properties/Methods
+  /**
+   * Instance properties/methods
    */
-
   private final ReadWriteLock _rwl = new ReentrantReadWriteLock();
   private final Lock _lookupTableReadLock = _rwl.readLock();
   private final Lock _lookupTableWriteLock = _rwl.writeLock();
@@ -122,7 +120,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     }
   }
 
-  /*
+  /**
    * `loadLookupTable()` reads contents of the DimensionTable into _lookupTable HashMap for fast lookup.
    */
   private void loadLookupTable()
