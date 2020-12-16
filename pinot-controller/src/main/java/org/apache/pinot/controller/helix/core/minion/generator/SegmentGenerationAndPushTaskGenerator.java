@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.minion.generator;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
@@ -52,9 +53,40 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * SegmentGenerationAndPushTaskGenerator generates task configs for SegmentGenerationAndPush minion tasks.
+ *
+ * This generator consumes configs from org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig:
+ *   inputDirURI - Required, the location of input data directory
+ *   inputFormat - Required, the input file format, e.g. JSON/Avro/Parquet/CSV/...
+ *   input.fs.className - Optional, the class name of filesystem to read input data. Default to be inferred from inputDirURI if not specified.
+ *   input.fs.prop.<keys> - Optional, defines the configs to initialize input filesystem.
+ *
+ *   outputDirURI - Optional, the location of output segments. Use local temp dir with push mode TAR, If not specified.
+ *   output.fs.className - Optional, the class name of filesystem to write output segments. Default to be inferred from outputDirURI if not specified.
+ *   output.fs.prop.<keys> - Optional, the configs to initialize output filesystem.
+ *   overwriteOutput - Optional, delete the output segment directory if set to true.
+ *
+ *   recordReader.className - Optional, the class name of RecordReader. Default to be inferred from inputFormat if not specified.
+ *   recordReader.configClassName - Optional, the class name of RecordReaderConfig. Default to be inferred from inputFormat if not specified.
+ *   recordReader.prop.<keys> - Optional, the configs used to initialize RecordReaderConfig.
+ *
+ *   schema - Optional, Pinot schema in Json string.
+ *   schemaURI - Optional, the URI to query for Pinot schema.
+ *
+ *   segmentNameGenerator.type - Optional, the segment name generator to create segment name.
+ *   segmentNameGenerator.configs.<keys> - Optional, configs of segment name generator.
+ *
+ *   push.mode - Optional, push job type: TAR/URI/METADATA, default to METADATA
+ *   push.controllerUri - Optional, controller uri to send push request to, default to the controller vip uri.
+ *   push.segmentUriPrefix - Optional, segment download uri prefix, used when push.mode=uri.
+ *   push.segmentUriSuffix - Optional, segment download uri suffix, used when push.mode=uri.
+ *
+ */
 public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGenerationAndPushTaskGenerator.class);
 
+  private static final BatchConfigProperties.SegmentPushType DEFAULT_SEGMENT_PUSH_TYPE = BatchConfigProperties.SegmentPushType.TAR;
   private final ClusterInfoAccessor _clusterInfoAccessor;
 
   public SegmentGenerationAndPushTaskGenerator(ClusterInfoAccessor clusterInfoAccessor) {
@@ -82,7 +114,9 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
       Preconditions.checkNotNull(tableTaskConfig);
       Map<String, String> taskConfigs =
           tableTaskConfig.getConfigsForTaskType(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE);
-      Preconditions.checkNotNull(taskConfigs, "Task config shouldn't be null for Table: {}", offlineTableName);
+      if (tableConfigs == null) {
+        LOGGER.warn("Skip null task config for table: {}", offlineTableName);
+      }
 
       // Get max number of tasks for this table
       int tableMaxNumTasks;
@@ -90,7 +124,7 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
       if (tableMaxNumTasksConfig != null) {
         try {
           tableMaxNumTasks = Integer.parseInt(tableMaxNumTasksConfig);
-        } catch (Exception e) {
+        } catch (NumberFormatException e) {
           tableMaxNumTasks = Integer.MAX_VALUE;
         }
       } else {
@@ -110,8 +144,6 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
       for (Map<String, String> batchConfigMap : batchConfigMaps) {
         try {
           URI inputDirURI = getDirectoryUri(batchConfigMap.get(BatchConfigProperties.INPUT_DIR_URI));
-          URI outputDirURI = getDirectoryUri(batchConfigMap.get(BatchConfigProperties.OUTPUT_DIR_URI));
-
           updateRecordReaderConfigs(batchConfigMap);
           List<OfflineSegmentZKMetadata> offlineSegmentsMetadata = Collections.emptyList();
           // For append mode, we don't create segments for input file URIs already created.
@@ -121,21 +153,9 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
           List<URI> inputFileURIs = getInputFilesFromDirectory(batchConfigMap, inputDirURI,
               getExistingSegmentInputFiles(offlineSegmentsMetadata));
 
-          String pushMode = IngestionConfigUtils.getPushMode(batchConfigMap);
           for (URI inputFileURI : inputFileURIs) {
-            Map<String, String> singleFileGenerationTaskConfig = new HashMap<>(batchConfigMap);
-            singleFileGenerationTaskConfig.put(BatchConfigProperties.INPUT_FILE_URI, inputFileURI.toString());
-            URI outputSegmentDirURI = getRelativeOutputPath(inputDirURI, inputFileURI, outputDirURI);
-            singleFileGenerationTaskConfig.put(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI, outputSegmentDirURI.toString());
-            singleFileGenerationTaskConfig
-                .put(BatchConfigProperties.SCHEMA, JsonUtils.objectToString(_clusterInfoAccessor.getTableSchema(offlineTableName)));
-            singleFileGenerationTaskConfig
-                .put(BatchConfigProperties.TABLE_CONFIGS, JsonUtils.objectToString(_clusterInfoAccessor.getTableConfig(offlineTableName)));
-            singleFileGenerationTaskConfig.put(BatchConfigProperties.SEQUENCE_ID, String.valueOf(tableNumTasks));
-            singleFileGenerationTaskConfig.put(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE, BatchConfigProperties.SegmentNameGeneratorType.SIMPLE);
-            singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE, pushMode);
-            singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_CONTROLLER_URI, _clusterInfoAccessor.getVipUrl());
-            // Only submit raw data files with timestamp larger than checkpoint
+            Map<String, String> singleFileGenerationTaskConfig =
+                getSingleFileGenerationTaskConfig(offlineTableName, tableNumTasks, batchConfigMap, inputFileURI);
             pinotTaskConfigs.add(new PinotTaskConfig(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
                 singleFileGenerationTaskConfig));
             tableNumTasks++;
@@ -152,6 +172,38 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
       }
     }
     return pinotTaskConfigs;
+  }
+
+  private Map<String, String> getSingleFileGenerationTaskConfig(String offlineTableName, int sequenceID,
+      Map<String, String> batchConfigMap, URI inputFileURI)
+      throws JsonProcessingException, URISyntaxException {
+
+    URI inputDirURI = getDirectoryUri(batchConfigMap.get(BatchConfigProperties.INPUT_DIR_URI));
+    URI outputDirURI = null;
+    if (batchConfigMap.containsKey(BatchConfigProperties.OUTPUT_DIR_URI)) {
+     outputDirURI = getDirectoryUri(batchConfigMap.get(BatchConfigProperties.OUTPUT_DIR_URI));
+    }
+    String pushMode = IngestionConfigUtils.getPushMode(batchConfigMap);
+
+    Map<String, String> singleFileGenerationTaskConfig = new HashMap<>(batchConfigMap);
+    singleFileGenerationTaskConfig.put(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, inputFileURI.toString());
+    if (outputDirURI != null) {
+      URI outputSegmentDirURI = getRelativeOutputPath(inputDirURI, inputFileURI, outputDirURI);
+      singleFileGenerationTaskConfig.put(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI, outputSegmentDirURI.toString());
+    }
+    singleFileGenerationTaskConfig
+        .put(BatchConfigProperties.SCHEMA, JsonUtils.objectToString(_clusterInfoAccessor.getTableSchema(offlineTableName)));
+    singleFileGenerationTaskConfig
+        .put(BatchConfigProperties.TABLE_CONFIGS, JsonUtils.objectToString(_clusterInfoAccessor.getTableConfig(offlineTableName)));
+    singleFileGenerationTaskConfig.put(BatchConfigProperties.SEQUENCE_ID, String.valueOf(sequenceID));
+    singleFileGenerationTaskConfig.put(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE, BatchConfigProperties.SegmentNameGeneratorType.SIMPLE);
+    if ((outputDirURI == null) || (pushMode == null)) {
+      singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE, DEFAULT_SEGMENT_PUSH_TYPE.toString());
+    } else {
+      singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE, pushMode);
+    }
+    singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_CONTROLLER_URI, _clusterInfoAccessor.getVipUrl());
+    return singleFileGenerationTaskConfig;
   }
 
   private void updateRecordReaderConfigs(Map<String, String> batchConfigMap) {
@@ -171,7 +223,7 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
     String inputDirURIScheme = inputDirURI.getScheme();
     if (!PinotFSFactory.isSchemeSupported(inputDirURIScheme)) {
       String fsClass = batchConfigMap.get(BatchConfigProperties.INPUT_FS_CLASS);
-      PinotConfiguration fsProps = IngestionConfigUtils.getFsProps(batchConfigMap);
+      PinotConfiguration fsProps = IngestionConfigUtils.getInputFsProps(batchConfigMap);
       PinotFSFactory.register(inputDirURIScheme, fsClass, fsProps);
     }
     PinotFS inputDirFS = PinotFSFactory.create(inputDirURIScheme);
@@ -208,10 +260,7 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
         }
       }
       try {
-        URI inputFileURI = new URI(file);
-        if (inputFileURI.getScheme() == null) {
-          inputFileURI = new File(file).toURI();
-        }
+        URI inputFileURI = getFileURI(file, inputDirURI);
         if (inputDirFS.isDirectory(inputFileURI) || existingSegmentInputFileURIs.contains(inputFileURI.toString())) {
           continue;
         }
@@ -221,6 +270,16 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
       }
     }
     return inputFileURIs;
+  }
+
+  private URI getFileURI(String uriStr, URI fullUriForPathOnlyUriStr)
+      throws URISyntaxException {
+    URI fileURI = URI.create(uriStr);
+    if (fileURI.getScheme() == null) {
+      return new URI(fullUriForPathOnlyUriStr.getScheme(), fullUriForPathOnlyUriStr.getAuthority(),
+          fileURI.getPath(), fileURI.getQuery(), fileURI.getFragment());
+    }
+    return fileURI;
   }
 
   private Set<String> getExistingSegmentInputFiles(List<OfflineSegmentZKMetadata> offlineSegmentsMetadata) {
@@ -243,7 +302,7 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
     return uri;
   }
 
-  public static URI getRelativeOutputPath(URI baseInputDir, URI inputFile, URI outputDir) {
+  private static URI getRelativeOutputPath(URI baseInputDir, URI inputFile, URI outputDir) {
     URI relativePath = baseInputDir.relativize(inputFile);
     Preconditions.checkState(relativePath.getPath().length() > 0 && !relativePath.equals(inputFile),
         "Unable to extract out the relative path based on base input path: " + baseInputDir);
@@ -252,4 +311,5 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
     URI relativeOutputURI = outputDir.resolve(relativePath).resolve(".");
     return relativeOutputURI;
   }
+
 }

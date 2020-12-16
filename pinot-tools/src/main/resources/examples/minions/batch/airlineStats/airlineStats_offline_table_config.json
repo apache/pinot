@@ -22,14 +22,13 @@
       "batchConfigMaps": [
         {
           "inputDirURI": "s3://my.s3.bucket/batch/airlineStats/rawdata/",
-          "fs.className": "org.apache.pinot.plugin.filesystem.S3PinotFS",
-          "fs.prop.region": "us-west-2",
+          "input.fs.className": "org.apache.pinot.plugin.filesystem.S3PinotFS",
+          "input.fs.prop.region": "us-west-2",
           "includeFileNamePattern": "glob:**/*.avro",
           "excludeFileNamePattern": "glob:**/*.tmp",
           "inputFormat": "avro",
           "outputDirURI": "s3://my.s3.bucket/batch/airlineStats/segments",
-          "recordReader.className": "org.apache.pinot.plugin.inputformat.avro.AvroRecordReader",
-          "pushMode": "metadata"
+          "push.mode": "metadata"
         }
       ],
       "segmentNameSpec": {},

@@ -27,11 +27,7 @@
       "batchConfigMaps": [
         {
           "inputDirURI": "examples/minions/batch/baseballStats/rawdata",
-          "includeFileNamePattern": "glob:**/*.csv",
-          "excludeFileNamePattern": "glob:**/*.tmp",
-          "inputFormat": "csv",
-          "outputDirURI": "examples/minions/batch/baseballStats/segments",
-          "push.mode": "tar"
+          "inputFormat": "csv"
         }
       ],
       "segmentNameSpec": {},
