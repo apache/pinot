@@ -1,6 +1,6 @@
-import $ from 'jquery';
 import { moduleForComponent, test } from 'ember-qunit';
 import hbs from 'htmlbars-inline-precompile';
+import * as anomalyUtil from 'thirdeye-frontend/utils/anomaly';
 
 moduleForComponent(
   'composite-anomalies/parent-anomalies',
@@ -30,45 +30,40 @@ test('it renders', function (assert) {
         }
       }
     ],
-    feedbackOptions: [
-      'Not reviewed yet',
-      'Yes - unexpected',
-      'Expected temporary change',
-      'Expected permanent change',
-      'No change observed'
-    ]
+    feedbackOptionNames: anomalyUtil.anomalyResponseObj.mapBy('name'),
+    feedbackOptionValues: anomalyUtil.anomalyResponseObj.mapBy('value')
   });
 
   this.render(hbs`{{composite-anomalies/parent-anomalies}}`);
 
-  assert.equal($('h4.panel-title').html(), this.tableTitle);
-  assert.equal($('p.composite-anomalies-no-records').html(), this.noAnmalies);
+  assert.equal(this.$('h4.panel-title').html(), this.tableTitle);
+  assert.equal(this.$('p.composite-anomalies-no-records').html(), this.noAnmalies);
 
   this.render(hbs`
     {{composite-anomalies/parent-anomalies title=tableTitle}}
   `);
 
-  assert.equal($('.panel-title').html(), this.tableTitle);
-  assert.equal($('.composite-anomalies-no-records').html(), this.noAnmalies);
+  assert.equal(this.$('.panel-title').html(), this.tableTitle);
+  assert.equal(this.$('.composite-anomalies-no-records').html(), this.noAnmalies);
 
   this.render(hbs`
     {{composite-anomalies/parent-anomalies data=tableData}}
   `);
 
   // assert.equal($('.start-time').html(), 'Sep 7th, 12:00 ');
-  assert.equal($('.duration').html(), '72 hours');
-  assert.equal($('.details').html(), 'oe_viral_detection (2)');
-  assert.equal($('.ember-power-select-selected-item').html().trim(), this.feedbackOptions[0]);
+  assert.equal(this.$('.duration').html(), '72 hours');
+  assert.equal(this.$('.details').html(), 'oe_viral_detection (2)');
+  assert.equal(this.$('.ember-power-select-selected-item').html().trim(), this.feedbackOptionNames[0]);
 
   // Check other values based on feedback
 
-  this.feedbackOptions.forEach((option, index) => {
-    this.tableData[0].feedback = index === 0 ? null : index;
+  this.feedbackOptionNames.forEach((option, index) => {
+    this.tableData[0].feedback = this.feedbackOptionValues[index];
 
     this.render(hbs`
       {{composite-anomalies/parent-anomalies data=tableData}}
     `);
 
-    assert.equal($('.ember-power-select-selected-item').html().trim(), option);
+    assert.equal(this.$('.ember-power-select-selected-item').html().trim(), option);
   });
 });

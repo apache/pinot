@@ -39,6 +39,7 @@ import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
 import moment from 'moment';
 import _ from 'lodash';
 import config from 'thirdeye-frontend/config/environment';
+import * as anomalyUtil from 'thirdeye-frontend/utils/anomaly';
 
 const TABLE_DATE_FORMAT = 'MMM DD, hh:mm A'; // format for anomaly table
 const TIME_PICKER_INCREMENT = 5; // tells date picker hours field how granularly to display time
@@ -86,13 +87,7 @@ export default Component.extend({
   isPreviewMode: false,
   alertId: null,
   alertData: null,
-  anomalyResponseNames: [
-    'Not reviewed yet',
-    'Yes - unexpected',
-    'Expected temporary change',
-    'Expected permanent change',
-    'No change observed'
-  ],
+  anomalyResponseNames: anomalyUtil.anomalyResponseObj.mapBy('name'),
   selectedDimension: null,
   isReportSuccess: false,
   isReportFailure: false,
