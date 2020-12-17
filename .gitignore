@@ -2,6 +2,8 @@ cscope.*
 .classpath
 .project
 .svn
+.externalToolBuilders/
+maven-eclipse.xml
 target/
 bin/
 */bin/
