@@ -23,10 +23,14 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
+import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.core.util.QueryOptions;
 
 
@@ -86,40 +90,56 @@ public class DataTableUtils {
    */
   public static DataTable buildEmptyDataTable(QueryContext queryContext)
       throws IOException {
-    AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
-
-    // Selection query.
-    if (aggregationFunctions == null) {
-      List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
-      int numSelectExpressions = selectExpressions.size();
-      String[] columnNames = new String[numSelectExpressions];
-      for (int i = 0; i < numSelectExpressions; i++) {
-        columnNames[i] = selectExpressions.get(i).toString();
-      }
-      DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numSelectExpressions];
-      // NOTE: Use STRING column data type as default for selection query.
-      Arrays.fill(columnDataTypes, DataSchema.ColumnDataType.STRING);
-      DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
-      return new DataTableBuilder(dataSchema).build();
+    if (QueryContextUtils.isSelectionQuery(queryContext)) {
+      return buildEmptyDataTableForSelectionQuery(queryContext);
+    } else if (QueryContextUtils.isAggregationQuery(queryContext)) {
+      return buildEmptyDataTableForAggregationQuery(queryContext);
+    } else {
+      assert QueryContextUtils.isDistinctQuery(queryContext);
+      return buildEmptyDataTableForDistinctQuery(queryContext);
     }
+  }
 
-    // Aggregation query.
+  /**
+   * Helper method to build an empty data table for selection query.
+   */
+  private static DataTable buildEmptyDataTableForSelectionQuery(QueryContext queryContext) {
+    List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
+    int numSelectExpressions = selectExpressions.size();
+    String[] columnNames = new String[numSelectExpressions];
+    for (int i = 0; i < numSelectExpressions; i++) {
+      columnNames[i] = selectExpressions.get(i).toString();
+    }
+    ColumnDataType[] columnDataTypes = new ColumnDataType[numSelectExpressions];
+    // NOTE: Use STRING column data type as default for selection query
+    Arrays.fill(columnDataTypes, ColumnDataType.STRING);
+    DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
+    return new DataTableBuilder(dataSchema).build();
+  }
+
+  /**
+   * Helper method to build an empty data table for aggregation query.
+   */
+  private static DataTable buildEmptyDataTableForAggregationQuery(QueryContext queryContext)
+      throws IOException {
+    AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
+    assert aggregationFunctions != null;
     int numAggregations = aggregationFunctions.length;
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     if (groupByExpressions != null) {
-      // Aggregation group-by query.
+      // Aggregation group-by query
 
       if (new QueryOptions(queryContext.getQueryOptions()).isGroupByModeSQL()) {
         // SQL format
 
         int numColumns = groupByExpressions.size() + numAggregations;
         String[] columnNames = new String[numColumns];
-        DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numColumns];
+        ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
         int index = 0;
         for (ExpressionContext groupByExpression : groupByExpressions) {
           columnNames[index] = groupByExpression.toString();
           // Use STRING column data type as default for group-by expressions
-          columnDataTypes[index] = DataSchema.ColumnDataType.STRING;
+          columnDataTypes[index] = ColumnDataType.STRING;
           index++;
         }
         for (AggregationFunction aggregationFunction : aggregationFunctions) {
@@ -133,10 +153,9 @@ public class DataTableUtils {
         // PQL format
 
         String[] columnNames = new String[]{"functionName", "GroupByResultMap"};
-        DataSchema.ColumnDataType[] columnDataTypes =
-            new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.OBJECT};
+        ColumnDataType[] columnDataTypes = new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.OBJECT};
 
-        // Build the data table.
+        // Build the data table
         DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(columnNames, columnDataTypes));
         for (AggregationFunction aggregationFunction : aggregationFunctions) {
           dataTableBuilder.startRow();
@@ -148,10 +167,10 @@ public class DataTableUtils {
         return dataTableBuilder.build();
       }
     } else {
-      // Aggregation only query.
+      // Aggregation only query
 
       String[] aggregationColumnNames = new String[numAggregations];
-      DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numAggregations];
+      ColumnDataType[] columnDataTypes = new ColumnDataType[numAggregations];
       Object[] aggregationResults = new Object[numAggregations];
       for (int i = 0; i < numAggregations; i++) {
         AggregationFunction aggregationFunction = aggregationFunctions[i];
@@ -162,7 +181,7 @@ public class DataTableUtils {
             aggregationFunction.extractAggregationResult(aggregationFunction.createAggregationResultHolder());
       }
 
-      // Build the data table.
+      // Build the data table
       DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(aggregationColumnNames, columnDataTypes));
       dataTableBuilder.startRow();
       for (int i = 0; i < numAggregations; i++) {
@@ -185,5 +204,33 @@ public class DataTableUtils {
       dataTableBuilder.finishRow();
       return dataTableBuilder.build();
     }
+  }
+
+  /**
+   * Helper method to build an empty data table for distinct query.
+   */
+  private static DataTable buildEmptyDataTableForDistinctQuery(QueryContext queryContext)
+      throws IOException {
+    AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
+    assert aggregationFunctions != null && aggregationFunctions.length == 1
+        && aggregationFunctions[0] instanceof DistinctAggregationFunction;
+    DistinctAggregationFunction distinctAggregationFunction = (DistinctAggregationFunction) aggregationFunctions[0];
+
+    // Create the distinct table
+    String[] columnNames = distinctAggregationFunction.getColumns();
+    ColumnDataType[] columnDataTypes = new ColumnDataType[columnNames.length];
+    // NOTE: Use STRING column data type as default for distinct query
+    Arrays.fill(columnDataTypes, ColumnDataType.STRING);
+    DistinctTable distinctTable =
+        new DistinctTable(new DataSchema(columnNames, columnDataTypes), Collections.emptySet());
+
+    // Build the data table
+    DataTableBuilder dataTableBuilder = new DataTableBuilder(
+        new DataSchema(new String[]{distinctAggregationFunction.getColumnName()},
+            new ColumnDataType[]{ColumnDataType.OBJECT}));
+    dataTableBuilder.startRow();
+    dataTableBuilder.setColumn(0, distinctTable);
+    dataTableBuilder.finishRow();
+    return dataTableBuilder.build();
   }
 }
