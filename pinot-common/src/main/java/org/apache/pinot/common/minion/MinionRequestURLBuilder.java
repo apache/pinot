@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.minion;
 
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.StringUtil;
 
@@ -37,8 +38,17 @@ public class MinionRequestURLBuilder {
     return new MinionRequestURLBuilder(baseUrl);
   }
 
-  public String forTaskSchedule() {
-    return StringUtil.join("/", _baseUrl, "tasks/schedule");
+  public String forTaskSchedule(@Nullable String taskType, @Nullable String tableNameWithType) {
+    String url = StringUtil.join("/", _baseUrl, "tasks/schedule");
+    if (taskType != null && tableNameWithType != null) {
+      return url + "?taskType=" + taskType + "&tableName=" + tableNameWithType;
+    } else if (taskType != null) {
+      return url + "?taskType=" + taskType;
+    } else if (tableNameWithType != null) {
+      return url + "?tableName=" + tableNameWithType;
+    } else {
+      return url;
+    }
   }
 
   public String forListAllTasks(String taskType) {

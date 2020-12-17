@@ -63,7 +63,7 @@ public class MinionClientTest {
         createHandler(200, "{\"SegmentGenerationAndPushTask\":\"Task_SegmentGenerationAndPushTask_1607470525615\"}",
             0));
     MinionClient minionClient = new MinionClient("localhost", "14202");
-    Assert.assertEquals(minionClient.scheduleMinionTasks().get("SegmentGenerationAndPushTask"),
+    Assert.assertEquals(minionClient.scheduleMinionTasks(null, null).get("SegmentGenerationAndPushTask"),
         "Task_SegmentGenerationAndPushTask_1607470525615");
     httpServer.stop(0);
   }

@@ -21,6 +21,7 @@ package org.apache.pinot.controller.api.resources;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -168,9 +169,18 @@ public class PinotTaskRestletResource {
 
   @POST
   @Path("/tasks/schedule")
-  @ApiOperation("Schedule tasks")
-  public Map<String, String> scheduleTasks() {
-    return _pinotTaskManager.scheduleTasks();
+  @ApiOperation("Schedule tasks and return a map from task type to task name scheduled")
+  public Map<String, String> scheduleTasks(@ApiParam(value = "Task type") @QueryParam("taskType") String taskType,
+      @ApiParam(value = "Table name (with type suffix)") @QueryParam("tableName") String tableName) {
+    if (taskType != null) {
+      // Schedule task for the given task type
+      String taskName = tableName != null ? _pinotTaskManager.scheduleTask(taskType, tableName)
+          : _pinotTaskManager.scheduleTask(taskType);
+      return Collections.singletonMap(taskType, taskName);
+    } else {
+      // Schedule tasks for all task types
+      return tableName != null ? _pinotTaskManager.scheduleTasks(tableName) : _pinotTaskManager.scheduleTasks();
+    }
   }
 
   @Deprecated
