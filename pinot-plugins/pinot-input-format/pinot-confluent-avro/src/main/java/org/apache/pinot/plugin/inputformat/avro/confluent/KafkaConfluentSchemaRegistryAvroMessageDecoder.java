@@ -95,7 +95,7 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMes
     SchemaRegistryClient schemaRegistryClient =
             new CachedSchemaRegistryClient(
                     createRestService(schemaRegistryUrl, props),
-                    1000);
+                    1000, props);
 
     _deserializer = new KafkaAvroDeserializer(schemaRegistryClient);
     Preconditions.checkNotNull(topicName, "Topic must be provided");
