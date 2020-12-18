@@ -131,17 +131,22 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
         return;
       }
 
-      for (SegmentDataManager segmentManager : segmentManagers) {
-        IndexSegment indexSegment = segmentManager.getSegment();
-        try (PinotSegmentRecordReader reader =
-            new PinotSegmentRecordReader(indexSegment.getSegmentMetadata().getIndexDir())) {
-          while (reader.hasNext()) {
-            GenericRow row = reader.next();
-            _lookupTable.put(row.getPrimaryKey(_primaryKeyColumns), row);
+      try {
+        for (SegmentDataManager segmentManager : segmentManagers) {
+          IndexSegment indexSegment = segmentManager.getSegment();
+          try (PinotSegmentRecordReader reader = new PinotSegmentRecordReader(indexSegment.getSegmentMetadata().getIndexDir())) {
+            while (reader.hasNext()) {
+              GenericRow row = reader.next();
+              _lookupTable.put(row.getPrimaryKey(_primaryKeyColumns), row);
+            }
           }
         }
-        releaseSegment(segmentManager);
+      } finally {
+        for (SegmentDataManager segmentManager : segmentManagers) {
+          releaseSegment(segmentManager);
+        }
       }
+
     } finally {
       _lookupTableWriteLock.unlock();
     }
