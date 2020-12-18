@@ -442,12 +442,24 @@ public class TableConfigUtilsTest {
     } catch (IllegalStateException e) {
       // expected
     }
+  }
 
-    // Dimension table
+  @Test
+  public void testIngestionConfigForDimensionTable() {
+    Map<String, String> batchConfigMap = new HashMap<>();
+    batchConfigMap.put(BatchConfigProperties.BATCH_TYPE, "s3");
+    batchConfigMap
+        .put(BatchConfigProperties.constructBatchProperty("s3", BatchConfigProperties.INPUT_DIR_URI), "s3://foo");
+    batchConfigMap
+        .put(BatchConfigProperties.constructBatchProperty("s3", BatchConfigProperties.OUTPUT_DIR_URI), "s3://bar");
+    batchConfigMap
+        .put(BatchConfigProperties.constructBatchProperty("s3", BatchConfigProperties.FS_CLASS), "org.foo.S3FS");
+    batchConfigMap.put(BatchConfigProperties.constructBatchProperty("s3", BatchConfigProperties.INPUT_FORMAT), "avro");
+    batchConfigMap.put(BatchConfigProperties.constructBatchProperty("s3", BatchConfigProperties.RECORD_READER_CLASS),
+        "org.foo.Reader");
 
     // valid dimension table ingestion config
-    batchConfigMap.put(BatchConfigProperties.BATCH_TYPE, "s3");
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIsDimTable(true)
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIsDimTable(true)
         .setIngestionConfig(
             new IngestionConfig(new BatchIngestionConfig(Lists.newArrayList(batchConfigMap, batchConfigMap), "REFRESH",
                 null), null, null, null)
