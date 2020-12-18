@@ -45,7 +45,7 @@ fi
 
 # Only run integration tests if needed
 if [ "$RUN_INTEGRATION_TESTS" != false ]; then
-  mvn test -B -P github-action,integration-tests-only && exit 0 || exit 1
+  mvn test -B -P github-actions,integration-tests-only && exit 0 || exit 1
 else
-  mvn test -B -P github-action,no-integration-tests && exit 0 || exit 1
+  mvn test -B -P github-actions,no-integration-tests && exit 0 || exit 1
 fi
