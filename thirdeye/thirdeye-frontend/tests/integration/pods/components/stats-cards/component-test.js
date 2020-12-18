@@ -3,12 +3,12 @@ import { setupRenderingTest } from 'ember-qunit';
 import { render } from '@ember/test-helpers';
 import hbs from 'htmlbars-inline-precompile';
 
-module('Integration | Component | stats cards', function(hooks) {
+module('Integration | Component | stats cards', function (hooks) {
   setupRenderingTest(hooks);
 
   const CARD = '.te-horizontal-cards__card';
 
-  test('it renders', async function(assert) {
+  test('it renders', async function (assert) {
     const fetchedStats = {
       totalAnomalies: {
         value: 10,
@@ -35,39 +35,47 @@ module('Integration | Component | stats cards', function(hooks) {
     const $number = this.$(`${CARD}-number`);
 
     // Testing titles of all cards
-    assert.equal(
-      $title.get(0).innerText.trim(),
-      'Anomalies',
-      'title of 1st card is correct');
-    assert.equal(
-      $title.get(1).innerText.trim(),
-      'Response Rate',
-      'title of 2nd card is correct');
-    assert.equal(
-      $title.get(2).innerText.trim(),
-      'Precision',
-      'title of 3rd card is correct');
-    assert.equal(
-      $title.get(3).innerText.trim(),
-      'Recall',
-      'title of 4th card is correct');  
+    assert.equal($title.get(0).innerText.trim(), 'Anomalies', 'title of 1st card is correct');
+    assert.equal($title.get(1).innerText.trim(), 'Response Rate', 'title of 2nd card is correct');
+    assert.equal($title.get(2).innerText.trim(), 'Precision', 'title of 3rd card is correct');
+    assert.equal($title.get(3).innerText.trim(), 'Recall', 'title of 4th card is correct');
 
     // Testing values of all cards
-    assert.equal(
-      $number.get(0).innerText.trim(),
-      10,
-      'value of 1st card is correct');
-    assert.equal(
-      $number.get(1).innerText.trim(),
-      '30%',
-      'value of 2nd card is correct');
-    assert.equal(
-      $number.get(2).innerText.trim(),
-      '40%',
-      'value of 3rd card is correct');
-    assert.equal(
-      $number.get(3).innerText.trim(),
-      '50%',
-      'value of 4th card is correct');
+    assert.equal($number.get(0).innerText.trim(), 10, 'value of 1st card is correct');
+    assert.equal($number.get(1).innerText.trim(), '30%', 'value of 2nd card is correct');
+    assert.equal($number.get(2).innerText.trim(), '40%', 'value of 3rd card is correct');
+    assert.equal($number.get(3).innerText.trim(), '50%', 'value of 4th card is correct');
+  });
+
+  test('NaN percentage values are represented as N/A', async function (assert) {
+    const fetchedStats = {
+      totalAnomalies: {
+        value: 0,
+        type: 'COUNT'
+      },
+      responseRate: {
+        value: 0,
+        type: 'PERCENT'
+      },
+      precision: {
+        value: 'NaN',
+        type: 'PERCENT'
+      },
+      recall: {
+        value: 'NaN',
+        type: 'PERCENT'
+      }
+    };
+    this.setProperties({ stats: fetchedStats });
+
+    await render(hbs`{{stats-cards
+        stats=stats}}`);
+    const $number = this.$(`${CARD}-number`);
+
+    // Testing values of all cards
+    assert.equal($number.get(0).innerText.trim(), 0, 'value of 1st card is correct');
+    assert.equal($number.get(1).innerText.trim(), '0%', 'value of 2nd card is correct');
+    assert.equal($number.get(2).innerText.trim(), 'N/A', 'value of 3rd card is correct');
+    assert.equal($number.get(3).innerText.trim(), 'N/A', 'value of 4th card is correct');
   });
 });
