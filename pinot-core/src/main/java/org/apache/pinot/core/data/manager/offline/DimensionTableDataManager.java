@@ -100,7 +100,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     super.addSegment(indexDir, indexLoadingConfig);
     try {
       loadLookupTable();
-      _logger.info("Successfully loaded lookup table: {}", getTableName());
+      _logger.info("Successfully added segment {} and loaded lookup table: {}", indexDir.getName(), getTableName());
     } catch (Exception e) {
       throw new RuntimeException(String.format("Error loading lookup table: %s", getTableName()), e);
     }
@@ -111,10 +111,11 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     super.removeSegment(segmentName);
     try {
       loadLookupTable();
-      _logger.info("Successfully removed segment and reloaded lookup table: {}", getTableName());
+      _logger.info("Successfully removed segment {} and reloaded lookup table: {}", segmentName, getTableName());
     } catch (Exception e) {
-      throw new RuntimeException(
-          String.format("Error reloading lookup table after segment remove for table: {}", getTableName()), e);
+      throw new RuntimeException(String
+          .format("Error reloading lookup table after segment remove ({}) for table: {}", segmentName, getTableName()),
+          e);
     }
   }
 
@@ -134,7 +135,8 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
       try {
         for (SegmentDataManager segmentManager : segmentManagers) {
           IndexSegment indexSegment = segmentManager.getSegment();
-          try (PinotSegmentRecordReader reader = new PinotSegmentRecordReader(indexSegment.getSegmentMetadata().getIndexDir())) {
+          try (PinotSegmentRecordReader reader = new PinotSegmentRecordReader(
+              indexSegment.getSegmentMetadata().getIndexDir())) {
             while (reader.hasNext()) {
               GenericRow row = reader.next();
               _lookupTable.put(row.getPrimaryKey(_primaryKeyColumns), row);
@@ -146,7 +148,6 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
           releaseSegment(segmentManager);
         }
       }
-
     } finally {
       _lookupTableWriteLock.unlock();
     }
