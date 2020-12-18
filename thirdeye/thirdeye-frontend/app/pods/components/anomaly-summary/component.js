@@ -4,14 +4,10 @@
  * @exports anomaly-summary
  */
 import Component from '@ember/component';
-import {
-  set,
-  get,
-  computed,
-  getProperties
-} from '@ember/object';
+import { set, get, computed, getProperties } from '@ember/object';
 import { colorMapping, makeTime } from 'thirdeye-frontend/utils/rca-utils';
-import { getFormattedDuration,
+import {
+  getFormattedDuration,
   anomalyResponseMapNew,
   verifyAnomalyFeedback,
   anomalyResponseObj,
@@ -19,7 +15,7 @@ import { getFormattedDuration,
   updateAnomalyFeedback,
   anomalyTypeMapping
 } from 'thirdeye-frontend/utils/anomaly';
-import RSVP from "rsvp";
+import RSVP from 'rsvp';
 import fetch from 'fetch';
 import { checkStatus, humanizeFloat, buildBounds } from 'thirdeye-frontend/utils/utils';
 import columns from 'thirdeye-frontend/shared/anomaliesTableColumns';
@@ -78,7 +74,7 @@ export default Component.extend({
     show: false
   },
   isLoading: false,
-  feedbackOptions: ['Not reviewed yet', 'Yes - unexpected', 'Expected temporary change', 'Expected permanent change', 'No change observed'],
+  feedbackOptions: anomalyResponseObj.mapBy('name'),
   labelMap: anomalyResponseMapNew,
   labelResponse: {},
 
@@ -87,149 +83,133 @@ export default Component.extend({
     this._fetchAnomalyData();
   },
 
-  axis: computed(
-    'anomalyData',
-    'series',
-    function () {
-      const {
-        anomalyData,
-        series
-      } = this.getProperties('anomalyData', 'series');
+  axis: computed('anomalyData', 'series', function () {
+    const { anomalyData, series } = this.getProperties('anomalyData', 'series');
 
-      let start = anomalyData.startTime;
-      let end = anomalyData.endTime;
-      if (series.Current && series.Current.timestamps && Array.isArray(series.Current.timestamps)) {
-        start = series.Current.timestamps[0];
-        end = series.Current.timestamps[series.Current.timestamps.length - 1];
-      }
+    let start = anomalyData.startTime;
+    let end = anomalyData.endTime;
+    if (series.Current && series.Current.timestamps && Array.isArray(series.Current.timestamps)) {
+      start = series.Current.timestamps[0];
+      end = series.Current.timestamps[series.Current.timestamps.length - 1];
+    }
 
-      return {
-        y: {
-          show: true,
-          tick: {
-            format: function(d){return humanizeFloat(d);}
-          }
-        },
-        y2: {
-          show: false,
-          min: 0,
-          max: 1
-        },
-        x: {
-          type: 'timeseries',
-          show: true,
-          min: start,
-          max: end,
-          tick: {
-            fit: false,
-            format: (d) => {
-              const t = makeTime(d);
-              if (t.valueOf() === t.clone().startOf('day').valueOf()) {
-                return t.format('MMM D');
-              }
-              return t.format('h:mm a');
-            }
+    return {
+      y: {
+        show: true,
+        tick: {
+          format: function (d) {
+            return humanizeFloat(d);
           }
         }
+      },
+      y2: {
+        show: false,
+        min: 0,
+        max: 1
+      },
+      x: {
+        type: 'timeseries',
+        show: true,
+        min: start,
+        max: end,
+        tick: {
+          fit: false,
+          format: (d) => {
+            const t = makeTime(d);
+            if (t.valueOf() === t.clone().startOf('day').valueOf()) {
+              return t.format('MMM D');
+            }
+            return t.format('h:mm a');
+          }
+        }
+      }
+    };
+  }),
+
+  series: computed('anomalyData', 'current', 'predicted', function () {
+    const { anomalyData, current, predicted } = getProperties(this, 'anomalyData', 'current', 'predicted');
+
+    const series = {};
+
+    if (!_.isEmpty(anomalyData)) {
+      const key = 'Anomaly';
+      series[key] = {
+        timestamps: [anomalyData.startTime, anomalyData.endTime],
+        values: [1, 1],
+        type: 'region',
+        color: 'screenshot-anomaly'
       };
     }
-  ),
 
-  series: computed(
-    'anomalyData',
-    'current',
-    'predicted',
-    function () {
-      const {
-        anomalyData, current, predicted
-      } = getProperties(this, 'anomalyData', 'current', 'predicted');
-
-      const series = {};
-
-      if (!_.isEmpty(anomalyData)) {
-        const key = 'Anomaly';
-        series[key] = {
-          timestamps: [anomalyData.startTime, anomalyData.endTime],
-          values: [1, 1],
-          type: 'region',
-          color: 'screenshot-anomaly'
-        };
-      }
-
-      if (current && !_.isEmpty(current.current)) {
-        series['Current'] = {
-          timestamps: current.timestamp,
-          values: current.current,
-          type: 'line',
-          color: 'screenshot-current'
-        };
-      }
-
-      if (predicted && !_.isEmpty(predicted.value)) {
-        series['Predicted'] = {
-          timestamps: predicted.timestamp,
-          values: predicted.value,
-          type: 'line',
-          color: 'screenshot-predicted'
-        };
-      }
-
-      buildBounds(series, predicted, current, true);
-
-      return series;
+    if (current && !_.isEmpty(current.current)) {
+      series['Current'] = {
+        timestamps: current.timestamp,
+        values: current.current,
+        type: 'line',
+        color: 'screenshot-current'
+      };
     }
-  ),
+
+    if (predicted && !_.isEmpty(predicted.value)) {
+      series['Predicted'] = {
+        timestamps: predicted.timestamp,
+        values: predicted.value,
+        type: 'line',
+        color: 'screenshot-predicted'
+      };
+    }
+
+    buildBounds(series, predicted, current, true);
+
+    return series;
+  }),
 
   /**
    * formats anomaly for table
    * @method anomaly
    * @return {Object}
    */
-  anomaly: computed(
-    'anomalyData',
-    'labelResponse',
-    function() {
-      const anomalyData = get(this, 'anomalyData');
-      const labelResponse = get(this, 'labelResponse');
-      let tableAnomaly = {};
+  anomaly: computed('anomalyData', 'labelResponse', function () {
+    const anomalyData = get(this, 'anomalyData');
+    const labelResponse = get(this, 'labelResponse');
+    let tableAnomaly = {};
 
-      if (anomalyData) {
-        const a = anomalyData; //for convenience below
-        const change = (a.avgBaselineVal !== 0 && a.avgBaselineVal !== "Infinity" && a.avgCurrentVal !== "Infinity") ? (a.avgCurrentVal/a.avgBaselineVal - 1.0) * 100.0 : 0;
-        tableAnomaly = {
-          anomalyId: a.id,
-          metricUrn: a.metricUrn,
-          start: a.startTime,
-          end: a.endTime,
-          metricName: a.metric,
-          dataset: a.collection,
-          dimensions: a.dimensions,
-          startDateStr: this._formatAnomaly(a),
-          durationStr: getFormattedDuration(a.startTime, a.endTime),
-          shownCurrent: a.avgCurrentVal === "Infinity" ? 0 : humanizeFloat(a.avgCurrentVal),
-          shownBaseline: a.avgBaselineVal === "Infinity" ? 0 : humanizeFloat(a.avgBaselineVal),
-          change: change,
-          shownChangeRate: humanizeFloat(change),
-          anomalyFeedback: a.feedback ? a.feedback.feedbackType : "NONE",
-          showResponseSaved: (labelResponse.anomalyId === a.id) ? labelResponse.showResponseSaved : false,
-          showResponseFailed: (labelResponse.anomalyId === a.id) ? labelResponse.showResponseFailed: false,
-          type: anomalyTypeMapping[a.type]
-        };
-      }
-      return tableAnomaly;
+    if (anomalyData) {
+      const a = anomalyData; //for convenience below
+      const change =
+        a.avgBaselineVal !== 0 && a.avgBaselineVal !== 'Infinity' && a.avgCurrentVal !== 'Infinity'
+          ? (a.avgCurrentVal / a.avgBaselineVal - 1.0) * 100.0
+          : 0;
+      tableAnomaly = {
+        anomalyId: a.id,
+        metricUrn: a.metricUrn,
+        start: a.startTime,
+        end: a.endTime,
+        metricName: a.metric,
+        dataset: a.collection,
+        dimensions: a.dimensions,
+        startDateStr: this._formatAnomaly(a),
+        durationStr: getFormattedDuration(a.startTime, a.endTime),
+        shownCurrent: a.avgCurrentVal === 'Infinity' ? 0 : humanizeFloat(a.avgCurrentVal),
+        shownBaseline: a.avgBaselineVal === 'Infinity' ? 0 : humanizeFloat(a.avgBaselineVal),
+        change: change,
+        shownChangeRate: humanizeFloat(change),
+        anomalyFeedback: a.feedback ? a.feedback.feedbackType : 'NONE',
+        showResponseSaved: labelResponse.anomalyId === a.id ? labelResponse.showResponseSaved : false,
+        showResponseFailed: labelResponse.anomalyId === a.id ? labelResponse.showResponseFailed : false,
+        type: anomalyTypeMapping[a.type]
+      };
     }
-  ),
+    return tableAnomaly;
+  }),
 
   /**
    * generates component id using anomalyId
    */
-  id: computed(
-    'anomalyId',
-    function() {
-      const anomalyId = get(this, 'anomalyId');
-      return `timeseries-chart-anomaly-summary-${anomalyId}`;
-    }
-  ),
+  id: computed('anomalyId', function () {
+    const anomalyId = get(this, 'anomalyId');
+    return `timeseries-chart-anomaly-summary-${anomalyId}`;
+  }),
 
   _fetchAnomalyData() {
     const anomalyData = get(this, 'anomalyData');
@@ -240,21 +220,22 @@ export default Component.extend({
 
     const predictedUrl = `/detection/predicted-baseline/${anomalyId}?start=${anomalyData.startTime}&end=${anomalyData.endTime}&padding=true`;
     const timeseriesHash = {
-      predicted: fetch(predictedUrl).then(res => checkStatus(res, 'get', true))
+      predicted: fetch(predictedUrl).then((res) => checkStatus(res, 'get', true))
     };
-    RSVP.hash(timeseriesHash).then((res) => {
-      if (!(this.get('isDestroyed') || this.get('isDestroying'))) {
-        set(this, 'current', res.predicted);
-        set(this, 'predicted', res.predicted);
-        set(this, 'isLoading', false);
-      }
-    })
+    RSVP.hash(timeseriesHash)
+      .then((res) => {
+        if (!(this.get('isDestroyed') || this.get('isDestroying'))) {
+          set(this, 'current', res.predicted);
+          set(this, 'predicted', res.predicted);
+          set(this, 'isLoading', false);
+        }
+      })
       .catch(() => {
         if (!(this.get('isDestroyed') || this.get('isDestroying'))) {
           set(this, 'isLoading', false);
         }
       });
-    },
+  },
 
   _formatAnomaly(anomaly) {
     return `${moment(anomaly.startTime).format(TABLE_DATE_FORMAT)}`;
@@ -268,13 +249,13 @@ export default Component.extend({
      * @param {String} selectedResponse - user-selected anomaly feedback option
      * @param {Object} inputObj - the selection object
      */
-    onChangeAnomalyFeedback: async function(anomalyRecord, selectedResponse) {
+    onChangeAnomalyFeedback: async function (anomalyRecord, selectedResponse) {
       const anomalyData = get(this, 'anomalyData');
       // Reset status icon
       set(this, 'renderStatusIcon', false);
-      const responseObj = anomalyResponseObj.find(res => res.name === selectedResponse);
+      const responseObj = anomalyResponseObj.find((res) => res.name === selectedResponse);
       // get the response object from anomalyResponseObjNew
-      const newFeedbackValue = anomalyResponseObjNew.find(res => res.name === selectedResponse).value;
+      const newFeedbackValue = anomalyResponseObjNew.find((res) => res.name === selectedResponse).value;
       try {
         // Save anomaly feedback
         await updateAnomalyFeedback(anomalyRecord.anomalyId, responseObj.value);
