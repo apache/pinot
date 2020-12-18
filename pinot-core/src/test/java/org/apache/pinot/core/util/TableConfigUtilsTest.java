@@ -445,7 +445,7 @@ public class TableConfigUtilsTest {
   }
 
   @Test
-  public void testIngestionConfigForDimensionTable() {
+  public void ingestionConfigForDimensionTableTest() {
     Map<String, String> batchConfigMap = new HashMap<>();
     batchConfigMap.put(BatchConfigProperties.BATCH_TYPE, "s3");
     batchConfigMap

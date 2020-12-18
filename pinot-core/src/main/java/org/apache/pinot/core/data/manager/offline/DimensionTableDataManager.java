@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.data.manager.offline;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.HashMap;
 import java.util.List;
@@ -29,7 +28,6 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
@@ -87,11 +85,9 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
   protected void doInit() {
     super.doInit();
 
+    // dimension tables should always have schemas with primary keys
     _tableSchema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
-    Preconditions.checkState(_tableSchema != null, "Failed to find schema for table: %s", _tableNameWithType);
     _primaryKeyColumns = _tableSchema.getPrimaryKeyColumns();
-    Preconditions.checkState(!CollectionUtils.isEmpty(_primaryKeyColumns),
-        "Primary key columns must be configured for dimension table: %s", _tableNameWithType);
   }
 
   @Override
