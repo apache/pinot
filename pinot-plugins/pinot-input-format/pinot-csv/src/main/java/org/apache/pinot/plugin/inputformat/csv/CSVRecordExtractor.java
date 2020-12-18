@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.inputformat.csv;
 
+import com.google.common.collect.ImmutableSet;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.csv.CSVRecord;
@@ -41,7 +42,7 @@ public class CSVRecordExtractor extends BaseRecordExtractor<CSVRecord> {
     if (fields == null || fields.isEmpty()) {
       _fields = csvRecordExtractorConfig.getColumnNames();
     } else {
-      _fields = fields;
+      _fields = ImmutableSet.copyOf(fields);
     }
     _multiValueDelimiter = csvRecordExtractorConfig.getMultiValueDelimiter();
   }

@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.plugin.inputformat.avro;
 
+import com.google.common.collect.ImmutableSet;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,9 +41,11 @@ public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
 
   @Override
   public void init(@Nullable Set<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig) {
-    _fields = fields;
     if (fields == null || fields.isEmpty()) {
       _extractAll = true;
+      _fields = Collections.emptySet();
+    } else {
+      _fields = ImmutableSet.copyOf(fields);
     }
   }
 
