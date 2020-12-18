@@ -36,8 +36,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class OfflineNonReplicaGroupSegmentAssignmentTest {
@@ -50,7 +49,7 @@ public class OfflineNonReplicaGroupSegmentAssignmentTest {
   private static final int NUM_INSTANCES = 10;
   private static final List<String> INSTANCES =
       SegmentAssignmentTestUtils.getNameList(INSTANCE_NAME_PREFIX, NUM_INSTANCES);
-  private static final String RAW_TABLE_NAME = "testTable";
+  private static final String RAW_TABLE_NAME = "assignmentTable";
   private static final String INSTANCE_PARTITIONS_NAME =
       InstancePartitionsType.OFFLINE.getInstancePartitionsName(RAW_TABLE_NAME);
 
@@ -95,8 +94,8 @@ public class OfflineNonReplicaGroupSegmentAssignmentTest {
         assertEquals(instancesAssigned.get(replicaId), INSTANCES.get(expectedAssignedInstanceId));
         expectedAssignedInstanceId = (expectedAssignedInstanceId + 1) % NUM_INSTANCES;
       }
-      currentAssignment
-          .put(segmentName, SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
+      currentAssignment.put(segmentName,
+          SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
     }
   }
 
@@ -106,8 +105,8 @@ public class OfflineNonReplicaGroupSegmentAssignmentTest {
     for (String segmentName : SEGMENTS) {
       List<String> instancesAssigned =
           _segmentAssignment.assignSegment(segmentName, currentAssignment, _instancePartitionsMap);
-      currentAssignment
-          .put(segmentName, SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
+      currentAssignment.put(segmentName,
+          SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
     }
 
     // There should be 100 segments assigned
@@ -124,9 +123,8 @@ public class OfflineNonReplicaGroupSegmentAssignmentTest {
     Arrays.fill(expectedNumSegmentsAssignedPerInstance, numSegmentsPerInstance);
     assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
     // Current assignment should already be balanced
-    assertEquals(_segmentAssignment
-            .rebalanceTable(currentAssignment, _instancePartitionsMap, null, null, new BaseConfiguration()),
-        currentAssignment);
+    assertEquals(_segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, null, null,
+        new BaseConfiguration()), currentAssignment);
   }
 
   @Test
@@ -135,8 +133,8 @@ public class OfflineNonReplicaGroupSegmentAssignmentTest {
     for (String segmentName : SEGMENTS) {
       List<String> instancesAssigned =
           _segmentAssignment.assignSegment(segmentName, currentAssignment, _instancePartitionsMap);
-      currentAssignment
-          .put(segmentName, SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
+      currentAssignment.put(segmentName,
+          SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
     }
 
     // Bootstrap table should reassign all segments based on their alphabetical order

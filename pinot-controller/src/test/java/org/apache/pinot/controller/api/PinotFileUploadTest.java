@@ -23,7 +23,7 @@ import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -35,30 +35,26 @@ import org.testng.annotations.Test;
 
 /**
  * Tests for the file upload restlet.
- *
  */
-public class PinotFileUploadTest extends ControllerTest {
-  private static final String TABLE_NAME = "testTable";
+public class PinotFileUploadTest {
+  private static final String TABLE_NAME = "fileTable";
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
-    startZk();
-    startController();
-    addFakeBrokerInstancesToAutoJoinHelixCluster(5, true);
-    addFakeServerInstancesToAutoJoinHelixCluster(5, true);
+  public void setUp() throws Exception {
+    ControllerTestUtils.setupClusterAndValidate();
 
     // Adding table
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setSegmentAssignmentStrategy("RandomAssignmentStrategy").setNumReplicas(2).build();
-    _helixResourceManager.addTable(tableConfig);
+        .setSegmentAssignmentStrategy("RandomAssignmentStrategy")
+        .setNumReplicas(2)
+        .build();
+    ControllerTestUtils.getHelixResourceManager().addTable(tableConfig);
   }
 
   @Test
-  public void testUploadBogusData()
-      throws Exception {
+  public void testUploadBogusData() throws Exception {
     org.apache.http.client.HttpClient httpClient = new DefaultHttpClient();
-    HttpPost httpPost = new HttpPost(_controllerRequestURLBuilder.forDataFileUpload());
+    HttpPost httpPost = new HttpPost(ControllerTestUtils.getControllerRequestURLBuilder().forDataFileUpload());
     HttpEntity entity = new StringEntity("blah");
     httpPost.setEntity(entity);
     HttpResponse response = httpClient.execute(httpPost);
@@ -69,8 +65,6 @@ public class PinotFileUploadTest extends ControllerTest {
 
   @AfterClass
   public void tearDown() {
-    stopFakeInstances();
-    stopController();
-    stopZk();
+    ControllerTestUtils.cleanup();
   }
 }

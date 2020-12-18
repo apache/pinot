@@ -73,7 +73,7 @@ public class LeadControllerManagerTest {
   @Test
   public void testLeadControllerManager() {
     LeadControllerManager leadControllerManager = new LeadControllerManager(_helixManager, _controllerMetrics);
-    String tableName = "testTable";
+    String tableName = "leadControllerTestTable";
     int expectedPartitionIndex = LeadControllerUtils.getPartitionIdForTable(tableName);
     String partitionName = LeadControllerUtils.generatePartitionName(expectedPartitionIndex);
 

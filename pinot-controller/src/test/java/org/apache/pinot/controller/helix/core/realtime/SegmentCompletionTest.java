@@ -28,7 +28,6 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -37,16 +36,13 @@ import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.LongMsgOffsetFactory;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.common.protocols.SegmentCompletionProtocol.ControllerResponseStatus;
-import static org.apache.pinot.common.protocols.SegmentCompletionProtocol.Request;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.apache.pinot.common.protocols.SegmentCompletionProtocol.*;
+import static org.mockito.Mockito.*;
 
 
 public class SegmentCompletionTest {
@@ -66,8 +62,7 @@ public class SegmentCompletionTest {
   private final LongMsgOffset s3Offset = new LongMsgOffset(30L);
 
   @BeforeMethod
-  public void testCaseSetup()
-      throws Exception {
+  public void testCaseSetup() throws Exception {
     testCaseSetup(true, true);
   }
 
@@ -85,8 +80,7 @@ public class SegmentCompletionTest {
     Assert.assertEquals(respOffset.compareTo(offset), 0);
   }
 
-  public void testCaseSetup(boolean isLeader, boolean isConnected)
-      throws Exception {
+  public void testCaseSetup(boolean isLeader, boolean isConnected) throws Exception {
     PinotHelixResourceManager mockPinotHelixResourceManager = mock(PinotHelixResourceManager.class);
     HelixManager mockHelixManager = createMockHelixManager(isLeader, isConnected);
     when(mockPinotHelixResourceManager.getHelixZkManager()).thenReturn(mockHelixManager);
@@ -115,8 +109,7 @@ public class SegmentCompletionTest {
 
   // Simulate a new controller taking over with an empty completion manager object,
   // but segment metadata is fine in zk
-  private void replaceSegmentCompletionManager()
-      throws Exception {
+  private void replaceSegmentCompletionManager() throws Exception {
     long oldSecs = segmentCompletionMgr._seconds;
     segmentCompletionMgr = new MockSegmentCompletionManager(segmentManager, true, true);
     segmentCompletionMgr._seconds = oldSecs;
@@ -126,15 +119,15 @@ public class SegmentCompletionTest {
   }
 
   @Test
-  public void testStoppedConsumeDuringCompletion()
-      throws Exception {
+  public void testStoppedConsumeDuringCompletion() throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     final String reason = "IAmLazy";
 
     // s1 sends offset of 20, gets HOLD at t = 5s;
     segmentCompletionMgr._seconds = 5;
-    params = new Request.Params().withInstanceId(s1).withStreamPartitionMsgOffset(s1Offset.toString())
+    params = new Request.Params().withInstanceId(s1)
+        .withStreamPartitionMsgOffset(s1Offset.toString())
         .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
@@ -157,19 +150,22 @@ public class SegmentCompletionTest {
 
     // Now s1 comes back, and is asked to catchup.
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s1).withStreamPartitionMsgOffset(s1Offset.toString())
+    params = new Request.Params().withInstanceId(s1)
+        .withStreamPartitionMsgOffset(s1Offset.toString())
         .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP);
     // s2 is asked to commit.
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString())
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
         .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
     // s3 comes back with new caught up offset, it should get a HOLD, since commit is not done yet.
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s3).withStreamPartitionMsgOffset(s2Offset.toString())
+    params = new Request.Params().withInstanceId(s3)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
         .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
@@ -183,8 +179,8 @@ public class SegmentCompletionTest {
     segmentCompletionMgr._seconds += 5;
     params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).
         withSegmentName(segmentNameStr);
-    response = segmentCompletionMgr
-        .segmentCommitEnd(params, true, false, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
+    response = segmentCompletionMgr.segmentCommitEnd(params, true, false,
+        CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
 
     // Now the FSM should have disappeared from the map
@@ -202,8 +198,7 @@ public class SegmentCompletionTest {
   }
 
   @Test
-  public void testStoppedConsumeBeforeHold()
-      throws Exception {
+  public void testStoppedConsumeBeforeHold() throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     final String reason = "IAmLazy";
@@ -260,8 +255,8 @@ public class SegmentCompletionTest {
     segmentCompletionMgr._seconds += 5;
     params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).
         withSegmentName(segmentNameStr);
-    response = segmentCompletionMgr
-        .segmentCommitEnd(params, true, false, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
+    response = segmentCompletionMgr.segmentCommitEnd(params, true, false,
+        CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
 
     // Now the FSM should have disappeared from the map
@@ -280,14 +275,13 @@ public class SegmentCompletionTest {
 
   // s2 sends stoppedConsuming message, but then may have gotten restarted, so eventually we complete the segment.
   @Test
-  public void testHappyPathAfterStoppedConsuming()
-      throws Exception {
+  public void testHappyPathAfterStoppedConsuming() throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     segmentCompletionMgr._seconds = 5;
 
     params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).
-        withSegmentName(segmentNameStr) .withReason("some reason");
+        withSegmentName(segmentNameStr).withReason("some reason");
     response = segmentCompletionMgr.segmentStoppedConsuming(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED);
     Assert.assertEquals(new LLCSegmentName(segmentNameStr), segmentManager._stoppedSegmentName);
@@ -299,27 +293,23 @@ public class SegmentCompletionTest {
   }
 
   @Test
-  public void testHappyPath()
-      throws Exception {
+  public void testHappyPath() throws Exception {
     testHappyPath(5L);
   }
 
   // Tests happy path with split commit protocol
   @Test
-  public void testHappyPathSplitCommitWithLocalFS()
-      throws Exception {
+  public void testHappyPathSplitCommitWithLocalFS() throws Exception {
     testHappyPathSplitCommit(5L, "/local/file", "http://null:null/segments/" + tableName + "/" + segmentNameStr);
   }
 
   @Test
-  public void testHappyPathSplitCommitWithDeepstore()
-      throws Exception {
+  public void testHappyPathSplitCommitWithDeepstore() throws Exception {
     testHappyPathSplitCommit(5L, "fakefs:///segment1", "fakefs:///segment1");
   }
 
   @Test
-  public void testHappyPathSplitCommitWithPeerDownloadScheme()
-      throws Exception {
+  public void testHappyPathSplitCommitWithPeerDownloadScheme() throws Exception {
     testHappyPathSplitCommit(5L, CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME + "/segment1",
         CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME + "/segment1");
   }
@@ -340,8 +330,7 @@ public class SegmentCompletionTest {
 
   // When commit segment file fails, makes sure the fsm aborts and that a segment can successfully commit afterwards.
   @Test
-  public void testCommitSegmentFileFail()
-      throws Exception {
+  public void testCommitSegmentFileFail() throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     // s1 sends offset of 20, gets HOLD at t = 5s;
@@ -393,10 +382,9 @@ public class SegmentCompletionTest {
     // false when detecting SegmentLocation == "doNotCommitMe";
     segmentCompletionMgr._seconds += 5;
     params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).
-        withSegmentName(segmentNameStr)
-        .withSegmentLocation("doNotCommitMe");
-    response = segmentCompletionMgr
-        .segmentCommitEnd(params, true, true, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
+        withSegmentName(segmentNameStr).withSegmentLocation("doNotCommitMe");
+    response = segmentCompletionMgr.segmentCommitEnd(params, true, true,
+        CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.FAILED);
 
     // Now the FSM should have aborted
@@ -432,17 +420,15 @@ public class SegmentCompletionTest {
     // s3's file successfully commits
     segmentCompletionMgr._seconds += 5;
     params = new Request.Params().withInstanceId(s3).withStreamPartitionMsgOffset(s2Offset.toString()).
-        withSegmentName(segmentNameStr)
-        .withSegmentLocation("location");
-    response = segmentCompletionMgr
-        .segmentCommitEnd(params, true, true, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
+        withSegmentName(segmentNameStr).withSegmentLocation("location");
+    response = segmentCompletionMgr.segmentCommitEnd(params, true, true,
+        CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), ControllerResponseStatus.COMMIT_SUCCESS);
     // And the FSM should be removed.
     Assert.assertFalse(fsmMap.containsKey(segmentNameStr));
   }
 
-  private void testHappyPathSplitCommit(long startTime, String segmentLocation, String downloadURL)
-      throws Exception {
+  private void testHappyPathSplitCommit(long startTime, String segmentLocation, String downloadURL) throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     // s1 sends offset of 20, gets HOLD at t = 5s;
@@ -492,12 +478,14 @@ public class SegmentCompletionTest {
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE);
 
     segmentCompletionMgr._seconds += 5;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr)
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr)
         .withSegmentLocation(segmentLocation);
-    response = segmentCompletionMgr
-        .segmentCommitEnd(params, true, true, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
+    response = segmentCompletionMgr.segmentCommitEnd(params, true, true,
+        CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
-    Assert.assertEquals(segmentManager.getSegmentZKMetadata(null, null,null).getDownloadUrl(), downloadURL);
+    Assert.assertEquals(segmentManager.getSegmentZKMetadata(null, null, null).getDownloadUrl(), downloadURL);
 
     // Now the FSM should have disappeared from the map
     Assert.assertFalse(fsmMap.containsKey(segmentNameStr));
@@ -515,8 +503,7 @@ public class SegmentCompletionTest {
 
   // Tests that we abort when the server instance comes back with a different offset than it is told to commit with
   @Test
-  public void testCommitDifferentOffsetSplitCommit()
-      throws Exception {
+  public void testCommitDifferentOffsetSplitCommit() throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     // s1 sends offset of 20, gets HOLD at t = 5s;
@@ -541,16 +528,20 @@ public class SegmentCompletionTest {
 
     // s3 sends a commit start with 20
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s3).withStreamPartitionMsgOffset(s1Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s3)
+        .withStreamPartitionMsgOffset(s1Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentCommitStart(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE);
 
     // s3 comes back to try to commit with a different offset
     segmentCompletionMgr._seconds += 5;
-    params = new Request.Params().withInstanceId(s3).withStreamPartitionMsgOffset(s3Offset.toString()).withSegmentName(segmentNameStr)
+    params = new Request.Params().withInstanceId(s3)
+        .withStreamPartitionMsgOffset(s3Offset.toString())
+        .withSegmentName(segmentNameStr)
         .withSegmentLocation("location");
-    response = segmentCompletionMgr
-        .segmentCommitEnd(params, true, true, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
+    response = segmentCompletionMgr.segmentCommitEnd(params, true, true,
+        CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.FAILED);
 
     // Now the FSM should have disappeared from the map
@@ -558,7 +549,9 @@ public class SegmentCompletionTest {
 
     // Now if s2 or s1 come back, they are asked to hold.
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s1Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s1Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
 
@@ -566,51 +559,66 @@ public class SegmentCompletionTest {
     Assert.assertTrue(fsmMap.containsKey(segmentNameStr));
   }
 
-  public void testHappyPath(long startTime)
-      throws Exception {
+  public void testHappyPath(long startTime) throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     // s1 sends offset of 20, gets HOLD at t = 5s;
     segmentCompletionMgr._seconds = startTime;
-    params = new Request.Params().withInstanceId(s1).withStreamPartitionMsgOffset(s1Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s1)
+        .withStreamPartitionMsgOffset(s1Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
     // s2 sends offset of 40, gets HOLD
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
     // s3 sends offset of 30, gets catchup to 40
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s3).withStreamPartitionMsgOffset(s3Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s3)
+        .withStreamPartitionMsgOffset(s3Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP);
     verifyOffset(response, s2Offset);
     // Now s1 comes back, and is asked to catchup.
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s1).withStreamPartitionMsgOffset(s1Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s1)
+        .withStreamPartitionMsgOffset(s1Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP);
     // s2 is asked to commit.
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
     // s3 comes back with new caught up offset, it should get a HOLD, since commit is not done yet.
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s3).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s3)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
     // s2 executes a successful commit
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentCommitStart(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE);
 
     segmentCompletionMgr._seconds += 5;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
-    response = segmentCompletionMgr
-        .segmentCommitEnd(params, true, false, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
+    response = segmentCompletionMgr.segmentCommitEnd(params, true, false,
+        CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
 
     // Now the FSM should have disappeared from the map
@@ -618,7 +626,9 @@ public class SegmentCompletionTest {
 
     // Now if s3 or s1 come back, they are asked to keep the segment they have.
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s1).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s1)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.KEEP);
 
@@ -627,71 +637,86 @@ public class SegmentCompletionTest {
   }
 
   @Test
-  public void testControllerNotConnected()
-      throws Exception {
+  public void testControllerNotConnected() throws Exception {
     testCaseSetup(true, false); // Leader but not connected
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     // s1 sends offset of 20, gets HOLD at t = 5s;
     segmentCompletionMgr._seconds = 5L;
-    params = new Request.Params().withInstanceId(s1).withStreamPartitionMsgOffset(s1Offset.toString()).withSegmentName(segmentNameStr)
+    params = new Request.Params().withInstanceId(s1)
+        .withStreamPartitionMsgOffset(s1Offset.toString())
+        .withSegmentName(segmentNameStr)
         .withReason("rowLimit");
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), ControllerResponseStatus.NOT_LEADER);
   }
 
   @Test
-  public void testWinnerOnTimeLimit()
-      throws Exception {
+  public void testWinnerOnTimeLimit() throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     segmentCompletionMgr._seconds = 10L;
-    params = new Request.Params().withInstanceId(s1).withStreamPartitionMsgOffset(s1Offset.toString()).withSegmentName(segmentNameStr)
+    params = new Request.Params().withInstanceId(s1)
+        .withStreamPartitionMsgOffset(s1Offset.toString())
+        .withSegmentName(segmentNameStr)
         .withReason(SegmentCompletionProtocol.REASON_TIME_LIMIT);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
   }
 
   @Test
-  public void testWinnerOnRowLimit()
-      throws Exception {
+  public void testWinnerOnRowLimit() throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     segmentCompletionMgr._seconds = 10L;
-    params = new Request.Params().withInstanceId(s1).withStreamPartitionMsgOffset(s1Offset.toString()).withSegmentName(segmentNameStr)
+    params = new Request.Params().withInstanceId(s1)
+        .withStreamPartitionMsgOffset(s1Offset.toString())
+        .withSegmentName(segmentNameStr)
         .withReason(SegmentCompletionProtocol.REASON_ROW_LIMIT);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), ControllerResponseStatus.COMMIT);
     // S2 comes with the same offset as S1
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s1Offset.toString()).withSegmentName(segmentNameStr)
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s1Offset.toString())
+        .withSegmentName(segmentNameStr)
         .withReason(SegmentCompletionProtocol.REASON_ROW_LIMIT);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), ControllerResponseStatus.HOLD);
     segmentCompletionMgr._seconds += 1;
     // S3 comes with a different offset and without row limit. we ask it to hold even though it is higher.
-    params = new Request.Params().withInstanceId(s3).withStreamPartitionMsgOffset(s3Offset.toString()).withSegmentName(segmentNameStr)
+    params = new Request.Params().withInstanceId(s3)
+        .withStreamPartitionMsgOffset(s3Offset.toString())
+        .withSegmentName(segmentNameStr)
         .withReason(SegmentCompletionProtocol.REASON_TIME_LIMIT);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), ControllerResponseStatus.HOLD);
     // S1 comes back to commit the segment
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s1).withStreamPartitionMsgOffset(s1Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s1)
+        .withStreamPartitionMsgOffset(s1Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentCommitStart(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE);
 
     segmentCompletionMgr._seconds += 5;
-    params = new Request.Params().withInstanceId(s1).withStreamPartitionMsgOffset(s1Offset.toString()).withSegmentName(segmentNameStr);
-    response = segmentCompletionMgr
-        .segmentCommitEnd(params, true, false, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
+    params = new Request.Params().withInstanceId(s1)
+        .withStreamPartitionMsgOffset(s1Offset.toString())
+        .withSegmentName(segmentNameStr);
+    response = segmentCompletionMgr.segmentCommitEnd(params, true, false,
+        CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
     // We ask S2 to keep the segment
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s1Offset.toString()).withSegmentName(segmentNameStr)
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s1Offset.toString())
+        .withSegmentName(segmentNameStr)
         .withReason(SegmentCompletionProtocol.REASON_ROW_LIMIT);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), ControllerResponseStatus.KEEP);
     // And we ask S3 to discard because it was ahead.
-    params = new Request.Params().withInstanceId(s3).withStreamPartitionMsgOffset(s3Offset.toString()).withSegmentName(segmentNameStr)
+    params = new Request.Params().withInstanceId(s3)
+        .withStreamPartitionMsgOffset(s3Offset.toString())
+        .withSegmentName(segmentNameStr)
         .withReason(SegmentCompletionProtocol.REASON_TIME_LIMIT);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), ControllerResponseStatus.DISCARD);
@@ -699,40 +724,45 @@ public class SegmentCompletionTest {
 
   // Tests that when server is delayed(Stalls for a hour), when server comes back, we commit successfully.
   @Test
-  public void testDelayedServerSplitCommit()
-      throws Exception {
+  public void testDelayedServerSplitCommit() throws Exception {
     testDelayedServer(true);
   }
 
   @Test
-  public void testDelayedServer()
-      throws Exception {
+  public void testDelayedServer() throws Exception {
     testDelayedServer(false);
   }
 
-  public void testDelayedServer(boolean isSplitCommit)
-      throws Exception {
+  public void testDelayedServer(boolean isSplitCommit) throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     // s1 sends offset of 20, gets HOLD at t = 5s;
     final int startTimeSecs = 5;
     segmentCompletionMgr._seconds = startTimeSecs;
-    params = new Request.Params().withInstanceId(s1).withStreamPartitionMsgOffset(s1Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s1)
+        .withStreamPartitionMsgOffset(s1Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
     // s2 sends offset of 40, gets HOLD
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
     // Now s1 comes back again, and is asked to hold
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s1).withStreamPartitionMsgOffset(s1Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s1)
+        .withStreamPartitionMsgOffset(s1Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
     // s2 is asked to commit.
     segmentCompletionMgr._seconds += SegmentCompletionProtocol.MAX_HOLD_TIME_MS / 1000;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
 
@@ -744,11 +774,15 @@ public class SegmentCompletionTest {
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
     // s2 commits.
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentCommitStart(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE);
     segmentCompletionMgr._seconds += 5;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr)
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr)
         .withSegmentLocation("location");
     response = segmentCompletionMgr.segmentCommitEnd(params, true, isSplitCommit,
         CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
@@ -768,79 +802,99 @@ public class SegmentCompletionTest {
 
   // We test the case where all servers go silent after controller asks one of them commit
   @Test
-  public void testDeadServers()
-      throws Exception {
+  public void testDeadServers() throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     // s1 sends offset of 20, gets HOLD at t = 5s;
     final int startTimeSecs = 5;
     segmentCompletionMgr._seconds = startTimeSecs;
-    params = new Request.Params().withInstanceId(s1).withStreamPartitionMsgOffset(s1Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s1)
+        .withStreamPartitionMsgOffset(s1Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
     // s2 sends offset of 40, gets HOLD
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
     // s3 is asked to catch up.
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s3).withStreamPartitionMsgOffset(s3Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s3)
+        .withStreamPartitionMsgOffset(s3Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP);
     verifyOffset(response, s2Offset);
 
     // Now s2 is asked to commit.
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
 
     // All servers are dead
     segmentCompletionMgr._seconds += 3600;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
     Assert.assertFalse(fsmMap.containsKey(segmentNameStr));
 
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), ControllerResponseStatus.HOLD);
     Assert.assertTrue(fsmMap.containsKey(segmentNameStr));
 
     // Now s2 is asked to commit because the max time to pick committer has passed.
     segmentCompletionMgr._seconds += 4;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), ControllerResponseStatus.COMMIT);
   }
 
   // We test the case when the committer is asked to commit, but they never come back.
   @Test
-  public void testCommitterFailure()
-      throws Exception {
+  public void testCommitterFailure() throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     // s1 sends offset of 20, gets HOLD at t = 5s;
     final int startTimeSecs = 5;
     segmentCompletionMgr._seconds = startTimeSecs;
-    params = new Request.Params().withInstanceId(s1).withStreamPartitionMsgOffset(s1Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s1)
+        .withStreamPartitionMsgOffset(s1Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
     // s2 sends offset of 40, gets HOLD
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
     // s3 is asked to hold.
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s3).withStreamPartitionMsgOffset(s3Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s3)
+        .withStreamPartitionMsgOffset(s3Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP);
     verifyOffset(response, s2Offset);
     // Now s2 is asked to commit.
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
 
@@ -848,7 +902,9 @@ public class SegmentCompletionTest {
     segmentCompletionMgr._seconds += SegmentCompletionProtocol.MAX_HOLD_TIME_MS / 1000;
 
     // But since s1 and s3 are in HOLDING state, they should come back again. s1 is asked to catchup
-    params = new Request.Params().withInstanceId(s1).withStreamPartitionMsgOffset(s1Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s1)
+        .withStreamPartitionMsgOffset(s1Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP);
 
@@ -858,7 +914,9 @@ public class SegmentCompletionTest {
 
     // s1 comes back with the updated offset, since it was asked to catch up.
     // The FSM will be aborted, and destroyed ...
-    params = new Request.Params().withInstanceId(s1).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s1)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
 
@@ -866,19 +924,25 @@ public class SegmentCompletionTest {
 
     // s1 comes back again, a new FSM created
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s1).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s1)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
 
     // s3 comes back
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s3).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s3)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
 
     // And winner chosen when the last one does not come back at all
     segmentCompletionMgr._seconds += 5;
-    params = new Request.Params().withInstanceId(s3).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s3)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
 
@@ -887,8 +951,7 @@ public class SegmentCompletionTest {
   }
 
   @Test
-  public void testHappyPathSlowCommit()
-      throws Exception {
+  public void testHappyPathSlowCommit() throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     // s1 sends offset of 20, gets HOLD at t = 1509242466s;
@@ -896,28 +959,38 @@ public class SegmentCompletionTest {
     final String tableName = new LLCSegmentName(segmentNameStr).getTableName();
     Assert.assertNull(commitTimeMap.get(tableName));
     segmentCompletionMgr._seconds = startTime;
-    params = new Request.Params().withInstanceId(s1).withStreamPartitionMsgOffset(s1Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s1)
+        .withStreamPartitionMsgOffset(s1Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
     // s2 sends offset of 40, gets HOLD
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
     // s3 sends offset of 30, gets catchup to 40
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s3).withStreamPartitionMsgOffset(s3Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s3)
+        .withStreamPartitionMsgOffset(s3Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP);
     verifyOffset(response, s2Offset);
     // Now s1 comes back, and is asked to catchup.
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s1).withStreamPartitionMsgOffset(s1Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s1)
+        .withStreamPartitionMsgOffset(s1Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP);
     // s2 is asked to commit.
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
     long commitTimeSec = response.getBuildTimeSeconds();
@@ -925,7 +998,9 @@ public class SegmentCompletionTest {
 
     // Fast forward to one second before commit time, and send a lease renewal request for 20s
     segmentCompletionMgr._seconds = startTime + commitTimeSec - 1;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr)
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr)
         .withExtraTimeSec(20);
     response = segmentCompletionMgr.extendBuildTime(params);
     Assert.assertEquals(response.getStatus(), ControllerResponseStatus.PROCESSED);
@@ -933,7 +1008,9 @@ public class SegmentCompletionTest {
 
     // Another lease extension in 19s.
     segmentCompletionMgr._seconds += 19;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr)
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr)
         .withExtraTimeSec(20);
     response = segmentCompletionMgr.extendBuildTime(params);
     Assert.assertEquals(response.getStatus(), ControllerResponseStatus.PROCESSED);
@@ -941,50 +1018,61 @@ public class SegmentCompletionTest {
 
     // Commit in 15s
     segmentCompletionMgr._seconds += 15;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentCommitStart(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE);
     long commitTimeMs = (segmentCompletionMgr._seconds - startTime) * 1000;
     Assert.assertEquals(commitTimeMap.get(tableName).longValue(), commitTimeMs);
     segmentCompletionMgr._seconds += 55;
-    response = segmentCompletionMgr
-        .segmentCommitEnd(params, true, false, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
+    response = segmentCompletionMgr.segmentCommitEnd(params, true, false,
+        CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
     // now FSM should be out of the map.
     Assert.assertFalse((fsmMap.containsKey(segmentNameStr)));
   }
 
   @Test
-  public void testFailedSlowCommit()
-      throws Exception {
+  public void testFailedSlowCommit() throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     final String tableName = new LLCSegmentName(segmentNameStr).getTableName();
     // s1 sends offset of 20, gets HOLD at t = 5s;
     final long startTime = 5;
     segmentCompletionMgr._seconds = startTime;
-    params = new Request.Params().withInstanceId(s1).withStreamPartitionMsgOffset(s1Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s1)
+        .withStreamPartitionMsgOffset(s1Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
     // s2 sends offset of 40, gets HOLD
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
     // s3 sends offset of 30, gets catchup to 40
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s3).withStreamPartitionMsgOffset(s3Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s3)
+        .withStreamPartitionMsgOffset(s3Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP);
     verifyOffset(response, s2Offset);
     // Now s1 comes back, and is asked to catchup.
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s1).withStreamPartitionMsgOffset(s1Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s1)
+        .withStreamPartitionMsgOffset(s1Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP);
     // s2 is asked to commit.
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
     long commitTimeSec = response.getBuildTimeSeconds();
@@ -992,7 +1080,9 @@ public class SegmentCompletionTest {
 
     // Fast forward to one second before commit time, and send a lease renewal request for 20s
     segmentCompletionMgr._seconds = startTime + commitTimeSec - 1;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr)
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr)
         .withExtraTimeSec(20);
     response = segmentCompletionMgr.extendBuildTime(params);
     Assert.assertEquals(response.getStatus(), ControllerResponseStatus.PROCESSED);
@@ -1000,7 +1090,9 @@ public class SegmentCompletionTest {
 
     // Come back too late.
     segmentCompletionMgr._seconds += 25;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentCommitStart(params);
     Assert.assertEquals(response.getStatus(), ControllerResponseStatus.HOLD);
     // now FSM should be out of the map.
@@ -1009,35 +1101,44 @@ public class SegmentCompletionTest {
   }
 
   @Test
-  public void testLeaseTooLong()
-      throws Exception {
+  public void testLeaseTooLong() throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     // s1 sends offset of 20, gets HOLD at t = 5s;
     final long startTime = 5;
     segmentCompletionMgr._seconds = startTime;
-    params = new Request.Params().withInstanceId(s1).withStreamPartitionMsgOffset(s1Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s1)
+        .withStreamPartitionMsgOffset(s1Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
     // s2 sends offset of 40, gets HOLD
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
     // s3 sends offset of 30, gets catchup to 40
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s3).withStreamPartitionMsgOffset(s3Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s3)
+        .withStreamPartitionMsgOffset(s3Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP);
     verifyOffset(response, s2Offset);
     // Now s1 comes back, and is asked to catchup.
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s1).withStreamPartitionMsgOffset(s1Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s1)
+        .withStreamPartitionMsgOffset(s1Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP);
     // s2 is asked to commit.
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
     long commitTimeSec = response.getBuildTimeSeconds();
@@ -1045,7 +1146,9 @@ public class SegmentCompletionTest {
 
     // Fast forward to one second before commit time, and send a lease renewal request for 20s
     segmentCompletionMgr._seconds = startTime + commitTimeSec - 1;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr)
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr)
         .withExtraTimeSec(20);
     response = segmentCompletionMgr.extendBuildTime(params);
     Assert.assertEquals(response.getStatus(), ControllerResponseStatus.PROCESSED);
@@ -1053,9 +1156,11 @@ public class SegmentCompletionTest {
 
     final int leaseTimeSec = 20;
     // Lease will not be granted if the time taken so far plus lease time exceeds the max allowabale.
-    while (segmentCompletionMgr._seconds + leaseTimeSec <= startTime + SegmentCompletionManager
-        .getMaxCommitTimeForAllSegmentsSeconds()) {
-      params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr)
+    while (segmentCompletionMgr._seconds + leaseTimeSec
+        <= startTime + SegmentCompletionManager.getMaxCommitTimeForAllSegmentsSeconds()) {
+      params = new Request.Params().withInstanceId(s2)
+          .withStreamPartitionMsgOffset(s2Offset.toString())
+          .withSegmentName(segmentNameStr)
           .withExtraTimeSec(leaseTimeSec);
       response = segmentCompletionMgr.extendBuildTime(params);
       Assert.assertEquals(response.getStatus(), ControllerResponseStatus.PROCESSED);
@@ -1064,7 +1169,9 @@ public class SegmentCompletionTest {
     }
 
     // Now the lease request should fail.
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr)
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr)
         .withExtraTimeSec(leaseTimeSec);
     response = segmentCompletionMgr.extendBuildTime(params);
     Assert.assertEquals(response.getStatus(), ControllerResponseStatus.FAILED);
@@ -1072,34 +1179,43 @@ public class SegmentCompletionTest {
   }
 
   @Test
-  public void testControllerFailureDuringCommit()
-      throws Exception {
+  public void testControllerFailureDuringCommit() throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     // s1 sends offset of 20, gets HOLD at t = 5s;
     segmentCompletionMgr._seconds = 5;
-    params = new Request.Params().withInstanceId(s1).withStreamPartitionMsgOffset(s1Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s1)
+        .withStreamPartitionMsgOffset(s1Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
     // s2 sends offset of 40, gets HOLD
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
     // s3 sends offset of 30, gets catchup to 40
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s3).withStreamPartitionMsgOffset(s3Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s3)
+        .withStreamPartitionMsgOffset(s3Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP);
     verifyOffset(response, s2Offset);
     // Now s1 comes back, and is asked to catchup.
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s1).withStreamPartitionMsgOffset(s1Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s1)
+        .withStreamPartitionMsgOffset(s1Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP);
     // s2 is asked to commit.
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
 
@@ -1107,24 +1223,32 @@ public class SegmentCompletionTest {
     replaceSegmentCompletionManager();
 
     // s3 comes back with the correct offset but is asked to hold.
-    params = new Request.Params().withInstanceId(s3).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s3)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
 
     // s1 comes back, and still asked to hold.
-    params = new Request.Params().withInstanceId(s1).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s1)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
 
     // s2 has no idea the controller failed, so it comes back with a commit,but the controller asks it to hold,
     // (essentially a commit failure)
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentCommitStart(params);
     Assert.assertTrue(response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.HOLD));
 
     // So s2 goes back into HOLDING state. s1 and s3 are already holding, so now it will get COMMIT back.
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
   }
@@ -1132,34 +1256,43 @@ public class SegmentCompletionTest {
   // Tests that when controller fails, after controller failure, commit doesn't continue. Then because all server instances
   // are in holding state, we will ask one to commit.
   @Test
-  public void testControllerFailureDuringSplitCommit()
-      throws Exception {
+  public void testControllerFailureDuringSplitCommit() throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     // s1 sends offset of 20, gets HOLD at t = 5s;
     segmentCompletionMgr._seconds = 5;
-    params = new Request.Params().withInstanceId(s1).withStreamPartitionMsgOffset(s1Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s1)
+        .withStreamPartitionMsgOffset(s1Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
     // s2 sends offset of 40, gets HOLD
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
     // s3 sends offset of 30, gets catchup to 40
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s3).withStreamPartitionMsgOffset(s3Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s3)
+        .withStreamPartitionMsgOffset(s3Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP);
     verifyOffset(response, s2Offset);
     // Now s1 comes back, and is asked to catchup.
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s1).withStreamPartitionMsgOffset(s1Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s1)
+        .withStreamPartitionMsgOffset(s1Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP);
     // s2 is asked to commit.
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
 
@@ -1167,41 +1300,52 @@ public class SegmentCompletionTest {
     replaceSegmentCompletionManager();
 
     // s3 comes back with the correct offset but is asked to hold.
-    params = new Request.Params().withInstanceId(s3).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s3)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
 
     // s1 comes back, and still asked to hold.
-    params = new Request.Params().withInstanceId(s1).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s1)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
 
     // s2 has no idea the controller failed, so it comes back with a commit,but the controller asks it to hold,
     // (essentially a commit failure)
     segmentCompletionMgr._seconds += 1;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentCommitStart(params);
     Assert.assertTrue(response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.HOLD));
 
     // So s2 goes back into HOLDING state. s1 and s3 are already holding, so now it will get COMMIT back.
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr)
+    params = new Request.Params().withInstanceId(s2)
+        .withStreamPartitionMsgOffset(s2Offset.toString())
+        .withSegmentName(segmentNameStr)
         .withSegmentLocation("location");
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
   }
 
   @Test
-  public void testNotLeader()
-      throws Exception {
+  public void testNotLeader() throws Exception {
     testCaseSetup(false, true);
     SegmentCompletionProtocol.Response response;
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
 
-    params = new Request.Params().withInstanceId(s1).withStreamPartitionMsgOffset(s1Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s1)
+        .withStreamPartitionMsgOffset(s1Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER);
 
-    params = new Request.Params().withInstanceId(s1).withStreamPartitionMsgOffset(s1Offset.toString()).withSegmentName(segmentNameStr);
+    params = new Request.Params().withInstanceId(s1)
+        .withStreamPartitionMsgOffset(s1Offset.toString())
+        .withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentCommitStart(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER);
   }

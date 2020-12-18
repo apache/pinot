@@ -22,6 +22,7 @@ import com.google.common.base.Function;
 import javax.annotation.Nullable;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -32,20 +33,19 @@ import org.testng.annotations.Test;
 /**
  * Tests for HelixHelper. This is in pinot-controller mostly to have the necessary test fixtures.
  */
-public class HelixHelperTest extends ControllerTest {
+public class HelixHelperTest {
   public static final String RESOURCE_NAME = "potato_OFFLINE";
   public static final String INSTANCE_NAME = "Server_1.2.3.4_1234";
 
   @BeforeClass
-  public void setUp() {
-    startZk();
-    startController();
+  public void setUp() throws Exception {
+    ControllerTestUtils.setupClusterAndValidate();
 
     IdealState idealState = new IdealState(RESOURCE_NAME);
     idealState.setStateModelDefRef("OnlineOffline");
     idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
     idealState.setReplicas("0");
-    _helixAdmin.addResource(getHelixClusterName(), RESOURCE_NAME, idealState);
+    ControllerTestUtils.getHelixAdmin().addResource(ControllerTestUtils.getHelixClusterName(), RESOURCE_NAME, idealState);
   }
 
   /**
@@ -55,7 +55,7 @@ public class HelixHelperTest extends ControllerTest {
   public void testWriteLargeIdealState() {
     final int numSegments = 20000;
 
-    HelixHelper.updateIdealState(_helixManager, RESOURCE_NAME, new Function<IdealState, IdealState>() {
+    HelixHelper.updateIdealState(ControllerTestUtils.getHelixManager(), RESOURCE_NAME, new Function<IdealState, IdealState>() {
       @Override
       public IdealState apply(@Nullable IdealState idealState) {
         Assert.assertNotNull(idealState);
@@ -66,7 +66,7 @@ public class HelixHelperTest extends ControllerTest {
       }
     }, RetryPolicies.noDelayRetryPolicy(1));
 
-    IdealState resourceIdealState = _helixAdmin.getResourceIdealState(getHelixClusterName(), RESOURCE_NAME);
+    IdealState resourceIdealState = ControllerTestUtils.getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(), RESOURCE_NAME);
     for (int i = 0; i < numSegments; i++) {
       Assert.assertEquals(resourceIdealState.getInstanceStateMap("segment_" + i).get(INSTANCE_NAME), "ONLINE");
     }
@@ -89,7 +89,7 @@ public class HelixHelperTest extends ControllerTest {
   }
 
   private void aMethodWhichThrowsExceptionInUpdater(String testSegment) {
-    HelixHelper.updateIdealState(_helixManager, RESOURCE_NAME, new Function<IdealState, IdealState>() {
+    HelixHelper.updateIdealState(ControllerTestUtils.getHelixManager(), RESOURCE_NAME, new Function<IdealState, IdealState>() {
       @Override
       public IdealState apply(@Nullable IdealState idealState) {
         if (testSegment == null) {
@@ -102,7 +102,6 @@ public class HelixHelperTest extends ControllerTest {
 
   @AfterClass
   public void tearDown() {
-    stopController();
-    stopZk();
+    ControllerTestUtils.cleanup();
   }
 }

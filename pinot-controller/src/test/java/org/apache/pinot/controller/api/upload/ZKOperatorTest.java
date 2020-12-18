@@ -21,9 +21,8 @@ package org.apache.pinot.controller.api.upload;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -32,45 +31,36 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
+import static org.mockito.Mockito.*;
+import static org.testng.Assert.*;
 
 
-public class ZKOperatorTest extends ControllerTest {
-  private static final String RAW_TABLE_NAME = "testTable";
+public class ZKOperatorTest {
+  private static final String TABLE_NAME = "operatorTestTable";
   private static final String SEGMENT_NAME = "testSegment";
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
-    startZk();
-    startController();
+  public void setUp() throws Exception {
+    ControllerTestUtils.setupClusterAndValidate();
 
-    addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
-    addFakeServerInstancesToAutoJoinHelixCluster(1, true);
-
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
-    _helixResourceManager.addTable(tableConfig);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    ControllerTestUtils.getHelixResourceManager().addTable(tableConfig);
   }
 
   @Test
-  public void testCompleteSegmentOperations()
-      throws Exception {
+  public void testCompleteSegmentOperations() throws Exception {
     ZKOperator zkOperator =
-        new ZKOperator(_helixResourceManager, mock(ControllerConf.class), mock(ControllerMetrics.class));
+        new ZKOperator(ControllerTestUtils.getHelixResourceManager(), mock(ControllerConf.class), mock(ControllerMetrics.class));
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
     when(segmentMetadata.getName()).thenReturn(SEGMENT_NAME);
     when(segmentMetadata.getCrc()).thenReturn("12345");
     when(segmentMetadata.getIndexCreationTime()).thenReturn(123L);
     HttpHeaders httpHeaders = mock(HttpHeaders.class);
-    zkOperator.completeSegmentOperations(RAW_TABLE_NAME, segmentMetadata, null, null, false, httpHeaders, "downloadUrl",
+    zkOperator.completeSegmentOperations(TABLE_NAME, segmentMetadata, null, null, false, httpHeaders, "downloadUrl",
         false, "crypter");
 
     OfflineSegmentZKMetadata segmentZKMetadata =
-        _helixResourceManager.getOfflineSegmentZKMetadata(RAW_TABLE_NAME, SEGMENT_NAME);
+        ControllerTestUtils.getHelixResourceManager().getOfflineSegmentZKMetadata(TABLE_NAME, SEGMENT_NAME);
     assertEquals(segmentZKMetadata.getCrc(), 12345L);
     assertEquals(segmentZKMetadata.getCreationTime(), 123L);
     long pushTime = segmentZKMetadata.getPushTime();
@@ -82,7 +72,7 @@ public class ZKOperatorTest extends ControllerTest {
     // Refresh the segment with unmatched IF_MATCH field
     when(httpHeaders.getHeaderString(HttpHeaders.IF_MATCH)).thenReturn("123");
     try {
-      zkOperator.completeSegmentOperations(RAW_TABLE_NAME, segmentMetadata, null, null, false, httpHeaders,
+      zkOperator.completeSegmentOperations(TABLE_NAME, segmentMetadata, null, null, false, httpHeaders,
           "otherDownloadUrl", false, null);
       fail();
     } catch (Exception e) {
@@ -93,10 +83,10 @@ public class ZKOperatorTest extends ControllerTest {
     // downloadURL and crypter
     when(httpHeaders.getHeaderString(HttpHeaders.IF_MATCH)).thenReturn("12345");
     when(segmentMetadata.getIndexCreationTime()).thenReturn(456L);
-    zkOperator
-        .completeSegmentOperations(RAW_TABLE_NAME, segmentMetadata, null, null, false, httpHeaders, "otherDownloadUrl",
-            false, "otherCrypter");
-    segmentZKMetadata = _helixResourceManager.getOfflineSegmentZKMetadata(RAW_TABLE_NAME, SEGMENT_NAME);
+    zkOperator.completeSegmentOperations(TABLE_NAME, segmentMetadata, null, null, false, httpHeaders,
+        "otherDownloadUrl", false, "otherCrypter");
+    segmentZKMetadata = ControllerTestUtils
+        .getHelixResourceManager().getOfflineSegmentZKMetadata(TABLE_NAME, SEGMENT_NAME);
     assertEquals(segmentZKMetadata.getCrc(), 12345L);
     // Push time should not change
     assertEquals(segmentZKMetadata.getPushTime(), pushTime);
@@ -112,11 +102,13 @@ public class ZKOperatorTest extends ControllerTest {
     when(segmentMetadata.getCrc()).thenReturn("23456");
     when(segmentMetadata.getIndexCreationTime()).thenReturn(789L);
     // Add a tiny sleep to guarantee that refresh time is different from the previous round
-    Thread.sleep(10L);
-    zkOperator
-        .completeSegmentOperations(RAW_TABLE_NAME, segmentMetadata, null, null, false, httpHeaders, "otherDownloadUrl",
-            false, "otherCrypter");
-    segmentZKMetadata = _helixResourceManager.getOfflineSegmentZKMetadata(RAW_TABLE_NAME, SEGMENT_NAME);
+    // 1 second delay to avoid "org.apache.helix.HelixException: Specified EXTERNALVIEW operatorTestTable_OFFLINE is
+    // not found!" exception from being thrown sporadically.
+    Thread.sleep(1000L);
+    zkOperator.completeSegmentOperations(TABLE_NAME, segmentMetadata, null, null, false, httpHeaders,
+        "otherDownloadUrl", false, "otherCrypter");
+    segmentZKMetadata = ControllerTestUtils
+        .getHelixResourceManager().getOfflineSegmentZKMetadata(TABLE_NAME, SEGMENT_NAME);
     assertEquals(segmentZKMetadata.getCrc(), 23456L);
     // Push time should not change
     assertEquals(segmentZKMetadata.getPushTime(), pushTime);
@@ -129,10 +121,6 @@ public class ZKOperatorTest extends ControllerTest {
 
   @AfterClass
   public void tearDown() {
-    _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
-
-    stopFakeInstances();
-    stopController();
-    stopZk();
+    ControllerTestUtils.cleanup();
   }
 }

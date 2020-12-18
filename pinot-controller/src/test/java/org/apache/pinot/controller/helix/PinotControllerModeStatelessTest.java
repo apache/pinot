@@ -44,7 +44,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class PinotControllerModeTest extends ControllerTest {
+public class PinotControllerModeStatelessTest extends ControllerTest {
   private static long TIMEOUT_IN_MS = 10_000L;
 
   @BeforeClass
@@ -57,7 +57,7 @@ public class PinotControllerModeTest extends ControllerTest {
     // Start a Helix-only controller
     Map<String, Object> properties = getDefaultControllerConfiguration();
     properties.put(ControllerConf.CONTROLLER_MODE, ControllerConf.ControllerMode.HELIX_ONLY);
-    
+
     startController(properties);
     TestUtils.waitForCondition(aVoid -> _helixManager.isConnected(), TIMEOUT_IN_MS,
         "Failed to start the Helix-only controller");
@@ -70,7 +70,7 @@ public class PinotControllerModeTest extends ControllerTest {
     // Start the first dual-mode controller
     Map<String, Object> properties = getDefaultControllerConfiguration();
     properties.put(ControllerConf.CONTROLLER_MODE, ControllerConf.ControllerMode.DUAL);
-    
+
     startController(properties);
 
     // check the throttling constraint
@@ -162,7 +162,7 @@ public class PinotControllerModeTest extends ControllerTest {
     properties = getDefaultControllerConfiguration();
     properties.put(ControllerConf.CONTROLLER_MODE, ControllerConf.ControllerMode.DUAL);
     properties.put(ControllerConf.CONTROLLER_PORT, DEFAULT_CONTROLLER_PORT + 2);
-    
+
     ControllerStarter thirdDualModeController = getControllerStarter(new ControllerConf(properties));
     thirdDualModeController.start();
     PinotHelixResourceManager pinotHelixResourceManager = thirdDualModeController.getHelixResourceManager();
@@ -201,7 +201,7 @@ public class PinotControllerModeTest extends ControllerTest {
   public void testPinotOnlyController() {
     Map<String, Object> properties = getDefaultControllerConfiguration();
     properties.put(ControllerConf.CONTROLLER_MODE, ControllerConf.ControllerMode.PINOT_ONLY);
-    
+
     ControllerStarter firstPinotOnlyController = getControllerStarter(new ControllerConf(properties));
 
     // Starting Pinot-only controller without Helix controller should fail
@@ -216,7 +216,7 @@ public class PinotControllerModeTest extends ControllerTest {
     properties = getDefaultControllerConfiguration();
     properties.put(ControllerConf.CONTROLLER_MODE, ControllerConf.ControllerMode.HELIX_ONLY);
     properties.put(ControllerConf.CONTROLLER_PORT, DEFAULT_CONTROLLER_PORT + 1);
-    
+
     ControllerStarter helixOnlyController = new ControllerStarter(new ControllerConf(properties));
     helixOnlyController.start();
     HelixManager helixControllerManager = helixOnlyController.getHelixControllerManager();
@@ -236,7 +236,7 @@ public class PinotControllerModeTest extends ControllerTest {
     properties = getDefaultControllerConfiguration();
     properties.put(ControllerConf.CONTROLLER_MODE, ControllerConf.ControllerMode.PINOT_ONLY);
     properties.put(ControllerConf.CONTROLLER_PORT, DEFAULT_CONTROLLER_PORT + 2);
-    
+
     ControllerStarter secondPinotOnlyController = getControllerStarter(new ControllerConf(properties));
     secondPinotOnlyController.start();
     TestUtils.waitForCondition(

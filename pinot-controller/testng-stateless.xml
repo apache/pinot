@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE suite SYSTEM "http://testng.org/testng-1.0.dtd" >
+<!--
+
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License.  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing,
+    software distributed under the License is distributed on an
+    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+    KIND, either express or implied.  See the License for the
+    specific language governing permissions and limitations
+    under the License.
+
+-->
+<suite name="testng.suite.controller.stateless">
+  <!--
+      These test cases take extra time to run because they have to spend time setting up and destroying
+      their individual state. When possible add new test cases to the testng-stateful.xml suite, so that
+      time is not wasted setting up and destroying state and test cases can run faster. Add test cases
+      here only if your test cases can not use the shared state that is setup in the testng-stateful.xml
+      suite.
+  -->
+  <test name="testng.suite.controller.stateless">
+    <classes>
+      <class name="org.apache.pinot.controller.api.PinotBrokerRestletResourceStatelessTest"/>
+      <class name="org.apache.pinot.controller.helix.ControllerTenantStatelessTest"/>
+      <class name="org.apache.pinot.controller.helix.PinotControllerModeStatelessTest"/>
+      <class name="org.apache.pinot.controller.helix.ControllerPeriodicTaskStarterStatelessTest"/>
+      <class name="org.apache.pinot.controller.validation.ValidationManagerStatelessTest"/>
+      <class name="org.apache.pinot.controller.helix.core.PinotHelixResourceManagerStatelessTest"/>
+      <class name="org.apache.pinot.controller.helix.core.rebalance.TableRebalancerClusterStatelessTest"/>
+    </classes>
+  </test>
+</suite>

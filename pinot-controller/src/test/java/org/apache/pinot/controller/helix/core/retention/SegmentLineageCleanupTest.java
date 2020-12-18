@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.lineage.LineageEntry;
 import org.apache.pinot.common.lineage.LineageEntryState;
@@ -31,8 +30,8 @@ import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.controller.LeadControllerManager;
-import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -41,18 +40,18 @@ import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.*;
 
 
-public class SegmentLineageCleanupTest extends ControllerTest {
-  private static final int BASE_SERVER_ADMIN_PORT = 10000;
+public class SegmentLineageCleanupTest {
   private static final int NUM_INSTANCES = 1;
   private static final long MAX_TIMEOUT_IN_MILLISECOND = 10_000L; // 10 seconds
 
-  private static final String OFFLINE_TABLE_NAME = "testTable_OFFLINE";
+  private static final String OFFLINE_TABLE_NAME = "segmentTable_OFFLINE";
   private static final String BROKER_TENANT_NAME = "brokerTenant";
   private static final String SERVER_TENANT_NAME = "serverTenant";
   private static final String RETENTION_TIME_UNIT = "DAYS";
@@ -61,27 +60,20 @@ public class SegmentLineageCleanupTest extends ControllerTest {
   private RetentionManager _retentionManager;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
-    startZk();
-    Map<String, Object> properties = getDefaultControllerConfiguration();
-    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
-
-    startController(properties);
-    addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_INSTANCES, false);
-    addFakeServerInstancesToAutoJoinHelixCluster(NUM_INSTANCES, false, BASE_SERVER_ADMIN_PORT);
+  public void setUp() throws Exception {
+    ControllerTestUtils.setupClusterAndValidate();
 
     // Create server tenant
     Tenant serverTenant = new Tenant(TenantRole.SERVER, SERVER_TENANT_NAME, NUM_INSTANCES, NUM_INSTANCES, 0);
-    _helixResourceManager.createServerTenant(serverTenant);
+    ControllerTestUtils.getHelixResourceManager().createServerTenant(serverTenant);
 
     // Create broker tenant
     Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, NUM_INSTANCES, 0, 0);
-    PinotResourceManagerResponse response = _helixResourceManager.createBrokerTenant(brokerTenant);
+    PinotResourceManagerResponse response = ControllerTestUtils.getHelixResourceManager().createBrokerTenant(brokerTenant);
     Assert.assertTrue(response.isSuccessful());
 
     // Enable lead controller resource
-    enableResourceConfigForLeadControllerResource(true);
+    ControllerTestUtils.enableResourceConfigForLeadControllerResource(true);
 
     // Create the retention manager
     LeadControllerManager leadControllerManager = mock(LeadControllerManager.class);
@@ -90,31 +82,33 @@ public class SegmentLineageCleanupTest extends ControllerTest {
     ControllerMetrics controllerMetrics = new ControllerMetrics(new MetricsRegistry());
     conf.setRetentionControllerFrequencyInSeconds(0);
     conf.setDeletedSegmentsRetentionInDays(0);
-    _retentionManager = new RetentionManager(_helixResourceManager, leadControllerManager, conf, controllerMetrics);
+    _retentionManager = new RetentionManager(ControllerTestUtils.getHelixResourceManager(), leadControllerManager, conf, controllerMetrics);
 
     // Update table config
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(OFFLINE_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
-            .setServerTenant(SERVER_TENANT_NAME).setNumReplicas(1).setRetentionTimeUnit(RETENTION_TIME_UNIT)
-            .setRetentionTimeValue(RETENTION_TIME_VALUE).build();
-    _helixResourceManager.addTable(tableConfig);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(OFFLINE_TABLE_NAME)
+        .setBrokerTenant(BROKER_TENANT_NAME)
+        .setServerTenant(SERVER_TENANT_NAME)
+        .setNumReplicas(1)
+        .setRetentionTimeUnit(RETENTION_TIME_UNIT)
+        .setRetentionTimeValue(RETENTION_TIME_VALUE)
+        .build();
+    ControllerTestUtils.getHelixResourceManager().addTable(tableConfig);
   }
 
   @Test
-  public void testSegmentLineageCleanup()
-      throws IOException, InterruptedException {
+  public void testSegmentLineageCleanup() throws IOException, InterruptedException {
     // Create metadata for original segments
     for (int i = 0; i < 5; ++i) {
-      _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
+      ControllerTestUtils.getHelixResourceManager().addNewSegment(OFFLINE_TABLE_NAME,
           SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "segment_" + i), "downloadUrl");
     }
 
     // Create metadata for merged segments.
     for (int i = 0; i < 2; ++i) {
-      _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
+      ControllerTestUtils.getHelixResourceManager().addNewSegment(OFFLINE_TABLE_NAME,
           SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "merged_" + i), "downloadUrl");
     }
-    Assert.assertEquals(_helixResourceManager.getSegmentsFor(OFFLINE_TABLE_NAME).size(), 7);
+    Assert.assertEquals(ControllerTestUtils.getHelixResourceManager().getSegmentsFor(OFFLINE_TABLE_NAME).size(), 7);
     long currentTimeInMillis = System.currentTimeMillis();
 
     // Validate the case when the lineage entry state is 'IN_PROGRESS'
@@ -122,33 +116,33 @@ public class SegmentLineageCleanupTest extends ControllerTest {
     segmentLineage.addLineageEntry("0",
         new LineageEntry(Arrays.asList("segment_0", "segment_1"), Arrays.asList("merged_0"),
             LineageEntryState.IN_PROGRESS, currentTimeInMillis));
-    SegmentLineageAccessHelper.writeSegmentLineage(_helixResourceManager.getPropertyStore(), segmentLineage, -1);
+    SegmentLineageAccessHelper.writeSegmentLineage(ControllerTestUtils.getHelixResourceManager().getPropertyStore(), segmentLineage, -1);
     _retentionManager.processTable(OFFLINE_TABLE_NAME);
     waitForSegmentsToDelete(OFFLINE_TABLE_NAME, 7);
-    List<String> segmentsForTable = _helixResourceManager.getSegmentsFor(OFFLINE_TABLE_NAME);
+    List<String> segmentsForTable = ControllerTestUtils.getHelixResourceManager().getSegmentsFor(OFFLINE_TABLE_NAME);
     Assert.assertEquals(segmentsForTable.size(), 7);
 
     // Validate the case when the lineage entry state is 'COMPLETED'
     segmentLineage.updateLineageEntry("0",
         new LineageEntry(Arrays.asList("segment_0", "segment_1"), Arrays.asList("merged_0"),
             LineageEntryState.COMPLETED, currentTimeInMillis));
-    SegmentLineageAccessHelper.writeSegmentLineage(_helixResourceManager.getPropertyStore(), segmentLineage, -1);
+    SegmentLineageAccessHelper.writeSegmentLineage(ControllerTestUtils.getHelixResourceManager().getPropertyStore(), segmentLineage, -1);
     _retentionManager.processTable(OFFLINE_TABLE_NAME);
     waitForSegmentsToDelete(OFFLINE_TABLE_NAME, 5);
-    segmentsForTable = _helixResourceManager.getSegmentsFor(OFFLINE_TABLE_NAME);
+    segmentsForTable = ControllerTestUtils.getHelixResourceManager().getSegmentsFor(OFFLINE_TABLE_NAME);
     Assert.assertEquals(segmentsForTable.size(), 5);
     Assert.assertTrue(Collections.disjoint(segmentsForTable, Arrays.asList("segment_0", "segment_1")));
 
     // Validate the case when the lineage entry state is 'COMPLETED' and all segments are deleted
-    _helixResourceManager.deleteSegment(OFFLINE_TABLE_NAME, "merged_0");
+    ControllerTestUtils.getHelixResourceManager().deleteSegment(OFFLINE_TABLE_NAME, "merged_0");
     waitForSegmentsToDelete(OFFLINE_TABLE_NAME, 4);
     _retentionManager.processTable(OFFLINE_TABLE_NAME);
     waitForSegmentsToDelete(OFFLINE_TABLE_NAME, 4);
-    segmentsForTable = _helixResourceManager.getSegmentsFor(OFFLINE_TABLE_NAME);
+    segmentsForTable = ControllerTestUtils.getHelixResourceManager().getSegmentsFor(OFFLINE_TABLE_NAME);
     Assert.assertEquals(segmentsForTable.size(), 4);
     Assert.assertTrue(Collections.disjoint(segmentsForTable, Arrays.asList("segment_0", "segment_1", "merged_0")));
     segmentLineage =
-        SegmentLineageAccessHelper.getSegmentLineage(_helixResourceManager.getPropertyStore(), OFFLINE_TABLE_NAME);
+        SegmentLineageAccessHelper.getSegmentLineage(ControllerTestUtils.getHelixResourceManager().getPropertyStore(), OFFLINE_TABLE_NAME);
     Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 0);
 
     // Validate the case when the lineage entry state is 'IN_PROGRESS' and timestamp is old
@@ -156,14 +150,14 @@ public class SegmentLineageCleanupTest extends ControllerTest {
         new LineageEntry(Arrays.asList("segment_2", "segment_3"), Arrays.asList("merged_1", "merged_2"),
             LineageEntryState.IN_PROGRESS, currentTimeInMillis - TimeUnit.DAYS.toMillis(2L));
     segmentLineage.addLineageEntry("1", lineageEntry);
-    SegmentLineageAccessHelper.writeSegmentLineage(_helixResourceManager.getPropertyStore(), segmentLineage, -1);
+    SegmentLineageAccessHelper.writeSegmentLineage(ControllerTestUtils.getHelixResourceManager().getPropertyStore(), segmentLineage, -1);
     _retentionManager.processTable(OFFLINE_TABLE_NAME);
     waitForSegmentsToDelete(OFFLINE_TABLE_NAME, 3);
-    segmentsForTable = _helixResourceManager.getSegmentsFor(OFFLINE_TABLE_NAME);
+    segmentsForTable = ControllerTestUtils.getHelixResourceManager().getSegmentsFor(OFFLINE_TABLE_NAME);
     Assert.assertEquals(segmentsForTable.size(), 3);
     Assert.assertTrue(Collections.disjoint(segmentsForTable, Arrays.asList("merged_1", "merged_2")));
     segmentLineage =
-        SegmentLineageAccessHelper.getSegmentLineage(_helixResourceManager.getPropertyStore(), OFFLINE_TABLE_NAME);
+        SegmentLineageAccessHelper.getSegmentLineage(ControllerTestUtils.getHelixResourceManager().getPropertyStore(), OFFLINE_TABLE_NAME);
     Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 1);
   }
 
@@ -171,12 +165,17 @@ public class SegmentLineageCleanupTest extends ControllerTest {
       throws InterruptedException {
     long endTimeMs = System.currentTimeMillis() + MAX_TIMEOUT_IN_MILLISECOND;
     do {
-      if (_helixResourceManager.getSegmentsFor(tableNameWithType).size() == expectedNumSegmentsAfterDelete) {
+      if (ControllerTestUtils.getHelixResourceManager().getSegmentsFor(tableNameWithType).size() == expectedNumSegmentsAfterDelete) {
         return;
       } else {
         Thread.sleep(500L);
       }
     } while (System.currentTimeMillis() < endTimeMs);
     throw new RuntimeException("Timeout while waiting for segments to be deleted");
+  }
+
+  @AfterClass
+  public void tearDown() {
+    ControllerTestUtils.cleanup();
   }
 }

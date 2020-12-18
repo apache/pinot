@@ -21,70 +21,78 @@ package org.apache.pinot.controller.helix;
 import java.io.IOException;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class ControllerSentinelTestV2 extends ControllerTest {
+public class ControllerSentinelTestV2 {
+  private static final String TABLE_NAME = "sentinalTable";
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
-    startZk();
-    startController();
-    addFakeBrokerInstancesToAutoJoinHelixCluster(20, true);
-    addFakeServerInstancesToAutoJoinHelixCluster(20, true);
+  public void setUp() throws Exception {
+    ControllerTestUtils.setupClusterAndValidate();
   }
 
   @Test
-  public void testOfflineTableLifeCycle()
-      throws IOException {
+  public void testOfflineTableLifeCycle() throws IOException {
     // Create offline table creation request
-    String tableName = "testTable";
     TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setNumReplicas(3).build();
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString());
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setNumReplicas(
+            ControllerTestUtils.MIN_NUM_REPLICAS).build();
+    ControllerTestUtils
+        .sendPostRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableCreate(), tableConfig.toJsonString());
     Assert.assertEquals(
-        _helixAdmin.getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
-            .getPartitionSet().size(), 1);
+        ControllerTestUtils
+            .getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
+            .getPartitionSet()
+            .size(), 1);
     Assert.assertEquals(
-        _helixAdmin.getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
-            .getInstanceSet(tableName + "_OFFLINE").size(), 20);
+        ControllerTestUtils
+            .getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
+            .getInstanceSet(TABLE_NAME + "_OFFLINE")
+            .size(), ControllerTestUtils.NUM_BROKER_INSTANCES);
 
     // Adding segments
     for (int i = 0; i < 10; ++i) {
       Assert.assertEquals(
-          _helixAdmin.getResourceIdealState(getHelixClusterName(), tableName + "_OFFLINE").getNumPartitions(), i);
-      _helixResourceManager
-          .addNewSegment(tableName, SegmentMetadataMockUtils.mockSegmentMetadata(tableName), "downloadUrl");
+          ControllerTestUtils
+              .getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(), TABLE_NAME + "_OFFLINE").getNumPartitions(), i);
+      ControllerTestUtils.getHelixResourceManager().addNewSegment(TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME),
+          "downloadUrl");
       Assert.assertEquals(
-          _helixAdmin.getResourceIdealState(getHelixClusterName(), tableName + "_OFFLINE").getNumPartitions(), i + 1);
+          ControllerTestUtils
+              .getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(), TABLE_NAME + "_OFFLINE").getNumPartitions(),
+          i + 1);
     }
 
     // Delete table
-    sendDeleteRequest(_controllerRequestURLBuilder.forTableDelete(tableName));
+    ControllerTestUtils.sendDeleteRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableDelete(TABLE_NAME));
     Assert.assertEquals(
-        _helixAdmin.getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
-            .getPartitionSet().size(), 0);
+        ControllerTestUtils
+            .getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
+            .getPartitionSet()
+            .size(), 0);
 
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(),
-        TagNameUtils.getBrokerTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME)).size(), 20);
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(),
-        TagNameUtils.getRealtimeTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME)).size(), 20);
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(),
-        TagNameUtils.getOfflineTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME)).size(), 20);
+    Assert.assertEquals(
+        ControllerTestUtils.getHelixAdmin().getInstancesInClusterWithTag(ControllerTestUtils.getHelixClusterName(),
+        TagNameUtils.getBrokerTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME)).size(), ControllerTestUtils.NUM_BROKER_INSTANCES);
+    Assert.assertEquals(
+        ControllerTestUtils.getHelixAdmin().getInstancesInClusterWithTag(ControllerTestUtils.getHelixClusterName(),
+        TagNameUtils.getRealtimeTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME)).size(), ControllerTestUtils.NUM_BROKER_INSTANCES);
+    Assert.assertEquals(
+        ControllerTestUtils.getHelixAdmin().getInstancesInClusterWithTag(ControllerTestUtils.getHelixClusterName(),
+        TagNameUtils.getOfflineTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME)).size(), ControllerTestUtils.NUM_BROKER_INSTANCES);
   }
 
-  @AfterClass
+  @AfterTest
   public void tearDown() {
-    stopFakeInstances();
-    stopController();
-    stopZk();
+    ControllerTestUtils.cleanup();
   }
 }
