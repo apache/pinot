@@ -4,6 +4,7 @@ import org.apache.pinot.spi.stream.v2.Checkpoint;
 import org.apache.pinot.spi.stream.v2.PartitionGroupMetadata;
 import software.amazon.awssdk.services.kinesis.model.GetShardIteratorRequest;
 import software.amazon.awssdk.services.kinesis.model.GetShardIteratorResponse;
+import software.amazon.awssdk.services.kinesis.model.SequenceNumberRange;
 import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 
 
@@ -12,11 +13,11 @@ public class KinesisShardMetadata extends KinesisConnectionHandler implements Pa
   Checkpoint _startCheckpoint;
   Checkpoint _endCheckpoint;
 
-  public KinesisShardMetadata(String shardId, String streamName) {
-    GetShardIteratorResponse getShardIteratorResponse = _kinesisClient.getShardIterator(GetShardIteratorRequest.builder().shardId(shardId).shardIteratorType(
-        ShardIteratorType.LATEST).streamName(streamName).build());
-    _startCheckpoint = new KinesisCheckpoint(getShardIteratorResponse.shardIterator());
-    _endCheckpoint = null;
+  public KinesisShardMetadata(String shardId, String streamName, String awsRegion) {
+    super(streamName, awsRegion);
+
+    _startCheckpoint = new KinesisCheckpoint(shardId, null);
+    _endCheckpoint = new KinesisCheckpoint(shardId, null);
     _shardId = shardId;
   }
 

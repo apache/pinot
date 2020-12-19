@@ -8,17 +8,17 @@ import software.amazon.awssdk.services.kinesis.model.Record;
 
 
 public class KinesisFetchResult implements FetchResult<Record> {
-  private final String _nextShardIterator;
+  private final KinesisCheckpoint _kinesisCheckpoint;
   private final List<Record> _recordList;
 
-  public KinesisFetchResult(String nextShardIterator, List<Record> recordList){
-     _nextShardIterator = nextShardIterator;
+  public KinesisFetchResult(KinesisCheckpoint kinesisCheckpoint, List<Record> recordList){
+     _kinesisCheckpoint = kinesisCheckpoint;
      _recordList = recordList;
   }
 
   @Override
   public Checkpoint getLastCheckpoint() {
-    return new KinesisCheckpoint(_nextShardIterator);
+    return _kinesisCheckpoint;
   }
 
   @Override
