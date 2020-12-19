@@ -7,6 +7,7 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.v2.Checkpoint;
 import org.apache.pinot.spi.stream.v2.ConsumerV2;
 import org.apache.pinot.spi.stream.v2.FetchResult;
+import org.apache.pinot.spi.stream.v2.PartitionGroupMetadata;
 import software.amazon.awssdk.services.kinesis.model.GetRecordsRequest;
 import software.amazon.awssdk.services.kinesis.model.GetRecordsResponse;
 import software.amazon.awssdk.services.kinesis.model.GetShardIteratorRequest;
@@ -18,18 +19,14 @@ import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 public class KinesisConsumer extends KinesisConnectionHandler implements ConsumerV2 {
   String _stream;
   Integer _maxRecords;
+  String _shardId;
 
-  //TODO: Fetch AWS region from  Stream Config.
-  public KinesisConsumer(String stream, String awsRegion) {
-    super(stream, awsRegion);
-    _stream = stream;
-    _maxRecords = 20;
-  }
-
-  public KinesisConsumer(String stream, String awsRegion, StreamConfig streamConfig) {
-    super(stream, awsRegion);
+  public KinesisConsumer(String stream, StreamConfig streamConfig, PartitionGroupMetadata partitionGroupMetadata) {
+    super(stream, streamConfig.getStreamConfigsMap().getOrDefault("aws-region", "global"));
     _stream = stream;
     _maxRecords = Integer.parseInt(streamConfig.getStreamConfigsMap().getOrDefault("maxRecords", "20"));
+    KinesisShardMetadata kinesisShardMetadata = (KinesisShardMetadata) partitionGroupMetadata;
+    _shardId = kinesisShardMetadata.getShardId();
   }
 
   @Override
@@ -73,7 +70,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Consume
       nextStartSequenceNumber = recordList.get(recordList.size() - 1).sequenceNumber();
     }
 
-    KinesisCheckpoint kinesisCheckpoint = new KinesisCheckpoint(kinesisStartCheckpoint.getShardId(), nextStartSequenceNumber);
+    KinesisCheckpoint kinesisCheckpoint = new KinesisCheckpoint(nextStartSequenceNumber);
     KinesisFetchResult kinesisFetchResult = new KinesisFetchResult(kinesisCheckpoint,
         recordList);
 
@@ -86,11 +83,11 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Consume
     if(kinesisStartCheckpoint.getSequenceNumber() != null) {
       String kinesisStartSequenceNumber = kinesisStartCheckpoint.getSequenceNumber();
       getShardIteratorResponse = _kinesisClient.getShardIterator(
-          GetShardIteratorRequest.builder().streamName(_stream).shardId(kinesisStartCheckpoint.getShardId()).shardIteratorType(ShardIteratorType.AT_SEQUENCE_NUMBER)
+          GetShardIteratorRequest.builder().streamName(_stream).shardId(_shardId).shardIteratorType(ShardIteratorType.AT_SEQUENCE_NUMBER)
               .startingSequenceNumber(kinesisStartSequenceNumber).build());
     } else{
       getShardIteratorResponse = _kinesisClient.getShardIterator(
-          GetShardIteratorRequest.builder().shardId(kinesisStartCheckpoint.getShardId()).streamName(_stream).shardIteratorType(ShardIteratorType.LATEST).build());
+          GetShardIteratorRequest.builder().shardId(_shardId).streamName(_stream).shardIteratorType(ShardIteratorType.LATEST).build());
     }
 
     return getShardIteratorResponse.shardIterator();

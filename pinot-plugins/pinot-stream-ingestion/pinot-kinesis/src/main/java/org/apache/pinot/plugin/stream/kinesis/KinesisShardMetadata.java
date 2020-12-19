@@ -15,9 +15,8 @@ public class KinesisShardMetadata extends KinesisConnectionHandler implements Pa
 
   public KinesisShardMetadata(String shardId, String streamName, String awsRegion) {
     super(streamName, awsRegion);
-
-    _startCheckpoint = new KinesisCheckpoint(shardId, null);
-    _endCheckpoint = new KinesisCheckpoint(shardId, null);
+    _startCheckpoint = null;
+    _endCheckpoint = null;
     _shardId = shardId;
   }
 
