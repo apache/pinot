@@ -50,6 +50,7 @@ public class IndexLoadingConfig {
   private Set<String> _textIndexColumns = new HashSet<>();
   private Set<String> _fstIndexColumns = new HashSet<>();
   private Set<String> _rangeIndexColumns = new HashSet<>();
+  private Set<String> _h3IndexColumns = new HashSet<>();
   private Set<String> _noDictionaryColumns = new HashSet<>(); // TODO: replace this by _noDictionaryConfig.
   private Map<String, String> _noDictionaryConfig = new HashMap<>();
   private Set<String> _varLengthDictionaryColumns = new HashSet<>();
@@ -96,6 +97,11 @@ public class IndexLoadingConfig {
     List<String> rangeIndexColumns = indexingConfig.getRangeIndexColumns();
     if (rangeIndexColumns != null) {
       _rangeIndexColumns.addAll(rangeIndexColumns);
+    }
+
+    List<String> h3IndexColumns = indexingConfig.getH3IndexColumns();
+    if (h3IndexColumns != null) {
+      _h3IndexColumns.addAll(h3IndexColumns);
     }
 
     List<String> bloomFilterColumns = indexingConfig.getBloomFilterColumns();
@@ -238,6 +244,10 @@ public class IndexLoadingConfig {
 
   public Set<String> getRangeIndexColumns() {
     return _rangeIndexColumns;
+  }
+
+  public Set<String> getH3IndexColumns() {
+    return _h3IndexColumns;
   }
 
   public Map<String, Map<String, String>> getColumnProperties() {

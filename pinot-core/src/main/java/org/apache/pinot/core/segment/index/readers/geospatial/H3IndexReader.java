@@ -78,7 +78,6 @@ public class H3IndexReader implements Closeable {
     }
   }
 
-  //todo: fix this
   private synchronized ImmutableRoaringBitmap buildRoaringBitmapForIndex(final int index) {
     int currentOffset = getOffset(index);
     int bufferLength;

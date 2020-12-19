@@ -28,6 +28,7 @@ import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.LuceneFSTIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
 import org.apache.pinot.core.segment.index.readers.TextIndexReader;
+import org.apache.pinot.core.segment.index.readers.geospatial.H3IndexReader;
 
 
 public abstract class BaseDataSource implements DataSource {
@@ -36,6 +37,7 @@ public abstract class BaseDataSource implements DataSource {
   private final Dictionary _dictionary;
   private final InvertedIndexReader<?> _invertedIndex;
   private final InvertedIndexReader<?> _rangeIndex;
+  private final H3IndexReader _h3Index;
   private final TextIndexReader _textIndex;
   private final TextIndexReader _fstIndex;
   private final BloomFilterReader _bloomFilter;
@@ -44,6 +46,7 @@ public abstract class BaseDataSource implements DataSource {
   public BaseDataSource(DataSourceMetadata dataSourceMetadata, ForwardIndexReader<?> forwardIndex,
                         @Nullable Dictionary dictionary, @Nullable InvertedIndexReader<?> invertedIndex,
                         @Nullable InvertedIndexReader<?> rangeIndex,
+                        @Nullable H3IndexReader h3Index,
                         @Nullable TextIndexReader textIndex,
                         @Nullable TextIndexReader fstIndex,
                         @Nullable BloomFilterReader bloomFilter,
@@ -53,6 +56,7 @@ public abstract class BaseDataSource implements DataSource {
     _dictionary = dictionary;
     _invertedIndex = invertedIndex;
     _rangeIndex = rangeIndex;
+    _h3Index = h3Index;
     _textIndex = textIndex;
     _fstIndex = fstIndex;
     _bloomFilter = bloomFilter;
@@ -91,6 +95,12 @@ public abstract class BaseDataSource implements DataSource {
   @Override
   public TextIndexReader getFSTIndex() {
     return _fstIndex;
+  }
+
+  @Nullable
+  @Override
+  public H3IndexReader getH3Index() {
+    return _h3Index;
   }
 
   @Nullable

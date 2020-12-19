@@ -33,7 +33,7 @@ public class StarTreeDataSource extends BaseDataSource {
   public StarTreeDataSource(FieldSpec fieldSpec, int numDocs, ForwardIndexReader<?> forwardIndex,
       @Nullable Dictionary dictionary) {
     super(new StarTreeDataSourceMetadata(fieldSpec, numDocs),
-            forwardIndex, dictionary, null, null,
+            forwardIndex, dictionary, null, null, null,
             null, null, null, null);
   }
 

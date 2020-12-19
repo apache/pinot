@@ -32,6 +32,7 @@ import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
 import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
 import org.apache.pinot.core.operator.filter.ExpressionFilterOperator;
 import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
+import org.apache.pinot.core.operator.filter.H3IndexFilterOperator;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.FSTBasedRegexpPredicateEvaluatorFactory;
@@ -39,7 +40,9 @@ import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.FilterContext;
+import org.apache.pinot.core.query.request.context.FunctionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.predicate.GeoPredicate;
 import org.apache.pinot.core.query.request.context.predicate.Predicate;
 import org.apache.pinot.core.query.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.core.query.request.context.predicate.TextMatchPredicate;
@@ -125,9 +128,17 @@ public class FilterPlanNode implements PlanNode {
         Predicate predicate = filter.getPredicate();
         ExpressionContext lhs = predicate.getLhs();
         if (lhs.getType() == ExpressionContext.Type.FUNCTION) {
-          // TODO: ExpressionFilterOperator does not support predicate types without PredicateEvaluator (IS_NULL,
-          //       IS_NOT_NULL, TEXT_MATCH)
-          return new ExpressionFilterOperator(_indexSegment, predicate, _numDocs);
+          FunctionContext function = lhs.getFunction();
+          if (function.getFunctionName().equalsIgnoreCase("H3_WITHIN")) {
+            String columnName = function.getArguments().get(0).getIdentifier();
+            GeoPredicate geoPredicate = new GeoPredicate();
+            //set geo predicate
+            return new H3IndexFilterOperator(geoPredicate, _indexSegment.getDataSource(columnName), _numDocs);
+          } else {
+            // TODO: ExpressionFilterOperator does not support predicate types without PredicateEvaluator (IS_NULL,
+            //       IS_NOT_NULL, TEXT_MATCH)
+            return new ExpressionFilterOperator(_indexSegment, predicate, _numDocs);
+          }
         } else {
           DataSource dataSource = _indexSegment.getDataSource(lhs.getIdentifier());
           switch (predicate.getType()) {

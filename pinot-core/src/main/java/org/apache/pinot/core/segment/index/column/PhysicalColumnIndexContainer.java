@@ -50,6 +50,7 @@ import org.apache.pinot.core.segment.index.readers.forward.FixedBitMVForwardInde
 import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
 import org.apache.pinot.core.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.geospatial.H3IndexReader;
 import org.apache.pinot.core.segment.index.readers.sorted.SortedIndexReaderImpl;
 import org.apache.pinot.core.segment.index.readers.text.LuceneTextIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
@@ -67,6 +68,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   private final ForwardIndexReader<?> _forwardIndex;
   private final InvertedIndexReader<?> _invertedIndex;
   private final InvertedIndexReader<?> _rangeIndex;
+  private final H3IndexReader _h3Index;
   private final TextIndexReader _textIndex;
   private final TextIndexReader _fstIndex;
   private final BaseImmutableDictionary _dictionary;
@@ -79,6 +81,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     String columnName = metadata.getColumnName();
     boolean loadInvertedIndex = indexLoadingConfig.getInvertedIndexColumns().contains(columnName);
     boolean loadRangeIndex = indexLoadingConfig.getRangeIndexColumns().contains(columnName);
+    boolean loadH3Index = indexLoadingConfig.getH3IndexColumns().contains(columnName);
     boolean loadTextIndex = indexLoadingConfig.getTextIndexColumns().contains(columnName);
     boolean loadOnHeapDictionary = indexLoadingConfig.getOnHeapDictionaryColumns().contains(columnName);
     BloomFilterConfig bloomFilterConfig = indexLoadingConfig.getBloomFilterConfigs().get(columnName);
@@ -100,6 +103,11 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       _textIndex = null;
     }
 
+    if (loadH3Index) {
+      _h3Index = new H3IndexReader(segmentReader.getIndexFor(columnName, ColumnIndexType.H3_INDEX));
+    } else {
+      _h3Index = null;
+    }
     PinotDataBuffer fwdIndexBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.FORWARD_INDEX);
 
     if (metadata.hasDictionary()) {
@@ -155,6 +163,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       } else {
         _rangeIndex = null;
       }
+
     } else {
       // Raw index
       _forwardIndex = loadRawForwardIndex(fwdIndexBuffer, metadata.getDataType());
@@ -164,6 +173,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       _invertedIndex = null;
       _fstIndex = null;
     }
+
   }
 
   @Override
@@ -179,6 +189,11 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   @Override
   public InvertedIndexReader<?> getRangeIndex() {
     return _rangeIndex;
+  }
+
+  @Override
+  public H3IndexReader getH3Index() {
+    return _h3Index;
   }
 
   @Override

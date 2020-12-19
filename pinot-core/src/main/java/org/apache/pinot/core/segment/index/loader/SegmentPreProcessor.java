@@ -30,6 +30,7 @@ import org.apache.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMax
 import org.apache.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.pinot.core.segment.index.loader.defaultcolumn.DefaultColumnHandler;
 import org.apache.pinot.core.segment.index.loader.defaultcolumn.DefaultColumnHandlerFactory;
+import org.apache.pinot.core.segment.index.loader.invertedindex.H3IndexHandler;
 import org.apache.pinot.core.segment.index.loader.invertedindex.InvertedIndexHandler;
 import org.apache.pinot.core.segment.index.loader.invertedindex.LuceneFSTIndexHandler;
 import org.apache.pinot.core.segment.index.loader.invertedindex.RangeIndexHandler;
@@ -113,6 +114,11 @@ public class SegmentPreProcessor implements AutoCloseable {
       RangeIndexHandler rangeIndexHandler =
           new RangeIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
       rangeIndexHandler.createRangeIndices();
+
+      // Create column H3 indices according to the index config.
+      H3IndexHandler h3IndexHandler =
+          new H3IndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
+      h3IndexHandler.createH3Indices();
 
       Set<String> textIndexColumns = _indexLoadingConfig.getTextIndexColumns();
       if (textIndexColumns.size() > 0) {
