@@ -24,19 +24,21 @@ public class KinesisConnectionHandler {
   private String _awsRegion;
   KinesisClient _kinesisClient;
 
-  public KinesisConnectionHandler(){
+  public KinesisConnectionHandler() {
 
   }
 
-  public KinesisConnectionHandler(String stream, String awsRegion){
+  public KinesisConnectionHandler(String stream, String awsRegion) {
     _stream = stream;
     _awsRegion = awsRegion;
-    _kinesisClient = KinesisClient.builder().region(Region.of(_awsRegion)).credentialsProvider(DefaultCredentialsProvider.create()).build();
+    _kinesisClient =
+        KinesisClient.builder().region(Region.of(_awsRegion)).credentialsProvider(DefaultCredentialsProvider.create())
+            .build();
   }
 
-  public List<Shard> getShards(){
-    ListShardsResponse listShardsResponse =  _kinesisClient.listShards(ListShardsRequest.builder().streamName(_stream).build());
+  public List<Shard> getShards() {
+    ListShardsResponse listShardsResponse =
+        _kinesisClient.listShards(ListShardsRequest.builder().streamName(_stream).build());
     return listShardsResponse.shards();
   }
-
 }
