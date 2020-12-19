@@ -12,10 +12,10 @@ import software.amazon.awssdk.services.kinesis.model.Shard;
 public class KinesisPartitionGroupMetadataMap extends KinesisConnectionHandler implements PartitionGroupMetadataMap {
   private final List<PartitionGroupMetadata> _stringPartitionGroupMetadataIndex = new ArrayList<>();
 
-  public KinesisPartitionGroupMetadataMap(String stream, String awsRegion){
+  public KinesisPartitionGroupMetadataMap(String stream, String awsRegion) {
     super(stream, awsRegion);
     List<Shard> shardList = getShards();
-    for(Shard shard : shardList){
+    for (Shard shard : shardList) {
       String startSequenceNumber = shard.sequenceNumberRange().startingSequenceNumber();
       String endingSequenceNumber = shard.sequenceNumberRange().endingSequenceNumber();
       KinesisShardMetadata shardMetadata = new KinesisShardMetadata(shard.shardId(), stream, awsRegion);
@@ -34,5 +34,4 @@ public class KinesisPartitionGroupMetadataMap extends KinesisConnectionHandler i
   public PartitionGroupMetadata getPartitionGroupMetadata(int index) {
     return _stringPartitionGroupMetadataIndex.get(index);
   }
-
 }

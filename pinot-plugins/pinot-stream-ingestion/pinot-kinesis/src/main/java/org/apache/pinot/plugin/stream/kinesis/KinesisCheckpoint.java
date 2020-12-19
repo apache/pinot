@@ -6,7 +6,7 @@ import org.apache.pinot.spi.stream.v2.Checkpoint;
 public class KinesisCheckpoint implements Checkpoint {
   String _sequenceNumber;
 
-  public KinesisCheckpoint(String sequenceNumber){
+  public KinesisCheckpoint(String sequenceNumber) {
     _sequenceNumber = sequenceNumber;
   }
 
@@ -24,5 +24,4 @@ public class KinesisCheckpoint implements Checkpoint {
     //TODO: Implement SerDe
     return new KinesisCheckpoint(new String(blob));
   }
-
 }
