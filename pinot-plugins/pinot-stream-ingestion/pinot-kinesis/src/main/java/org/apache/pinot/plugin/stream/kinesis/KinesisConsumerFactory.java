@@ -21,7 +21,8 @@ public class KinesisConsumerFactory implements StreamConsumerFactoryV2 {
   @Override
   public PartitionGroupMetadataMap getPartitionGroupsMetadata(
       PartitionGroupMetadataMap currentPartitionGroupsMetadata) {
-    return new KinesisPartitionGroupMetadataMap(_streamConfig.getTopicName(), _streamConfig.getStreamConfigsMap().getOrDefault(AWS_REGION, "us-central-1"));
+    return new KinesisPartitionGroupMetadataMap(_streamConfig.getTopicName(),
+        _streamConfig.getStreamConfigsMap().getOrDefault(AWS_REGION, "global"));
   }
 
   @Override

@@ -11,9 +11,9 @@ public class KinesisFetchResult implements FetchResult<Record> {
   private final KinesisCheckpoint _kinesisCheckpoint;
   private final List<Record> _recordList;
 
-  public KinesisFetchResult(KinesisCheckpoint kinesisCheckpoint, List<Record> recordList){
-     _kinesisCheckpoint = kinesisCheckpoint;
-     _recordList = recordList;
+  public KinesisFetchResult(KinesisCheckpoint kinesisCheckpoint, List<Record> recordList) {
+    _kinesisCheckpoint = kinesisCheckpoint;
+    _recordList = recordList;
   }
 
   @Override
