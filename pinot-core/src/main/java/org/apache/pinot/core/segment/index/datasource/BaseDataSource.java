@@ -28,6 +28,7 @@ import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.JsonIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
 import org.apache.pinot.core.segment.index.readers.TextIndexReader;
+import org.apache.pinot.core.segment.index.readers.geospatial.H3IndexReader;
 
 
 public abstract class BaseDataSource implements DataSource {
@@ -36,6 +37,7 @@ public abstract class BaseDataSource implements DataSource {
   private final Dictionary _dictionary;
   private final InvertedIndexReader<?> _invertedIndex;
   private final InvertedIndexReader<?> _rangeIndex;
+  private final H3IndexReader _h3Index;
   private final TextIndexReader _textIndex;
   private final TextIndexReader _fstIndex;
   private final JsonIndexReader _jsonIndex;
@@ -44,7 +46,7 @@ public abstract class BaseDataSource implements DataSource {
 
   public BaseDataSource(DataSourceMetadata dataSourceMetadata, ForwardIndexReader<?> forwardIndex,
       @Nullable Dictionary dictionary, @Nullable InvertedIndexReader<?> invertedIndex,
-      @Nullable InvertedIndexReader<?> rangeIndex, @Nullable TextIndexReader textIndex,
+      @Nullable InvertedIndexReader<?> rangeIndex, @Nullable H3IndexReader h3Index, @Nullable TextIndexReader textIndex,
       @Nullable TextIndexReader fstIndex, @Nullable JsonIndexReader jsonIndex, @Nullable BloomFilterReader bloomFilter,
       @Nullable NullValueVectorReader nullValueVector) {
     _dataSourceMetadata = dataSourceMetadata;
@@ -52,6 +54,7 @@ public abstract class BaseDataSource implements DataSource {
     _dictionary = dictionary;
     _invertedIndex = invertedIndex;
     _rangeIndex = rangeIndex;
+    _h3Index = h3Index;
     _textIndex = textIndex;
     _fstIndex = fstIndex;
     _jsonIndex = jsonIndex;
@@ -103,6 +106,10 @@ public abstract class BaseDataSource implements DataSource {
   @Override
   public JsonIndexReader getJsonIndex() {
     return _jsonIndex;
+  }
+
+  public H3IndexReader getH3Index() {
+    return _h3Index;
   }
 
   @Nullable
