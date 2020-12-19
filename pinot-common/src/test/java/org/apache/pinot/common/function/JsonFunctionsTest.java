@@ -60,6 +60,9 @@ public class JsonFunctionsTest {
     assertEquals(JsonFunctions.jsonPathString(jsonString, "$.actor.id"), "33500718");
     assertEquals(JsonFunctions.jsonPathLong(jsonString, "$.actor.id"), 33500718L);
     assertEquals(JsonFunctions.jsonPathDouble(jsonString, "$.actor.id"), 33500718.0);
+    assertEquals(JsonFunctions.jsonPathString(jsonString, "$.actor.aaa", "null"), "null");
+    assertEquals(JsonFunctions.jsonPathLong(jsonString, "$.actor.aaa", 100L), 100L);
+    assertEquals(JsonFunctions.jsonPathDouble(jsonString, "$.actor.aaa", 53.2), 53.2);
   }
 
 }

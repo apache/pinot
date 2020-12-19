@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.plugin.inputformat.thrift;
 
+import com.google.common.collect.ImmutableSet;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -41,10 +43,12 @@ public class ThriftRecordExtractor extends BaseRecordExtractor<TBase> {
 
   @Override
   public void init(@Nullable Set<String> fields, RecordExtractorConfig recordExtractorConfig) {
-    _fields = fields;
     _fieldIds = ((ThriftRecordExtractorConfig) recordExtractorConfig).getFieldIds();
     if (fields == null || fields.isEmpty()) {
       _extractAll = true;
+      _fields = Collections.emptySet();
+    } else {
+      _fields = ImmutableSet.copyOf(fields);
     }
   }
 

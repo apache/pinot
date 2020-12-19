@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.plugin.inputformat.protobuf;
 
+import com.google.common.collect.ImmutableSet;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,9 +45,11 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
 
   @Override
   public void init(@Nullable Set<String> fields, RecordExtractorConfig recordExtractorConfig) {
-    _fields = fields;
     if (fields == null || fields.isEmpty()) {
       _extractAll = true;
+      _fields = Collections.emptySet();
+    } else {
+      _fields = ImmutableSet.copyOf(fields);
     }
   }
 
