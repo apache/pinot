@@ -16,9 +16,11 @@ public class KinesisPartitionGroupMetadataMap extends KinesisConnectionHandler i
     super(stream, awsRegion);
     List<Shard> shardList = getShards();
     for(Shard shard : shardList){
+      String startSequenceNumber = shard.sequenceNumberRange().startingSequenceNumber();
       String endingSequenceNumber = shard.sequenceNumberRange().endingSequenceNumber();
       KinesisShardMetadata shardMetadata = new KinesisShardMetadata(shard.shardId(), stream, awsRegion);
-      shardMetadata.setStartCheckpoint(new KinesisCheckpoint(shard.shardId(), endingSequenceNumber));
+      shardMetadata.setStartCheckpoint(new KinesisCheckpoint(startSequenceNumber));
+      shardMetadata.setEndCheckpoint(new KinesisCheckpoint(endingSequenceNumber));
       _stringPartitionGroupMetadataIndex.add(shardMetadata);
     }
   }
