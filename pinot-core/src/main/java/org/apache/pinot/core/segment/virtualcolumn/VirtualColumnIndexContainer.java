@@ -26,6 +26,7 @@ import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReaderImpl;
 import org.apache.pinot.core.segment.index.readers.TextIndexReader;
+import org.apache.pinot.core.segment.index.readers.geospatial.H3IndexReader;
 
 
 /**
@@ -75,6 +76,11 @@ public class VirtualColumnIndexContainer implements ColumnIndexContainer {
 
   @Override
   public NullValueVectorReaderImpl getNullValueVector() {
+    return null;
+  }
+
+  @Override
+  public H3IndexReader getH3Index() {
     return null;
   }
 
