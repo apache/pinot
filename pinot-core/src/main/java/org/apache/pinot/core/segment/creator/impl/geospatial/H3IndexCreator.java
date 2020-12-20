@@ -26,6 +26,8 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
+import static org.apache.pinot.core.segment.creator.impl.V1Constants.Indexes.H3_INDEX_FILE_EXTENSION;
+
 
 public class H3IndexCreator implements GeoSpatialIndexCreator {
 
@@ -152,7 +154,7 @@ public class H3IndexCreator implements GeoSpatialIndexCreator {
     offsetStream.close();
     bitmapStream.close();
 
-    File outputFile = new File(_indexDir, _fieldSpec.getName() + ".h3.index");
+    File outputFile = new File(_indexDir, _fieldSpec.getName() + H3_INDEX_FILE_EXTENSION);
     long length = headerStream.size() + dictionaryStream.size() + offsetStream.size() + bitmapStream.size();
     //write the actual file
     PinotDataBuffer h3IndexBuffer =
