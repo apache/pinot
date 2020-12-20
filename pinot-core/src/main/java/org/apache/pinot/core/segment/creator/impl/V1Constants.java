@@ -40,6 +40,7 @@ public class V1Constants {
     public static final String BITMAP_RANGE_INDEX_FILE_EXTENSION = ".bitmap.range";
     public static final String BITMAP_H3_INDEX_FILE_EXTENSION = ".bitmap.h3";
     public static final String FST_INDEX_FILE_EXTENSION = ".lucene.fst";
+    public static final String H3_INDEX_FILE_EXTENSION = ".h3.index";
     public static final String BLOOM_FILTER_FILE_EXTENSION = ".bloom";
     public static final String NULLVALUE_VECTOR_FILE_EXTENSION = ".bitmap.nullvalue";
   }

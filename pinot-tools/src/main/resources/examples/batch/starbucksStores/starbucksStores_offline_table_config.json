@@ -1,0 +1,27 @@
+{
+  "tableName": "starbucksStores",
+  "tableType": "OFFLINE",
+  "segmentsConfig": {
+    "segmentPushType": "APPEND",
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+    "schemaName": "starbucksStores",
+    "replication": "1"
+  },
+  "tenants": {
+  },
+  "tableIndexConfig": {
+    "loadMode": "MMAP",
+    "invertedIndexColumns": [
+    ],
+    "h3IndexColumns": [
+      "location_st_point"
+    ],
+    "noDictionaryColumns": [
+      "location_st_point"
+    ]
+  },
+  "metadata": {
+    "customConfigs": {
+    }
+  }
+}

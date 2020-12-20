@@ -37,6 +37,7 @@ import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
 import org.apache.pinot.core.segment.index.readers.forward.FixedBitMVForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
 import org.apache.pinot.core.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
@@ -67,7 +68,7 @@ public class H3IndexHandler {
     // Only create H3 index on non-dictionary-encoded columns
     for (String column : indexLoadingConfig.getH3IndexColumns()) {
       ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
-      if (columnMetadata != null && !columnMetadata.hasDictionary()) {
+      if (columnMetadata != null) {
         _h3IndexColumns.add(columnMetadata);
       }
     }
@@ -84,7 +85,7 @@ public class H3IndexHandler {
       throws Exception {
     String column = columnMetadata.getColumnName();
     File inProgress = new File(_indexDir, column + ".h3.inprogress");
-    File h3IndexFile = new File(_indexDir, column + V1Constants.Indexes.BITMAP_H3_INDEX_FILE_EXTENSION);
+    File h3IndexFile = new File(_indexDir, column + V1Constants.Indexes.H3_INDEX_FILE_EXTENSION);
 
     if (!inProgress.exists()) {
       // Marker file does not exist, which means last run ended normally.
@@ -162,6 +163,7 @@ public class H3IndexHandler {
             for (int i = 0; i < numDocs; i++) {
               byte[] bytes = forwardIndexReader.getBytes(i, readerContext);
               Geometry geometry = GeometrySerializer.deserialize(bytes);
+              //todo:check if its a point
               Coordinate coordinate = geometry.getCoordinate();
               h3IndexCreator.add(i, coordinate.x, coordinate.y);
             }
@@ -189,7 +191,7 @@ public class H3IndexHandler {
       if (columnMetadata.hasDictionary()) {
         return new FixedBitSVForwardIndexReaderV2(buffer, numRows, numBitsPerValue);
       } else {
-        return new FixedByteChunkSVForwardIndexReader(buffer, columnMetadata.getDataType());
+        return new VarByteChunkSVForwardIndexReader(buffer, columnMetadata.getDataType());
       }
     } else {
       if (columnMetadata.hasDictionary()) {

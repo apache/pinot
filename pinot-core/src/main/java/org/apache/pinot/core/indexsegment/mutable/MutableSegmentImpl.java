@@ -64,6 +64,7 @@ import org.apache.pinot.core.segment.index.readers.MutableDictionary;
 import org.apache.pinot.core.segment.index.readers.MutableForwardIndex;
 import org.apache.pinot.core.segment.index.readers.ValidDocIndexReader;
 import org.apache.pinot.core.segment.index.readers.ValidDocIndexReaderImpl;
+import org.apache.pinot.core.segment.index.readers.geospatial.H3IndexReader;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
@@ -334,7 +335,7 @@ public class MutableSegmentImpl implements MutableSegment {
       // TODO: Support range index and bloom filter for mutable segment
       _indexContainerMap.put(column,
           new IndexContainer(fieldSpec, partitionFunction, partitions, new NumValuesInfo(), forwardIndex, dictionary,
-              invertedIndexReader, null, textIndex, fstIndexColumns.contains(column), jsonIndex, null,
+              invertedIndexReader, null, null, textIndex, fstIndexColumns.contains(column), jsonIndex, null,
               nullValueVector));
     }
 
@@ -1050,6 +1051,7 @@ public class MutableSegmentImpl implements MutableSegment {
     final MutableDictionary _dictionary;
     final RealtimeInvertedIndexReader _invertedIndex;
     final InvertedIndexReader _rangeIndex;
+    final H3IndexReader _h3Index;
     final RealtimeLuceneTextIndexReader _textIndex;
     final boolean _enableFST;
     final MutableJsonIndex _jsonIndex;
@@ -1066,9 +1068,9 @@ public class MutableSegmentImpl implements MutableSegment {
     IndexContainer(FieldSpec fieldSpec, @Nullable PartitionFunction partitionFunction,
         @Nullable Set<Integer> partitions, NumValuesInfo numValuesInfo, MutableForwardIndex forwardIndex,
         @Nullable MutableDictionary dictionary, @Nullable RealtimeInvertedIndexReader invertedIndex,
-        @Nullable InvertedIndexReader rangeIndex, @Nullable RealtimeLuceneTextIndexReader textIndex, boolean enableFST,
-        @Nullable MutableJsonIndex jsonIndex, @Nullable BloomFilterReader bloomFilter,
-        @Nullable MutableNullValueVector nullValueVector) {
+        @Nullable InvertedIndexReader rangeIndex, @Nullable H3IndexReader h3Index,
+        @Nullable RealtimeLuceneTextIndexReader textIndex, boolean enableFST, @Nullable MutableJsonIndex jsonIndex,
+        @Nullable BloomFilterReader bloomFilter, @Nullable MutableNullValueVector nullValueVector) {
       _fieldSpec = fieldSpec;
       _partitionFunction = partitionFunction;
       _partitions = partitions;
@@ -1077,6 +1079,8 @@ public class MutableSegmentImpl implements MutableSegment {
       _dictionary = dictionary;
       _invertedIndex = invertedIndex;
       _rangeIndex = rangeIndex;
+      _h3Index = h3Index;
+
       _textIndex = textIndex;
       _enableFST = enableFST;
       _jsonIndex = jsonIndex;
@@ -1087,7 +1091,8 @@ public class MutableSegmentImpl implements MutableSegment {
     DataSource toDataSource() {
       return new MutableDataSource(_fieldSpec, _numDocsIndexed, _numValuesInfo._numValues,
           _numValuesInfo._maxNumValuesPerMVEntry, _partitionFunction, _partitions, _minValue, _maxValue, _forwardIndex,
-          _dictionary, _invertedIndex, _rangeIndex, _textIndex, _enableFST, _jsonIndex, _bloomFilter, _nullValueVector);
+          _dictionary, _invertedIndex, _rangeIndex, _h3Index, _textIndex, _enableFST, _jsonIndex, _bloomFilter,
+          _nullValueVector);
     }
 
     @Override

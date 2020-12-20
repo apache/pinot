@@ -98,4 +98,8 @@ public class H3IndexReader implements Closeable {
     // NOTE: DO NOT close the PinotDataBuffer here because it is tracked by the caller and might be reused later. The
     // caller is responsible of closing the PinotDataBuffer.
   }
+
+  public Dictionary getDictionary() {
+    return _dictionary;
+  }
 }
