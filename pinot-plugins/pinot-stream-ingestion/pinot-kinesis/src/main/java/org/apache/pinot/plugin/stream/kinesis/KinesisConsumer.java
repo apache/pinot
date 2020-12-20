@@ -46,7 +46,6 @@ import software.amazon.awssdk.services.kinesis.model.Record;
 import software.amazon.awssdk.services.kinesis.model.ResourceNotFoundException;
 import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 
-//TODO: Handle exceptions and timeout
 public class KinesisConsumer extends KinesisConnectionHandler implements ConsumerV2 {
   String _stream;
   Integer _maxRecords;
