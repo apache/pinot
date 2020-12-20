@@ -43,10 +43,10 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
 
   @Override
   protected FilterBlock getNextBlock() {
-    H3IndexReader h3IndexReader = (H3IndexReader) _dataSource.getRangeIndex();
+    H3IndexReader h3IndexReader = _dataSource.getH3Index();
     assert h3IndexReader != null;
-
-    long h3Id = 1000;
+    //todo: pick this from the geoPredicate
+    long h3Id = h3IndexReader.getDictionary().getLongValue(0);
     ImmutableRoaringBitmap docIds = h3IndexReader.getDocIds(h3Id);
     return new FilterBlock(new BitmapDocIdSet(docIds, _numDocs) {
 
