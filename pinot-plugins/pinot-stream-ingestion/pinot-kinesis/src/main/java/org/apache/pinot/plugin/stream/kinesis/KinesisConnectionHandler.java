@@ -59,4 +59,10 @@ public class KinesisConnectionHandler {
         _kinesisClient.listShards(ListShardsRequest.builder().streamName(_stream).build());
     return listShardsResponse.shards();
   }
+
+  public void close(){
+    if(_kinesisClient != null) {
+      _kinesisClient.close();
+    }
+  }
 }
