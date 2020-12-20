@@ -21,6 +21,12 @@ package org.apache.pinot.plugin.stream.kinesis;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.v2.Checkpoint;
 import org.apache.pinot.spi.stream.v2.ConsumerV2;
@@ -39,6 +45,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Consume
   String _stream;
   Integer _maxRecords;
   String _shardId;
+  ExecutorService _executorService;
 
   public KinesisConsumer(KinesisConfig kinesisConfig, PartitionGroupMetadata partitionGroupMetadata) {
     super(kinesisConfig.getStream(), kinesisConfig.getAwsRegion());
@@ -46,10 +53,27 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Consume
     _maxRecords = kinesisConfig.maxRecordsToFetch();
     KinesisShardMetadata kinesisShardMetadata = (KinesisShardMetadata) partitionGroupMetadata;
     _shardId = kinesisShardMetadata.getShardId();
+    _executorService = Executors.newSingleThreadExecutor();
   }
 
   @Override
   public KinesisFetchResult fetch(Checkpoint start, Checkpoint end, long timeout) {
+    Future<KinesisFetchResult> kinesisFetchResultFuture = _executorService.submit(new Callable<KinesisFetchResult>() {
+      @Override
+      public KinesisFetchResult call()
+          throws Exception {
+        return getResult(start, end);
+      }
+    });
+
+    try {
+      return kinesisFetchResultFuture.get(timeout, TimeUnit.MILLISECONDS);
+    } catch(Exception e){
+      return null;
+    }
+  }
+
+  private KinesisFetchResult getResult(Checkpoint start, Checkpoint end) {
     try {
       KinesisCheckpoint kinesisStartCheckpoint = (KinesisCheckpoint) start;
 
@@ -65,9 +89,8 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Consume
       }
 
       String nextStartSequenceNumber = null;
-      Long startTimestamp = System.currentTimeMillis();
 
-      while (shardIterator != null && !isTimedOut(startTimestamp, timeout)) {
+      while (shardIterator != null) {
         GetRecordsRequest getRecordsRequest = GetRecordsRequest.builder().shardIterator(shardIterator).build();
         GetRecordsResponse getRecordsResponse = _kinesisClient.getRecords(getRecordsRequest);
 
@@ -119,7 +142,4 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Consume
     return getShardIteratorResponse.shardIterator();
   }
 
-  private boolean isTimedOut(Long startTimestamp, Long timeout) {
-    return (System.currentTimeMillis() - startTimestamp) >= timeout;
-  }
 }
