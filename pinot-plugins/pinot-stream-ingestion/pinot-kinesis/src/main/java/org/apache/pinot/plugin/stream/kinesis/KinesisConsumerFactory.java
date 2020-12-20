@@ -28,19 +28,17 @@ import org.apache.pinot.spi.stream.v2.StreamConsumerFactoryV2;
 
 
 public class KinesisConsumerFactory implements StreamConsumerFactoryV2 {
-  private StreamConfig _streamConfig;
-  private final String AWS_REGION = "aws-region";
+  private KinesisConfig _kinesisConfig;
 
   @Override
   public void init(StreamConfig streamConfig) {
-    _streamConfig = streamConfig;
+    _kinesisConfig = new KinesisConfig(streamConfig);
   }
 
   @Override
   public PartitionGroupMetadataMap getPartitionGroupsMetadata(
       PartitionGroupMetadataMap currentPartitionGroupsMetadata) {
-    return new KinesisPartitionGroupMetadataMap(_streamConfig.getTopicName(),
-        _streamConfig.getStreamConfigsMap().getOrDefault(AWS_REGION, "global"));
+    return new KinesisPartitionGroupMetadataMap(_kinesisConfig.getStream(), _kinesisConfig.getAwsRegion());
   }
 
   @Override
@@ -50,6 +48,6 @@ public class KinesisConsumerFactory implements StreamConsumerFactoryV2 {
 
   @Override
   public ConsumerV2 createConsumer(PartitionGroupMetadata metadata) {
-    return new KinesisConsumer(_streamConfig.getTopicName(), _streamConfig, metadata);
+    return new KinesisConsumer(_kinesisConfig, metadata);
   }
 }
