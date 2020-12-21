@@ -23,10 +23,19 @@ import com.uber.h3core.LengthUnit;
 import java.io.IOException;
 import java.util.List;
 import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.geospatial.serde.GeometrySerializer;
+import org.apache.pinot.core.geospatial.transform.function.StPointFunction;
+import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.FunctionContext;
 import org.apache.pinot.core.query.request.context.predicate.GeoPredicate;
+import org.apache.pinot.core.query.request.context.predicate.Predicate;
+import org.apache.pinot.core.query.request.context.predicate.RangePredicate;
 import org.apache.pinot.core.segment.index.readers.geospatial.H3IndexReader;
+import org.apache.pinot.spi.utils.BytesUtils;
+import org.locationtech.jts.geom.Geometry;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -36,14 +45,51 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
 
   // NOTE: Range index can only apply to dictionary-encoded columns for now
   // TODO: Support raw index columns
-  private final GeoPredicate _geoPredicate;
-  private final DataSource _dataSource;
   private final int _numDocs;
   private final H3Core _h3Core;
+  private final H3IndexReader _h3IndexReader;
+  private Geometry _geometry;
+  private double _distance;
 
-  public H3IndexFilterOperator(GeoPredicate geoPredicate, DataSource dataSource, int numDocs) {
-    _geoPredicate = geoPredicate;
-    _dataSource = dataSource;
+  public H3IndexFilterOperator(Predicate predicate, IndexSegment indexSegment, int numDocs) {
+    FunctionContext function = predicate.getLhs().getFunction();
+    String columnName;
+
+    if (function.getArguments().get(0).getType() == ExpressionContext.Type.IDENTIFIER) {
+      columnName = function.getArguments().get(0).getIdentifier();
+      byte[] bytes = BytesUtils.toBytes(function.getArguments().get(1).getLiteral());
+      _geometry = GeometrySerializer.deserialize(bytes);
+    } else if (function.getArguments().get(1).getType() == ExpressionContext.Type.IDENTIFIER) {
+      columnName = function.getArguments().get(1).getIdentifier();
+      byte[] bytes = BytesUtils.toBytes(function.getArguments().get(0).getLiteral());
+      _geometry = GeometrySerializer.deserialize(bytes);
+    } else {
+      throw new RuntimeException("Expecting one of the arguments of ST_DISTANCE to be an identifier");
+    }
+    DataSource dataSource = indexSegment.getDataSource(columnName);
+    _h3IndexReader = dataSource.getH3Index();
+    switch (predicate.getType()) {
+      case EQ:
+        break;
+      case NOT_EQ:
+        break;
+      case IN:
+        break;
+      case NOT_IN:
+        break;
+      case RANGE:
+        RangePredicate rangePredicate = (RangePredicate) predicate;
+        _distance = Double.parseDouble(rangePredicate.getUpperBound());
+        break;
+      case REGEXP_LIKE:
+        break;
+      case TEXT_MATCH:
+        break;
+      case IS_NULL:
+        break;
+      case IS_NOT_NULL:
+        break;
+    }
     _numDocs = numDocs;
     try {
       _h3Core = H3Core.newInstance();
@@ -54,34 +100,31 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
 
   @Override
   protected FilterBlock getNextBlock() {
-    H3IndexReader h3IndexReader = _dataSource.getH3Index();
     //todo: this needs to come from somewhere?
     int resolution = 5;
-    long h3Id = _h3Core
-        .geoToH3(_geoPredicate.getGeometry().getCoordinate().x, _geoPredicate.getGeometry().getCoordinate().y,
-            resolution);
-    assert h3IndexReader != null;
+    long h3Id = _h3Core.geoToH3(_geometry.getCoordinate().x, _geometry.getCoordinate().y, resolution);
+    assert _h3IndexReader != null;
 
-    //find the number of rings based on geopredicate.distance
+    //find the number of rings based on distance
     //FullMatch
     double edgeLength = _h3Core.edgeLength(resolution, LengthUnit.km);
-    int numFullMatchedRings = (int) (_geoPredicate.getDistance() / edgeLength);
+    int numFullMatchedRings = (int) (_distance / edgeLength);
     List<Long> fullMatchRings = _h3Core.kRing(h3Id, numFullMatchedRings);
     fullMatchRings.add(h3Id);
     MutableRoaringBitmap fullMatchedDocIds = new MutableRoaringBitmap();
     for (long id : fullMatchRings) {
-      ImmutableRoaringBitmap docIds = h3IndexReader.getDocIds(id);
+      ImmutableRoaringBitmap docIds = _h3IndexReader.getDocIds(id);
       fullMatchedDocIds.or(docIds);
     }
 
     //partial matchedRings
-    int numPartialMatchedRings = (int) (_geoPredicate.getDistance() / edgeLength);
+    int numPartialMatchedRings = (int) ((_distance + edgeLength) / edgeLength);
     List<Long> partialMatchedRings = _h3Core.kRing(h3Id, numPartialMatchedRings);
     partialMatchedRings.add(h3Id);
     final MutableRoaringBitmap partialMatchDocIds = new MutableRoaringBitmap();
     partialMatchedRings.removeAll(fullMatchRings);
     for (long id : partialMatchedRings) {
-      ImmutableRoaringBitmap docIds = h3IndexReader.getDocIds(id);
+      ImmutableRoaringBitmap docIds = _h3IndexReader.getDocIds(id);
       partialMatchDocIds.or(docIds);
     }
 

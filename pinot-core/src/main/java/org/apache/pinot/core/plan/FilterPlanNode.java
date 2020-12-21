@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.geospatial.GeometryUtils;
+import org.apache.pinot.core.geospatial.transform.function.StDistanceFunction;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
@@ -134,24 +134,22 @@ public class FilterPlanNode implements PlanNode {
         ExpressionContext lhs = predicate.getLhs();
         if (lhs.getType() == ExpressionContext.Type.FUNCTION) {
           FunctionContext function = lhs.getFunction();
-          if (function.getFunctionName().equalsIgnoreCase("H3_WITHIN")) {
+
+          boolean canApplyH3Index = false;
+          if (function.getFunctionName().equalsIgnoreCase(StDistanceFunction.FUNCTION_NAME)) {
             String columnName = function.getArguments().get(0).getIdentifier();
-            GeoPredicate geoPredicate = new GeoPredicate();
-            geoPredicate.setType(GeoPredicate.Type.WITHIN);
-            float lat = Float.parseFloat(function.getArguments().get(1).getLiteral());
-            float lon = Float.parseFloat(function.getArguments().get(2).getLiteral());
-            float distance = Float.parseFloat(function.getArguments().get(3).getLiteral());
-//            float resolution =Float.parseFloat(function.getArguments().get(4).getLiteral());
-            Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(lat, lon));
-            geoPredicate.setGeometry(point);
-            geoPredicate.setDistance(distance);
-            //set geo predicate
-            return new H3IndexFilterOperator(geoPredicate, _indexSegment.getDataSource(columnName), _numDocs);
-          } else {
-            // TODO: ExpressionFilterOperator does not support predicate types without PredicateEvaluator (IS_NULL,
-            //       IS_NOT_NULL, TEXT_MATCH)
-            return new ExpressionFilterOperator(_indexSegment, predicate, _numDocs);
+            DataSource dataSource = _indexSegment.getDataSource(columnName);
+            if (dataSource.getH3Index() != null) {
+              canApplyH3Index = true;
+            }
           }
+
+          if (canApplyH3Index) {
+            return new H3IndexFilterOperator(predicate, _indexSegment, _numDocs);
+          }
+          // TODO: ExpressionFilterOperator does not support predicate types without PredicateEvaluator (IS_NULL,
+          //       IS_NOT_NULL, TEXT_MATCH)
+          return new ExpressionFilterOperator(_indexSegment, predicate, _numDocs);
         } else {
           String column = lhs.getIdentifier();
           DataSource dataSource = _indexSegment.getDataSource(column);
