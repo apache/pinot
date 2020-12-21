@@ -18,11 +18,15 @@ import java.util.PriorityQueue;
 import java.util.Random;
 import java.util.TreeMap;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.core.geospatial.GeometryUtils;
 import org.apache.pinot.core.segment.creator.GeoSpatialIndexCreator;
 import org.apache.pinot.core.segment.index.readers.geospatial.H3IndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.Point;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -272,6 +276,10 @@ public class H3IndexCreator implements GeoSpatialIndexCreator {
 
   public static void main(String[] args)
       throws Exception {
+    Point point1 = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(37.3861, -122.0839));
+    Point point2 = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(37.368832, -122.036346));
+    System.out.println("point1.distance(point2) = " + point1.distance(point2));
+    System.exit(0);
     File indexDir = new File(System.getProperty("java.io.tmpdir"), "h3IndexDir");
     FileUtils.deleteDirectory(indexDir);
     indexDir.mkdirs();
@@ -310,5 +318,7 @@ public class H3IndexCreator implements GeoSpatialIndexCreator {
         System.out.printf("Matched: expected: %d actual: %d for h3:%d \n", map.get(h3), docIds.getCardinality(), h3);
       }
     }
+
+
   }
 }

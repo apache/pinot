@@ -10,13 +10,13 @@ public class GeoPredicate {
   //this is the column name
   ExpressionContext _lhs;
 
-  Type type;
+  Predicate type;
 
   Geometry _geometry;
 
   double _distance;
 
-  public enum Type {
+  public enum Pre {
     WITHIN, OVERLAP;
   }
 
@@ -26,14 +26,6 @@ public class GeoPredicate {
 
   public void setLhs(ExpressionContext lhs) {
     _lhs = lhs;
-  }
-
-  public Type getType() {
-    return type;
-  }
-
-  public void setType(Type type) {
-    this.type = type;
   }
 
   public Geometry getGeometry() {
