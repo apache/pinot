@@ -79,6 +79,10 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Consume
 
     try {
 
+      if(_kinesisClient == null){
+        createConnection();
+      }
+
       String shardIterator = getShardIterator(kinesisStartCheckpoint);
 
       String kinesisEndSequenceNumber = null;
@@ -176,4 +180,8 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Consume
     return getShardIteratorResponse.shardIterator();
   }
 
+  @Override
+  public void close() {
+    super.close();
+  }
 }
