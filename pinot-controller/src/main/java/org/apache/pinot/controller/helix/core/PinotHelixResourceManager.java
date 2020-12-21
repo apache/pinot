@@ -110,6 +110,7 @@ import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
+import org.apache.pinot.spi.config.ConfigUtils;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
@@ -1323,7 +1324,9 @@ public class PinotHelixResourceManager {
     }
   }
 
-  private void ensureRealtimeClusterIsSetUp(TableConfig realtimeTableConfig) {
+  private void ensureRealtimeClusterIsSetUp(TableConfig rawRealtimeTableConfig) {
+    // Need to apply environment variabls here to ensure the secrets used in stream configs are correctly applied.
+    TableConfig realtimeTableConfig = ConfigUtils.applyConfigWithEnvVariables(rawRealtimeTableConfig);
     String realtimeTableName = realtimeTableConfig.getTableName();
     StreamConfig streamConfig = new StreamConfig(realtimeTableConfig.getTableName(),
         IngestionConfigUtils.getStreamConfigMap(realtimeTableConfig));
