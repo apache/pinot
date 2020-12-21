@@ -163,21 +163,24 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Consume
   }
 
   private String getShardIterator(KinesisCheckpoint kinesisStartCheckpoint) {
-    GetShardIteratorResponse getShardIteratorResponse;
-
     if (kinesisStartCheckpoint.getSequenceNumber() != null) {
-      String kinesisStartSequenceNumber = kinesisStartCheckpoint.getSequenceNumber();
-      getShardIteratorResponse = _kinesisClient.getShardIterator(
-          GetShardIteratorRequest.builder().streamName(_stream).shardId(_shardId)
-              .shardIteratorType(ShardIteratorType.AT_SEQUENCE_NUMBER)
-              .startingSequenceNumber(kinesisStartSequenceNumber).build());
+      return getShardIterator(ShardIteratorType.AT_SEQUENCE_NUMBER, kinesisStartCheckpoint.getSequenceNumber());
     } else {
-      getShardIteratorResponse = _kinesisClient.getShardIterator(
-          GetShardIteratorRequest.builder().shardId(_shardId).streamName(_stream)
-              .shardIteratorType(ShardIteratorType.LATEST).build());
+      return getShardIterator(ShardIteratorType.LATEST, null);
     }
+  }
 
-    return getShardIteratorResponse.shardIterator();
+  public String getShardIterator(ShardIteratorType shardIteratorType, String sequenceNumber){
+    if(sequenceNumber == null){
+      return _kinesisClient.getShardIterator(
+          GetShardIteratorRequest.builder().shardId(_shardId).streamName(_stream)
+              .shardIteratorType(shardIteratorType).build()).shardIterator();
+    }else{
+      return _kinesisClient.getShardIterator(
+          GetShardIteratorRequest.builder().streamName(_stream).shardId(_shardId)
+              .shardIteratorType(shardIteratorType)
+              .startingSequenceNumber(sequenceNumber).build()).shardIterator();
+    }
   }
 
   @Override
