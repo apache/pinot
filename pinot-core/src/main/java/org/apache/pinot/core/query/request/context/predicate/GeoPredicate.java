@@ -16,7 +16,39 @@ public class GeoPredicate {
 
   double _distance;
 
-  enum Type {
+  public enum Type {
     WITHIN, OVERLAP;
+  }
+
+  public ExpressionContext getLhs() {
+    return _lhs;
+  }
+
+  public void setLhs(ExpressionContext lhs) {
+    _lhs = lhs;
+  }
+
+  public Type getType() {
+    return type;
+  }
+
+  public void setType(Type type) {
+    this.type = type;
+  }
+
+  public Geometry getGeometry() {
+    return _geometry;
+  }
+
+  public void setGeometry(Geometry geometry) {
+    _geometry = geometry;
+  }
+
+  public double getDistance() {
+    return _distance;
+  }
+
+  public void setDistance(double distance) {
+    _distance = distance;
   }
 }

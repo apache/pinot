@@ -7,7 +7,9 @@ import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.IntDictionary;
 import org.apache.pinot.core.segment.index.readers.LongDictionary;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,6 +49,9 @@ public class H3IndexReader implements Closeable {
   public ImmutableRoaringBitmap getDocIds(long h3IndexId) {
     SoftReference<ImmutableRoaringBitmap>[] bitmapArrayReference = null;
     int dictId = _dictionary.indexOf(String.valueOf(h3IndexId));
+    if (dictId < 0) {
+      return new MutableRoaringBitmap();
+    }
     // Return the bitmap if it's still on heap
     if (_bitmaps != null) {
       bitmapArrayReference = _bitmaps.get();
