@@ -24,7 +24,6 @@ import java.io.File;
 import java.net.URI;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.resources.SuccessResponse;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -51,14 +50,16 @@ public class FileIngestionHelper {
   private final TableConfig _tableConfig;
   private final Schema _schema;
   private final BatchConfig _batchConfig;
-  private final ControllerConf _controllerConf;
+  private final String _controllerHost;
+  private final int _controllerPort;
 
-  public FileIngestionHelper(TableConfig tableConfig, Schema schema,
-      BatchConfig batchConfig, ControllerConf controllerConf) {
+  public FileIngestionHelper(TableConfig tableConfig, Schema schema, BatchConfig batchConfig, String controllerHost,
+      int controllerPort) {
     _tableConfig = tableConfig;
     _schema = schema;
     _batchConfig = batchConfig;
-    _controllerConf = controllerConf;
+    _controllerHost = controllerHost;
+    _controllerPort = controllerPort;
   }
 
   /**
@@ -67,6 +68,7 @@ public class FileIngestionHelper {
   public SuccessResponse buildSegmentAndPush(DataPayload payload)
       throws Exception {
     String tableNameWithType = _tableConfig.getTableName();
+    LOGGER.info("Starting ingestion of {} payload to table: {}", payload._payloadType, tableNameWithType);
 
     // Setup working dir
     File workingDir = new File(FileUtils.getTempDirectory(),
@@ -80,26 +82,29 @@ public class FileIngestionHelper {
       Preconditions.checkState(segmentTarDir.mkdirs(), "Could not create directory for segment tar file: %s", inputDir);
 
       // Copy file to local working dir
-      File inputFile =
-          new File(inputDir, String.format("%s.%s", DATA_FILE_PREFIX, _batchConfig.getInputFormat().toString().toLowerCase()));
-      if (payload._dataSource.equals(DataSource.URI)) {
+      File inputFile = new File(inputDir,
+          String.format("%s.%s", DATA_FILE_PREFIX, _batchConfig.getInputFormat().toString().toLowerCase()));
+      if (payload._payloadType == PayloadType.URI) {
         FileIngestionUtils.copyURIToLocal(_batchConfig, payload._uri, inputFile);
+        LOGGER.info("Copied from URI: {} to local file: {}", payload._uri, inputFile.getAbsolutePath());
       } else {
         FileIngestionUtils.copyMultipartToLocal(payload._multiPart, inputFile);
+        LOGGER.info("Copied multipart payload to local file: {}", inputDir.getAbsolutePath());
       }
 
       // Build segment
       SegmentGeneratorConfig segmentGeneratorConfig =
           FileIngestionUtils.generateSegmentGeneratorConfig(_tableConfig, _batchConfig, _schema, inputFile, outputDir);
       String segmentName = FileIngestionUtils.buildSegment(segmentGeneratorConfig);
+      LOGGER.info("Built segment: {}", segmentName);
 
       // Tar and push segment
       File segmentTarFile =
           new File(segmentTarDir, segmentName + org.apache.pinot.spi.ingestion.batch.spec.Constants.TAR_GZ_FILE_EXT);
       TarGzCompressionUtils.createTarGzFile(new File(outputDir, segmentName), segmentTarFile);
       FileIngestionUtils
-          .uploadSegment(tableNameWithType, Lists.newArrayList(segmentTarFile), _controllerConf.getControllerHost(),
-              Integer.parseInt(_controllerConf.getControllerPort()));
+          .uploadSegment(tableNameWithType, Lists.newArrayList(segmentTarFile), _controllerHost, _controllerPort);
+      LOGGER.info("Uploaded tar: {} to {}:{}", segmentTarFile.getAbsolutePath(), _controllerHost, _controllerPort);
 
       return new SuccessResponse(
           "Successfully ingested file into table: " + tableNameWithType + " as segment: " + segmentName);
@@ -114,26 +119,25 @@ public class FileIngestionHelper {
   /**
    * Enum to identify the source of ingestion file
    */
-  private enum DataSource {
-    URI,
-    FILE
+  private enum PayloadType {
+    URI, FILE
   }
 
   /**
    * Wrapper around file payload
    */
-  public static class DataPayload{
-    DataSource _dataSource;
+  public static class DataPayload {
+    PayloadType _payloadType;
     FormDataMultiPart _multiPart;
     URI _uri;
 
     public DataPayload(FormDataMultiPart multiPart) {
-      _dataSource = DataSource.FILE;
+      _payloadType = PayloadType.FILE;
       _multiPart = multiPart;
     }
 
     public DataPayload(URI uri) {
-      _dataSource = DataSource.URI;
+      _payloadType = PayloadType.URI;
       _uri = uri;
     }
   }

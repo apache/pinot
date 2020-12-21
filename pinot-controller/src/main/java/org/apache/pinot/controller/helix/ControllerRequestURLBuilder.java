@@ -295,13 +295,13 @@ public class ControllerRequestURLBuilder {
 
   public String forIngestFromFile(String tableNameWithType, String batchConfigMapStr)
       throws UnsupportedEncodingException {
-    return String.format("%s?tableName=%s&batchConfigMapStr=%s", StringUtil.join("/", _baseUrl, "ingestFromFile"),
+    return String.format("%s?tableNameWithType=%s&batchConfigMapStr=%s", StringUtil.join("/", _baseUrl, "ingestFromFile"),
         tableNameWithType, URLEncoder.encode(batchConfigMapStr, StandardCharsets.UTF_8.toString()));
   }
 
   public String forIngestFromURI(String tableNameWithType, String batchConfigMapStr, String sourceURIStr)
       throws UnsupportedEncodingException {
-    return String.format("%s?tableName=%s&batchConfigMapStr=%s&sourceURIStr=%s",
+    return String.format("%s?tableNameWithType=%s&batchConfigMapStr=%s&sourceURIStr=%s",
         StringUtil.join("/", _baseUrl, "ingestFromURI"), tableNameWithType,
         URLEncoder.encode(batchConfigMapStr, StandardCharsets.UTF_8.toString()),
         URLEncoder.encode(sourceURIStr, StandardCharsets.UTF_8.toString()));

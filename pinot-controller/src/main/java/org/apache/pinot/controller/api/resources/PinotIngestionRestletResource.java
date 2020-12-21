@@ -53,6 +53,25 @@ import org.slf4j.LoggerFactory;
 
 /**
  * APIs related to ingestion
+ *
+ * Ingest data into the tableNameWithType using the form multipart file
+ * /ingestFromFile?tableNameWithType=foo_OFFLINE
+ * &batchConfigMapStr={
+ *   "inputFormat":"csv",
+ *   "recordReader.prop.delimiter":"|"
+ * }
+ *
+ * Ingest data into the tableNameWithType using the source file URI
+ * /ingestFromURI?tableNameWithType=foo_OFFLINE
+ * &batchConfigMapStr={
+ *   "inputFormat":"json",
+ *   "input.fs.className":"org.apache.pinot.plugin.filesystem.S3PinotFS",
+ *   "input.fs.prop.region":"us-central",
+ *   "input.fs.prop.accessKey":"foo",
+ *   "input.fs.prop.secretKey":"bar"
+ * }
+ * &sourceURIStr=s3://test.bucket/path/to/json/data/data.json
+ *
  */
 @Api(tags = Constants.TABLE_TAG)
 @Path("/")
@@ -67,79 +86,110 @@ public class PinotIngestionRestletResource {
   ControllerConf _controllerConf;
 
   /**
-   * API to upload a file and ingest it into a Pinot table
-   * @param tableName Name of the table to upload to
+   * API to upload a file and ingest it into a Pinot table.
+   * This call will copy the file locally, create a segment and push the segment to Pinot.
+   * A response will be returned after the completion of all of the above steps.
+   *
+   * @param tableNameWithType Name of the table to upload to, with type suffix
    * @param batchConfigMapStr Batch config Map as a string. Provide the
    *                          input format (inputFormat)
    *                          record reader configs (recordReader.prop.<property>),
    *                          fs class name (input.fs.className)
    *                          fs configs (input.fs.prop.<property>)
    * @param fileUpload file to upload as a multipart
+   * @param asyncResponse injected async response to return result
    */
   @POST
   @ManagedAsync
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Path("/ingestFromFile")
-  @ApiOperation(value = "Ingest a file", notes = "Creates a segment using given file and pushes it to Pinot")
+  @ApiOperation(value = "Ingest a file", notes =
+      "Creates a segment using given file and pushes it to Pinot. Example usage:"
+          + "\n```"
+          + "\ncurl -X POST -F file=@data.json -H \"Content-Type: multipart/form-data\" \"http://localhost:9000/ingestFromFile?tableNameWithType=foo_OFFLINE&"
+          + "\nbatchConfigMapStr={"
+          + "\n  \"inputFormat\":\"csv\","
+          + "\n  \"recordReader.prop.delimiter\":\"|\""
+          + "\n}\" "
+          + "\n```")
   public void ingestFromFile(
-      @ApiParam(value = "Name of the table to upload the file to", required = true) @QueryParam("tableName") String tableName,
-      @ApiParam(value = "Batch config map as string", required = true) @QueryParam("batchConfigMapStr") String batchConfigMapStr,
-      FormDataMultiPart fileUpload,
-      @Suspended final AsyncResponse asyncResponse) {
+      @ApiParam(value = "Name of the table to upload the file to", required = true) @QueryParam("tableNameWithType") String tableNameWithType,
+      @ApiParam(value = "Batch config Map as json string. Must pass inputFormat, and optionally record reader properties. e.g. {\"inputFormat\":\"json\"}", required = true) @QueryParam("batchConfigMapStr") String batchConfigMapStr,
+      FormDataMultiPart fileUpload, @Suspended final AsyncResponse asyncResponse) {
     try {
-      asyncResponse.resume(ingestData(tableName, batchConfigMapStr, new DataPayload(fileUpload)));
+      asyncResponse.resume(ingestData(tableNameWithType, batchConfigMapStr, new DataPayload(fileUpload)));
     } catch (Exception e) {
       asyncResponse.resume(new ControllerApplicationException(LOGGER,
-          String.format("Caught exception when ingesting file into table: %s. %s", tableName, e.getMessage()),
+          String.format("Caught exception when ingesting file into table: %s. %s", tableNameWithType, e.getMessage()),
           Response.Status.INTERNAL_SERVER_ERROR, e));
     }
   }
 
   /**
-   * API to ingest a file into Pinot from a URI
-   * @param tableName Name of the table to upload to
+   * API to ingest a file into Pinot from a URI.
+   * This call will copy the file locally, create a segment and push the segment to Pinot.
+   * A response will be returned after the completion of all of the above steps.
+   *
+   * @param tableNameWithType Name of the table to upload to, with type suffix
    * @param batchConfigMapStr Batch config Map as a string. Provide the
    *                          input format (inputFormat)
    *                          record reader configs (recordReader.prop.<property>),
    *                          fs class name (input.fs.className)
    *                          fs configs (input.fs.prop.<property>)
    * @param sourceURIStr URI for input file to ingest
+   * @param asyncResponse injected async response to return result
    */
   @POST
   @ManagedAsync
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Path("/ingestFromURI")
-  @ApiOperation(value = "Ingest from the given URI", notes = "Creates a segment using file at the given URI and pushes it to Pinot")
+  @ApiOperation(value = "Ingest from the given URI", notes =
+      "Creates a segment using file at the given URI and pushes it to Pinot. Example usage:"
+          + "\n```"
+          + "\ncurl -X POST \"http://localhost:9000/ingestFromURI?tableNameWithType=foo_OFFLINE"
+          + "\n&batchConfigMapStr={"
+          + "\n  \"inputFormat\":\"json\","
+          + "\n  \"input.fs.className\":\"org.apache.pinot.plugin.filesystem.S3PinotFS\","
+          + "\n  \"input.fs.prop.region\":\"us-central\","
+          + "\n  \"input.fs.prop.accessKey\":\"foo\","
+          + "\n  \"input.fs.prop.secretKey\":\"bar\""
+          + "\n}"
+          + "\n&sourceURIStr=s3://test.bucket/path/to/json/data/data.json\""
+          + "\n```")
   public void ingestFromURI(
-      @ApiParam(value = "Name of the table to upload the file to", required = true) @QueryParam("tableName") String tableName,
-      @ApiParam(value = "Batch config map as string", required = true) @QueryParam("batchConfigMapStr") String batchConfigMapStr,
-      @ApiParam(value = "URI", required = true) @QueryParam("sourceURIStr") String sourceURIStr,
+      @ApiParam(value = "Name of the table to upload the file to", required = true) @QueryParam("tableNameWithType") String tableNameWithType,
+      @ApiParam(value = "Batch config Map as json string. Must pass inputFormat, and optionally input FS properties. e.g. {\"inputFormat\":\"json\"}", required = true) @QueryParam("batchConfigMapStr") String batchConfigMapStr,
+      @ApiParam(value = "URI of file to upload", required = true) @QueryParam("sourceURIStr") String sourceURIStr,
       @Suspended final AsyncResponse asyncResponse) {
     try {
-      asyncResponse.resume(ingestData(tableName, batchConfigMapStr, new DataPayload(new URI(sourceURIStr))));
+      asyncResponse.resume(ingestData(tableNameWithType, batchConfigMapStr, new DataPayload(new URI(sourceURIStr))));
     } catch (Exception e) {
       asyncResponse.resume(new ControllerApplicationException(LOGGER,
-          String.format("Caught exception when ingesting file into table: %s. %s", tableName, e.getMessage()),
+          String.format("Caught exception when ingesting file into table: %s. %s", tableNameWithType, e.getMessage()),
           Response.Status.INTERNAL_SERVER_ERROR, e));
     }
   }
 
-  private SuccessResponse ingestData(String tableName, String batchConfigMapStr, DataPayload payload)
+  private SuccessResponse ingestData(String tableNameWithType, String batchConfigMapStr, DataPayload payload)
       throws Exception {
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     Preconditions
-        .checkState(TableType.REALTIME != tableType, "Cannot ingest file into REALTIME table: %s", tableName);
-    String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
+        .checkState(tableType != null, "Must provide table name with type suffix for table: %s", tableNameWithType);
+    Preconditions
+        .checkState(TableType.REALTIME != tableType, "Cannot ingest file into REALTIME table: %s", tableNameWithType);
     TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
     Preconditions.checkState(tableConfig != null, "Table: %s not found", tableNameWithType);
     Map<String, String> batchConfigMap =
-        JsonUtils.stringToObject(batchConfigMapStr, new TypeReference<Map<String, String>>() {});
+        JsonUtils.stringToObject(batchConfigMapStr, new TypeReference<Map<String, String>>() {
+        });
     BatchConfig batchConfig = new BatchConfig(tableNameWithType, batchConfigMap);
     Schema schema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
 
-    FileIngestionHelper fileIngestionHelper = new FileIngestionHelper(tableConfig, schema, batchConfig, _controllerConf);
+    FileIngestionHelper fileIngestionHelper =
+        new FileIngestionHelper(tableConfig, schema, batchConfig, _controllerConf.getControllerHost(),
+            Integer.parseInt(_controllerConf.getControllerPort()));
     return fileIngestionHelper.buildSegmentAndPush(payload);
   }
 }
