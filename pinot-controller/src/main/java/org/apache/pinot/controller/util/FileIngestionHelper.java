@@ -52,14 +52,16 @@ public class FileIngestionHelper {
   private final BatchConfig _batchConfig;
   private final String _controllerHost;
   private final int _controllerPort;
+  private final File _uploadDir;
 
   public FileIngestionHelper(TableConfig tableConfig, Schema schema, BatchConfig batchConfig, String controllerHost,
-      int controllerPort) {
+      int controllerPort, File uploadDir) {
     _tableConfig = tableConfig;
     _schema = schema;
     _batchConfig = batchConfig;
     _controllerHost = controllerHost;
     _controllerPort = controllerPort;
+    _uploadDir = uploadDir;
   }
 
   /**
@@ -68,11 +70,12 @@ public class FileIngestionHelper {
   public SuccessResponse buildSegmentAndPush(DataPayload payload)
       throws Exception {
     String tableNameWithType = _tableConfig.getTableName();
-    LOGGER.info("Starting ingestion of {} payload to table: {}", payload._payloadType, tableNameWithType);
+    File workingDir = new File(_uploadDir,
+        String.format("%s_%s_%d", WORKING_DIR_PREFIX, tableNameWithType, System.currentTimeMillis()));
+    LOGGER.info("Starting ingestion of {} payload to table: {} using working dir: {}", payload._payloadType,
+        tableNameWithType, workingDir.getAbsolutePath());
 
     // Setup working dir
-    File workingDir = new File(FileUtils.getTempDirectory(),
-        String.format("%s_%s_%d", WORKING_DIR_PREFIX, tableNameWithType, System.currentTimeMillis()));
     File inputDir = new File(workingDir, INPUT_DATA_DIR);
     File outputDir = new File(workingDir, OUTPUT_SEGMENT_DIR);
     File segmentTarDir = new File(workingDir, SEGMENT_TAR_DIR);
