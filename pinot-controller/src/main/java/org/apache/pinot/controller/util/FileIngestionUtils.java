@@ -117,17 +117,9 @@ public final class FileIngestionUtils {
     FileFormat fileFormat = batchConfig.getInputFormat();
     segmentGeneratorConfig.setFormat(fileFormat);
     segmentGeneratorConfig.setRecordReaderPath(RecordReaderFactory.getRecordReaderClassName(fileFormat.toString()));
-    String readerConfigClassName = RecordReaderFactory.getRecordReaderConfigClassName(fileFormat.toString());
-    if (readerConfigClassName != null) {
-      Map<String, String> configs = batchConfig.getRecordReaderProps();
-      if (configs == null) {
-        configs = Collections.emptyMap();
-      }
-      JsonNode jsonNode = new ObjectMapper().valueToTree(IngestionConfigUtils.getRecordReaderProps(configs));
-      Class<?> clazz = PluginManager.get().loadClass(readerConfigClassName);
-      RecordReaderConfig recordReaderConfig = (RecordReaderConfig) JsonUtils.jsonNodeToObject(jsonNode, clazz);
-      segmentGeneratorConfig.setReaderConfig(recordReaderConfig);
-    }
+    Map<String, String> configs = batchConfig.getRecordReaderProps();
+    segmentGeneratorConfig.setReaderConfig(
+        RecordReaderFactory.getRecordReaderConfig(fileFormat, IngestionConfigUtils.getRecordReaderProps(configs)));
     // Using current time as postfix to prevent overwriting segments with same time ranges
     segmentGeneratorConfig.setSegmentNameGenerator(
         new SimpleSegmentNameGenerator(tableConfig.getTableName(), String.valueOf(System.currentTimeMillis())));

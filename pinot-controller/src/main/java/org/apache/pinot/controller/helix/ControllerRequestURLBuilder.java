@@ -22,6 +22,8 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.StringUtil;
@@ -299,11 +301,27 @@ public class ControllerRequestURLBuilder {
         tableNameWithType, URLEncoder.encode(batchConfigMapStr, StandardCharsets.UTF_8.toString()));
   }
 
+  public String forIngestFromFile(String tableNameWithType, Map<String, String> batchConfigMap)
+      throws UnsupportedEncodingException {
+    String batchConfigMapStr =
+        batchConfigMap.entrySet().stream().map(e -> String.format("\"%s\":\"%s\"", e.getKey(), e.getValue()))
+            .collect(Collectors.joining(",", "{", "}"));
+    return forIngestFromFile(tableNameWithType, batchConfigMapStr);
+  }
+
   public String forIngestFromURI(String tableNameWithType, String batchConfigMapStr, String sourceURIStr)
       throws UnsupportedEncodingException {
     return String.format("%s?tableNameWithType=%s&batchConfigMapStr=%s&sourceURIStr=%s",
         StringUtil.join("/", _baseUrl, "ingestFromURI"), tableNameWithType,
         URLEncoder.encode(batchConfigMapStr, StandardCharsets.UTF_8.toString()),
         URLEncoder.encode(sourceURIStr, StandardCharsets.UTF_8.toString()));
+  }
+
+  public String forIngestFromURI(String tableNameWithType, Map<String, String> batchConfigMap, String sourceURIStr)
+      throws UnsupportedEncodingException {
+    String batchConfigMapStr =
+        batchConfigMap.entrySet().stream().map(e -> String.format("\"%s\":\"%s\"", e.getKey(), e.getValue()))
+            .collect(Collectors.joining(",", "{", "}"));
+    return forIngestFromURI(tableNameWithType, batchConfigMapStr, sourceURIStr);
   }
 }

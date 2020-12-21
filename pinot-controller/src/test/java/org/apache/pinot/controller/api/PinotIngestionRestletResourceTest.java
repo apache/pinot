@@ -27,7 +27,9 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -72,15 +74,15 @@ public class PinotIngestionRestletResourceTest extends ControllerTest {
     // Add schema & table
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     Schema schema =
-        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("foo", FieldSpec.DataType.STRING)
-            .addSingleValueDimension("bar", FieldSpec.DataType.STRING).build();
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("breed", FieldSpec.DataType.STRING)
+            .addSingleValueDimension("name", FieldSpec.DataType.STRING).build();
     _helixResourceManager.addSchema(schema, true);
     _helixResourceManager.addTable(tableConfig);
 
     // Create a file with few records
     _inputFile = new File(FileUtils.getTempDirectory(), "pinotIngestionRestletResourceTest_data.csv");
     try (BufferedWriter bw = new BufferedWriter(new FileWriter(_inputFile))) {
-      bw.write("foo|bar\n");
+      bw.write("breed|name\n");
       bw.write("dog|cooper\n");
       bw.write("cat|kylo\n");
       bw.write("dog|cookie\n");
@@ -95,15 +97,16 @@ public class PinotIngestionRestletResourceTest extends ControllerTest {
     Assert.assertEquals(segments.size(), 0);
 
     // ingest from file
-    sendHttpPost(_controllerRequestURLBuilder
-        .forIngestFromFile(TABLE_NAME_WITH_TYPE, "{\"inputFormat\":\"csv\",\"recordReader.prop.delimiter\":\"|\"}"));
+    Map<String, String> batchConfigMap = new HashMap<>();
+    batchConfigMap.put("inputFormat", "csv");
+    batchConfigMap.put("recordReader.prop.delimiter", "|");
+    sendHttpPost(_controllerRequestURLBuilder.forIngestFromFile(TABLE_NAME_WITH_TYPE, batchConfigMap));
     segments = _helixResourceManager.getSegmentsFor(TABLE_NAME_WITH_TYPE);
     Assert.assertEquals(segments.size(), 1);
 
     // ingest from URI
-    sendHttpPost(_controllerRequestURLBuilder
-        .forIngestFromURI(TABLE_NAME_WITH_TYPE, "{\"inputFormat\":\"csv\",\"recordReader.prop.delimiter\":\"|\"}",
-            String.format("file://%s", _inputFile.getAbsolutePath())));
+    sendHttpPost(_controllerRequestURLBuilder.forIngestFromURI(TABLE_NAME_WITH_TYPE, batchConfigMap,
+        String.format("file://%s", _inputFile.getAbsolutePath())));
     segments = _helixResourceManager.getSegmentsFor(TABLE_NAME_WITH_TYPE);
     Assert.assertEquals(segments.size(), 2);
   }
