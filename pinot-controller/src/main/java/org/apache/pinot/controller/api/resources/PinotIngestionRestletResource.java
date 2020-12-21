@@ -110,10 +110,11 @@ public class PinotIngestionRestletResource {
   @Path("/ingestFromFile")
   @ApiOperation(value = "Ingest a file", notes = "Creates a segment using given file and pushes it to Pinot. "
       + "\n All steps happen on the controller. This API is NOT meant for production environments/large input files. "
-      + "\n Example usage:" + "\n```"
+      + "\n Example usage (query params need encoding):" + "\n```"
       + "\ncurl -X POST -F file=@data.json -H \"Content-Type: multipart/form-data\" \"http://localhost:9000/ingestFromFile?tableNameWithType=foo_OFFLINE&"
       + "\nbatchConfigMapStr={" + "\n  \"inputFormat\":\"csv\"," + "\n  \"recordReader.prop.delimiter\":\"|\""
-      + "\n}\" " + "\n```")
+      + "\n}\" "
+      + "\n```")
   public void ingestFromFile(
       @ApiParam(value = "Name of the table to upload the file to", required = true) @QueryParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Batch config Map as json string. Must pass inputFormat, and optionally record reader properties. e.g. {\"inputFormat\":\"json\"}", required = true) @QueryParam("batchConfigMapStr") String batchConfigMapStr,
@@ -149,7 +150,7 @@ public class PinotIngestionRestletResource {
   @ApiOperation(value = "Ingest from the given URI", notes =
       "Creates a segment using file at the given URI and pushes it to Pinot. "
           + "\n All steps happen on the controller. This API is NOT meant for production environments/large input files. "
-          + "\nExample usage:" + "\n```"
+          + "\nExample usage (query params need encoding):" + "\n```"
           + "\ncurl -X POST \"http://localhost:9000/ingestFromURI?tableNameWithType=foo_OFFLINE"
           + "\n&batchConfigMapStr={" + "\n  \"inputFormat\":\"json\","
           + "\n  \"input.fs.className\":\"org.apache.pinot.plugin.filesystem.S3PinotFS\","
