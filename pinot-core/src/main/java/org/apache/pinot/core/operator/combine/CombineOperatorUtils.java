@@ -25,6 +25,8 @@ import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.common.utils.CommonConstants.Server.PINOT_SERVER_MAX_THREADS_PER_QUERY;
+
 
 @SuppressWarnings("rawtypes")
 public class CombineOperatorUtils {
@@ -44,12 +46,13 @@ public class CombineOperatorUtils {
    * derive it using available processors at runtime.
    */
   private static int getMaxThreadsPerQuery() {
-    if (System.getenv("pinot.server.max.threads.per.query") != null) {
+    String systemPropertyMaxThreads = System.getProperty(PINOT_SERVER_MAX_THREADS_PER_QUERY);
+    if (systemPropertyMaxThreads != null) {
       try {
-        return Integer.parseInt(System.getenv("pinot.server.max.threads.per.query"));
+        return Integer.parseInt(systemPropertyMaxThreads);
       } catch (NumberFormatException numberFormatException) {
-        LOGGER.warn("pinot.server.max.threads.per.query should be an integer. Using default resolution strategy to " +
-            "get MAX_NUM_THREADS_PER_QUERY");
+        LOGGER.warn("{} should be an integer. Will be using runtime available processors as fallback.",
+            PINOT_SERVER_MAX_THREADS_PER_QUERY, numberFormatException);
       }
     }
     return Math.max(1, Math.min(10, Runtime.getRuntime().availableProcessors() / 2));

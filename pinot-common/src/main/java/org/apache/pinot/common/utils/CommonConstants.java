@@ -283,6 +283,7 @@ public class CommonConstants {
     public static final String DEFAULT_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE = "ALL";
 
     public static final String PINOT_SERVER_METRICS_PREFIX = "pinot.server.metrics.prefix";
+    public static final String PINOT_SERVER_MAX_THREADS_PER_QUERY = "pinot.server.maxThreadsPerQuery";
 
     public static class SegmentCompletionProtocol {
       public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.server.segment.uploader";
