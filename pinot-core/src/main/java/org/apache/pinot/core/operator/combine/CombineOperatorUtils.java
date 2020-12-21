@@ -22,10 +22,13 @@ import java.util.List;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 @SuppressWarnings("rawtypes")
 public class CombineOperatorUtils {
+  private static final Logger LOGGER = LoggerFactory.getLogger(CombineOperatorUtils.class);
   private CombineOperatorUtils() {
   }
 
@@ -34,8 +37,24 @@ public class CombineOperatorUtils {
    * <p>NOTE: Runtime.getRuntime().availableProcessors() may return value < 2 in container based environment, e.g.
    *          Kubernetes.
    */
-  public static final int MAX_NUM_THREADS_PER_QUERY =
-      Math.max(1, Math.min(10, Runtime.getRuntime().availableProcessors() / 2));
+  public static final int MAX_NUM_THREADS_PER_QUERY = getMaxThreadsPerQuery();
+
+  /**
+   * Check if pinot.server.max.threads.per.query is set as env variable. If yes converts it to int and returns. Else
+   * derive it using available processors at runtime.
+   */
+  private static int getMaxThreadsPerQuery() {
+    if (System.getenv("pinot.server.max.threads.per.query") != null) {
+      try {
+        return Integer.parseInt(System.getenv("pinot.server.max.threads.per.query"));
+      } catch (NumberFormatException numberFormatException) {
+        LOGGER.warn("pinot.server.max.threads.per.query should be an integer. Using default resolution strategy to " +
+            "get MAX_NUM_THREADS_PER_QUERY");
+      }
+    }
+    return Math.max(1, Math.min(10, Runtime.getRuntime().availableProcessors() / 2));
+  }
+
 
   /**
    * Returns the number of threads used to execute the query in parallel.
