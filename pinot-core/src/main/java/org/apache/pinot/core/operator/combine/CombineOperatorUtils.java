@@ -42,7 +42,7 @@ public class CombineOperatorUtils {
   public static final int MAX_NUM_THREADS_PER_QUERY = getMaxThreadsPerQuery();
 
   /**
-   * Check if pinot.server.max.threads.per.query is set as env variable. If yes converts it to int and returns. Else
+   * Check if pinot.server.max.threads.per.query is set as system variable. If yes converts it to int and returns. Else
    * derive it using available processors at runtime.
    */
   private static int getMaxThreadsPerQuery() {
