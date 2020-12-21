@@ -49,9 +49,7 @@ public class KinesisConnectionHandler {
   public KinesisConnectionHandler(String stream, String awsRegion) {
     _stream = stream;
     _awsRegion = awsRegion;
-    _kinesisClient =
-        KinesisClient.builder().region(Region.of(_awsRegion)).credentialsProvider(DefaultCredentialsProvider.create())
-            .build();
+    createConnection();
   }
 
   public List<Shard> getShards() {
@@ -60,9 +58,17 @@ public class KinesisConnectionHandler {
     return listShardsResponse.shards();
   }
 
+  public void createConnection(){
+    if(_kinesisClient == null) {
+      _kinesisClient = KinesisClient.builder().region(Region.of(_awsRegion)).credentialsProvider(DefaultCredentialsProvider.create())
+          .build();
+    }
+  }
+
   public void close(){
     if(_kinesisClient != null) {
       _kinesisClient.close();
+      _kinesisClient = null;
     }
   }
 }
