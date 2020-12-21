@@ -25,7 +25,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 
 import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.common.DataSourceMetadata;
+import org.apache.pinot.core.geospatial.GeometryUtils;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
@@ -50,6 +50,9 @@ import org.apache.pinot.core.segment.index.datasource.MutableDataSource;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
 import org.apache.pinot.core.segment.index.readers.ValidDocIndexReader;
 import org.apache.pinot.core.util.QueryOptions;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.Point;
 
 
 public class FilterPlanNode implements PlanNode {
@@ -132,6 +135,14 @@ public class FilterPlanNode implements PlanNode {
           if (function.getFunctionName().equalsIgnoreCase("H3_WITHIN")) {
             String columnName = function.getArguments().get(0).getIdentifier();
             GeoPredicate geoPredicate = new GeoPredicate();
+            geoPredicate.setType(GeoPredicate.Type.WITHIN);
+            float lat = Float.parseFloat(function.getArguments().get(1).getLiteral());
+            float lon = Float.parseFloat(function.getArguments().get(2).getLiteral());
+            float distance = Float.parseFloat(function.getArguments().get(3).getLiteral());
+//            float resolution =Float.parseFloat(function.getArguments().get(4).getLiteral());
+            Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(lat, lon));
+            geoPredicate.setGeometry(point);
+            geoPredicate.setDistance(distance);
             //set geo predicate
             return new H3IndexFilterOperator(geoPredicate, _indexSegment.getDataSource(columnName), _numDocs);
           } else {
