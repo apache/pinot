@@ -31,6 +31,7 @@ import org.apache.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMax
 import org.apache.pinot.core.segment.index.loader.defaultcolumn.DefaultColumnHandler;
 import org.apache.pinot.core.segment.index.loader.defaultcolumn.DefaultColumnHandlerFactory;
 import org.apache.pinot.core.segment.index.loader.invertedindex.InvertedIndexHandler;
+import org.apache.pinot.core.segment.index.loader.invertedindex.LuceneFSTIndexHandler;
 import org.apache.pinot.core.segment.index.loader.invertedindex.RangeIndexHandler;
 import org.apache.pinot.core.segment.index.loader.invertedindex.TextIndexHandler;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
@@ -118,6 +119,14 @@ public class SegmentPreProcessor implements AutoCloseable {
         TextIndexHandler textIndexHandler =
             new TextIndexHandler(_indexDir, _segmentMetadata, textIndexColumns, segmentWriter);
         textIndexHandler.createTextIndexesOnSegmentLoad();
+      }
+
+      Set<String> fstIndexColumns = _indexLoadingConfig.getFSTIndexColumns();
+      if (fstIndexColumns.size() > 0) {
+        LuceneFSTIndexHandler luceneFSTIndexHandler =
+                new LuceneFSTIndexHandler(
+                        _indexDir, _segmentMetadata, fstIndexColumns, segmentWriter);
+        luceneFSTIndexHandler.createFSTIndexesOnSegmentLoad();
       }
 
       // Create bloom filter if required

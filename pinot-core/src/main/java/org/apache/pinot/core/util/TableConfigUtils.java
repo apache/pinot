@@ -86,7 +86,7 @@ public final class TableConfigUtils {
     validateIngestionConfig(tableConfig, schema);
     validateTierConfigList(tableConfig.getTierConfigsList());
     validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
-    validateFieldConfigList(tableConfig.getFieldConfigList(), schema);
+    validateFieldConfigList(tableConfig.getFieldConfigList(), tableConfig.getIndexingConfig(), schema);
     validateUpsertConfig(tableConfig, schema);
   }
 
@@ -480,7 +480,8 @@ public final class TableConfigUtils {
    * Validates the Field Config List in the given TableConfig
    * Ensures that every referred column name exists in the corresponding schema
    */
-  private static void validateFieldConfigList(@Nullable List<FieldConfig> fieldConfigList, @Nullable Schema schema) {
+  private static void validateFieldConfigList(@Nullable List<FieldConfig> fieldConfigList,
+      @Nullable IndexingConfig indexingConfigs, @Nullable Schema schema) {
     if (fieldConfigList == null || schema == null) {
       return;
     }
@@ -489,6 +490,17 @@ public final class TableConfigUtils {
       String columnName = fieldConfig.getName();
       Preconditions.checkState(schema.getFieldSpecFor(columnName) != null,
           "Column Name " + columnName + " defined in field config list must be a valid column defined in the schema");
+
+      if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY) {
+        Preconditions.checkArgument(!indexingConfigs.getNoDictionaryColumns().contains(columnName),
+            "FieldConfig encoding type is different from indexingConfig for column: " + columnName);
+      }
+
+      // FST Index is only available on dictionary encoded columns.
+      if (fieldConfig.getIndexType() == FieldConfig.IndexType.FST) {
+        Preconditions.checkArgument(fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY,
+            "FST Index is only enabled on dictionary encoded columns");
+      }
     }
   }
 

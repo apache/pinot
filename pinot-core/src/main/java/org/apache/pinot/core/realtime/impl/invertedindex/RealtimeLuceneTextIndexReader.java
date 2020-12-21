@@ -30,6 +30,7 @@ import org.apache.lucene.search.SearcherManager;
 import org.apache.pinot.core.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.core.segment.index.readers.TextIndexReader;
 import org.roaringbitmap.IntIterator;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.LoggerFactory;
 
@@ -87,6 +88,11 @@ public class RealtimeLuceneTextIndexReader implements TextIndexReader {
    */
   public void add(String document) {
     _indexCreator.add(document);
+  }
+
+  @Override
+  public ImmutableRoaringBitmap getDictIds(String searchQuery) {
+    throw new UnsupportedOperationException();
   }
 
   @Override

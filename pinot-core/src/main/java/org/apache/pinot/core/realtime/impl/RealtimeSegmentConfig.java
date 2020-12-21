@@ -40,6 +40,7 @@ public class RealtimeSegmentConfig {
   private final Set<String> _varLengthDictionaryColumns;
   private final Set<String> _invertedIndexColumns;
   private final Set<String> _textIndexColumns;
+  private final Set<String> _fstIndexColumns;
   private final RealtimeSegmentZKMetadata _realtimeSegmentZKMetadata;
   private final boolean _offHeap;
   private final PinotDataBufferMemoryManager _memoryManager;
@@ -54,9 +55,9 @@ public class RealtimeSegmentConfig {
   private final String _consumerDir;
 
   // TODO: Clean up this constructor. Most of these things can be extracted from tableConfig.
-  private RealtimeSegmentConfig(String tableNameWithType, String segmentName, String streamName, Schema schema,
-      String timeColumnName, int capacity, int avgNumMultiValues, Set<String> noDictionaryColumns,
-      Set<String> varLengthDictionaryColumns, Set<String> invertedIndexColumns, Set<String> textIndexColumns,
+  private RealtimeSegmentConfig(String tableNameWithType, String segmentName, String streamName, Schema schema, String timeColumnName,
+      int capacity, int avgNumMultiValues, Set<String> noDictionaryColumns, Set<String> varLengthDictionaryColumns,
+      Set<String> invertedIndexColumns, Set<String> textIndexColumns, Set<String> fstIndexColumns,
       RealtimeSegmentZKMetadata realtimeSegmentZKMetadata, boolean offHeap, PinotDataBufferMemoryManager memoryManager,
       RealtimeSegmentStatsHistory statsHistory, String partitionColumn, PartitionFunction partitionFunction,
       int partitionId, boolean aggregateMetrics, boolean nullHandlingEnabled, String consumerDir,
@@ -72,6 +73,7 @@ public class RealtimeSegmentConfig {
     _varLengthDictionaryColumns = varLengthDictionaryColumns;
     _invertedIndexColumns = invertedIndexColumns;
     _textIndexColumns = textIndexColumns;
+    _fstIndexColumns = fstIndexColumns;
     _realtimeSegmentZKMetadata = realtimeSegmentZKMetadata;
     _offHeap = offHeap;
     _memoryManager = memoryManager;
@@ -135,6 +137,10 @@ public class RealtimeSegmentConfig {
     return _textIndexColumns;
   }
 
+  public Set<String> getFSTIndexColumns() {
+    return _fstIndexColumns;
+  }
+
   public RealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata() {
     return _realtimeSegmentZKMetadata;
   }
@@ -195,6 +201,7 @@ public class RealtimeSegmentConfig {
     private Set<String> _varLengthDictionaryColumns;
     private Set<String> _invertedIndexColumns;
     private Set<String> _textIndexColumns = new HashSet<>();
+    private Set<String> _fstIndexColumns = new HashSet<>();
     private RealtimeSegmentZKMetadata _realtimeSegmentZKMetadata;
     private boolean _offHeap;
     private PinotDataBufferMemoryManager _memoryManager;
@@ -274,6 +281,11 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
+    public Builder setFSTIndexColumns(Set<String> fstIndexColumns) {
+      _fstIndexColumns = fstIndexColumns;
+      return this;
+    }
+
     public Builder setRealtimeSegmentZKMetadata(RealtimeSegmentZKMetadata realtimeSegmentZKMetadata) {
       _realtimeSegmentZKMetadata = realtimeSegmentZKMetadata;
       return this;
@@ -337,9 +349,9 @@ public class RealtimeSegmentConfig {
     public RealtimeSegmentConfig build() {
       return new RealtimeSegmentConfig(_tableNameWithType, _segmentName, _streamName, _schema, _timeColumnName,
           _capacity, _avgNumMultiValues, _noDictionaryColumns, _varLengthDictionaryColumns, _invertedIndexColumns,
-          _textIndexColumns, _realtimeSegmentZKMetadata, _offHeap, _memoryManager, _statsHistory, _partitionColumn,
-          _partitionFunction, _partitionId, _aggregateMetrics, _nullHandlingEnabled, _consumerDir, _upsertMode,
-          _partitionUpsertMetadataManager);
+          _textIndexColumns, _fstIndexColumns, _realtimeSegmentZKMetadata, _offHeap, _memoryManager,
+          _statsHistory, _partitionColumn, _partitionFunction, _partitionId, _aggregateMetrics,
+          _nullHandlingEnabled, _consumerDir, _upsertMode, _partitionUpsertMetadataManager);
     }
   }
 }

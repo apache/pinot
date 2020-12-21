@@ -411,6 +411,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     // Add the column metadata information to the metadata properties.
     SegmentColumnarIndexCreator
         .addColumnMetadataInfo(_segmentProperties, column, columnIndexCreationInfo, totalDocs, fieldSpec,
-            true/*hasDictionary*/, dictionaryElementSize, true/*hasInvertedIndex*/, TextIndexType.NONE);
+            true/*hasDictionary*/, dictionaryElementSize, true/*hasInvertedIndex*/,
+            false/*hasFSTIndex*/, TextIndexType.NONE);
   }
 }

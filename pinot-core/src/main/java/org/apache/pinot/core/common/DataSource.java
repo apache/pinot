@@ -67,6 +67,11 @@ public interface DataSource {
   TextIndexReader getTextIndex();
 
   /**
+   * Returns the FST index for the column if exists, or {@code null} if not.
+   */
+  TextIndexReader getFSTIndex();
+
+  /**
    * Returns the bloom filter for the column if exists, or {@code null} if not.
    */
   @Nullable
