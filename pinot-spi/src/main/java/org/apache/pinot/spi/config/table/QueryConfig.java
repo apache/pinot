@@ -37,15 +37,26 @@ public class QueryConfig extends BaseJsonConfig {
   // If the server times out, it will directly interrupt the query execution. The server response does not matter much
   // because by the time the server times out, the broker should already timed out and returned the response.
   private final Long _timeoutMs;
+  private final Integer _maxThreadsPerQuery;
 
   @JsonCreator
-  public QueryConfig(@JsonProperty("timeoutMs") @Nullable Long timeoutMs) {
+  public QueryConfig(@JsonProperty("timeoutMs") @Nullable Long timeoutMs,
+                     @JsonProperty("maxThreadsPerQuery") @Nullable Integer maxThreadsPerQuery) {
     Preconditions.checkArgument(timeoutMs == null || timeoutMs > 0, "Invalid 'timeoutMs': %s", timeoutMs);
+    Preconditions.checkArgument(maxThreadsPerQuery == null || maxThreadsPerQuery < 1, "Invalid 'maxThreadsPerQuery': %s",
+        maxThreadsPerQuery);
     _timeoutMs = timeoutMs;
+    _maxThreadsPerQuery = maxThreadsPerQuery;
   }
 
   @Nullable
   public Long getTimeoutMs() {
     return _timeoutMs;
   }
+
+  @Nullable
+  public Integer getMaxThreadsPerQuery() {
+    return _maxThreadsPerQuery;
+  }
+
 }
