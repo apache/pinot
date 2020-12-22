@@ -9,7 +9,7 @@
     },
     {
       "dataType": "FLOAT",
-      "name": "long"
+      "name": "lon"
     },
     {
       "dataType": "STRING",
@@ -22,7 +22,7 @@
     {
       "dataType": "BYTES",
       "name": "location_st_point",
-      "transformFunction": "stPoint(lat,long)"
+      "transformFunction": "stPoint(lat,lon)"
     }
   ],
   "schemaName": "starbucksStores"
