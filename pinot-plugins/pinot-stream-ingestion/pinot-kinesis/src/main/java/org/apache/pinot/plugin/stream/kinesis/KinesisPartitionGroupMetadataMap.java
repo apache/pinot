@@ -35,28 +35,28 @@ public class KinesisPartitionGroupMetadataMap extends KinesisConnectionHandler i
   private final List<PartitionGroupMetadata> _stringPartitionGroupMetadataIndex = new ArrayList<>();
 
   public KinesisPartitionGroupMetadataMap(String stream, String awsRegion,
-      PartitionGroupMetadataMap partitionGroupMetadataMap) {
+      PartitionGroupMetadataMap currentPartitionGroupMetadataMap) {
     //TODO: Handle child shards. Do not consume data from child shard unless parent is finished.
     //Return metadata only for shards in current metadata
     super(stream, awsRegion);
     KinesisPartitionGroupMetadataMap currentPartitionMeta =
-        (KinesisPartitionGroupMetadataMap) partitionGroupMetadataMap;
+        (KinesisPartitionGroupMetadataMap) currentPartitionGroupMetadataMap;
     List<PartitionGroupMetadata> currentMetaList = currentPartitionMeta.getMetadataList();
 
     List<Shard> shardList = getShards();
 
-    Map<String, PartitionGroupMetadata> metadataMap = new HashMap<>();
+    Map<String, PartitionGroupMetadata> currentMetadataMap = new HashMap<>();
     for (PartitionGroupMetadata partitionGroupMetadata : currentMetaList) {
       KinesisShardMetadata kinesisShardMetadata = (KinesisShardMetadata) partitionGroupMetadata;
-      metadataMap.put(kinesisShardMetadata.getShardId(), kinesisShardMetadata);
+      currentMetadataMap.put(kinesisShardMetadata.getShardId(), kinesisShardMetadata);
     }
 
     for (Shard shard : shardList) {
-      if (metadataMap.containsKey(shard.shardId())) {
+      if (currentMetadataMap.containsKey(shard.shardId())) {
         //Return existing shard metadata
-        _stringPartitionGroupMetadataIndex.add(metadataMap.get(shard.shardId()));
-      } else if (metadataMap.containsKey(shard.parentShardId())) {
-        KinesisShardMetadata kinesisShardMetadata = (KinesisShardMetadata) metadataMap.get(shard.parentShardId());
+        _stringPartitionGroupMetadataIndex.add(currentMetadataMap.get(shard.shardId()));
+      } else if (currentMetadataMap.containsKey(shard.parentShardId())) {
+        KinesisShardMetadata kinesisShardMetadata = (KinesisShardMetadata) currentMetadataMap.get(shard.parentShardId());
         if (isProcessingFinished(kinesisShardMetadata)) {
           //Add child shards for processing since parent has finished
           appendShardMetadata(stream, awsRegion, shard);
