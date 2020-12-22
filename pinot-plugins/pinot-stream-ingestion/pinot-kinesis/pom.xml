@@ -35,7 +35,7 @@
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
     <phase.prop>package</phase.prop>
-    <aws.version>2.13.46</aws.version>
+    <aws.version>2.15.50</aws.version>
   </properties>
 
   <dependencies>
