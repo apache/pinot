@@ -43,7 +43,8 @@ public class QueryConfig extends BaseJsonConfig {
   public QueryConfig(@JsonProperty("timeoutMs") @Nullable Long timeoutMs,
                      @JsonProperty("maxThreadsPerQuery") @Nullable Integer maxThreadsPerQuery) {
     Preconditions.checkArgument(timeoutMs == null || timeoutMs > 0, "Invalid 'timeoutMs': %s", timeoutMs);
-    Preconditions.checkArgument(maxThreadsPerQuery == null || maxThreadsPerQuery < 1, "Invalid 'maxThreadsPerQuery': %s",
+    Preconditions.checkArgument(maxThreadsPerQuery == null || maxThreadsPerQuery > 1, "Invalid 'maxThreadsPerQuery': " +
+            "%s",
         maxThreadsPerQuery);
     _timeoutMs = timeoutMs;
     _maxThreadsPerQuery = maxThreadsPerQuery;
