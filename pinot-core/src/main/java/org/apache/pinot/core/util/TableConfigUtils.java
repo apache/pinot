@@ -45,6 +45,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
@@ -145,6 +146,7 @@ public final class TableConfigUtils {
    *
    * 2. For OFFLINE table
    * - checks for valid field spec for timeColumnName in schema, if timeColumnName and schema are non-null
+   * - for Dimension tables checks the primary key requirement
    *
    * 3. Checks peerDownloadSchema
    */
@@ -160,6 +162,12 @@ public final class TableConfigUtils {
       Preconditions.checkState(schema.getSpecForTimeColumn(timeColumnName) != null,
           "Cannot find valid fieldSpec for timeColumn: %s from the table config: %s, in the schema: %s", timeColumnName,
           tableConfig.getTableName(), schema.getSchemaName());
+    }
+    if (tableConfig.isDimTable()) {
+      Preconditions.checkState(tableConfig.getTableType() == TableType.OFFLINE,
+          "Dimension table must be of OFFLINE table type.");
+      Preconditions.checkState(schema != null, "Dimension table must have an associated schema");
+      Preconditions.checkState(schema.getPrimaryKeyColumns().size() > 0, "Dimension table must have primary key[s]");
     }
 
     String peerSegmentDownloadScheme = validationConfig.getPeerSegmentDownloadScheme();
@@ -181,6 +189,7 @@ public final class TableConfigUtils {
    * 3. checks for null column name or transform function in transform config
    * 4. validity of transform function string
    * 5. checks for source fields used in destination columns
+   * 6. ingestion type for dimension tables
    */
   public static void validateIngestionConfig(TableConfig tableConfig, @Nullable Schema schema) {
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
@@ -190,7 +199,8 @@ public final class TableConfigUtils {
 
       // Batch
       if (ingestionConfig.getBatchIngestionConfig() != null) {
-        List<Map<String, String>> batchConfigMaps = ingestionConfig.getBatchIngestionConfig().getBatchConfigMaps();
+        BatchIngestionConfig cfg = ingestionConfig.getBatchIngestionConfig();
+        List<Map<String, String>> batchConfigMaps = cfg.getBatchConfigMaps();
         try {
           if (CollectionUtils.isNotEmpty(batchConfigMaps)) {
             // Validate that BatchConfig can be created
@@ -199,6 +209,14 @@ public final class TableConfigUtils {
         } catch (Exception e) {
           throw new IllegalStateException("Could not create BatchConfig using the batchConfig map", e);
         }
+        if (tableConfig.isDimTable()) {
+          Preconditions.checkState(cfg.getSegmentIngestionType().equalsIgnoreCase("REFRESH"),
+              "Dimension tables must have segment ingestion type REFRESH");
+        }
+      }
+      if (tableConfig.isDimTable()){
+        Preconditions.checkState(ingestionConfig.getBatchIngestionConfig() != null,
+            "Dimension tables must have batch ingestion configuration");
       }
 
       // Stream

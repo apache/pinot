@@ -29,7 +29,7 @@ public abstract class SegmentDataManager {
   private int _referenceCount = 1;
 
   @VisibleForTesting
-  synchronized int getReferenceCount() {
+  public synchronized int getReferenceCount() {
     return _referenceCount;
   }
 

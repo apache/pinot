@@ -174,6 +174,50 @@ public class TableConfigUtilsTest {
   }
 
   @Test
+  public void validateDimensionTableConfig() {
+    // dimension table with REALTIME type (should be OFFLINE)
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension(TIME_COLUMN, FieldSpec.DataType.STRING).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(TABLE_NAME).setIsDimTable(true).setTimeColumnName(TIME_COLUMN).build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail with a Dimension table of type REALTIME");
+    } catch (IllegalStateException e) {
+      // expected
+    }
+
+    // dimension table without a schema
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(TABLE_NAME).setIsDimTable(true).setTimeColumnName(TIME_COLUMN).build();
+    try {
+      TableConfigUtils.validate(tableConfig, null);
+      Assert.fail("Should fail with a Dimension table without a schema");
+    } catch (IllegalStateException e) {
+      // expected
+    }
+
+    // dimension table without a Primary Key
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension(TIME_COLUMN, FieldSpec.DataType.STRING).build();
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(TABLE_NAME).setIsDimTable(true).setTimeColumnName(TIME_COLUMN).build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail with a Dimension without a primary key");
+    } catch (IllegalStateException e) {
+      // expected
+    }
+
+    // valid dimension table
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(TABLE_NAME).setIsDimTable(true).build();
+    TableConfigUtils.validate(tableConfig, schema);
+  }
+
+  @Test
   public void validateIngestionConfig() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
     // null ingestion config
@@ -395,6 +439,50 @@ public class TableConfigUtilsTest {
     try {
       TableConfigUtils.validateIngestionConfig(tableConfig, null);
       Assert.fail("Should fail for invalid batch config map");
+    } catch (IllegalStateException e) {
+      // expected
+    }
+  }
+
+  @Test
+  public void ingestionConfigForDimensionTableTest() {
+    Map<String, String> batchConfigMap = new HashMap<>();
+    batchConfigMap.put(BatchConfigProperties.INPUT_DIR_URI, "s3://foo");
+    batchConfigMap.put(BatchConfigProperties.OUTPUT_DIR_URI, "gs://bar");
+    batchConfigMap.put(BatchConfigProperties.INPUT_FS_CLASS, "org.foo.S3FS");
+    batchConfigMap.put(BatchConfigProperties.OUTPUT_FS_CLASS, "org.foo.GcsFS");
+    batchConfigMap.put(BatchConfigProperties.INPUT_FORMAT, "avro");
+    batchConfigMap.put(BatchConfigProperties.RECORD_READER_CLASS, "org.foo.Reader");
+
+    // valid dimension table ingestion config
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIsDimTable(true)
+        .setIngestionConfig(
+            new IngestionConfig(new BatchIngestionConfig(Lists.newArrayList(batchConfigMap, batchConfigMap), "REFRESH",
+                null), null, null, null)
+        ).build();
+    TableConfigUtils.validateIngestionConfig(tableConfig, null);
+
+    // dimension tables should have batch ingestion config
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIsDimTable(true)
+        .setIngestionConfig(
+            new IngestionConfig(null, null, null, null)
+        ).build();
+    try {
+      TableConfigUtils.validateIngestionConfig(tableConfig, null);
+      Assert.fail("Should fail for Dimension table without batch ingestion config");
+    } catch (IllegalStateException e) {
+      // expected
+    }
+
+    // dimension tables should have batch ingestion config of type REFRESH
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIsDimTable(true)
+        .setIngestionConfig(
+            new IngestionConfig(new BatchIngestionConfig(Lists.newArrayList(batchConfigMap, batchConfigMap), "APPEND",
+                null), null, null, null)
+        ).build();
+    try {
+      TableConfigUtils.validateIngestionConfig(tableConfig, null);
+      Assert.fail("Should fail for Dimension table with ingestion type APPEND (should be REFRESH)");
     } catch (IllegalStateException e) {
       // expected
     }
