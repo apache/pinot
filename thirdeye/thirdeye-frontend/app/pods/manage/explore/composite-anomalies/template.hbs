@@ -1,7 +1,12 @@
 <section class="te-page__middle">
   <section class="container">
-    <section class="te-content-block__date-picker-section {{unless rootLevel "te-content-block__date-picker-section--disabled"}}">   
-      <span class="te-content-block__date-picker-label">Showing</span>
+    <section
+      class="te-content-block__date-picker-section
+        {{unless rootLevel "te-content-block__date-picker-section--disabled"}}"
+    >
+      <span class="te-content-block__date-picker-label">
+        Showing
+      </span>
       {{date-range-picker
         class="te-range-picker"
         timePicker=datePicker.TIME_PICKER
@@ -16,29 +21,41 @@
         applyAction=(action "onRangeSelection")
       }}
     </section>
-  
     <section class="te-content-block__performance-health-wrapper">
-      {{detection-health
-        health=model.detectionHealth
-      }}       
+      <section class="te-horizontal-cards te-content-block__alert-performance">
+        <h4 class="te-self-serve__block-title">
+          <label for="select-dimension" class="control-label te-label">
+            Alert Performance
+            <span>
+              <i class="glyphicon glyphicon-question-sign"></i>
+              {{#tooltip-on-element class="te-tooltip"}}
+                All estimated performance numbers are based on reviewed anomalies.
+              {{/tooltip-on-element}}
+            </span>
+          </label>
+        </h4>
+        {{! Alert anomaly stats cards }}
+        {{#if fetchPerformanceStatsTask.isRunning}}
+          <div class="spinner-wrapper spinner-wrapper--card">
+            {{ember-spinner lines=30 radius=20 length=0 width=10 opacity=0 trail=75 color="blue"}}
+          </div>
+        {{else}}
+          {{stats-cards stats=performanceStats}}
+        {{/if}}
+      </section>
+      {{detection-health health=model.detectionHealth}}
     </section>
   </section>
 </section>
-
 <section class="te-page__bottom">
   <section class="container">
-   {{#if fetchAnomaliesTask.isRunning }}
+    {{#if fetchAnomaliesTask.isRunning}}
       <div class="spinner-wrapper spinner-wrapper--card">
-        {{ember-spinner lines=30 radius=20 length=0 width=10 opacity=0 trail=75 color='blue'}}
+        {{ember-spinner lines=30 radius=20 length=0 width=10 opacity=0 trail=75 color="blue"}}
       </div>
-    {{else}}  
-      {{composite-anomalies
-        anomalies=anomalies
-        alertId=model.alertId
-        onBreadcrumbClick=(action "onBreadcrumbClick")
-      }}
+    {{else}}
+      {{composite-anomalies anomalies=anomalies alertId=model.alertId onBreadcrumbClick=(action "onBreadcrumbClick")}}
     {{/if}}
-  </section>  
-</section>  
-
+  </section>
+</section>
 {{outlet}}

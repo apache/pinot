@@ -4,5 +4,13 @@
   "trailingComma":"none",
   "extends": [
     "plugin:prettier/recommended"
+  ],
+  "overrides": [
+    {
+      "files": "*.hbs",
+      "options": {
+        "singleQuote": false
+      }
+    }
   ]
 }

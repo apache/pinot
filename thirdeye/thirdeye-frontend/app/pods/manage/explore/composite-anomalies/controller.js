@@ -2,7 +2,7 @@ import Controller from '@ember/controller';
 import { get, set, getProperties } from '@ember/object';
 import { task } from 'ember-concurrency';
 
-import { getAnomaliesByAlertId } from 'thirdeye-frontend/utils/anomaly';
+import { getAnomaliesByAlertId, getPerformanceStatsByAlertId } from 'thirdeye-frontend/utils/anomaly';
 import { getDatePickerSpec } from 'thirdeye-frontend/utils/date-picker-utils';
 
 import moment from 'moment';
@@ -77,9 +77,23 @@ export default Controller.extend({
 
       this.set('anomalies', yield getAnomaliesByAlertId(alertId, startDate, endDate));
     } catch (reason) {
-      /* eslint-disable no-console */
-      console.error(reason);
-      /* eslint-disable no-console */
+      window.console.error('Unable to fetch anomalies - ', reason);
+    }
+  }),
+
+  /**
+   * Fetch the performance stats for the alert in the calculated time range
+   *
+   * @private
+   */
+  fetchPerformanceStatsTask: task(function* () {
+    try {
+      const { alertId } = get(this, 'model');
+      const { startDate, endDate } = this;
+
+      this.set('performanceStats', yield getPerformanceStatsByAlertId(alertId, startDate, endDate));
+    } catch (reason) {
+      window.console.error('Unable to fetch performance stats - ', reason);
     }
   }),
 
@@ -102,6 +116,7 @@ export default Controller.extend({
     this.initializeDatePicker();
 
     this.get('fetchAnomaliesTask').perform();
+    this.get('fetchPerformanceStatsTask').perform();
   },
 
   /** Event Handlers */
