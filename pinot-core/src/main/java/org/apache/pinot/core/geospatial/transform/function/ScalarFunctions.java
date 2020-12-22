@@ -22,6 +22,7 @@ import org.apache.pinot.core.geospatial.GeometryUtils;
 import org.apache.pinot.core.geospatial.serde.GeometrySerializer;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.io.WKTWriter;
 
@@ -71,5 +72,18 @@ public class ScalarFunctions {
   public static String stAsText(byte[] bytes) {
     WKTWriter writer = new WKTWriter();
     return writer.write(GeometrySerializer.deserialize(bytes));
+  }
+
+  /**
+   * Saves the geometry object as WKT format.
+   *
+   * @param bytes the serialized geometry object
+   * @return the geometry in WKT
+   */
+  @ScalarFunction
+  public static byte[] toSphericalGeography(byte[] bytes) {
+    Geometry geometry = GeometrySerializer.deserialize(bytes);
+    GeometryUtils.setGeography(geometry);
+    return GeometrySerializer.serialize(geometry);
   }
 }
