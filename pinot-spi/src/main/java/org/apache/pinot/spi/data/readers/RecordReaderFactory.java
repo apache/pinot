@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.spi.data.readers;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
@@ -121,6 +123,20 @@ public class RecordReaderFactory {
           readerConfigFile);
     }
     throw new UnsupportedOperationException("No supported RecordReader found for file format - '" + fileFormat + "'");
+  }
+
+  /**
+   * Creates a {@link RecordReaderConfig} instance using file format and reader config properties
+   */
+  public static RecordReaderConfig getRecordReaderConfig(FileFormat fileFormat, Map<String, String> configs)
+      throws ClassNotFoundException, IOException {
+    String readerConfigClassName = getRecordReaderConfigClassName(fileFormat.toString());
+    if (readerConfigClassName != null) {
+      JsonNode jsonNode = new ObjectMapper().valueToTree(configs);
+      Class<?> clazz = PluginManager.get().loadClass(readerConfigClassName);
+      return (RecordReaderConfig) JsonUtils.jsonNodeToObject(jsonNode, clazz);
+    }
+    return null;
   }
 
   /**
