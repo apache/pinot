@@ -18,11 +18,14 @@
  */
 package org.apache.pinot.plugin.stream.kinesis;
 
+import java.util.Map;
 import org.apache.pinot.spi.stream.StreamConfig;
 
 
 public class KinesisConfig {
-  private final StreamConfig _streamConfig;
+  private final Map<String, String> _props;
+
+  public static final String STREAM = "stream";
   private static final String AWS_REGION = "aws-region";
   private static final String MAX_RECORDS_TO_FETCH = "max-records-to-fetch";
 
@@ -30,18 +33,22 @@ public class KinesisConfig {
   private static final String DEFAULT_MAX_RECORDS = "20";
 
   public KinesisConfig(StreamConfig streamConfig) {
-    _streamConfig = streamConfig;
+    _props = streamConfig.getStreamConfigsMap();
+  }
+
+  public KinesisConfig(Map<String, String> props) {
+    _props = props;
   }
 
   public String getStream(){
-    return _streamConfig.getTopicName();
+    return _props.get(STREAM);
   }
 
   public String getAwsRegion(){
-    return _streamConfig.getStreamConfigsMap().getOrDefault(AWS_REGION, DEFAULT_AWS_REGION);
+    return _props.getOrDefault(AWS_REGION, DEFAULT_AWS_REGION);
   }
 
   public Integer maxRecordsToFetch(){
-    return Integer.parseInt(_streamConfig.getStreamConfigsMap().getOrDefault(MAX_RECORDS_TO_FETCH, DEFAULT_MAX_RECORDS));
+    return Integer.parseInt(_props.getOrDefault(MAX_RECORDS_TO_FETCH, DEFAULT_MAX_RECORDS));
   }
 }
