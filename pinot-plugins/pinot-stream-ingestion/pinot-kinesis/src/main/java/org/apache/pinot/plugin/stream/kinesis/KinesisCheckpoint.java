@@ -38,7 +38,7 @@ public class KinesisCheckpoint implements Checkpoint {
   }
 
   @Override
-  public Checkpoint deserialize(byte[] blob) {
+  public KinesisCheckpoint deserialize(byte[] blob) {
     //TODO: Implement SerDe
     return new KinesisCheckpoint(new String(blob));
   }

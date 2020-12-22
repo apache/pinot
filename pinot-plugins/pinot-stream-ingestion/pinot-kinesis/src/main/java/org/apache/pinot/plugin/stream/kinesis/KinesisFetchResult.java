@@ -35,7 +35,7 @@ public class KinesisFetchResult implements FetchResult<Record> {
   }
 
   @Override
-  public Checkpoint getLastCheckpoint() {
+  public KinesisCheckpoint getLastCheckpoint() {
     return _kinesisCheckpoint;
   }
 

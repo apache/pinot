@@ -25,11 +25,11 @@ import software.amazon.awssdk.services.kinesis.model.GetShardIteratorResponse;
 import software.amazon.awssdk.services.kinesis.model.SequenceNumberRange;
 import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 
-
+//TODO: Implement shardId as Array
 public class KinesisShardMetadata extends KinesisConnectionHandler implements PartitionGroupMetadata {
   String _shardId;
-  Checkpoint _startCheckpoint;
-  Checkpoint _endCheckpoint;
+  KinesisCheckpoint _startCheckpoint;
+  KinesisCheckpoint _endCheckpoint;
 
   public KinesisShardMetadata(String shardId, String streamName, String awsRegion) {
     super(streamName, awsRegion);
@@ -43,23 +43,23 @@ public class KinesisShardMetadata extends KinesisConnectionHandler implements Pa
   }
 
   @Override
-  public Checkpoint getStartCheckpoint() {
+  public KinesisCheckpoint getStartCheckpoint() {
     return _startCheckpoint;
   }
 
   @Override
-  public Checkpoint getEndCheckpoint() {
+  public KinesisCheckpoint getEndCheckpoint() {
     return _endCheckpoint;
   }
 
   @Override
   public void setStartCheckpoint(Checkpoint startCheckpoint) {
-    _startCheckpoint = startCheckpoint;
+    _startCheckpoint = (KinesisCheckpoint) startCheckpoint;
   }
 
   @Override
   public void setEndCheckpoint(Checkpoint endCheckpoint) {
-    _endCheckpoint = endCheckpoint;
+    _endCheckpoint = (KinesisCheckpoint) endCheckpoint;
   }
 
   @Override
@@ -68,7 +68,7 @@ public class KinesisShardMetadata extends KinesisConnectionHandler implements Pa
   }
 
   @Override
-  public PartitionGroupMetadata deserialize(byte[] blob) {
+  public KinesisShardMetadata deserialize(byte[] blob) {
     return null;
   }
 }
