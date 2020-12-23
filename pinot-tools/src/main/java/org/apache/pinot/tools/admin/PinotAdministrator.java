@@ -19,6 +19,8 @@
 package org.apache.pinot.tools.admin;
 
 import java.lang.reflect.Field;
+import java.util.Map;
+import org.apache.pinot.common.Utils;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.admin.command.AddSchemaCommand;
@@ -136,6 +138,9 @@ public class PinotAdministrator {
 
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   boolean _help = false;
+
+  @Option(name = "-version", required = false, help = true, aliases = {"-v", "--v", "--version"}, usage = "Print the version of Pinot package.")
+  boolean _version = false;
   boolean _status = false;
 
   private boolean getStatus() {
@@ -146,8 +151,9 @@ public class PinotAdministrator {
     try {
       CmdLineParser parser = new CmdLineParser(this);
       parser.parseArgument(args);
-
-      if ((_subCommand == null) || _help) {
+      if (_version) {
+        printVersion();
+      } else if ((_subCommand == null) || _help) {
         printUsage();
       } else if (_subCommand.getHelp()) {
         _subCommand.printUsage();
@@ -159,6 +165,14 @@ public class PinotAdministrator {
       LOGGER.error("Error: {}", e.getMessage());
     } catch (Exception e) {
       LOGGER.error("Exception caught: ", e);
+    }
+  }
+
+  private void printVersion() {
+    LOGGER.info("List All Pinot Component Versions:");
+    Map<String, String> componentVersions = Utils.getComponentVersions();
+    for (Map.Entry<String, String> entry : componentVersions.entrySet()) {
+      LOGGER.info("Package: {}, Version: {}", entry.getKey(), entry.getValue());
     }
   }
 
