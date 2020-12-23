@@ -115,13 +115,15 @@ public class BootstrapTableTool {
         String inputDirURI = spec.getInputDirURI();
         if (!new File(inputDirURI).exists()) {
           URL resolvedInputDirURI = BootstrapTableTool.class.getClassLoader().getResource(inputDirURI);
-          if (resolvedInputDirURI.getProtocol().equals("jar")) {
-            String[] splits = resolvedInputDirURI.getFile().split("!");
-            String inputDir = new File(setupTableTmpDir, "inputData").toString();
-            JarUtils.copyResourcesToDirectory(splits[0], splits[1].substring(1), inputDir);
-            spec.setInputDirURI(inputDir);
-          } else {
-            spec.setInputDirURI(resolvedInputDirURI.toString());
+          if (resolvedInputDirURI != null) {
+            if (resolvedInputDirURI.getProtocol().equals("jar")) {
+              String[] splits = resolvedInputDirURI.getFile().split("!");
+              String inputDir = new File(setupTableTmpDir, "inputData").toString();
+              JarUtils.copyResourcesToDirectory(splits[0], splits[1].substring(1), inputDir);
+              spec.setInputDirURI(inputDir);
+            } else {
+              spec.setInputDirURI(resolvedInputDirURI.toString());
+            }
           }
         }
         IngestionJobLauncher.runIngestionJob(spec);
