@@ -45,6 +45,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
@@ -75,10 +76,12 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.stream.OffsetCriteria;
+import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.stream.PartitionOffsetFetcher;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
@@ -155,6 +158,82 @@ public class PinotLLCRealtimeSegmentManager {
     }
     _tableConfigCache = new TableConfigCache(_propertyStore);
     _flushThresholdUpdateManager = new FlushThresholdUpdateManager();
+  }
+
+  /**
+   * The committing segment will call this.
+   * 
+   * For example, say we have 3 shards, grouped into PartitionGroups as [0], [1], [2]
+   * Now segment of PG (partition group) 0 is committing. First, we'll update the metadata to DONE, and ideal state to ONLINE
+   * Then, the currentPartitionGroupMetadata list will contain - [1], [2]
+   * The newPartitionGroupMetadata list will contain - [0], [1], [2]
+   * We then get the set of PGs for which new segments need to be made - [0]
+   */
+  public void commitPartitionGroup(String realtimeTableName, CommittingSegmentDescriptor committingSegmentDescriptor) {
+    TableConfig realtimeTableConfig = getTableConfig(realtimeTableName);
+    StreamConfig streamConfig = new StreamConfig(realtimeTableName, IngestionConfigUtils.getStreamConfigMap(realtimeTableConfig));
+    int numReplicas = realtimeTableConfig.getValidationConfig().getReplicasPerPartitionNumber();
+    IdealState idealState = getIdealState(realtimeTableName);
+
+    // update status in segment metadata to DONE
+    // ..
+
+    // update Ideal State for this segment to ONLINE
+    // ..
+
+    // fetch current partition groups (which are actively CONSUMING - from example above, [1], [2])
+    List<PartitionGroupMetadata> currentPartitionGroupMetadataList = getCurrentPartitionGroupMetadataList(idealState);
+
+    // get new partition groups (honor any groupings which are already consuming - [0], [1], [2])
+    StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
+    List<PartitionGroupMetadata> newPartitionGroupMetadataList =
+        streamConsumerFactory.getPartitionGroupMetadataList(currentPartitionGroupMetadataList);
+
+    // from the above list, remove the partition groups which are already CONSUMING
+    // i.e. newPartitionGroups - currentPartitionGroups. Therefore, ([0], [1], [2]) - ([1], [2]) = ([0])
+    // ..
+
+    // setup segment metadata and ideal state for the new found  partition groups
+    setupNewPartitionGroups(newPartitionGroupMetadataList, numReplicas);
+  }
+
+  public void setupIdealStateForConsuming(List<SegmentZKMetadata> segmentZKMetadata, int numReplicas) {
+    // add all segments from the list to ideal state, with state CONSUMING
+  }
+
+  public void persistSegmentMetadata(List<SegmentZKMetadata> segmentMetadata) {
+    // persist new segment metadata from list to zk
+  }
+
+  /**
+   * Using the list of partition group metadata, create a list of equivalent segment zk metadata
+   */
+  public List<SegmentZKMetadata> constructSegmentMetadata(List<PartitionGroupMetadata> partitionGroupMetadataList) {
+    List<SegmentZKMetadata> segmentZKMetadata = new ArrayList<>();
+    // for each partition group construct a segment zk metadata object
+    return segmentZKMetadata;
+  }
+
+  /**
+   * Using the ideal state, return a list of the current partition groups
+   */
+  public List<PartitionGroupMetadata> getCurrentPartitionGroupMetadataList(IdealState idealState) {
+    List<PartitionGroupMetadata> partitionGroupMetadataList = new ArrayList<>();
+    // from all segment names in the ideal state, find unique groups
+
+    // create a PartitionGroupMetadata, one for each group
+    return partitionGroupMetadataList;
+  }
+
+  public void setupNewPartitionGroups(List<PartitionGroupMetadata> newPartitionGroupMetadataList, int numReplicas) {
+    // construct segment zk metadata for the new partition groups
+    List<SegmentZKMetadata> segmentMetadata = constructSegmentMetadata(newPartitionGroupMetadataList);
+
+    // create these new segments metadata
+    persistSegmentMetadata(segmentMetadata);
+
+    // setup ideal state for the new segments
+    setupIdealStateForConsuming(segmentMetadata, numReplicas);
   }
 
   public boolean getIsSplitCommitEnabled() {

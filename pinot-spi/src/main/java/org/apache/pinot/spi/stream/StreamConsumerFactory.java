@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.spi.stream;
 
+import java.util.List;
 import java.util.Set;
-import org.apache.pinot.spi.data.Schema;
 
 
 /**
@@ -73,4 +73,11 @@ public abstract class StreamConsumerFactory {
   public StreamPartitionMsgOffsetFactory createStreamMsgOffsetFactory() {
     return new LongMsgOffsetFactory();
   }
+
+  // takes the current state of partition groups (groupings of shards, the state of the consumption) and creates the new state
+  public abstract List<PartitionGroupMetadata> getPartitionGroupMetadataList(
+      List<PartitionGroupMetadata> currentPartitionGroupsMetadata);
+
+  // creates a consumer which consumes from a partition group
+  public abstract PartitionGroupConsumer createConsumer(PartitionGroupMetadata metadata);
 }
