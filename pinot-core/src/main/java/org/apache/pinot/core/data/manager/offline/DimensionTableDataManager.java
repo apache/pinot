@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.manager.offline;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.util.HashMap;
 import java.util.List;
@@ -62,6 +63,11 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
    */
   public static DimensionTableDataManager createInstanceByTableName(String tableNameWithType) {
     return _instances.computeIfAbsent(tableNameWithType, k -> new DimensionTableDataManager());
+  }
+
+  @VisibleForTesting
+  public static DimensionTableDataManager registerDimensionTable(String tableNameWithType, DimensionTableDataManager instance) {
+    return _instances.computeIfAbsent(tableNameWithType, k -> instance);
   }
 
   public static DimensionTableDataManager getInstanceByTableName(String tableNameWithType) {

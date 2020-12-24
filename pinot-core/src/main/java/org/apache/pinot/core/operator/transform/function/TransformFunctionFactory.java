@@ -92,6 +92,7 @@ public class TransformFunctionFactory {
           put(canonicalize(TransformFunctionType.VALUEIN.getName().toLowerCase()), ValueInTransformFunction.class);
           put(canonicalize(TransformFunctionType.MAPVALUE.getName().toLowerCase()), MapValueTransformFunction.class);
           put(canonicalize(TransformFunctionType.INIDSET.getName().toLowerCase()), InIdSetTransformFunction.class);
+          put(canonicalize(TransformFunctionType.LOOKUP.getName().toLowerCase()), LookupTransformFunction.class);
 
           // Array functions
           put(canonicalize(TransformFunctionType.ARRAYAVERAGE.getName().toLowerCase()), ArrayAverageTransformFunction.class);
