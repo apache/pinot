@@ -23,13 +23,21 @@ operations:
     - type: tableOp
       description: Create table t1
       op: CREATE
-      schemaFileName: /tmp/schema
-      tableConfigFileName: /tmp/tableConfig
+      schemaFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/FeatureTest1-schema.json
+      tableConfigFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/feature-test-1.json
     - type: segmentOp
       description: Add segments X and Y to T1
       op: UPLOAD
-      inputDataFileName: /tmp/data.csv
-      tableConfigFileName: /tmp/tableConfig
+      inputDataFileName: pinot-integration-tests/src/test/resources/compat-tests/data/FeatureTest1-data-00.csv
+      schemaFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/FeatureTest1-schema.json
+      tableConfigFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/feature-test-1.json
+      recordReaderConfigFileName: pinot-integration-tests/src/test/resources/compat-tests/data/recordReaderConfig.json
+      segmentName: FeatureTest1_Segment
+    - type: segmentOp
+      description: Delete segments X and Y to T1
+      op: DELETE
+      tableConfigFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/feature-test-1.json
+      segmentName: FeatureTest1_Segment
     - type: tableOp
       # description: Remove table T1
       op: DELETE
