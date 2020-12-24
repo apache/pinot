@@ -20,6 +20,8 @@ package org.apache.pinot.plugin.stream.kinesis; /**
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import software.amazon.awssdk.services.kinesis.model.Record;
 import software.amazon.awssdk.services.kinesis.model.Shard;
 
@@ -29,7 +31,8 @@ public class KinesisConsumerTest {
     Map<String, String> props = new HashMap<>();
     props.put("stream", "kinesis-test");
     props.put("aws-region", "us-west-2");
-    props.put("maxRecords", "10");
+    props.put("max-records-to-fetch", "2000");
+    props.put("shard-iterator-type", "AT-SEQUENCE-NUMBER");
 
     KinesisConfig kinesisConfig = new KinesisConfig(props);
 
@@ -38,6 +41,8 @@ public class KinesisConsumerTest {
     List<Shard> shardList = kinesisConnectionHandler.getShards();
 
     for(Shard shard : shardList) {
+      System.out.println("SHARD: " + shard.shardId());
+
       KinesisConsumer kinesisConsumer = new KinesisConsumer(kinesisConfig, new KinesisShardMetadata(shard.shardId(), "kinesis-test", "us-west-2"));
 
       KinesisCheckpoint kinesisCheckpoint = new KinesisCheckpoint(shard.sequenceNumberRange().startingSequenceNumber());
@@ -45,7 +50,6 @@ public class KinesisConsumerTest {
 
       List<Record> list = fetchResult.getMessages();
 
-      System.out.println("SHARD: " + shard.shardId());
       for (Record record : list) {
         System.out.println("SEQ-NO: " + record.sequenceNumber() + ", DATA: " + record.data().asUtf8String());
       }
