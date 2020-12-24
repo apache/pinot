@@ -35,4 +35,25 @@ public interface AccessControl {
    * @return Whether the client has data access to the table
    */
   boolean hasDataAccess(HttpHeaders httpHeaders, String tableName);
+
+  /**
+   * Return whether the client has write permission to the give table
+   *
+   * @param httpHeaders http headers
+   * @param tableName name of the table to be accessed
+   * @return whether the client has write permission
+   */
+  default boolean hasWritePermission(HttpHeaders httpHeaders, String tableName) {
+    return true;
+  }
+
+  /**
+   * Return whether the client has permission to write endpoints which are not table level
+   *
+   * @param httpHeaders http headers
+   * @return whether the client has write permission
+   */
+  default boolean hasWritePermission(HttpHeaders httpHeaders) {
+    return true;
+  }
 }
