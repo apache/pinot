@@ -85,6 +85,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.BrokerResourceStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
@@ -122,7 +123,10 @@ import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConsumerFactory;
+import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -1332,6 +1336,10 @@ public class PinotHelixResourceManager {
         IngestionConfigUtils.getStreamConfigMap(realtimeTableConfig));
     IdealState idealState = getTableIdealState(realtimeTableName);
 
+    if (streamConfig.isShardedConsumerType()) {
+      setupShardedRealtimeTable(streamConfig, idealState, realtimeTableConfig.getValidationConfig().getReplicasPerPartitionNumber());
+    }
+
     if (streamConfig.hasHighLevelConsumerType()) {
       if (idealState == null) {
         LOGGER.info("Initializing IdealState for HLC table: {}", realtimeTableName);
@@ -1363,6 +1371,27 @@ public class PinotHelixResourceManager {
       }
     }
   }
+
+  /**
+   * Sets up the realtime table ideal state
+   * @param streamConfig
+   */
+  private void setupShardedRealtimeTable(StreamConfig streamConfig, IdealState idealState, int numReplicas) {
+    StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
+
+    // get current partition groups and their metadata - this will be empty when creating the table
+    List<PartitionGroupMetadata> currentPartitionGroupMetadataList = _pinotLLCRealtimeSegmentManager.getCurrentPartitionGroupMetadataList(idealState);
+
+    // get new partition groups and their metadata,
+    // Assume table has 3 shards. Say we get [0], [1], [2] groups (for now assume that each group contains only 1 shard)
+    List<PartitionGroupMetadata> newPartitionGroupMetadataList =
+        streamConsumerFactory.getPartitionGroupMetadataList(currentPartitionGroupMetadataList);
+
+    // setup segment zk metadata and ideal state for all the new found partition groups
+    _pinotLLCRealtimeSegmentManager.setupNewPartitionGroups(newPartitionGroupMetadataList, numReplicas);
+  }
+
+
 
   private void ensurePropertyStoreEntryExistsForHighLevelConsumer(String realtimeTableName) {
     String propertyStorePath = ZKMetadataProvider.constructPropertyStorePathForResource(realtimeTableName);
