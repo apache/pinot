@@ -95,6 +95,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Consume
       }
 
       String nextStartSequenceNumber = null;
+      boolean isEndOfShard = false;
 
       while (shardIterator != null) {
         GetRecordsRequest getRecordsRequest = GetRecordsRequest.builder().shardIterator(shardIterator).build();
@@ -114,14 +115,21 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Consume
           }
         }
 
+        if(getRecordsResponse.hasChildShards()){
+          //This statement returns true only when end of current shard has reached.
+          isEndOfShard = true;
+          break;
+        }
+
         shardIterator = getRecordsResponse.nextShardIterator();
+
       }
 
       if (nextStartSequenceNumber == null && recordList.size() > 0) {
         nextStartSequenceNumber = recordList.get(recordList.size() - 1).sequenceNumber();
       }
 
-      KinesisCheckpoint kinesisCheckpoint = new KinesisCheckpoint(nextStartSequenceNumber);
+      KinesisCheckpoint kinesisCheckpoint = new KinesisCheckpoint(nextStartSequenceNumber, isEndOfShard);
       KinesisFetchResult kinesisFetchResult = new KinesisFetchResult(kinesisCheckpoint, recordList);
 
       return kinesisFetchResult;

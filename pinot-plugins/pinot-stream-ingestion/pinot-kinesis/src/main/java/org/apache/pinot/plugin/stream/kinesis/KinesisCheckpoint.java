@@ -22,9 +22,20 @@ import org.apache.pinot.spi.stream.v2.Checkpoint;
 
 public class KinesisCheckpoint implements Checkpoint {
   String _sequenceNumber;
+  Boolean _isEndOfPartition = false;
 
   public KinesisCheckpoint(String sequenceNumber) {
     _sequenceNumber = sequenceNumber;
+  }
+
+  public KinesisCheckpoint(String sequenceNumber, Boolean isEndOfPartition) {
+    _sequenceNumber = sequenceNumber;
+    _isEndOfPartition = isEndOfPartition;
+  }
+
+  @Override
+  public boolean isEndOfPartition() {
+    return _isEndOfPartition;
   }
 
   public String getSequenceNumber() {
@@ -38,7 +49,6 @@ public class KinesisCheckpoint implements Checkpoint {
 
   @Override
   public KinesisCheckpoint deserialize(byte[] blob) {
-    //TODO: Implement SerDe
     return new KinesisCheckpoint(new String(blob));
   }
 }
