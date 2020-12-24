@@ -71,4 +71,5 @@ public class KinesisConnectionHandler {
       _kinesisClient = null;
     }
   }
+
 }

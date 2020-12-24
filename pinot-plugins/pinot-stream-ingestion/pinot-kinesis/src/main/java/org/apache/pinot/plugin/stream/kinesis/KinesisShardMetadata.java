@@ -25,7 +25,7 @@ import software.amazon.awssdk.services.kinesis.model.GetShardIteratorResponse;
 import software.amazon.awssdk.services.kinesis.model.SequenceNumberRange;
 import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 
-//TODO: Implement shardId as Array
+//TODO: Implement shardId as Array and have unique id
 public class KinesisShardMetadata extends KinesisConnectionHandler implements PartitionGroupMetadata {
   String _shardId;
   KinesisCheckpoint _startCheckpoint;

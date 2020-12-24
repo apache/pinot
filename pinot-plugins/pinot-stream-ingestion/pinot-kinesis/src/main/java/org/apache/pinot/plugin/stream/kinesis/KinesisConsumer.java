@@ -51,6 +51,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Consume
   Integer _maxRecords;
   String _shardId;
   ExecutorService _executorService;
+  ShardIteratorType _shardIteratorType;
   private final Logger LOG = LoggerFactory.getLogger(KinesisConsumer.class);
 
   public KinesisConsumer(KinesisConfig kinesisConfig, PartitionGroupMetadata partitionGroupMetadata) {
@@ -59,22 +60,23 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Consume
     _maxRecords = kinesisConfig.maxRecordsToFetch();
     KinesisShardMetadata kinesisShardMetadata = (KinesisShardMetadata) partitionGroupMetadata;
     _shardId = kinesisShardMetadata.getShardId();
+    _shardIteratorType = kinesisConfig.getShardIteratorType();
     _executorService = Executors.newSingleThreadExecutor();
   }
 
   @Override
   public KinesisFetchResult fetch(Checkpoint start, Checkpoint end, long timeout) {
-    Future<KinesisFetchResult> kinesisFetchResultFuture = _executorService.submit(() -> getResult(start, end));
+    List<Record> recordList = new ArrayList<>();
+    Future<KinesisFetchResult> kinesisFetchResultFuture = _executorService.submit(() -> getResult(start, end, recordList));
 
     try {
       return kinesisFetchResultFuture.get(timeout, TimeUnit.MILLISECONDS);
     } catch(Exception e){
-      return null;
+        return handleException((KinesisCheckpoint) start, recordList);
     }
   }
 
-  private KinesisFetchResult getResult(Checkpoint start, Checkpoint end) {
-    List<Record> recordList = new ArrayList<>();
+  private KinesisFetchResult getResult(Checkpoint start, Checkpoint end, List<Record> recordList) {
     KinesisCheckpoint kinesisStartCheckpoint = (KinesisCheckpoint) start;
 
     try {
@@ -83,7 +85,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Consume
         createConnection();
       }
 
-      String shardIterator = getShardIterator(kinesisStartCheckpoint);
+      String shardIterator = getShardIterator(kinesisStartCheckpoint.getSequenceNumber());
 
       String kinesisEndSequenceNumber = null;
 
@@ -162,25 +164,15 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Consume
     }
   }
 
-  private String getShardIterator(KinesisCheckpoint kinesisStartCheckpoint) {
-    if (kinesisStartCheckpoint.getSequenceNumber() != null) {
-      return getShardIterator(ShardIteratorType.AT_SEQUENCE_NUMBER, kinesisStartCheckpoint.getSequenceNumber());
-    } else {
-      return getShardIterator(ShardIteratorType.LATEST, null);
-    }
-  }
+  public String getShardIterator(String sequenceNumber) {
 
-  public String getShardIterator(ShardIteratorType shardIteratorType, String sequenceNumber){
-    if(sequenceNumber == null){
-      return _kinesisClient.getShardIterator(
-          GetShardIteratorRequest.builder().shardId(_shardId).streamName(_stream)
-              .shardIteratorType(shardIteratorType).build()).shardIterator();
-    }else{
-      return _kinesisClient.getShardIterator(
-          GetShardIteratorRequest.builder().streamName(_stream).shardId(_shardId)
-              .shardIteratorType(shardIteratorType)
-              .startingSequenceNumber(sequenceNumber).build()).shardIterator();
+    GetShardIteratorRequest.Builder requestBuilder =
+        GetShardIteratorRequest.builder().streamName(_stream).shardId(_shardId).shardIteratorType(_shardIteratorType);
+
+    if (sequenceNumber != null) {
+      requestBuilder = requestBuilder.startingSequenceNumber(sequenceNumber);
     }
+    return _kinesisClient.getShardIterator(requestBuilder.build()).shardIterator();
   }
 
   @Override
