@@ -20,14 +20,9 @@ package org.apache.pinot.compat.tests;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.io.File;
+import java.io.IOException;
 import java.net.URI;
 import java.util.UUID;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -35,7 +30,6 @@ import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import org.apache.pinot.core.query.utils.Pair;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -66,6 +60,8 @@ public class SegmentOp extends BaseOp {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentOp.class);
   private static final FileFormat DEFAULT_FILE_FORMAT = FileFormat.CSV;
   private static final String STATE_ONLINE = "ONLINE";
+  private static final int DEFAULT_MAX_SLEEP_TIME_MS = 30000;
+  private static final int DEFAULT_WAIT_TIME_MS = 5000;
 
   public enum Op {
     UPLOAD, DELETE
@@ -148,16 +144,22 @@ public class SegmentOp extends BaseOp {
    */
   private boolean createAndUploadSegments() {
     File localTempDir = new File(FileUtils.getTempDirectory(), "pinot-compat-test-" + UUID.randomUUID());
+    localTempDir.deleteOnExit();
     File localOutputTempDir = new File(localTempDir, "output");
     try {
       FileUtils.forceMkdir(localOutputTempDir);
       File segmentTarFile = generateSegment(localOutputTempDir);
       uploadSegment(segmentTarFile);
 
-      Pair<Long, Long> onlineSegmentCount = getOnlineSegmentCount(getTableExternalView());
-      if (onlineSegmentCount.getFirst() <= 0 && onlineSegmentCount.getSecond() <= 0) {
-        LOGGER.error("Uploaded segment {} not found or not in {} state.", _segmentName, STATE_ONLINE);
-        return false;
+      long startTime = System.currentTimeMillis();
+      while (getOnlineSegmentCount() <= 0) {
+        if ((System.currentTimeMillis() - startTime) > DEFAULT_MAX_SLEEP_TIME_MS) {
+          LOGGER.error("Upload segment verification failed, count is zero after max wait time {} ms.",
+              DEFAULT_MAX_SLEEP_TIME_MS);
+          return false;
+        }
+        LOGGER.warn("Upload segment verification count is zero, will retry after {} ms.", DEFAULT_WAIT_TIME_MS);
+        Thread.sleep(DEFAULT_WAIT_TIME_MS);
       }
       LOGGER.info("Successfully verified segment {} and its current status is {}.", _segmentName, STATE_ONLINE);
 
@@ -197,10 +199,9 @@ public class SegmentOp extends BaseOp {
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(segmentGeneratorConfig);
     driver.build();
-    String segmentName = driver.getSegmentName();
-    File indexDir = new File(outputDir, segmentName);
-    LOGGER.info("Successfully created segment: {} at directory: {}", segmentName, indexDir);
-    File segmentTarFile = new File(outputDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    File indexDir = new File(outputDir, _segmentName);
+    LOGGER.info("Successfully created segment: {} at directory: {}", _segmentName, indexDir);
+    File segmentTarFile = new File(outputDir, _segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
     TarGzCompressionUtils.createTarGzFile(indexDir, segmentTarFile);
     LOGGER.info("Tarring segment from: {} to: {}", indexDir, segmentTarFile);
 
@@ -232,11 +233,16 @@ public class SegmentOp extends BaseOp {
       ControllerTest.sendDeleteRequest(ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL)
           .forSegmentDelete(_tableName, _segmentName));
 
-      Pair<Long, Long> onlineSegmentCount = getOnlineSegmentCount(getTableExternalView());
-      if (onlineSegmentCount.getFirst() > 0 || onlineSegmentCount.getSecond() > 0) {
-        LOGGER.error("Delete segment {} for the table {} is not successful and segment count is {}.", _segmentName,
-            _tableName, (onlineSegmentCount.getFirst() + onlineSegmentCount.getSecond()));
-        return false;
+      long startTime = System.currentTimeMillis();
+      while (getOnlineSegmentCount() > 0) {
+        if ((System.currentTimeMillis() - startTime) > DEFAULT_MAX_SLEEP_TIME_MS) {
+          LOGGER.error("Delete segment verification failed, count is greater than zero after max wait time {} ms.",
+              DEFAULT_MAX_SLEEP_TIME_MS);
+          return false;
+        }
+        LOGGER
+            .warn("Delete segment verification count greater than zero, will retry after {} ms.", DEFAULT_WAIT_TIME_MS);
+        Thread.sleep(DEFAULT_WAIT_TIME_MS);
       }
     } catch (Exception e) {
       LOGGER.error("Request to delete the segment {} for the table {} failed.", _segmentName, _tableName, e);
@@ -248,27 +254,14 @@ public class SegmentOp extends BaseOp {
   }
 
   /**
-   * Delay of 5 seconds to get segment from controller.
-   * @return Offline and Realtime segment for the table.
-   */
-  private TableViews.TableView getTableExternalView()
-      throws ExecutionException, InterruptedException {
-    ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-    Callable<TableViews.TableView> validationCallback = () -> {
-      return JsonUtils.stringToObject(ControllerTest.sendGetRequest(
-          ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL).forTableExternalView(_tableName)),
-          TableViews.TableView.class);
-    };
-    Future<TableViews.TableView> futureTableView = executorService.schedule(validationCallback, 5, TimeUnit.SECONDS);
-    return  futureTableView.get();
-  }
-
-  /**
    * Retrieve the number of segments for both OFFLINE and REALTIME which are in ONLINE state.
-   * @param segmentTreeView External table view retrieved from controller.
-   * @return Pair of counts for OFFLINE and REALTIME segments.
+   * @return count for OFFLINE and REALTIME segments.
    */
-  private Pair<Long, Long> getOnlineSegmentCount(TableViews.TableView segmentTreeView) {
+  private long getOnlineSegmentCount()
+      throws IOException {
+    TableViews.TableView segmentTreeView = JsonUtils.stringToObject(ControllerTest.sendGetRequest(
+        ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL).forTableExternalView(_tableName)),
+        TableViews.TableView.class);
     long offlineSegmentCount = segmentTreeView.offline != null ? segmentTreeView.offline.entrySet().stream()
         .filter(k -> k.getKey().equalsIgnoreCase(_segmentName))
         .filter(v -> v.getValue().values().contains(STATE_ONLINE)).count() : 0;
@@ -276,6 +269,6 @@ public class SegmentOp extends BaseOp {
         .filter(k -> k.getKey().equalsIgnoreCase(_segmentName))
         .filter(v -> v.getValue().values().contains(STATE_ONLINE)).count() : 0;
 
-    return new Pair<>(offlineSegmentCount, realtimeSegmentCount);
+    return offlineSegmentCount + realtimeSegmentCount;
   }
 }
