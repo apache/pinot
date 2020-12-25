@@ -63,6 +63,12 @@ public class FilterOperatorUtils {
       }
       return new ScanBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
     } else if (predicateType == Predicate.Type.REGEXP_LIKE) {
+      if (dataSource.getFSTIndex() != null && dataSource.getDataSourceMetadata().isSorted()) {
+        return new SortedIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
+      }
+      if (dataSource.getFSTIndex() != null && dataSource.getInvertedIndex() != null) {
+        return new BitmapBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
+      }
       return new ScanBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
     } else {
       if (dataSource.getDataSourceMetadata().isSorted() && dataSource.getDictionary() != null) {

@@ -51,6 +51,7 @@ import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForward
 import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.inv.OnHeapBitmapInvertedIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneFSTIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.core.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -88,6 +89,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private Map<String, ForwardIndexCreator> _forwardIndexCreatorMap = new HashMap<>();
   private Map<String, DictionaryBasedInvertedIndexCreator> _invertedIndexCreatorMap = new HashMap<>();
   private Map<String, TextIndexCreator> _textIndexCreatorMap = new HashMap<>();
+  private Map<String, TextIndexCreator> _fstIndexCreatorMap = new HashMap<>();
   private Map<String, NullValueVectorCreator> _nullValueVectorCreatorMap = new HashMap<>();
   private String segmentName;
   private Schema schema;
@@ -98,6 +100,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private Map<String, Map<String, String>> _columnProperties;
 
   private final Set<String> _textIndexColumns = new HashSet<>();
+  private final Set<String> _fstIndexColumns = new HashSet<>();
 
   @Override
   public void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
@@ -131,6 +134,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       _textIndexColumns.add(columnName);
     }
 
+    for (String columnName : config.getFSTIndexCreationColumns()) {
+      Preconditions.checkState(schema.hasColumn(columnName),
+          "Cannot create fst index for column: %s because it is not in schema", columnName);
+      _fstIndexColumns.add(columnName);
+    }
+
     // Initialize creators for dictionary, forward index and inverted index
     for (FieldSpec fieldSpec : fieldSpecs) {
       // Ignore virtual columns
@@ -141,8 +150,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       String columnName = fieldSpec.getName();
       ColumnIndexCreationInfo indexCreationInfo = indexCreationInfoMap.get(columnName);
       Preconditions.checkNotNull(indexCreationInfo, "Missing index creation info for column: %s", columnName);
+      boolean dictEnabledColumn = createDictionaryForColumn(indexCreationInfo, segmentCreationSpec, fieldSpec);
 
-      if (createDictionaryForColumn(indexCreationInfo, segmentCreationSpec, fieldSpec)) {
+      if (dictEnabledColumn) {
         // Create dictionary-encoded index
 
         // Initialize dictionary creator
@@ -216,6 +226,17 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
             "Text index is currently only supported on STRING type columns");
         _textIndexCreatorMap
             .put(columnName, new LuceneTextIndexCreator(columnName, _indexDir, true /* commitOnClose */));
+      }
+
+      if (_fstIndexColumns.contains(columnName)) {
+        Preconditions.checkState(fieldSpec.isSingleValueField(),
+            "FST index is currently only supported on single-value columns");
+        Preconditions.checkState(fieldSpec.getDataType() == DataType.STRING,
+            "FST index is only supported on STRING type columns");
+        Preconditions.checkState(dictEnabledColumn,
+            "FST index is currently only supported on dictionary columns");
+        _fstIndexCreatorMap.put(columnName, new LuceneFSTIndexCreator(_indexDir, columnName,
+            (String[]) indexCreationInfo.getSortedUniqueElementsArray()));
       }
 
       _nullHandlingEnabled = config.isNullHandlingEnabled();
@@ -334,7 +355,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           int dictId = dictionaryCreator.indexOfSV(columnValueToIndex);
           // store the docID -> dictID mapping in forward index
           forwardIndexCreator.putDictId(dictId);
-          DictionaryBasedInvertedIndexCreator invertedIndexCreator = _invertedIndexCreatorMap.get(columnName);
+          DictionaryBasedInvertedIndexCreator invertedIndexCreator =
+                  _invertedIndexCreatorMap.get(columnName);
           if (invertedIndexCreator != null) {
             // if inverted index enabled during segment creation,
             // then store dictID -> docID mapping in inverted index
@@ -421,6 +443,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
     for (TextIndexCreator textIndexCreator : _textIndexCreatorMap.values()) {
       textIndexCreator.seal();
+    }
+    for (TextIndexCreator fstIndexCreator : _fstIndexCreatorMap.values()) {
+      fstIndexCreator.seal();
     }
     for (NullValueVectorCreator nullValueVectorCreator : _nullValueVectorCreatorMap.values()) {
       nullValueVectorCreator.seal();
@@ -510,13 +535,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       boolean hasInvertedIndex = true;
 
       boolean hasTextIndex = _textIndexColumns.contains(column);
+      boolean hasFSTIndex = _fstIndexColumns.contains(column);
       // for new generated segment we write as NONE if text index does not exist
       // for reading existing segments that don't have this property, non-existence
       // of this property will be treated as NONE. See the builder in ColumnMetadata
       TextIndexType textIndexType = hasTextIndex ? TextIndexType.LUCENE : TextIndexType.NONE;
 
       addColumnMetadataInfo(properties, column, columnIndexCreationInfo, totalDocs, schema.getFieldSpecFor(column),
-          _dictionaryCreatorMap.containsKey(column), dictionaryElementSize, hasInvertedIndex, textIndexType);
+          _dictionaryCreatorMap.containsKey(column), dictionaryElementSize, hasInvertedIndex, hasFSTIndex, textIndexType);
     }
 
     properties.save();
@@ -524,7 +550,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   public static void addColumnMetadataInfo(PropertiesConfiguration properties, String column,
       ColumnIndexCreationInfo columnIndexCreationInfo, int totalDocs, FieldSpec fieldSpec, boolean hasDictionary,
-      int dictionaryElementSize, boolean hasInvertedIndex, TextIndexType textIndexType) {
+      int dictionaryElementSize, boolean hasInvertedIndex, boolean hasFSTIndex, TextIndexType textIndexType) {
     int cardinality = columnIndexCreationInfo.getDistinctValueCount();
     properties.setProperty(getKeyFor(column, CARDINALITY), String.valueOf(cardinality));
     properties.setProperty(getKeyFor(column, TOTAL_DOCS), String.valueOf(totalDocs));
@@ -539,6 +565,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     properties.setProperty(getKeyFor(column, HAS_DICTIONARY), String.valueOf(hasDictionary));
     properties.setProperty(getKeyFor(column, TEXT_INDEX_TYPE), textIndexType.name());
     properties.setProperty(getKeyFor(column, HAS_INVERTED_INDEX), String.valueOf(hasInvertedIndex));
+    properties.setProperty(getKeyFor(column, HAS_FST_INDEX), String.valueOf(hasFSTIndex));
     properties.setProperty(getKeyFor(column, IS_SINGLE_VALUED), String.valueOf(fieldSpec.isSingleValueField()));
     properties.setProperty(getKeyFor(column, MAX_MULTI_VALUE_ELEMTS),
         String.valueOf(columnIndexCreationInfo.getMaxNumberOfMultiValueElements()));

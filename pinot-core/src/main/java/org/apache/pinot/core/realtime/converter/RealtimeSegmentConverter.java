@@ -52,14 +52,15 @@ public class RealtimeSegmentConverter {
   private final String _sortedColumn;
   private final List<String> _invertedIndexColumns;
   private final List<String> _textIndexColumns;
+  private final List<String> _fstIndexColumns;
   private final List<String> _noDictionaryColumns;
   private final List<String> _varLengthDictionaryColumns;
   private final boolean _nullHandlingEnabled;
 
   public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, String outputPath, Schema schema,
       String tableName, TableConfig tableConfig, String segmentName, String sortedColumn,
-      List<String> invertedIndexColumns, List<String> textIndexColumns, List<String> noDictionaryColumns,
-      List<String> varLengthDictionaryColumns, boolean nullHandlingEnabled) {
+      List<String> invertedIndexColumns, List<String> textIndexColumns, List<String> fstIndexColumns,
+      List<String> noDictionaryColumns, List<String> varLengthDictionaryColumns, boolean nullHandlingEnabled) {
     _realtimeSegmentImpl = realtimeSegment;
     _outputPath = outputPath;
     _invertedIndexColumns = new ArrayList<>(invertedIndexColumns);
@@ -75,6 +76,7 @@ public class RealtimeSegmentConverter {
     _varLengthDictionaryColumns = varLengthDictionaryColumns;
     _nullHandlingEnabled = nullHandlingEnabled;
     _textIndexColumns = textIndexColumns;
+    _fstIndexColumns = fstIndexColumns;
   }
 
   public void build(@Nullable SegmentVersion segmentVersion, ServerMetrics serverMetrics)
@@ -116,6 +118,7 @@ public class RealtimeSegmentConverter {
     genConfig.setOutDir(_outputPath);
     genConfig.setSegmentName(_segmentName);
     genConfig.setTextIndexCreationColumns(_textIndexColumns);
+    genConfig.setFSTIndexCreationColumns(_fstIndexColumns);
     SegmentPartitionConfig segmentPartitionConfig = _realtimeSegmentImpl.getSegmentPartitionConfig();
     genConfig.setSegmentPartitionConfig(segmentPartitionConfig);
     genConfig.setNullHandlingEnabled(_nullHandlingEnabled);

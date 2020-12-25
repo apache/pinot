@@ -36,16 +36,25 @@ import org.apache.pinot.spi.data.FieldSpec;
  */
 @SuppressWarnings("rawtypes")
 public class MutableDataSource extends BaseDataSource {
+  final boolean _fstIndexEnabled;
 
-  public MutableDataSource(FieldSpec fieldSpec, int numDocs, int numValues, int maxNumValuesPerMVEntry,
+  public MutableDataSource(FieldSpec fieldSpec, int numDocs, int numValues, int maxNumValuesPerMVEntry, boolean fstIndexEnabled,
       @Nullable PartitionFunction partitionFunction, @Nullable Set<Integer> partitions, @Nullable Comparable minValue,
       @Nullable Comparable maxValue, ForwardIndexReader forwardIndex, @Nullable Dictionary dictionary,
       @Nullable InvertedIndexReader invertedIndex, @Nullable InvertedIndexReader rangeIndex,
-      @Nullable TextIndexReader textIndex, @Nullable BloomFilterReader bloomFilter,
+      @Nullable TextIndexReader textIndex, @Nullable TextIndexReader fstIndex,
+      @Nullable BloomFilterReader bloomFilter,
       @Nullable NullValueVectorReader nullValueVector) {
     super(new MutableDataSourceMetadata(fieldSpec, numDocs, numValues, maxNumValuesPerMVEntry, partitionFunction,
-            partitions, minValue, maxValue), forwardIndex, dictionary, invertedIndex, rangeIndex, textIndex, bloomFilter,
-        nullValueVector);
+                    partitions, minValue, maxValue), forwardIndex, dictionary,
+            invertedIndex, rangeIndex, textIndex, fstIndex,
+            bloomFilter, nullValueVector);
+    _fstIndexEnabled = fstIndexEnabled;
+  }
+
+  // Returns whether the current field has fst index enabled.
+  public boolean hasFSTIndexEnabled() {
+    return _fstIndexEnabled;
   }
 
   private static class MutableDataSourceMetadata implements DataSourceMetadata {

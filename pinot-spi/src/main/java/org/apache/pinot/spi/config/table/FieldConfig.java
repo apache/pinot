@@ -67,7 +67,7 @@ public class FieldConfig extends BaseJsonConfig {
 
   // If null, there won't be any index
   public enum IndexType {
-    INVERTED, SORTED, TEXT
+    INVERTED, SORTED, TEXT, FST
   }
 
   public String getName() {

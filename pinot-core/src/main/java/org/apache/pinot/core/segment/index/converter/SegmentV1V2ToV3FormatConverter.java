@@ -34,6 +34,7 @@ import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.creator.impl.text.LuceneTextIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneFSTIndexCreator;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.readers.text.LuceneTextIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
@@ -151,12 +152,15 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
           if (v2DataReader.hasIndexFor(column, ColumnIndexType.NULLVALUE_VECTOR)) {
             copyNullValueVector(v2DataReader, v3DataWriter, column);
           }
+          // Copies FST index if there is one available.
+          copyExistingFSTIndex(v2DataReader, v3DataWriter, column);
         }
 
         // inverted indexes are intentionally stored at the end of the single file
         for (String column : allColumns) {
           copyExistingInvertedIndex(v2DataReader, v3DataWriter, column);
         }
+
         v3DataWriter.saveAndClose();
       }
     }
@@ -193,6 +197,13 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
       throws IOException {
     if (reader.hasIndexFor(column, ColumnIndexType.INVERTED_INDEX)) {
       readCopyBuffers(reader, writer, column, ColumnIndexType.INVERTED_INDEX);
+    }
+  }
+
+  private void copyExistingFSTIndex(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column)
+      throws Exception {
+    if (reader.hasIndexFor(column, ColumnIndexType.FST_INDEX)) {
+      readCopyBuffers(reader, writer, column, ColumnIndexType.FST_INDEX);
     }
   }
 

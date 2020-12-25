@@ -23,7 +23,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+
 import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
@@ -32,13 +34,16 @@ import org.apache.pinot.core.operator.filter.ExpressionFilterOperator;
 import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
+import org.apache.pinot.core.operator.filter.predicate.FSTBasedRegexpPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.predicate.Predicate;
+import org.apache.pinot.core.query.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.core.query.request.context.predicate.TextMatchPredicate;
+import org.apache.pinot.core.segment.index.datasource.MutableDataSource;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
 import org.apache.pinot.core.segment.index.readers.ValidDocIndexReader;
 import org.apache.pinot.core.util.QueryOptions;
@@ -129,6 +134,32 @@ public class FilterPlanNode implements PlanNode {
             case TEXT_MATCH:
               return new TextMatchFilterOperator(dataSource.getTextIndex(), ((TextMatchPredicate) predicate).getValue(),
                   _numDocs);
+            case REGEXP_LIKE:
+              PredicateEvaluator evaluator = null;
+
+              // FST Index is available only for rolled out segments. So, we use different
+              // evaluator for rolled out and consuming segments.
+              //
+              // Rolled out segments (immutable): FST Index reader is available use FSTBasedEvaluator
+              // else use regular flow of getting predicate evaluator.
+              //
+              // Consuming segments: when FSTIndex is enabled use AutomatonBasedEvaluator so that regexp
+              // matching logic is similar to that of FSTBasedEvaluator else use regular flow of getting
+              // predicate evaluator.
+              if (dataSource.getFSTIndex() != null) {
+                evaluator = FSTBasedRegexpPredicateEvaluatorFactory
+                    .newFSTBasedEvaluator(dataSource.getFSTIndex(), dataSource.getDictionary(),
+                        ((RegexpLikePredicate) predicate).getValue());
+              } else if (dataSource instanceof MutableDataSource && ((MutableDataSource) dataSource)
+                  .hasFSTIndexEnabled()) {
+                evaluator = FSTBasedRegexpPredicateEvaluatorFactory
+                    .newAutomatonBasedEvaluator(dataSource.getDictionary(),
+                        ((RegexpLikePredicate) predicate).getValue());
+              } else {
+                evaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
+                    dataSource.getDataSourceMetadata().getDataType());
+              }
+              return FilterOperatorUtils.getLeafFilterOperator(evaluator, dataSource, _numDocs);
             case IS_NULL:
               NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
               if (nullValueVector != null) {

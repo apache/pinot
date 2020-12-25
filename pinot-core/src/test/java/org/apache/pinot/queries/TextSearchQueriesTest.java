@@ -86,7 +86,8 @@ import org.testng.annotations.Test;
  * The test table has a SKILLS column and QUERY_LOG column. Text index is created
  * on each of these columns.
  */
-public class TextSearchQueriesTest extends BaseQueriesTest {  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "TextSearchQueriesTest");
+public class TextSearchQueriesTest extends BaseQueriesTest {
+  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "TextSearchQueriesTest");
   private static final String TABLE_NAME = "MyTable";
   private static final String SEGMENT_NAME = "testSegment";
 

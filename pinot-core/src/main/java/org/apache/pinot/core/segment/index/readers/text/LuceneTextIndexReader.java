@@ -39,6 +39,7 @@ import org.apache.pinot.core.segment.index.readers.TextIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.LoggerFactory;
 
@@ -119,6 +120,11 @@ public class LuceneTextIndexReader implements TextIndexReader {
       throw new IllegalStateException("Failed to find text index file for column: " + _column);
     }
     return file;
+  }
+
+  @Override
+  public ImmutableRoaringBitmap getDictIds(String searchQuery) {
+    throw new UnsupportedOperationException("");
   }
 
   @Override

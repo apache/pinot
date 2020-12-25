@@ -20,6 +20,7 @@ package org.apache.pinot.core.operator.filter;
 
 import com.google.common.base.Preconditions;
 import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.operator.blocks.EmptyFilterBlock;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
@@ -66,8 +67,9 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
 
     int[] dictIds = _exclusive ? _predicateEvaluator.getNonMatchingDictIds() : _predicateEvaluator.getMatchingDictIds();
     int numDictIds = dictIds.length;
-    // NOTE: PredicateEvaluator without matching/non-matching dictionary ids should not reach here.
-    Preconditions.checkState(numDictIds > 0);
+    if (numDictIds == 0) {
+      return EmptyFilterBlock.getInstance();
+    }
     if (numDictIds == 1) {
       ImmutableRoaringBitmap docIds = (ImmutableRoaringBitmap) _invertedIndexReader.getDocIds(dictIds[0]);
       if (_exclusive) {

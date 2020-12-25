@@ -27,10 +27,14 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.segment.creator.impl.text.LuceneTextIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneFSTIndexCreator;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.readers.LuceneFSTIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.core.segment.creator.impl.V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
 
 
 class FilePerIndexDirectory extends ColumnIndexDirectory {
@@ -134,6 +138,9 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
         break;
       case TEXT_INDEX:
         filename = column + LuceneTextIndexCreator.LUCENE_TEXT_INDEX_FILE_EXTENSION;
+        break;
+      case FST_INDEX:
+        filename = column + FST_INDEX_FILE_EXTENSION;
         break;
       default:
         throw new UnsupportedOperationException("Unknown index type: " + indexType.toString());

@@ -257,6 +257,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final String _tableNameWithType;
   private final List<String> _invertedIndexColumns;
   private final List<String> _textIndexColumns;
+  private final List<String> _fstIndexColumns;
   private final List<String> _noDictionaryColumns;
   private final List<String> _varLengthDictionaryColumns;
   private final String _sortedColumn;
@@ -757,8 +758,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(_realtimeSegment, tempSegmentFolder.getAbsolutePath(), _schema,
               _tableNameWithType, _tableConfig, _segmentZKMetadata.getSegmentName(), _sortedColumn,
-              _invertedIndexColumns, _textIndexColumns, _noDictionaryColumns, _varLengthDictionaryColumns,
-              _nullHandlingEnabled);
+              _invertedIndexColumns, _textIndexColumns, _fstIndexColumns, _noDictionaryColumns,
+              _varLengthDictionaryColumns, _nullHandlingEnabled);
       segmentLogger.info("Trying to build segment");
       try {
         converter.build(_segmentVersion, _serverMetrics);
@@ -1186,6 +1187,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     Set<String> textIndexColumns = indexLoadingConfig.getTextIndexColumns();
     _textIndexColumns = new ArrayList<>(textIndexColumns);
 
+    Set<String> fstIndexColumns = indexLoadingConfig.getFSTIndexColumns();
+    _fstIndexColumns = new ArrayList<>(fstIndexColumns);
+
     // Start new realtime segment
     String consumerDir = realtimeTableDataManager.getConsumerDir();
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
@@ -1195,6 +1199,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setNoDictionaryColumns(indexLoadingConfig.getNoDictionaryColumns())
             .setVarLengthDictionaryColumns(indexLoadingConfig.getVarLengthDictionaryColumns())
             .setInvertedIndexColumns(invertedIndexColumns).setTextIndexColumns(textIndexColumns)
+            .setFSTIndexColumns(fstIndexColumns)
             .setRealtimeSegmentZKMetadata(segmentZKMetadata).setOffHeap(_isOffHeap).setMemoryManager(_memoryManager)
             .setStatsHistory(realtimeTableDataManager.getStatsHistory())
             .setAggregateMetrics(indexingConfig.isAggregateMetrics()).setNullHandlingEnabled(_nullHandlingEnabled)
