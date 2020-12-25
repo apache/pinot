@@ -21,6 +21,7 @@ package org.apache.pinot.core.indexsegment.generator;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -57,7 +58,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Configuration properties used in the creation of index segments.
  */
-public class SegmentGeneratorConfig {
+public class SegmentGeneratorConfig implements Serializable {
   public enum TimeColumnType {
     EPOCH, SIMPLE_DATE
   }
