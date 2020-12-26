@@ -28,7 +28,7 @@ public class GeoPredicate {
   //this is the column name
   ExpressionContext _lhs;
 
-  Predicate type;
+  Predicate _type;
 
   Geometry _geometry;
 
@@ -44,6 +44,14 @@ public class GeoPredicate {
 
   public void setLhs(ExpressionContext lhs) {
     _lhs = lhs;
+  }
+
+  public Predicate getType() {
+    return _type;
+  }
+
+  public void setType(Predicate type) {
+    _type = type;
   }
 
   public Geometry getGeometry() {
