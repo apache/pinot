@@ -42,6 +42,7 @@ import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
@@ -88,6 +89,7 @@ public class SegmentPushUtils implements Serializable {
   public static void pushSegments(SegmentGenerationJobSpec spec, PinotFS fileSystem, List<String> tarFilePaths)
       throws RetriableOperationException, AttemptsExceededException {
     String tableName = spec.getTableSpec().getTableName();
+    boolean cleanUpOutputDir = spec.isCleanUpOutputDir();
     LOGGER.info("Start pushing segments: {}... to locations: {} for table {}",
         Arrays.toString(tarFilePaths.subList(0, Math.min(5, tarFilePaths.size())).toArray()),
         Arrays.toString(spec.getPinotClusterSpecs()), tableName);
@@ -136,7 +138,9 @@ public class SegmentPushUtils implements Serializable {
               throw e;
             }
           } finally {
-            FileUtils.deleteQuietly(tarFile);
+            if (cleanUpOutputDir) {
+              fileSystem.delete(tarFileURI, true);
+            }
           }
         });
       }
@@ -150,7 +154,8 @@ public class SegmentPushUtils implements Serializable {
         Arrays.toString(segmentUris.subList(0, Math.min(5, segmentUris.size())).toArray()),
         Arrays.toString(spec.getPinotClusterSpecs()));
     for (String segmentUri : segmentUris) {
-      File segmentPath = new File(URI.create(segmentUri).getRawPath());
+      URI segmentURI = URI.create(segmentUri);
+      PinotFS outputDirFS = PinotFSFactory.create(segmentURI.getScheme());
       for (PinotClusterSpec pinotClusterSpec : spec.getPinotClusterSpecs()) {
         URI controllerURI;
         try {
@@ -188,7 +193,9 @@ public class SegmentPushUtils implements Serializable {
               throw e;
             }
           } finally {
-            FileUtils.deleteQuietly(segmentPath);
+            if (spec.isCleanUpOutputDir()) {
+              outputDirFS.delete(segmentURI, true);
+            }
           }
         });
       }

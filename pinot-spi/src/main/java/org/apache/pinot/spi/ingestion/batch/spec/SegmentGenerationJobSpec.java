@@ -111,6 +111,11 @@ public class SegmentGenerationJobSpec implements Serializable {
    */
   private PushJobSpec _pushJobSpec;
 
+  /**
+   * Should clean up output segment on job completion.
+   */
+  private boolean _cleanUpOutputDir;
+
   public ExecutionFrameworkSpec getExecutionFrameworkSpec() {
     return _executionFrameworkSpec;
   }
@@ -246,6 +251,14 @@ public class SegmentGenerationJobSpec implements Serializable {
 
   public void setSegmentCreationJobParallelism(int segmentCreationJobParallelism) {
     _segmentCreationJobParallelism = segmentCreationJobParallelism;
+  }
+
+  public void setCleanUpOutputDir(boolean cleanUpOutputDir) {
+    _cleanUpOutputDir = cleanUpOutputDir;
+  }
+
+  public boolean isCleanUpOutputDir() {
+    return _cleanUpOutputDir;
   }
 }
 
