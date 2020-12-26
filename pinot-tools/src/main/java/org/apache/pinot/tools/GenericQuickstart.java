@@ -129,8 +129,7 @@ public class GenericQuickstart {
 
   public static void main(String[] args)
       throws Exception {
-    String tableDirectoryPath =
-        "/Users/kishoreg/projects/incubator-pinot/pinot-tools/src/main/resources/examples/batch/starbucksStores";
+    String tableDirectoryPath ="";
 //    CSVRecordReader reader = new CSVRecordReader();
 //    reader.init(new File(tableDirectoryPath, "rawdata/data.csv"), Sets.newHashSet("lat", "long", "name", "address"), null);
 //    while (reader.hasNext()) {

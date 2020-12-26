@@ -20,6 +20,7 @@ package org.apache.pinot.core.segment.index.readers.geospatial;
 
 import java.io.Closeable;
 import java.lang.ref.SoftReference;
+import org.apache.pinot.core.segment.creator.impl.geospatial.H3IndexResolution;
 import org.apache.pinot.core.segment.index.readers.BitmapInvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.IntDictionary;
@@ -38,6 +39,7 @@ public class H3IndexReader implements Closeable {
 
   private final PinotDataBuffer _bitmapBuffer;
   private final PinotDataBuffer _offsetBuffer;
+  private final H3IndexResolution _resolution;
   private final int _numBitmaps;
   private final int _bitmapBufferSize;
 
@@ -52,8 +54,9 @@ public class H3IndexReader implements Closeable {
   public H3IndexReader(PinotDataBuffer dataBuffer) {
     int version = dataBuffer.getInt(0 * Integer.BYTES);
     _numBitmaps = dataBuffer.getInt(1 * Integer.BYTES);
+    _resolution = new H3IndexResolution(dataBuffer.getShort(2 * Integer.BYTES));
 
-    int headerSize = 2 * Integer.BYTES;
+    int headerSize = 2 * Integer.BYTES + Short.BYTES;
     //read the dictionary
     int dictionarySize = _numBitmaps * Long.BYTES;
     int offsetsSize = _numBitmaps * Integer.BYTES;
@@ -62,6 +65,10 @@ public class H3IndexReader implements Closeable {
     _bitmapBuffer = dataBuffer.view(headerSize + dictionarySize + offsetsSize, dataBuffer.size());
     _dictionary = new LongDictionary(dictionaryBuffer, _numBitmaps);
     _bitmapBufferSize = (int) _bitmapBuffer.size();
+  }
+
+  public H3IndexResolution getH3IndexResolution() {
+    return _resolution;
   }
 
   public ImmutableRoaringBitmap getDocIds(long h3IndexId) {
