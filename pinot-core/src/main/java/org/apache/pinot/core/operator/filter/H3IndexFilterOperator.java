@@ -33,6 +33,7 @@ import org.apache.pinot.core.query.request.context.FunctionContext;
 import org.apache.pinot.core.query.request.context.predicate.GeoPredicate;
 import org.apache.pinot.core.query.request.context.predicate.Predicate;
 import org.apache.pinot.core.query.request.context.predicate.RangePredicate;
+import org.apache.pinot.core.segment.creator.impl.geospatial.H3IndexResolution;
 import org.apache.pinot.core.segment.index.readers.geospatial.H3IndexReader;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.locationtech.jts.geom.Geometry;
@@ -40,14 +41,16 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
+/**
+ * A filter operator that uses H3 index for geospatial data retrieval
+ */
 public class H3IndexFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "H3IndexFilterOperator";
 
-  // NOTE: Range index can only apply to dictionary-encoded columns for now
-  // TODO: Support raw index columns
   private final int _numDocs;
   private final H3Core _h3Core;
   private final H3IndexReader _h3IndexReader;
+  private final H3IndexResolution _resolution;
   private Geometry _geometry;
   private double _distance;
 
@@ -68,6 +71,7 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
     }
     DataSource dataSource = indexSegment.getDataSource(columnName);
     _h3IndexReader = dataSource.getH3Index();
+    _resolution = _h3IndexReader.getH3IndexResolution();
     switch (predicate.getType()) {
       case EQ:
         break;
@@ -94,14 +98,13 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
     try {
       _h3Core = H3Core.newInstance();
     } catch (IOException e) {
-      throw new RuntimeException("Unable to instantiate H3", e);      //todo:log error
+      throw new RuntimeException("Unable to instantiate H3 instance", e);
     }
   }
 
   @Override
   protected FilterBlock getNextBlock() {
-    //todo: this needs to come from somewhere?
-    int resolution = 5;
+    int resolution = _resolution.getLowestResolution();
     long h3Id = _h3Core.geoToH3(_geometry.getCoordinate().x, _geometry.getCoordinate().y, resolution);
     assert _h3IndexReader != null;
 

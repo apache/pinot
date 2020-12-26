@@ -63,8 +63,7 @@ public interface DataSource {
   InvertedIndexReader<?> getRangeIndex();
 
   /**
-   * Returns the range index for the column if exists, or {@code null} if not.
-   * <p>TODO: Have a separate interface for range index.
+   * Returns the H3 index for the geospatial column if exists, or {@code null} if not.
    */
   @Nullable
   H3IndexReader getH3Index();

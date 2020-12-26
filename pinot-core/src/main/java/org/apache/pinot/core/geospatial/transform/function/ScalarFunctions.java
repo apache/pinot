@@ -75,15 +75,28 @@ public class ScalarFunctions {
   }
 
   /**
-   * Saves the geometry object as WKT format.
+   * Converts a Geometry object to a spherical geography object.
    *
    * @param bytes the serialized geometry object
-   * @return the geometry in WKT
+   * @return the geographical object
    */
   @ScalarFunction
   public static byte[] toSphericalGeography(byte[] bytes) {
     Geometry geometry = GeometrySerializer.deserialize(bytes);
     GeometryUtils.setGeography(geometry);
+    return GeometrySerializer.serialize(geometry);
+  }
+
+  /**
+   * Converts a spherical geographical object to a Geometry object.
+   *
+   * @param bytes the serialized geographical object
+   * @return the geometry object
+   */
+  @ScalarFunction
+  public static byte[] toGeometry(byte[] bytes) {
+    Geometry geometry = GeometrySerializer.deserialize(bytes);
+    GeometryUtils.setGeometry(geometry);
     return GeometrySerializer.serialize(geometry);
   }
 }

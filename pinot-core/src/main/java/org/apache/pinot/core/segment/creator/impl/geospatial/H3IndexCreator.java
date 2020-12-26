@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.creator.impl.geospatial;
 
+import com.google.common.collect.Lists;
 import com.uber.h3core.H3Core;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -59,28 +60,30 @@ public class H3IndexCreator implements GeoSpatialIndexCreator {
   private final H3Core _h3Core;
   private File _indexDir;
   private FieldSpec _fieldSpec;
-  private int _resolution;
+  private H3IndexResolution _resolution;
+  private int _lowestResolution;
 
   TreeMap<Long, MutableRoaringBitmap> _h3IndexMap;
 
   int numChunks = 0;
   List<Integer> chunkLengths = new ArrayList<>();
 
-  public H3IndexCreator(File indexDir, FieldSpec fieldSpec, int resolution)
+  public H3IndexCreator(File indexDir, FieldSpec fieldSpec, H3IndexResolution resolution)
       throws IOException {
 
     _indexDir = indexDir;
     _fieldSpec = fieldSpec;
     _resolution = resolution;
     _h3Core = H3Core.newInstance();
-    //todo: initialize this with right size based on the
-    long numHexagons = _h3Core.numHexagons(resolution);
+    _resolution = resolution;
+    _lowestResolution = resolution.getLowestResolution();
     _h3IndexMap = new TreeMap<>();
   }
 
   @Override
   public void add(int docId, double lat, double lon) {
-    Long h3Id = _h3Core.geoToH3(lat, lon, _resolution);
+    // TODO support multiple resolutions
+    Long h3Id = _h3Core.geoToH3(lat, lon, _lowestResolution);
     MutableRoaringBitmap roaringBitmap = _h3IndexMap.get(h3Id);
     if (roaringBitmap == null) {
       roaringBitmap = new MutableRoaringBitmap();
@@ -172,6 +175,7 @@ public class H3IndexCreator implements GeoSpatialIndexCreator {
     //write header file
     headerStream.writeInt(VERSION);
     headerStream.writeInt(writer.getNumUniqueIds());
+    headerStream.writeShort(_resolution.serialize());
     headerStream.close();
     dictionaryStream.close();
     offsetStream.close();
@@ -299,13 +303,13 @@ public class H3IndexCreator implements GeoSpatialIndexCreator {
     Point point2 = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(37.368832, -122.036346));
     System.out.println("point1.distance(point2) = " + point1.distance(point2));
     System.out.println("sphericalDistance = " + StDistanceFunction.sphericalDistance(point1, point2));
-    System.exit(0);
+//    System.exit(0);
     File indexDir = new File(System.getProperty("java.io.tmpdir"), "h3IndexDir");
     FileUtils.deleteDirectory(indexDir);
     indexDir.mkdirs();
     FieldSpec spec = new DimensionFieldSpec("geo_col", FieldSpec.DataType.STRING, true);
     int resolution = 5;
-    H3IndexCreator creator = new H3IndexCreator(indexDir, spec, resolution);
+    H3IndexCreator creator = new H3IndexCreator(indexDir, spec, new H3IndexResolution(Lists.newArrayList(resolution)));
     Random rand = new Random();
     H3Core h3Core = H3Core.newInstance();
     Map<Long, Integer> map = new HashMap<>();

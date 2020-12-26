@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.index.loader.invertedindex;
 
+import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
@@ -27,6 +28,7 @@ import org.apache.pinot.core.geospatial.serde.GeometrySerializer;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.creator.impl.geospatial.H3IndexCreator;
+import org.apache.pinot.core.segment.creator.impl.geospatial.H3IndexResolution;
 import org.apache.pinot.core.segment.creator.impl.inv.RangeIndexCreator;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.loader.LoaderUtils;
@@ -153,9 +155,11 @@ public class H3IndexHandler {
   private void handleNonDictionaryBasedColumn(ColumnMetadata columnMetadata)
       throws Exception {
     int numDocs = columnMetadata.getTotalDocs();
+    // TODO set the resolution
     try (ForwardIndexReader forwardIndexReader = getForwardIndexReader(columnMetadata, _segmentWriter);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
-        H3IndexCreator h3IndexCreator = new H3IndexCreator(_indexDir, columnMetadata.getFieldSpec(), 5)) {
+        H3IndexCreator h3IndexCreator = new H3IndexCreator(_indexDir, columnMetadata.getFieldSpec(), new H3IndexResolution(
+            Lists.newArrayList(5)))) {
       if (columnMetadata.isSingleValue()) {
         // Single-value column.
         switch (columnMetadata.getDataType()) {
