@@ -26,6 +26,7 @@ public enum ColumnIndexType {
   NULLVALUE_VECTOR("nullvalue_vector"),
   TEXT_INDEX("text_index"),
   FST_INDEX("fst_index"),
+  RANGE_INDEX("range_index"),
   H3_INDEX("h3_index");
 
   private final String indexName;
