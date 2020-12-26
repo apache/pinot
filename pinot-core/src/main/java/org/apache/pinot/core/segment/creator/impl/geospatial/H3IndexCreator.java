@@ -175,7 +175,7 @@ public class H3IndexCreator implements GeoSpatialIndexCreator {
     //write header file
     headerStream.writeInt(VERSION);
     headerStream.writeInt(writer.getNumUniqueIds());
-    headerStream.writeShort(_resolution.size());
+    headerStream.writeShort(_resolution.serialize());
     headerStream.close();
     dictionaryStream.close();
     offsetStream.close();
