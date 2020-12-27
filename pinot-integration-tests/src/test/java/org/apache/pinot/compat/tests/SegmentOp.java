@@ -61,7 +61,7 @@ public class SegmentOp extends BaseOp {
   private static final FileFormat DEFAULT_FILE_FORMAT = FileFormat.CSV;
   private static final String STATE_ONLINE = "ONLINE";
   private static final int DEFAULT_MAX_SLEEP_TIME_MS = 30000;
-  private static final int DEFAULT_WAIT_TIME_MS = 5000;
+  private static final int DEFAULT_SLEEP_INTERVAL_MS = 200;
 
   public enum Op {
     UPLOAD, DELETE
@@ -139,7 +139,7 @@ public class SegmentOp extends BaseOp {
   }
 
   /**
-   * Create Segment file, compress to TarGz, and upload the files to controller.
+   * Create Segment file, compress to TarGz, upload the files to controller and verify segment upload.
    * @return true if all successful, false in case of failure.
    */
   private boolean createAndUploadSegments() {
@@ -150,20 +150,7 @@ public class SegmentOp extends BaseOp {
       FileUtils.forceMkdir(localOutputTempDir);
       File segmentTarFile = generateSegment(localOutputTempDir);
       uploadSegment(segmentTarFile);
-
-      long startTime = System.currentTimeMillis();
-      while (getOnlineSegmentCount() <= 0) {
-        if ((System.currentTimeMillis() - startTime) > DEFAULT_MAX_SLEEP_TIME_MS) {
-          LOGGER.error("Upload segment verification failed, count is zero after max wait time {} ms.",
-              DEFAULT_MAX_SLEEP_TIME_MS);
-          return false;
-        }
-        LOGGER.warn("Upload segment verification count is zero, will retry after {} ms.", DEFAULT_WAIT_TIME_MS);
-        Thread.sleep(DEFAULT_WAIT_TIME_MS);
-      }
-      LOGGER.info("Successfully verified segment {} and its current status is {}.", _segmentName, STATE_ONLINE);
-
-      return true;
+      return verifySegmentInState(STATE_ONLINE);
     } catch (Exception e) {
       LOGGER.error("Failed to create and upload segment for input data file {}.", _inputDataFileName, e);
       return false;
@@ -222,6 +209,30 @@ public class SegmentOp extends BaseOp {
   }
 
   /**
+   * Verify given table and segment name in the controller are in the state matching the parameter.
+   * @param state of the segment to be verified in the controller.
+   * @return true if segment is in the state provided in the parameter, else false.
+   * @throws IOException
+   * @throws InterruptedException
+   */
+  private boolean verifySegmentInState(String state)
+      throws IOException, InterruptedException {
+    long startTime = System.currentTimeMillis();
+    while (getSegmentCountInState(state) <= 0) {
+      if ((System.currentTimeMillis() - startTime) > DEFAULT_MAX_SLEEP_TIME_MS) {
+        LOGGER.error("Upload segment verification failed, count is zero after max wait time {} ms.",
+            DEFAULT_MAX_SLEEP_TIME_MS);
+        return false;
+      }
+      LOGGER.warn("Upload segment verification count is zero, will retry after {} ms.", DEFAULT_SLEEP_INTERVAL_MS);
+      Thread.sleep(DEFAULT_SLEEP_INTERVAL_MS);
+    }
+
+    LOGGER.info("Successfully verified segment {} and its current status is {}.", _segmentName, state);
+    return true;
+  }
+
+  /**
    * Deletes the segment for the given segment name and table name.
    * @return true if delete successful, else false.
    */
@@ -232,21 +243,31 @@ public class SegmentOp extends BaseOp {
 
       ControllerTest.sendDeleteRequest(ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL)
           .forSegmentDelete(_tableName, _segmentName));
-
-      long startTime = System.currentTimeMillis();
-      while (getOnlineSegmentCount() > 0) {
-        if ((System.currentTimeMillis() - startTime) > DEFAULT_MAX_SLEEP_TIME_MS) {
-          LOGGER.error("Delete segment verification failed, count is greater than zero after max wait time {} ms.",
-              DEFAULT_MAX_SLEEP_TIME_MS);
-          return false;
-        }
-        LOGGER
-            .warn("Delete segment verification count greater than zero, will retry after {} ms.", DEFAULT_WAIT_TIME_MS);
-        Thread.sleep(DEFAULT_WAIT_TIME_MS);
-      }
+      return verifySegmentDeleted();
     } catch (Exception e) {
       LOGGER.error("Request to delete the segment {} for the table {} failed.", _segmentName, _tableName, e);
       return false;
+    }
+  }
+
+  /**
+   * Verify given table name and segment name deleted from the controller.
+   * @return true if no segment found, else false.
+   * @throws IOException
+   * @throws InterruptedException
+   */
+  private boolean verifySegmentDeleted()
+      throws IOException, InterruptedException {
+    long startTime = System.currentTimeMillis();
+    while (getCountForSegmentName() > 0) {
+      if ((System.currentTimeMillis() - startTime) > DEFAULT_MAX_SLEEP_TIME_MS) {
+        LOGGER.error("Delete segment verification failed, count is greater than zero after max wait time {} ms.",
+            DEFAULT_MAX_SLEEP_TIME_MS);
+        return false;
+      }
+      LOGGER.warn("Delete segment verification count greater than zero, will retry after {} ms.",
+          DEFAULT_SLEEP_INTERVAL_MS);
+      Thread.sleep(DEFAULT_SLEEP_INTERVAL_MS);
     }
 
     LOGGER.info("Successfully delete the segment {} for the table {}.", _segmentName, _tableName);
@@ -254,20 +275,47 @@ public class SegmentOp extends BaseOp {
   }
 
   /**
-   * Retrieve the number of segments for both OFFLINE and REALTIME which are in ONLINE state.
-   * @return count for OFFLINE and REALTIME segments.
+   * Retrieve external view for the given table name.
+   * @return TableViews.TableView of OFFLINE and REALTIME segments.
    */
-  private long getOnlineSegmentCount()
+  private TableViews.TableView getExternalViewForTable()
       throws IOException {
-    TableViews.TableView segmentTreeView = JsonUtils.stringToObject(ControllerTest.sendGetRequest(
+    return JsonUtils.stringToObject(ControllerTest.sendGetRequest(
         ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL).forTableExternalView(_tableName)),
         TableViews.TableView.class);
-    long offlineSegmentCount = segmentTreeView.offline != null ? segmentTreeView.offline.entrySet().stream()
-        .filter(k -> k.getKey().equalsIgnoreCase(_segmentName))
-        .filter(v -> v.getValue().values().contains(STATE_ONLINE)).count() : 0;
-    long realtimeSegmentCount = segmentTreeView.realtime != null ? segmentTreeView.realtime.entrySet().stream()
-        .filter(k -> k.getKey().equalsIgnoreCase(_segmentName))
-        .filter(v -> v.getValue().values().contains(STATE_ONLINE)).count() : 0;
+  }
+
+  /**
+   * Retrieve the number of segments for both OFFLINE and REALTIME which are in state matching the parameter.
+   * @param state of the segment to be verified in the controller.
+   * @return count for OFFLINE and REALTIME segments.
+   */
+  private long getSegmentCountInState(String state)
+      throws IOException {
+    long offlineSegmentCount =
+        getExternalViewForTable().offline != null ? getExternalViewForTable().offline.entrySet().stream()
+            .filter(k -> k.getKey().equalsIgnoreCase(_segmentName)).filter(v -> v.getValue().values().contains(state))
+            .count() : 0;
+    long realtimeSegmentCount =
+        getExternalViewForTable().realtime != null ? getExternalViewForTable().realtime.entrySet().stream()
+            .filter(k -> k.getKey().equalsIgnoreCase(_segmentName)).filter(v -> v.getValue().values().contains(state))
+            .count() : 0;
+
+    return offlineSegmentCount + realtimeSegmentCount;
+  }
+
+  /**
+   * Retrieve the number of segments for both OFFLINE and REALTIME irrespective of the state.
+   * @return count for OFFLINE and REALTIME segments.
+   */
+  private long getCountForSegmentName()
+      throws IOException {
+    long offlineSegmentCount =
+        getExternalViewForTable().offline != null ? getExternalViewForTable().offline.entrySet().stream()
+            .filter(k -> k.getKey().equalsIgnoreCase(_segmentName)).count() : 0;
+    long realtimeSegmentCount =
+        getExternalViewForTable().realtime != null ? getExternalViewForTable().realtime.entrySet().stream()
+            .filter(k -> k.getKey().equalsIgnoreCase(_segmentName)).count() : 0;
 
     return offlineSegmentCount + realtimeSegmentCount;
   }
