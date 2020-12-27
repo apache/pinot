@@ -116,7 +116,7 @@ public class BootstrapTableTool {
         if (!new File(inputDirURI).exists()) {
           URL resolvedInputDirURI = BootstrapTableTool.class.getClassLoader().getResource(inputDirURI);
           if (resolvedInputDirURI != null) {
-            if (resolvedInputDirURI.getProtocol().equals("jar")) {
+            if ("jar".equals(resolvedInputDirURI.getProtocol())) {
               String[] splits = resolvedInputDirURI.getFile().split("!");
               String inputDir = new File(setupTableTmpDir, "inputData").toString();
               JarUtils.copyResourcesToDirectory(splits[0], splits[1].substring(1), inputDir);
