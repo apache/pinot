@@ -51,7 +51,7 @@ import org.apache.pinot.spi.data.readers.PrimaryKey;
  * <pre>{@code SELECT
  *    baseballStats.playerName,
  *    baseballStats.teamID,
- *    lookup('baseballTeams', 'teamName', 'teamID', baseballStats.teamID)
+ *    LOOKUP('dimBaseballTeams', 'teamName', 'teamID', baseballStats.teamID)
  * FROM
  *    baseballStats
  * LIMIT 10}</pre>
