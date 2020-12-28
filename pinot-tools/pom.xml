@@ -322,6 +322,17 @@
               </jvmSettings>
             </program>
             <program>
+              <mainClass>org.apache.pinot.tools.JsonIndexQuickStart</mainClass>
+              <name>quick-start-json-index</name>
+              <jvmSettings>
+                <initialMemorySize>1G</initialMemorySize>
+                <maxMemorySize>1G</maxMemorySize>
+                <extraArguments>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
+                </extraArguments>
+              </jvmSettings>
+            </program>
+            <program>
               <mainClass>org.apache.pinot.tools.admin.command.LaunchDataIngestionJobCommand</mainClass>
               <name>pinot-ingestion-job</name>
               <jvmSettings>

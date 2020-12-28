@@ -18,20 +18,20 @@
  */
 package org.apache.pinot.core.plan;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-
 import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
 import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
 import org.apache.pinot.core.operator.filter.ExpressionFilterOperator;
 import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
+import org.apache.pinot.core.operator.filter.JsonMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.FSTBasedRegexpPredicateEvaluatorFactory;
@@ -40,10 +40,12 @@ import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvide
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.predicate.JsonMatchPredicate;
 import org.apache.pinot.core.query.request.context.predicate.Predicate;
 import org.apache.pinot.core.query.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.core.query.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.core.segment.index.datasource.MutableDataSource;
+import org.apache.pinot.core.segment.index.readers.JsonIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
 import org.apache.pinot.core.segment.index.readers.ValidDocIndexReader;
 import org.apache.pinot.core.util.QueryOptions;
@@ -129,29 +131,27 @@ public class FilterPlanNode implements PlanNode {
           //       IS_NOT_NULL, TEXT_MATCH)
           return new ExpressionFilterOperator(_indexSegment, predicate, _numDocs);
         } else {
-          DataSource dataSource = _indexSegment.getDataSource(lhs.getIdentifier());
+          String column = lhs.getIdentifier();
+          DataSource dataSource = _indexSegment.getDataSource(column);
           switch (predicate.getType()) {
             case TEXT_MATCH:
               return new TextMatchFilterOperator(dataSource.getTextIndex(), ((TextMatchPredicate) predicate).getValue(),
                   _numDocs);
             case REGEXP_LIKE:
-              PredicateEvaluator evaluator = null;
-
-              // FST Index is available only for rolled out segments. So, we use different
-              // evaluator for rolled out and consuming segments.
+              // FST Index is available only for rolled out segments. So, we use different evaluator for rolled out and
+              // consuming segments.
               //
               // Rolled out segments (immutable): FST Index reader is available use FSTBasedEvaluator
               // else use regular flow of getting predicate evaluator.
               //
-              // Consuming segments: when FSTIndex is enabled use AutomatonBasedEvaluator so that regexp
-              // matching logic is similar to that of FSTBasedEvaluator else use regular flow of getting
-              // predicate evaluator.
+              // Consuming segments: When FST is enabled, use AutomatonBasedEvaluator so that regexp matching logic is
+              // similar to that of FSTBasedEvaluator, else use regular flow of getting predicate evaluator.
+              PredicateEvaluator evaluator;
               if (dataSource.getFSTIndex() != null) {
                 evaluator = FSTBasedRegexpPredicateEvaluatorFactory
                     .newFSTBasedEvaluator(dataSource.getFSTIndex(), dataSource.getDictionary(),
                         ((RegexpLikePredicate) predicate).getValue());
-              } else if (dataSource instanceof MutableDataSource && ((MutableDataSource) dataSource)
-                  .hasFSTIndexEnabled()) {
+              } else if (dataSource instanceof MutableDataSource && ((MutableDataSource) dataSource).isFSTEnabled()) {
                 evaluator = FSTBasedRegexpPredicateEvaluatorFactory
                     .newAutomatonBasedEvaluator(dataSource.getDictionary(),
                         ((RegexpLikePredicate) predicate).getValue());
@@ -160,6 +160,11 @@ public class FilterPlanNode implements PlanNode {
                     dataSource.getDataSourceMetadata().getDataType());
               }
               return FilterOperatorUtils.getLeafFilterOperator(evaluator, dataSource, _numDocs);
+            case JSON_MATCH:
+              JsonIndexReader jsonIndex = dataSource.getJsonIndex();
+              Preconditions
+                  .checkState(jsonIndex != null, "Cannot apply JSON_MATCH on column: %s without json index", column);
+              return new JsonMatchFilterOperator(jsonIndex, ((JsonMatchPredicate) predicate).getValue(), _numDocs);
             case IS_NULL:
               NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
               if (nullValueVector != null) {

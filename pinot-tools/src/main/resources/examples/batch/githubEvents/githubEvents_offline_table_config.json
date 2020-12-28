@@ -1,0 +1,27 @@
+{
+  "tableName": "githubEvents",
+  "tableType": "OFFLINE",
+  "tenants": {
+  },
+  "segmentsConfig": {
+    "segmentPushType": "REFRESH",
+    "replication": "1"
+  },
+  "tableIndexConfig": {
+    "loadMode": "MMAP",
+    "noDictionaryColumns": [
+      "actor",
+      "repo",
+      "payload"
+    ],
+    "jsonIndexColumns": [
+      "actor",
+      "repo",
+      "payload"
+    ]
+  },
+  "metadata": {
+    "customConfigs": {
+    }
+  }
+}

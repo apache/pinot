@@ -1,0 +1,40 @@
+{
+  "dimensionFieldSpecs": [
+    {
+      "name": "id",
+      "dataType": "STRING"
+    },
+    {
+      "name": "type",
+      "dataType": "STRING"
+    },
+    {
+      "name": "actor",
+      "dataType": "STRING",
+      "maxLength": 2147483647
+    },
+    {
+      "name": "repo",
+      "dataType": "STRING",
+      "maxLength": 2147483647
+    },
+    {
+      "name": "payload",
+      "dataType": "STRING",
+      "maxLength": 2147483647
+    },
+    {
+      "name": "public",
+      "dataType": "BOOLEAN"
+    }
+  ],
+  "dateTimeFieldSpecs": [
+    {
+      "name": "created_at",
+      "dataType": "STRING",
+      "format": "1:SECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd'T'HH:mm:ss'Z'",
+      "granularity": "1:SECONDS"
+    }
+  ],
+  "schemaName": "githubEvents"
+}

@@ -161,14 +161,17 @@ public class FilterOperatorUtils {
         if (filterOperator instanceof TextMatchFilterOperator) {
           return 3;
         }
-        if (filterOperator instanceof AndFilterOperator) {
+        if (filterOperator instanceof JsonMatchFilterOperator) {
           return 4;
         }
-        if (filterOperator instanceof OrFilterOperator) {
+        if (filterOperator instanceof AndFilterOperator) {
           return 5;
         }
+        if (filterOperator instanceof OrFilterOperator) {
+          return 6;
+        }
         if (filterOperator instanceof ScanBasedFilterOperator) {
-          return getScanBasedFilterPriority((ScanBasedFilterOperator) filterOperator, 6, debugOptions);
+          return getScanBasedFilterPriority((ScanBasedFilterOperator) filterOperator, 7, debugOptions);
         }
         if (filterOperator instanceof ExpressionFilterOperator) {
           return 10;
