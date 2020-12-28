@@ -52,6 +52,10 @@
           <artifactId>log4j-over-slf4j</artifactId>
         </exclusion>
         <exclusion>
+          <groupId>ch.qos.logback</groupId>
+          <artifactId>logback-classic</artifactId>
+        </exclusion>
+        <exclusion>
           <groupId>org.glassfish.hk2.external</groupId>
           <artifactId>aopalliance-repackaged</artifactId>
         </exclusion>
@@ -64,6 +68,12 @@
     <dependency>
       <groupId>io.dropwizard</groupId>
       <artifactId>dropwizard-migrations</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>ch.qos.logback</groupId>
+          <artifactId>logback-classic</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>io.dropwizard</groupId>
