@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.core.data.manager.offline.DimensionTableDataManager;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
@@ -292,6 +293,9 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
       put("dimTableWithIntPK_OFFLINE", FieldSpec.DataType.INT);
       put("dimTableWithStringPK_OFFLINE", FieldSpec.DataType.STRING);
       put("dimTableWithLongPK_OFFLINE", FieldSpec.DataType.LONG);
+      put("dimTableWithFloatPK_OFFLINE", FieldSpec.DataType.FLOAT);
+      put("dimTableWithDoublePK_OFFLINE", FieldSpec.DataType.DOUBLE);
+      put("dimTableWithBytesPK_OFFLINE", FieldSpec.DataType.BYTES);
     }};
     for (Map.Entry<String, FieldSpec.DataType> table : testTables.entrySet()) {
       DimensionTableDataManager mgr = mock(DimensionTableDataManager.class);
@@ -303,7 +307,12 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
       when(mgr.lookupRowByPrimaryKey(any(PrimaryKey.class))).thenAnswer(invocation -> {
         PrimaryKey key = invocation.getArgument(0);
         GenericRow row = new GenericRow();
-        row.putValue("lookupColumn", "lookup_value_for_" + key.toString());
+        if (table.getValue() == FieldSpec.DataType.BYTES) {
+          byte[] keyContent = ArrayUtils.toPrimitive((Byte[])(key.getValues()[0])); // assuming one col
+          row.putValue("lookupColumn", String.format("lookup_value_for_[%s]", new String(keyContent) ));
+        } else {
+          row.putValue("lookupColumn", "lookup_value_for_" + key.toString());
+        }
         return row;
       });
     }
@@ -335,6 +344,36 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
     expectedResults = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedResults[i] = String.format("lookup_value_for_[%s]", _longSVValues[i]);
+    }
+    testTransformFunction(transformFunction, expectedResults);
+
+    // PK: [Float]
+    expression = QueryContextConverterUtils.getExpression(
+        String.format("lookup('dimTableWithFloatPK', 'lookupColumn', 'primaryColumn', %s)", FLOAT_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    expectedResults = new String[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedResults[i] = String.format("lookup_value_for_[%s]", _floatSVValues[i]);
+    }
+    testTransformFunction(transformFunction, expectedResults);
+
+    // PK: [Double]
+    expression = QueryContextConverterUtils.getExpression(
+        String.format("lookup('dimTableWithDoublePK', 'lookupColumn', 'primaryColumn', %s)", DOUBLE_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    expectedResults = new String[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedResults[i] = String.format("lookup_value_for_[%s]", _doubleSVValues[i]);
+    }
+    testTransformFunction(transformFunction, expectedResults);
+
+    // PK: [Byte[]]
+    expression = QueryContextConverterUtils.getExpression(
+        String.format("lookup('dimTableWithBytesPK', 'lookupColumn', 'primaryColumn', %s)", BYTES_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    expectedResults = new String[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedResults[i] = String.format("lookup_value_for_[%s]", new String(_bytesSVValues[i]));
     }
     testTransformFunction(transformFunction, expectedResults);
   }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -149,6 +150,19 @@ public class LookupTransformFunction extends BaseTransformFunction {
           break;
         case LONG:
           pkColumns[i] = ArrayUtils.toObject(tf.transformToLongValuesSV(projectionBlock));
+          break;
+        case FLOAT:
+          pkColumns[i] = ArrayUtils.toObject(tf.transformToFloatValuesSV(projectionBlock));
+          break;
+        case DOUBLE:
+          pkColumns[i] = ArrayUtils.toObject(tf.transformToDoubleValuesSV(projectionBlock));
+          break;
+        case BYTES:
+          byte[][] primitiveValues = tf.transformToBytesValuesSV(projectionBlock);
+          pkColumns[i] = new Byte[numDocuments][];
+          for (int n = 0; n < numDocuments; n++) {
+            pkColumns[i][n] = ArrayUtils.toObject(primitiveValues[n]);
+          }
           break;
         default:
           throw new IllegalStateException("Unknown column type for primary key");
