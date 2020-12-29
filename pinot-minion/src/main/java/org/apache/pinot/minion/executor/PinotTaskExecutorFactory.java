@@ -24,9 +24,17 @@ package org.apache.pinot.minion.executor;
 public interface PinotTaskExecutorFactory {
 
   /**
-   * Creates an new instance of {@link PinotTaskExecutor}.
-   *
-   * @return Pinot task executor
+   * Initializes the task executor factory.
+   */
+  void init(MinionTaskZkMetadataManager zkMetadataManager);
+
+  /**
+   * Returns the task type of the executor.
+   */
+  String getTaskType();
+
+  /**
+   * Creates a new task executor.
    */
   PinotTaskExecutor create();
 }

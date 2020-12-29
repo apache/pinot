@@ -16,14 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.minion.executor;
+package org.apache.pinot.minion.event;
 
-import org.apache.pinot.core.common.MinionConstants;
-import org.apache.pinot.spi.annotations.minion.TaskExecutorFactory;
+import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 
 
-@TaskExecutorFactory
-public class SegmentGenerationAndPushTaskExecutorFactory implements PinotTaskExecutorFactory {
+public class DefaultMinionEventObserverFactory implements MinionEventObserverFactory {
+  private static final DefaultMinionEventObserverFactory INSTANCE = new DefaultMinionEventObserverFactory();
+  private static final DefaultMinionEventObserver OBSERVER_INSTANCE = new DefaultMinionEventObserver();
+
+  private DefaultMinionEventObserverFactory() {
+  }
+
+  public static DefaultMinionEventObserverFactory getInstance() {
+    return INSTANCE;
+  }
 
   @Override
   public void init(MinionTaskZkMetadataManager zkMetadataManager) {
@@ -31,11 +38,11 @@ public class SegmentGenerationAndPushTaskExecutorFactory implements PinotTaskExe
 
   @Override
   public String getTaskType() {
-    return MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE;
+    return null;
   }
 
   @Override
-  public PinotTaskExecutor create() {
-    return new SegmentGenerationAndPushTaskExecutor();
+  public MinionEventObserver create() {
+    return OBSERVER_INSTANCE;
   }
 }

@@ -88,8 +88,8 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     when(mockClusterInfoProvide.getLLCRealtimeSegmentsMetadata(REALTIME_TABLE_NAME))
         .thenReturn(Lists.newArrayList(metadata1));
 
-    RealtimeToOfflineSegmentsTaskGenerator generator =
-        new RealtimeToOfflineSegmentsTaskGenerator(mockClusterInfoProvide);
+    RealtimeToOfflineSegmentsTaskGenerator generator = new RealtimeToOfflineSegmentsTaskGenerator();
+    generator.init(mockClusterInfoProvide);
 
     // Skip task generation, if offline table
     TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
@@ -141,8 +141,8 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     when(mockClusterInfoProvide.getLLCRealtimeSegmentsMetadata(REALTIME_TABLE_NAME))
         .thenReturn(Lists.newArrayList(metadata1));
 
-    RealtimeToOfflineSegmentsTaskGenerator generator =
-        new RealtimeToOfflineSegmentsTaskGenerator(mockClusterInfoProvide);
+    RealtimeToOfflineSegmentsTaskGenerator generator = new RealtimeToOfflineSegmentsTaskGenerator();
+    generator.init(mockClusterInfoProvide);
 
     // if same task and table, IN_PROGRESS, then don't generate again
     taskStatesMap.put(taskName, TaskState.IN_PROGRESS);
@@ -177,8 +177,8 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     when(mockClusterInfoProvide.getTaskStates(RealtimeToOfflineSegmentsTask.TASK_TYPE)).thenReturn(new HashMap<>());
     when(mockClusterInfoProvide.getLLCRealtimeSegmentsMetadata(REALTIME_TABLE_NAME)).thenReturn(Lists.newArrayList());
 
-    RealtimeToOfflineSegmentsTaskGenerator generator =
-        new RealtimeToOfflineSegmentsTaskGenerator(mockClusterInfoProvide);
+    RealtimeToOfflineSegmentsTaskGenerator generator = new RealtimeToOfflineSegmentsTaskGenerator();
+    generator.init(mockClusterInfoProvide);
     List<PinotTaskConfig> pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(realtimeTableConfig));
     assertTrue(pinotTaskConfigs.isEmpty());
 
@@ -188,7 +188,8 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     when(mockClusterInfoProvide.getLLCRealtimeSegmentsMetadata(REALTIME_TABLE_NAME))
         .thenReturn(Lists.newArrayList(seg1));
 
-    generator = new RealtimeToOfflineSegmentsTaskGenerator(mockClusterInfoProvide);
+    generator = new RealtimeToOfflineSegmentsTaskGenerator();
+    generator.init(mockClusterInfoProvide);
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(realtimeTableConfig));
     assertTrue(pinotTaskConfigs.isEmpty());
 
@@ -200,7 +201,8 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     when(mockClusterInfoProvide.getLLCRealtimeSegmentsMetadata(REALTIME_TABLE_NAME))
         .thenReturn(Lists.newArrayList(seg1, seg2, seg3));
 
-    generator = new RealtimeToOfflineSegmentsTaskGenerator(mockClusterInfoProvide);
+    generator = new RealtimeToOfflineSegmentsTaskGenerator();
+    generator.init(mockClusterInfoProvide);
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(realtimeTableConfig));
     assertTrue(pinotTaskConfigs.isEmpty());
   }
@@ -227,8 +229,8 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     taskConfigsMap.put(RealtimeToOfflineSegmentsTask.TASK_TYPE, new HashMap<>());
     TableConfig realtimeTableConfig = getRealtimeTableConfig(taskConfigsMap);
 
-    RealtimeToOfflineSegmentsTaskGenerator generator =
-        new RealtimeToOfflineSegmentsTaskGenerator(mockClusterInfoProvide);
+    RealtimeToOfflineSegmentsTaskGenerator generator = new RealtimeToOfflineSegmentsTaskGenerator();
+    generator.init(mockClusterInfoProvide);
     List<PinotTaskConfig> pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(realtimeTableConfig));
     assertEquals(pinotTaskConfigs.size(), 1);
     assertEquals(pinotTaskConfigs.get(0).getTaskType(), RealtimeToOfflineSegmentsTask.TASK_TYPE);
@@ -246,7 +248,8 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
         "download2"); // 21 May 2020 8am to 22 May 2020 8am UTC
     when(mockClusterInfoProvide.getLLCRealtimeSegmentsMetadata(REALTIME_TABLE_NAME))
         .thenReturn(Lists.newArrayList(seg1, seg2));
-    generator = new RealtimeToOfflineSegmentsTaskGenerator(mockClusterInfoProvide);
+    generator = new RealtimeToOfflineSegmentsTaskGenerator();
+    generator.init(mockClusterInfoProvide);
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(realtimeTableConfig));
     assertEquals(pinotTaskConfigs.size(), 1);
     assertEquals(pinotTaskConfigs.get(0).getTaskType(), RealtimeToOfflineSegmentsTask.TASK_TYPE);
@@ -281,8 +284,8 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     taskConfigsMap.put(RealtimeToOfflineSegmentsTask.TASK_TYPE, new HashMap<>());
     TableConfig realtimeTableConfig = getRealtimeTableConfig(taskConfigsMap);
 
-    RealtimeToOfflineSegmentsTaskGenerator generator =
-        new RealtimeToOfflineSegmentsTaskGenerator(mockClusterInfoProvide);
+    RealtimeToOfflineSegmentsTaskGenerator generator = new RealtimeToOfflineSegmentsTaskGenerator();
+    generator.init(mockClusterInfoProvide);
     List<PinotTaskConfig> pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(realtimeTableConfig));
     assertEquals(pinotTaskConfigs.size(), 1);
     assertEquals(pinotTaskConfigs.get(0).getTaskType(), RealtimeToOfflineSegmentsTask.TASK_TYPE);
@@ -296,7 +299,8 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     // No segments match
     when(mockClusterInfoProvide.getMinionRealtimeToOfflineSegmentsTaskMetadata(REALTIME_TABLE_NAME))
         .thenReturn(new RealtimeToOfflineSegmentsTaskMetadata(REALTIME_TABLE_NAME, 1590490800000L)); // 26 May 2020 UTC
-    generator = new RealtimeToOfflineSegmentsTaskGenerator(mockClusterInfoProvide);
+    generator = new RealtimeToOfflineSegmentsTaskGenerator();
+    generator.init(mockClusterInfoProvide);
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(realtimeTableConfig));
     assertEquals(pinotTaskConfigs.size(), 0);
 
@@ -327,7 +331,8 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     taskConfigs.put("m1" + RealtimeToOfflineSegmentsTask.AGGREGATION_TYPE_KEY_SUFFIX, "MAX");
     taskConfigsMap.put(RealtimeToOfflineSegmentsTask.TASK_TYPE, taskConfigs);
     realtimeTableConfig = getRealtimeTableConfig(taskConfigsMap);
-    generator = new RealtimeToOfflineSegmentsTaskGenerator(mockClusterInfoProvide);
+    generator = new RealtimeToOfflineSegmentsTaskGenerator();
+    generator.init(mockClusterInfoProvide);
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(realtimeTableConfig));
     assertEquals(pinotTaskConfigs.size(), 1);
     assertEquals(pinotTaskConfigs.get(0).getTaskType(), RealtimeToOfflineSegmentsTask.TASK_TYPE);
@@ -365,8 +370,8 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     when(mockClusterInfoProvide.getLLCRealtimeSegmentsMetadata(REALTIME_TABLE_NAME))
         .thenReturn(Lists.newArrayList(metadata1, metadata2));
 
-    RealtimeToOfflineSegmentsTaskGenerator generator =
-        new RealtimeToOfflineSegmentsTaskGenerator(mockClusterInfoProvide);
+    RealtimeToOfflineSegmentsTaskGenerator generator = new RealtimeToOfflineSegmentsTaskGenerator();
+    generator.init(mockClusterInfoProvide);
 
     // last COMPLETED segment's endTime is less than windowEnd time. CONSUMING segment overlap. Skip task
     List<PinotTaskConfig> pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(realtimeTableConfig));
@@ -413,8 +418,8 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     when(mockClusterInfoProvide.getLLCRealtimeSegmentsMetadata(REALTIME_TABLE_NAME))
         .thenReturn(Lists.newArrayList(metadata1));
 
-    RealtimeToOfflineSegmentsTaskGenerator generator =
-        new RealtimeToOfflineSegmentsTaskGenerator(mockClusterInfoProvide);
+    RealtimeToOfflineSegmentsTaskGenerator generator = new RealtimeToOfflineSegmentsTaskGenerator();
+    generator.init(mockClusterInfoProvide);
 
     List<PinotTaskConfig> pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(realtimeTableConfig));
     assertTrue(pinotTaskConfigs.isEmpty());

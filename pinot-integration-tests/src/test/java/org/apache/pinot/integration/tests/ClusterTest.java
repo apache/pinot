@@ -18,10 +18,8 @@
  */
 package org.apache.pinot.integration.tests;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
-
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
@@ -37,9 +35,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-
 import javax.annotation.Nullable;
-
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
@@ -54,7 +50,6 @@ import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
-import org.apache.pinot.core.requesthandler.PinotQueryRequest;
 import org.apache.pinot.common.utils.CommonConstants.Broker;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Minion;
@@ -62,8 +57,9 @@ import org.apache.pinot.common.utils.CommonConstants.Server;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.core.requesthandler.PinotQueryRequest;
 import org.apache.pinot.minion.MinionStarter;
-import org.apache.pinot.minion.events.MinionEventObserverFactory;
+import org.apache.pinot.minion.event.MinionEventObserverFactory;
 import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
@@ -77,8 +73,9 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -164,8 +161,8 @@ public abstract class ClusterTest extends ControllerTest {
     try {
       for (int i = 0; i < numServers; i++) {
         configuration.setProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR, Server.DEFAULT_INSTANCE_DATA_DIR + "-" + i);
-        configuration.setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR,
-            Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
+        configuration
+            .setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
         configuration.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, baseAdminApiPort - i);
         configuration.setProperty(Server.CONFIG_OF_NETTY_PORT, baseNettyPort + i);
         HelixServerStarter helixServerStarter = new HelixServerStarter(getHelixClusterName(), zkStr, configuration);
@@ -179,22 +176,21 @@ public abstract class ClusterTest extends ControllerTest {
 
   // NOTE: We don't allow multiple Minion instances in the same JVM because Minion uses singleton class MinionContext
   //       to manage the instance level configs
-  protected void startMinion(@Nullable Map<String, PinotTaskExecutorFactory> taskExecutorFactoryRegistry,
-      @Nullable Map<String, MinionEventObserverFactory> eventObserverFactoryRegistry) {
+  protected void startMinion(@Nullable List<PinotTaskExecutorFactory> taskExecutorFactories,
+      @Nullable List<MinionEventObserverFactory> eventObserverFactories) {
     FileUtils.deleteQuietly(new File(Minion.DEFAULT_INSTANCE_BASE_DIR));
     try {
-      _minionStarter =
-          new MinionStarter(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, new PinotConfiguration());
+      _minionStarter = new MinionStarter(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, new PinotConfiguration());
       // Register task executor factories
-      if (taskExecutorFactoryRegistry != null) {
-        for (Map.Entry<String, PinotTaskExecutorFactory> entry : taskExecutorFactoryRegistry.entrySet()) {
-          _minionStarter.registerTaskExecutorFactory(entry.getKey(), entry.getValue());
+      if (taskExecutorFactories != null) {
+        for (PinotTaskExecutorFactory taskExecutorFactory : taskExecutorFactories) {
+          _minionStarter.registerTaskExecutorFactory(taskExecutorFactory);
         }
       }
       // Register event observer factories
-      if (eventObserverFactoryRegistry != null) {
-        for (Map.Entry<String, MinionEventObserverFactory> entry : eventObserverFactoryRegistry.entrySet()) {
-          _minionStarter.registerEventObserverFactory(entry.getKey(), entry.getValue());
+      if (eventObserverFactories != null) {
+        for (MinionEventObserverFactory eventObserverFactory : eventObserverFactories) {
+          _minionStarter.registerEventObserverFactory(eventObserverFactory);
         }
       }
       _minionStarter.start();
@@ -264,11 +260,13 @@ public abstract class ClusterTest extends ControllerTest {
       if (numSegments == 1) {
         File segmentTarFile = segmentTarFiles[0];
         if (System.currentTimeMillis() % 2 == 0) {
-          assertEquals(fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, tableName).getStatusCode(),
+          assertEquals(fileUploadDownloadClient
+                  .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, tableName).getStatusCode(),
               HttpStatus.SC_OK);
         } else {
           assertEquals(
-              uploadSegmentWithOnlyMetadata(tableName, uploadSegmentHttpURI, fileUploadDownloadClient, segmentTarFile), HttpStatus.SC_OK);
+              uploadSegmentWithOnlyMetadata(tableName, uploadSegmentHttpURI, fileUploadDownloadClient, segmentTarFile),
+              HttpStatus.SC_OK);
         }
       } else {
         // Upload all segments in parallel
@@ -277,9 +275,12 @@ public abstract class ClusterTest extends ControllerTest {
         for (File segmentTarFile : segmentTarFiles) {
           futures.add(executorService.submit(() -> {
             if (System.currentTimeMillis() % 2 == 0) {
-              return fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, tableName).getStatusCode();
+              return fileUploadDownloadClient
+                  .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, tableName)
+                  .getStatusCode();
             } else {
-              return uploadSegmentWithOnlyMetadata(tableName, uploadSegmentHttpURI, fileUploadDownloadClient, segmentTarFile);
+              return uploadSegmentWithOnlyMetadata(tableName, uploadSegmentHttpURI, fileUploadDownloadClient,
+                  segmentTarFile);
             }
           }));
         }
@@ -295,14 +296,17 @@ public abstract class ClusterTest extends ControllerTest {
       FileUploadDownloadClient fileUploadDownloadClient, File segmentTarFile)
       throws IOException, HttpErrorStatusException {
     List<Header> headers = ImmutableList.of(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI,
-            "file://" + segmentTarFile.getParentFile().getAbsolutePath() + "/" + URLEncoder.encode(segmentTarFile.getName(), StandardCharsets.UTF_8.toString())),
-        new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE, FileUploadDownloadClient.FileUploadType.METADATA.toString()));
+            "file://" + segmentTarFile.getParentFile().getAbsolutePath() + "/" + URLEncoder
+                .encode(segmentTarFile.getName(), StandardCharsets.UTF_8.toString())),
+        new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
+            FileUploadDownloadClient.FileUploadType.METADATA.toString()));
     // Add table name as a request parameter
-    NameValuePair
-        tableNameValuePair = new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME, tableName);
+    NameValuePair tableNameValuePair =
+        new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME, tableName);
     List<NameValuePair> parameters = Arrays.asList(tableNameValuePair);
     return fileUploadDownloadClient
-        .uploadSegmentMetadata(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, headers, parameters, fileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS).getStatusCode();
+        .uploadSegmentMetadata(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, headers, parameters,
+            fileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS).getStatusCode();
   }
 
   public static class AvroFileSchemaKafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {

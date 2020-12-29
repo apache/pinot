@@ -18,7 +18,21 @@
  */
 package org.apache.pinot.minion.executor;
 
+import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.spi.annotations.minion.TaskExecutorFactory;
+
+
+@TaskExecutorFactory
 public class PurgeTaskExecutorFactory implements PinotTaskExecutorFactory {
+
+  @Override
+  public void init(MinionTaskZkMetadataManager zkMetadataManager) {
+  }
+
+  @Override
+  public String getTaskType() {
+    return MinionConstants.PurgeTask.TASK_TYPE;
+  }
 
   @Override
   public PinotTaskExecutor create() {

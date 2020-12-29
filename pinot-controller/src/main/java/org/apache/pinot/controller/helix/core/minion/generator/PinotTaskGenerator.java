@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix.core.minion.generator;
 
 import java.util.List;
 import org.apache.helix.task.JobConfig;
+import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 
@@ -30,23 +31,22 @@ import org.apache.pinot.spi.config.table.TableConfig;
 public interface PinotTaskGenerator {
 
   /**
+   * Initializes the task generator.
+   */
+  void init(ClusterInfoAccessor clusterInfoAccessor);
+
+  /**
    * Returns the task type of the generator.
-   *
-   * @return Task type of the generator
    */
   String getTaskType();
 
   /**
    * Generates a list of tasks to schedule based on the given table configs.
-   *
-   * @return List of tasks to schedule
    */
   List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs);
 
   /**
    * Returns the timeout in milliseconds for each task, 3600000 (1 hour) by default.
-   *
-   * @return Timeout in milliseconds for each task.
    */
   default long getTaskTimeoutMs() {
     return JobConfig.DEFAULT_TIMEOUT_PER_TASK;
@@ -54,8 +54,6 @@ public interface PinotTaskGenerator {
 
   /**
    * Returns the maximum number of concurrent tasks allowed per instance, 1 by default.
-   *
-   * @return Maximum number of concurrent tasks allowed per instance
    */
   default int getNumConcurrentTasksPerInstance() {
     return JobConfig.DEFAULT_NUM_CONCURRENT_TASKS_PER_INSTANCE;
