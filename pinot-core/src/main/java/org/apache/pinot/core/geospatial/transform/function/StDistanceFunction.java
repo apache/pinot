@@ -98,10 +98,9 @@ public class StDistanceFunction extends BaseTransformFunction {
     for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
       Geometry firstGeometry = GeometrySerializer.deserialize(firstValues[i]);
       Geometry secondGeometry = GeometrySerializer.deserialize(secondValues[i]);
-      //FIXME(why the deserialzied value lost SRID)
-//      if (GeometryUtils.isGeography(firstGeometry) != GeometryUtils.isGeography(secondGeometry)) {
-//        throw new RuntimeException("The first and second arguments shall either all be geometry or all geography");
-//      }
+      if (GeometryUtils.isGeography(firstGeometry) != GeometryUtils.isGeography(secondGeometry)) {
+        throw new RuntimeException("The first and second arguments shall either all be geometry or all geography");
+      }
       if (GeometryUtils.isGeography(secondGeometry)) {
         _results[i] = sphericalDistance(firstGeometry, secondGeometry);
       } else {
