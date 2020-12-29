@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.util.Arrays;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.core.data.manager.offline.DimensionTableDataManager;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
@@ -59,6 +60,7 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
     // e.g
     // lookupRowByPrimaryKey(['FOO']) -> (TeamID: 'foo', TeamName: 'teamName_for_foo', TeamInteger: hashCode(['foo']), ...
     //
+    when(tableManager.getPrimaryKeyColumns()).thenReturn(Arrays.asList("teamID"));
     when(tableManager.getColumnFieldSpec("teamID"))
         .thenReturn(new DimensionFieldSpec("teamID", FieldSpec.DataType.STRING, true));
     when(tableManager.getColumnFieldSpec("teamName"))
@@ -300,6 +302,7 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
     for (Map.Entry<String, FieldSpec.DataType> table : testTables.entrySet()) {
       DimensionTableDataManager mgr = mock(DimensionTableDataManager.class);
       DimensionTableDataManager.registerDimensionTable(table.getKey(), mgr);
+      when(mgr.getPrimaryKeyColumns()).thenReturn(Arrays.asList("primaryColumn"));
       when(mgr.getColumnFieldSpec("primaryColumn"))
           .thenReturn(new DimensionFieldSpec("primaryColumn", table.getValue(), true));
       when(mgr.getColumnFieldSpec("lookupColumn"))

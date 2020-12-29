@@ -20,6 +20,7 @@ package org.apache.pinot.core.data.manager.offline;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -166,5 +167,9 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
 
   public FieldSpec getColumnFieldSpec(String columnName) {
     return _tableSchema.getFieldSpecFor(columnName);
+  }
+
+  public List<String> getPrimaryKeyColumns() {
+    return new ArrayList<>(_primaryKeyColumns);
   }
 }
