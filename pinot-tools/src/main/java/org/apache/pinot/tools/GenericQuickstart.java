@@ -106,13 +106,13 @@ public class GenericQuickstart {
 
     Runtime.getRuntime().addShutdownHook(new Thread(() -> {
       try {
-        printStatus(Color.GREEN, "***** Shutting down GenericQuickStart *****");
+        printStatus(Color.GREEN, "***** Shutting down QuickStart cluster *****");
         runner.stop();
         _kafkaStarter.stop();
         ZkStarter.stopLocalZkServer(_zookeeperInstance);
 //        FileUtils.deleteDirectory(_tableDirectory);
       } catch (Exception e) {
-        LOGGER.error("Caught exception in shutting down GenericQuickStart QuickStart", e);
+        LOGGER.error("Caught exception in shutting down QuickStart cluster", e);
       }
     }));
 

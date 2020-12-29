@@ -101,6 +101,10 @@ public class FilterPlanNode implements PlanNode {
           .equals(RangePredicate.UNBOUNDED)) {
         return false;
       }
+      if (function.getArguments().get(0).getType() != ExpressionContext.Type.IDENTIFIER) {
+        // TODO: handle nested geography/geometry conversion functions
+        return false;
+      }
       String columnName = function.getArguments().get(0).getIdentifier();
       DataSource dataSource = _indexSegment.getDataSource(columnName);
       return dataSource.getH3Index() != null;
