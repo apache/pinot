@@ -170,6 +170,6 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
   }
 
   public List<String> getPrimaryKeyColumns() {
-    return new ArrayList<>(_primaryKeyColumns);
+    return _primaryKeyColumns;
   }
 }

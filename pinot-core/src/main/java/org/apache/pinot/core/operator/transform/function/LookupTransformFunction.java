@@ -117,23 +117,22 @@ public class LookupTransformFunction extends BaseTransformFunction {
     // Validate lookup table and relevant columns
     _dataManager = DimensionTableDataManager.getInstanceByTableName(_dimTableName);
     Preconditions.checkArgument(_dataManager != null,
-            String.format("Dimension table does not exist: %s", _dimTableName));
+        "Dimension table does not exist: %s", _dimTableName);
 
     _lookupColumnFieldSpec = _dataManager.getColumnFieldSpec(_dimColumnName);
     Preconditions.checkArgument(_lookupColumnFieldSpec != null,
-        String.format("Column does not exist in dimension table: %s:%s", _dimTableName, _dimColumnName));
+        "Column does not exist in dimension table: %s:%s", _dimTableName, _dimColumnName);
 
     for (String joinKey : _joinKeys) {
       FieldSpec pkColumnSpec = _dataManager.getColumnFieldSpec(joinKey);
       Preconditions.checkArgument(pkColumnSpec != null,
-          String.format("Primary key column doesn't exist in dimension table: %s:%s", _dimTableName, joinKey));
+          "Primary key column doesn't exist in dimension table: %s:%s", _dimTableName, joinKey);
       _joinValueFieldSpecs.add(pkColumnSpec);
     }
 
     List<String> tablePrimaryKeyColumns = _dataManager.getPrimaryKeyColumns();
     Preconditions.checkArgument(_joinKeys.equals(tablePrimaryKeyColumns),
-        String.format("Provided join keys (%s) must be the same as table primary keys: %s", _joinKeys,
-            tablePrimaryKeyColumns));
+        "Provided join keys (%s) must be the same as table primary keys: %s", _joinKeys, tablePrimaryKeyColumns);
   }
 
   @Override
@@ -146,30 +145,30 @@ public class LookupTransformFunction extends BaseTransformFunction {
     int numPkColumns = _joinKeys.size();
     int numDocuments = projectionBlock.getNumDocs();
     Object[][] pkColumns = new Object[numPkColumns][];
-    for (int i = 0; i < numPkColumns; i++) {
-      FieldSpec.DataType colType = _joinValueFieldSpecs.get(i).getDataType();
-      TransformFunction tf = _joinValueFunctions.get(i);
+    for (int c = 0; c < numPkColumns; c++) {
+      FieldSpec.DataType colType = _joinValueFieldSpecs.get(c).getDataType();
+      TransformFunction tf = _joinValueFunctions.get(c);
       switch (colType) {
-        case STRING:
-          pkColumns[i] = tf.transformToStringValuesSV(projectionBlock);
-          break;
         case INT:
-          pkColumns[i] = ArrayUtils.toObject(tf.transformToIntValuesSV(projectionBlock));
+          pkColumns[c] = ArrayUtils.toObject(tf.transformToIntValuesSV(projectionBlock));
           break;
         case LONG:
-          pkColumns[i] = ArrayUtils.toObject(tf.transformToLongValuesSV(projectionBlock));
+          pkColumns[c] = ArrayUtils.toObject(tf.transformToLongValuesSV(projectionBlock));
           break;
         case FLOAT:
-          pkColumns[i] = ArrayUtils.toObject(tf.transformToFloatValuesSV(projectionBlock));
+          pkColumns[c] = ArrayUtils.toObject(tf.transformToFloatValuesSV(projectionBlock));
           break;
         case DOUBLE:
-          pkColumns[i] = ArrayUtils.toObject(tf.transformToDoubleValuesSV(projectionBlock));
+          pkColumns[c] = ArrayUtils.toObject(tf.transformToDoubleValuesSV(projectionBlock));
+          break;
+        case STRING:
+          pkColumns[c] = tf.transformToStringValuesSV(projectionBlock);
           break;
         case BYTES:
           byte[][] primitiveValues = tf.transformToBytesValuesSV(projectionBlock);
-          pkColumns[i] = new Byte[numDocuments][];
-          for (int n = 0; n < numDocuments; n++) {
-            pkColumns[i][n] = ArrayUtils.toObject(primitiveValues[n]);
+          pkColumns[c] = new Byte[numDocuments][];
+          for (int i = 0; i < numDocuments; i++) {
+            pkColumns[c][i] = ArrayUtils.toObject(primitiveValues[i]);
           }
           break;
         default:
@@ -178,11 +177,11 @@ public class LookupTransformFunction extends BaseTransformFunction {
     }
 
     Object[] resultSet = new Object[numDocuments];
+    Object[] pkValues = new Object[numPkColumns];
     for (int i = 0; i < numDocuments; i++) {
       // prepare pk
-      Object[] pkValues = new Object[numPkColumns];
-      for (int j = 0; j < numPkColumns; j++) {
-        pkValues[j] = pkColumns[j][i];
+      for (int c = 0; c < numPkColumns; c++) {
+        pkValues[c] = pkColumns[c][i];
       }
       // lookup
       GenericRow row = _dataManager.lookupRowByPrimaryKey(new PrimaryKey(pkValues));
