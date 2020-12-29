@@ -1786,7 +1786,7 @@ public class PinotHelixResourceManager {
    *  3. Invoke enablePartition on the segment
    */
   public void resetSegment(String tableNameWithType, String segmentName, long externalViewWaitTimeMs)
-      throws InterruptedException {
+      throws InterruptedException, TimeoutException {
     IdealState idealState = getTableIdealState(tableNameWithType);
     Preconditions.checkState(idealState != null, "Could not find ideal state for table: %s", tableNameWithType);
     ExternalView externalView = getTableExternalView(tableNameWithType);
@@ -1798,13 +1798,15 @@ public class PinotHelixResourceManager {
 
     // First, disable or reset the segment
     for (String instance : instanceSet) {
-      if (externalViewStateMap == null || SegmentStateModel.ERROR.equals(externalViewStateMap.get(instance))) {
-        LOGGER.info("Resetting segment: {} of table: {}", segmentName, tableNameWithType);
-        _helixAdmin.resetPartition(_helixClusterName, instance, tableNameWithType, Lists.newArrayList(segmentName));
-      } else {
+      if (externalViewStateMap == null || !SegmentStateModel.ERROR.equals(externalViewStateMap.get(instance))) {
         LOGGER.info("Disabling segment: {} of table: {}", segmentName, tableNameWithType);
+        // enablePartition takes a segment which is NOT in ERROR state, to OFFLINE state
         _helixAdmin
             .enablePartition(false, _helixClusterName, instance, tableNameWithType, Lists.newArrayList(segmentName));
+      } else {
+        LOGGER.info("Resetting segment: {} of table: {}", segmentName, tableNameWithType);
+        // resetPartition takes a segment which is in ERROR state, to OFFLINE state
+        _helixAdmin.resetPartition(_helixClusterName, instance, tableNameWithType, Lists.newArrayList(segmentName));
       }
     }
 
@@ -1825,7 +1827,7 @@ public class PinotHelixResourceManager {
       Thread.sleep(EXTERNAL_VIEW_CHECK_INTERVAL_MS);
     }
     if (!instancesToCheck.isEmpty()) {
-      throw new IllegalStateException(String.format(
+      throw new TimeoutException(String.format(
           "Timed out waiting for external view to stabilize after call to disable/reset segment: %s of table: %s. Skipping enable of segment.",
           segmentName, tableNameWithType));
     }
@@ -1845,7 +1847,7 @@ public class PinotHelixResourceManager {
    * 3. Invoke enablePartition on the segments
    */
   public void resetAllSegments(String tableNameWithType, long externalViewWaitTimeMs)
-      throws InterruptedException {
+      throws InterruptedException, TimeoutException {
     IdealState idealState = getTableIdealState(tableNameWithType);
     Preconditions.checkState(idealState != null, "Could not find ideal state for table: %s", tableNameWithType);
     ExternalView externalView = getTableExternalView(tableNameWithType);
@@ -1859,10 +1861,10 @@ public class PinotHelixResourceManager {
       Set<String> instanceSet = idealState.getInstanceSet(segmentName);
       Map<String, String> externalViewStateMap = externalView.getStateMap(segmentName);
       for (String instance : instanceSet) {
-        if (externalViewStateMap == null || SegmentStateModel.ERROR.equals(externalViewStateMap.get(instance))) {
-          instanceToResetSegmentsMap.computeIfAbsent(instance, i -> new HashSet<>()).add(segmentName);
-        } else {
+        if (externalViewStateMap == null || !SegmentStateModel.ERROR.equals(externalViewStateMap.get(instance))) {
           instanceToDisableSegmentsMap.computeIfAbsent(instance, i -> new HashSet<>()).add(segmentName);
+        } else {
+          instanceToResetSegmentsMap.computeIfAbsent(instance, i -> new HashSet<>()).add(segmentName);
         }
       }
       segmentInstancesToCheck.put(segmentName, new HashSet<>(instanceSet));
@@ -1871,9 +1873,11 @@ public class PinotHelixResourceManager {
     // First, disable/reset the segments
     LOGGER.info("Disabling/resetting segments of table: {}", tableNameWithType);
     for (Map.Entry<String, Set<String>> entry : instanceToResetSegmentsMap.entrySet()) {
+      // resetPartition takes a segment which is in ERROR state, to OFFLINE state
       _helixAdmin
           .resetPartition(_helixClusterName, entry.getKey(), tableNameWithType, Lists.newArrayList(entry.getValue()));
     } for (Map.Entry<String, Set<String>> entry : instanceToDisableSegmentsMap.entrySet()) {
+      // enablePartition takes a segment which is NOT in ERROR state, to OFFLINE state
       _helixAdmin.enablePartition(false, _helixClusterName, entry.getKey(), tableNameWithType,
           Lists.newArrayList(entry.getValue()));
     }
@@ -1909,7 +1913,7 @@ public class PinotHelixResourceManager {
       Thread.sleep(EXTERNAL_VIEW_CHECK_INTERVAL_MS);
     }
     if (!segmentInstancesToCheck.isEmpty()) {
-      throw new IllegalStateException(String.format(
+      throw new TimeoutException(String.format(
           "Timed out waiting for external view to stabilize after call to disable/reset segments. Skipping enable of segments of table: %s",
           tableNameWithType));
     }

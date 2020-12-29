@@ -33,6 +33,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -375,10 +376,14 @@ public class PinotSegmentRestletResource {
           maxWaitTimeMs > 0 ? maxWaitTimeMs : _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
       return new SuccessResponse(
           String.format("Successfully reset segment: %s of table: %s", segmentName, tableNameWithType));
+    } catch (IllegalStateException e) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Failed to reset segments in table: %s. %s", tableNameWithType, e.getMessage()),
+          Status.NOT_FOUND);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           String.format("Failed to reset segment: %s of table: %s. %s", segmentName, tableNameWithType, e.getMessage()),
-          Status.NOT_FOUND);
+          Status.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -400,10 +405,14 @@ public class PinotSegmentRestletResource {
       _pinotHelixResourceManager.resetAllSegments(tableNameWithType,
           maxWaitTimeMs > 0 ? maxWaitTimeMs : _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
       return new SuccessResponse(String.format("Successfully reset all segments of table: %s", tableNameWithType));
-    } catch (Exception e) {
+    } catch (IllegalStateException e) {
       throw new ControllerApplicationException(LOGGER,
           String.format("Failed to reset segments in table: %s. %s", tableNameWithType, e.getMessage()),
           Status.NOT_FOUND);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Failed to reset segments in table: %s. %s", tableNameWithType, e.getMessage()),
+          Status.INTERNAL_SERVER_ERROR);
     }
   }
 
