@@ -362,23 +362,22 @@ public class PinotSegmentRestletResource {
   @POST
   @Path("segments/{tableNameWithType}/{segmentName}/reset")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Resets a segment by first disabling it, waiting for external view to stabilize, and finally enabling it again",
-      notes = "Resets a segment by disabling and then enabling a segment")
+  @ApiOperation(value = "Resets a segment by first disabling it, waiting for external view to stabilize, and finally enabling it again", notes = "Resets a segment by disabling and then enabling the segment")
   public SuccessResponse resetSegment(
       @ApiParam(value = "Name of the table with type", required = true) @PathParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
-      @ApiParam(value = "Time in millis to wait for external view to converge") @QueryParam("externalViewWaitTimeMs") long externalViewWaitTimeMs) {
+      @ApiParam(value = "Maximum time in milliseconds to wait for reset to be completed. By default, uses serverAdminRequestTimeout") @QueryParam("maxWaitTimeMs") long maxWaitTimeMs) {
     segmentName = URIUtils.decode(segmentName);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     try {
       Preconditions.checkState(tableType != null, "Must provide table name with type: %s", tableNameWithType);
       _pinotHelixResourceManager.resetSegment(tableNameWithType, segmentName,
-          externalViewWaitTimeMs > 0 ? externalViewWaitTimeMs
-              : _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
-      return new SuccessResponse("Successfully invoked segment reset");
+          maxWaitTimeMs > 0 ? maxWaitTimeMs : _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+      return new SuccessResponse(
+          String.format("Successfully reset segment: %s of table: %s", segmentName, tableNameWithType));
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
-          String.format("Failed to reset segment: %s in table: %s. %s", segmentName, tableNameWithType, e.getMessage()),
+          String.format("Failed to reset segment: %s of table: %s. %s", segmentName, tableNameWithType, e.getMessage()),
           Status.NOT_FOUND);
     }
   }
@@ -391,17 +390,16 @@ public class PinotSegmentRestletResource {
   @POST
   @Path("segments/{tableNameWithType}/reset")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Resets all segments of the table, by first disabling them, waiting for external view to stabilize, and finally enabling the segments",
-      notes = "Resets a segment by disabling and then enabling a segment")
+  @ApiOperation(value = "Resets all segments of the table, by first disabling them, waiting for external view to stabilize, and finally enabling the segments", notes = "Resets a segment by disabling and then enabling a segment")
   public SuccessResponse resetAllSegments(
       @ApiParam(value = "Name of the table with type", required = true) @PathParam("tableNameWithType") String tableNameWithType,
-      @ApiParam(value = "Time in millis to wait for external view to converge") @QueryParam("externalViewWaitTimeMs") long externalViewWaitTimeMs) {
+      @ApiParam(value = "Maximum time in milliseconds to wait for reset to be completed. By default, uses serverAdminRequestTimeout") @QueryParam("maxWaitTimeMs") long maxWaitTimeMs) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     try {
       Preconditions.checkState(tableType != null, "Must provide table name with type: %s", tableNameWithType);
-      _pinotHelixResourceManager.resetAllSegments(tableNameWithType, externalViewWaitTimeMs > 0 ? externalViewWaitTimeMs
-          : _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
-      return new SuccessResponse("Successfully invoked segment reset");
+      _pinotHelixResourceManager.resetAllSegments(tableNameWithType,
+          maxWaitTimeMs > 0 ? maxWaitTimeMs : _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+      return new SuccessResponse(String.format("Successfully reset all segments of table: %s", tableNameWithType));
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           String.format("Failed to reset segments in table: %s. %s", tableNameWithType, e.getMessage()),
