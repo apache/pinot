@@ -101,7 +101,7 @@ public class StDistanceFunction extends BaseTransformFunction {
       if (GeometryUtils.isGeography(firstGeometry) != GeometryUtils.isGeography(secondGeometry)) {
         throw new RuntimeException("The first and second arguments shall either all be geometry or all geography");
       }
-      if (GeometryUtils.isGeography(secondGeometry)) {
+      if (GeometryUtils.isGeography(firstGeometry)) {
         _results[i] = sphericalDistance(firstGeometry, secondGeometry);
       } else {
         _results[i] =
