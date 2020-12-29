@@ -100,7 +100,8 @@ public class LookupTransformFunction extends BaseTransformFunction {
     _dimColumnName = ((LiteralTransformFunction) dimColumnFunction).getLiteral();
 
     List<TransformFunction> joinArguments = arguments.subList(2, arguments.size());
-    for (int i = 0; i < joinArguments.size() / 2; i++) {
+    int numJoinArguments = joinArguments.size();
+    for (int i = 0; i < numJoinArguments / 2; i++) {
       TransformFunction dimJoinKeyFunction = joinArguments.get((i * 2));
       Preconditions.checkArgument(dimJoinKeyFunction instanceof LiteralTransformFunction,
           "JoinKey argument must be a literal(string) representing the primary key for the dimension table");
