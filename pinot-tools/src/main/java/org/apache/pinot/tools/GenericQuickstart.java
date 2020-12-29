@@ -129,12 +129,9 @@ public class GenericQuickstart {
 
   public static void main(String[] args)
       throws Exception {
-    String tableDirectoryPath ="/Users/yupeng/gocode/src/code.uber.internal/data/incubator-pinot/pinot-tools/src/main/resources/examples/batch/starbucksStores";
-//    CSVRecordReader reader = new CSVRecordReader();
-//    reader.init(new File(tableDirectoryPath, "rawdata/data.csv"), Sets.newHashSet("lat", "long", "name", "address"), null);
-//    while (reader.hasNext()) {
-//      System.out.println("reader.next() = " + reader.next());
-//    }
+    ClassLoader classLoader = GenericQuickstart.class.getClassLoader();
+    URL resource = classLoader.getResource("examples/batch/starbucksStores");
+    String tableDirectoryPath = resource.getPath();
 
     GenericQuickstart quickstart = new GenericQuickstart(
         tableDirectoryPath,
