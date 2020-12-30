@@ -21,6 +21,7 @@ package org.apache.pinot.core.segment.creator;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.Map;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.spi.data.Schema;
@@ -31,7 +32,7 @@ import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 /**
  * Interface for segment creators, which create an index over a set of rows and writes the resulting index to disk.
  */
-public interface SegmentCreator extends Closeable {
+public interface SegmentCreator extends Closeable, Serializable {
 
   /**
    * Initializes the segment creation.

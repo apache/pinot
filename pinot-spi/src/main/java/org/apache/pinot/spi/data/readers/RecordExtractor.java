@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.data.readers;
 
+import java.io.Serializable;
 import java.util.Set;
 import javax.annotation.Nullable;
 
@@ -29,7 +30,7 @@ import javax.annotation.Nullable;
  * 3) Nested/Complex fields (e.g. json maps, avro maps, avro records) become Map<Object, Object>
  * @param <T> The format of the input record
  */
-public interface RecordExtractor<T> {
+public interface RecordExtractor<T> extends Serializable {
 
   /**
    * Initialize the record extractor with its config

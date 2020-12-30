@@ -28,6 +28,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -59,7 +60,7 @@ import static org.apache.pinot.spi.data.FieldSpec.DataType.STRING;
  */
 @SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
-public final class Schema {
+public final class Schema implements Serializable {
   private static final Logger LOGGER = LoggerFactory.getLogger(Schema.class);
 
   private String _schemaName;
@@ -73,7 +74,7 @@ public final class Schema {
   private List<String> _primaryKeyColumns;
 
   // Json ignored fields
-  private transient final Map<String, FieldSpec> _fieldSpecMap = new HashMap<>();
+  private final Map<String, FieldSpec> _fieldSpecMap = new HashMap<>();
   private transient final List<String> _dimensionNames = new ArrayList<>();
   private transient final List<String> _metricNames = new ArrayList<>();
   private transient final List<String> _dateTimeNames = new ArrayList<>();

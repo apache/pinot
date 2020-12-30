@@ -21,12 +21,11 @@ package org.apache.pinot.spi.data;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
+import java.io.Serializable;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.joda.time.DateTime;
-import org.joda.time.format.DateTimeFormat;
 
 
 /**
@@ -47,7 +46,7 @@ import org.joda.time.format.DateTimeFormat;
  */
 @SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class TimeGranularitySpec {
+public class TimeGranularitySpec implements Serializable {
   private static final int DEFAULT_TIME_UNIT_SIZE = 1;
   private static final String DEFAULT_TIME_FORMAT = TimeFormat.EPOCH.toString();
   private static final String COLON_SEPARATOR = ":";
