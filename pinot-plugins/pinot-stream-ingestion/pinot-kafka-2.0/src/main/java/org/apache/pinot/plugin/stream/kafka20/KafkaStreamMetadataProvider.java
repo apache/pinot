@@ -21,11 +21,15 @@ package org.apache.pinot.plugin.stream.kafka20;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.OffsetCriteria;
+import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
@@ -42,8 +46,25 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   }
 
   @Override
+  @Deprecated
   public int fetchPartitionCount(long timeoutMillis) {
     return _consumer.partitionsFor(_topic, Duration.ofMillis(timeoutMillis)).size();
+  }
+
+  /**
+   * Fetch the partitionGroupMetadata list.
+   * @param currentPartitionGroupsMetadata In case of Kafka, each partition group contains a single partition.
+   *                                       Hence current partition groups are not needed to compute the new partition groups
+   */
+  @Override
+  public List<PartitionGroupMetadata> getPartitionGroupMetadataList(
+      @Nullable List<PartitionGroupMetadata> currentPartitionGroupsMetadata, long timeoutMillis) {
+    int partitionCount = _consumer.partitionsFor(_topic, Duration.ofMillis(timeoutMillis)).size();
+    List<PartitionGroupMetadata> partitionGroupMetadataList = new ArrayList<>(partitionCount);
+    for (int i = 0; i < partitionCount; i++) {
+      partitionGroupMetadataList.add(new KafkaPartitionGroupMetadata(i));
+    }
+    return partitionGroupMetadataList;
   }
 
   public synchronized long fetchPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis)

@@ -33,16 +33,16 @@ public class PartitionOffsetFetcher implements Callable<Boolean> {
 
   private final String _topicName;
   private final OffsetCriteria _offsetCriteria;
-  private final int _partitionId;
+  private final int _partitionGroupId;
 
   private Exception _exception = null;
   private StreamPartitionMsgOffset _offset;
   private StreamConsumerFactory _streamConsumerFactory;
   StreamConfig _streamConfig;
 
-  public PartitionOffsetFetcher(final OffsetCriteria offsetCriteria, int partitionId, StreamConfig streamConfig) {
+  public PartitionOffsetFetcher(final OffsetCriteria offsetCriteria, int partitionGroupId, StreamConfig streamConfig) {
     _offsetCriteria = offsetCriteria;
-    _partitionId = partitionId;
+    _partitionGroupId = partitionGroupId;
     _streamConfig = streamConfig;
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
     _topicName = streamConfig.getTopicName();
@@ -64,18 +64,19 @@ public class PartitionOffsetFetcher implements Callable<Boolean> {
   @Override
   public Boolean call()
       throws Exception {
-    String clientId = PartitionOffsetFetcher.class.getSimpleName() + "-" + _topicName + "-" + _partitionId;
+    String clientId = PartitionOffsetFetcher.class.getSimpleName() + "-" + _topicName + "-" + _partitionGroupId;
     try (StreamMetadataProvider streamMetadataProvider = _streamConsumerFactory
-        .createPartitionMetadataProvider(clientId, _partitionId)) {
+        .createPartitionMetadataProvider(clientId, _partitionGroupId)) {
       _offset =
           streamMetadataProvider.fetchStreamPartitionOffset(_offsetCriteria, STREAM_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
       if (_exception != null) {
         LOGGER.info("Successfully retrieved offset({}) for stream topic {} partition {}", _offset, _topicName,
-            _partitionId);
+            _partitionGroupId);
       }
       return Boolean.TRUE;
     } catch (TransientConsumerException e) {
-      LOGGER.warn("Temporary exception when fetching offset for topic {} partition {}:{}", _topicName, _partitionId,
+      LOGGER.warn("Temporary exception when fetching offset for topic {} partition {}:{}", _topicName,
+          _partitionGroupId,
           e.getMessage());
       _exception = e;
       return Boolean.FALSE;

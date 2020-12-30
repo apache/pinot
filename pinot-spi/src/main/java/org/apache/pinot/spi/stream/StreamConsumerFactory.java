@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.spi.stream;
 
-import java.util.List;
 import java.util.Set;
 
 
@@ -42,6 +41,7 @@ public abstract class StreamConsumerFactory {
    * @param partition the partition id of the partition for which this consumer is being created
    * @return
    */
+  @Deprecated
   public abstract PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition);
 
   /**
@@ -74,10 +74,6 @@ public abstract class StreamConsumerFactory {
     return new LongMsgOffsetFactory();
   }
 
-  // takes the current state of partition groups (groupings of shards, the state of the consumption) and creates the new state
-  public abstract List<PartitionGroupMetadata> getPartitionGroupMetadataList(
-      List<PartitionGroupMetadata> currentPartitionGroupsMetadata);
-
   // creates a consumer which consumes from a partition group
-  public abstract PartitionGroupConsumer createConsumer(PartitionGroupMetadata metadata);
+  public abstract PartitionGroupConsumer createPartitionGroupConsumer(PartitionGroupMetadata metadata);
 }

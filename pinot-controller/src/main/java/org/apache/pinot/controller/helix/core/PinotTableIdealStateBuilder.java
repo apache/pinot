@@ -32,7 +32,8 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.stream.PartitionCountFetcher;
+import org.apache.pinot.spi.stream.PartitionGroupMetadata;
+import org.apache.pinot.spi.stream.PartitionGroupMetadataFetcher;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -115,13 +116,15 @@ public class PinotTableIdealStateBuilder {
     pinotLLCRealtimeSegmentManager.setUpNewTable(realtimeTableConfig, idealState);
   }
 
-  public static int getPartitionCount(StreamConfig streamConfig) {
-    PartitionCountFetcher partitionCountFetcher = new PartitionCountFetcher(streamConfig);
+  public static List<PartitionGroupMetadata> getPartitionGroupMetadataList(StreamConfig streamConfig,
+      List<PartitionGroupMetadata> currentPartitionGroupMetadataList) {
+    PartitionGroupMetadataFetcher partitionGroupMetadataFetcher =
+        new PartitionGroupMetadataFetcher(streamConfig, currentPartitionGroupMetadataList);
     try {
-      RetryPolicies.noDelayRetryPolicy(3).attempt(partitionCountFetcher);
-      return partitionCountFetcher.getPartitionCount();
+      RetryPolicies.noDelayRetryPolicy(3).attempt(partitionGroupMetadataFetcher);
+      return partitionGroupMetadataFetcher.getPartitionGroupMetadataList();
     } catch (Exception e) {
-      Exception fetcherException = partitionCountFetcher.getException();
+      Exception fetcherException = partitionGroupMetadataFetcher.getException();
       LOGGER.error("Could not get partition count for {}", streamConfig.getTopicName(), fetcherException);
       throw new RuntimeException(fetcherException);
     }

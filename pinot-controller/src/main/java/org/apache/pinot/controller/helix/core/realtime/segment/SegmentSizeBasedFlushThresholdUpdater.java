@@ -102,7 +102,7 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
     // less same characteristics at any one point in time).
     // However, when we start a new table or change controller mastership, we can have any partition completing first.
     // It is best to learn the ratio as quickly as we can, so we allow any partition to supply the value.
-    if (new LLCSegmentName(newSegmentName).getPartitionId() == 0 || _latestSegmentRowsToSizeRatio == 0) {
+    if (new LLCSegmentName(newSegmentName).getPartitionGroupId() == 0 || _latestSegmentRowsToSizeRatio == 0) {
       if (_latestSegmentRowsToSizeRatio > 0) {
         _latestSegmentRowsToSizeRatio =
             CURRENT_SEGMENT_RATIO_WEIGHT * currentRatio + PREVIOUS_SEGMENT_RATIO_WEIGHT * _latestSegmentRowsToSizeRatio;

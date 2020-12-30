@@ -19,7 +19,6 @@
 package org.apache.pinot.integration.tests;
 
 import java.lang.reflect.Constructor;
-import java.util.List;
 import java.util.Random;
 import java.util.Set;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -122,13 +121,7 @@ public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeCluster
     }
 
     @Override
-    public List<PartitionGroupMetadata> getPartitionGroupMetadataList(
-        List<PartitionGroupMetadata> currentPartitionGroupsMetadata) {
-      return null;
-    }
-
-    @Override
-    public PartitionGroupConsumer createConsumer(PartitionGroupMetadata metadata) {
+    public PartitionGroupConsumer createPartitionGroupConsumer(PartitionGroupMetadata metadata) {
       return null;
     }
   }

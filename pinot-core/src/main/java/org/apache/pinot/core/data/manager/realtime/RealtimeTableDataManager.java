@@ -36,6 +36,7 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
@@ -89,7 +90,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   // In some streams, it's possible that having multiple consumers (with the same consumer name on the same host) consuming from the same stream partition can lead to bugs.
   // The semaphores will stay in the hash map even if the consuming partitions move to a different host.
   // We expect that there will be a small number of semaphores, but that may be ok.
-  private final Map<Integer, Semaphore> _partitionIdToSemaphoreMap = new ConcurrentHashMap<>();
+  private final Map<Integer, Semaphore> _partitionGroupIdToSemaphoreMap = new ConcurrentHashMap<>();
 
   // The old name of the stats file used to be stats.ser which we changed when we moved all packages
   // from com.linkedin to org.apache because of not being able to deserialize the old files using the newer classes
@@ -274,7 +275,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       llcSegmentName = new LLCSegmentName(segmentName);
       if (_tableUpsertMetadataManager != null) {
         partitionUpsertMetadataManager =
-            _tableUpsertMetadataManager.getOrCreatePartitionManager(llcSegmentName.getPartitionId());
+            _tableUpsertMetadataManager.getOrCreatePartitionManager(llcSegmentName.getPartitionGroupId());
       }
     }
 
@@ -307,11 +308,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         }
 
         // Generates only one semaphore for every partitionId
-        int partitionId = llcSegmentName.getPartitionId();
-        _partitionIdToSemaphoreMap.putIfAbsent(partitionId, new Semaphore(1));
+        int partitionGroupId = llcSegmentName.getPartitionGroupId();
+        _partitionGroupIdToSemaphoreMap.putIfAbsent(partitionGroupId, new Semaphore(1));
         manager =
             new LLRealtimeSegmentDataManager(realtimeSegmentZKMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
-                indexLoadingConfig, schema, llcSegmentName, _partitionIdToSemaphoreMap.get(partitionId), _serverMetrics,
+                indexLoadingConfig, schema, llcSegmentName, _partitionGroupIdToSemaphoreMap.get(partitionGroupId), _serverMetrics,
                 partitionUpsertMetadataManager);
       }
       _logger.info("Initialize RealtimeSegmentDataManager - " + segmentName);
@@ -336,7 +337,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     columnToReaderMap.put(_timeColumnName, new PinotSegmentColumnReader(immutableSegment, _timeColumnName));
     int numTotalDocs = immutableSegment.getSegmentMetadata().getTotalDocs();
     String segmentName = immutableSegment.getSegmentName();
-    int partitionId = new LLCSegmentName(immutableSegment.getSegmentName()).getPartitionId();
+    int partitionId = new LLCSegmentName(immutableSegment.getSegmentName()).getPartitionGroupId();
     PartitionUpsertMetadataManager partitionUpsertMetadataManager =
         _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionId);
     int numPrimaryKeyColumns = _primaryKeyColumns.size();

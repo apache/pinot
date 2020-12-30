@@ -30,6 +30,8 @@ import java.util.Map;
 import java.util.Random;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
@@ -48,6 +50,7 @@ import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignme
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import org.apache.pinot.controller.util.SegmentCompletionUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.core.realtime.impl.fakestream.FakePartitionGroupMetadata;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -57,6 +60,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.OffsetCriteria;
+import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -333,7 +337,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       assertTrue(oldSegmentZKMetadataMap.containsKey(segmentName));
       assertTrue(segmentZKMetadataMap.containsKey(segmentName));
       assertEquals(segmentZKMetadataMap.get(segmentName), oldSegmentZKMetadataMap.get(segmentName));
-      oldNumPartitions = Math.max(oldNumPartitions, new LLCSegmentName(segmentName).getPartitionId() + 1);
+      oldNumPartitions = Math.max(oldNumPartitions, new LLCSegmentName(segmentName).getPartitionGroupId() + 1);
     }
 
     // Check that for new partitions, each partition should have exactly 1 new segment in CONSUMING state, and metadata
@@ -341,7 +345,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     Map<Integer, List<String>> partitionIdToSegmentsMap = new HashMap<>();
     for (Map.Entry<String, Map<String, String>> entry : instanceStatesMap.entrySet()) {
       String segmentName = entry.getKey();
-      int partitionId = new LLCSegmentName(segmentName).getPartitionId();
+      int partitionId = new LLCSegmentName(segmentName).getPartitionGroupId();
       partitionIdToSegmentsMap.computeIfAbsent(partitionId, k -> new ArrayList<>()).add(segmentName);
     }
     for (int partitionId = oldNumPartitions; partitionId < segmentManager._numPartitions; partitionId++) {
@@ -579,7 +583,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       if (instanceStateMap.containsValue(SegmentStateModel.ONLINE) || instanceStateMap.containsValue(
           SegmentStateModel.CONSUMING)) {
         LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
-        int partitionsId = llcSegmentName.getPartitionId();
+        int partitionsId = llcSegmentName.getPartitionGroupId();
         Map<Integer, String> sequenceNumberToSegmentMap = partitionIdToSegmentsMap.get(partitionsId);
         int sequenceNumber = llcSegmentName.getSequenceNumber();
         assertFalse(sequenceNumberToSegmentMap.containsKey(sequenceNumber));
@@ -910,12 +914,12 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    int getNumPartitions(StreamConfig streamConfig) {
-      return _numPartitions;
+    List<PartitionGroupMetadata> getPartitionGroupMetadataList(StreamConfig streamConfig, List<PartitionGroupMetadata> currentPartitionGroupMetadataList) {
+      return IntStream.range(0, _numPartitions).mapToObj(FakePartitionGroupMetadata::new).collect(Collectors.toList());
     }
 
     @Override
-    LongMsgOffset getPartitionOffset(StreamConfig streamConfig, OffsetCriteria offsetCriteria, int partitionId) {
+    LongMsgOffset getPartitionOffset(StreamConfig streamConfig, OffsetCriteria offsetCriteria, int partitionGroupId) {
       // The criteria for this test should always be SMALLEST (for default streaming config and new added partitions)
       assertTrue(offsetCriteria.isSmallest());
       return PARTITION_OFFSET;

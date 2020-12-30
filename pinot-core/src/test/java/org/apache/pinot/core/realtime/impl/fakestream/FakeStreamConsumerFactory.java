@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.realtime.impl.fakestream;
 
-import java.util.List;
 import java.util.Set;
 import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -69,14 +68,9 @@ public class FakeStreamConsumerFactory extends StreamConsumerFactory {
     return new FakeStreamMetadataProvider(_streamConfig);
   }
 
-  @Override
-  public List<PartitionGroupMetadata> getPartitionGroupMetadataList(
-      List<PartitionGroupMetadata> currentPartitionGroupsMetadata) {
-    return null;
-  }
 
   @Override
-  public PartitionGroupConsumer createConsumer(PartitionGroupMetadata metadata) {
+  public PartitionGroupConsumer createPartitionGroupConsumer(PartitionGroupMetadata metadata) {
     return null;
   }
 
@@ -93,7 +87,7 @@ public class FakeStreamConsumerFactory extends StreamConsumerFactory {
 
     // stream metadata provider
     StreamMetadataProvider streamMetadataProvider = streamConsumerFactory.createStreamMetadataProvider(clientId);
-    int partitionCount = streamMetadataProvider.fetchPartitionCount(10_000);
+    int partitionCount = streamMetadataProvider.getPartitionGroupMetadataList(null, 10_000).size();
     System.out.println(partitionCount);
 
     // Partition metadata provider

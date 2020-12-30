@@ -165,7 +165,7 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       assertNotNull(columnPartitionMetadata);
       assertTrue(columnPartitionMetadata.getFunctionName().equalsIgnoreCase("murmur"));
       assertEquals(columnPartitionMetadata.getNumPartitions(), 2);
-      int streamPartitionId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionId();
+      int streamPartitionId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionGroupId();
       assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(streamPartitionId));
       numSegmentsForPartition[streamPartitionId]++;
     }
@@ -236,7 +236,7 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       assertNotNull(columnPartitionMetadata);
       assertTrue(columnPartitionMetadata.getFunctionName().equalsIgnoreCase("murmur"));
       assertEquals(columnPartitionMetadata.getNumPartitions(), 2);
-      int streamPartitionId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionId();
+      int streamPartitionId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionGroupId();
       numSegmentsForPartition[streamPartitionId]++;
 
       if (segmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
@@ -313,7 +313,7 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       assertNotNull(columnPartitionMetadata);
       assertTrue(columnPartitionMetadata.getFunctionName().equalsIgnoreCase("murmur"));
       assertEquals(columnPartitionMetadata.getNumPartitions(), 2);
-      int streamPartitionId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionId();
+      int streamPartitionId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionGroupId();
       numSegmentsForPartition[streamPartitionId]++;
 
       if (segmentZKMetadata.getStatus() == Status.IN_PROGRESS) {

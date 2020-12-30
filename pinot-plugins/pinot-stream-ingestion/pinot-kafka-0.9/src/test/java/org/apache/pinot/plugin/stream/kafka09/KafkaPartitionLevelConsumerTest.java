@@ -291,7 +291,7 @@ public class KafkaPartitionLevelConsumerTest {
 
     KafkaStreamMetadataProvider streamMetadataProvider =
         new KafkaStreamMetadataProvider(clientId, streamConfig, mockKafkaSimpleConsumerFactory);
-    Assert.assertEquals(streamMetadataProvider.fetchPartitionCount(10000L), 2);
+    Assert.assertEquals(streamMetadataProvider.getPartitionGroupMetadataList(null, 10000L), 2);
   }
 
   @Test
