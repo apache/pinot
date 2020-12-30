@@ -20,6 +20,7 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.util.Arrays;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.pinot.common.utils.PrimitiveArrayUtils;
 import org.apache.pinot.core.data.manager.offline.DimensionTableDataManager;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
@@ -28,6 +29,7 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.testng.Assert;
 import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Test;
@@ -310,12 +312,7 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
       when(mgr.lookupRowByPrimaryKey(any(PrimaryKey.class))).thenAnswer(invocation -> {
         PrimaryKey key = invocation.getArgument(0);
         GenericRow row = new GenericRow();
-        if (table.getValue() == FieldSpec.DataType.BYTES) {
-          byte[] keyContent = ArrayUtils.toPrimitive((Byte[])(key.getValues()[0])); // assuming one col
-          row.putValue("lookupColumn", String.format("lookup_value_for_[%s]", new String(keyContent) ));
-        } else {
-          row.putValue("lookupColumn", "lookup_value_for_" + key.toString());
-        }
+        row.putValue("lookupColumn", String.format("lookup_value_for_[%s]", key.hashCode()));
         return row;
       });
     }
@@ -326,7 +323,8 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     String[] expectedResults = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedResults[i] = String.format("lookup_value_for_[%s]", _intSVValues[i]);
+      PrimaryKey key = new PrimaryKey(new Object[]{(Integer)_intSVValues[i]});
+      expectedResults[i] = String.format("lookup_value_for_[%s]", key.hashCode());
     }
     testTransformFunction(transformFunction, expectedResults);
 
@@ -336,7 +334,8 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     expectedResults = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedResults[i] = String.format("lookup_value_for_[%s]", _stringSVValues[i]);
+      PrimaryKey key = new PrimaryKey(new Object[]{_stringSVValues[i]});
+      expectedResults[i] = String.format("lookup_value_for_[%s]", key.hashCode());
     }
     testTransformFunction(transformFunction, expectedResults);
 
@@ -346,7 +345,8 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     expectedResults = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedResults[i] = String.format("lookup_value_for_[%s]", _longSVValues[i]);
+      PrimaryKey key = new PrimaryKey(new Object[]{(Long)_longSVValues[i]});
+      expectedResults[i] = String.format("lookup_value_for_[%s]", key.hashCode());
     }
     testTransformFunction(transformFunction, expectedResults);
 
@@ -356,7 +356,8 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     expectedResults = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedResults[i] = String.format("lookup_value_for_[%s]", _floatSVValues[i]);
+      PrimaryKey key = new PrimaryKey(new Object[]{(Float)_floatSVValues[i]});
+      expectedResults[i] = String.format("lookup_value_for_[%s]", key.hashCode());
     }
     testTransformFunction(transformFunction, expectedResults);
 
@@ -366,7 +367,8 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     expectedResults = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedResults[i] = String.format("lookup_value_for_[%s]", _doubleSVValues[i]);
+      PrimaryKey key = new PrimaryKey(new Object[]{(Double)_doubleSVValues[i]});
+      expectedResults[i] = String.format("lookup_value_for_[%s]", key.hashCode());
     }
     testTransformFunction(transformFunction, expectedResults);
 
@@ -376,7 +378,8 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     expectedResults = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedResults[i] = String.format("lookup_value_for_[%s]", new String(_bytesSVValues[i]));
+      PrimaryKey key = new PrimaryKey(new Object[]{new ByteArray(_bytesSVValues[i])});
+      expectedResults[i] = String.format("lookup_value_for_[%s]", key.hashCode());
     }
     testTransformFunction(transformFunction, expectedResults);
   }

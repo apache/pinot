@@ -31,6 +31,7 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
@@ -166,9 +167,9 @@ public class LookupTransformFunction extends BaseTransformFunction {
           break;
         case BYTES:
           byte[][] primitiveValues = tf.transformToBytesValuesSV(projectionBlock);
-          pkColumns[c] = new Byte[numDocuments][];
+          pkColumns[c] = new ByteArray[numDocuments];
           for (int i = 0; i < numDocuments; i++) {
-            pkColumns[c][i] = ArrayUtils.toObject(primitiveValues[i]);
+            pkColumns[c][i] = new ByteArray(primitiveValues[i]);
           }
           break;
         default:
