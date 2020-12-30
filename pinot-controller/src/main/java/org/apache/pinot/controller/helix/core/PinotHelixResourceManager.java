@@ -1828,8 +1828,9 @@ public class PinotHelixResourceManager {
     }
     if (!instancesToCheck.isEmpty()) {
       throw new TimeoutException(String.format(
-          "Timed out waiting for external view to stabilize after call to disable/reset segment: %s of table: %s. Skipping enable of segment.",
-          segmentName, tableNameWithType));
+          "Timed out waiting for external view to stabilize after call to disable/reset segment: %s of table: %s. "
+              + "Disable/reset might complete in the background, but skipping enable of segment.", segmentName,
+          tableNameWithType));
     }
 
     // Lastly, enable segment
@@ -1914,7 +1915,8 @@ public class PinotHelixResourceManager {
     }
     if (!segmentInstancesToCheck.isEmpty()) {
       throw new TimeoutException(String.format(
-          "Timed out waiting for external view to stabilize after call to disable/reset segments. Skipping enable of segments of table: %s",
+          "Timed out waiting for external view to stabilize after call to disable/reset segments. "
+              + "Disable/reset might complete in the background, but skipping enable of segments of table: %s",
           tableNameWithType));
     }
 
