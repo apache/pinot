@@ -21,16 +21,17 @@ package org.apache.pinot.core.operator.filter;
 import com.uber.h3core.H3Core;
 import com.uber.h3core.LengthUnit;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.geospatial.serde.GeometrySerializer;
-import org.apache.pinot.core.geospatial.transform.function.StPointFunction;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
+import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
+import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.FunctionContext;
-import org.apache.pinot.core.query.request.context.predicate.GeoPredicate;
 import org.apache.pinot.core.query.request.context.predicate.Predicate;
 import org.apache.pinot.core.query.request.context.predicate.RangePredicate;
 import org.apache.pinot.core.segment.creator.impl.geospatial.H3IndexResolution;
@@ -47,17 +48,23 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 public class H3IndexFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "H3IndexFilterOperator";
 
+  private Predicate _predicate;
+  private final DataSource _dataSource;
   private final int _numDocs;
   private final H3Core _h3Core;
+  private final IndexSegment _segment;
   private final H3IndexReader _h3IndexReader;
   private final H3IndexResolution _resolution;
   private Geometry _geometry;
   private double _distance;
 
   public H3IndexFilterOperator(Predicate predicate, IndexSegment indexSegment, int numDocs) {
+    _predicate = predicate;
+    _segment = indexSegment;
     FunctionContext function = predicate.getLhs().getFunction();
     String columnName;
 
+    // TODO: handle composite function that contains ST_DISTANCE
     if (function.getArguments().get(0).getType() == ExpressionContext.Type.IDENTIFIER) {
       columnName = function.getArguments().get(0).getIdentifier();
       byte[] bytes = BytesUtils.toBytes(function.getArguments().get(1).getLiteral());
@@ -69,30 +76,16 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
     } else {
       throw new RuntimeException("Expecting one of the arguments of ST_DISTANCE to be an identifier");
     }
-    DataSource dataSource = indexSegment.getDataSource(columnName);
-    _h3IndexReader = dataSource.getH3Index();
+    _dataSource = indexSegment.getDataSource(columnName);
+    _h3IndexReader = _dataSource.getH3Index();
     _resolution = _h3IndexReader.getH3IndexResolution();
     switch (predicate.getType()) {
-      case EQ:
-        break;
-      case NOT_EQ:
-        break;
-      case IN:
-        break;
-      case NOT_IN:
-        break;
       case RANGE:
         RangePredicate rangePredicate = (RangePredicate) predicate;
         _distance = Double.parseDouble(rangePredicate.getUpperBound());
         break;
-      case REGEXP_LIKE:
-        break;
-      case TEXT_MATCH:
-        break;
-      case IS_NULL:
-        break;
-      case IS_NOT_NULL:
-        break;
+      default:
+        throw new RuntimeException(String.format("H3 index does not support predicate type %s", predicate.getType()));
     }
     _numDocs = numDocs;
     try {
@@ -108,32 +101,39 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
     long h3Id = _h3Core.geoToH3(_geometry.getCoordinate().x, _geometry.getCoordinate().y, resolution);
     assert _h3IndexReader != null;
 
-    //find the number of rings based on distance
-    //FullMatch
-    double edgeLength = _h3Core.edgeLength(resolution, LengthUnit.km);
-    int numFullMatchedRings = (int) (_distance / edgeLength);
-    List<Long> fullMatchRings = _h3Core.kRing(h3Id, numFullMatchedRings);
-    fullMatchRings.add(h3Id);
+    // find the number of rings based on distance for full match
+    // use the edge of the hexagon to determine the rings are within the distance. This is calculated by (1) divide the
+    // distance by edge length of the solution to get the number of contained rings (2) use the (floor of number - 1)
+    // for fetching the rings since ring0 is the original hexagon
+    double edgeLength = _h3Core.edgeLength(resolution, LengthUnit.m);
+    int numFullMatchedRings = (int) Math.floor(_distance / edgeLength);
     MutableRoaringBitmap fullMatchedDocIds = new MutableRoaringBitmap();
-    for (long id : fullMatchRings) {
-      ImmutableRoaringBitmap docIds = _h3IndexReader.getDocIds(id);
-      fullMatchedDocIds.or(docIds);
+    List<Long> fullMatchRings = new ArrayList<>();
+    if (numFullMatchedRings > 0) {
+      fullMatchRings = _h3Core.kRing(h3Id, numFullMatchedRings - 1);
+      for (long id : fullMatchRings) {
+        ImmutableRoaringBitmap docIds = _h3IndexReader.getDocIds(id);
+        fullMatchedDocIds.or(docIds);
+      }
     }
 
-    //partial matchedRings
-    int numPartialMatchedRings = (int) ((_distance + edgeLength) / edgeLength);
-    List<Long> partialMatchedRings = _h3Core.kRing(h3Id, numPartialMatchedRings);
-    partialMatchedRings.add(h3Id);
-    final MutableRoaringBitmap partialMatchDocIds = new MutableRoaringBitmap();
+    // partial matchedRings
+    // use the previous number + 1 to get the partial ring, which is the ceiling of the number
+    int numPartialMatchedRings = numFullMatchedRings + 1;
+    List<Long> partialMatchedRings = _h3Core.kRing(h3Id, numPartialMatchedRings - 1);
     partialMatchedRings.removeAll(fullMatchRings);
+    final MutableRoaringBitmap partialMatchDocIds = new MutableRoaringBitmap();
     for (long id : partialMatchedRings) {
       ImmutableRoaringBitmap docIds = _h3IndexReader.getDocIds(id);
       partialMatchDocIds.or(docIds);
     }
 
-    //TODO:evaluate the actual distance for the partial matched by scanning
+    ExpressionFilterOperator expressionFilterOperator = new ExpressionFilterOperator(_segment, _predicate, _numDocs);
+    FilterBlockDocIdSet filterBlockDocIdSet = expressionFilterOperator.getNextBlock().getBlockDocIdSet();
+    MutableRoaringBitmap filteredPartialMatchDocIds =
+        ((ScanBasedDocIdIterator) filterBlockDocIdSet.iterator()).applyAnd(partialMatchDocIds);
 
-    MutableRoaringBitmap result = ImmutableRoaringBitmap.or(fullMatchedDocIds, partialMatchDocIds);
+    MutableRoaringBitmap result = ImmutableRoaringBitmap.or(fullMatchedDocIds, filteredPartialMatchDocIds);
     return new FilterBlock(new BitmapDocIdSet(result, _numDocs) {
 
       // Override this method to reflect the entries scanned

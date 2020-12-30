@@ -106,19 +106,19 @@ public class GenericQuickstart {
 
     Runtime.getRuntime().addShutdownHook(new Thread(() -> {
       try {
-        printStatus(Color.GREEN, "***** Shutting down GitHubEventsQuickStart *****");
+        printStatus(Color.GREEN, "***** Shutting down QuickStart cluster *****");
         runner.stop();
         _kafkaStarter.stop();
         ZkStarter.stopLocalZkServer(_zookeeperInstance);
 //        FileUtils.deleteDirectory(_tableDirectory);
       } catch (Exception e) {
-        LOGGER.error("Caught exception in shutting down GitHubEvents QuickStart", e);
+        LOGGER.error("Caught exception in shutting down QuickStart cluster", e);
       }
     }));
 
-    printStatus(Color.YELLOW, "***** Realtime github demo quickstart setup complete *****");
+    printStatus(Color.YELLOW, "***** GenericQuickStart demo quickstart setup complete *****");
 
-    String q1 = "select count(*) from pullRequestMergedEvents limit 0";
+    String q1 = "select count(*) from starbucksStores limit 0";
     printStatus(Color.YELLOW, "Total number of documents in the table");
     printStatus(Color.CYAN, "Query : " + q1);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q1)));
@@ -129,12 +129,9 @@ public class GenericQuickstart {
 
   public static void main(String[] args)
       throws Exception {
-    String tableDirectoryPath ="";
-//    CSVRecordReader reader = new CSVRecordReader();
-//    reader.init(new File(tableDirectoryPath, "rawdata/data.csv"), Sets.newHashSet("lat", "long", "name", "address"), null);
-//    while (reader.hasNext()) {
-//      System.out.println("reader.next() = " + reader.next());
-//    }
+    ClassLoader classLoader = GenericQuickstart.class.getClassLoader();
+    URL resource = classLoader.getResource("examples/batch/starbucksStores");
+    String tableDirectoryPath = resource.getPath();
 
     GenericQuickstart quickstart = new GenericQuickstart(
         tableDirectoryPath,
