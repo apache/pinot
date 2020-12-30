@@ -39,7 +39,7 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
  * versions of the stream implementation
  */
 @InterfaceStability.Evolving
-public interface StreamPartitionMsgOffset extends Comparable {
+public interface StreamPartitionMsgOffset extends Checkpoint {
 
   /**
    * Compare this offset with another one.

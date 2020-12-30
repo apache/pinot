@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.plugin.stream.kafka20;
 
+import java.util.List;
 import java.util.Set;
+import org.apache.pinot.spi.stream.PartitionGroupConsumer;
+import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.PartitionLevelConsumer;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamLevelConsumer;
@@ -46,5 +49,16 @@ public class KafkaConsumerFactory extends StreamConsumerFactory {
   @Override
   public StreamMetadataProvider createStreamMetadataProvider(String clientId) {
     return new KafkaStreamMetadataProvider(clientId, _streamConfig);
+  }
+
+  @Override
+  public List<PartitionGroupMetadata> getPartitionGroupMetadataList(
+      List<PartitionGroupMetadata> currentPartitionGroupsMetadata) {
+    return null;
+  }
+
+  @Override
+  public PartitionGroupConsumer createConsumer(PartitionGroupMetadata metadata) {
+    return null;
   }
 }

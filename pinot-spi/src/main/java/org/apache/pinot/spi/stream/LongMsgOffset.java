@@ -50,4 +50,14 @@ public class LongMsgOffset implements StreamPartitionMsgOffset {
   public String toString() {
     return Long.toString(_offset);
   }
+
+  @Override
+  public String serialize() {
+    return toString();
+  }
+
+  @Override
+  public Checkpoint deserialize(String checkpointStr) {
+    return new LongMsgOffset(checkpointStr);
+  }
 }
