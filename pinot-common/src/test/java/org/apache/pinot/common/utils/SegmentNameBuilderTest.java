@@ -58,7 +58,7 @@ public class SegmentNameBuilderTest {
     // Check partition range
     assertEquals(longNameSegment.getPartitionRange(), "0");
     assertEquals(shortNameSegment.getPartitionRange(), "ALL");
-    assertEquals(llcSegment.getPartitionId(), 0);
+    assertEquals(llcSegment.getPartitionGroupId(), 0);
 
     // Check groupId
     assertEquals(longNameSegment.getGroupId(), "myTable_REALTIME_1234567_0");
@@ -127,14 +127,14 @@ public class SegmentNameBuilderTest {
 
     LLCSegmentName segName1 = new LLCSegmentName(tableName, partitionId, sequenceNumber, msSinceEpoch);
     Assert.assertEquals(segName1.getSegmentName(), segmentName);
-    Assert.assertEquals(segName1.getPartitionId(), partitionId);
+    Assert.assertEquals(segName1.getPartitionGroupId(), partitionId);
     Assert.assertEquals(segName1.getCreationTime(), creationTime);
     Assert.assertEquals(segName1.getSequenceNumber(), sequenceNumber);
     Assert.assertEquals(segName1.getTableName(), tableName);
 
     LLCSegmentName segName2 = new LLCSegmentName(segmentName);
     Assert.assertEquals(segName2.getSegmentName(), segmentName);
-    Assert.assertEquals(segName2.getPartitionId(), partitionId);
+    Assert.assertEquals(segName2.getPartitionGroupId(), partitionId);
     Assert.assertEquals(segName2.getCreationTime(), creationTime);
     Assert.assertEquals(segName2.getSequenceNumber(), sequenceNumber);
     Assert.assertEquals(segName2.getTableName(), tableName);

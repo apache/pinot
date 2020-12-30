@@ -95,7 +95,7 @@ public class RealtimeSegmentSelector implements SegmentSelector {
         if (instanceStateMap.containsValue(SegmentStateModel.CONSUMING)) {
           // Keep the first CONSUMING segment for each partition
           LLCSegmentName llcSegmentName = new LLCSegmentName(segment);
-          partitionIdToFirstConsumingLLCSegmentMap.compute(llcSegmentName.getPartitionId(), (k, consumingSegment) -> {
+          partitionIdToFirstConsumingLLCSegmentMap.compute(llcSegmentName.getPartitionGroupId(), (k, consumingSegment) -> {
             if (consumingSegment == null) {
               return llcSegmentName;
             } else {

@@ -136,7 +136,7 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
    * Helper method to assign instances for CONSUMING segment based on the segment partition id and instance partitions.
    */
   private List<String> assignConsumingSegment(String segmentName, InstancePartitions instancePartitions) {
-    int partitionId = new LLCSegmentName(segmentName).getPartitionId();
+    int partitionId = new LLCSegmentName(segmentName).getPartitionGroupId();
 
     int numReplicaGroups = instancePartitions.getNumReplicaGroups();
     if (numReplicaGroups == 1) {
@@ -325,7 +325,7 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
 
         Map<Integer, List<String>> partitionIdToSegmentsMap = new HashMap<>();
         for (String segmentName : currentAssignment.keySet()) {
-          int partitionId = new LLCSegmentName(segmentName).getPartitionId();
+          int partitionId = new LLCSegmentName(segmentName).getPartitionGroupId();
           partitionIdToSegmentsMap.computeIfAbsent(partitionId, k -> new ArrayList<>()).add(segmentName);
         }
 
@@ -360,7 +360,7 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
       // Replica-group based assignment
 
       // Uniformly spray the segment partitions over the instance partitions
-      int segmentPartitionId = new LLCSegmentName(segmentName).getPartitionId();
+      int segmentPartitionId = new LLCSegmentName(segmentName).getPartitionGroupId();
       int numPartitions = instancePartitions.getNumPartitions();
       int partitionId = segmentPartitionId % numPartitions;
       return SegmentAssignmentUtils.assignSegmentWithReplicaGroup(currentAssignment, instancePartitions, partitionId);

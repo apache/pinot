@@ -127,6 +127,7 @@ import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -1378,6 +1379,8 @@ public class PinotHelixResourceManager {
    */
   private void setupShardedRealtimeTable(StreamConfig streamConfig, IdealState idealState, int numReplicas) {
     StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
+    StreamMetadataProvider streamMetadataProvider = streamConsumerFactory
+        .createStreamMetadataProvider(streamConfig.getTopicName() + "_" + System.currentTimeMillis());
 
     // get current partition groups and their metadata - this will be empty when creating the table
     List<PartitionGroupMetadata> currentPartitionGroupMetadataList = _pinotLLCRealtimeSegmentManager.getCurrentPartitionGroupMetadataList(idealState);
@@ -1385,7 +1388,7 @@ public class PinotHelixResourceManager {
     // get new partition groups and their metadata,
     // Assume table has 3 shards. Say we get [0], [1], [2] groups (for now assume that each group contains only 1 shard)
     List<PartitionGroupMetadata> newPartitionGroupMetadataList =
-        streamConsumerFactory.getPartitionGroupMetadataList(currentPartitionGroupMetadataList);
+        streamMetadataProvider.getPartitionGroupMetadataList(currentPartitionGroupMetadataList, 5000);
 
     // setup segment zk metadata and ideal state for all the new found partition groups
     _pinotLLCRealtimeSegmentManager.setupNewPartitionGroups(newPartitionGroupMetadataList, numReplicas);

@@ -63,7 +63,7 @@ public abstract class SegmentName {
     throw new RuntimeException("No groupId in " + getSegmentName());
   }
 
-  public int getPartitionId() {
+  public int getPartitionGroupId() {
     throw new RuntimeException("No partitionId in " + getSegmentName());
   }
 

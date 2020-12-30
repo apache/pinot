@@ -22,9 +22,13 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.IOException;
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import kafka.api.PartitionOffsetRequestInfo;
 import kafka.common.TopicAndPartition;
 import kafka.javaapi.OffsetRequest;
@@ -36,6 +40,7 @@ import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.kafka.common.protocol.Errors;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.OffsetCriteria;
+import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
@@ -84,7 +89,12 @@ public class KafkaStreamMetadataProvider extends KafkaConnectionHandler implemen
    * @return
    */
   @Override
+  @Deprecated
   public synchronized int fetchPartitionCount(long timeoutMillis) {
+    return fetchPartitionCountInternal(timeoutMillis);
+  }
+
+  private int fetchPartitionCountInternal(long timeoutMillis) {
     int unknownTopicReplyCount = 0;
     final int MAX_UNKNOWN_TOPIC_REPLY_COUNT = 10;
     int kafkaErrorCount = 0;
@@ -143,6 +153,22 @@ public class KafkaStreamMetadataProvider extends KafkaConnectionHandler implemen
     }
 
     throw new TimeoutException();
+  }
+
+  /**
+   * Fetch the partition group metadata list
+   * @param currentPartitionGroupsMetadata In case of Kafka, each partition group contains a single partition.
+   *                                       Hence current partition groups are not needed to compute the new partition groups
+   */
+  @Override
+  public List<PartitionGroupMetadata> getPartitionGroupMetadataList(
+      @Nullable List<PartitionGroupMetadata> currentPartitionGroupsMetadata, long timeoutMillis) {
+    int partitionCount = fetchPartitionCountInternal(timeoutMillis);
+    List<PartitionGroupMetadata> partitionGroupMetadataList = new ArrayList<>(partitionCount);
+    for (int i = 0; i < partitionCount; i++) {
+      partitionGroupMetadataList.add(new KafkaPartitionGroupMetadata(i));
+    }
+    return partitionGroupMetadataList;
   }
 
   public synchronized long fetchPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis)

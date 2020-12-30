@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.stream;
 
+import java.util.List;
 import java.util.concurrent.Callable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,24 +27,27 @@ import org.slf4j.LoggerFactory;
 /**
  * Fetches the partition count of a stream using the {@link StreamMetadataProvider}
  */
-public class PartitionCountFetcher implements Callable<Boolean> {
+public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(PartitionCountFetcher.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(PartitionGroupMetadataFetcher.class);
 
   private int _partitionCount = -1;
+  private List<PartitionGroupMetadata> _partitionGroupMetadataList;
+  private List<PartitionGroupMetadata> _currentPartitionGroupMetadata;
   private final StreamConfig _streamConfig;
   private StreamConsumerFactory _streamConsumerFactory;
   private Exception _exception;
   private final String _topicName;
 
-  public PartitionCountFetcher(StreamConfig streamConfig) {
+  public PartitionGroupMetadataFetcher(StreamConfig streamConfig, List<PartitionGroupMetadata> currentPartitionGroupMetadataList) {
     _streamConfig = streamConfig;
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
     _topicName = streamConfig.getTopicName();
+    _currentPartitionGroupMetadata = currentPartitionGroupMetadataList;
   }
 
-  public int getPartitionCount() {
-    return _partitionCount;
+  public List<PartitionGroupMetadata> getPartitionGroupMetadataList() {
+    return _partitionGroupMetadataList;
   }
 
   public Exception getException() {
@@ -59,10 +63,10 @@ public class PartitionCountFetcher implements Callable<Boolean> {
   public Boolean call()
       throws Exception {
 
-    String clientId = PartitionCountFetcher.class.getSimpleName() + "-" + _topicName;
+    String clientId = PartitionGroupMetadataFetcher.class.getSimpleName() + "-" + _topicName;
     try (
         StreamMetadataProvider streamMetadataProvider = _streamConsumerFactory.createStreamMetadataProvider(clientId)) {
-      _partitionCount = streamMetadataProvider.fetchPartitionCount(/*maxWaitTimeMs=*/5000L);
+      _partitionGroupMetadataList = streamMetadataProvider.getPartitionGroupMetadataList(_currentPartitionGroupMetadata, /*maxWaitTimeMs=*/5000L);
       if (_exception != null) {
         // We had at least one failure, but succeeded now. Log an info
         LOGGER.info("Successfully retrieved partition count as {} for topic {}", _partitionCount, _topicName);

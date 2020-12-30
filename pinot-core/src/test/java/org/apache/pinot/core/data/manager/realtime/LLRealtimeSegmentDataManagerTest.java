@@ -719,7 +719,7 @@ public class LLRealtimeSegmentDataManagerTest {
     long timeout = 10_000L;
     FakeLLRealtimeSegmentDataManager firstSegmentDataManager = createFakeSegmentManager();
     Assert.assertTrue(firstSegmentDataManager.getAcquiredConsumerSemaphore().get());
-    Semaphore firstSemaphore = firstSegmentDataManager.getPartitionConsumerSemaphore();
+    Semaphore firstSemaphore = firstSegmentDataManager.getPartitionGroupConsumerSemaphore();
     Assert.assertEquals(firstSemaphore.availablePermits(), 0);
     Assert.assertFalse(firstSemaphore.hasQueuedThreads());
 
@@ -751,18 +751,18 @@ public class LLRealtimeSegmentDataManagerTest {
         "Failed to acquire the semaphore for the second segment manager in " + timeout + "ms");
 
     Assert.assertTrue(secondSegmentDataManager.get().getAcquiredConsumerSemaphore().get());
-    Semaphore secondSemaphore = secondSegmentDataManager.get().getPartitionConsumerSemaphore();
+    Semaphore secondSemaphore = secondSegmentDataManager.get().getPartitionGroupConsumerSemaphore();
     Assert.assertEquals(firstSemaphore, secondSemaphore);
     Assert.assertEquals(secondSemaphore.availablePermits(), 0);
     Assert.assertFalse(secondSemaphore.hasQueuedThreads());
 
     // Call destroy method the 2nd time on the first segment manager, the permits in semaphore won't increase.
     firstSegmentDataManager.destroy();
-    Assert.assertEquals(firstSegmentDataManager.getPartitionConsumerSemaphore().availablePermits(), 0);
+    Assert.assertEquals(firstSegmentDataManager.getPartitionGroupConsumerSemaphore().availablePermits(), 0);
 
     // The permit finally gets released in the Semaphore.
     secondSegmentDataManager.get().destroy();
-    Assert.assertEquals(secondSegmentDataManager.get().getPartitionConsumerSemaphore().availablePermits(), 1);
+    Assert.assertEquals(secondSegmentDataManager.get().getPartitionGroupConsumerSemaphore().availablePermits(), 1);
   }
 
   public static class FakeLLRealtimeSegmentDataManager extends LLRealtimeSegmentDataManager {
@@ -800,7 +800,7 @@ public class LLRealtimeSegmentDataManagerTest {
         throws Exception {
       super(segmentZKMetadata, tableConfig, realtimeTableDataManager, resourceDataDir,
           new IndexLoadingConfig(makeInstanceDataManagerConfig(), tableConfig), schema, llcSegmentName,
-          semaphoreMap.get(llcSegmentName.getPartitionId()), serverMetrics,
+          semaphoreMap.get(llcSegmentName.getPartitionGroupId()), serverMetrics,
           new PartitionUpsertMetadataManager("testTable_REALTIME", 0, serverMetrics));
       _state = LLRealtimeSegmentDataManager.class.getDeclaredField("_state");
       _state.setAccessible(true);

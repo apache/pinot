@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.stream;
 
 import java.io.Closeable;
+import java.util.List;
 import javax.annotation.Nonnull;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
@@ -32,10 +33,14 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
 public interface StreamMetadataProvider extends Closeable {
   /**
    * Fetches the number of partitions for a topic given the stream configs
-   * @param timeoutMillis
-   * @return
+   * @deprecated use getPartitionGroupMetadataList instead
    */
+  @Deprecated
   int fetchPartitionCount(long timeoutMillis);
+
+  // takes the current state of partition groups (groupings of shards, the state of the consumption) and creates the new state
+  List<PartitionGroupMetadata> getPartitionGroupMetadataList(
+      List<PartitionGroupMetadata> currentPartitionGroupsMetadata, long timeoutMillis);
 
   // Issue 5953 Retain this interface for 0.5.0, remove in 0.6.0
   @Deprecated
