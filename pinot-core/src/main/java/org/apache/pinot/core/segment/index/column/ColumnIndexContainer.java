@@ -49,7 +49,7 @@ public interface ColumnIndexContainer extends Closeable {
   InvertedIndexReader<?> getRangeIndex();
 
   /**
-   * Returns the range index for the column, or {@code null} if it does not exist.
+   * Returns the H3 index for the column, or {@code null} if it does not exist.
    */
   H3IndexReader getH3Index();
 

@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.segment.index.loader.invertedindex;
 
-import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
@@ -29,7 +29,6 @@ import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.creator.impl.geospatial.H3IndexCreator;
 import org.apache.pinot.core.segment.creator.impl.geospatial.H3IndexResolution;
-import org.apache.pinot.core.segment.creator.impl.inv.RangeIndexCreator;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.loader.LoaderUtils;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
@@ -38,12 +37,11 @@ import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
 import org.apache.pinot.core.segment.index.readers.forward.FixedBitMVForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
-import org.apache.pinot.core.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.config.table.H3IndexConfig;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.slf4j.Logger;
@@ -59,6 +57,7 @@ public class H3IndexHandler {
   private final String _segmentName;
   private final SegmentVersion _segmentVersion;
   private final Set<ColumnMetadata> _h3IndexColumns = new HashSet<>();
+  private final HashMap<String, H3IndexConfig> _h3IndexMap = new HashMap<>();
 
   public H3IndexHandler(File indexDir, SegmentMetadataImpl segmentMetadata, IndexLoadingConfig indexLoadingConfig,
       SegmentDirectory.Writer segmentWriter) {
@@ -68,10 +67,11 @@ public class H3IndexHandler {
     _segmentVersion = SegmentVersion.valueOf(segmentMetadata.getVersion());
 
     // Only create H3 index on non-dictionary-encoded columns
-    for (String column : indexLoadingConfig.getH3IndexColumns()) {
-      ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
+    for (H3IndexConfig h3IndexConfig : indexLoadingConfig.getH3IndexConfigs()) {
+      ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(h3IndexConfig.getColumn());
       if (columnMetadata != null) {
         _h3IndexColumns.add(columnMetadata);
+        _h3IndexMap.put(h3IndexConfig.getColumn(), h3IndexConfig);
       }
     }
   }
@@ -91,10 +91,8 @@ public class H3IndexHandler {
 
     if (!inProgress.exists()) {
       // Marker file does not exist, which means last run ended normally.
-
       if (_segmentWriter.hasIndexFor(column, ColumnIndexType.H3_INDEX)) {
         // Skip creating range index if already exists.
-
         LOGGER.info("Found h3 index for segment: {}, column: {}", _segmentName, column);
         return;
       }
@@ -155,11 +153,10 @@ public class H3IndexHandler {
   private void handleNonDictionaryBasedColumn(ColumnMetadata columnMetadata)
       throws Exception {
     int numDocs = columnMetadata.getTotalDocs();
-    // TODO set the resolution
     try (ForwardIndexReader forwardIndexReader = getForwardIndexReader(columnMetadata, _segmentWriter);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
-        H3IndexCreator h3IndexCreator = new H3IndexCreator(_indexDir, columnMetadata.getFieldSpec(), new H3IndexResolution(
-            Lists.newArrayList(5)))) {
+        H3IndexCreator h3IndexCreator = new H3IndexCreator(_indexDir, columnMetadata.getFieldSpec(),
+            new H3IndexResolution(_h3IndexMap.get(columnMetadata.getColumnName()).getResolutions()))) {
       if (columnMetadata.isSingleValue()) {
         // Single-value column.
         switch (columnMetadata.getDataType()) {

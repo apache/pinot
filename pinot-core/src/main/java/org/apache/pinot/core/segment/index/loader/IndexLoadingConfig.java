@@ -32,6 +32,7 @@ import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.H3IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -50,7 +51,6 @@ public class IndexLoadingConfig {
   private Set<String> _textIndexColumns = new HashSet<>();
   private Set<String> _fstIndexColumns = new HashSet<>();
   private Set<String> _rangeIndexColumns = new HashSet<>();
-  private Set<String> _h3IndexColumns = new HashSet<>();
   private Set<String> _noDictionaryColumns = new HashSet<>(); // TODO: replace this by _noDictionaryConfig.
   private Map<String, String> _noDictionaryConfig = new HashMap<>();
   private Set<String> _varLengthDictionaryColumns = new HashSet<>();
@@ -58,6 +58,7 @@ public class IndexLoadingConfig {
   private Map<String, BloomFilterConfig> _bloomFilterConfigs = new HashMap<>();
   private boolean _enableDynamicStarTreeCreation;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
+  private List<H3IndexConfig> _h3IndexConfigs;
   private boolean _enableDefaultStarTree;
 
   private SegmentVersion _segmentVersion;
@@ -99,10 +100,7 @@ public class IndexLoadingConfig {
       _rangeIndexColumns.addAll(rangeIndexColumns);
     }
 
-    List<String> h3IndexColumns = indexingConfig.getH3IndexColumns();
-    if (h3IndexColumns != null) {
-      _h3IndexColumns.addAll(h3IndexColumns);
-    }
+    _h3IndexConfigs = indexingConfig.getH3IndexConfigs();
 
     List<String> bloomFilterColumns = indexingConfig.getBloomFilterColumns();
     if (bloomFilterColumns != null) {
@@ -246,8 +244,9 @@ public class IndexLoadingConfig {
     return _rangeIndexColumns;
   }
 
-  public Set<String> getH3IndexColumns() {
-    return _h3IndexColumns;
+  @Nullable
+  public List<H3IndexConfig> getH3IndexConfigs() {
+    return _h3IndexConfigs;
   }
 
   public Map<String, Map<String, String>> getColumnProperties() {

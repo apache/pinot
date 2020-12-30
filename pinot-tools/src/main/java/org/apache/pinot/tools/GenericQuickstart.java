@@ -57,7 +57,7 @@ public class GenericQuickstart {
   private final File _schemaFile;
   private final File _tableConfigFile;
   private final File _tableDirectory;
-  private String _tableName;
+  private final String _tableName;
   private StreamDataServerStartable _kafkaStarter;
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
 

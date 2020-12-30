@@ -57,6 +57,7 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
+import org.apache.pinot.spi.config.table.H3IndexConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,7 +82,12 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     String columnName = metadata.getColumnName();
     boolean loadInvertedIndex = indexLoadingConfig.getInvertedIndexColumns().contains(columnName);
     boolean loadRangeIndex = indexLoadingConfig.getRangeIndexColumns().contains(columnName);
-    boolean loadH3Index = indexLoadingConfig.getH3IndexColumns().contains(columnName);
+    boolean loadH3Index = false;
+    if (indexLoadingConfig.getH3IndexConfigs() != null) {
+      for (H3IndexConfig h3IndexConfig : indexLoadingConfig.getH3IndexConfigs()) {
+        loadH3Index = h3IndexConfig.getColumn().equals(columnName);
+      }
+    }
     boolean loadTextIndex = indexLoadingConfig.getTextIndexColumns().contains(columnName);
     boolean loadOnHeapDictionary = indexLoadingConfig.getOnHeapDictionaryColumns().contains(columnName);
     BloomFilterConfig bloomFilterConfig = indexLoadingConfig.getBloomFilterConfigs().get(columnName);
@@ -103,11 +109,8 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       _textIndex = null;
     }
 
-    if (loadH3Index) {
-      _h3Index = new H3IndexReader(segmentReader.getIndexFor(columnName, ColumnIndexType.H3_INDEX));
-    } else {
-      _h3Index = null;
-    }
+    _h3Index = loadH3Index ? new H3IndexReader(segmentReader.getIndexFor(columnName, ColumnIndexType.H3_INDEX)) : null;
+
     PinotDataBuffer fwdIndexBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.FORWARD_INDEX);
 
     if (metadata.hasDictionary()) {
