@@ -25,8 +25,6 @@ public interface PartitionGroupMetadata {
 
   int getGroupId();
 
-  List<String> getPartitions();
-
   Checkpoint getStartCheckpoint(); // similar to getStartOffset
 
   Checkpoint getEndCheckpoint(); // similar to getEndOffset

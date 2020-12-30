@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.realtime.impl.fakestream;
 
+import java.util.List;
 import java.util.Set;
 import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -26,6 +27,8 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.OffsetCriteria;
+import org.apache.pinot.spi.stream.PartitionGroupConsumer;
+import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.PartitionLevelConsumer;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
@@ -64,6 +67,17 @@ public class FakeStreamConsumerFactory extends StreamConsumerFactory {
   @Override
   public StreamMetadataProvider createStreamMetadataProvider(String clientId) {
     return new FakeStreamMetadataProvider(_streamConfig);
+  }
+
+  @Override
+  public List<PartitionGroupMetadata> getPartitionGroupMetadataList(
+      List<PartitionGroupMetadata> currentPartitionGroupsMetadata) {
+    return null;
+  }
+
+  @Override
+  public PartitionGroupConsumer createConsumer(PartitionGroupMetadata metadata) {
+    return null;
   }
 
   public static void main(String[] args)

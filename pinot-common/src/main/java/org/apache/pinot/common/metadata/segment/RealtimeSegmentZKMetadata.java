@@ -35,6 +35,7 @@ public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {
   private Status _status = null;
   private int _sizeThresholdToFlushSegment = -1;
   private String _timeThresholdToFlushSegment = null; // store as period string for readability
+  private String _partitionGroupMetadataStr = null;
 
   public RealtimeSegmentZKMetadata() {
     setSegmentType(SegmentType.REALTIME);
@@ -49,6 +50,7 @@ public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {
     if (flushThresholdTime != null && !flushThresholdTime.equals(NULL)) {
       _timeThresholdToFlushSegment = znRecord.getSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_TIME);
     }
+    _partitionGroupMetadataStr = znRecord.getSimpleField(CommonConstants.Segment.PARTITION_GROUP_METADATA);
   }
 
   @Override
@@ -140,5 +142,9 @@ public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {
    */
   public void setTimeThresholdToFlushSegment(String timeThresholdPeriodString) {
     _timeThresholdToFlushSegment = timeThresholdPeriodString;
+  }
+
+  public String getPartitionGroupMetadataStr() {
+    return _partitionGroupMetadataStr;
   }
 }

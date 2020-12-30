@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.spi.stream;
 
-public interface PartitionGroupConsumer {
+import java.io.Closeable;
+
+
+public interface PartitionGroupConsumer extends Closeable {
   FetchResult fetch(Checkpoint start, Checkpoint end, long timeout);
 }

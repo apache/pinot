@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.spi.stream;
 
-public interface Checkpoint {
-  byte[] serialize();
-  Checkpoint deserialize(byte[] blob);
+public interface Checkpoint extends Comparable {
+  String serialize();
+  Checkpoint deserialize(String checkpointStr);
 }

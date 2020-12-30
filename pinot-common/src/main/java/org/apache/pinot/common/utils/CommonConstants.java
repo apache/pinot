@@ -393,6 +393,10 @@ public class CommonConstants {
     public static final String FLUSH_THRESHOLD_TIME = "segment.flush.threshold.time";
     public static final String PARTITION_METADATA = "segment.partition.metadata";
     /**
+     * Serialized {@link org.apache.pinot.spi.stream.PartitionGroupMetadata} for this segment
+     */
+    public static final String PARTITION_GROUP_METADATA = "segment.partition.group.metadata";
+    /**
      * This field is used for parallel push protection to lock the segment globally.
      * We put the segment upload start timestamp so that if the previous push failed without unlock the segment, the
      * next upload won't be blocked forever.
