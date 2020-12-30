@@ -2,6 +2,8 @@
   "tableName": "starbucksStores",
   "tableType": "OFFLINE",
   "segmentsConfig": {
+    "retentionTimeUnit": "DAYS",
+    "retentionTimeValue": "1",
     "segmentPushType": "APPEND",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "schemaName": "starbucksStores",

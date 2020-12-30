@@ -23,7 +23,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.geospatial.transform.function.StDistanceFunction;
 import org.apache.pinot.core.indexsegment.IndexSegment;
@@ -42,17 +41,14 @@ import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.FunctionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.request.context.predicate.GeoPredicate;
 import org.apache.pinot.core.query.request.context.predicate.Predicate;
+import org.apache.pinot.core.query.request.context.predicate.RangePredicate;
 import org.apache.pinot.core.query.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.core.query.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.core.segment.index.datasource.MutableDataSource;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
 import org.apache.pinot.core.segment.index.readers.ValidDocIndexReader;
 import org.apache.pinot.core.util.QueryOptions;
-import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.geom.Point;
 
 
 public class FilterPlanNode implements PlanNode {
@@ -91,6 +87,29 @@ public class FilterPlanNode implements PlanNode {
     } else {
       return new MatchAllFilterOperator(_numDocs);
     }
+  }
+
+  private boolean canApplyH3Index(Predicate predicate, FunctionContext function) {
+    if (function.getFunctionName().equalsIgnoreCase(StDistanceFunction.FUNCTION_NAME)) {
+      Predicate.Type type = predicate.getType();
+      if (type != Predicate.Type.RANGE) {
+        return false;
+      }
+      RangePredicate rangePredicate = (RangePredicate) predicate;
+      // TODO: support lower bound
+      if (rangePredicate.getUpperBound().equals(RangePredicate.UNBOUNDED) || !rangePredicate.getLowerBound()
+          .equals(RangePredicate.UNBOUNDED)) {
+        return false;
+      }
+      if (function.getArguments().get(0).getType() != ExpressionContext.Type.IDENTIFIER) {
+        // TODO: handle nested geography/geometry conversion functions
+        return false;
+      }
+      String columnName = function.getArguments().get(0).getIdentifier();
+      DataSource dataSource = _indexSegment.getDataSource(columnName);
+      return dataSource.getH3Index() != null;
+    }
+    return false;
   }
 
   /**
@@ -132,17 +151,7 @@ public class FilterPlanNode implements PlanNode {
         ExpressionContext lhs = predicate.getLhs();
         if (lhs.getType() == ExpressionContext.Type.FUNCTION) {
           FunctionContext function = lhs.getFunction();
-
-          boolean canApplyH3Index = false;
-          if (function.getFunctionName().equalsIgnoreCase(StDistanceFunction.FUNCTION_NAME)) {
-            String columnName = function.getArguments().get(0).getIdentifier();
-            DataSource dataSource = _indexSegment.getDataSource(columnName);
-            if (dataSource.getH3Index() != null) {
-              canApplyH3Index = true;
-            }
-          }
-
-          if (canApplyH3Index) {
+          if (canApplyH3Index(predicate, function)) {
             return new H3IndexFilterOperator(predicate, _indexSegment, _numDocs);
           }
           // TODO: ExpressionFilterOperator does not support predicate types without PredicateEvaluator (IS_NULL,
