@@ -20,5 +20,4 @@ maintainers:
 dependencies:
 - name: mysql
   version: 1.6.6
-  repository: https://kubernetes-charts.storage.googleapis.com/
-
+  repository: https://charts.helm.sh/stable
