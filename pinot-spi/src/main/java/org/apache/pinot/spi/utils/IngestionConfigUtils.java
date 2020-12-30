@@ -34,7 +34,7 @@ import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
  */
 public final class IngestionConfigUtils {
   public static final String DOT_SEPARATOR = ".";
-  private static final String DEFAULT_PUSH_MODE = "metadata";
+  private static final String DEFAULT_PUSH_MODE = "tar";
 
   /**
    * Fetches the streamConfig from the given realtime table.
@@ -107,8 +107,12 @@ public final class IngestionConfigUtils {
     return getConfigMapWithPrefix(batchConfigMap, BatchConfigProperties.RECORD_READER_PROP_PREFIX + DOT_SEPARATOR);
   }
 
-  public static PinotConfiguration getFsProps(Map<String, String> batchConfigMap) {
+  public static PinotConfiguration getInputFsProps(Map<String, String> batchConfigMap) {
     return new PinotConfiguration(getPropsWithPrefix(batchConfigMap, BatchConfigProperties.INPUT_FS_PROP_PREFIX + DOT_SEPARATOR));
+  }
+
+  public static PinotConfiguration getOutputFsProps(Map<String, String> batchConfigMap) {
+    return new PinotConfiguration(getPropsWithPrefix(batchConfigMap, BatchConfigProperties.OUTPUT_FS_PROP_PREFIX + DOT_SEPARATOR));
   }
 
   public static Map<String, Object> getPropsWithPrefix(Map<String, String> batchConfigMap, String prefix) {
