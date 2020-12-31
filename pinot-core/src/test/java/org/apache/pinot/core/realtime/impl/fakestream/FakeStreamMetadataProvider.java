@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nonnull;
 import org.apache.pinot.spi.stream.OffsetCriteria;
+import org.apache.pinot.spi.stream.PartitionGroupInfo;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
@@ -35,9 +36,11 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
  */
 public class FakeStreamMetadataProvider implements StreamMetadataProvider {
   private final int _numPartitions;
+  private StreamConfig _streamConfig;
 
   public FakeStreamMetadataProvider(StreamConfig streamConfig) {
     _numPartitions = FakeStreamConfigUtils.getNumPartitions(streamConfig);
+    _streamConfig = streamConfig;
   }
 
   @Override
@@ -46,11 +49,12 @@ public class FakeStreamMetadataProvider implements StreamMetadataProvider {
   }
 
   @Override
-  public List<PartitionGroupMetadata> getPartitionGroupMetadataList(
-      List<PartitionGroupMetadata> currentPartitionGroupsMetadata, long timeoutMillis) {
-    List<PartitionGroupMetadata> partitionGroupMetadataList = new ArrayList<>();
+  public List<PartitionGroupInfo> getPartitionGroupInfoList(
+      List<PartitionGroupMetadata> currentPartitionGroupsMetadata, long timeoutMillis)
+      throws TimeoutException {
+    List<PartitionGroupInfo> partitionGroupMetadataList = new ArrayList<>();
     for (int i = 0; i < _numPartitions; i++) {
-      partitionGroupMetadataList.add(new FakePartitionGroupMetadata(i));
+      partitionGroupMetadataList.add(new PartitionGroupInfo(i, fetchStreamPartitionOffset(_streamConfig.getOffsetCriteria(), 5000).toString()));
     }
     return partitionGroupMetadataList;
   }

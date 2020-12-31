@@ -27,27 +27,24 @@ import org.slf4j.LoggerFactory;
 /**
  * Fetches the partition count of a stream using the {@link StreamMetadataProvider}
  */
-public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
+public class PartitionGroupInfoFetcher implements Callable<Boolean> {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(PartitionGroupMetadataFetcher.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(PartitionGroupInfoFetcher.class);
 
-  private int _partitionCount = -1;
-  private List<PartitionGroupMetadata> _partitionGroupMetadataList;
-  private List<PartitionGroupMetadata> _currentPartitionGroupMetadata;
-  private final StreamConfig _streamConfig;
-  private StreamConsumerFactory _streamConsumerFactory;
+  private List<PartitionGroupInfo> _partitionGroupInfoList;
+  private final List<PartitionGroupMetadata> _currentPartitionGroupMetadata;
+  private final StreamConsumerFactory _streamConsumerFactory;
   private Exception _exception;
   private final String _topicName;
 
-  public PartitionGroupMetadataFetcher(StreamConfig streamConfig, List<PartitionGroupMetadata> currentPartitionGroupMetadataList) {
-    _streamConfig = streamConfig;
-    _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
+  public PartitionGroupInfoFetcher(StreamConfig streamConfig, List<PartitionGroupMetadata> currentPartitionGroupMetadataList) {
+    _streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
     _topicName = streamConfig.getTopicName();
     _currentPartitionGroupMetadata = currentPartitionGroupMetadataList;
   }
 
-  public List<PartitionGroupMetadata> getPartitionGroupMetadataList() {
-    return _partitionGroupMetadataList;
+  public List<PartitionGroupInfo> getPartitionGroupInfoList() {
+    return _partitionGroupInfoList;
   }
 
   public Exception getException() {
@@ -55,21 +52,19 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   }
 
   /**
-   * Callable to fetch the number of partitions of the stream given the stream metadata
-   * @return
-   * @throws Exception
+   * Callable to fetch the partition group info for the stream
    */
   @Override
   public Boolean call()
       throws Exception {
 
-    String clientId = PartitionGroupMetadataFetcher.class.getSimpleName() + "-" + _topicName;
+    String clientId = PartitionGroupInfoFetcher.class.getSimpleName() + "-" + _topicName;
     try (
         StreamMetadataProvider streamMetadataProvider = _streamConsumerFactory.createStreamMetadataProvider(clientId)) {
-      _partitionGroupMetadataList = streamMetadataProvider.getPartitionGroupMetadataList(_currentPartitionGroupMetadata, /*maxWaitTimeMs=*/5000L);
+      _partitionGroupInfoList = streamMetadataProvider.getPartitionGroupInfoList(_currentPartitionGroupMetadata, /*maxWaitTimeMs=*/5000L);
       if (_exception != null) {
         // We had at least one failure, but succeeded now. Log an info
-        LOGGER.info("Successfully retrieved partition count as {} for topic {}", _partitionCount, _topicName);
+        LOGGER.info("Successfully retrieved partition group info for topic {}", _topicName);
       }
       return Boolean.TRUE;
     } catch (TransientConsumerException e) {

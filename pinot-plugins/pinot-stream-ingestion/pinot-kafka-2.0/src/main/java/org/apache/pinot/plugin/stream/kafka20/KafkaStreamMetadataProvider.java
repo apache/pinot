@@ -58,10 +58,9 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   /**
    * Fetch the partitionGroupMetadata list.
    * @param currentPartitionGroupsMetadata In case of Kafka, each partition group contains a single partition.
-   *                                       Hence current partition groups are not needed to compute the new partition groups
    */
   @Override
-  public List<PartitionGroupInfo> getPartitionGroupMetadataList(
+  public List<PartitionGroupInfo> getPartitionGroupInfoList(
       List<PartitionGroupMetadata> currentPartitionGroupsMetadata, long timeoutMillis)
       throws TimeoutException {
     int partitionCount = _consumer.partitionsFor(_topic, Duration.ofMillis(timeoutMillis)).size();
