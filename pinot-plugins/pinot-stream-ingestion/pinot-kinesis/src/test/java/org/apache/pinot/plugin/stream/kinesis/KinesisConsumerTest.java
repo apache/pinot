@@ -48,10 +48,11 @@ public class KinesisConsumerTest {
       KinesisCheckpoint kinesisCheckpoint = new KinesisCheckpoint(shard.sequenceNumberRange().startingSequenceNumber());
       KinesisFetchResult fetchResult = kinesisConsumer.fetch(kinesisCheckpoint, null, 6 * 10 * 1000L);
 
-      List<Record> list = fetchResult.getMessages();
+      KinesisRecordsBatch list = fetchResult.getMessages();
+      int n = list.getMessageCount();
 
-      for (Record record : list) {
-        System.out.println("SEQ-NO: " + record.sequenceNumber() + ", DATA: " + record.data().asUtf8String());
+      for (int i=0;i<n;i++) {
+        System.out.println("SEQ-NO: " + list.getMessageOffsetAtIndex(i) + ", DATA: " + list.getMessageAtIndex(i));
       }
     }
   }
