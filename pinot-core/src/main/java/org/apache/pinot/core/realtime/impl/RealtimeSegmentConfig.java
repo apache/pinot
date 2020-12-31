@@ -18,12 +18,16 @@
  */
 package org.apache.pinot.core.realtime.impl;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.spi.config.table.H3IndexColumn;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 
@@ -41,6 +45,7 @@ public class RealtimeSegmentConfig {
   private final Set<String> _invertedIndexColumns;
   private final Set<String> _textIndexColumns;
   private final Set<String> _fstIndexColumns;
+  private final Map<String, H3IndexColumn> _h3IndexColumns;
   private final RealtimeSegmentZKMetadata _realtimeSegmentZKMetadata;
   private final boolean _offHeap;
   private final PinotDataBufferMemoryManager _memoryManager;
@@ -55,13 +60,14 @@ public class RealtimeSegmentConfig {
   private final String _consumerDir;
 
   // TODO: Clean up this constructor. Most of these things can be extracted from tableConfig.
-  private RealtimeSegmentConfig(String tableNameWithType, String segmentName, String streamName, Schema schema, String timeColumnName,
-      int capacity, int avgNumMultiValues, Set<String> noDictionaryColumns, Set<String> varLengthDictionaryColumns,
-      Set<String> invertedIndexColumns, Set<String> textIndexColumns, Set<String> fstIndexColumns,
-      RealtimeSegmentZKMetadata realtimeSegmentZKMetadata, boolean offHeap, PinotDataBufferMemoryManager memoryManager,
-      RealtimeSegmentStatsHistory statsHistory, String partitionColumn, PartitionFunction partitionFunction,
-      int partitionId, boolean aggregateMetrics, boolean nullHandlingEnabled, String consumerDir,
-      UpsertConfig.Mode upsertMode, PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
+  private RealtimeSegmentConfig(String tableNameWithType, String segmentName, String streamName, Schema schema,
+      String timeColumnName, int capacity, int avgNumMultiValues, Set<String> noDictionaryColumns,
+      Set<String> varLengthDictionaryColumns, Set<String> invertedIndexColumns, Set<String> textIndexColumns,
+      Set<String> fstIndexColumns, RealtimeSegmentZKMetadata realtimeSegmentZKMetadata, boolean offHeap,
+      PinotDataBufferMemoryManager memoryManager, RealtimeSegmentStatsHistory statsHistory, String partitionColumn,
+      PartitionFunction partitionFunction, int partitionId, boolean aggregateMetrics, boolean nullHandlingEnabled,
+      String consumerDir, UpsertConfig.Mode upsertMode, PartitionUpsertMetadataManager partitionUpsertMetadataManager,
+      List<H3IndexColumn> h3IndexColumns) {
     _tableNameWithType = tableNameWithType;
     _segmentName = segmentName;
     _streamName = streamName;
@@ -86,6 +92,12 @@ public class RealtimeSegmentConfig {
     _consumerDir = consumerDir;
     _upsertMode = upsertMode != null ? upsertMode : UpsertConfig.Mode.NONE;
     _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
+    _h3IndexColumns = new HashMap<>();
+    if (h3IndexColumns != null) {
+      for (H3IndexColumn h3IndexColumn : h3IndexColumns) {
+        _h3IndexColumns.put(h3IndexColumn.getName(), h3IndexColumn);
+      }
+    }
   }
 
   public String getTableNameWithType() {
@@ -135,6 +147,10 @@ public class RealtimeSegmentConfig {
    */
   public Set<String> getTextIndexColumns() {
     return _textIndexColumns;
+  }
+
+  public Map<String, H3IndexColumn> getH3IndexColumns() {
+    return _h3IndexColumns;
   }
 
   public Set<String> getFSTIndexColumns() {
@@ -214,6 +230,7 @@ public class RealtimeSegmentConfig {
     private String _consumerDir;
     private UpsertConfig.Mode _upsertMode;
     private PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
+    private List<H3IndexColumn> _h3IndexColumns;
 
     public Builder() {
     }
@@ -346,12 +363,17 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
+    public Builder setH3IndexColumns(List<H3IndexColumn> h3IndexColumns) {
+      _h3IndexColumns = h3IndexColumns;
+      return this;
+    }
+
     public RealtimeSegmentConfig build() {
       return new RealtimeSegmentConfig(_tableNameWithType, _segmentName, _streamName, _schema, _timeColumnName,
           _capacity, _avgNumMultiValues, _noDictionaryColumns, _varLengthDictionaryColumns, _invertedIndexColumns,
-          _textIndexColumns, _fstIndexColumns, _realtimeSegmentZKMetadata, _offHeap, _memoryManager,
-          _statsHistory, _partitionColumn, _partitionFunction, _partitionId, _aggregateMetrics,
-          _nullHandlingEnabled, _consumerDir, _upsertMode, _partitionUpsertMetadataManager);
+          _textIndexColumns, _fstIndexColumns, _realtimeSegmentZKMetadata, _offHeap, _memoryManager, _statsHistory,
+          _partitionColumn, _partitionFunction, _partitionId, _aggregateMetrics, _nullHandlingEnabled, _consumerDir,
+          _upsertMode, _partitionUpsertMetadataManager, _h3IndexColumns);
     }
   }
 }

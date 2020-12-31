@@ -26,7 +26,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.segment.index.readers.geospatial.H3IndexReader;
+import org.apache.pinot.core.segment.index.readers.geospatial.ImmutableH3IndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -82,7 +82,7 @@ public class H3IndexCreatorTest {
     File h3IndexFile = new File(TEMP_DIR, COLUMN_NAME + ".h3.index");
     PinotDataBuffer h3IndexBuffer =
         PinotDataBuffer.mapFile(h3IndexFile, true, 0, h3IndexFile.length(), ByteOrder.BIG_ENDIAN, "H3 index file");
-    H3IndexReader reader = new H3IndexReader(h3IndexBuffer);
+    ImmutableH3IndexReader reader = new ImmutableH3IndexReader(h3IndexBuffer);
     for (Map.Entry<Long, Integer> entry : map.entrySet()) {
       Long h3 = entry.getKey();
       ImmutableRoaringBitmap docIds = reader.getDocIds(h3);

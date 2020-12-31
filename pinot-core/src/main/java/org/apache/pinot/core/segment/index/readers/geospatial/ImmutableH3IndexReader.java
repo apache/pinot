@@ -24,6 +24,7 @@ import java.lang.ref.SoftReference;
 import org.apache.pinot.core.segment.creator.impl.geospatial.H3IndexCreator;
 import org.apache.pinot.core.segment.creator.impl.geospatial.H3IndexResolution;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.segment.index.readers.H3IndexReader;
 import org.apache.pinot.core.segment.index.readers.LongDictionary;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -36,9 +37,9 @@ import org.slf4j.LoggerFactory;
  * Reader of the H3 index. Please reference {@link org.apache.pinot.core.segment.creator.impl.geospatial.H3IndexCreator}
  * for the index file layout.
  */
-public class H3IndexReader implements Closeable {
+public class ImmutableH3IndexReader implements H3IndexReader, Closeable {
 
-  public static final Logger LOGGER = LoggerFactory.getLogger(H3IndexReader.class);
+  public static final Logger LOGGER = LoggerFactory.getLogger(ImmutableH3IndexReader.class);
 
   private final PinotDataBuffer _bitmapBuffer;
   private final PinotDataBuffer _offsetBuffer;
@@ -54,7 +55,7 @@ public class H3IndexReader implements Closeable {
    * Constructs an inverted index with the specified size.
    * @param dataBuffer data buffer for the inverted index.
    */
-  public H3IndexReader(PinotDataBuffer dataBuffer) {
+  public ImmutableH3IndexReader(PinotDataBuffer dataBuffer) {
     int version = dataBuffer.getInt(0 * Integer.BYTES);
     Preconditions.checkArgument(version == H3IndexCreator.VERSION,
         "Only the h3 index version " + H3IndexCreator.VERSION + " is supported");
@@ -76,6 +77,7 @@ public class H3IndexReader implements Closeable {
     return _resolution;
   }
 
+  @Override
   public ImmutableRoaringBitmap getDocIds(long h3IndexId) {
     SoftReference<ImmutableRoaringBitmap>[] bitmapArrayReference;
     int dictId = _dictionary.indexOf(String.valueOf(h3IndexId));
