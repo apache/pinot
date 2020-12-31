@@ -40,6 +40,7 @@ import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.kafka.common.protocol.Errors;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.OffsetCriteria;
+import org.apache.pinot.spi.stream.PartitionGroupInfo;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
@@ -54,13 +55,14 @@ import org.slf4j.LoggerFactory;
 public class KafkaStreamMetadataProvider extends KafkaConnectionHandler implements StreamMetadataProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaStreamMetadataProvider.class);
 
+  private StreamConfig _streamConfig;
+
   /**
    * Create a partition specific metadata provider
-   * @param streamConfig
-   * @param partition
    */
   public KafkaStreamMetadataProvider(String clientId, StreamConfig streamConfig, int partition) {
     super(clientId, streamConfig, partition, new KafkaSimpleConsumerFactoryImpl());
+    _streamConfig = streamConfig;
   }
 
   /**
@@ -69,18 +71,21 @@ public class KafkaStreamMetadataProvider extends KafkaConnectionHandler implemen
    */
   public KafkaStreamMetadataProvider(String clientId, StreamConfig streamConfig) {
     super(clientId, streamConfig, new KafkaSimpleConsumerFactoryImpl());
+    _streamConfig = streamConfig;
   }
 
   @VisibleForTesting
   public KafkaStreamMetadataProvider(String clientId, StreamConfig streamConfig, int partition,
       KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
     super(clientId, streamConfig, partition, kafkaSimpleConsumerFactory);
+    _streamConfig = streamConfig;
   }
 
   @VisibleForTesting
   public KafkaStreamMetadataProvider(String clientId, StreamConfig streamConfig,
       KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
     super(clientId, streamConfig, kafkaSimpleConsumerFactory);
+    _streamConfig = streamConfig;
   }
 
   /**
@@ -156,19 +161,30 @@ public class KafkaStreamMetadataProvider extends KafkaConnectionHandler implemen
   }
 
   /**
-   * Fetch the partition group metadata list
+   * Fetch the partitionGroupMetadata list.
    * @param currentPartitionGroupsMetadata In case of Kafka, each partition group contains a single partition.
-   *                                       Hence current partition groups are not needed to compute the new partition groups
    */
   @Override
-  public List<PartitionGroupMetadata> getPartitionGroupMetadataList(
-      @Nullable List<PartitionGroupMetadata> currentPartitionGroupsMetadata, long timeoutMillis) {
+  public List<PartitionGroupInfo> getPartitionGroupInfoList(
+      List<PartitionGroupMetadata> currentPartitionGroupsMetadata, long timeoutMillis)
+      throws java.util.concurrent.TimeoutException {
     int partitionCount = fetchPartitionCountInternal(timeoutMillis);
-    List<PartitionGroupMetadata> partitionGroupMetadataList = new ArrayList<>(partitionCount);
-    for (int i = 0; i < partitionCount; i++) {
-      partitionGroupMetadataList.add(new KafkaPartitionGroupMetadata(i));
+    List<PartitionGroupInfo> newPartitionGroupInfoList = new ArrayList<>(partitionCount);
+
+    // add a PartitionGroupInfo into the list foreach partition already present in current.
+    // the end checkpoint is set as checkpoint
+    for (PartitionGroupMetadata currentPartitionGroupMetadata : currentPartitionGroupsMetadata) {
+      newPartitionGroupInfoList.add(new PartitionGroupInfo(currentPartitionGroupMetadata.getPartitionGroupId(),
+          currentPartitionGroupMetadata.getEndCheckpoint()));
     }
-    return partitionGroupMetadataList;
+    // add PartitiongroupInfo for new partitions
+    // use offset criteria from stream config
+    for (int i = currentPartitionGroupsMetadata.size(); i < partitionCount; i++) {
+      StreamPartitionMsgOffset streamPartitionMsgOffset =
+          fetchStreamPartitionOffset(_streamConfig.getOffsetCriteria(), 5000);
+      newPartitionGroupInfoList.add(new PartitionGroupInfo(i, streamPartitionMsgOffset.toString()));
+    }
+    return newPartitionGroupInfoList;
   }
 
   public synchronized long fetchPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis)

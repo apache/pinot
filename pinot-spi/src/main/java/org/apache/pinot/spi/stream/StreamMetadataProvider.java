@@ -40,7 +40,7 @@ public interface StreamMetadataProvider extends Closeable {
   int fetchPartitionCount(long timeoutMillis);
 
   // takes the current state of partition groups (groupings of shards, the state of the consumption) and creates the new state
-  List<PartitionGroupInfo> getPartitionGroupMetadataList(
+  List<PartitionGroupInfo> getPartitionGroupInfoList(
       List<PartitionGroupMetadata> currentPartitionGroupsMetadata, long timeoutMillis)
       throws TimeoutException;
 

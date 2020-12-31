@@ -1337,7 +1337,7 @@ public class PinotHelixResourceManager {
       idealState = PinotTableIdealStateBuilder
           .buildLowLevelRealtimeIdealStateFor(realtimeTableName, realtimeTableConfig, idealState,
               _enableBatchMessageMode);
-      _pinotLLCRealtimeSegmentManager.setupNewShardedTable(realtimeTableConfig, idealState);
+      _pinotLLCRealtimeSegmentManager.setupNewTable(realtimeTableConfig, idealState);
       LOGGER.info("Successfully setup table for SHARDED consumers for {} ", realtimeTableName);
     } else {
 
@@ -1366,7 +1366,7 @@ public class PinotHelixResourceManager {
           idealState = PinotTableIdealStateBuilder
               .buildLowLevelRealtimeIdealStateFor(realtimeTableName, realtimeTableConfig, idealState,
                   _enableBatchMessageMode);
-          _pinotLLCRealtimeSegmentManager.setupNewShardedTable(realtimeTableConfig, idealState);
+          _pinotLLCRealtimeSegmentManager.setupNewTable(realtimeTableConfig, idealState);
           LOGGER.info("Successfully added Helix entries for low-level consumers for {} ", realtimeTableName);
         } else {
           LOGGER.info("LLC is already set up for table {}, not configuring again", realtimeTableName);

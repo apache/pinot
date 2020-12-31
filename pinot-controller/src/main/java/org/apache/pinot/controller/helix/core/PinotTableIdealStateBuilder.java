@@ -30,10 +30,10 @@ import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
-import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.stream.PartitionGroupInfo;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
-import org.apache.pinot.spi.stream.PartitionGroupMetadataFetcher;
+import org.apache.pinot.spi.stream.PartitionGroupInfoFetcher;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -115,15 +115,15 @@ public class PinotTableIdealStateBuilder {
     return idealState;
   }
 
-  public static List<PartitionGroupMetadata> getPartitionGroupMetadataList(StreamConfig streamConfig,
+  public static List<PartitionGroupInfo> getPartitionGroupInfoList(StreamConfig streamConfig,
       List<PartitionGroupMetadata> currentPartitionGroupMetadataList) {
-    PartitionGroupMetadataFetcher partitionGroupMetadataFetcher =
-        new PartitionGroupMetadataFetcher(streamConfig, currentPartitionGroupMetadataList);
+    PartitionGroupInfoFetcher partitionGroupInfoFetcher =
+        new PartitionGroupInfoFetcher(streamConfig, currentPartitionGroupMetadataList);
     try {
-      RetryPolicies.noDelayRetryPolicy(3).attempt(partitionGroupMetadataFetcher);
-      return partitionGroupMetadataFetcher.getPartitionGroupMetadataList();
+      RetryPolicies.noDelayRetryPolicy(3).attempt(partitionGroupInfoFetcher);
+      return partitionGroupInfoFetcher.getPartitionGroupInfoList();
     } catch (Exception e) {
-      Exception fetcherException = partitionGroupMetadataFetcher.getException();
+      Exception fetcherException = partitionGroupInfoFetcher.getException();
       LOGGER.error("Could not get partition count for {}", streamConfig.getTopicName(), fetcherException);
       throw new RuntimeException(fetcherException);
     }
