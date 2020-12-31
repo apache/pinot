@@ -46,9 +46,9 @@ public abstract class BaseDataSource implements DataSource {
 
   public BaseDataSource(DataSourceMetadata dataSourceMetadata, ForwardIndexReader<?> forwardIndex,
       @Nullable Dictionary dictionary, @Nullable InvertedIndexReader<?> invertedIndex,
-      @Nullable InvertedIndexReader<?> rangeIndex, @Nullable H3IndexReader h3Index, @Nullable TextIndexReader textIndex,
+      @Nullable InvertedIndexReader<?> rangeIndex, @Nullable TextIndexReader textIndex,
       @Nullable TextIndexReader fstIndex, @Nullable JsonIndexReader jsonIndex, @Nullable BloomFilterReader bloomFilter,
-      @Nullable NullValueVectorReader nullValueVector) {
+      @Nullable NullValueVectorReader nullValueVector, @Nullable H3IndexReader h3Index) {
     _dataSourceMetadata = dataSourceMetadata;
     _forwardIndex = forwardIndex;
     _dictionary = dictionary;
@@ -60,6 +60,15 @@ public abstract class BaseDataSource implements DataSource {
     _jsonIndex = jsonIndex;
     _bloomFilter = bloomFilter;
     _nullValueVector = nullValueVector;
+  }
+
+  public BaseDataSource(DataSourceMetadata dataSourceMetadata, ForwardIndexReader<?> forwardIndex,
+      @Nullable Dictionary dictionary, @Nullable InvertedIndexReader<?> invertedIndex,
+      @Nullable InvertedIndexReader<?> rangeIndex, @Nullable TextIndexReader textIndex,
+      @Nullable TextIndexReader fstIndex, @Nullable BloomFilterReader bloomFilter,
+      @Nullable NullValueVectorReader nullValueVector) {
+    this(dataSourceMetadata, forwardIndex, dictionary, invertedIndex, rangeIndex, textIndex, fstIndex, bloomFilter,
+        nullValueVector, null);
   }
 
   @Override

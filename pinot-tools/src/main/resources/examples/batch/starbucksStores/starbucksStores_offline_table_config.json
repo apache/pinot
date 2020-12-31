@@ -15,8 +15,11 @@
     "loadMode": "MMAP",
     "invertedIndexColumns": [
     ],
-    "h3IndexColumns": [
-      "location_st_point"
+    "h3IndexConfigs": [
+      {
+        "column": "location_st_point",
+        "resolutions": [5]
+      }
     ],
     "noDictionaryColumns": [
       "location_st_point"

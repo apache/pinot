@@ -117,9 +117,11 @@ public class SegmentPreProcessor implements AutoCloseable {
       rangeIndexHandler.createRangeIndices();
 
       // Create column H3 indices according to the index config.
-      H3IndexHandler h3IndexHandler =
-          new H3IndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
-      h3IndexHandler.createH3Indices();
+      if (_indexLoadingConfig.getH3IndexConfigs() != null) {
+        H3IndexHandler h3IndexHandler =
+            new H3IndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
+        h3IndexHandler.createH3Indices();
+      }
 
       Set<String> textIndexColumns = _indexLoadingConfig.getTextIndexColumns();
       if (!textIndexColumns.isEmpty()) {

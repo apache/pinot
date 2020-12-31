@@ -44,12 +44,12 @@ public class MutableDataSource extends BaseDataSource {
       @Nullable PartitionFunction partitionFunction, @Nullable Set<Integer> partitions, @Nullable Comparable minValue,
       @Nullable Comparable maxValue, ForwardIndexReader forwardIndex, @Nullable Dictionary dictionary,
       @Nullable InvertedIndexReader invertedIndex, @Nullable InvertedIndexReader rangeIndex,
-      @Nullable H3IndexReader h3Index, @Nullable TextIndexReader textIndex, boolean enableFST,
-      @Nullable JsonIndexReader jsonIndex, @Nullable BloomFilterReader bloomFilter,
-      @Nullable NullValueVectorReader nullValueVector) {
+      @Nullable TextIndexReader textIndex, boolean enableFST, @Nullable JsonIndexReader jsonIndex,
+      @Nullable BloomFilterReader bloomFilter, @Nullable NullValueVectorReader nullValueVector,
+      @Nullable H3IndexReader h3Index) {
     super(new MutableDataSourceMetadata(fieldSpec, numDocs, numValues, maxNumValuesPerMVEntry, partitionFunction,
-            partitions, minValue, maxValue), forwardIndex, dictionary, invertedIndex, rangeIndex, h3Index, textIndex, null,
-        jsonIndex, bloomFilter, nullValueVector);
+            partitions, minValue, maxValue), forwardIndex, dictionary, invertedIndex, rangeIndex, textIndex, null,
+        jsonIndex, bloomFilter, nullValueVector, h3Index);
     _enableFST = enableFST;
   }
 

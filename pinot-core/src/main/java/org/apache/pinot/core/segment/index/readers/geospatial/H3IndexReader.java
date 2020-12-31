@@ -18,24 +18,27 @@
  */
 package org.apache.pinot.core.segment.index.readers.geospatial;
 
+import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.lang.ref.SoftReference;
+import org.apache.pinot.core.segment.creator.impl.geospatial.H3IndexCreator;
 import org.apache.pinot.core.segment.creator.impl.geospatial.H3IndexResolution;
-import org.apache.pinot.core.segment.index.readers.BitmapInvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
-import org.apache.pinot.core.segment.index.readers.IntDictionary;
 import org.apache.pinot.core.segment.index.readers.LongDictionary;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
-import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * Reader of the H3 index. Please reference {@link org.apache.pinot.core.segment.creator.impl.geospatial.H3IndexCreator}
+ * for the index file layout.
+ */
 public class H3IndexReader implements Closeable {
 
-  public static final Logger LOGGER = LoggerFactory.getLogger(BitmapInvertedIndexReader.class);
+  public static final Logger LOGGER = LoggerFactory.getLogger(H3IndexReader.class);
 
   private final PinotDataBuffer _bitmapBuffer;
   private final PinotDataBuffer _offsetBuffer;
@@ -53,6 +56,8 @@ public class H3IndexReader implements Closeable {
    */
   public H3IndexReader(PinotDataBuffer dataBuffer) {
     int version = dataBuffer.getInt(0 * Integer.BYTES);
+    Preconditions.checkArgument(version == H3IndexCreator.VERSION,
+        "Only the h3 index version " + H3IndexCreator.VERSION + " is supported");
     _numBitmaps = dataBuffer.getInt(1 * Integer.BYTES);
     _resolution = new H3IndexResolution(dataBuffer.getShort(2 * Integer.BYTES));
 
@@ -72,7 +77,7 @@ public class H3IndexReader implements Closeable {
   }
 
   public ImmutableRoaringBitmap getDocIds(long h3IndexId) {
-    SoftReference<ImmutableRoaringBitmap>[] bitmapArrayReference = null;
+    SoftReference<ImmutableRoaringBitmap>[] bitmapArrayReference;
     int dictId = _dictionary.indexOf(String.valueOf(h3IndexId));
     if (dictId < 0) {
       return new MutableRoaringBitmap();
@@ -90,17 +95,17 @@ public class H3IndexReader implements Closeable {
         }
       } else {
         bitmapArrayReference = new SoftReference[_numBitmaps];
-        _bitmaps = new SoftReference<SoftReference<ImmutableRoaringBitmap>[]>(bitmapArrayReference);
+        _bitmaps = new SoftReference<>(bitmapArrayReference);
       }
     } else {
       bitmapArrayReference = new SoftReference[_numBitmaps];
-      _bitmaps = new SoftReference<SoftReference<ImmutableRoaringBitmap>[]>(bitmapArrayReference);
+      _bitmaps = new SoftReference<>(bitmapArrayReference);
     }
     synchronized (this) {
       ImmutableRoaringBitmap value;
       if (bitmapArrayReference[dictId] == null || bitmapArrayReference[dictId].get() == null) {
         value = buildRoaringBitmapForIndex(dictId);
-        bitmapArrayReference[dictId] = new SoftReference<ImmutableRoaringBitmap>(value);
+        bitmapArrayReference[dictId] = new SoftReference<>(value);
       } else {
         value = bitmapArrayReference[dictId].get();
       }
@@ -110,12 +115,8 @@ public class H3IndexReader implements Closeable {
 
   private synchronized ImmutableRoaringBitmap buildRoaringBitmapForIndex(final int index) {
     int currentOffset = getOffset(index);
-    int bufferLength;
-    if (index == _numBitmaps - 1) {
-      bufferLength = _bitmapBufferSize - currentOffset;
-    } else {
-      bufferLength = getOffset(index + 1) - currentOffset;
-    }
+    // get the length by comparing with the start offset of the next index or the end of all indices
+    int bufferLength = (index == _numBitmaps - 1 ? _bitmapBufferSize : getOffset(index + 1)) - currentOffset;
     return new ImmutableRoaringBitmap(_bitmapBuffer.toDirectByteBuffer(currentOffset, bufferLength));
   }
 
