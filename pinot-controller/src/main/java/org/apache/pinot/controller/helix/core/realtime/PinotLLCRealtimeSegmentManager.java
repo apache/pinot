@@ -207,7 +207,7 @@ public class PinotLLCRealtimeSegmentManager {
   /**
    * Sets up the realtime table ideal state for a table of consumer type SHARDED
    */
-  public void setupNewTable(TableConfig tableConfig, IdealState idealState) {
+  public void setUpNewTable(TableConfig tableConfig, IdealState idealState) {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
     String realtimeTableName = tableConfig.getTableName();
