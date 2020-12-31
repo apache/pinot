@@ -94,9 +94,8 @@ public class PinotTableIdealStateBuilder {
     return idealState;
   }
 
-  public static void buildLowLevelRealtimeIdealStateFor(PinotLLCRealtimeSegmentManager pinotLLCRealtimeSegmentManager,
-      String realtimeTableName, TableConfig realtimeTableConfig, IdealState idealState,
-      boolean enableBatchMessageMode) {
+  public static IdealState buildLowLevelRealtimeIdealStateFor(String realtimeTableName, TableConfig realtimeTableConfig,
+      IdealState idealState, boolean enableBatchMessageMode) {
 
     // Validate replicasPerPartition here.
     final String replicasPerPartitionStr = realtimeTableConfig.getValidationConfig().getReplicasPerPartition();
@@ -105,7 +104,7 @@ public class PinotTableIdealStateBuilder {
     }
     final int nReplicas;
     try {
-      nReplicas = Integer.valueOf(replicasPerPartitionStr);
+      nReplicas = Integer.parseInt(replicasPerPartitionStr);
     } catch (NumberFormatException e) {
       throw new PinotHelixResourceManager.InvalidTableConfigException(
           "Invalid value for replicasPerPartition, expected a number: " + replicasPerPartitionStr, e);
@@ -113,7 +112,7 @@ public class PinotTableIdealStateBuilder {
     if (idealState == null) {
       idealState = buildEmptyRealtimeIdealStateFor(realtimeTableName, nReplicas, enableBatchMessageMode);
     }
-    pinotLLCRealtimeSegmentManager.setUpNewTable(realtimeTableConfig, idealState);
+    return idealState;
   }
 
   public static List<PartitionGroupMetadata> getPartitionGroupMetadataList(StreamConfig streamConfig,

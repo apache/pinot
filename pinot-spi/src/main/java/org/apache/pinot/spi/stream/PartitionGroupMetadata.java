@@ -18,22 +18,56 @@
  */
 package org.apache.pinot.spi.stream;
 
-import java.util.List;
+public class PartitionGroupMetadata {
 
+  // fixme: Make partitionGroupId string everywhere (LLCSegmentName, StreamMetadataProvider)
+  private final int _partitionGroupId;
+  private int _sequenceNumber;
+  private String _startCheckpoint;
+  private String _endCheckpoint;
+  private String _status;
 
-public interface PartitionGroupMetadata {
+  public PartitionGroupMetadata(int partitionGroupId, int sequenceNumber, String startCheckpoint,
+      String endCheckpoint, String status) {
+    _partitionGroupId = partitionGroupId;
+    _sequenceNumber = sequenceNumber;
+    _startCheckpoint = startCheckpoint;
+    _endCheckpoint = endCheckpoint;
+  }
 
-  int getGroupId();
+  public void setSequenceNumber(int sequenceNumber) {
+    _sequenceNumber = sequenceNumber;
+  }
 
-  Checkpoint getStartCheckpoint(); // similar to getStartOffset
+  public void setStartCheckpoint(String startCheckpoint) {
+    _startCheckpoint = startCheckpoint;
+  }
 
-  Checkpoint getEndCheckpoint(); // similar to getEndOffset
+  public void setEndCheckpoint(String endCheckpoint) {
+    _endCheckpoint = endCheckpoint;
+  }
 
-  void setStartCheckpoint(Checkpoint startCheckpoint);
+  public int getPartitionGroupId() {
+    return _partitionGroupId;
+  }
 
-  void setEndCheckpoint(Checkpoint endCheckpoint);
+  public int getSequenceNumber() {
+    return _sequenceNumber;
+  }
 
-  byte[] serialize();
+  public String getStartCheckpoint() {
+    return _startCheckpoint;
+  }
 
-  PartitionGroupMetadata deserialize(byte[] blob);
+  public String getEndCheckpoint() {
+    return _endCheckpoint;
+  }
+
+  public String getStatus() {
+    return _status;
+  }
+
+  public void setStatus(String status) {
+    _status = status;
+  }
 }
