@@ -907,15 +907,22 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     @Override
     void updateIdealStateOnSegmentCompletion(String realtimeTableName, String committingSegmentName,
-        String newSegmentName, SegmentAssignment segmentAssignment,
+        List<String> newSegmentNames, SegmentAssignment segmentAssignment,
         Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap) {
       updateInstanceStatesForNewConsumingSegment(_idealState.getRecord().getMapFields(), committingSegmentName,
-          newSegmentName, segmentAssignment, instancePartitionsMap);
+          null, segmentAssignment, instancePartitionsMap);
+      for (String segmentName : newSegmentNames) {
+        updateInstanceStatesForNewConsumingSegment(_idealState.getRecord().getMapFields(), null,
+            segmentName, segmentAssignment, instancePartitionsMap);
+      }
     }
 
     @Override
-    List<PartitionGroupInfo> getPartitionGroupInfoList(StreamConfig streamConfig, List<PartitionGroupMetadata> currentPartitionGroupMetadataList) {
-      return IntStream.range(0, _numPartitions).mapToObj(FakePartitionGroupMetadata::new).collect(Collectors.toList());
+    List<PartitionGroupInfo> getPartitionGroupInfoList(StreamConfig streamConfig,
+        List<PartitionGroupMetadata> currentPartitionGroupMetadataList) {
+      return IntStream.range(0, _numPartitions).mapToObj(i -> new PartitionGroupInfo(i,
+          getPartitionOffset(streamConfig, OffsetCriteria.SMALLEST_OFFSET_CRITERIA, i).toString()))
+          .collect(Collectors.toList());
     }
 
     @Override
