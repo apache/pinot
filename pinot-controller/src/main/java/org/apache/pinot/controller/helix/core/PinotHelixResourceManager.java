@@ -85,7 +85,6 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.BrokerResourceStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
@@ -124,6 +123,7 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
+import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
@@ -1337,64 +1337,49 @@ public class PinotHelixResourceManager {
         IngestionConfigUtils.getStreamConfigMap(realtimeTableConfig));
     IdealState idealState = getTableIdealState(realtimeTableName);
 
-    if (streamConfig.isShardedConsumerType()) {
-      setupShardedRealtimeTable(streamConfig, idealState, realtimeTableConfig.getValidationConfig().getReplicasPerPartitionNumber());
-    }
 
-    if (streamConfig.hasHighLevelConsumerType()) {
-      if (idealState == null) {
-        LOGGER.info("Initializing IdealState for HLC table: {}", realtimeTableName);
-        idealState = PinotTableIdealStateBuilder
-            .buildInitialHighLevelRealtimeIdealStateFor(realtimeTableName, realtimeTableConfig, _helixZkManager,
-                _propertyStore, _enableBatchMessageMode);
-        _helixAdmin.addResource(_helixClusterName, realtimeTableName, idealState);
-      } else {
-        // Remove LLC segments if it is not configured
-        if (!streamConfig.hasLowLevelConsumerType()) {
-          _pinotLLCRealtimeSegmentManager.removeLLCSegments(idealState);
+    if (streamConfig.isShardedConsumerType()) {
+      idealState = PinotTableIdealStateBuilder
+          .buildLowLevelRealtimeIdealStateFor(realtimeTableName, realtimeTableConfig, idealState,
+              _enableBatchMessageMode);
+      _pinotLLCRealtimeSegmentManager.setUpNewTable(realtimeTableConfig, idealState);
+      LOGGER.info("Successfully added Helix entries for low-level consumers for {} ", realtimeTableName);
+      _pinotLLCRealtimeSegmentManager.setupNewShardedTable(rawRealtimeTableConfig, idealState);
+    } else {
+
+      if (streamConfig.hasHighLevelConsumerType()) {
+        if (idealState == null) {
+          LOGGER.info("Initializing IdealState for HLC table: {}", realtimeTableName);
+          idealState = PinotTableIdealStateBuilder
+              .buildInitialHighLevelRealtimeIdealStateFor(realtimeTableName, realtimeTableConfig, _helixZkManager,
+                  _propertyStore, _enableBatchMessageMode);
+          _helixAdmin.addResource(_helixClusterName, realtimeTableName, idealState);
+        } else {
+          // Remove LLC segments if it is not configured
+          if (!streamConfig.hasLowLevelConsumerType()) {
+            _pinotLLCRealtimeSegmentManager.removeLLCSegments(idealState);
+          }
+        }
+        // For HLC table, property store entry must exist to trigger watchers to create segments
+        ensurePropertyStoreEntryExistsForHighLevelConsumer(realtimeTableName);
+      }
+
+      // Either we have only low-level consumer, or both.
+      if (streamConfig.hasLowLevelConsumerType()) {
+        // Will either create idealstate entry, or update the IS entry with new segments
+        // (unless there are low-level segments already present)
+        if (ZKMetadataProvider.getLLCRealtimeSegments(_propertyStore, realtimeTableName).isEmpty()) {
+          idealState = PinotTableIdealStateBuilder
+              .buildLowLevelRealtimeIdealStateFor(realtimeTableName, realtimeTableConfig, idealState,
+                  _enableBatchMessageMode);
+          _pinotLLCRealtimeSegmentManager.setUpNewTable(realtimeTableConfig, idealState);
+          LOGGER.info("Successfully added Helix entries for low-level consumers for {} ", realtimeTableName);
+        } else {
+          LOGGER.info("LLC is already set up for table {}, not configuring again", realtimeTableName);
         }
       }
-      // For HLC table, property store entry must exist to trigger watchers to create segments
-      ensurePropertyStoreEntryExistsForHighLevelConsumer(realtimeTableName);
-    }
-
-    // Either we have only low-level consumer, or both.
-    if (streamConfig.hasLowLevelConsumerType()) {
-      // Will either create idealstate entry, or update the IS entry with new segments
-      // (unless there are low-level segments already present)
-      if (ZKMetadataProvider.getLLCRealtimeSegments(_propertyStore, realtimeTableName).isEmpty()) {
-        PinotTableIdealStateBuilder
-            .buildLowLevelRealtimeIdealStateFor(_pinotLLCRealtimeSegmentManager, realtimeTableName, realtimeTableConfig,
-                idealState, _enableBatchMessageMode);
-        LOGGER.info("Successfully added Helix entries for low-level consumers for {} ", realtimeTableName);
-      } else {
-        LOGGER.info("LLC is already set up for table {}, not configuring again", realtimeTableName);
-      }
     }
   }
-
-  /**
-   * Sets up the realtime table ideal state
-   * @param streamConfig
-   */
-  private void setupShardedRealtimeTable(StreamConfig streamConfig, IdealState idealState, int numReplicas) {
-    StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
-    StreamMetadataProvider streamMetadataProvider = streamConsumerFactory
-        .createStreamMetadataProvider(streamConfig.getTopicName() + "_" + System.currentTimeMillis());
-
-    // get current partition groups and their metadata - this will be empty when creating the table
-    List<PartitionGroupMetadata> currentPartitionGroupMetadataList = _pinotLLCRealtimeSegmentManager.getCurrentPartitionGroupMetadataList(idealState);
-
-    // get new partition groups and their metadata,
-    // Assume table has 3 shards. Say we get [0], [1], [2] groups (for now assume that each group contains only 1 shard)
-    List<PartitionGroupMetadata> newPartitionGroupMetadataList =
-        streamMetadataProvider.getPartitionGroupMetadataList(currentPartitionGroupMetadataList, 5000);
-
-    // setup segment zk metadata and ideal state for all the new found partition groups
-    _pinotLLCRealtimeSegmentManager.setupNewPartitionGroups(newPartitionGroupMetadataList, numReplicas);
-  }
-
-
 
   private void ensurePropertyStoreEntryExistsForHighLevelConsumer(String realtimeTableName) {
     String propertyStorePath = ZKMetadataProvider.constructPropertyStorePathForResource(realtimeTableName);
