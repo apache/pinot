@@ -43,7 +43,7 @@ public class IndexingConfig extends BaseJsonConfig {
   private List<String> _onHeapDictionaryColumns;
   private boolean _enableDefaultStarTree;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
-  private List<H3IndexConfig> _h3IndexConfigs;
+  private List<H3IndexColumn> _h3IndexColumns;
   // Whether to allow creating star-tree when server loads the segment
   private boolean _enableDynamicStarTreeCreation;
   private SegmentPartitionConfig _segmentPartitionConfig;
@@ -67,12 +67,12 @@ public class IndexingConfig extends BaseJsonConfig {
   }
 
   @Nullable
-  public List<H3IndexConfig> getH3IndexConfigs() {
-    return _h3IndexConfigs;
+  public List<H3IndexColumn> getH3IndexColumns() {
+    return _h3IndexColumns;
   }
 
-  public void setH3IndexConfigs(List<H3IndexConfig> h3IndexConfigs) {
-    _h3IndexConfigs = h3IndexConfigs;
+  public void setH3IndexColumns(List<H3IndexColumn> h3IndexColumns) {
+    _h3IndexColumns = h3IndexColumns;
   }
 
   public List<String> getRangeIndexColumns() {

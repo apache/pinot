@@ -26,17 +26,17 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
-public class H3IndexConfig extends BaseJsonConfig {
+public class H3IndexColumn extends BaseJsonConfig {
   // the column to build h3 index
-  private final String _column;
+  private final String _name;
   // the index resolutions
   private final List<Integer> _resolutions;
 
   @JsonCreator
-  public H3IndexConfig(@JsonProperty(value = "column", required = true) String columnName,
+  public H3IndexColumn(@JsonProperty(value = "name", required = true) String name,
       @JsonProperty(value = "resolutions", required = true) List<Integer> resolutions) {
     Preconditions.checkArgument(CollectionUtils.isNotEmpty(resolutions), "'resolutions must be configured'");
-    _column = columnName;
+    _name = name;
     _resolutions = resolutions;
   }
 
@@ -44,7 +44,7 @@ public class H3IndexConfig extends BaseJsonConfig {
     return _resolutions;
   }
 
-  public String getColumn() {
-    return _column;
+  public String getName() {
+    return _name;
   }
 }
