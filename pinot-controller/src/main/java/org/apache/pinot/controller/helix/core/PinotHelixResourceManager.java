@@ -126,12 +126,7 @@ import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.stream.PartitionGroupMetadata;
-import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
-import org.apache.pinot.spi.stream.StreamConsumerFactory;
-import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
-import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -1361,9 +1356,8 @@ public class PinotHelixResourceManager {
       idealState = PinotTableIdealStateBuilder
           .buildLowLevelRealtimeIdealStateFor(realtimeTableName, realtimeTableConfig, idealState,
               _enableBatchMessageMode);
-      _pinotLLCRealtimeSegmentManager.setUpNewTable(realtimeTableConfig, idealState);
-      LOGGER.info("Successfully added Helix entries for low-level consumers for {} ", realtimeTableName);
-      _pinotLLCRealtimeSegmentManager.setupNewShardedTable(rawRealtimeTableConfig, idealState);
+      _pinotLLCRealtimeSegmentManager.setupNewShardedTable(realtimeTableConfig, idealState);
+      LOGGER.info("Successfully setup table for SHARDED consumers for {} ", realtimeTableName);
     } else {
 
       if (streamConfig.hasHighLevelConsumerType()) {
@@ -1391,7 +1385,7 @@ public class PinotHelixResourceManager {
           idealState = PinotTableIdealStateBuilder
               .buildLowLevelRealtimeIdealStateFor(realtimeTableName, realtimeTableConfig, idealState,
                   _enableBatchMessageMode);
-          _pinotLLCRealtimeSegmentManager.setUpNewTable(realtimeTableConfig, idealState);
+          _pinotLLCRealtimeSegmentManager.setupNewShardedTable(realtimeTableConfig, idealState);
           LOGGER.info("Successfully added Helix entries for low-level consumers for {} ", realtimeTableName);
         } else {
           LOGGER.info("LLC is already set up for table {}, not configuring again", realtimeTableName);
