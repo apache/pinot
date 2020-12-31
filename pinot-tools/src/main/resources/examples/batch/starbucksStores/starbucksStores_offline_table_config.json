@@ -11,16 +11,18 @@
   },
   "tenants": {
   },
+  "fieldConfigList": [
+    {
+      "name": "location_st_point",
+      "encodingType":"RAW",
+      "indexType":"H3",
+      "properties": {
+        "resolutions": "5"
+      }
+    }
+  ],
   "tableIndexConfig": {
     "loadMode": "MMAP",
-    "invertedIndexColumns": [
-    ],
-    "h3IndexColumns": [
-      {
-        "name": "location_st_point",
-        "resolutions": [5]
-      }
-    ],
     "noDictionaryColumns": [
       "location_st_point"
     ]

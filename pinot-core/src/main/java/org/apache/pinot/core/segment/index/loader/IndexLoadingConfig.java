@@ -19,6 +19,7 @@
 package org.apache.pinot.core.segment.index.loader;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -58,7 +59,7 @@ public class IndexLoadingConfig {
   private Map<String, BloomFilterConfig> _bloomFilterConfigs = new HashMap<>();
   private boolean _enableDynamicStarTreeCreation;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
-  private List<H3IndexColumn> _h3IndexColumns;
+  private List<H3IndexColumn> _h3IndexColumns = new ArrayList<>();
   private boolean _enableDefaultStarTree;
 
   private SegmentVersion _segmentVersion;
@@ -100,8 +101,6 @@ public class IndexLoadingConfig {
       _rangeIndexColumns.addAll(rangeIndexColumns);
     }
 
-    _h3IndexColumns = indexingConfig.getH3IndexColumns();
-
     List<String> bloomFilterColumns = indexingConfig.getBloomFilterColumns();
     if (bloomFilterColumns != null) {
       for (String bloomFilterColumn : bloomFilterColumns) {
@@ -127,6 +126,7 @@ public class IndexLoadingConfig {
 
     extractTextIndexColumnsFromTableConfig(tableConfig);
     extractFSTIndexColumnsFromTableConfig(tableConfig);
+    extractH3IndexColumnsFromTableConfig(tableConfig);
 
     Map<String, String> noDictionaryConfig = indexingConfig.getNoDictionaryConfig();
     if (noDictionaryConfig != null) {
@@ -174,6 +174,17 @@ public class IndexLoadingConfig {
         String column = fieldConfig.getName();
         if (fieldConfig.getIndexType() == FieldConfig.IndexType.TEXT) {
           _textIndexColumns.add(column);
+        }
+      }
+    }
+  }
+
+  private void extractH3IndexColumnsFromTableConfig(TableConfig tableConfig) {
+    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+    if (fieldConfigList != null) {
+      for (FieldConfig fieldConfig : fieldConfigList) {
+        if (fieldConfig.getIndexType() == FieldConfig.IndexType.H3) {
+          _h3IndexColumns.add(new H3IndexColumn(fieldConfig.getName(), fieldConfig.getProperties()));
         }
       }
     }
