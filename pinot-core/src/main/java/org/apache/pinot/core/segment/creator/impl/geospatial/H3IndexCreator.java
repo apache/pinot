@@ -26,7 +26,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.ObjectInputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
@@ -45,7 +44,6 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Point;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -53,9 +51,48 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import static org.apache.pinot.core.segment.creator.impl.V1Constants.Indexes.H3_INDEX_FILE_EXTENSION;
 
 
+/**
+ * The creator of H3 index.
+ * <p>2 passes are used to create the h3 index via merge sort.
+ *  * <ul>
+ *  *   <li>
+ *  *     In the first pass (adding values phase), when add() method is called, derive the h3 index from the given latitude,
+ *  *     and longitude with the specified resolution, and store the index in chunks with each chunk sorted.
+ *  *   </li>
+ *  *   <li>
+ *  *     In the second pass, when seal() method is called, the sorted chunks are merged into the index file.
+ *  *   </li>
+ *  * </ul>
+ * <pre>
+ *
+ * Layout for H3 inverted index, header & dictionary & offset & bitmap :
+ * |-------------------------------------------------------------------------|
+ * |                                     version                             |
+ * |                               Number of unique H3Ids                    |
+ * |                                     resolutions                         |
+ * |-------------------------------------------------------------------------|
+ * |                                    1st H3Id                             |
+ * |                                    2nd H3Id                             |
+ * |                                    ...                                  |
+ * |                                    last H3Id                            |
+ * |-------------------------------------------------------------------------|
+ * |                        Offset of the bitmap for 1st H3Id                |
+ * |                        Offset of the bitmap for 2nd H3Id                |
+ * |                                   ...                                   |
+ * |                       Offset of the bitmap for last H3Id                |
+ * |-------------------------------------------------------------------------|
+ * |                         Serialized bitmap for 1st H3Id                  |
+ * |                         Serialized bitmap for 2nd H3Id                  |
+ * |                                   ...                                   |
+ * |                        Serialized bitmap for last H3Id                  |
+ * |-------------------------------------------------------------------------|
+ * </pre>
+ *
+ */
 public class H3IndexCreator implements GeoSpatialIndexCreator {
+  private static final String CHUNK_PREFIX = "chunk-";
 
-  private static final int VERSION = 1;
+  public static final int VERSION = 1;
   private static final int FLUSH_THRESHOLD = 100_000;
   private final H3Core _h3Core;
   private File _indexDir;
@@ -70,7 +107,6 @@ public class H3IndexCreator implements GeoSpatialIndexCreator {
 
   public H3IndexCreator(File indexDir, FieldSpec fieldSpec, H3IndexResolution resolution)
       throws IOException {
-
     _indexDir = indexDir;
     _fieldSpec = fieldSpec;
     _resolution = resolution;
@@ -96,10 +132,9 @@ public class H3IndexCreator implements GeoSpatialIndexCreator {
   }
 
   private void flush() {
-    //dump what ever we have in _h3IndexMap in a sorted order
+    File tempChunkFile = new File(_indexDir, CHUNK_PREFIX + numChunks);
+    //dump whatever we have in _h3IndexMap in a sorted order
     try {
-
-      File tempChunkFile = new File(_indexDir, "chunk-" + numChunks);
       DataOutputStream dos = new DataOutputStream(new FileOutputStream(tempChunkFile));
       chunkLengths.add(_h3IndexMap.size());
       for (Map.Entry<Long, MutableRoaringBitmap> entry : _h3IndexMap.entrySet()) {
@@ -117,25 +152,25 @@ public class H3IndexCreator implements GeoSpatialIndexCreator {
       _h3IndexMap.clear();
       numChunks++;
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      throw new RuntimeException(String.format("Failed to create h3 index in %s", tempChunkFile), e);
     }
   }
 
   public void seal()
-      throws Exception {
+      throws IOException {
     flush();
 
-    //merge all the chunk files, since they are sorted we can write the dictionary as well
+    // merge sort all the chunk files, since they are sorted we can write the dictionary as well
     PriorityQueue<Entry> queue = new PriorityQueue<>();
 
     ChunkReader[] chunkReaders = new ChunkReader[numChunks];
     for (int chunkId = 0; chunkId < numChunks; chunkId++) {
-      File chunkFile = new File(_indexDir, "chunk-" + chunkId);
+      File chunkFile = new File(_indexDir, CHUNK_PREFIX + chunkId);
       chunkReaders[chunkId] = new ChunkReader(chunkId, chunkLengths.get(chunkId), chunkFile);
-
       Entry e = chunkReaders[chunkId].getNextEntry();
       queue.add(e);
     }
+
     long prevH3Id = -1;
     MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
 
@@ -163,9 +198,9 @@ public class H3IndexCreator implements GeoSpatialIndexCreator {
 
       prevH3Id = currH3Id;
 
-      Entry e = chunkReaders[poll.chunkId].getNextEntry();
-      if (e != null) {
-        queue.add(e);
+      Entry entry = chunkReaders[poll.chunkId].getNextEntry();
+      if (entry != null) {
+        queue.add(entry);
       }
     }
     if (prevH3Id != -1) {
@@ -198,15 +233,21 @@ public class H3IndexCreator implements GeoSpatialIndexCreator {
     writtenBytes += offsetFile.length();
 
     h3IndexBuffer.readFrom(writtenBytes, bitmapFile, 0, bitmapFile.length());
-    writtenBytes += headerFile.length();
   }
 
   @Override
   public void close()
       throws IOException {
     //delete chunk files
+    for (int chunkId = 0; chunkId < numChunks; chunkId++) {
+      File chunkFile = new File(_indexDir, CHUNK_PREFIX + chunkId);
+      FileUtils.forceDelete(chunkFile);
+    }
   }
 
+  /**
+   * Reader of an index chunk.
+   */
   class ChunkReader {
     private int _chunkId;
     private Integer _chunkLength;
@@ -214,7 +255,7 @@ public class H3IndexCreator implements GeoSpatialIndexCreator {
     int index = 0;
 
     ChunkReader(int chunkId, Integer chunkLength, File chunkFile)
-        throws Exception {
+        throws IOException {
       _chunkId = chunkId;
       _chunkLength = chunkLength;
       dataInputStream = new DataInputStream(new FileInputStream(chunkFile));
@@ -237,14 +278,11 @@ public class H3IndexCreator implements GeoSpatialIndexCreator {
 
   class Entry implements Comparable<Entry> {
     int chunkId;
-
     long h3Id;
-
     ImmutableRoaringBitmap bitmap;
 
     @Override
     public boolean equals(Object o) {
-
       return h3Id == ((Entry) o).h3Id;
     }
 
@@ -266,25 +304,23 @@ public class H3IndexCreator implements GeoSpatialIndexCreator {
   }
 
   private class Writer {
-
     private DataOutputStream _dictionaryStream;
     private DataOutputStream _offsetStream;
     private DataOutputStream _bitmapStream;
     private int _offset = 0;
     private int _numUniqueIds = 0;
 
-    public Writer(DataOutputStream dictionaryStream, DataOutputStream offsetStream, DataOutputStream bitmapStream) {
-
+    Writer(DataOutputStream dictionaryStream, DataOutputStream offsetStream, DataOutputStream bitmapStream) {
       _dictionaryStream = dictionaryStream;
       _offsetStream = offsetStream;
       _bitmapStream = bitmapStream;
     }
 
-    public int getNumUniqueIds() {
+    int getNumUniqueIds() {
       return _numUniqueIds;
     }
 
-    public void add(long h3Id, ImmutableRoaringBitmap bitmap)
+    void add(long h3Id, ImmutableRoaringBitmap bitmap)
         throws IOException {
       _dictionaryStream.writeLong(h3Id);
       _offsetStream.writeInt(_offset);
@@ -303,7 +339,6 @@ public class H3IndexCreator implements GeoSpatialIndexCreator {
     Point point2 = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(37.368832, -122.036346));
     System.out.println("point1.distance(point2) = " + point1.distance(point2));
     System.out.println("sphericalDistance = " + StDistanceFunction.sphericalDistance(point1, point2));
-//    System.exit(0);
     File indexDir = new File(System.getProperty("java.io.tmpdir"), "h3IndexDir");
     FileUtils.deleteDirectory(indexDir);
     indexDir.mkdirs();
@@ -342,7 +377,5 @@ public class H3IndexCreator implements GeoSpatialIndexCreator {
         System.out.printf("Matched: expected: %d actual: %d for h3:%d \n", map.get(h3), docIds.getCardinality(), h3);
       }
     }
-
-
   }
 }

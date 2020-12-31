@@ -21,7 +21,16 @@ package org.apache.pinot.core.segment.creator;
 import java.io.Closeable;
 
 
+/**
+ * An index creator for geospatial data
+ */
 public interface GeoSpatialIndexCreator extends Closeable {
 
+  /**
+   * Adds a doc associated with a geospatial point
+   * @param docId the document id
+   * @param lat the latitude
+   * @param lon the longitude
+   */
   void add(int docId, double lat, double lon);
 }
