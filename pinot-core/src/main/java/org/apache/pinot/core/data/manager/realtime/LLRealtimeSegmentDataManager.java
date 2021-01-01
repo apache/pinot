@@ -71,8 +71,10 @@ import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.stream.FetchResult;
 import org.apache.pinot.spi.stream.MessageBatch;
-import org.apache.pinot.spi.stream.PartitionLevelConsumer;
+import org.apache.pinot.spi.stream.PartitionGroupConsumer;
+import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.RowMetadata;
@@ -249,10 +251,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private Thread _consumerThread;
   private final String _streamTopic;
   private final int _partitionGroupId;
+  private final PartitionGroupMetadata _partitionGroupMetadata;
   final String _clientId;
   private final LLCSegmentName _llcSegmentName;
   private final RecordTransformer _recordTransformer;
-  private PartitionLevelConsumer _partitionLevelConsumer = null;
+  private PartitionGroupConsumer _partitionGroupConsumer = null;
   private StreamMetadataProvider _streamMetadataProvider = null;
   private final File _resourceTmpDir;
   private final String _tableNameWithType;
@@ -380,12 +383,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       // Update _currentOffset upon return from this method
       MessageBatch messageBatch;
       try {
-        messageBatch = _partitionLevelConsumer
+        FetchResult fetchResult = _partitionGroupConsumer
             .fetchMessages(_currentOffset, null, _partitionLevelStreamConfig.getFetchTimeoutMillis());
+        messageBatch = fetchResult.getMessages();
         consecutiveErrorCount = 0;
-      } catch (TimeoutException e) {
-        handleTransientStreamErrors(e);
-        continue;
       } catch (TransientConsumerException e) {
         handleTransientStreamErrors(e);
         continue;
@@ -898,7 +899,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   private void closePartitionLevelConsumer() {
     try {
-      _partitionLevelConsumer.close();
+      _partitionGroupConsumer.close();
     } catch (Exception e) {
       segmentLogger.warn("Could not close stream consumer", e);
     }
@@ -1130,6 +1131,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
     _llcSegmentName = llcSegmentName;
     _partitionGroupId = _llcSegmentName.getPartitionGroupId();
+    _partitionGroupMetadata = new PartitionGroupMetadata(_partitionGroupId, _llcSegmentName.getSequenceNumber(),
+        _segmentZKMetadata.getStartOffset(), _segmentZKMetadata.getEndOffset(),
+        _segmentZKMetadata.getStatus().toString());
     _partitionGroupConsumerSemaphore = partitionGroupConsumerSemaphore;
     _acquiredConsumerSemaphore = new AtomicBoolean(false);
     _metricKeyName = _tableNameWithType + "-" + _streamTopic + "-" + _partitionGroupId;
@@ -1305,11 +1309,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
    * @param reason
    */
   private void makeStreamConsumer(String reason) {
-    if (_partitionLevelConsumer != null) {
+    if (_partitionGroupConsumer != null) {
       closePartitionLevelConsumer();
     }
     segmentLogger.info("Creating new stream consumer, reason: {}", reason);
-    _partitionLevelConsumer = _streamConsumerFactory.createPartitionLevelConsumer(_clientId, _partitionGroupId);
+    _partitionGroupConsumer = _streamConsumerFactory.createPartitionGroupConsumer(_partitionGroupMetadata);
   }
 
   /**

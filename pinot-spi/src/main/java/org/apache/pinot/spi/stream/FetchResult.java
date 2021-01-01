@@ -18,10 +18,7 @@
  */
 package org.apache.pinot.spi.stream;
 
-import java.util.List;
-
-
 public interface FetchResult<T> {
   Checkpoint getLastCheckpoint();
-  List<T> getMessages();
+  MessageBatch<T> getMessages();
 }
