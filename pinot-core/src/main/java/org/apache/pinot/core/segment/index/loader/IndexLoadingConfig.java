@@ -19,6 +19,7 @@
 package org.apache.pinot.core.segment.index.loader;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -32,7 +33,7 @@ import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.H3IndexConfig;
+import org.apache.pinot.spi.config.table.H3IndexColumn;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -58,7 +59,7 @@ public class IndexLoadingConfig {
   private Map<String, BloomFilterConfig> _bloomFilterConfigs = new HashMap<>();
   private boolean _enableDynamicStarTreeCreation;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
-  private List<H3IndexConfig> _h3IndexConfigs;
+  private List<H3IndexColumn> _h3IndexColumns = new ArrayList<>();
   private boolean _enableDefaultStarTree;
 
   private SegmentVersion _segmentVersion;
@@ -100,8 +101,6 @@ public class IndexLoadingConfig {
       _rangeIndexColumns.addAll(rangeIndexColumns);
     }
 
-    _h3IndexConfigs = indexingConfig.getH3IndexConfigs();
-
     List<String> bloomFilterColumns = indexingConfig.getBloomFilterColumns();
     if (bloomFilterColumns != null) {
       for (String bloomFilterColumn : bloomFilterColumns) {
@@ -127,6 +126,7 @@ public class IndexLoadingConfig {
 
     extractTextIndexColumnsFromTableConfig(tableConfig);
     extractFSTIndexColumnsFromTableConfig(tableConfig);
+    extractH3IndexColumnsFromTableConfig(tableConfig);
 
     Map<String, String> noDictionaryConfig = indexingConfig.getNoDictionaryConfig();
     if (noDictionaryConfig != null) {
@@ -174,6 +174,17 @@ public class IndexLoadingConfig {
         String column = fieldConfig.getName();
         if (fieldConfig.getIndexType() == FieldConfig.IndexType.TEXT) {
           _textIndexColumns.add(column);
+        }
+      }
+    }
+  }
+
+  private void extractH3IndexColumnsFromTableConfig(TableConfig tableConfig) {
+    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+    if (fieldConfigList != null) {
+      for (FieldConfig fieldConfig : fieldConfigList) {
+        if (fieldConfig.getIndexType() == FieldConfig.IndexType.H3) {
+          _h3IndexColumns.add(new H3IndexColumn(fieldConfig.getName(), fieldConfig.getProperties()));
         }
       }
     }
@@ -245,8 +256,8 @@ public class IndexLoadingConfig {
   }
 
   @Nullable
-  public List<H3IndexConfig> getH3IndexConfigs() {
-    return _h3IndexConfigs;
+  public List<H3IndexColumn> getH3IndexColumns() {
+    return _h3IndexColumns;
   }
 
   public Map<String, Map<String, String>> getColumnProperties() {
