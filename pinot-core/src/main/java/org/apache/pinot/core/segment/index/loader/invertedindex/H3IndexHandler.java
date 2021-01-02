@@ -41,7 +41,7 @@ import org.apache.pinot.core.segment.index.readers.forward.VarByteChunkSVForward
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
-import org.apache.pinot.spi.config.table.H3IndexConfig;
+import org.apache.pinot.spi.config.table.H3IndexColumn;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.slf4j.Logger;
@@ -57,7 +57,7 @@ public class H3IndexHandler {
   private final String _segmentName;
   private final SegmentVersion _segmentVersion;
   private final Set<ColumnMetadata> _h3IndexColumns = new HashSet<>();
-  private final HashMap<String, H3IndexConfig> _h3IndexMap = new HashMap<>();
+  private final HashMap<String, H3IndexColumn> _h3IndexMap = new HashMap<>();
 
   public H3IndexHandler(File indexDir, SegmentMetadataImpl segmentMetadata, IndexLoadingConfig indexLoadingConfig,
       SegmentDirectory.Writer segmentWriter) {
@@ -67,11 +67,11 @@ public class H3IndexHandler {
     _segmentVersion = SegmentVersion.valueOf(segmentMetadata.getVersion());
 
     // Only create H3 index on non-dictionary-encoded columns
-    for (H3IndexConfig h3IndexConfig : indexLoadingConfig.getH3IndexConfigs()) {
-      ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(h3IndexConfig.getColumn());
+    for (H3IndexColumn h3IndexConfig : indexLoadingConfig.getH3IndexColumns()) {
+      ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(h3IndexConfig.getName());
       if (columnMetadata != null) {
         _h3IndexColumns.add(columnMetadata);
-        _h3IndexMap.put(h3IndexConfig.getColumn(), h3IndexConfig);
+        _h3IndexMap.put(h3IndexConfig.getName(), h3IndexConfig);
       }
     }
   }

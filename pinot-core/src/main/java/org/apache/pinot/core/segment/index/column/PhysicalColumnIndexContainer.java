@@ -59,7 +59,7 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
-import org.apache.pinot.spi.config.table.H3IndexConfig;
+import org.apache.pinot.spi.config.table.H3IndexColumn;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,9 +86,9 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     boolean loadInvertedIndex = indexLoadingConfig.getInvertedIndexColumns().contains(columnName);
     boolean loadRangeIndex = indexLoadingConfig.getRangeIndexColumns().contains(columnName);
     boolean loadH3Index = false;
-    if (indexLoadingConfig.getH3IndexConfigs() != null) {
-      for (H3IndexConfig h3IndexConfig : indexLoadingConfig.getH3IndexConfigs()) {
-        loadH3Index = h3IndexConfig.getColumn().equals(columnName);
+    if (indexLoadingConfig.getH3IndexColumns() != null) {
+      for (H3IndexColumn h3IndexColumn : indexLoadingConfig.getH3IndexColumns()) {
+        loadH3Index = h3IndexColumn.getName().equals(columnName);
       }
     }
     boolean loadTextIndex = indexLoadingConfig.getTextIndexColumns().contains(columnName);
