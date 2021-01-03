@@ -28,7 +28,7 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
-public interface PartitionLevelConsumer extends Closeable {
+public interface PartitionLevelConsumer extends Closeable, PartitionGroupConsumer {
 
   /**
    * Is here for backward compatibility for a short time.
@@ -61,5 +61,11 @@ public interface PartitionLevelConsumer extends Closeable {
     long startOffsetLong = ((LongMsgOffset)startOffset).getOffset();
     long endOffsetLong = endOffset == null ? Long.MAX_VALUE : ((LongMsgOffset)endOffset).getOffset();
     return fetchMessages(startOffsetLong, endOffsetLong, timeoutMillis);
+  }
+
+  default MessageBatch fetchMessages(Checkpoint startCheckpoint, Checkpoint endCheckpoint, int timeoutMillis)
+      throws java.util.concurrent.TimeoutException {
+    // TODO Issue 5359 remove this default implementation once all kafka consumers have migrated to use this API
+    return fetchMessages((StreamPartitionMsgOffset) startCheckpoint, (StreamPartitionMsgOffset) endCheckpoint, timeoutMillis);
   }
 }

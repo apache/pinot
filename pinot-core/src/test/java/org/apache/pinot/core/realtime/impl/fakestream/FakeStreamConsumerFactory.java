@@ -71,7 +71,7 @@ public class FakeStreamConsumerFactory extends StreamConsumerFactory {
 
 
   @Override
-  public PartitionGroupConsumer createPartitionGroupConsumer(PartitionGroupMetadata metadata) {
+  public PartitionGroupConsumer createPartitionGroupConsumer(String clientId, PartitionGroupMetadata metadata) {
     return null;
   }
 

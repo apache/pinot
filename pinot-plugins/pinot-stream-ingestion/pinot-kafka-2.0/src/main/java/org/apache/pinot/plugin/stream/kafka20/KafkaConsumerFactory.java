@@ -51,7 +51,7 @@ public class KafkaConsumerFactory extends StreamConsumerFactory {
   }
 
   @Override
-  public PartitionGroupConsumer createPartitionGroupConsumer(PartitionGroupMetadata metadata) {
-    return null;
+  public PartitionGroupConsumer createPartitionGroupConsumer(String clientId, PartitionGroupMetadata metadata) {
+    return new KafkaPartitionLevelConsumer(clientId, _streamConfig, metadata.getPartitionGroupId());
   }
 }

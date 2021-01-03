@@ -46,6 +46,7 @@ import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.stream.Checkpoint;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.LongMsgOffsetFactory;
 import org.apache.pinot.spi.stream.PermanentConsumerException;
@@ -193,7 +194,7 @@ public class LLRealtimeSegmentDataManagerTest {
               + "  \"status\" : \"CATCH_UP\""
               + "}";
       SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
-      StreamPartitionMsgOffset extractedOffset = segmentDataManager.extractOffset(response);
+      Checkpoint extractedOffset = segmentDataManager.extractOffset(response);
       Assert.assertEquals(extractedOffset.compareTo(new LongMsgOffset(offset)), 0);
     }
     {
@@ -207,7 +208,7 @@ public class LLRealtimeSegmentDataManagerTest {
               + "  \"status\" : \"CATCH_UP\""
               + "}";
       SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
-      StreamPartitionMsgOffset extractedOffset = segmentDataManager.extractOffset(response);
+      Checkpoint extractedOffset = segmentDataManager.extractOffset(response);
       Assert.assertEquals(extractedOffset.compareTo(new LongMsgOffset(offset)), 0);
     }
     {
@@ -221,7 +222,7 @@ public class LLRealtimeSegmentDataManagerTest {
               + "  \"status\" : \"CATCH_UP\""
               + "}";
       SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
-      StreamPartitionMsgOffset extractedOffset = segmentDataManager.extractOffset(response);
+      Checkpoint extractedOffset = segmentDataManager.extractOffset(response);
       Assert.assertEquals(extractedOffset.compareTo(new LongMsgOffset(offset)), 0);
     }
     segmentDataManager.destroy();
