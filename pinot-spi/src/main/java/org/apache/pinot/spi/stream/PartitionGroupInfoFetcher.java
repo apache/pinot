@@ -32,6 +32,7 @@ public class PartitionGroupInfoFetcher implements Callable<Boolean> {
   private static final Logger LOGGER = LoggerFactory.getLogger(PartitionGroupInfoFetcher.class);
 
   private List<PartitionGroupInfo> _partitionGroupInfoList;
+  private final StreamConfig _streamConfig;
   private final List<PartitionGroupMetadata> _currentPartitionGroupMetadata;
   private final StreamConsumerFactory _streamConsumerFactory;
   private Exception _exception;
@@ -40,6 +41,7 @@ public class PartitionGroupInfoFetcher implements Callable<Boolean> {
   public PartitionGroupInfoFetcher(StreamConfig streamConfig, List<PartitionGroupMetadata> currentPartitionGroupMetadataList) {
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
     _topicName = streamConfig.getTopicName();
+    _streamConfig = streamConfig;
     _currentPartitionGroupMetadata = currentPartitionGroupMetadataList;
   }
 
@@ -61,7 +63,7 @@ public class PartitionGroupInfoFetcher implements Callable<Boolean> {
     String clientId = PartitionGroupInfoFetcher.class.getSimpleName() + "-" + _topicName;
     try (
         StreamMetadataProvider streamMetadataProvider = _streamConsumerFactory.createStreamMetadataProvider(clientId)) {
-      _partitionGroupInfoList = streamMetadataProvider.getPartitionGroupInfoList(_currentPartitionGroupMetadata, /*maxWaitTimeMs=*/5000L);
+      _partitionGroupInfoList = streamMetadataProvider.getPartitionGroupInfoList(clientId, _streamConfig, _currentPartitionGroupMetadata, /*maxWaitTimeMs=*/5000);
       if (_exception != null) {
         // We had at least one failure, but succeeded now. Log an info
         LOGGER.info("Successfully retrieved partition group info for topic {}", _topicName);

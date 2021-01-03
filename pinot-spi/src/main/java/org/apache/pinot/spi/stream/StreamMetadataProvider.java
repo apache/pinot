@@ -19,6 +19,8 @@
 package org.apache.pinot.spi.stream;
 
 import java.io.Closeable;
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nonnull;
@@ -39,11 +41,6 @@ public interface StreamMetadataProvider extends Closeable {
   @Deprecated
   int fetchPartitionCount(long timeoutMillis);
 
-  // takes the current state of partition groups (groupings of shards, the state of the consumption) and creates the new state
-  List<PartitionGroupInfo> getPartitionGroupInfoList(
-      List<PartitionGroupMetadata> currentPartitionGroupsMetadata, long timeoutMillis)
-      throws TimeoutException;
-
   // Issue 5953 Retain this interface for 0.5.0, remove in 0.6.0
   @Deprecated
   long fetchPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis)
@@ -59,5 +56,34 @@ public interface StreamMetadataProvider extends Closeable {
       throws java.util.concurrent.TimeoutException {
     long offset = fetchPartitionOffset(offsetCriteria, timeoutMillis);
     return new LongMsgOffset(offset);
+  }
+
+  /**
+   * Fetch the partitionGroupMetadata list.
+   * @param currentPartitionGroupsMetadata In case of Kafka, each partition group contains a single partition.
+   */
+  default List<PartitionGroupInfo> getPartitionGroupInfoList(String clientId, StreamConfig streamConfig,
+      List<PartitionGroupMetadata> currentPartitionGroupsMetadata, int timeoutMillis)
+      throws TimeoutException {
+    int partitionCount = fetchPartitionCount(timeoutMillis);
+    List<PartitionGroupInfo> newPartitionGroupInfoList = new ArrayList<>(partitionCount);
+
+    // add a PartitionGroupInfo into the list foreach partition already present in current.
+    // the end checkpoint is set as checkpoint
+    for (PartitionGroupMetadata currentPartitionGroupMetadata : currentPartitionGroupsMetadata) {
+      newPartitionGroupInfoList.add(new PartitionGroupInfo(currentPartitionGroupMetadata.getPartitionGroupId(),
+          currentPartitionGroupMetadata.getEndCheckpoint()));
+    }
+    // add PartitiongroupInfo for new partitions
+    // use offset criteria from stream config
+    StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
+    for (int i = currentPartitionGroupsMetadata.size(); i < partitionCount; i++) {
+      StreamMetadataProvider partitionMetadataProvider =
+          streamConsumerFactory.createPartitionMetadataProvider(clientId, i);
+      StreamPartitionMsgOffset streamPartitionMsgOffset =
+          partitionMetadataProvider.fetchStreamPartitionOffset(streamConfig.getOffsetCriteria(), timeoutMillis);
+      newPartitionGroupInfoList.add(new PartitionGroupInfo(i, streamPartitionMsgOffset.toString()));
+    }
+    return newPartitionGroupInfoList;
   }
 }

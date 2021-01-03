@@ -119,10 +119,5 @@ public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeCluster
     public StreamMetadataProvider createStreamMetadataProvider(String clientId) {
       throw new UnsupportedOperationException();
     }
-
-    @Override
-    public PartitionGroupConsumer createPartitionGroupConsumer(String clientId, PartitionGroupMetadata metadata) {
-      return null;
-    }
   }
 }

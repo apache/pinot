@@ -48,17 +48,6 @@ public class FakeStreamMetadataProvider implements StreamMetadataProvider {
     return _numPartitions;
   }
 
-  @Override
-  public List<PartitionGroupInfo> getPartitionGroupInfoList(
-      List<PartitionGroupMetadata> currentPartitionGroupsMetadata, long timeoutMillis)
-      throws TimeoutException {
-    List<PartitionGroupInfo> partitionGroupMetadataList = new ArrayList<>();
-    for (int i = 0; i < _numPartitions; i++) {
-      partitionGroupMetadataList.add(new PartitionGroupInfo(i, fetchStreamPartitionOffset(_streamConfig.getOffsetCriteria(), 5000).toString()));
-    }
-    return partitionGroupMetadataList;
-  }
-
   public long fetchPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis) throws TimeoutException {
     throw new UnsupportedOperationException("This method is deprecated");
   }
