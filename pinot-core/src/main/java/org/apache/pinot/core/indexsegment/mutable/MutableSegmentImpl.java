@@ -54,6 +54,7 @@ import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneIndexRefr
 import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneTextIndexReader;
 import org.apache.pinot.core.realtime.impl.nullvalue.MutableNullValueVector;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.core.segment.creator.impl.geospatial.H3IndexResolution;
 import org.apache.pinot.core.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.core.segment.index.datasource.MutableDataSource;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
@@ -317,7 +318,7 @@ public class MutableSegmentImpl implements MutableSegment {
       RealtimeH3IndexReader h3IndexReader;
       try {
         h3IndexReader = h3IndexColumnMap.containsKey(column) ? new RealtimeH3IndexReader(
-            h3IndexColumnMap.get(column).getResolutions()) : null;
+            new H3IndexResolution(h3IndexColumnMap.get(column).getResolutions())) : null;
       } catch (IOException e) {
         throw new RuntimeException(String.format("Failed to initiate H3 index reader for column %s", column));
       }

@@ -23,11 +23,6 @@ public class RealtimeH3IndexReader implements GeoSpatialIndexCreator, H3IndexRea
   private final H3IndexResolution _resolution;
   private int _lowestResolution;
 
-  public RealtimeH3IndexReader(List<Integer> resolutions)
-      throws IOException {
-    this(new H3IndexResolution(resolutions));
-  }
-
   public RealtimeH3IndexReader(H3IndexResolution resolution)
       throws IOException {
     _resolution = resolution;
