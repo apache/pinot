@@ -18,10 +18,7 @@
  */
 package org.apache.pinot.plugin.stream.kinesis;
 
-import java.util.ArrayList;
 import java.util.List;
-import org.apache.pinot.spi.stream.MessageBatch;
-import org.apache.pinot.spi.stream.v2.Checkpoint;
 import org.apache.pinot.spi.stream.v2.FetchResult;
 import software.amazon.awssdk.services.kinesis.model.Record;
 

@@ -22,12 +22,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 import org.apache.pinot.spi.stream.v2.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.v2.PartitionGroupMetadataMap;
-import software.amazon.awssdk.services.kinesis.model.ListShardsRequest;
-import software.amazon.awssdk.services.kinesis.model.ListShardsResponse;
 import software.amazon.awssdk.services.kinesis.model.Shard;
 
 
@@ -56,7 +52,8 @@ public class KinesisPartitionGroupMetadataMap extends KinesisConnectionHandler i
         //Return existing shard metadata
         _stringPartitionGroupMetadataIndex.add(currentMetadataMap.get(shard.shardId()));
       } else if (currentMetadataMap.containsKey(shard.parentShardId())) {
-        KinesisShardMetadata kinesisShardMetadata = (KinesisShardMetadata) currentMetadataMap.get(shard.parentShardId());
+        KinesisShardMetadata kinesisShardMetadata =
+            (KinesisShardMetadata) currentMetadataMap.get(shard.parentShardId());
         if (isProcessingFinished(kinesisShardMetadata)) {
           //Add child shards for processing since parent has finished
           appendShardMetadata(stream, awsRegion, shard);

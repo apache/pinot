@@ -24,16 +24,14 @@ import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 
 
 public class KinesisConfig {
-  private final Map<String, String> _props;
-
   public static final String STREAM = "stream";
-  private static final String AWS_REGION = "aws-region";
-  private static final String MAX_RECORDS_TO_FETCH = "max-records-to-fetch";
   public static final String SHARD_ITERATOR_TYPE = "shard-iterator-type";
-
-  private static final String DEFAULT_AWS_REGION = "us-central-1";
-  private static final String DEFAULT_MAX_RECORDS = "20";
-  private static final String DEFAULT_SHARD_ITERATOR_TYPE = "LATEST";
+  public static final String AWS_REGION = "aws-region";
+  public static final String MAX_RECORDS_TO_FETCH = "max-records-to-fetch";
+  public static final String DEFAULT_AWS_REGION = "us-central-1";
+  public static final String DEFAULT_MAX_RECORDS = "20";
+  public static final String DEFAULT_SHARD_ITERATOR_TYPE = ShardIteratorType.LATEST.toString();
+  private final Map<String, String> _props;
 
   public KinesisConfig(StreamConfig streamConfig) {
     _props = streamConfig.getStreamConfigsMap();
@@ -43,20 +41,19 @@ public class KinesisConfig {
     _props = props;
   }
 
-  public String getStream(){
+  public String getStream() {
     return _props.get(STREAM);
   }
 
-  public String getAwsRegion(){
+  public String getAwsRegion() {
     return _props.getOrDefault(AWS_REGION, DEFAULT_AWS_REGION);
   }
 
-  public Integer maxRecordsToFetch(){
+  public Integer maxRecordsToFetch() {
     return Integer.parseInt(_props.getOrDefault(MAX_RECORDS_TO_FETCH, DEFAULT_MAX_RECORDS));
   }
 
-  public ShardIteratorType getShardIteratorType(){
+  public ShardIteratorType getShardIteratorType() {
     return ShardIteratorType.fromValue(_props.getOrDefault(SHARD_ITERATOR_TYPE, DEFAULT_SHARD_ITERATOR_TYPE));
   }
-
 }

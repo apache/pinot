@@ -20,10 +20,7 @@ package org.apache.pinot.plugin.stream.kinesis;
 
 import org.apache.pinot.spi.stream.v2.Checkpoint;
 import org.apache.pinot.spi.stream.v2.PartitionGroupMetadata;
-import software.amazon.awssdk.services.kinesis.model.GetShardIteratorRequest;
-import software.amazon.awssdk.services.kinesis.model.GetShardIteratorResponse;
-import software.amazon.awssdk.services.kinesis.model.SequenceNumberRange;
-import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
+
 
 //TODO: Implement shardId as Array and have unique id
 public class KinesisShardMetadata extends KinesisConnectionHandler implements PartitionGroupMetadata {
@@ -48,13 +45,13 @@ public class KinesisShardMetadata extends KinesisConnectionHandler implements Pa
   }
 
   @Override
-  public KinesisCheckpoint getEndCheckpoint() {
-    return _endCheckpoint;
+  public void setStartCheckpoint(Checkpoint startCheckpoint) {
+    _startCheckpoint = (KinesisCheckpoint) startCheckpoint;
   }
 
   @Override
-  public void setStartCheckpoint(Checkpoint startCheckpoint) {
-    _startCheckpoint = (KinesisCheckpoint) startCheckpoint;
+  public KinesisCheckpoint getEndCheckpoint() {
+    return _endCheckpoint;
   }
 
   @Override
