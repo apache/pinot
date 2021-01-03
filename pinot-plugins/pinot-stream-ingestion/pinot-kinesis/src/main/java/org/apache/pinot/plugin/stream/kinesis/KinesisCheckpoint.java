@@ -18,38 +18,51 @@
  */
 package org.apache.pinot.plugin.stream.kinesis;
 
-import org.apache.pinot.spi.stream.v2.Checkpoint;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import java.io.IOException;
+import java.util.Map;
+import org.apache.pinot.spi.stream.Checkpoint;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class KinesisCheckpoint implements Checkpoint {
-  String _sequenceNumber;
-  Boolean _isEndOfPartition = false;
+  private Map<String, String> _shardToStartSequenceMap;
 
-  public KinesisCheckpoint(String sequenceNumber) {
-    _sequenceNumber = sequenceNumber;
+  public KinesisCheckpoint(Map<String, String> shardToStartSequenceMap) {
+    _shardToStartSequenceMap = shardToStartSequenceMap;
   }
 
-  public KinesisCheckpoint(String sequenceNumber, Boolean isEndOfPartition) {
-    _sequenceNumber = sequenceNumber;
-    _isEndOfPartition = isEndOfPartition;
+  public KinesisCheckpoint(String checkpointStr)
+      throws IOException {
+    _shardToStartSequenceMap = JsonUtils.stringToObject(checkpointStr, new TypeReference<Map<String, String>>() {
+    });
   }
 
-  @Override
-  public boolean isEndOfPartition() {
-    return _isEndOfPartition;
-  }
-
-  public String getSequenceNumber() {
-    return _sequenceNumber;
+  public Map<String, String> getShardToStartSequenceMap() {
+    return _shardToStartSequenceMap;
   }
 
   @Override
-  public byte[] serialize() {
-    return _sequenceNumber.getBytes();
+  public String serialize() {
+    try {
+      return JsonUtils.objectToString(_shardToStartSequenceMap);
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException();
+    }
   }
 
   @Override
-  public KinesisCheckpoint deserialize(byte[] blob) {
-    return new KinesisCheckpoint(new String(blob));
+  public KinesisCheckpoint deserialize(String blob) {
+    try {
+      return new KinesisCheckpoint(blob);
+    } catch (IOException e) {
+      throw new IllegalStateException();
+    }
+  }
+
+  @Override
+  public int compareTo(Object o) {
+    return this._shardToStartSequenceMap.values().iterator().next().compareTo(((KinesisCheckpoint) o)._shardToStartSequenceMap.values().iterator().next());
   }
 }

@@ -17,9 +17,11 @@ package org.apache.pinot.plugin.stream.kinesis; /**
  * under the License.
  */
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import software.amazon.awssdk.services.kinesis.model.Shard;
 import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 
@@ -29,7 +31,8 @@ public class KinesisConsumerTest {
   private static final String STREAM_NAME = "kinesis-test";
   private static final String AWS_REGION = "us-west-2";
 
-  public static void main(String[] args) {
+  public static void main(String[] args)
+      throws IOException {
     Map<String, String> props = new HashMap<>();
     props.put(KinesisConfig.STREAM, STREAM_NAME);
     props.put(KinesisConfig.AWS_REGION, AWS_REGION);
@@ -42,18 +45,19 @@ public class KinesisConsumerTest {
       System.out.println("SHARD: " + shard.shardId());
 
       KinesisConsumer kinesisConsumer =
-          new KinesisConsumer(kinesisConfig, new KinesisShardMetadata(shard.shardId(), STREAM_NAME, AWS_REGION));
+          new KinesisConsumer(kinesisConfig);
       System.out.println(
           "Kinesis Checkpoint Range: < " + shard.sequenceNumberRange().startingSequenceNumber() + ", " + shard
               .sequenceNumberRange().endingSequenceNumber() + " >");
-      KinesisCheckpoint kinesisCheckpoint = new KinesisCheckpoint(shard.sequenceNumberRange().startingSequenceNumber());
-      KinesisFetchResult fetchResult = kinesisConsumer.fetch(kinesisCheckpoint, null, 60 * 1000L);
-      KinesisRecordsBatch list = fetchResult.getMessages();
-      int n = list.getMessageCount();
+      Map<String, String> shardIdToSeqNumMap = new HashMap<>();
+      shardIdToSeqNumMap.put(shard.shardId(), shard.sequenceNumberRange().startingSequenceNumber());
+      KinesisCheckpoint kinesisCheckpoint = new KinesisCheckpoint(shardIdToSeqNumMap);
+      KinesisRecordsBatch kinesisRecordsBatch = kinesisConsumer.fetchMessages(kinesisCheckpoint, null, 60 * 1000);
+      int n = kinesisRecordsBatch.getMessageCount();
 
       System.out.println("Found " + n + " messages ");
       for (int i = 0; i < n; i++) {
-        System.out.println("SEQ-NO: " + list.getMessageOffsetAtIndex(i) + ", DATA: " + list.getMessageAtIndex(i));
+        System.out.println("SEQ-NO: " + kinesisRecordsBatch.getMessageOffsetAtIndex(i) + ", DATA: " + kinesisRecordsBatch.getMessageAtIndex(i));
       }
       kinesisConsumer.close();
     }

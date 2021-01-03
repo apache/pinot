@@ -18,36 +18,41 @@
  */
 package org.apache.pinot.plugin.stream.kinesis;
 
-import org.apache.pinot.spi.stream.StreamConfig;
-import org.apache.pinot.spi.stream.v2.ConsumerV2;
-import org.apache.pinot.spi.stream.v2.PartitionGroupMetadata;
-import org.apache.pinot.spi.stream.v2.PartitionGroupMetadataMap;
-import org.apache.pinot.spi.stream.v2.SegmentNameGenerator;
-import org.apache.pinot.spi.stream.v2.StreamConsumerFactoryV2;
+import java.util.Set;
+import org.apache.pinot.spi.stream.PartitionGroupConsumer;
+import org.apache.pinot.spi.stream.PartitionGroupMetadata;
+import org.apache.pinot.spi.stream.PartitionLevelConsumer;
+import org.apache.pinot.spi.stream.StreamConsumerFactory;
+import org.apache.pinot.spi.stream.StreamLevelConsumer;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
 
 
-public class KinesisConsumerFactory implements StreamConsumerFactoryV2 {
-  private KinesisConfig _kinesisConfig;
+public class KinesisConsumerFactory extends StreamConsumerFactory {
 
   @Override
-  public void init(StreamConfig streamConfig) {
-    _kinesisConfig = new KinesisConfig(streamConfig);
+  public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {
+    throw new UnsupportedOperationException();
   }
 
   @Override
-  public PartitionGroupMetadataMap getPartitionGroupsMetadata(
-      PartitionGroupMetadataMap currentPartitionGroupsMetadata) {
-    return new KinesisPartitionGroupMetadataMap(_kinesisConfig.getStream(), _kinesisConfig.getAwsRegion(),
-        currentPartitionGroupsMetadata);
+  public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Set<String> fieldsToRead,
+      String groupId) {
+    throw new UnsupportedOperationException();
   }
 
   @Override
-  public SegmentNameGenerator getSegmentNameGenerator() {
+  public StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition) {
     return null;
   }
 
   @Override
-  public ConsumerV2 createConsumer(PartitionGroupMetadata metadata) {
-    return new KinesisConsumer(_kinesisConfig, metadata);
+  public StreamMetadataProvider createStreamMetadataProvider(String clientId) {
+    return new KinesisStreamMetadataProvider(clientId, new KinesisConfig(_streamConfig));
   }
+
+  @Override
+  public PartitionGroupConsumer createPartitionGroupConsumer(String clientId, PartitionGroupMetadata metadata) {
+    return new KinesisConsumer(new KinesisConfig(_streamConfig));
+  }
+
 }
