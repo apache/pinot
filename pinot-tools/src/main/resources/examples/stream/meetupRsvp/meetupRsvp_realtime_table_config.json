@@ -12,6 +12,16 @@
     "retentionTimeValue": "1"
   },
   "tenants": {},
+  "fieldConfigList": [
+    {
+      "name": "location",
+      "encodingType":"RAW",
+      "indexType":"H3",
+      "properties": {
+        "resolutions": "5"
+      }
+    }
+  ],
   "tableIndexConfig": {
     "loadMode": "MMAP",
     "streamConfigs": {
