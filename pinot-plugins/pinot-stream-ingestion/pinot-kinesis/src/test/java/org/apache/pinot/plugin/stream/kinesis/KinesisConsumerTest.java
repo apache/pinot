@@ -20,40 +20,43 @@ package org.apache.pinot.plugin.stream.kinesis; /**
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import software.amazon.awssdk.services.kinesis.model.Record;
 import software.amazon.awssdk.services.kinesis.model.Shard;
+import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 
 
 public class KinesisConsumerTest {
+
+  private static final String STREAM_NAME = "kinesis-test";
+  private static final String AWS_REGION = "us-west-2";
+
   public static void main(String[] args) {
     Map<String, String> props = new HashMap<>();
-    props.put("stream", "kinesis-test");
-    props.put("aws-region", "us-west-2");
-    props.put("max-records-to-fetch", "2000");
-    props.put("shard-iterator-type", "AT-SEQUENCE-NUMBER");
-
+    props.put(KinesisConfig.STREAM, STREAM_NAME);
+    props.put(KinesisConfig.AWS_REGION, AWS_REGION);
+    props.put(KinesisConfig.MAX_RECORDS_TO_FETCH, "10");
+    props.put(KinesisConfig.SHARD_ITERATOR_TYPE, ShardIteratorType.AT_SEQUENCE_NUMBER.toString());
     KinesisConfig kinesisConfig = new KinesisConfig(props);
-
-    KinesisConnectionHandler kinesisConnectionHandler = new KinesisConnectionHandler("kinesis-test", "us-west-2");
-
+    KinesisConnectionHandler kinesisConnectionHandler = new KinesisConnectionHandler(STREAM_NAME, AWS_REGION);
     List<Shard> shardList = kinesisConnectionHandler.getShards();
-
-    for(Shard shard : shardList) {
+    for (Shard shard : shardList) {
       System.out.println("SHARD: " + shard.shardId());
 
-      KinesisConsumer kinesisConsumer = new KinesisConsumer(kinesisConfig, new KinesisShardMetadata(shard.shardId(), "kinesis-test", "us-west-2"));
-
+      KinesisConsumer kinesisConsumer =
+          new KinesisConsumer(kinesisConfig, new KinesisShardMetadata(shard.shardId(), STREAM_NAME, AWS_REGION));
+      System.out.println(
+          "Kinesis Checkpoint Range: < " + shard.sequenceNumberRange().startingSequenceNumber() + ", " + shard
+              .sequenceNumberRange().endingSequenceNumber() + " >");
       KinesisCheckpoint kinesisCheckpoint = new KinesisCheckpoint(shard.sequenceNumberRange().startingSequenceNumber());
-      KinesisFetchResult fetchResult = kinesisConsumer.fetch(kinesisCheckpoint, null, 6 * 10 * 1000L);
-
+      KinesisFetchResult fetchResult = kinesisConsumer.fetch(kinesisCheckpoint, null, 60 * 1000L);
       KinesisRecordsBatch list = fetchResult.getMessages();
       int n = list.getMessageCount();
 
-      for (int i=0;i<n;i++) {
+      System.out.println("Found " + n + " messages ");
+      for (int i = 0; i < n; i++) {
         System.out.println("SEQ-NO: " + list.getMessageOffsetAtIndex(i) + ", DATA: " + list.getMessageAtIndex(i));
       }
+      kinesisConsumer.close();
     }
+    kinesisConnectionHandler.close();
   }
 }

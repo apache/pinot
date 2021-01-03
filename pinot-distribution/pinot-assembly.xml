@@ -55,6 +55,10 @@
       <source>${pinot.root}/pinot-plugins/pinot-stream-ingestion/pinot-kafka-${kafka.version}/target/pinot-kafka-${kafka.version}-${project.version}-shaded.jar</source>
       <destName>plugins/pinot-stream-ingestion/pinot-kafka-${kafka.version}/pinot-kafka-${kafka.version}-${project.version}-shaded.jar</destName>
     </file>
+    <file>
+      <source>${pinot.root}/pinot-plugins/pinot-stream-ingestion/pinot-kinesis/target/pinot-kinesis-${project.version}-shaded.jar</source>
+      <destName>plugins/pinot-stream-ingestion/pinot-kinesis/pinot-kinesis-${project.version}-shaded.jar</destName>
+    </file>
     <!-- End Include Pinot Stream Ingestion Plugins-->
     <!-- Start Include Pinot Batch Ingestion Plugins-->
     <file>

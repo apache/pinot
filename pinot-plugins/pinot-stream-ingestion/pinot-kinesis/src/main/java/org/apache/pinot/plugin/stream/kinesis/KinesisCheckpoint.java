@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.stream.kinesis;
 
 import org.apache.pinot.spi.stream.v2.Checkpoint;
 
+
 public class KinesisCheckpoint implements Checkpoint {
   String _sequenceNumber;
   Boolean _isEndOfPartition = false;
