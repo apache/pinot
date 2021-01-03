@@ -1240,7 +1240,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         int numPartitions = columnPartitionConfig.getNumPartitions();
         try {
           // fixme: get this from ideal state
-          int numStreamPartitions = _streamMetadataProvider.getPartitionGroupInfoList(Collections.emptyList(), 5000).size();
+          int numStreamPartitions = _streamMetadataProvider
+              .getPartitionGroupInfoList(_clientId, _partitionLevelStreamConfig, Collections.emptyList(), 5000).size();
           if (numStreamPartitions != numPartitions) {
             segmentLogger.warn(
                 "Number of stream partitions: {} does not match number of partitions in the partition config: {}, using number of stream partitions",

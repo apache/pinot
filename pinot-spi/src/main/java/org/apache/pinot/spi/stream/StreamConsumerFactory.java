@@ -75,5 +75,7 @@ public abstract class StreamConsumerFactory {
   }
 
   // creates a consumer which consumes from a partition group
-  public abstract PartitionGroupConsumer createPartitionGroupConsumer(String clientId, PartitionGroupMetadata metadata);
+  public PartitionGroupConsumer createPartitionGroupConsumer(String clientId, PartitionGroupMetadata metadata) {
+    return createPartitionLevelConsumer(clientId, metadata.getPartitionGroupId());
+  }
 }
