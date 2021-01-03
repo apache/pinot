@@ -25,11 +25,11 @@ import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.H3IndexReader;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.JsonIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
 import org.apache.pinot.core.segment.index.readers.TextIndexReader;
-import org.apache.pinot.core.segment.index.readers.geospatial.H3IndexReader;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
@@ -37,7 +37,7 @@ import org.apache.pinot.spi.data.FieldSpec;
  * The {@code MutableDataSource} class is the data source for a column in the mutable segment.
  */
 @SuppressWarnings("rawtypes")
-public class MutableDataSource extends BaseDataSource {
+public class MutableDataSource extends BaseDataSourcePhysicalColumnIndexContainer {
   private final boolean _enableFST;
 
   public MutableDataSource(FieldSpec fieldSpec, int numDocs, int numValues, int maxNumValuesPerMVEntry,

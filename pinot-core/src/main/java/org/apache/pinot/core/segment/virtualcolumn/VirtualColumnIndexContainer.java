@@ -27,7 +27,7 @@ import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.JsonIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReaderImpl;
 import org.apache.pinot.core.segment.index.readers.TextIndexReader;
-import org.apache.pinot.core.segment.index.readers.geospatial.H3IndexReader;
+import org.apache.pinot.core.segment.index.readers.geospatial.ImmutableH3IndexReader;
 
 
 /**
@@ -91,7 +91,7 @@ public class VirtualColumnIndexContainer implements ColumnIndexContainer {
   }
 
   @Override
-  public H3IndexReader getH3Index() {
+  public ImmutableH3IndexReader getH3Index() {
     return null;
   }
 

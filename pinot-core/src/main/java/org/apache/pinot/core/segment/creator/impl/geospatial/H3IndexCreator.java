@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.segment.creator.impl.geospatial;
 
-import com.google.common.collect.Lists;
 import com.uber.h3core.H3Core;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -29,22 +28,14 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
-import java.util.Random;
 import java.util.TreeMap;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.geospatial.GeometryUtils;
-import org.apache.pinot.core.geospatial.transform.function.StDistanceFunction;
 import org.apache.pinot.core.segment.creator.GeoSpatialIndexCreator;
-import org.apache.pinot.core.segment.index.readers.geospatial.H3IndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.Point;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 

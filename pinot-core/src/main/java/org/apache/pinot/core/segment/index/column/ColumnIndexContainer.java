@@ -26,7 +26,7 @@ import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.JsonIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReaderImpl;
 import org.apache.pinot.core.segment.index.readers.TextIndexReader;
-import org.apache.pinot.core.segment.index.readers.geospatial.H3IndexReader;
+import org.apache.pinot.core.segment.index.readers.geospatial.ImmutableH3IndexReader;
 
 
 /**
@@ -52,7 +52,7 @@ public interface ColumnIndexContainer extends Closeable {
   /**
    * Returns the H3 index for the column, or {@code null} if it does not exist.
    */
-  H3IndexReader getH3Index();
+  ImmutableH3IndexReader getH3Index();
 
   /**
    * Returns the text index for the column, or {@code null} if it does not exist.

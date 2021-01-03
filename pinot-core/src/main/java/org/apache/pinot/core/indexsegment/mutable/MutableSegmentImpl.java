@@ -47,6 +47,7 @@ import org.apache.pinot.core.realtime.impl.dictionary.MutableDictionaryFactory;
 import org.apache.pinot.core.realtime.impl.forward.FixedByteMVMutableForwardIndex;
 import org.apache.pinot.core.realtime.impl.forward.FixedByteSVMutableForwardIndex;
 import org.apache.pinot.core.realtime.impl.forward.VarByteSVMutableForwardIndex;
+import org.apache.pinot.core.realtime.impl.geospatial.RealtimeH3IndexReader;
 import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeInvertedIndexReader;
 import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
 import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders;
@@ -54,6 +55,7 @@ import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneTextIndex
 import org.apache.pinot.core.realtime.impl.json.MutableJsonIndex;
 import org.apache.pinot.core.realtime.impl.nullvalue.MutableNullValueVector;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.core.segment.creator.impl.geospatial.H3IndexResolution;
 import org.apache.pinot.core.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.core.segment.index.datasource.MutableDataSource;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
@@ -64,7 +66,6 @@ import org.apache.pinot.core.segment.index.readers.MutableDictionary;
 import org.apache.pinot.core.segment.index.readers.MutableForwardIndex;
 import org.apache.pinot.core.segment.index.readers.ValidDocIndexReader;
 import org.apache.pinot.core.segment.index.readers.ValidDocIndexReaderImpl;
-import org.apache.pinot.core.segment.index.readers.geospatial.H3IndexReader;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
@@ -76,6 +77,7 @@ import org.apache.pinot.core.util.FixedIntArrayOffHeapIdMap;
 import org.apache.pinot.core.util.IdMap;
 import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.H3IndexColumn;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -224,6 +226,7 @@ public class MutableSegmentImpl implements MutableSegment {
     Set<String> textIndexColumns = config.getTextIndexColumns();
     Set<String> fstIndexColumns = config.getFSTIndexColumns();
     Set<String> jsonIndexColumns = config.getJsonIndexColumns();
+    Map<String, H3IndexColumn> h3IndexColumnMap = config.getH3IndexColumns();
 
     int avgNumMultiValues = config.getAvgNumMultiValues();
 
@@ -313,6 +316,13 @@ public class MutableSegmentImpl implements MutableSegment {
       // Inverted index
       RealtimeInvertedIndexReader invertedIndexReader =
           invertedIndexColumns.contains(column) ? new RealtimeInvertedIndexReader() : null;
+      RealtimeH3IndexReader h3IndexReader;
+      try {
+        h3IndexReader = h3IndexColumnMap.containsKey(column) ? new RealtimeH3IndexReader(
+            new H3IndexResolution(h3IndexColumnMap.get(column).getResolutions())) : null;
+      } catch (IOException e) {
+        throw new RuntimeException(String.format("Failed to initiate H3 index reader for column %s", column));
+      }
 
       // Text index
       RealtimeLuceneTextIndexReader textIndex;
@@ -335,7 +345,7 @@ public class MutableSegmentImpl implements MutableSegment {
       // TODO: Support range index and bloom filter for mutable segment
       _indexContainerMap.put(column,
           new IndexContainer(fieldSpec, partitionFunction, partitions, new NumValuesInfo(), forwardIndex, dictionary,
-              invertedIndexReader, null, null, textIndex, fstIndexColumns.contains(column), jsonIndex, null,
+              invertedIndexReader, null, h3IndexReader, textIndex, fstIndexColumns.contains(column), jsonIndex, null,
               nullValueVector));
     }
 
@@ -1051,7 +1061,7 @@ public class MutableSegmentImpl implements MutableSegment {
     final MutableDictionary _dictionary;
     final RealtimeInvertedIndexReader _invertedIndex;
     final InvertedIndexReader _rangeIndex;
-    final H3IndexReader _h3Index;
+    final RealtimeH3IndexReader _h3Index;
     final RealtimeLuceneTextIndexReader _textIndex;
     final boolean _enableFST;
     final MutableJsonIndex _jsonIndex;
@@ -1068,7 +1078,7 @@ public class MutableSegmentImpl implements MutableSegment {
     IndexContainer(FieldSpec fieldSpec, @Nullable PartitionFunction partitionFunction,
         @Nullable Set<Integer> partitions, NumValuesInfo numValuesInfo, MutableForwardIndex forwardIndex,
         @Nullable MutableDictionary dictionary, @Nullable RealtimeInvertedIndexReader invertedIndex,
-        @Nullable InvertedIndexReader rangeIndex, @Nullable H3IndexReader h3Index,
+        @Nullable InvertedIndexReader rangeIndex, @Nullable RealtimeH3IndexReader h3Index,
         @Nullable RealtimeLuceneTextIndexReader textIndex, boolean enableFST, @Nullable MutableJsonIndex jsonIndex,
         @Nullable BloomFilterReader bloomFilter, @Nullable MutableNullValueVector nullValueVector) {
       _fieldSpec = fieldSpec;
