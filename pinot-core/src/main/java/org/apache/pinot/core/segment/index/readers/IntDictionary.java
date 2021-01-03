@@ -30,7 +30,9 @@ public class IntDictionary extends BaseImmutableDictionary {
 
   @Override
   public int insertionIndexOf(String stringValue) {
-    return binarySearch(Integer.parseInt(stringValue));
+    // First convert string to Double and then downcast to int. This allows type conversion from any compatible
+    // numerical value represented as string to an int value.
+    return binarySearch(Double.valueOf(stringValue).intValue());
   }
 
   @Override

@@ -30,7 +30,9 @@ public class LongDictionary extends BaseImmutableDictionary {
 
   @Override
   public int insertionIndexOf(String stringValue) {
-    return binarySearch(Long.parseLong(stringValue));
+    // First convert string to Double and then downcast to long. This allows type conversion from any compatible
+    // numerical value represented as string to a long value.
+    return binarySearch(Double.valueOf(stringValue).longValue());
   }
 
   @Override

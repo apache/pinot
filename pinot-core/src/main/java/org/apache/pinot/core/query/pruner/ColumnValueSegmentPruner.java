@@ -239,15 +239,22 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
     return false;
   }
 
+  /**
+   * Convert String value to specified numerical type. We first verify that the input string contains a number by parsing
+   * it as Double. The resulting Double is then downcast to specified numerical type. This allows us to create predicates
+   * which allow for comparing values of two different numerical types such as:
+   * SELECT * FROM table WHERE a > 5.0
+   * SELECT * FROM table WHERE timestamp > NOW() - 5.0.
+   */
   private static Comparable convertValue(String stringValue, DataType dataType) {
     try {
       switch (dataType) {
         case INT:
-          return Integer.valueOf(stringValue);
+          return Double.valueOf(stringValue).intValue();
         case LONG:
-          return Long.valueOf(stringValue);
+          return Double.valueOf(stringValue).longValue();
         case FLOAT:
-          return Float.valueOf(stringValue);
+          return Double.valueOf(stringValue).floatValue();
         case DOUBLE:
           return Double.valueOf(stringValue);
         case STRING:

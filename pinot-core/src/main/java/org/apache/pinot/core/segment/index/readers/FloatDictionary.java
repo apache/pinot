@@ -30,7 +30,9 @@ public class FloatDictionary extends BaseImmutableDictionary {
 
   @Override
   public int insertionIndexOf(String stringValue) {
-    return binarySearch(Float.parseFloat(stringValue));
+    // First convert string to Double and then downcast to float. This allows type conversion from any compatible
+    // numerical value represented as string to a float value.
+    return binarySearch(Double.valueOf(stringValue).floatValue());
   }
 
   @Override
