@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupInfo;
@@ -76,7 +77,7 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     // use offset criteria from stream config
     for (int i = currentPartitionGroupsMetadata.size(); i < partitionCount; i++) {
       StreamPartitionMsgOffset streamPartitionMsgOffset =
-          fetchStreamPartitionOffset(_streamConfig.getOffsetCriteria(), 5000);
+          fetchStreamPartitionOffsetInternal(i, _streamConfig.getOffsetCriteria(), 5000);
       newPartitionGroupInfoList.add(new PartitionGroupInfo(i, streamPartitionMsgOffset.toString()));
     }
     return newPartitionGroupInfoList;
@@ -98,6 +99,22 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     } else if (offsetCriteria.isSmallest()) {
       offset =  _consumer.beginningOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
           .get(_topicPartition);
+    } else {
+      throw new IllegalArgumentException("Unknown initial offset value " + offsetCriteria.toString());
+    }
+    return new LongMsgOffset(offset);
+  }
+
+  private StreamPartitionMsgOffset fetchStreamPartitionOffsetInternal(int partitionId, @Nonnull OffsetCriteria offsetCriteria, long timeoutMillis) {
+    Preconditions.checkNotNull(offsetCriteria);
+    TopicPartition topicPartition = new TopicPartition(_topic, partitionId);
+    long offset = -1;
+    if (offsetCriteria.isLargest()) {
+      offset =  _consumer.endOffsets(Collections.singletonList(topicPartition), Duration.ofMillis(timeoutMillis))
+          .get(topicPartition);
+    } else if (offsetCriteria.isSmallest()) {
+      offset =  _consumer.beginningOffsets(Collections.singletonList(topicPartition), Duration.ofMillis(timeoutMillis))
+          .get(topicPartition);
     } else {
       throw new IllegalArgumentException("Unknown initial offset value " + offsetCriteria.toString());
     }

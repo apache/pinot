@@ -25,7 +25,7 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
  * An interface to be implemented by streams that are consumed using Pinot LLC consumption.
  */
 @InterfaceStability.Evolving
-public interface StreamPartitionMsgOffsetFactory extends PartitionGroupCheckpointFactory{
+public interface PartitionGroupCheckpointFactory {
   /**
    * Initialization, called once when the factory is created.
    * @param streamConfig
@@ -37,7 +37,7 @@ public interface StreamPartitionMsgOffsetFactory extends PartitionGroupCheckpoin
    * @param offsetStr
    * @return StreamPartitionMsgOffset
    */
-  StreamPartitionMsgOffset create(String offsetStr);
+  Checkpoint create(String offsetStr);
 
   /**
    * Construct an offset from another one provided, of the same type.
@@ -45,9 +45,5 @@ public interface StreamPartitionMsgOffsetFactory extends PartitionGroupCheckpoin
    * @param other
    * @return
    */
-  StreamPartitionMsgOffset create(StreamPartitionMsgOffset other);
-
-  default Checkpoint create(Checkpoint other) {
-    return create((StreamPartitionMsgOffset) other);
-  }
+  Checkpoint create(Checkpoint other);
 }

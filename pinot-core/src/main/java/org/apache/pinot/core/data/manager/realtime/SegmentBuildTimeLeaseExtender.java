@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
+import org.apache.pinot.spi.stream.Checkpoint;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -91,7 +92,7 @@ public class SegmentBuildTimeLeaseExtender {
    * @param initialBuildTimeMs is the initial time budget that SegmentCompletionManager has allocated.
    * @param offset The offset at which this segment is being built.
    */
-  public void addSegment(String segmentId, long initialBuildTimeMs, StreamPartitionMsgOffset offset) {
+  public void addSegment(String segmentId, long initialBuildTimeMs, Checkpoint offset) {
     final long initialDelayMs = initialBuildTimeMs * 9 / 10;
     final SegmentCompletionProtocol.Request.Params reqParams = new SegmentCompletionProtocol.Request.Params();
     reqParams.withStreamPartitionMsgOffset(offset.toString()).withSegmentName(segmentId).withExtraTimeSec(EXTRA_TIME_SECONDS)

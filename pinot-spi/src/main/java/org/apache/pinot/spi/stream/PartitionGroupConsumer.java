@@ -19,8 +19,10 @@
 package org.apache.pinot.spi.stream;
 
 import java.io.Closeable;
+import java.util.concurrent.TimeoutException;
 
 
 public interface PartitionGroupConsumer extends Closeable {
-  FetchResult fetchMessages(Checkpoint start, Checkpoint end, long timeout);
+  MessageBatch fetchMessages(Checkpoint start, Checkpoint end, int timeout)
+      throws TimeoutException;
 }
