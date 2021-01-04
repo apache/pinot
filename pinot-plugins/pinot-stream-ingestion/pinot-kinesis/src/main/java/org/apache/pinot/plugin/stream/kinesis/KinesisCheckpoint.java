@@ -23,10 +23,11 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
 import java.util.Map;
 import org.apache.pinot.spi.stream.Checkpoint;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-public class KinesisCheckpoint implements Checkpoint {
+public class KinesisCheckpoint implements StreamPartitionMsgOffset {
   private Map<String, String> _shardToStartSequenceMap;
 
   public KinesisCheckpoint(Map<String, String> shardToStartSequenceMap) {

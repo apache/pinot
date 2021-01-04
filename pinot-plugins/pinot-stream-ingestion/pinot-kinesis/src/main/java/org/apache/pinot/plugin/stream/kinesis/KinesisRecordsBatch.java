@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.plugin.stream.kinesis;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.RowMetadata;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
@@ -27,9 +29,11 @@ import software.amazon.awssdk.services.kinesis.model.Record;
 
 public class KinesisRecordsBatch implements MessageBatch<byte[]> {
   private List<Record> _recordList;
+  private String _shardId;
 
-  public KinesisRecordsBatch(List<Record> recordList) {
+  public KinesisRecordsBatch(List<Record> recordList, String shardId) {
     _recordList = recordList;
+    _shardId = shardId;
   }
 
   @Override
@@ -44,8 +48,7 @@ public class KinesisRecordsBatch implements MessageBatch<byte[]> {
 
   @Override
   public int getMessageOffsetAtIndex(int index) {
-    //TODO: Doesn't translate to offset. Needs to be replaced.
-    return _recordList.get(index).hashCode();
+    return _recordList.get(index).data().asByteBuffer().arrayOffset();
   }
 
   @Override
@@ -60,7 +63,9 @@ public class KinesisRecordsBatch implements MessageBatch<byte[]> {
 
   @Override
   public StreamPartitionMsgOffset getNextStreamParitionMsgOffsetAtIndex(int index) {
-    throw new UnsupportedOperationException();
+    Map<String, String> shardToSequenceMap = new HashMap<>();
+    shardToSequenceMap.put(_shardId, _recordList.get(index).sequenceNumber());
+    return new KinesisCheckpoint(shardToSequenceMap);
   }
 
   @Override
