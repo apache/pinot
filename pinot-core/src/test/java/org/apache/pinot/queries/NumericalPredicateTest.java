@@ -131,7 +131,7 @@ public class NumericalPredicateTest extends BaseQueriesTest {
   /** Check if we can do arithmetic on LONG column. */
   @Test
   public void testLongColumnLessThanDateCalculation() {
-    Operator operator = getOperatorForSqlQuery("select count(*) from scores where longColumn < now() - 10000000");
+    Operator operator = getOperatorForSqlQuery("select count(*) from scores where longColumn < now() - 10000000.0");
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     List<Object> result = block.getAggregationResult();
     Assert.assertEquals(result.size(), 1);
