@@ -89,7 +89,7 @@ public class NumericalPredicateTest extends BaseQueriesTest {
     records.add(createRecord(1, 1609046249848l, 1.1f, 1.11d, "mickey"));
     records.add(createRecord(25, 1609046359848l, 25.1f, 25.01d, "minnie"));
     records.add(createRecord(40, 1609046659848l, 40.1f, 40.11d, "donald"));
-    records.add(createRecord(15, 1609046219848l, 15.1f, 15.01d, "goofy"));
+    records.add(createRecord(15, 1609046219848l, 15.1f, 10.01d, "goofy"));
     records.add(createRecord(45, 1609046279848l, 45.1f, 45.11d, "daffy"));
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
@@ -108,7 +108,7 @@ public class NumericalPredicateTest extends BaseQueriesTest {
 
   /** Check if we can compare an INT column with a decimal value. */
   @Test
-  public void testCompareIntColumnWithDecimalValue() {
+  public void testIntColumnGreaterThanDecimalValue() {
     Operator operator = getOperatorForSqlQuery("SELECT count(*) FROM testTable WHERE intColumn > 15.1");
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     List<Object> result = block.getAggregationResult();
@@ -116,9 +116,19 @@ public class NumericalPredicateTest extends BaseQueriesTest {
     Assert.assertEquals(result.get(0), 3l);
   }
 
+  /** Check if we can compare an INT column with a decimal value. */
+  @Test
+  public void testIntColumnEqualToDecimalValue() {
+    Operator operator = getOperatorForSqlQuery("SELECT count(*) FROM testTable WHERE intColumn = 40.00000000000");
+    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
+    List<Object> result = block.getAggregationResult();
+    Assert.assertEquals(result.size(), 1);
+    Assert.assertEquals(result.get(0), 1l);
+  }
+
   /** Check if we can do arithmetic on LONG column. */
   @Test
-  public void testCompareLongColumnWithDoubleValue() {
+  public void testLongColumnLessThanDateCalculation() {
     Operator operator = getOperatorForSqlQuery("select count(*) from scores where longColumn < now() - 10000000");
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     List<Object> result = block.getAggregationResult();
@@ -126,14 +136,24 @@ public class NumericalPredicateTest extends BaseQueriesTest {
     Assert.assertEquals(result.get(0), 6l);
   }
 
-  /** Check if we can compare columns of different numerical types. */
+  /** Check if we can use columns of different numerical types in calculations. */
   @Test
-  public void testCompareFloatColumnWithDoubleColumn() {
+  public void testDoubleColumnAndFloatColumnCalculation() {
     Operator operator = getOperatorForSqlQuery("select count(*) from scores where doubleColumn - floatColumn < 0");
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     List<Object> result = block.getAggregationResult();
     Assert.assertEquals(1, result.size());
     Assert.assertEquals(result.get(0), 3l);
+  }
+
+  /** Check if we can compare two columns of different numerical types. */
+  @Test
+  public void testCompareIntColumnWithLongColumn() {
+    Operator operator = getOperatorForSqlQuery("select count(*) from scores where intColumn > doubleColumn");
+    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
+    List<Object> result = block.getAggregationResult();
+    Assert.assertEquals(1, result.size());
+    Assert.assertEquals(result.get(0), 1l);
   }
 
   @AfterClass
