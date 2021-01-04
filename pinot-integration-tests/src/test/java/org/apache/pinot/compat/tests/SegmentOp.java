@@ -22,8 +22,12 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.util.Collections;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.controller.api.resources.TableViews;
@@ -59,12 +63,12 @@ import org.slf4j.LoggerFactory;
 public class SegmentOp extends BaseOp {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentOp.class);
   private static final FileFormat DEFAULT_FILE_FORMAT = FileFormat.CSV;
-  private static final String STATE_ONLINE = "ONLINE";
   private static final int DEFAULT_MAX_SLEEP_TIME_MS = 30000;
   private static final int DEFAULT_SLEEP_INTERVAL_MS = 200;
 
   public enum Op {
-    UPLOAD, DELETE
+    UPLOAD,
+    DELETE
   }
 
   private Op _op;
@@ -150,7 +154,7 @@ public class SegmentOp extends BaseOp {
       FileUtils.forceMkdir(localOutputTempDir);
       File segmentTarFile = generateSegment(localOutputTempDir);
       uploadSegment(segmentTarFile);
-      return verifySegmentInState(STATE_ONLINE);
+      return verifySegmentInState(CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE);
     } catch (Exception e) {
       LOGGER.error("Failed to create and upload segment for input data file {}.", _inputDataFileName, e);
       return false;
@@ -218,10 +222,15 @@ public class SegmentOp extends BaseOp {
   private boolean verifySegmentInState(String state)
       throws IOException, InterruptedException {
     long startTime = System.currentTimeMillis();
-    while (getSegmentCountInState(state) <= 0) {
+    long segmentCount;
+    while ((segmentCount = getSegmentCountInState(state)) <= 0) {
       if ((System.currentTimeMillis() - startTime) > DEFAULT_MAX_SLEEP_TIME_MS) {
         LOGGER.error("Upload segment verification failed, count is zero after max wait time {} ms.",
             DEFAULT_MAX_SLEEP_TIME_MS);
+        return false;
+      } else if (segmentCount == -1) {
+        LOGGER.error("Upload segment verification failed, one or more segment(s) is in {} state.",
+            CommonConstants.Helix.StateModel.SegmentStateModel.ERROR);
         return false;
       }
       LOGGER.warn("Upload segment verification count is zero, will retry after {} ms.", DEFAULT_SLEEP_INTERVAL_MS);
@@ -286,37 +295,33 @@ public class SegmentOp extends BaseOp {
   }
 
   /**
-   * Retrieve the number of segments for both OFFLINE and REALTIME which are in state matching the parameter.
+   * Retrieve the number of segments for OFFLINE which are in state matching the parameter.
    * @param state of the segment to be verified in the controller.
-   * @return count for OFFLINE and REALTIME segments.
+   * @return -1 in case of ERROR, 0 if in OFFLINE state else return count of state matching parameter.
    */
   private long getSegmentCountInState(String state)
       throws IOException {
-    long offlineSegmentCount =
+    final Set<String> segmentState =
         getExternalViewForTable().offline != null ? getExternalViewForTable().offline.entrySet().stream()
-            .filter(k -> k.getKey().equalsIgnoreCase(_segmentName)).filter(v -> v.getValue().values().contains(state))
-            .count() : 0;
-    long realtimeSegmentCount =
-        getExternalViewForTable().realtime != null ? getExternalViewForTable().realtime.entrySet().stream()
-            .filter(k -> k.getKey().equalsIgnoreCase(_segmentName)).filter(v -> v.getValue().values().contains(state))
-            .count() : 0;
+            .filter(k -> k.getKey().equals(_segmentName)).flatMap(x -> x.getValue().values().stream())
+            .collect(Collectors.toSet()) : Collections.emptySet();
 
-    return offlineSegmentCount + realtimeSegmentCount;
+    if (segmentState.contains(CommonConstants.Helix.StateModel.SegmentStateModel.ERROR)) {
+      return -1;
+    } else if (segmentState.contains(CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE)) {
+      return 0;
+    }
+
+    return segmentState.stream().filter(x -> x.contains(state)).count();
   }
 
   /**
-   * Retrieve the number of segments for both OFFLINE and REALTIME irrespective of the state.
-   * @return count for OFFLINE and REALTIME segments.
+   * Retrieve the number of segments for both OFFLINE irrespective of the state.
+   * @return count for OFFLINE segments.
    */
   private long getCountForSegmentName()
       throws IOException {
-    long offlineSegmentCount =
-        getExternalViewForTable().offline != null ? getExternalViewForTable().offline.entrySet().stream()
-            .filter(k -> k.getKey().equalsIgnoreCase(_segmentName)).count() : 0;
-    long realtimeSegmentCount =
-        getExternalViewForTable().realtime != null ? getExternalViewForTable().realtime.entrySet().stream()
-            .filter(k -> k.getKey().equalsIgnoreCase(_segmentName)).count() : 0;
-
-    return offlineSegmentCount + realtimeSegmentCount;
+    return getExternalViewForTable().offline != null ? getExternalViewForTable().offline.entrySet().stream()
+        .filter(k -> k.getKey().equals(_segmentName)).count() : 0;
   }
 }
