@@ -32,7 +32,22 @@ public class IntDictionary extends BaseImmutableDictionary {
   public int insertionIndexOf(String stringValue) {
     // First convert string to Double and then downcast to int. This allows type conversion from any compatible
     // numerical value represented as string to an int value.
-    return binarySearch(Double.valueOf(stringValue).intValue());
+    Double doubleValue = Double.valueOf(stringValue);
+
+    // A value greater than Integer.MAX_VALUE will downcast to Integer.MAX_VALUE and a value less than Integer.MIN_VALUE
+    // will downcast to Integer.MIN_VALUE. This can cause binary search to return a match if the column actually contains
+    // Integer.MIN_VALUE or Integer.MAX_VALUE. We avoid this error by explicitly checking for overflow and underflow.
+    if (doubleValue > Integer.MAX_VALUE) {
+      // Binary search nsert position of value greater than Integer.MAX_VALUE
+      return -(length()+1);
+    }
+
+    if (doubleValue < Integer.MIN_VALUE) {
+      // Binary search Insert position of value greater less than Integer.MIN_VALUE
+      return -1;
+    }
+
+    return binarySearch(doubleValue.intValue());
   }
 
   @Override

@@ -30,9 +30,24 @@ public class LongDictionary extends BaseImmutableDictionary {
 
   @Override
   public int insertionIndexOf(String stringValue) {
-    // First convert string to Double and then downcast to long. This allows type conversion from any compatible
+    // Convert string to Double and then downcast to long. This allows type conversion from any compatible
     // numerical value represented as string to a long value.
-    return binarySearch(Double.valueOf(stringValue).longValue());
+    Double doubleValue = Double.valueOf(stringValue);
+
+    // A value greater than Long.MAX_VALUE will downcast to Long.MAX_VALUE and a value less than Long.MIN_VALUE will
+    // downcast to Long.MIN_VALUE. This can cause binary search to return a match if the column actually contains
+    // Long.MIN_VALUE or Long.MAX_VALUE. We avoid this error by explicitly checking for overflow and underflow.
+    if (doubleValue > Long.MAX_VALUE) {
+      // Binary search insert position of value greater than Long.MAX_VALUE
+      return -(length()+1);
+    }
+
+    if (doubleValue < Integer.MIN_VALUE) {
+      // Binary search insert position of value less than Long.MIN_VALUE
+      return -1;
+    }
+
+    return binarySearch(doubleValue.longValue());
   }
 
   @Override

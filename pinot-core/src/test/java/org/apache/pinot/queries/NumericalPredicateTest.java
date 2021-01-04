@@ -91,6 +91,8 @@ public class NumericalPredicateTest extends BaseQueriesTest {
     records.add(createRecord(40, 1609046659848l, 40.1f, 40.11d, "donald"));
     records.add(createRecord(15, 1609046219848l, 15.1f, 10.01d, "goofy"));
     records.add(createRecord(45, 1609046279848l, 45.1f, 45.11d, "daffy"));
+    records.add(createRecord(Integer.MAX_VALUE, Long.MAX_VALUE, 47.1f, 47.01d, "pluto"));
+    records.add(createRecord(Integer.MIN_VALUE, Long.MIN_VALUE, 49.1f, 49.11d, "daisy"));
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
@@ -113,7 +115,7 @@ public class NumericalPredicateTest extends BaseQueriesTest {
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     List<Object> result = block.getAggregationResult();
     Assert.assertEquals(result.size(), 1);
-    Assert.assertEquals(result.get(0), 3l);
+    Assert.assertEquals(result.get(0), 4l);
   }
 
   /** Check if we can compare an INT column with a decimal value. */
@@ -133,7 +135,7 @@ public class NumericalPredicateTest extends BaseQueriesTest {
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     List<Object> result = block.getAggregationResult();
     Assert.assertEquals(result.size(), 1);
-    Assert.assertEquals(result.get(0), 6l);
+    Assert.assertEquals(result.get(0), 7l);
   }
 
   /** Check if we can use columns of different numerical types in calculations. */
@@ -142,8 +144,8 @@ public class NumericalPredicateTest extends BaseQueriesTest {
     Operator operator = getOperatorForSqlQuery("select count(*) from scores where doubleColumn - floatColumn < 0");
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     List<Object> result = block.getAggregationResult();
-    Assert.assertEquals(1, result.size());
-    Assert.assertEquals(result.get(0), 3l);
+    Assert.assertEquals(result.size(), 1);
+    Assert.assertEquals(result.get(0), 4l);
   }
 
   /** Check if we can compare two columns of different numerical types. */
@@ -152,8 +154,88 @@ public class NumericalPredicateTest extends BaseQueriesTest {
     Operator operator = getOperatorForSqlQuery("select count(*) from scores where intColumn > doubleColumn");
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     List<Object> result = block.getAggregationResult();
-    Assert.assertEquals(1, result.size());
-    Assert.assertEquals(result.get(0), 1l);
+    Assert.assertEquals(result.size(), 1);
+    Assert.assertEquals(result.get(0), 2l);
+  }
+
+  /** Check integer comparison with value exceeding integer maximum. */
+  @Test
+  public void testCompareIntColumnWithOverflowValue() {
+    Operator operator = getOperatorForSqlQuery("select count(*) from scores where intColumn < 3000000000.0");
+    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
+    List<Object> result = block.getAggregationResult();
+    Assert.assertEquals(result.size(), 1);
+    Assert.assertEquals(result.get(0), 8l);
+  }
+
+  /** Check integer comparison with value less than integer maximum. */
+  @Test
+  public void testCompareIntColumnWithUnderflowValue() {
+    Operator operator = getOperatorForSqlQuery("select count(*) from scores where intColumn > -3000000000.0");
+    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
+    List<Object> result = block.getAggregationResult();
+    Assert.assertEquals(result.size(), 1);
+    Assert.assertEquals(result.get(0), 8l);
+  }
+
+  /** Check integer comparison with value exceeding integer maximum. */
+  @Test
+  public void testCompareLongColumnWithOverflowValue() {
+    Operator operator = getOperatorForSqlQuery("select count(*) from scores where intColumn < 9223372036854775808.0");
+    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
+    List<Object> result = block.getAggregationResult();
+    Assert.assertEquals(result.size(), 1);
+    Assert.assertEquals(result.get(0), 8l);
+  }
+
+  /** Check integer comparison with value less than integer maximum. */
+  @Test
+  public void testCompareLongColumnWithUnderflowValue() {
+    Operator operator = getOperatorForSqlQuery("select count(*) from scores where intColumn > -9223372036854775808.0");
+    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
+    List<Object> result = block.getAggregationResult();
+    Assert.assertEquals(result.size(), 1);
+    Assert.assertEquals(result.get(0), 8l);
+  }
+
+  /** Check integer comparison with value exceeding integer maximum. */
+  @Test
+  public void testEquateIntColumnWithOverflowValue() {
+    Operator operator = getOperatorForSqlQuery("select count(*) from scores where intColumn = 3000000000.0");
+    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
+    List<Object> result = block.getAggregationResult();
+    Assert.assertEquals(result.size(), 1);
+    Assert.assertEquals(result.get(0), 0l);
+  }
+
+  /** Check integer comparison with value below integer maximum. */
+  @Test
+  public void testEquateIntColumnWithUnderflowValue() {
+    Operator operator = getOperatorForSqlQuery("select count(*) from scores where intColumn = -3000000000.0");
+    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
+    List<Object> result = block.getAggregationResult();
+    Assert.assertEquals(result.size(), 1);
+    Assert.assertEquals(result.get(0), 0l);
+  }
+
+  /** Check long comparison with value exceeding integer maximum. */
+  @Test
+  public void testEquateLongColumnWithOverflowValue() {
+    Operator operator = getOperatorForSqlQuery("select count(*) from scores where intColumn = 9223372036854775808.0");
+    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
+    List<Object> result = block.getAggregationResult();
+    Assert.assertEquals(result.size(), 1);
+    Assert.assertEquals(result.get(0), 0l);
+  }
+
+  /** Check long comparison with value below integer maximum. */
+  @Test
+  public void testEquateLongColumnWithUnderflowValue() {
+    Operator operator = getOperatorForSqlQuery("select count(*) from scores where intColumn = -9223372036854775808.0");
+    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
+    List<Object> result = block.getAggregationResult();
+    Assert.assertEquals(result.size(), 1);
+    Assert.assertEquals(result.get(0), 0l);
   }
 
   @AfterClass
