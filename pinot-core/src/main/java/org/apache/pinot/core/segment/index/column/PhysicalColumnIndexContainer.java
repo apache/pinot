@@ -51,6 +51,7 @@ import org.apache.pinot.core.segment.index.readers.forward.FixedBitMVForwardInde
 import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
 import org.apache.pinot.core.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.json.ImmutableJsonIndexReader;
 import org.apache.pinot.core.segment.index.readers.sorted.SortedIndexReaderImpl;
 import org.apache.pinot.core.segment.index.readers.text.LuceneTextIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
@@ -106,7 +107,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     if (loadJsonIndex) {
       Preconditions.checkState(segmentReader.hasIndexFor(columnName, ColumnIndexType.JSON_INDEX));
       PinotDataBuffer jsonIndexBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.JSON_INDEX);
-      _jsonIndex = new JsonIndexReader(jsonIndexBuffer, metadata.getTotalDocs());
+      _jsonIndex = new ImmutableJsonIndexReader(jsonIndexBuffer, metadata.getTotalDocs());
     } else {
       _jsonIndex = null;
     }
