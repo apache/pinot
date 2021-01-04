@@ -52,6 +52,8 @@ import org.apache.pinot.thirdeye.dashboard.resources.v2.RootCauseResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.RootCauseSessionResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.RootCauseTemplateResource;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
+import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionAlertRegistry;
+import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
 import org.apache.pinot.thirdeye.model.download.ModelDownloaderManager;
 import org.apache.pinot.thirdeye.tracking.RequestStatisticsLogger;
 import org.eclipse.jetty.servlets.CrossOriginFilter;
@@ -103,14 +105,16 @@ public class ThirdEyeDashboardApplication
       corsFilter.addMappingForUrlPatterns(EnumSet.allOf(DispatcherType.class), true, "/*");
     }
 
+    if (config.getComponentPackageList() != null) {
+      DetectionRegistry.setPackageList(config.getComponentPackageList());
+      DetectionAlertRegistry.setPackageList(config.getComponentPackageList());
+    }
     super.initDAOs();
-
     try {
       ThirdEyeCacheRegistry.initializeCaches(config);
     } catch (Exception e) {
       LOG.error("Exception while loading caches", e);
     }
-
 
     final JerseyEnvironment jersey = env.jersey();
     injector = Guice.createInjector(new ThirdEyeDashboardModule(config, env, DAO_REGISTRY));
