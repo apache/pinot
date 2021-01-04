@@ -25,6 +25,7 @@ import org.apache.pinot.spi.stream.PartitionLevelConsumer;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamLevelConsumer;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
 
 
 public class KinesisConsumerFactory extends StreamConsumerFactory {
@@ -55,4 +56,8 @@ public class KinesisConsumerFactory extends StreamConsumerFactory {
     return new KinesisConsumer(new KinesisConfig(_streamConfig));
   }
 
+  @Override
+  public StreamPartitionMsgOffsetFactory createStreamMsgOffsetFactory() {
+    return new KinesisMsgOffsetFactory();
+  }
 }

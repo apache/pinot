@@ -43,7 +43,7 @@ public class KinesisRecordsBatch implements MessageBatch<byte[]> {
 
   @Override
   public byte[] getMessageAtIndex(int index) {
-    return _recordList.get(index).data().asByteArray();
+    return _recordList.get(index).data().asByteBuffer().array();
   }
 
   @Override
