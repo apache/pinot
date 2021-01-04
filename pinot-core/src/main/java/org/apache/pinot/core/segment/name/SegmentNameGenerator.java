@@ -19,13 +19,14 @@
 package org.apache.pinot.core.segment.name;
 
 import com.google.common.base.Joiner;
+import java.io.Serializable;
 import javax.annotation.Nullable;
 
 
 /**
  * Interface for segment name generator based on the segment sequence id and time range.
  */
-public interface SegmentNameGenerator {
+public interface SegmentNameGenerator extends Serializable {
   Joiner JOINER = Joiner.on('_').skipNulls();
 
   /**

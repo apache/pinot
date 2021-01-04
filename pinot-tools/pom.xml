@@ -311,8 +311,30 @@
               </jvmSettings>
             </program>
             <program>
+              <mainClass>org.apache.pinot.tools.BatchQuickstartWithMinion</mainClass>
+              <name>quick-start-batch-with-minion</name>
+              <jvmSettings>
+                <initialMemorySize>1G</initialMemorySize>
+                <maxMemorySize>1G</maxMemorySize>
+                <extraArguments>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
+                </extraArguments>
+              </jvmSettings>
+            </program>
+            <program>
               <mainClass>org.apache.pinot.tools.UpsertQuickStart</mainClass>
               <name>quick-start-upsert-streaming</name>
+              <jvmSettings>
+                <initialMemorySize>1G</initialMemorySize>
+                <maxMemorySize>1G</maxMemorySize>
+                <extraArguments>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
+                </extraArguments>
+              </jvmSettings>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.tools.JsonIndexQuickStart</mainClass>
+              <name>quick-start-json-index</name>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>

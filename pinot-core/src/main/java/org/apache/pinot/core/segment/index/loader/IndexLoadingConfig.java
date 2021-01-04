@@ -49,6 +49,7 @@ public class IndexLoadingConfig {
   private ReadMode _readMode = ReadMode.DEFAULT_MODE;
   private List<String> _sortedColumns = Collections.emptyList();
   private Set<String> _invertedIndexColumns = new HashSet<>();
+  private Set<String> _jsonIndexColumns = new HashSet<>();
   private Set<String> _textIndexColumns = new HashSet<>();
   private Set<String> _fstIndexColumns = new HashSet<>();
   private Set<String> _rangeIndexColumns = new HashSet<>();
@@ -94,6 +95,11 @@ public class IndexLoadingConfig {
     List<String> invertedIndexColumns = indexingConfig.getInvertedIndexColumns();
     if (invertedIndexColumns != null) {
       _invertedIndexColumns.addAll(invertedIndexColumns);
+    }
+
+    List<String> jsonIndexColumns = indexingConfig.getJsonIndexColumns();
+    if (jsonIndexColumns != null) {
+      _jsonIndexColumns.addAll(jsonIndexColumns);
     }
 
     List<String> rangeIndexColumns = indexingConfig.getRangeIndexColumns();
@@ -249,6 +255,10 @@ public class IndexLoadingConfig {
 
   public Set<String> getInvertedIndexColumns() {
     return _invertedIndexColumns;
+  }
+
+  public Set<String> getJsonIndexColumns() {
+    return _jsonIndexColumns;
   }
 
   public Set<String> getRangeIndexColumns() {

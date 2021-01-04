@@ -25,7 +25,7 @@ import java.util.Arrays;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.core.io.util.ValueReader;
-import org.apache.pinot.core.io.util.VarLengthBytesValueReaderWriter;
+import org.apache.pinot.core.io.util.VarLengthValueReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.spi.utils.ByteArray;
 
@@ -41,17 +41,20 @@ public abstract class BaseImmutableDictionary implements Dictionary {
   private final byte _paddingByte;
 
   protected BaseImmutableDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue, byte paddingByte) {
-    if (VarLengthBytesValueReaderWriter.isVarLengthBytesDictBuffer(dataBuffer)) {
-      _valueReader = new VarLengthBytesValueReaderWriter(dataBuffer);
+    if (VarLengthValueReader.isVarLengthValueBuffer(dataBuffer)) {
+      VarLengthValueReader valueReader = new VarLengthValueReader(dataBuffer);
+      _valueReader = valueReader;
+      _length = valueReader.getNumValues();
+      _paddingByte = 0;
     } else {
-      Preconditions.checkState(dataBuffer.size() == length * numBytesPerValue,
-          "Buffer size mismatch: bufferSize = %s, numValues = %s, numBytesPerValue = %s", dataBuffer.size(), length,
+      Preconditions.checkState(dataBuffer.size() == (long) length * numBytesPerValue,
+          "Buffer size mismatch: bufferSize = %s, numValues = %s, numByesPerValue = %s", dataBuffer.size(), length,
           numBytesPerValue);
       _valueReader = new FixedByteValueReaderWriter(dataBuffer);
+      _length = length;
+      _paddingByte = paddingByte;
     }
-    _length = length;
     _numBytesPerValue = numBytesPerValue;
-    _paddingByte = paddingByte;
   }
 
   /**

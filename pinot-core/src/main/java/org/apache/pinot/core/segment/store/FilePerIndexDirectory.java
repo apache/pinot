@@ -26,19 +26,14 @@ import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
 
 
 class FilePerIndexDirectory extends ColumnIndexDirectory {
-  private static Logger LOGGER = LoggerFactory.getLogger(FilePerIndexDirectory.class);
-
-  private Map<IndexKey, PinotDataBuffer> indexBuffers = new HashMap<>();
+  private final Map<IndexKey, PinotDataBuffer> indexBuffers = new HashMap<>();
 
   protected FilePerIndexDirectory(File segmentDirectory, SegmentMetadataImpl metadata, ReadMode readMode) {
     super(segmentDirectory, metadata, readMode);
@@ -138,7 +133,10 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
         filename = column + LuceneTextIndexCreator.LUCENE_TEXT_INDEX_FILE_EXTENSION;
         break;
       case FST_INDEX:
-        filename = column + FST_INDEX_FILE_EXTENSION;
+        filename = column + V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
+        break;
+      case JSON_INDEX:
+        filename = column + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION;
         break;
       default:
         throw new UnsupportedOperationException("Unknown index type: " + indexType.toString());

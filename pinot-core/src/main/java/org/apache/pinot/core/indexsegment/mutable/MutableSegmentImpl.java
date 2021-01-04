@@ -61,9 +61,9 @@ import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.apache.pinot.core.segment.index.readers.JsonIndexReader;
 import org.apache.pinot.core.segment.index.readers.MutableDictionary;
 import org.apache.pinot.core.segment.index.readers.MutableForwardIndex;
-import org.apache.pinot.core.segment.index.readers.TextIndexReader;
 import org.apache.pinot.core.segment.index.readers.ValidDocIndexReader;
 import org.apache.pinot.core.segment.index.readers.ValidDocIndexReaderImpl;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnContext;
@@ -338,11 +338,11 @@ public class MutableSegmentImpl implements MutableSegment {
       // Null value vector
       MutableNullValueVector nullValueVector = _nullHandlingEnabled ? new MutableNullValueVector() : null;
 
+      // TODO: Support range index, json index and bloom filter for mutable segment
       _indexContainerMap.put(column,
-          new IndexContainer(fieldSpec, fstIndexColumns.contains(column),
-              partitionFunction, partitions, new NumValuesInfo(), forwardIndex, dictionary,
-              invertedIndexReader, null, h3IndexReader, textIndex, null,
-              null, nullValueVector));
+          new IndexContainer(fieldSpec, partitionFunction, partitions, new NumValuesInfo(), forwardIndex, dictionary,
+              invertedIndexReader, null, h3IndexReader, textIndex, fstIndexColumns.contains(column), null, null,
+              nullValueVector));
     }
 
     if (_realtimeLuceneReaders != null) {
@@ -757,8 +757,8 @@ public class MutableSegmentImpl implements MutableSegment {
   /**
    * Helper method to read the value for the given document id.
    */
-  private static Object getValue(int docId, MutableForwardIndex forwardIndex,
-      @Nullable MutableDictionary dictionary, int maxNumMultiValues) {
+  private static Object getValue(int docId, MutableForwardIndex forwardIndex, @Nullable MutableDictionary dictionary,
+      int maxNumMultiValues) {
     if (dictionary != null) {
       // Dictionary based
       if (forwardIndex.isSingleValue()) {
@@ -1051,6 +1051,8 @@ public class MutableSegmentImpl implements MutableSegment {
     final InvertedIndexReader _rangeIndex;
     final RealtimeH3IndexReader _h3Index;
     final RealtimeLuceneTextIndexReader _textIndex;
+    final boolean _enableFST;
+    final JsonIndexReader _jsonIndex;
     final BloomFilterReader _bloomFilter;
     final MutableNullValueVector _nullValueVector;
 
@@ -1061,16 +1063,12 @@ public class MutableSegmentImpl implements MutableSegment {
     int _dictId = Integer.MIN_VALUE;
     int[] _dictIds;
 
-    boolean _fstIndexEnabled;
-
-    IndexContainer(
-        FieldSpec fieldSpec, boolean fstIndexEnabled,
-        @Nullable PartitionFunction partitionFunction, @Nullable Set<Integer> partitions,
-        NumValuesInfo numValuesInfo, MutableForwardIndex forwardIndex, @Nullable MutableDictionary dictionary,
-        @Nullable RealtimeInvertedIndexReader invertedIndex, @Nullable InvertedIndexReader rangeIndex,
-        @Nullable RealtimeH3IndexReader h3Index, @Nullable RealtimeLuceneTextIndexReader textIndex,
-        @Nullable TextIndexReader fstIndex, @Nullable BloomFilterReader bloomFilter,
-        @Nullable MutableNullValueVector nullValueVector) {
+    IndexContainer(FieldSpec fieldSpec, @Nullable PartitionFunction partitionFunction,
+        @Nullable Set<Integer> partitions, NumValuesInfo numValuesInfo, MutableForwardIndex forwardIndex,
+        @Nullable MutableDictionary dictionary, @Nullable RealtimeInvertedIndexReader invertedIndex,
+        @Nullable InvertedIndexReader rangeIndex, @Nullable RealtimeH3IndexReader h3Index,
+        @Nullable RealtimeLuceneTextIndexReader textIndex, boolean enableFST, @Nullable JsonIndexReader jsonIndex,
+        @Nullable BloomFilterReader bloomFilter, @Nullable MutableNullValueVector nullValueVector) {
       _fieldSpec = fieldSpec;
       _partitionFunction = partitionFunction;
       _partitions = partitions;
@@ -1082,18 +1080,17 @@ public class MutableSegmentImpl implements MutableSegment {
       _h3Index = h3Index;
 
       _textIndex = textIndex;
+      _enableFST = enableFST;
+      _jsonIndex = jsonIndex;
       _bloomFilter = bloomFilter;
       _nullValueVector = nullValueVector;
-      _fstIndexEnabled = fstIndexEnabled;
     }
 
     DataSource toDataSource() {
-      // FST Index is currently not built for consuming segment, only when the segment is rolled out FST index is
-      // generated.
       return new MutableDataSource(_fieldSpec, _numDocsIndexed, _numValuesInfo._numValues,
-          _numValuesInfo._maxNumValuesPerMVEntry, _fstIndexEnabled, _partitionFunction, _partitions, _minValue,
-          _maxValue, _forwardIndex, _dictionary, _invertedIndex, _rangeIndex, _textIndex, null, _bloomFilter,
-          _nullValueVector, _h3Index);
+          _numValuesInfo._maxNumValuesPerMVEntry, _partitionFunction, _partitions, _minValue, _maxValue, _forwardIndex,
+          _dictionary, _invertedIndex, _rangeIndex, _textIndex, _enableFST, _jsonIndex, _bloomFilter, _nullValueVector,
+          _h3Index);
     }
 
     @Override
@@ -1131,6 +1128,13 @@ public class MutableSegmentImpl implements MutableSegment {
           _textIndex.close();
         } catch (Exception e) {
           _logger.error("Caught exception while closing text index for column: {}, continuing with error", column, e);
+        }
+      }
+      if (_jsonIndex != null) {
+        try {
+          _jsonIndex.close();
+        } catch (Exception e) {
+          _logger.error("Caught exception while closing json index for column: {}, continuing with error", column, e);
         }
       }
       if (_bloomFilter != null) {

@@ -20,6 +20,7 @@ package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.base.Preconditions;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -32,11 +33,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
-import javax.ws.rs.DefaultValue;
 import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -63,7 +64,6 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.controller.util.TableMetadataReader;
-import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -352,6 +352,67 @@ public class PinotSegmentRestletResource {
     } else {
       throw new ControllerApplicationException(LOGGER,
           "Failed to find segment: " + segmentName + " in table: " + tableName, Status.NOT_FOUND);
+    }
+  }
+
+  /**
+   * Resets the segment of the table, by disabling and then enabling it.
+   * This API will take segments to OFFLINE state, wait for External View to stabilize, and then back to ONLINE/CONSUMING state,
+   * thus effective in resetting segments or consumers in error states.
+   */
+  @POST
+  @Path("segments/{tableNameWithType}/{segmentName}/reset")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Resets a segment by first disabling it, waiting for external view to stabilize, and finally enabling it again", notes = "Resets a segment by disabling and then enabling the segment")
+  public SuccessResponse resetSegment(
+      @ApiParam(value = "Name of the table with type", required = true) @PathParam("tableNameWithType") String tableNameWithType,
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
+      @ApiParam(value = "Maximum time in milliseconds to wait for reset to be completed. By default, uses serverAdminRequestTimeout") @QueryParam("maxWaitTimeMs") long maxWaitTimeMs) {
+    segmentName = URIUtils.decode(segmentName);
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    try {
+      Preconditions.checkState(tableType != null, "Must provide table name with type: %s", tableNameWithType);
+      _pinotHelixResourceManager.resetSegment(tableNameWithType, segmentName,
+          maxWaitTimeMs > 0 ? maxWaitTimeMs : _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+      return new SuccessResponse(
+          String.format("Successfully reset segment: %s of table: %s", segmentName, tableNameWithType));
+    } catch (IllegalStateException e) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Failed to reset segments in table: %s. %s", tableNameWithType, e.getMessage()),
+          Status.NOT_FOUND);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Failed to reset segment: %s of table: %s. %s", segmentName, tableNameWithType, e.getMessage()),
+          Status.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  /**
+   * Resets all segments of the given table
+   * This API will take segments to OFFLINE state, wait for External View to stabilize, and then back to ONLINE/CONSUMING state,
+   * thus effective in resetting segments or consumers in error states.
+   */
+  @POST
+  @Path("segments/{tableNameWithType}/reset")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Resets all segments of the table, by first disabling them, waiting for external view to stabilize, and finally enabling the segments", notes = "Resets a segment by disabling and then enabling a segment")
+  public SuccessResponse resetAllSegments(
+      @ApiParam(value = "Name of the table with type", required = true) @PathParam("tableNameWithType") String tableNameWithType,
+      @ApiParam(value = "Maximum time in milliseconds to wait for reset to be completed. By default, uses serverAdminRequestTimeout") @QueryParam("maxWaitTimeMs") long maxWaitTimeMs) {
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    try {
+      Preconditions.checkState(tableType != null, "Must provide table name with type: %s", tableNameWithType);
+      _pinotHelixResourceManager.resetAllSegments(tableNameWithType,
+          maxWaitTimeMs > 0 ? maxWaitTimeMs : _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+      return new SuccessResponse(String.format("Successfully reset all segments of table: %s", tableNameWithType));
+    } catch (IllegalStateException e) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Failed to reset segments in table: %s. %s", tableNameWithType, e.getMessage()),
+          Status.NOT_FOUND);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Failed to reset segments in table: %s. %s", tableNameWithType, e.getMessage()),
+          Status.INTERNAL_SERVER_ERROR);
     }
   }
 

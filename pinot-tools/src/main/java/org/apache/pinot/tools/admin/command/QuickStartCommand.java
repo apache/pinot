@@ -19,6 +19,7 @@
 package org.apache.pinot.tools.admin.command;
 
 import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.tools.BatchQuickstartWithMinion;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.HybridQuickstart;
 import org.apache.pinot.tools.Quickstart;
@@ -75,6 +76,12 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
       case "OFFLINE":
       case "BATCH":
         new Quickstart().execute();
+        break;
+      case "OFFLINE_MINION":
+      case "BATCH_MINION":
+      case "OFFLINE-MINION":
+      case "BATCH-MINION":
+        new BatchQuickstartWithMinion().execute();
         break;
       case "REALTIME":
       case "STREAM":

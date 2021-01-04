@@ -22,9 +22,9 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.data.partition.PartitionFunction;
-import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.datasource.BaseDataSource;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
@@ -34,7 +34,7 @@ public class StarTreeDataSource extends BaseDataSource {
       @Nullable Dictionary dictionary) {
     super(new StarTreeDataSourceMetadata(fieldSpec, numDocs),
             forwardIndex, dictionary, null, null, null,
-            null, null, null, null);
+            null, null, null, null, null);
   }
 
   private static final class StarTreeDataSourceMetadata implements DataSourceMetadata {

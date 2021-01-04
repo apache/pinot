@@ -21,12 +21,24 @@ package org.apache.pinot.tools;
 import com.google.common.base.Preconditions;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.Reader;
+import java.net.URI;
 import java.net.URL;
+import java.util.List;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.minion.MinionClient;
+import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.ingestion.batch.BatchConfig;
+import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.tools.admin.command.AddTableCommand;
 import org.apache.pinot.tools.utils.JarUtils;
 import org.slf4j.Logger;
@@ -36,9 +48,11 @@ import org.yaml.snakeyaml.Yaml;
 
 public class BootstrapTableTool {
   private static final Logger LOGGER = LoggerFactory.getLogger(BootstrapTableTool.class);
+  private static final String COMPLETED = "COMPLETED";
   private final String _controllerHost;
   private final int _controllerPort;
   private final String _tableDir;
+  private final MinionClient _minionClient;
 
   public BootstrapTableTool(String controllerHost, int controllerPort, String tableDir) {
     Preconditions.checkNotNull(controllerHost);
@@ -46,11 +60,13 @@ public class BootstrapTableTool {
     _controllerHost = controllerHost;
     _controllerPort = controllerPort;
     _tableDir = tableDir;
+    _minionClient = new MinionClient(controllerHost, String.valueOf(controllerPort));
   }
 
   public boolean execute()
       throws Exception {
     File setupTableTmpDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
+    setupTableTmpDir.mkdirs();
 
     File tableDir = new File(_tableDir);
     String tableName = tableDir.getName();
@@ -95,41 +111,125 @@ public class BootstrapTableTool {
         .setTableConfigFile(tableConfigFile.getAbsolutePath()).setControllerHost(_controllerHost)
         .setControllerPort(String.valueOf(_controllerPort)).setExecute(true).execute();
   }
+
   private boolean bootstrapOfflineTable(File setupTableTmpDir, String tableName, File schemaFile,
       File offlineTableConfigFile, File ingestionJobSpecFile)
       throws Exception {
-    LOGGER.info("Adding offline table: {}", tableName);
-    boolean tableCreationResult = createTable(schemaFile, offlineTableConfigFile);
+    TableConfig tableConfig =
+        JsonUtils.inputStreamToObject(new FileInputStream(offlineTableConfigFile), TableConfig.class);
+    if (tableConfig.getIngestionConfig() != null
+        && tableConfig.getIngestionConfig().getBatchIngestionConfig() != null) {
+      updatedTableConfig(tableConfig, tableName, setupTableTmpDir);
+    }
 
+    LOGGER.info("Adding offline table: {}", tableName);
+    File updatedTableConfigFile =
+        new File(setupTableTmpDir, String.format("%s_%d.config", tableName, System.currentTimeMillis()));
+    FileOutputStream outputStream = new FileOutputStream(updatedTableConfigFile);
+    outputStream.write(JsonUtils.objectToPrettyString(tableConfig).getBytes());
+    outputStream.close();
+    boolean tableCreationResult = createTable(schemaFile, updatedTableConfigFile);
     if (!tableCreationResult) {
       throw new RuntimeException(String
           .format("Unable to create offline table - %s from schema file [%s] and table conf file [%s].", tableName,
               schemaFile, offlineTableConfigFile));
     }
-
-    if (ingestionJobSpecFile.exists()) {
-      LOGGER.info("Launch data ingestion job to build index segment for table {} and push to controller [{}:{}]",
-          tableName, _controllerHost, _controllerPort);
-      try (Reader reader = new BufferedReader(new FileReader(ingestionJobSpecFile.getAbsolutePath()))) {
-        SegmentGenerationJobSpec spec = new Yaml().loadAs(reader, SegmentGenerationJobSpec.class);
-        String inputDirURI = spec.getInputDirURI();
-        if (!new File(inputDirURI).exists()) {
-          URL resolvedInputDirURI = BootstrapTableTool.class.getClassLoader().getResource(inputDirURI);
-          if (resolvedInputDirURI.getProtocol().equals("jar")) {
-            String[] splits = resolvedInputDirURI.getFile().split("!");
-            String inputDir = new File(setupTableTmpDir, "inputData").toString();
-            JarUtils.copyResourcesToDirectory(splits[0], splits[1].substring(1), inputDir);
-            spec.setInputDirURI(inputDir);
-          } else {
-            spec.setInputDirURI(resolvedInputDirURI.toString());
-          }
-        }
-        IngestionJobLauncher.runIngestionJob(spec);
+    if (tableConfig.getTaskConfig() != null) {
+      final Map<String, String> scheduledTasks = _minionClient
+          .scheduleMinionTasks(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
+              TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+      if (scheduledTasks.isEmpty()) {
+        LOGGER.info("No scheduled tasks.");
+        return true;
       }
-    } else {
-      LOGGER.info("Not found ingestionJobSpec.yaml at location [{}], skipping data ingestion",
-          ingestionJobSpecFile.getAbsolutePath());
+      waitForMinionTaskToFinish(scheduledTasks, 30_000L);
+    }
+    if (ingestionJobSpecFile != null) {
+      if (ingestionJobSpecFile.exists()) {
+        LOGGER.info("Launch data ingestion job to build index segment for table {} and push to controller [{}:{}]",
+            tableName, _controllerHost, _controllerPort);
+        try (Reader reader = new BufferedReader(new FileReader(ingestionJobSpecFile.getAbsolutePath()))) {
+          SegmentGenerationJobSpec spec = new Yaml().loadAs(reader, SegmentGenerationJobSpec.class);
+          String inputDirURI = spec.getInputDirURI();
+          if (!new File(inputDirURI).exists()) {
+            URL resolvedInputDirURI = BootstrapTableTool.class.getClassLoader().getResource(inputDirURI);
+            if (resolvedInputDirURI != null && "jar".equals(resolvedInputDirURI.getProtocol())) {
+              String[] splits = resolvedInputDirURI.getFile().split("!");
+              String inputDir = new File(setupTableTmpDir, "inputData").toString();
+              JarUtils.copyResourcesToDirectory(splits[0], splits[1].substring(1), inputDir);
+              spec.setInputDirURI(inputDir);
+            } else {
+              spec.setInputDirURI(resolvedInputDirURI.toString());
+            }
+          }
+          IngestionJobLauncher.runIngestionJob(spec);
+        }
+      } else {
+        LOGGER.info("Not found ingestionJobSpec.yaml at location [{}], skipping data ingestion",
+            ingestionJobSpecFile.getAbsolutePath());
+      }
     }
     return true;
+  }
+
+  private void updatedTableConfig(TableConfig tableConfig, String tableName, File setupTableTmpDir)
+      throws Exception {
+    final List<Map<String, String>> batchConfigsMaps =
+        tableConfig.getIngestionConfig().getBatchIngestionConfig().getBatchConfigMaps();
+    for (Map<String, String> batchConfigsMap : batchConfigsMaps) {
+      BatchConfig batchConfig = new BatchConfig(TableNameBuilder.OFFLINE.tableNameWithType(tableName), batchConfigsMap);
+      String inputDirURI = batchConfig.getInputDirURI();
+      if (!new File(inputDirURI).exists()) {
+        URL resolvedInputDirURI = BootstrapTableTool.class.getClassLoader().getResource(inputDirURI);
+        if (resolvedInputDirURI != null) {
+          if ("jar".equals(resolvedInputDirURI.getProtocol())) {
+            String[] splits = resolvedInputDirURI.getFile().split("!");
+            File inputDir = new File(setupTableTmpDir, "inputData");
+            JarUtils.copyResourcesToDirectory(splits[0], splits[1].substring(1), inputDir.toString());
+            batchConfigsMap.put(BatchConfigProperties.INPUT_DIR_URI, inputDir.toURI().toString());
+            batchConfigsMap.put(BatchConfigProperties.OUTPUT_DIR_URI,
+                new File(inputDir.getParent(), "segments").toURI().toString());
+          } else {
+            final URI inputURI = resolvedInputDirURI.toURI();
+            batchConfigsMap.put(BatchConfigProperties.INPUT_DIR_URI, inputURI.toString());
+            URI outputURI =
+                inputURI.getPath().endsWith("/") ? inputURI.resolve("../segments") : inputURI.resolve("./segments");
+            batchConfigsMap.put(BatchConfigProperties.OUTPUT_DIR_URI, outputURI.toString());
+          }
+        }
+      }
+    }
+  }
+
+  private boolean waitForMinionTaskToFinish(Map<String, String> scheduledTasks, long timeoutInMillis) {
+    long startTime = System.currentTimeMillis();
+    while (System.currentTimeMillis() - startTime < timeoutInMillis) {
+      try {
+        Thread.sleep(500L);
+      } catch (InterruptedException e) {
+        // Swallow the exception
+      }
+      try {
+        boolean allCompleted = true;
+        for (String taskType : scheduledTasks.keySet()) {
+          String taskName = scheduledTasks.get(taskType);
+          String taskState = _minionClient.getTaskState(taskName);
+          if (!COMPLETED.equalsIgnoreCase(taskState)) {
+            allCompleted = false;
+            break;
+          } else {
+            scheduledTasks.remove(taskType);
+          }
+        }
+        if (allCompleted) {
+          LOGGER.info("All minion tasks are completed.");
+          return true;
+        }
+      } catch (Exception e) {
+        LOGGER.error("Failed to query task endpoint", e);
+        continue;
+      }
+    }
+    return false;
   }
 }

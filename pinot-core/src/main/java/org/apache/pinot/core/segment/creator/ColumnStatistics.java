@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.creator;
 
+import java.io.Serializable;
 import java.util.Set;
 import org.apache.pinot.core.data.partition.PartitionFunction;
 
@@ -25,7 +26,7 @@ import org.apache.pinot.core.data.partition.PartitionFunction;
 /**
  * An interface to read the column statistics from statistics collectors.
  */
-public interface ColumnStatistics {
+public interface ColumnStatistics extends Serializable {
   /**
    * @return Minimum value of the column
    */

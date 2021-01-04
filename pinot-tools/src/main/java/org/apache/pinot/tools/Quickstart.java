@@ -43,6 +43,10 @@ public class Quickstart {
     }
   }
 
+  public String getBootstrapDataDir() {
+    return "examples/batch/baseballStats";
+  }
+
   public static void printStatus(Color color, String message) {
     System.out.println(color._code + message + Color.RESET._code);
   }
@@ -144,16 +148,17 @@ public class Quickstart {
     File dataFile = new File(dataDir, "baseballStats_data.csv");
 
     ClassLoader classLoader = Quickstart.class.getClassLoader();
-    URL resource = classLoader.getResource("examples/batch/baseballStats/baseballStats_schema.json");
+    URL resource = classLoader.getResource(getBootstrapDataDir() + "/baseballStats_schema.json");
     com.google.common.base.Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, schemaFile);
-    resource = classLoader.getResource("examples/batch/baseballStats/rawdata/baseballStats_data.csv");
+    resource = classLoader.getResource(getBootstrapDataDir() + "/rawdata/baseballStats_data.csv");
     com.google.common.base.Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, dataFile);
-    resource = classLoader.getResource("examples/batch/baseballStats/ingestionJobSpec.yaml");
-    com.google.common.base.Preconditions.checkNotNull(resource);
-    FileUtils.copyURLToFile(resource, ingestionJobSpecFile);
-    resource = classLoader.getResource("examples/batch/baseballStats/baseballStats_offline_table_config.json");
+    resource = classLoader.getResource(getBootstrapDataDir() + "/ingestionJobSpec.yaml");
+    if (resource != null) {
+      FileUtils.copyURLToFile(resource, ingestionJobSpecFile);
+    }
+    resource = classLoader.getResource(getBootstrapDataDir() + "/baseballStats_offline_table_config.json");
     com.google.common.base.Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, tableConfigFile);
 

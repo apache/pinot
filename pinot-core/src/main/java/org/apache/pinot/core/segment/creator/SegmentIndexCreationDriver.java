@@ -19,6 +19,7 @@
 package org.apache.pinot.core.segment.creator;
 
 import java.io.File;
+import java.io.Serializable;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.data.IngestionSchemaValidator;
 
@@ -29,7 +30,7 @@ import org.apache.pinot.spi.data.IngestionSchemaValidator;
  * Nov 6, 2014
  */
 
-public interface SegmentIndexCreationDriver {
+public interface SegmentIndexCreationDriver extends Serializable {
   /**
    * Configures the segment generator with the given segment generator configuration, which contains the input file
    * location, format, schema and other necessary information to create an index segment.

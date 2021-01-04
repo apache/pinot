@@ -21,6 +21,7 @@ package org.apache.pinot.spi.data.readers;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -49,7 +50,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
  *  MV: Object[] or List of Byte, Character, Short, Integer, Long, Float, Double, String
  *  We should not be using Boolean, Byte, Character and Short to keep it simple
  */
-public class GenericRow {
+public class GenericRow implements Serializable {
 
   /**
    * This key is used by a Decoder/RecordReader to handle 1 record to many records flattening.

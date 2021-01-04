@@ -19,7 +19,7 @@
 
 dependencies:
 - name: zookeeper
-  repository: https://kubernetes-charts-incubator.storage.googleapis.com/
+  repository: https://charts.helm.sh/incubator
   version: 2.1.3
 digest: sha256:12b613c8bde62ba0ff10e39e86c0645829a795c7345904a5de4257f9c5136676
 generated: "2020-04-18T19:26:51.965519+05:30"
