@@ -80,6 +80,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
         createConnection();
       }
 
+      //TODO: iterate upon all the shardIds in the map
       Map.Entry<String, String> next = kinesisStartCheckpoint.getShardToStartSequenceMap().entrySet().iterator().next();
       String shardIterator = getShardIterator(next.getKey(), next.getValue());
 
@@ -125,7 +126,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
         nextStartSequenceNumber = recordList.get(recordList.size() - 1).sequenceNumber();
       }
 
-      return new KinesisRecordsBatch(recordList);
+      return new KinesisRecordsBatch(recordList, next.getKey());
     } catch (ProvisionedThroughputExceededException e) {
       LOG.warn("The request rate for the stream is too high", e);
       return handleException(kinesisStartCheckpoint, recordList);
@@ -147,13 +148,16 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
   }
 
   private KinesisRecordsBatch handleException(KinesisCheckpoint start, List<Record> recordList) {
+    String shardId = start.getShardToStartSequenceMap().entrySet().iterator().next().getKey();
+
     if (recordList.size() > 0) {
       String nextStartSequenceNumber = recordList.get(recordList.size() - 1).sequenceNumber();
       Map<String, String> newCheckpoint = new HashMap<>(start.getShardToStartSequenceMap());
       newCheckpoint.put(newCheckpoint.keySet().iterator().next(), nextStartSequenceNumber);
-      return new KinesisRecordsBatch(recordList);
+
+      return new KinesisRecordsBatch(recordList, shardId);
     } else {
-      return new KinesisRecordsBatch(recordList);
+      return new KinesisRecordsBatch(recordList, shardId);
 
     }
   }
