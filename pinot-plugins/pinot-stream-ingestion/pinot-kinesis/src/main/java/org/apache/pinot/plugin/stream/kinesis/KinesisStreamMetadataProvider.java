@@ -2,7 +2,9 @@ package org.apache.pinot.plugin.stream.kinesis;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nonnull;
 import org.apache.pinot.spi.stream.OffsetCriteria;
@@ -40,7 +42,11 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
     List<PartitionGroupInfo> partitionGroupInfos = new ArrayList<>();
     List<Shard> shards = _kinesisConnectionHandler.getShards();
     for (Shard shard : shards) {
-      partitionGroupInfos.add(new PartitionGroupInfo(shard.shardId().hashCode(), shard.sequenceNumberRange().startingSequenceNumber()));
+      Map<String, String> shardToSequenceNumMap = new HashMap<>();
+      shardToSequenceNumMap.put(shard.shardId(), shard.sequenceNumberRange().startingSequenceNumber());
+      KinesisCheckpoint kinesisCheckpoint = new KinesisCheckpoint(shardToSequenceNumMap);
+      partitionGroupInfos
+          .add(new PartitionGroupInfo(Math.abs(shard.shardId().hashCode()), kinesisCheckpoint.serialize()));
     }
     return partitionGroupInfos;
   }

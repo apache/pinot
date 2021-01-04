@@ -22,7 +22,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
 import java.util.Map;
-import org.apache.pinot.spi.stream.Checkpoint;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -51,6 +50,11 @@ public class KinesisCheckpoint implements StreamPartitionMsgOffset {
     } catch (JsonProcessingException e) {
       throw new IllegalStateException();
     }
+  }
+
+  @Override
+  public String toString() {
+    return serialize();
   }
 
   @Override
