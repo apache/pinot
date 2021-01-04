@@ -1,11 +1,5 @@
-import Component from "@ember/component";
-import {
-  computed,
-  setProperties,
-  getProperties,
-  get,
-  set
-} from '@ember/object';
+import Component from '@ember/component';
+import { computed, setProperties, getProperties, get, set } from '@ember/object';
 import moment from 'moment';
 import {
   filterPrefix,
@@ -18,6 +12,7 @@ import {
 } from 'thirdeye-frontend/utils/rca-utils';
 import { humanizeChange, humanizeFloat } from 'thirdeye-frontend/utils/utils';
 import { equal, reads } from '@ember/object/computed';
+import { anomalyResponseMap } from 'thirdeye-frontend/utils/anomaly';
 
 const ROOTCAUSE_HIDDEN_DEFAULT = 'default';
 
@@ -27,13 +22,7 @@ const OFFSETS = ['current', 'predicted', 'wo1w', 'wo2w', 'wo3w', 'wo4w'];
  * Maps the status from the db to something human readable to display on the form
  * @type {Object}
  */
-const ANOMALY_OPTIONS_MAPPING = {
-  ANOMALY: 'Yes - unexpected',
-  ANOMALY_EXPECTED: 'Expected temporary change',
-  ANOMALY_NEW_TREND: 'Expected permanent change',
-  NOT_ANOMALY: 'No change observed',
-  NO_FEEDBACK: 'Not reviewed yet'
-};
+const ANOMALY_OPTIONS_MAPPING = anomalyResponseMap;
 
 export default Component.extend({
   classNames: ['rootcause-anomaly'],
@@ -84,65 +73,53 @@ export default Component.extend({
    * times
    * @type {boolean}
    */
-  isRangeChanged: computed(
-    'anomalyRange',
-    'anomaly',
-    function () {
-      const anomalyRange = get(this, 'anomalyRange');
-      const start = get(this, 'anomaly').start;
-      const end = get(this, 'anomaly').end;
-      return !(anomalyRange[0] === start && anomalyRange[1] === end);
-    }
-  ),
+  isRangeChanged: computed('anomalyRange', 'anomaly', function () {
+    const anomalyRange = get(this, 'anomalyRange');
+    const start = get(this, 'anomaly').start;
+    const end = get(this, 'anomaly').end;
+    return !(anomalyRange[0] === start && anomalyRange[1] === end);
+  }),
 
   /**
    * Urn of an anomaly
    * @type {String}
    */
-  anomalyUrn: computed(
-    'anomalyUrns',
-    function () {
-      const anomalyUrns = get(this, 'anomalyUrns');
-      const anomalyEventUrn = filterPrefix(anomalyUrns, 'thirdeye:event:anomaly:');
+  anomalyUrn: computed('anomalyUrns', function () {
+    const anomalyUrns = get(this, 'anomalyUrns');
+    const anomalyEventUrn = filterPrefix(anomalyUrns, 'thirdeye:event:anomaly:');
 
-      if (!anomalyEventUrn) return ;
+    if (!anomalyEventUrn) return;
 
-      return anomalyEventUrn[0];
-    }
-  ),
+    return anomalyEventUrn[0];
+  }),
 
   /**
    * Metric urn for anomaly topic metric
    * @type {string}
    */
-  metricUrn: computed(
-    'anomalyUrns',
-    function () {
-      const { anomalyUrns } = getProperties(this, 'anomalyUrns');
+  metricUrn: computed('anomalyUrns', function () {
+    const { anomalyUrns } = getProperties(this, 'anomalyUrns');
 
-      const metricUrns = filterPrefix(anomalyUrns, 'thirdeye:metric:');
+    const metricUrns = filterPrefix(anomalyUrns, 'thirdeye:metric:');
 
-      if (!metricUrns) { return; }
-
-      return metricUrns[0];
+    if (!metricUrns) {
+      return;
     }
-  ),
+
+    return metricUrns[0];
+  }),
 
   /**
    * Information about an anomaly displayed in the overview regarding its id, metric, dimensions, alert name, and duration
    * @type {Object}
    */
-  anomaly: computed(
-    'entities',
-    'anomalyUrn',
-    function () {
-      const { entities, anomalyUrn } = getProperties(this, 'entities', 'anomalyUrn');
+  anomaly: computed('entities', 'anomalyUrn', function () {
+    const { entities, anomalyUrn } = getProperties(this, 'entities', 'anomalyUrn');
 
-      if (!anomalyUrn || !entities || !entities[anomalyUrn]) return ;
+    if (!anomalyUrn || !entities || !entities[anomalyUrn]) return;
 
-      return entities[anomalyUrn];
-    }
-  ),
+    return entities[anomalyUrn];
+  }),
 
   /**
    * Anomaly function (alert) name
@@ -216,21 +193,19 @@ export default Component.extend({
    * Formatted metric label of anomaly topic metric
    * @type {string}
    */
-  metricLabel: computed(
-    'anomalyUrns',
-    'entities',
-    function () {
-      const { anomalyUrns, entities } = getProperties(this, 'anomalyUrns', 'entities');
+  metricLabel: computed('anomalyUrns', 'entities', function () {
+    const { anomalyUrns, entities } = getProperties(this, 'anomalyUrns', 'entities');
 
-      const metricUrns = filterPrefix(anomalyUrns, 'thirdeye:metric:');
+    const metricUrns = filterPrefix(anomalyUrns, 'thirdeye:metric:');
 
-      if (!metricUrns) { return; }
-
-      const metricUrn = metricUrns[0];
-
-      return toMetricLabel(metricUrn, entities);
+    if (!metricUrns) {
+      return;
     }
-  ),
+
+    const metricUrn = metricUrns[0];
+
+    return toMetricLabel(metricUrn, entities);
+  }),
 
   /**
    * Formatted anomaly start time
@@ -267,36 +242,29 @@ export default Component.extend({
    * Toggle for hide/expand panel
    * @type {boolean}
    */
-  isHidden: computed(
-    'requiresFeedback',
-    'isHiddenUser',
-    function () {
-      const { requiresFeedback, isHiddenUser } = getProperties(this, 'requiresFeedback', 'isHiddenUser');
-      if (isHiddenUser === ROOTCAUSE_HIDDEN_DEFAULT) {
-        return !requiresFeedback;
-      }
-      return isHiddenUser;
+  isHidden: computed('requiresFeedback', 'isHiddenUser', function () {
+    const { requiresFeedback, isHiddenUser } = getProperties(this, 'requiresFeedback', 'isHiddenUser');
+    if (isHiddenUser === ROOTCAUSE_HIDDEN_DEFAULT) {
+      return !requiresFeedback;
     }
-  ),
+    return isHiddenUser;
+  }),
 
   /**
    * External links for current anomaly
    * @type {Object} - an object with key as the link type and value as the url
    */
-  anomalyLinks: computed(
-    'anomaly',
-    function() {
-      const { externalUrls = [] } = get(this, 'anomaly.attributes');
-      let urls = {};
+  anomalyLinks: computed('anomaly', function () {
+    const { externalUrls = [] } = get(this, 'anomaly.attributes');
+    let urls = {};
 
-      if (externalUrls.length) {
-        externalUrls.forEach(url => {
-          urls[url] = get(this, 'anomaly.attributes')[url][0]; // there will always be only 1 element in this array
-        });
-      }
-      return urls;
+    if (externalUrls.length) {
+      externalUrls.forEach((url) => {
+        urls[url] = get(this, 'anomaly.attributes')[url][0]; // there will always be only 1 element in this array
+      });
     }
-  ),
+    return urls;
+  }),
 
   /**
    * Information about an anomaly's baselines, changes, and values to be displayed in the anomaly overview
@@ -315,32 +283,26 @@ export default Component.extend({
    *   }
    * }
    */
-  anomalyInfo: computed(
-    'aggregates',
-    'anomalyUrns',
-    'entities',
-    'baseline',
-    function () {
-      const { metricUrn, entities } = getProperties(this, 'metricUrn', 'entities');
+  anomalyInfo: computed('aggregates', 'anomalyUrns', 'entities', 'baseline', function () {
+    const { metricUrn, entities } = getProperties(this, 'metricUrn', 'entities');
 
-      const curr = this._getAggregate('current');
+    const curr = this._getAggregate('current');
 
-      const anomalyInfo = {};
-      [...this.offsets].forEach(offset => {
-        const value = this._getAggregate(offset);
-        const change = curr / value - 1;
+    const anomalyInfo = {};
+    [...this.offsets].forEach((offset) => {
+      const value = this._getAggregate(offset);
+      const change = curr / value - 1;
 
-        if (!Number.isNaN(value)) {
-          anomalyInfo[offset] = {
-            value: humanizeFloat(value), // numerical value to display
-            change: humanizeChange(change), // text of % change with + or - sign
-            direction: toColorDirection(change, isInverse(metricUrn, entities))
-          };
-        }
-      });
-      return anomalyInfo;
-    }
-  ),
+      if (!Number.isNaN(value)) {
+        anomalyInfo[offset] = {
+          value: humanizeFloat(value), // numerical value to display
+          change: humanizeChange(change), // text of % change with + or - sign
+          direction: toColorDirection(change, isInverse(metricUrn, entities))
+        };
+      }
+    });
+    return anomalyInfo;
+  }),
 
   /**
    * Returns any offset that has associated current and change values
@@ -348,7 +310,7 @@ export default Component.extend({
    */
   availableOffsets: computed('offsets', 'anomalyInfo', function () {
     const { offsets, anomalyInfo } = getProperties(this, 'offsets', 'anomalyInfo');
-    return offsets.filter(offset => offset in anomalyInfo);
+    return offsets.filter((offset) => offset in anomalyInfo);
   }),
 
   /**
@@ -364,7 +326,7 @@ export default Component.extend({
    * grabs value of new current only when warningValue is toggled
    * @type {string}
    */
-  warningChangedTo: computed('warningValue', function() {
+  warningChangedTo: computed('warningValue', function () {
     const newCurrent = this._getAggregate('current') * parseFloat(get(this, 'aggregateMultiplier'));
     return humanizeFloat(newCurrent);
   }),
@@ -377,11 +339,18 @@ export default Component.extend({
    * @private
    */
   _getAggregate(offset) {
-    const { metricUrn, aggregates, predicted, aggregateMultiplier } =
-      getProperties(this, 'metricUrn', 'aggregates', 'predicted', 'aggregateMultiplier');
+    const { metricUrn, aggregates, predicted, aggregateMultiplier } = getProperties(
+      this,
+      'metricUrn',
+      'aggregates',
+      'predicted',
+      'aggregateMultiplier'
+    );
     if (offset === 'predicted') {
       const value = parseFloat(predicted);
-      if (value === 0.0) { return Number.NaN; }
+      if (value === 0.0) {
+        return Number.NaN;
+      }
       return value / (aggregateMultiplier || 1.0);
     }
     return aggregates[toOffsetUrn(metricUrn, offset)];
@@ -396,9 +365,9 @@ export default Component.extend({
       const oldCurrent = parseFloat(get(this, 'current'));
       let newCurrent = this._getAggregate('current');
       const aggregateMultiplier = parseFloat(get(this, 'aggregateMultiplier'));
-      if (newCurrent && oldCurrent && aggregateMultiplier){
+      if (newCurrent && oldCurrent && aggregateMultiplier) {
         newCurrent = newCurrent * aggregateMultiplier;
-        const diffCurrent = Math.abs((newCurrent-oldCurrent)/newCurrent);
+        const diffCurrent = Math.abs((newCurrent - oldCurrent) / newCurrent);
         if (diffCurrent > 0.01) {
           set(this, 'warningValue', true);
         } else {

@@ -1,12 +1,7 @@
 import { isPresent } from '@ember/utils';
 import moment from 'moment';
 import _ from 'lodash';
-import {
-  checkStatus,
-  postProps,
-  getProps,
-  putProps
-} from 'thirdeye-frontend/utils/utils';
+import { checkStatus, postProps, getProps, putProps } from 'thirdeye-frontend/utils/utils';
 import { postYamlProps } from 'thirdeye-frontend/utils/yaml-tools';
 import fetch from 'fetch';
 import {
@@ -27,89 +22,46 @@ import { yamlAPI } from 'thirdeye-frontend/utils/api/self-serve';
  to hard code it for feedback mapping.
  */
 export const anomalyResponseObj = [
-  { name: 'Not reviewed yet',
-    value: 'NO_FEEDBACK',
-    status: 'Not Resolved'
-  },
-  { name: 'Yes - unexpected',
-    value: 'ANOMALY',
-    status: 'Confirmed Anomaly'
-  },
-  { name: 'Expected temporary change',
-    value: 'ANOMALY_EXPECTED',
-    status: 'Expected Anomaly'
-  },
-  { name: 'Expected permanent change',
-    value: 'ANOMALY_NEW_TREND',
-    status: 'Confirmed - New Trend'
-  },
-  { name: 'No change observed',
-    value: 'NOT_ANOMALY',
-    status: 'False Alarm'
-  }
+  { name: 'Not reviewed yet', value: 'NO_FEEDBACK', status: 'Not Resolved' },
+  { name: 'Yes - unexpected', value: 'ANOMALY', status: 'Confirmed Anomaly' },
+  { name: 'Expected temporary change', value: 'ANOMALY_EXPECTED', status: 'Expected Anomaly' },
+  { name: 'Expected permanent change', value: 'ANOMALY_NEW_TREND', status: 'Confirmed - New Trend' },
+  { name: 'No change observed', value: 'NOT_ANOMALY', status: 'False Alarm' }
 ];
 
-export const anomalyResponseObjNew = [
-  { name: 'Not reviewed yet',
-    value: 'NONE',
-    status: 'Not Resolved'
-  },
-  { name: 'Not reviewed yet',
-    value: 'NO_FEEDBACK',
-    status: 'Not Resolved'
-  },
-  { name: 'Yes - unexpected',
-    value: 'ANOMALY',
-    status: 'Confirmed Anomaly'
-  },
-  { name: 'Yes - unexpected',
-    value: 'FALSE_NEGATIVE',
-    status: 'Confirmed Anomaly'
-  },
-  { name: 'Expected temporary change',
-    value: 'ANOMALY_EXPECTED',
-    status: 'Expected Anomaly'
-  },
-  { name: 'Expected permanent change',
-    value: 'ANOMALY_NEW_TREND',
-    status: 'New Trend'
-  },
-  { name: 'No change observed',
-    value: 'NOT_ANOMALY',
-    status: 'False Alarm'
-  }
+export const reportedAnomalyResponseObj = [
+  { name: 'Not reviewed yet', value: 'NONE', status: 'Not Resolved' },
+  { name: 'Yes - unexpected', value: 'FALSE_NEGATIVE', status: 'Confirmed Anomaly' }
 ];
 
-export const anomalySeverityLevelObj = [{
-  name: 'Default', value: 'DEFAULT'
-}, {
-  name: 'Low', value: 'LOW'
-}, {
-  name: 'Medium', value: 'MEDIUM'
-}, {
-  name: 'High', value: 'HIGH'
-}, {
-  name: 'Critical', value: 'CRITICAL'
-}]
+export const anomalySeverityLevelObj = [
+  { name: 'Default', value: 'DEFAULT' },
+  { name: 'Low', value: 'LOW' },
+  { name: 'Medium', value: 'MEDIUM' },
+  { name: 'High', value: 'HIGH' },
+  { name: 'Critical', value: 'CRITICAL' }
+];
 
 export const anomalyTypeMapping = {
-  "DEVIATION": "Metric Deviation", "TREND_CHANGE": "Trend Change", "DATA_SLA": "SLA Violation"
-}
+  DEVIATION: 'Metric Deviation',
+  TREND_CHANGE: 'Trend Change',
+  DATA_SLA: 'SLA Violation'
+};
 
 /**
- * Mapping for anomalyResponseObj 'status' to 'name' for easy lookup
+ * Mapping for anomalyResponseObj 'value' to 'name' for easy lookup
  */
-export let anomalyResponseMap = {};
+export const anomalyResponseMap = {};
 anomalyResponseObj.forEach((obj) => {
-  anomalyResponseMap[obj.status] = obj.name;
+  anomalyResponseMap[obj.value] = obj.name;
 });
 
 /**
- * Mapping for anomalyResponseObjNew 'value' to 'name' for easy lookup
+ * Mapping for anomalyResponseObjAll 'value' to 'name' for easy lookup
  */
-export let anomalyResponseMapNew = {};
-anomalyResponseObjNew.forEach((obj) => {
-  anomalyResponseMapNew[obj.value] = obj.name;
+export const anomalyResponseMapAll = {};
+[...anomalyResponseObj, ...reportedAnomalyResponseObj].forEach((obj) => {
+  anomalyResponseMapAll[obj.value] = obj.name;
 });
 
 /**
@@ -254,7 +206,7 @@ export function getFormattedDuration(anomalyStart, anomalyEnd) {
   const minutes = anomalyDuration.get('minutes');
   const duration = [pluralizeTime(days, 'day'), pluralizeTime(hours, 'hour'), pluralizeTime(minutes, 'minute')];
   // We want to display only non-zero duration values in our table
-  const noZeroDurationArr = _.remove(duration, function(item) {
+  const noZeroDurationArr = _.remove(duration, function (item) {
     return isPresent(item);
   });
   return noZeroDurationArr.join(', ');
@@ -273,11 +225,21 @@ export function pluralizeTime(time, unit) {
 }
 
 export function searchAnomaly(offset, limit, startTime, endTime, anomalyIds) {
-  return searchAnomalyWithFilters(offset, limit, startTime, endTime, [], [], [], [], [], anomalyIds)
+  return searchAnomalyWithFilters(offset, limit, startTime, endTime, [], [], [], [], [], anomalyIds);
 }
 
-export function searchAnomalyWithFilters(offset, limit, startTime, endTime, feedbackStatuses, subscriptionGroups,
-  detectionNames, metrics, datasets, anomalyIds) {
+export function searchAnomalyWithFilters(
+  offset,
+  limit,
+  startTime,
+  endTime,
+  feedbackStatuses,
+  subscriptionGroups,
+  detectionNames,
+  metrics,
+  datasets,
+  anomalyIds
+) {
   let url = `/anomaly-search?offset=${offset}&limit=${limit}`;
   if (startTime) {
     url = url.concat(`&startTime=${startTime}`);
@@ -287,7 +249,7 @@ export function searchAnomalyWithFilters(offset, limit, startTime, endTime, feed
   }
   feedbackStatuses = feedbackStatuses || [];
   for (const feedbackStatus of feedbackStatuses) {
-    const feedback = anomalyResponseObj.find(feedback => feedback.name === feedbackStatus)
+    const feedback = anomalyResponseObj.find((feedback) => feedback.name === feedbackStatus);
     if (feedback) {
       url = url.concat(`&feedbackStatus=${feedback.value}`);
     }
@@ -315,12 +277,10 @@ export function searchAnomalyWithFilters(offset, limit, startTime, endTime, feed
   return fetch(url).then(checkStatus);
 }
 
-
 export default {
   anomalyResponseObj,
   anomalyResponseMap,
-  anomalyResponseObjNew,
-  anomalyResponseMapNew,
+  anomalyResponseMapAll,
   updateAnomalyFeedback,
   getFormattedDuration,
   verifyAnomalyFeedback,
