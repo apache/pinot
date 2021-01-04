@@ -43,7 +43,7 @@ public class IntDictionary extends BaseImmutableDictionary {
     }
 
     if (doubleValue < Integer.MIN_VALUE) {
-      // Binary search Insert position of value greater less than Integer.MIN_VALUE
+      // Binary search insert position of value greater less than Integer.MIN_VALUE
       return -1;
     }
 
