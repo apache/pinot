@@ -110,7 +110,7 @@ public class GenericQuickstart {
         runner.stop();
         _kafkaStarter.stop();
         ZkStarter.stopLocalZkServer(_zookeeperInstance);
-//        FileUtils.deleteDirectory(_tableDirectory);
+        FileUtils.deleteDirectory(_tableDirectory);
       } catch (Exception e) {
         LOGGER.error("Caught exception in shutting down QuickStart cluster", e);
       }
@@ -122,6 +122,13 @@ public class GenericQuickstart {
     printStatus(Color.YELLOW, "Total number of documents in the table");
     printStatus(Color.CYAN, "Query : " + q1);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q1)));
+    printStatus(Color.GREEN, "***************************************************");
+
+    String q2 = "select address, ST_DISTANCE(location_st_point, ST_Point(37, -122,1)) \n"
+        + "from starbucksStores WHERE ST_DISTANCE(location_st_point, ST_Point(37, -122, 1)) < 5000 limit 1000";
+    printStatus(Color.YELLOW, "Starbucks stores within 5km of the given point in bay area");
+    printStatus(Color.CYAN, "Query : " + q1);
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q2)));
     printStatus(Color.GREEN, "***************************************************");
 
     printStatus(Color.GREEN, "You can always go to http://localhost:9000 to play around in the query console");
