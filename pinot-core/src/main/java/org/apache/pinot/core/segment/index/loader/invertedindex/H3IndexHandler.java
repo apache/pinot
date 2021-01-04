@@ -109,7 +109,7 @@ public class H3IndexHandler {
     // Create new range index for the column.
     LOGGER.info("Creating new h3 index for segment: {}, column: {}", _segmentName, column);
     if (columnMetadata.hasDictionary()) {
-//      handleDictionaryBasedColumn(columnMetadata);
+      throw new UnsupportedOperationException("The geospatial column does not support dictionary");
     } else {
       handleNonDictionaryBasedColumn(columnMetadata);
     }
@@ -123,31 +123,6 @@ public class H3IndexHandler {
     FileUtils.deleteQuietly(inProgress);
 
     LOGGER.info("Created range index for segment: {}, column: {}", _segmentName, column);
-  }
-
-  //TODO: add later
-  private void handleDictionaryBasedColumn(ColumnMetadata columnMetadata)
-      throws IOException {
-//    int numDocs = columnMetadata.getTotalDocs();
-//    try (ForwardIndexReader forwardIndexReader = getForwardIndexReader(columnMetadata, _segmentWriter);
-//        ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
-//        H3IndexCreator h3IndexCreator = new H3IndexCreator(_indexDir, columnMetadata.getFieldSpec(), 5)) {
-//      if (columnMetadata.isSingleValue()) {
-//        // Single-value column
-//        for (int i = 0; i < numDocs; i++) {
-//          forwardIndexReader.getDictId(i, readerContext);
-////          h3IndexCreator.add();
-//        }
-//      } else {
-//        // Multi-value column
-////        int[] dictIds = new int[columnMetadata.getMaxNumberOfMultiValues()];
-////        for (int i = 0; i < numDocs; i++) {
-////          int length = forwardIndexReader.getDictIdMV(i, dictIds, readerContext);
-////          rangeIndexCreator.add(dictIds, length);
-////        }
-//      }
-//      h3IndexCreator.seal();
-//    }
   }
 
   private void handleNonDictionaryBasedColumn(ColumnMetadata columnMetadata)
