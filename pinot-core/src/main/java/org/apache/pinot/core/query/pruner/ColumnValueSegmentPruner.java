@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.pruner;
 
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -250,13 +251,13 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
     try {
       switch (dataType) {
         case INT:
-          return Double.valueOf(stringValue).intValue();
+          return (new BigDecimal(stringValue)).intValue();
         case LONG:
-          return Double.valueOf(stringValue).longValue();
+          return (new BigDecimal(stringValue)).longValue();
         case FLOAT:
-          return Double.valueOf(stringValue).floatValue();
+          return (new BigDecimal(stringValue)).floatValue();
         case DOUBLE:
-          return Double.valueOf(stringValue);
+          return (new BigDecimal(stringValue)).doubleValue();
         case STRING:
           return stringValue;
         case BYTES:

@@ -132,11 +132,21 @@ public class NumericalPredicateTest extends BaseQueriesTest {
   /** Check if we can compare an INT column with a decimal value. */
   @Test
   public void testIntColumnGreaterThanDecimalValue() {
-    Operator operator = getOperatorForSqlQuery("SELECT count(*) FROM testTable WHERE intColumn > 15.1");
+    Operator operator = getOperatorForSqlQuery("SELECT count(*) FROM testTable WHERE intColumn > 12.1");
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     List<Object> result = block.getAggregationResult();
     Assert.assertEquals(result.size(), 1);
-    Assert.assertEquals(result.get(0), 4l);
+    Assert.assertEquals(result.get(0), 5l);
+  }
+
+  /** Check if we can compare an INT column with a decimal value. */
+  @Test
+  public void testIntColumnLessThanDecimalValue() {
+    Operator operator = getOperatorForSqlQuery("SELECT count(*) FROM testTable WHERE intColumn < 12.1");
+    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
+    List<Object> result = block.getAggregationResult();
+    Assert.assertEquals(result.size(), 1);
+    Assert.assertEquals(result.get(0), 2l);
   }
 
   /** Check if we can compare an INT column with a decimal value. */

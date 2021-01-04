@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.segment.index.readers;
 
+import java.math.BigDecimal;
+import java.util.Locale;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -30,24 +32,24 @@ public class LongDictionary extends BaseImmutableDictionary {
 
   @Override
   public int insertionIndexOf(String stringValue) {
-    // Convert string to Double and then downcast to long. This allows type conversion from any compatible
+    // Convert string to BigDecimal and then downcast to long. This allows type conversion from any compatible
     // numerical value represented as string to a long value.
-    Double doubleValue = Double.valueOf(stringValue);
+    BigDecimal bigDecimal = new BigDecimal(stringValue);
 
     // A value greater than Long.MAX_VALUE will downcast to Long.MAX_VALUE and a value less than Long.MIN_VALUE will
     // downcast to Long.MIN_VALUE. This can cause binary search to return a match if the column actually contains
     // Long.MIN_VALUE or Long.MAX_VALUE. We avoid this error by explicitly checking for overflow and underflow.
-    if (doubleValue > Long.MAX_VALUE) {
+    if (bigDecimal.compareTo(BigDecimal.valueOf(Long.MAX_VALUE)) > 0) {
       // Binary search insert position of value greater than Long.MAX_VALUE
       return -(length()+1);
     }
 
-    if (doubleValue < Long.MIN_VALUE) {
+    if (bigDecimal.compareTo(BigDecimal.valueOf(Long.MIN_VALUE)) < 0) {
       // Binary search insert position of value less than Long.MIN_VALUE
       return -1;
     }
 
-    return binarySearch(doubleValue.longValue());
+    return binarySearch(bigDecimal.longValue());
   }
 
   @Override
