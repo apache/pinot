@@ -149,6 +149,9 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     } catch (KinesisException e) {
       LOG.warn("Encountered unknown unrecoverable AWS exception", e);
       throw new RuntimeException(e);
+    } catch(IllegalStateException e){
+       LOG.warn("Illegal state exception, connection is broken", e);
+       return handleException(kinesisStartCheckpoint, recordList);
     } catch (Throwable e) {
       // non transient errors
       LOG.error("Unknown fetchRecords exception", e);
@@ -175,6 +178,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     if (sequenceNumber != null && _shardIteratorType.toString().contains("SEQUENCE")) {
       requestBuilder = requestBuilder.startingSequenceNumber(sequenceNumber);
     }
+
     return _kinesisClient.getShardIterator(requestBuilder.build()).shardIterator();
   }
 
