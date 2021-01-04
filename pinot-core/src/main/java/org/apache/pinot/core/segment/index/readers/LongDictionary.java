@@ -42,7 +42,7 @@ public class LongDictionary extends BaseImmutableDictionary {
       return -(length()+1);
     }
 
-    if (doubleValue < Integer.MIN_VALUE) {
+    if (doubleValue < Long.MIN_VALUE) {
       // Binary search insert position of value less than Long.MIN_VALUE
       return -1;
     }
