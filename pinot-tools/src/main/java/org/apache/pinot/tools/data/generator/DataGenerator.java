@@ -110,7 +110,7 @@ public class DataGenerator {
       throws IOException {
     final int numPerFiles = (int) (totalDocs / numFiles);
     for (int i = 0; i < numFiles; i++) {
-      try (FileWriter writer = new FileWriter(outDir + "/output.csv")) {
+      try (FileWriter writer = new FileWriter(String.format("%s/output_%d.csv", outDir, i))) {
         writer.append(StringUtils.join(genSpec.getColumns(), ",")).append('\n');
         for (int j = 0; j < numPerFiles; j++) {
           Object[] values = new Object[genSpec.getColumns().size()];
