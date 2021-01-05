@@ -41,7 +41,7 @@ public class StreamConfig {
    * The type of the stream consumer either HIGHLEVEL or LOWLEVEL. For backward compatibility, adding SIMPLE which is equivalent to LOWLEVEL
    */
   public enum ConsumerType {
-    HIGHLEVEL, LOWLEVEL, SHARDED
+    HIGHLEVEL, LOWLEVEL
   }
 
   public static final int DEFAULT_FLUSH_THRESHOLD_ROWS = 5_000_000;
@@ -271,10 +271,6 @@ public class StreamConfig {
 
   public boolean hasLowLevelConsumerType() {
     return _consumerTypes.contains(ConsumerType.LOWLEVEL);
-  }
-
-  public boolean isShardedConsumerType() {
-    return _consumerTypes.size() == 1 && _consumerTypes.get(0).equals(ConsumerType.SHARDED);
   }
 
   public String getConsumerFactoryClassName() {

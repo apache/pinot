@@ -267,7 +267,7 @@ public class KafkaPartitionLevelConsumerTest {
   }
 
   @Test
-  public void testGetPartitionCount() throws Exception {
+  public void testGetPartitionCount() {
     String streamType = "kafka";
     String streamKafkaTopicName = "theTopic";
     String streamKafkaBrokerList = "abcd:1234,bcde:2345";
@@ -291,7 +291,7 @@ public class KafkaPartitionLevelConsumerTest {
 
     KafkaStreamMetadataProvider streamMetadataProvider =
         new KafkaStreamMetadataProvider(clientId, streamConfig, mockKafkaSimpleConsumerFactory);
-    Assert.assertEquals(streamMetadataProvider.getPartitionGroupInfoList("clientId", streamConfig, Collections.emptyList(), 10000), 2);
+    Assert.assertEquals(streamMetadataProvider.fetchPartitionCount(10000L), 2);
   }
 
   @Test

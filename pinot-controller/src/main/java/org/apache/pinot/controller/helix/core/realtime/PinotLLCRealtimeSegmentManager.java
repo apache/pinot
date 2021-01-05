@@ -24,12 +24,12 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -84,9 +84,7 @@ import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.stream.PartitionOffsetFetcher;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
-import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
-import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -204,42 +202,6 @@ public class PinotLLCRealtimeSegmentManager {
     return partitionGroupMetadataList;
   }
 
-  /**
-   * Sets up the realtime table ideal state for a table of consumer type SHARDED
-   */
-  public void setUpNewTable(TableConfig tableConfig, IdealState idealState) {
-    Preconditions.checkState(!_isStopping, "Segment manager is stopping");
-
-    String realtimeTableName = tableConfig.getTableName();
-    LOGGER.info("Setting up new SHARDED table: {}", realtimeTableName);
-
-    _flushThresholdUpdateManager.clearFlushThresholdUpdater(realtimeTableName);
-
-    PartitionLevelStreamConfig streamConfig =
-        new PartitionLevelStreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMap(tableConfig));
-
-    // get new partition groups and their metadata
-    List<PartitionGroupInfo> newPartitionGroupInfoList = getPartitionGroupInfoList(streamConfig, Collections.emptyList());
-    int numPartitionGroups = newPartitionGroupInfoList.size();
-
-    InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
-    int numReplicas = getNumReplicas(tableConfig, instancePartitions);
-
-    SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig);
-    Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
-        Collections.singletonMap(InstancePartitionsType.CONSUMING, instancePartitions);
-
-    long currentTimeMs = getCurrentTimeMs();
-    Map<String, Map<String, String>> instanceStatesMap = idealState.getRecord().getMapFields();
-    for (PartitionGroupInfo partitionGroupInfo : newPartitionGroupInfoList) {
-      String segmentName = setupNewPartitionGroup(tableConfig, streamConfig, partitionGroupInfo,
-          currentTimeMs, instancePartitions, numPartitionGroups, numReplicas);
-      updateInstanceStatesForNewConsumingSegment(instanceStatesMap, null, segmentName, segmentAssignment,
-          instancePartitionsMap);
-    }
-    setIdealState(realtimeTableName, idealState);
-  }
-
   public boolean getIsSplitCommitEnabled() {
     return _controllerConf.getAcceptSplitCommit();
   }
@@ -271,6 +233,50 @@ public class PinotLLCRealtimeSegmentManager {
       }
     }
     LOGGER.info("Wait completed: Number of completing segments = {}", _numCompletingSegments.get());
+  }
+
+  /**
+   * Sets up the initial segments for a new LLC real-time table.
+   * <p>NOTE: the passed in IdealState may contain HLC segments if both HLC and LLC are configured.
+   */
+  public void setUpNewTable(TableConfig tableConfig, IdealState idealState) {
+    Preconditions.checkState(!_isStopping, "Segment manager is stopping");
+
+    String realtimeTableName = tableConfig.getTableName();
+    LOGGER.info("Setting up new LLC table: {}", realtimeTableName);
+
+    // Make sure all the existing segments are HLC segments
+    List<String> currentSegments = getAllSegments(realtimeTableName);
+    for (String segmentName : currentSegments) {
+      // TODO: Should return 4xx HTTP status code. Currently all exceptions are returning 500
+      Preconditions.checkState(SegmentName.isHighLevelConsumerSegmentName(segmentName),
+          "Cannot set up new LLC table: %s with existing non-HLC segment: %s", realtimeTableName, segmentName);
+    }
+
+    _flushThresholdUpdateManager.clearFlushThresholdUpdater(realtimeTableName);
+
+    PartitionLevelStreamConfig streamConfig =
+        new PartitionLevelStreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMap(tableConfig));
+    InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
+    // get new partition groups and their metadata
+    List<PartitionGroupInfo> newPartitionGroupInfoList = getPartitionGroupInfoList(streamConfig, Collections.emptyList());
+    int numPartitionGroups = newPartitionGroupInfoList.size();
+
+    int numReplicas = getNumReplicas(tableConfig, instancePartitions);
+
+    SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig);
+    Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
+        Collections.singletonMap(InstancePartitionsType.CONSUMING, instancePartitions);
+
+    long currentTimeMs = getCurrentTimeMs();
+    Map<String, Map<String, String>> instanceStatesMap = idealState.getRecord().getMapFields();
+    for (PartitionGroupInfo partitionGroupInfo : newPartitionGroupInfoList) {
+      String segmentName = setupNewPartitionGroup(tableConfig, streamConfig, partitionGroupInfo,
+          currentTimeMs, instancePartitions, numPartitionGroups, numReplicas);
+      updateInstanceStatesForNewConsumingSegment(instanceStatesMap, null, segmentName, segmentAssignment,
+          instancePartitionsMap);
+    }
+    setIdealState(realtimeTableName, idealState);
   }
 
   /**
@@ -498,7 +504,7 @@ public class PinotLLCRealtimeSegmentManager {
         IngestionConfigUtils.getStreamConfigMap(tableConfig));
 
     // find new partition groups [A],[B],[C],[D]
-    List<PartitionGroupInfo> newPartitionGroupMetadataList =
+    List<PartitionGroupInfo> newPartitionGroupInfoList =
         getPartitionGroupInfoList(streamConfig, currentPartitionGroupMetadataList);
 
     // create new segment metadata, only if it is not IN_PROGRESS in the current state
@@ -508,7 +514,7 @@ public class PinotLLCRealtimeSegmentManager {
     List<String> newConsumingSegmentNames = new ArrayList<>();
     String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
     long newSegmentCreationTimeMs = getCurrentTimeMs();
-    for (PartitionGroupInfo partitionGroupInfo : newPartitionGroupMetadataList) {
+    for (PartitionGroupInfo partitionGroupInfo : newPartitionGroupInfoList) {
       int newPartitionGroupId = partitionGroupInfo.getPartitionGroupId();
       PartitionGroupMetadata currentPartitionGroupMetadata = currentGroupIdToMetadata.get(newPartitionGroupId);
       if (currentPartitionGroupMetadata == null) { // not present in current state. New partition found.
@@ -1162,14 +1168,16 @@ public class PinotLLCRealtimeSegmentManager {
     return System.currentTimeMillis();
   }
 
+  // fixme: investigate if this should only return active partitions (i.e. skip a shard if it has reached eol)
+  //  or return all unique partitions found in ideal state right from the birth of the table
   private int getNumPartitionsFromIdealState(IdealState idealState) {
-    int numPartitions = 0;
+    Set<String> uniquePartitions = new HashSet<>();
     for (String segmentName : idealState.getRecord().getMapFields().keySet()) {
       if (LLCSegmentName.isLowLevelConsumerSegmentName(segmentName)) {
-        numPartitions = Math.max(numPartitions, new LLCSegmentName(segmentName).getPartitionGroupId() + 1);
+        uniquePartitions.add(String.valueOf(new LLCSegmentName(segmentName).getPartitionGroupId()));
       }
     }
-    return numPartitions;
+    return uniquePartitions.size();
   }
 
   private int getNumReplicas(TableConfig tableConfig, InstancePartitions instancePartitions) {

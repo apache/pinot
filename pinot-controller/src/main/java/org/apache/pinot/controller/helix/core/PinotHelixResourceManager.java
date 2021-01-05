@@ -1351,45 +1351,34 @@ public class PinotHelixResourceManager {
         IngestionConfigUtils.getStreamConfigMap(realtimeTableConfig));
     IdealState idealState = getTableIdealState(realtimeTableName);
 
-
-    if (streamConfig.isShardedConsumerType()) {
-      idealState = PinotTableIdealStateBuilder
-          .buildLowLevelRealtimeIdealStateFor(realtimeTableName, realtimeTableConfig, idealState,
-              _enableBatchMessageMode);
-      _pinotLLCRealtimeSegmentManager.setUpNewTable(realtimeTableConfig, idealState);
-      LOGGER.info("Successfully setup table for SHARDED consumers for {} ", realtimeTableName);
-    } else {
-
-      if (streamConfig.hasHighLevelConsumerType()) {
-        if (idealState == null) {
-          LOGGER.info("Initializing IdealState for HLC table: {}", realtimeTableName);
-          idealState = PinotTableIdealStateBuilder
-              .buildInitialHighLevelRealtimeIdealStateFor(realtimeTableName, realtimeTableConfig, _helixZkManager,
-                  _propertyStore, _enableBatchMessageMode);
-          _helixAdmin.addResource(_helixClusterName, realtimeTableName, idealState);
-        } else {
-          // Remove LLC segments if it is not configured
-          if (!streamConfig.hasLowLevelConsumerType()) {
-            _pinotLLCRealtimeSegmentManager.removeLLCSegments(idealState);
-          }
+    if (streamConfig.hasHighLevelConsumerType()) {
+      if (idealState == null) {
+        LOGGER.info("Initializing IdealState for HLC table: {}", realtimeTableName);
+        idealState = PinotTableIdealStateBuilder
+            .buildInitialHighLevelRealtimeIdealStateFor(realtimeTableName, realtimeTableConfig, _helixZkManager,
+                _propertyStore, _enableBatchMessageMode);
+        _helixAdmin.addResource(_helixClusterName, realtimeTableName, idealState);
+      } else {
+        // Remove LLC segments if it is not configured
+        if (!streamConfig.hasLowLevelConsumerType()) {
+          _pinotLLCRealtimeSegmentManager.removeLLCSegments(idealState);
         }
-        // For HLC table, property store entry must exist to trigger watchers to create segments
-        ensurePropertyStoreEntryExistsForHighLevelConsumer(realtimeTableName);
       }
+      // For HLC table, property store entry must exist to trigger watchers to create segments
+      ensurePropertyStoreEntryExistsForHighLevelConsumer(realtimeTableName);
+    }
 
-      // Either we have only low-level consumer, or both.
-      if (streamConfig.hasLowLevelConsumerType()) {
-        // Will either create idealstate entry, or update the IS entry with new segments
-        // (unless there are low-level segments already present)
-        if (ZKMetadataProvider.getLLCRealtimeSegments(_propertyStore, realtimeTableName).isEmpty()) {
-          idealState = PinotTableIdealStateBuilder
-              .buildLowLevelRealtimeIdealStateFor(realtimeTableName, realtimeTableConfig, idealState,
-                  _enableBatchMessageMode);
-          _pinotLLCRealtimeSegmentManager.setUpNewTable(realtimeTableConfig, idealState);
-          LOGGER.info("Successfully added Helix entries for low-level consumers for {} ", realtimeTableName);
-        } else {
-          LOGGER.info("LLC is already set up for table {}, not configuring again", realtimeTableName);
-        }
+    // Either we have only low-level consumer, or both.
+    if (streamConfig.hasLowLevelConsumerType()) {
+      // Will either create idealstate entry, or update the IS entry with new segments
+      // (unless there are low-level segments already present)
+      if (ZKMetadataProvider.getLLCRealtimeSegments(_propertyStore, realtimeTableName).isEmpty()) {
+        PinotTableIdealStateBuilder
+            .buildLowLevelRealtimeIdealStateFor(realtimeTableName, realtimeTableConfig, idealState,
+                _enableBatchMessageMode);
+        LOGGER.info("Successfully added Helix entries for low-level consumers for {} ", realtimeTableName);
+      } else {
+        LOGGER.info("LLC is already set up for table {}, not configuring again", realtimeTableName);
       }
     }
   }

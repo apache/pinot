@@ -19,13 +19,9 @@
 package org.apache.pinot.core.realtime.impl.fakestream;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nonnull;
 import org.apache.pinot.spi.stream.OffsetCriteria;
-import org.apache.pinot.spi.stream.PartitionGroupInfo;
-import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
@@ -35,12 +31,10 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
  * StreamMetadataProvider implementation for the fake stream
  */
 public class FakeStreamMetadataProvider implements StreamMetadataProvider {
-  private final int _numPartitions;
-  private StreamConfig _streamConfig;
+  private int _numPartitions;
 
   public FakeStreamMetadataProvider(StreamConfig streamConfig) {
     _numPartitions = FakeStreamConfigUtils.getNumPartitions(streamConfig);
-    _streamConfig = streamConfig;
   }
 
   @Override
