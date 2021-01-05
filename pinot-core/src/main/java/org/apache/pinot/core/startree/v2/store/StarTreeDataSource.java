@@ -34,7 +34,7 @@ public class StarTreeDataSource extends BaseDataSource {
       @Nullable Dictionary dictionary) {
     super(new StarTreeDataSourceMetadata(fieldSpec, numDocs),
             forwardIndex, dictionary, null, null, null,
-            null, null, null, null, null, null);
+            null, null, null, null, null);
   }
 
   private static final class StarTreeDataSourceMetadata implements DataSourceMetadata {

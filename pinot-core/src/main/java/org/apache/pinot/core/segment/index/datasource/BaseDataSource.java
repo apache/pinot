@@ -67,8 +67,8 @@ public abstract class BaseDataSource implements DataSource {
       @Nullable InvertedIndexReader<?> rangeIndex, @Nullable TextIndexReader textIndex,
       @Nullable TextIndexReader fstIndex, @Nullable BloomFilterReader bloomFilter,
       @Nullable NullValueVectorReader nullValueVector) {
-    this(dataSourceMetadata, forwardIndex, dictionary, invertedIndex, rangeIndex, textIndex, fstIndex, bloomFilter,
-        nullValueVector, null);
+    this(dataSourceMetadata, forwardIndex, dictionary, invertedIndex, rangeIndex, textIndex, fstIndex, null,
+        bloomFilter, nullValueVector, null);
   }
 
   @Override
