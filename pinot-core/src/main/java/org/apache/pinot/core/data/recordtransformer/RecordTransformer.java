@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.recordtransformer;
 
+import java.io.Serializable;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
@@ -25,7 +26,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 /**
  * The record transformer which takes a {@link GenericRow} and transform it based on some custom rules.
  */
-public interface RecordTransformer {
+public interface RecordTransformer extends Serializable {
 
   /**
    * Transforms a record based on some custom rules.

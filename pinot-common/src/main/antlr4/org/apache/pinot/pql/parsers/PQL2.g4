@@ -78,6 +78,7 @@ predicate:
   | isClause                              # IsPredicate
   | regexpLikeClause                      # RegexpLikePredicate
   | textMatchClause                       # TextMatchPredicate
+  | jsonMatchClause                       # JsonMatchPredicate
   ;
 
 inClause:
@@ -98,6 +99,9 @@ regexpLikeClause:
 
 textMatchClause:
   TEXT_MATCH '(' expression ',' literal ')';
+
+jsonMatchClause:
+  JSON_MATCH '(' expression ',' literal ')';
 
 booleanOperator: OR | AND;
 

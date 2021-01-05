@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import java.io.Serializable;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -30,7 +31,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public abstract class BaseJsonConfig {
+public abstract class BaseJsonConfig implements Serializable {
 
   public JsonNode toJsonNode() {
     return JsonUtils.objectToJsonNode(this);

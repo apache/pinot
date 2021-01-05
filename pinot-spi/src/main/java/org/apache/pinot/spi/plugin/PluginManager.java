@@ -74,6 +74,26 @@ public class PluginManager {
     }
   };
 
+  private static final Map<String, String> INPUT_FORMAT_TO_RECORD_READER_CLASS_NAME_MAP = new HashMap<String, String>(){
+    {
+      put("avro", "org.apache.pinot.plugin.inputformat.avro.AvroRecordReader");
+      put("csv", "org.apache.pinot.plugin.inputformat.csv.CSVRecordReader");
+      put("json", "org.apache.pinot.plugin.inputformat.json.JSONRecordReader");
+      put("orc", "org.apache.pinot.plugin.inputformat.orc.ORCRecordReader");
+      put("parquet", "org.apache.pinot.plugin.inputformat.parquet.ParquetRecordReader");
+      put("protobuf", "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufRecordReader");
+      put("thrift", "org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReader");
+    }
+  };
+
+  private static final Map<String, String> INPUT_FORMAT_TO_RECORD_READER_CONFIG_CLASS_NAME_MAP = new HashMap<String, String>(){
+    {
+      put("csv", "org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig");
+      put("protobuf", "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufRecordReaderConfig");
+      put("thrift", "org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReaderConfig");
+    }
+  };
+
   private Map<Plugin, PluginClassLoader> _registry = new HashMap<>();
   private String _pluginsRootDir;
   private String _pluginsInclude;
@@ -140,6 +160,11 @@ public class PluginManager {
         LOGGER.error("Failed to load plugin [{}] from dir [{}]", pluginName, pluginDir, e);
       }
     }
+    initRecordReaderClassMap();
+  }
+
+  private void initRecordReaderClassMap() {
+
   }
 
   /**
@@ -281,6 +306,25 @@ public class PluginManager {
 
   public static PluginManager get() {
     return PLUGIN_MANAGER;
+  }
+
+  public String getRecordReaderClassName(String inputFormat) {
+    String inputFormatKey = inputFormat.toLowerCase();
+    return INPUT_FORMAT_TO_RECORD_READER_CLASS_NAME_MAP.get(inputFormatKey);
+  }
+
+  public String getRecordReaderConfigClassName(String inputFormat) {
+    String inputFormatKey = inputFormat.toLowerCase();
+    return INPUT_FORMAT_TO_RECORD_READER_CONFIG_CLASS_NAME_MAP.get(inputFormatKey);
+  }
+
+  public void registerRecordReaderClass(String inputFormat, String recordReaderClass, String recordReaderConfigClass) {
+    if (recordReaderClass != null) {
+      INPUT_FORMAT_TO_RECORD_READER_CLASS_NAME_MAP.put(inputFormat.toLowerCase(), recordReaderClass);
+    }
+    if (recordReaderConfigClass != null) {
+      INPUT_FORMAT_TO_RECORD_READER_CONFIG_CLASS_NAME_MAP.put(inputFormat.toLowerCase(), recordReaderConfigClass);
+    }
   }
 }
 

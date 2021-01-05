@@ -52,5 +52,4 @@ yarn-error.log*
 .github/PULL_REQUEST_TEMPLATE.md
 
 #quickstart files
-examples/
 quickstart*

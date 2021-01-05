@@ -110,4 +110,24 @@ public class StartMinionCommand extends AbstractBaseAdminCommand implements Comm
     }
     return PinotConfigUtils.generateMinionConf(_minionHost, _minionPort);
   }
+
+  public StartMinionCommand setMinionHost(String minionHost) {
+    _minionHost = minionHost;
+    return this;
+  }
+
+  public StartMinionCommand setMinionPort(int minionPort) {
+    _minionPort = minionPort;
+    return this;
+  }
+
+  public StartMinionCommand setZkAddress(String zkAddress) {
+    _zkAddress = zkAddress;
+    return this;
+  }
+
+  public StartMinionCommand setClusterName(String clusterName) {
+    _clusterName = clusterName;
+    return this;
+  }
 }

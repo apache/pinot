@@ -50,7 +50,6 @@ public class BatchConfigProperties {
   public static final String PUSH_SEGMENT_URI_PREFIX = "push.segmentUriPrefix";
   public static final String PUSH_SEGMENT_URI_SUFFIX = "push.segmentUriSuffix";
 
-  public static final String INPUT_FILE_URI = "input.file.uri";
   public static final String OUTPUT_SEGMENT_DIR_URI = "output.segment.dir.uri";
 
   public enum SegmentIngestionType {

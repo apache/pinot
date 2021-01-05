@@ -336,17 +336,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     }
 
     @Override
-    public void abortAndClose()
-        throws Exception {
-      abort();
-      close();
-    }
-
-    @Override
     public void save() {
-    }
-
-    void abort() {
     }
 
     @Override

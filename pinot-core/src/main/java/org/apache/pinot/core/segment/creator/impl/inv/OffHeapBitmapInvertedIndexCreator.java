@@ -21,16 +21,10 @@ package org.apache.pinot.core.segment.creator.impl.inv;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.channels.FileChannel;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.segment.creator.DictionaryBasedInvertedIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
-import org.apache.pinot.core.util.CleanerUtil;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.RoaringBitmapWriter;
@@ -184,44 +178,17 @@ public final class OffHeapBitmapInvertedIndexCreator implements DictionaryBasedI
     }
 
     // Create bitmaps from inverted index buffers and serialize them to file
-    ByteBuffer offsetBuffer = null;
-    ByteBuffer bitmapBuffer = null;
-    try (FileChannel channel = new RandomAccessFile(_invertedIndexFile, "rw").getChannel()) {
-      // map the offsets buffer
-      int startOfBitmaps = (_cardinality + 1) * Integer.BYTES;
-      offsetBuffer = channel.map(FileChannel.MapMode.READ_WRITE, 0, startOfBitmaps)
-              .order(ByteOrder.BIG_ENDIAN);
-      offsetBuffer.putInt(startOfBitmaps);
-      bitmapBuffer = channel.map(FileChannel.MapMode.READ_WRITE, startOfBitmaps, Integer.MAX_VALUE - startOfBitmaps)
-              .order(ByteOrder.LITTLE_ENDIAN);
-      RoaringBitmapWriter<RoaringBitmap> writer = RoaringBitmapWriter.writer().runCompress(false).get();
+    try (BitmapInvertedIndexWriter writer = new BitmapInvertedIndexWriter(_invertedIndexFile, _cardinality)) {
+      RoaringBitmapWriter<RoaringBitmap> bitmapWriter = RoaringBitmapWriter.writer().runCompress(false).get();
       int startIndex = 0;
       for (int dictId = 0; dictId < _cardinality; dictId++) {
         int endIndex = getInt(_invertedIndexLengthBuffer, dictId);
         for (int i = startIndex; i < endIndex; i++) {
-          writer.add(getInt(_invertedIndexValueBuffer, i));
+          bitmapWriter.add(getInt(_invertedIndexValueBuffer, i));
         }
-        RoaringBitmap bitmap = writer.get();
-        bitmap.serialize(bitmapBuffer);
-        // write offset into file
-        offsetBuffer.putInt(startOfBitmaps + bitmapBuffer.position());
+        writer.add(bitmapWriter.get());
+        bitmapWriter.reset();
         startIndex = endIndex;
-        writer.reset();
-      }
-      // we know how long the file should be now, so truncate it
-      channel.truncate(startOfBitmaps + bitmapBuffer.position());
-    } catch (Exception e) {
-      FileUtils.deleteQuietly(_invertedIndexFile);
-      throw e;
-    } finally {
-      if (CleanerUtil.UNMAP_SUPPORTED) {
-        CleanerUtil.BufferCleaner cleaner = CleanerUtil.getCleaner();
-        if (offsetBuffer != null) {
-          cleaner.freeBuffer(offsetBuffer);
-        }
-        if (bitmapBuffer != null) {
-          cleaner.freeBuffer(bitmapBuffer);
-        }
       }
     }
   }

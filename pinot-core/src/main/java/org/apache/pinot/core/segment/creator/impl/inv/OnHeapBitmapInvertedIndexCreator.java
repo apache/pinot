@@ -18,18 +18,11 @@
  */
 package org.apache.pinot.core.segment.creator.impl.inv;
 
-
 import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.channels.FileChannel;
-
-import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.segment.creator.DictionaryBasedInvertedIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
-import org.apache.pinot.core.util.CleanerUtil;
+import org.roaringbitmap.Container;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.RoaringBitmapWriter;
 
@@ -37,17 +30,18 @@ import org.roaringbitmap.RoaringBitmapWriter;
 /**
  * Implementation of {@link DictionaryBasedInvertedIndexCreator} that uses on-heap memory.
  */
+@SuppressWarnings("unchecked")
 public final class OnHeapBitmapInvertedIndexCreator implements DictionaryBasedInvertedIndexCreator {
   private final File _invertedIndexFile;
   private final RoaringBitmapWriter<RoaringBitmap>[] _bitmapWriters;
   private int _nextDocId;
 
-  @SuppressWarnings("unchecked")
   public OnHeapBitmapInvertedIndexCreator(File indexDir, String columnName, int cardinality) {
     _invertedIndexFile = new File(indexDir, columnName + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
+    RoaringBitmapWriter.Wizard<Container, RoaringBitmap> writerWizard = RoaringBitmapWriter.writer().runCompress(false);
     _bitmapWriters = new RoaringBitmapWriter[cardinality];
     for (int i = 0; i < cardinality; i++) {
-      _bitmapWriters[i] = RoaringBitmapWriter.writer().runCompress(false).get();
+      _bitmapWriters[i] = writerWizard.get();
     }
   }
 
@@ -67,34 +61,9 @@ public final class OnHeapBitmapInvertedIndexCreator implements DictionaryBasedIn
   @Override
   public void seal()
       throws IOException {
-    int startOfBitmaps = (_bitmapWriters.length + 1) * Integer.BYTES;
-    ByteBuffer bitmapBuffer = null;
-    ByteBuffer offsetBuffer = null;
-    try (FileChannel channel = new RandomAccessFile(_invertedIndexFile, "rw").getChannel()) {
-      // map the offsets buffer
-      offsetBuffer = channel.map(FileChannel.MapMode.READ_WRITE, 0, startOfBitmaps)
-              .order(ByteOrder.BIG_ENDIAN);
-      bitmapBuffer = channel.map(FileChannel.MapMode.READ_WRITE, startOfBitmaps, Integer.MAX_VALUE - startOfBitmaps)
-              .order(ByteOrder.LITTLE_ENDIAN);
-      // Write bitmap offsets
-      offsetBuffer.putInt(startOfBitmaps);
-      for (RoaringBitmapWriter<RoaringBitmap> writer : _bitmapWriters) {
-        writer.get().serialize(bitmapBuffer);
-        offsetBuffer.putInt(startOfBitmaps + bitmapBuffer.position());
-      }
-      channel.truncate(startOfBitmaps + bitmapBuffer.position());
-    } catch (Exception e) {
-      FileUtils.deleteQuietly(_invertedIndexFile);
-      throw e;
-    } finally {
-      if (CleanerUtil.UNMAP_SUPPORTED) {
-        CleanerUtil.BufferCleaner cleaner = CleanerUtil.getCleaner();
-        if (bitmapBuffer != null) {
-          cleaner.freeBuffer(bitmapBuffer);
-        }
-        if (offsetBuffer != null) {
-          cleaner.freeBuffer(offsetBuffer);
-        }
+    try (BitmapInvertedIndexWriter writer = new BitmapInvertedIndexWriter(_invertedIndexFile, _bitmapWriters.length)) {
+      for (RoaringBitmapWriter<RoaringBitmap> bitmapWriter : _bitmapWriters) {
+        writer.add(bitmapWriter.get());
       }
     }
   }
