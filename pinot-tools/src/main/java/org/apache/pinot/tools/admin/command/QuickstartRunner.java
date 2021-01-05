@@ -171,6 +171,13 @@ public class QuickstartRunner {
       Properties prop = new Properties();
       prop.put("pinot.broker.client.queryPort", String.valueOf(DEFAULT_BROKER_PORT + i));
 
+      prop.put("pinot.broker.client.protocol", "https");
+      prop.put("pinot.broker.client.tls.keystore.path", "/Users/alex/projects/incubator-pinot/truststore/generated.keystore.jks");
+      prop.put("pinot.broker.client.tls.keystore.password", "changeit");
+      prop.put("pinot.broker.client.tls.truststore.path", "/Users/alex/projects/incubator-pinot/truststore/generated.truststore.jks");
+      prop.put("pinot.broker.client.tls.truststore.password", "changeit");
+      prop.put("pinot.broker.client.tls.requires_client_auth", "false");
+
       try (OutputStream os = new FileOutputStream(configFileName)) {
         prop.store(os, "");
       }
@@ -310,7 +317,7 @@ public class QuickstartRunner {
       throws Exception {
     int brokerPort = _brokerPorts.get(RANDOM.nextInt(_brokerPorts.size()));
     return JsonUtils.stringToJsonNode(new PostQueryCommand().setBrokerPort(String.valueOf(brokerPort))
-        .setQueryType(CommonConstants.Broker.Request.SQL).setQuery(query).run());
+        .setBrokerProtocol("https").setQueryType(CommonConstants.Broker.Request.SQL).setQuery(query).run());
   }
 
   public static void registerDefaultPinotFS() {
