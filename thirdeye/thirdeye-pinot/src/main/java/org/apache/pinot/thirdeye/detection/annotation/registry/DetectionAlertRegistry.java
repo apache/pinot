@@ -25,6 +25,8 @@ import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ClassInfo;
 import io.github.classgraph.ClassInfoList;
 import io.github.classgraph.ScanResult;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilter;
 import org.apache.pinot.thirdeye.detection.alert.scheme.DetectionAlertScheme;
 import org.apache.pinot.thirdeye.detection.alert.suppress.DetectionAlertSuppressor;
@@ -36,7 +38,6 @@ import java.util.HashMap;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 /**
  * The detection alert registry.
@@ -53,13 +54,25 @@ public class DetectionAlertRegistry {
   // Alert Filter Type Map
   private static final Map<String, String> ALERT_FILTER_MAP = new HashMap<>();
 
+  // default package name for reflection to scan
+  private static final String DEFAULT_PACKAGE_LIST = "org.apache.pinot.thirdeye";
+
+  // list of package names for reflection to scan
+  private static List<String> packageList = new ArrayList<>();
+
+  // singleton instance
   private static DetectionAlertRegistry INSTANCE;
 
   public static DetectionAlertRegistry getInstance() {
     if (INSTANCE == null) {
-      INSTANCE = new DetectionAlertRegistry();
+      synchronized (DetectionAlertRegistry.class) {
+        // another check after acquiring the lock before initializing
+        if (INSTANCE == null) {
+          packageList.add(DEFAULT_PACKAGE_LIST);
+          INSTANCE = new DetectionAlertRegistry();
+        }
+      }
     }
-
     return INSTANCE;
   }
 
@@ -71,7 +84,10 @@ public class DetectionAlertRegistry {
    * Read all the alert schemes and suppressors and initialize the registry.
    */
   private static void init() {
-    try (ScanResult scanResult = new ClassGraph().enableAnnotationInfo().enableClassInfo().scan()) {
+    try (ScanResult scanResult = new ClassGraph()
+        .acceptPackages(packageList.toArray(new String[packageList.size()]))
+        .enableAnnotationInfo()
+        .enableClassInfo().scan()) {
       // register alert filters
       ClassInfoList alertFilterClassClasses = scanResult.getSubclasses(DetectionAlertFilter.class.getName());
       for (ClassInfo classInfo : alertFilterClassClasses) {
@@ -147,5 +163,9 @@ public class DetectionAlertRegistry {
   public String lookupAlertSuppressors(String suppressorType) {
     Preconditions.checkArgument(ALERT_SUPPRESSOR_MAP.containsKey(suppressorType.toUpperCase()), suppressorType + " not found in registry");
     return ALERT_SUPPRESSOR_MAP.get(suppressorType.toUpperCase());
+  }
+
+  public static void setPackageList(List<String> packageList) {
+    DetectionAlertRegistry.packageList = packageList;
   }
 }
