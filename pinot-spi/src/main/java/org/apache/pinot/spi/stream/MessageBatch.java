@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.stream;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 
@@ -61,6 +62,7 @@ public interface MessageBatch<T> {
    * Returns the metadata associated with the message at a particular index. This typically includes the timestamp
    * when the message was ingested by the upstream stream-provider and other relevant metadata.
    */
+  @Nullable
   default RowMetadata getMetadataAtIndex(int index) {
     return null;
   }
