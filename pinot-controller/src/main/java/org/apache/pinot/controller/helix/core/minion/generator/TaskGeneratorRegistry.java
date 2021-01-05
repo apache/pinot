@@ -22,29 +22,59 @@ import com.clearspring.analytics.util.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
+import org.apache.pinot.spi.annotations.minion.TaskGenerator;
+import org.reflections.Reflections;
+import org.reflections.scanners.TypeAnnotationsScanner;
+import org.reflections.util.ClasspathHelper;
+import org.reflections.util.ConfigurationBuilder;
+import org.reflections.util.FilterBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Registry for all {@link PinotTaskGenerator}.
  */
 public class TaskGeneratorRegistry {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TaskGeneratorRegistry.class);
+
   private final Map<String, PinotTaskGenerator> _taskGeneratorRegistry = new HashMap<>();
 
-  public TaskGeneratorRegistry(@Nonnull ClusterInfoAccessor clusterInfoAccessor) {
-    registerTaskGenerator(new ConvertToRawIndexTaskGenerator(clusterInfoAccessor));
-    registerTaskGenerator(new RealtimeToOfflineSegmentsTaskGenerator(clusterInfoAccessor));
-    registerTaskGenerator(new SegmentGenerationAndPushTaskGenerator(clusterInfoAccessor));
+  /**
+   * Registers the task generators via reflection.
+   * NOTE: In order to plugin a class using reflection, the class should include ".generator." in its class path. This
+   *       convention can significantly reduce the time of class scanning.
+   */
+  public TaskGeneratorRegistry(ClusterInfoAccessor clusterInfoAccessor) {
+    long startTimeMs = System.currentTimeMillis();
+    Reflections reflections = new Reflections(
+        new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage("org.apache.pinot"))
+            .filterInputsBy(new FilterBuilder.Include(".*\\.generator\\..*"))
+            .setScanners(new TypeAnnotationsScanner()));
+    Set<Class<?>> classes = reflections.getTypesAnnotatedWith(TaskGenerator.class, true);
+    for (Class<?> clazz : classes) {
+      TaskGenerator annotation = clazz.getAnnotation(TaskGenerator.class);
+      if (annotation.enabled()) {
+        try {
+          PinotTaskGenerator taskGenerator = (PinotTaskGenerator) clazz.newInstance();
+          taskGenerator.init(clusterInfoAccessor);
+          registerTaskGenerator(taskGenerator);
+        } catch (Exception e) {
+          LOGGER.error("Caught exception while initializing and registering task generator: {}, skipping it", clazz, e);
+        }
+      }
+    }
+    LOGGER.info("Initialized TaskGeneratorRegistry with {} task generators: {} in {}ms", _taskGeneratorRegistry.size(),
+        _taskGeneratorRegistry.keySet(), System.currentTimeMillis() - startTimeMs);
   }
 
   /**
    * Register a task generator.
-   *
-   * @param pinotTaskGenerator Task generator to be registered
    */
-  public void registerTaskGenerator(@Nonnull PinotTaskGenerator pinotTaskGenerator) {
+  public void registerTaskGenerator(PinotTaskGenerator pinotTaskGenerator) {
     // Task type cannot contain the task name separator
     String taskType = pinotTaskGenerator.getTaskType();
     Preconditions.checkArgument(!taskType.contains(PinotHelixTaskResourceManager.TASK_NAME_SEPARATOR),
@@ -54,22 +84,17 @@ public class TaskGeneratorRegistry {
   }
 
   /**
-   * Get all registered task types.
-   *
-   * @return Set of all registered task types
+   * Returns all registered task types.
    */
-  @Nonnull
   public Set<String> getAllTaskTypes() {
     return _taskGeneratorRegistry.keySet();
   }
 
   /**
-   * Get the task generator for the given task type.
-   *
-   * @param taskType Task type
-   * @return Task generator for the given task type
+   * Returns the task generator for the given task type.
    */
-  public PinotTaskGenerator getTaskGenerator(@Nonnull String taskType) {
+  @Nullable
+  public PinotTaskGenerator getTaskGenerator(String taskType) {
     return _taskGeneratorRegistry.get(taskType);
   }
 }

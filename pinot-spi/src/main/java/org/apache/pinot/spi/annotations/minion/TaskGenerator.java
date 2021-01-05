@@ -16,26 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.minion.executor;
+package org.apache.pinot.spi.annotations.minion;
 
-import org.apache.pinot.core.common.MinionConstants;
-import org.apache.pinot.spi.annotations.minion.TaskExecutorFactory;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 
-@TaskExecutorFactory
-public class SegmentGenerationAndPushTaskExecutorFactory implements PinotTaskExecutorFactory {
+/**
+ * Annotation for Minion task generators.
+ *
+ * NOTE:
+ *   - The annotated class must implement the PinotTaskGenerator interface
+ *   - The annotated class must be under the package of name 'org.apache.pinot.*.generator.*' to be auto-registered.
+ */
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+public @interface TaskGenerator {
 
-  @Override
-  public void init(MinionTaskZkMetadataManager zkMetadataManager) {
-  }
-
-  @Override
-  public String getTaskType() {
-    return MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE;
-  }
-
-  @Override
-  public PinotTaskExecutor create() {
-    return new SegmentGenerationAndPushTaskExecutor();
-  }
+  boolean enabled() default true;
 }

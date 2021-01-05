@@ -16,26 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.minion.executor;
+package org.apache.pinot.minion.event;
 
-import org.apache.pinot.core.common.MinionConstants;
-import org.apache.pinot.spi.annotations.minion.TaskExecutorFactory;
+import javax.annotation.Nullable;
+import org.apache.pinot.core.minion.PinotTaskConfig;
 
 
-@TaskExecutorFactory
-public class SegmentGenerationAndPushTaskExecutorFactory implements PinotTaskExecutorFactory {
+/**
+ * Default no-op minion event observer which can be extended.
+ */
+public class DefaultMinionEventObserver implements MinionEventObserver {
 
   @Override
-  public void init(MinionTaskZkMetadataManager zkMetadataManager) {
+  public void notifyTaskStart(PinotTaskConfig pinotTaskConfig) {
   }
 
   @Override
-  public String getTaskType() {
-    return MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE;
+  public void notifyTaskSuccess(PinotTaskConfig pinotTaskConfig, @Nullable Object executionResult) {
   }
 
   @Override
-  public PinotTaskExecutor create() {
-    return new SegmentGenerationAndPushTaskExecutor();
+  public void notifyTaskCancelled(PinotTaskConfig pinotTaskConfig) {
+  }
+
+  @Override
+  public void notifyTaskError(PinotTaskConfig pinotTaskConfig, Exception exception) {
   }
 }

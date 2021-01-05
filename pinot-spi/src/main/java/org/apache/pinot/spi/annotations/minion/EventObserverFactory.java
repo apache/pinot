@@ -16,17 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.minion.events;
+package org.apache.pinot.spi.annotations.minion;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
 
 /**
- * Factory for {@link MinionEventObserver}.
+ * Annotation for Minion event observer factories.
+ *
+ * NOTE:
+ *   - The annotated class must implement the MinionEventObserverFactory interface
+ *   - The annotated class must be under the package of name 'org.apache.pinot.*.event.*' to be auto-registered.
  */
-public interface MinionEventObserverFactory {
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+public @interface EventObserverFactory {
 
-  /**
-   * Creates an new instance of {@link MinionEventObserver}.
-   *
-   * @return Minion event observer
-   */
-  MinionEventObserver create();
+  boolean enabled() default true;
 }

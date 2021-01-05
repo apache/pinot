@@ -16,21 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.minion.events;
+package org.apache.pinot.minion.event;
 
-public class DefaultMinionEventObserverFactory implements MinionEventObserverFactory {
-  private static final MinionEventObserver DEFAULT_EVENT_OBSERVER = new DefaultMinionEventObserver();
-  private static final DefaultMinionEventObserverFactory INSTANCE = new DefaultMinionEventObserverFactory();
+import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 
-  private DefaultMinionEventObserverFactory() {
-  }
 
-  public static DefaultMinionEventObserverFactory getInstance() {
-    return INSTANCE;
-  }
+/**
+ * Factory for {@link MinionEventObserver}.
+ */
+public interface MinionEventObserverFactory {
 
-  @Override
-  public MinionEventObserver create() {
-    return DEFAULT_EVENT_OBSERVER;
-  }
+  /**
+   * Initializes the task executor factory.
+   */
+  void init(MinionTaskZkMetadataManager zkMetadataManager);
+
+  /**
+   * Returns the task type of the event observer.
+   */
+  String getTaskType();
+
+  /**
+   * Creates a new task event observer.
+   */
+  MinionEventObserver create();
 }

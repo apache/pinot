@@ -16,30 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.minion.events;
+package org.apache.pinot.spi.annotations.minion;
 
-import javax.annotation.Nullable;
-import org.apache.pinot.core.minion.PinotTaskConfig;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 
 /**
- * Default no-op minion event observer which can be extended.
+ * Annotation for Minion task executor factories.
+ *
+ * NOTE:
+ *   - The annotated class must implement the PinotTaskExecutorFactory interface
+ *   - The annotated class must be under the package of name 'org.apache.pinot.*.executor.*' to be auto-registered.
  */
-public class DefaultMinionEventObserver implements MinionEventObserver {
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+public @interface TaskExecutorFactory {
 
-  @Override
-  public void notifyTaskStart(PinotTaskConfig pinotTaskConfig) {
-  }
-
-  @Override
-  public void notifyTaskSuccess(PinotTaskConfig pinotTaskConfig, @Nullable Object executionResult) {
-  }
-
-  @Override
-  public void notifyTaskCancelled(PinotTaskConfig pinotTaskConfig) {
-  }
-
-  @Override
-  public void notifyTaskError(PinotTaskConfig pinotTaskConfig, Exception exception) {
-  }
+  boolean enabled() default true;
 }
