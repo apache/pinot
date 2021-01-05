@@ -297,7 +297,7 @@ public class SegmentOp extends BaseOp {
   /**
    * Retrieve the number of segments for OFFLINE which are in state matching the parameter.
    * @param state of the segment to be verified in the controller.
-   * @return -1 in case of ERROR, 0 if in OFFLINE state else return count of state matching parameter.
+   * @return -1 in case of ERROR, 1 if all matches the state else 0.
    */
   private long getSegmentCountInState(String state)
       throws IOException {
@@ -308,11 +308,9 @@ public class SegmentOp extends BaseOp {
 
     if (segmentState.contains(CommonConstants.Helix.StateModel.SegmentStateModel.ERROR)) {
       return -1;
-    } else if (segmentState.contains(CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE)) {
-      return 0;
     }
 
-    return segmentState.stream().filter(x -> x.contains(state)).count();
+    return segmentState.stream().allMatch(x -> x.contains(state)) ? 1 : 0;
   }
 
   /**
