@@ -22,17 +22,21 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableMap;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.Reader;
 import java.net.InetAddress;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -46,6 +50,8 @@ import org.apache.pinot.tools.utils.JarUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
+
+import static org.apache.pinot.tools.utils.PinotConfigUtils.getAvailablePort;
 
 
 public class QuickstartRunner {
@@ -117,10 +123,41 @@ public class QuickstartRunner {
   private void startControllers()
       throws Exception {
     for (int i = 0; i < _numControllers; i++) {
+      String configFileName = String.format("./controller_%d.properties", i);
+
+      Properties prop = new Properties();
+      prop.put("cluster.tenant.isolation.enable", "true");
+      prop.put("controller.mode", "DUAL");
+      prop.put("controller.data.dir", new File(_tempDir, DEFAULT_CONTROLLER_DIR + i).getAbsolutePath());
+      prop.put("controller.retention.frequencyInSeconds", "21600");
+      prop.put("controller.port", String.valueOf(DEFAULT_CONTROLLER_PORT + i));
+      prop.put("controller.host", NetUtil.getHostAddress());
+      prop.put("controller.offline.segment.interval.checker.frequencyInSeconds", "3600");
+      prop.put("controller.realtime.segment.validation.frequencyInSeconds", "3600");
+      prop.put("controller.vip.host", NetUtil.getHostAddress());
+      prop.put("controller.broker.resource.validation.frequencyInSeconds", "3600");
+      prop.put("controller.helix.cluster.name", "QuickStartCluster");
+      prop.put("controller.zk.str", ZK_ADDRESS);
+
+      prop.put("controller.access.protocols", "https");
+      prop.put("controller.access.protocols.https.host", "0.0.0.0");
+      prop.put("controller.access.protocols.https.port", String.valueOf(9443 + i));
+      prop.put("controller.access.protocols.https.vip", "false");
+      prop.put("controller.access.protocols.https.tls.keystore.path", "/Users/alex/projects/incubator-pinot/truststore/generated.keystore.jks");
+      prop.put("controller.access.protocols.https.tls.keystore.password", "changeit");
+      prop.put("controller.access.protocols.https.tls.truststore.path", "/Users/alex/projects/incubator-pinot/truststore/generated.truststore.jks");
+      prop.put("controller.access.protocols.https.tls.truststore.password", "changeit");
+      prop.put("controller.access.protocols.https.tls.requires_client_auth", "false");
+
+      try (OutputStream os = new FileOutputStream(configFileName)) {
+        prop.store(os, "");
+      }
+
       StartControllerCommand controllerStarter = new StartControllerCommand();
       controllerStarter.setControllerPort(String.valueOf(DEFAULT_CONTROLLER_PORT + i)).setZkAddress(ZK_ADDRESS)
           .setClusterName(CLUSTER_NAME).setTenantIsolation(_enableTenantIsolation)
-          .setDataDir(new File(_tempDir, DEFAULT_CONTROLLER_DIR + i).getAbsolutePath());
+          .setDataDir(new File(_tempDir, DEFAULT_CONTROLLER_DIR + i).getAbsolutePath())
+          .setConfigFileName(configFileName);
       controllerStarter.execute();
       _controllerPorts.add(DEFAULT_CONTROLLER_PORT + i);
     }
@@ -129,8 +166,18 @@ public class QuickstartRunner {
   private void startBrokers()
       throws Exception {
     for (int i = 0; i < _numBrokers; i++) {
+      String configFileName = String.format("./broker_%d.properties", i);
+
+      Properties prop = new Properties();
+      prop.put("pinot.broker.client.queryPort", String.valueOf(DEFAULT_BROKER_PORT + i));
+
+      try (OutputStream os = new FileOutputStream(configFileName)) {
+        prop.store(os, "");
+      }
+
       StartBrokerCommand brokerStarter = new StartBrokerCommand();
-      brokerStarter.setPort(DEFAULT_BROKER_PORT + i).setZkAddress(ZK_ADDRESS).setClusterName(CLUSTER_NAME);
+      brokerStarter.setPort(DEFAULT_BROKER_PORT + i).setZkAddress(ZK_ADDRESS).setClusterName(CLUSTER_NAME)
+          .setConfigFileName(configFileName);
       brokerStarter.execute();
       _brokerPorts.add(DEFAULT_BROKER_PORT + i);
     }
@@ -139,11 +186,25 @@ public class QuickstartRunner {
   private void startServers()
       throws Exception {
     for (int i = 0; i < _numServers; i++) {
+      String configFileName = String.format("./server_%d.properties", i);
+
+      Properties prop = new Properties();
+      prop.put("pinot.server.netty.host", NetUtil.getHostAddress());
+      prop.put("pinot.server.instance.dataDir", new File(_tempDir, DEFAULT_SERVER_DATA_DIR + i).getAbsolutePath());
+      prop.put("pinot.server.instance.segmentTarDir", new File(_tempDir, DEFAULT_SERVER_SEGMENT_DIR + i).getAbsolutePath());
+      prop.put("pinot.server.netty.port", String.valueOf(DEFAULT_SERVER_NETTY_PORT + i));
+      prop.put("pinot.server.adminapi.port", String.valueOf(DEFAULT_SERVER_ADMIN_API_PORT + i));
+
+      try (OutputStream os = new FileOutputStream(configFileName)) {
+        prop.store(os, "");
+      }
+
       StartServerCommand serverStarter = new StartServerCommand();
       serverStarter.setPort(DEFAULT_SERVER_NETTY_PORT + i).setAdminPort(DEFAULT_SERVER_ADMIN_API_PORT + i)
           .setZkAddress(ZK_ADDRESS).setClusterName(CLUSTER_NAME)
           .setDataDir(new File(_tempDir, DEFAULT_SERVER_DATA_DIR + i).getAbsolutePath())
-          .setSegmentDir(new File(_tempDir, DEFAULT_SERVER_SEGMENT_DIR + i).getAbsolutePath());
+          .setSegmentDir(new File(_tempDir, DEFAULT_SERVER_SEGMENT_DIR + i).getAbsolutePath())
+          .setConfigFileName(configFileName);
       serverStarter.execute();
     }
   }
