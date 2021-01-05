@@ -49,7 +49,7 @@ abstract class BaseRawStringSingleColumnDistinctExecutor implements DistinctExec
   @Override
   public DistinctTable getResult() {
     DataSchema dataSchema =
-        new DataSchema(new String[]{_expression.toString()}, new ColumnDataType[]{ColumnDataType.BYTES});
+        new DataSchema(new String[]{_expression.toString()}, new ColumnDataType[]{ColumnDataType.STRING});
     List<Record> records = new ArrayList<>(_valueSet.size());
     for (String value : _valueSet) {
       records.add(new Record(new Object[]{value}));
