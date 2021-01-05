@@ -18,6 +18,14 @@
  */
 package org.apache.pinot.compat.tests;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
 public class ClusterDescriptor {
-  public static final String CONTROLLER_URL = "localhost:9000";
+  private static final Logger LOGGER = LoggerFactory.getLogger(ClusterDescriptor.class);
+
+  public static final String CONTROLLER_HOST = "localhost";
+  public static final String CONTROLLER_POST = "9000";
+  public static final String CONTROLLER_URL = String.format("http://%s:%s", CONTROLLER_HOST, CONTROLLER_POST);
 }

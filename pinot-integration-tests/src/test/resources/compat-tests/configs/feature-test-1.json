@@ -1,15 +1,4 @@
 {
-  "fieldConfigList": [
-    {
-      "encodingType": "RAW",
-      "indexType": "TEXT",
-      "name": "textDim1",
-      "properties": {
-        "deriveNumDocsPerChunkForRawIndex": "true",
-        "rawIndexWriterVersion": "3"
-      }
-    }
-  ],
   "metadata": {
     "customConfigs": {
       "d2Name": ""
@@ -29,18 +18,7 @@
     "createInvertedIndexDuringSegmentGeneration": false,
     "enableDefaultStarTree": false,
     "enableDynamicStarTreeCreation": false,
-    "invertedIndexColumns": [
-      "stringDimSV2",
-      "longDimSV2",
-      "stringDimMV2",
-      "intDimMV2"
-    ],
     "loadMode": "MMAP",
-    "noDictionaryColumns": [
-      "stringDimSV2",
-      "floatMetric1",
-      "bytesDimSV1"
-    ],
     "nullHandlingEnabled": false,
     "sortedColumn": [],
     "streamConfigs": {}
@@ -48,7 +26,7 @@
   "tableName": "FeatureTest1",
   "tableType": "OFFLINE",
   "tenants": {
-    "broker": "perfTestShared",
-    "server": "FeatureTest1"
+    "broker": "DefaultTenant",
+    "server": "DefaultTenant"
   }
 }

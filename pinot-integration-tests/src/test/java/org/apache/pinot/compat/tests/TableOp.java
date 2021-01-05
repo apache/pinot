@@ -21,6 +21,8 @@ package org.apache.pinot.compat.tests;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 import org.apache.pinot.controller.helix.ControllerTest;
@@ -44,10 +46,7 @@ import org.slf4j.LoggerFactory;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TableOp extends BaseOp {
   public enum Op {
-    CREATE,
-    DELETE,
-    UPDATE_CONFIG,
-    UPDATE_SCHEMA,
+    CREATE, DELETE, UPDATE_CONFIG, UPDATE_SCHEMA,
   }
 
   private String _schemaFileName;
@@ -104,9 +103,12 @@ public class TableOp extends BaseOp {
 
   private boolean createSchema() {
     try {
-      ControllerTest.sendPostRequest(
-          ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL).forSchemaCreate(),
-          FileUtils.readFileToString(new File(_schemaFileName)));
+      Map<String, String> headers = new HashMap<String, String>() {{
+        put("Content-type", "application/json");
+      }};
+      ControllerTest
+          .sendPostRequest(ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL).forSchemaCreate(),
+              FileUtils.readFileToString(new File(_schemaFileName)), headers);
       return true;
     } catch (IOException e) {
       LOGGER.error("Failed to create schema with file: {}", _schemaFileName, e);
@@ -116,9 +118,9 @@ public class TableOp extends BaseOp {
 
   private boolean createTable() {
     try {
-      ControllerTest.sendPostRequest(
-          ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL).forTableCreate(),
-          FileUtils.readFileToString(new File(_tableConfigFileName)));
+      ControllerTest
+          .sendPostRequest(ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL).forTableCreate(),
+              FileUtils.readFileToString(new File(_tableConfigFileName)));
       return true;
     } catch (IOException e) {
       LOGGER.error("Failed to create table with file: {}", _tableConfigFileName, e);
@@ -129,8 +131,8 @@ public class TableOp extends BaseOp {
   private boolean deleteTable() {
     try {
       TableConfig tableConfig = JsonUtils.fileToObject(new File(_tableConfigFileName), TableConfig.class);
-      ControllerTest.sendDeleteRequest(
-          ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL).forTableDelete(tableConfig.getTableName()));
+      ControllerTest.sendDeleteRequest(ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL)
+          .forTableDelete(tableConfig.getTableName()));
       return true;
     } catch (IOException e) {
       LOGGER.error("Failed to delete table with file: {}", _tableConfigFileName, e);
