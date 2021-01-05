@@ -27,9 +27,12 @@ import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.routing.RoutingManager;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
+import org.glassfish.grizzly.ssl.SSLContextConfigurator;
+import org.glassfish.grizzly.ssl.SSLEngineConfigurator;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
 import org.glassfish.jersey.jackson.JacksonFeature;
@@ -38,6 +41,17 @@ import org.glassfish.jersey.server.ResourceConfig;
 
 public class BrokerAdminApiApplication extends ResourceConfig {
   private static final String RESOURCE_PACKAGE = "org.apache.pinot.broker.api.resources";
+
+  // TODO find a permanent home for broker configuration keys
+  private static final String PINOT_BROKER_CLIENT_PROTOCOL = "pinot.broker.client.protocol";
+  private static final String PINOT_BROKER_CLIENT_TLS_KEYSTORE_PATH = "pinot.broker.client.tls.keystore.path";
+  private static final String PINOT_BROKER_CLIENT_TLS_KEYSTORE_PASSWORD = "pinot.broker.client.tls.keystore.password";
+  private static final String PINOT_BROKER_CLIENT_TLS_TRUSTSTORE_PATH = "pinot.broker.client.tls.truststore.path";
+  private static final String PINOT_BROKER_CLIENT_TLS_TRUSTSTORE_PASSWORD = "pinot.broker.client.tls.truststore.password";
+  private static final String PINOT_BROKER_CLIENT_TLS_REQUIRES_CLIENT_AUTH = "pinot.broker.client.tls.requires_client_auth";
+
+  private static final String PROTOCOL_HTTPS = "https";
+  private static final String PROTOCOL_HTTP = "http";
 
   private URI _baseUri;
   private HttpServer _httpServer;
@@ -58,11 +72,40 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     registerClasses(io.swagger.jaxrs.listing.SwaggerSerializers.class);
   }
 
-  public void start(int httpPort) {
-    Preconditions.checkArgument(httpPort > 0);
-    _baseUri = URI.create("http://0.0.0.0:" + httpPort + "/");
-    _httpServer = GrizzlyHttpServerFactory.createHttpServer(_baseUri, this);
+  public void start(PinotConfiguration brokerConf) {
+    int brokerQueryPort = brokerConf.getProperty(
+        CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT);
+
+    Preconditions.checkArgument(brokerQueryPort > 0);
+    _baseUri = URI.create(String.format("%s://0.0.0.0:%d/",
+        brokerConf.getProperty(PINOT_BROKER_CLIENT_PROTOCOL, PROTOCOL_HTTP), brokerQueryPort));
+
+    _httpServer = buildHttpsServer(brokerConf);
     setupSwagger();
+  }
+
+  private HttpServer buildHttpsServer(PinotConfiguration brokerConf) {
+    boolean isSecure = PROTOCOL_HTTPS.equals(brokerConf.getProperty(PINOT_BROKER_CLIENT_PROTOCOL, PROTOCOL_HTTP));
+
+    if (isSecure) {
+      return GrizzlyHttpServerFactory.createHttpServer(_baseUri, this, true, buildSSLConfig(brokerConf));
+    }
+
+    return GrizzlyHttpServerFactory.createHttpServer(_baseUri, this);
+  }
+
+  private SSLEngineConfigurator buildSSLConfig(PinotConfiguration brokerConf) {
+    SSLContextConfigurator sslContextConfigurator = new SSLContextConfigurator();
+
+    sslContextConfigurator.setKeyStoreFile(brokerConf.getProperty(PINOT_BROKER_CLIENT_TLS_KEYSTORE_PATH));
+    sslContextConfigurator.setKeyStorePass(brokerConf.getProperty(PINOT_BROKER_CLIENT_TLS_KEYSTORE_PASSWORD));
+    sslContextConfigurator.setTrustStoreFile(brokerConf.getProperty(PINOT_BROKER_CLIENT_TLS_TRUSTSTORE_PATH));
+    sslContextConfigurator.setTrustStorePass(brokerConf.getProperty(PINOT_BROKER_CLIENT_TLS_TRUSTSTORE_PASSWORD));
+
+    boolean requiresClientAuth = brokerConf.getProperty(PINOT_BROKER_CLIENT_TLS_REQUIRES_CLIENT_AUTH, false);
+
+    return new SSLEngineConfigurator(sslContextConfigurator).setClientMode(false)
+        .setWantClientAuth(requiresClientAuth).setEnabledProtocols(new String[] { "TLSv1.2" });
   }
 
   private void setupSwagger() {

@@ -196,10 +196,12 @@ public class PinotQueryResource {
       LOGGER.error("Instance {} not found", instanceId);
       return QueryException.INTERNAL_ERROR.toString();
     }
+
+    // TODO extract protocol from Helix
+    String protocol = "http";
     String hostNameWithPrefix = instanceConfig.getHostName();
-    String url =
-        getQueryURL(hostNameWithPrefix.substring(hostNameWithPrefix.indexOf("_") + 1), instanceConfig.getPort(),
-            querySyntax);
+    String url = getQueryURL(protocol, hostNameWithPrefix.substring(hostNameWithPrefix.indexOf("_") + 1),
+        instanceConfig.getPort(), querySyntax);
     ObjectNode requestJson = getRequestJson(query, traceEnabled, queryOptions, querySyntax);
     return sendRequestRaw(url, query, requestJson);
   }
@@ -226,12 +228,12 @@ public class PinotQueryResource {
     return requestJson;
   }
 
-  private String getQueryURL(String hostName, String port, String querySyntax) {
+  private String getQueryURL(String protocol, String hostName, String port, String querySyntax) {
     switch (querySyntax) {
       case CommonConstants.Broker.Request.SQL:
-        return String.format("http://%s:%s/query/sql", hostName, port);
+        return String.format("%s://%s:%s/query/sql", protocol, hostName, port);
       case CommonConstants.Broker.Request.PQL:
-        return String.format("http://%s:%s/query", hostName, port);
+        return String.format("%s://%s:%s/query", protocol, hostName, port);
       default:
         throw new UnsupportedOperationException("Unsupported query syntax - " + querySyntax);
     }

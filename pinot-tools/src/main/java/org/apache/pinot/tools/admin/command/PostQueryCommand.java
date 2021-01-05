@@ -32,11 +32,14 @@ import org.slf4j.LoggerFactory;
 public class PostQueryCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(PostQueryCommand.class.getName());
 
-  @Option(name = "-brokerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
+  @Option(name = "-brokerHost", required = false, metaVar = "<String>", usage = "host name for broker.")
   private String _brokerHost;
 
   @Option(name = "-brokerPort", required = false, metaVar = "<int>", usage = "http port for broker.")
   private String _brokerPort = Integer.toString(CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT);
+
+  @Option(name = "-brokerProtocol", required = false, metaVar = "<String>", usage = "protocol for broker.")
+  private String _brokerProtocol = "http";
 
   @Option(name = "-queryType", required = false, metaVar = "<string>", usage = "Query use sql or pql.")
   private String _queryType = Request.PQL;
@@ -59,7 +62,8 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
 
   @Override
   public String toString() {
-    return ("PostQuery -brokerHost " + _brokerHost + " -brokerPort " + _brokerPort + " -queryType " + _queryType + " -query " + _query);
+    return ("PostQuery -brokerProtocol " + _brokerProtocol + " -brokerHost " + _brokerHost + " -brokerPort " +
+        _brokerPort + " -queryType " + _queryType + " -query " + _query);
   }
 
   @Override
@@ -82,6 +86,11 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
     return this;
   }
 
+  public PostQueryCommand setBrokerProtocol(String protocol) {
+    _brokerProtocol = protocol;
+    return this;
+  }
+
   public PostQueryCommand setQueryType(String queryType) {
     _queryType = queryType;
     return this;
@@ -100,7 +109,7 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
     LOGGER.info("Executing command: " + toString());
 
     String request;
-    String urlString = "http://" + _brokerHost + ":" + _brokerPort + "/query";
+    String urlString = _brokerProtocol + "://" + _brokerHost + ":" + _brokerPort + "/query";
     if (_queryType.toLowerCase().equals(Request.SQL)) {
       urlString += "/sql";
       request = JsonUtils.objectToString(Collections.singletonMap(Request.SQL, _query));
