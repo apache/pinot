@@ -50,7 +50,7 @@ abstract class BaseRawLongSingleColumnDistinctExecutor implements DistinctExecut
   @Override
   public DistinctTable getResult() {
     DataSchema dataSchema =
-        new DataSchema(new String[]{_expression.toString()}, new ColumnDataType[]{ColumnDataType.DOUBLE});
+        new DataSchema(new String[]{_expression.toString()}, new ColumnDataType[]{ColumnDataType.LONG});
     List<Record> records = new ArrayList<>(_valueSet.size());
     LongIterator valueIterator = _valueSet.iterator();
     while (valueIterator.hasNext()) {
