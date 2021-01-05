@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.plugin.stream.kinesis;
 
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.RowMetadata;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
@@ -28,8 +30,8 @@ import software.amazon.awssdk.services.kinesis.model.Record;
 
 
 public class KinesisRecordsBatch implements MessageBatch<byte[]> {
-  private List<Record> _recordList;
-  private String _shardId;
+  private final List<Record> _recordList;
+  private final String _shardId;
 
   public KinesisRecordsBatch(List<Record> recordList, String shardId) {
     _recordList = recordList;
@@ -43,22 +45,16 @@ public class KinesisRecordsBatch implements MessageBatch<byte[]> {
 
   @Override
   public byte[] getMessageAtIndex(int index) {
-    return _recordList.get(index).data().asByteBuffer().array();
+    return _recordList.get(index).data().asByteArray();
   }
-
   @Override
   public int getMessageOffsetAtIndex(int index) {
-    return _recordList.get(index).data().asByteBuffer().arrayOffset();
+    return ByteBuffer.wrap(_recordList.get(index).data().asByteArray()).arrayOffset();
   }
 
   @Override
   public int getMessageLengthAtIndex(int index) {
     return _recordList.get(index).data().asByteArray().length;
-  }
-
-  @Override
-  public RowMetadata getMetadataAtIndex(int index) {
-    throw new UnsupportedOperationException();
   }
 
   @Override

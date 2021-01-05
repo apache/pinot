@@ -59,13 +59,13 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
   }
 
   @Override
-  public KinesisRecordsBatch fetchMessages(Checkpoint start, Checkpoint end, int timeout) {
+  public KinesisRecordsBatch fetchMessages(Checkpoint start, Checkpoint end, int timeoutMs) {
     List<Record> recordList = new ArrayList<>();
     Future<KinesisRecordsBatch> kinesisFetchResultFuture =
         _executorService.submit(() -> getResult(start, end, recordList));
 
     try {
-      return kinesisFetchResultFuture.get(timeout, TimeUnit.MILLISECONDS);
+      return kinesisFetchResultFuture.get(timeoutMs, TimeUnit.MILLISECONDS);
     } catch (Exception e) {
       return handleException((KinesisCheckpoint) start, recordList);
     }
@@ -127,6 +127,9 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
       }
 
       return new KinesisRecordsBatch(recordList, next.getKey());
+    } catch (IllegalStateException e) {
+      LOG.warn("Illegal state exception, connection is broken", e);
+      return handleException(kinesisStartCheckpoint, recordList);
     } catch (ProvisionedThroughputExceededException e) {
       LOG.warn("The request rate for the stream is too high", e);
       return handleException(kinesisStartCheckpoint, recordList);
