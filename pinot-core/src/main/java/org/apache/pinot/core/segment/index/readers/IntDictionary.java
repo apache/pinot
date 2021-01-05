@@ -43,7 +43,7 @@ public class IntDictionary extends BaseImmutableDictionary {
       return -(length()+1);
     }
 
-    if (bigDecimal.compareTo(BigDecimal.valueOf(Long.MIN_VALUE)) < 0) {
+    if (bigDecimal.compareTo(BigDecimal.valueOf(Integer.MIN_VALUE)) < 0) {
       // Binary search insert position of value greater less than Integer.MIN_VALUE
       return -1;
     }
