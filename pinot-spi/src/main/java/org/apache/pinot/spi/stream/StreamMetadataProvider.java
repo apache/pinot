@@ -36,9 +36,9 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
 public interface StreamMetadataProvider extends Closeable {
   /**
    * Fetches the number of partitions for a topic given the stream configs
-   * @deprecated use getPartitionGroupMetadataList instead
+   * @param timeoutMillis
+   * @return
    */
-  @Deprecated
   int fetchPartitionCount(long timeoutMillis);
 
   // Issue 5953 Retain this interface for 0.5.0, remove in 0.6.0

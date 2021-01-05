@@ -30,6 +30,7 @@ import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.PartitionGroupInfo;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
@@ -94,8 +95,9 @@ public class PinotTableIdealStateBuilder {
     return idealState;
   }
 
-  public static IdealState buildLowLevelRealtimeIdealStateFor(String realtimeTableName, TableConfig realtimeTableConfig,
-      IdealState idealState, boolean enableBatchMessageMode) {
+  public static void buildLowLevelRealtimeIdealStateFor(PinotLLCRealtimeSegmentManager pinotLLCRealtimeSegmentManager,
+      String realtimeTableName, TableConfig realtimeTableConfig, IdealState idealState,
+      boolean enableBatchMessageMode) {
 
     // Validate replicasPerPartition here.
     final String replicasPerPartitionStr = realtimeTableConfig.getValidationConfig().getReplicasPerPartition();
@@ -104,7 +106,7 @@ public class PinotTableIdealStateBuilder {
     }
     final int nReplicas;
     try {
-      nReplicas = Integer.parseInt(replicasPerPartitionStr);
+      nReplicas = Integer.valueOf(replicasPerPartitionStr);
     } catch (NumberFormatException e) {
       throw new PinotHelixResourceManager.InvalidTableConfigException(
           "Invalid value for replicasPerPartition, expected a number: " + replicasPerPartitionStr, e);
@@ -112,7 +114,7 @@ public class PinotTableIdealStateBuilder {
     if (idealState == null) {
       idealState = buildEmptyRealtimeIdealStateFor(realtimeTableName, nReplicas, enableBatchMessageMode);
     }
-    return idealState;
+    pinotLLCRealtimeSegmentManager.setUpNewTable(realtimeTableConfig, idealState);
   }
 
   public static List<PartitionGroupInfo> getPartitionGroupInfoList(StreamConfig streamConfig,

@@ -42,7 +42,6 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   }
 
   @Override
-  @Deprecated
   public int fetchPartitionCount(long timeoutMillis) {
     return _consumer.partitionsFor(_topic, Duration.ofMillis(timeoutMillis)).size();
   }
