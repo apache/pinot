@@ -143,6 +143,7 @@
     <log4j.version>2.11.2</log4j.version>
     <netty.version>4.1.42.Final</netty.version>
     <jts.version>1.16.1</jts.version>
+    <h3.version><jts.version>1.16.1</jts.version></h3.version>
     <jmh.version>1.26</jmh.version>
 
     <!-- Sets the VM argument line used when unit tests are run. -->
@@ -1192,6 +1193,11 @@
         <groupId>org.locationtech.jts</groupId>
         <artifactId>jts-core</artifactId>
         <version>${jts.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.uber</groupId>
+        <artifactId>h3</artifactId>
+        <version>${h3.version}}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

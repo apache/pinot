@@ -100,7 +100,7 @@ public class FilterPlanNode implements PlanNode {
         return false;
       }
       RangePredicate rangePredicate = (RangePredicate) predicate;
-      // TODO: support lower bound
+      // TODO(https://github.com/apache/incubator-pinot/issues/6417): support lower bound
       if (rangePredicate.getUpperBound().equals(RangePredicate.UNBOUNDED) || !rangePredicate.getLowerBound()
           .equals(RangePredicate.UNBOUNDED)) {
         return false;
