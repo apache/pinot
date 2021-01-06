@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller;
 
+import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -37,6 +38,10 @@ import static org.apache.pinot.common.utils.CommonConstants.Controller.DEFAULT_M
 
 
 public class ControllerConf extends PinotConfiguration {
+  public static final List<String> SUPPORTED_PROTOCOLS = Arrays.asList(
+      CommonConstants.HTTP_PROTOCOL,
+      CommonConstants.HTTPS_PROTOCOL);
+
   public static final String CONTROLLER_VIP_HOST = "controller.vip.host";
   public static final String CONTROLLER_VIP_PORT = "controller.vip.port";
   public static final String CONTROLLER_VIP_PROTOCOL = "controller.vip.protocol";
@@ -365,19 +370,11 @@ public class ControllerConf extends PinotConfiguration {
   }  
 
   public String getControllerVipProtocol() {
-    return Optional.ofNullable(getProperty(CONTROLLER_VIP_PROTOCOL))
-
-        .filter(protocol -> CommonConstants.HTTPS_PROTOCOL.equals(protocol))
-
-        .orElse(CommonConstants.HTTP_PROTOCOL);
+    return getSupportedProtocol(CONTROLLER_VIP_PROTOCOL);
   }
 
   public String getControllerBrokerProtocol() {
-    return Optional.ofNullable(getProperty(CONTROLLER_BROKER_PROTOCOL))
-
-        .filter(protocol -> CommonConstants.HTTPS_PROTOCOL.equals(protocol))
-
-        .orElse(CommonConstants.HTTP_PROTOCOL);
+    return getSupportedProtocol(CONTROLLER_BROKER_PROTOCOL);
   }
 
   public int getRetentionControllerFrequencyInSeconds() {
@@ -671,5 +668,12 @@ public class ControllerConf extends PinotConfiguration {
       throw new RuntimeException("Invalid time spec '" + timeStr + "' (Valid examples: '3h', '4h30m', '30m')", e);
     }
     return seconds;
+  }
+
+  private String getSupportedProtocol(String property) {
+    String value = getProperty(property, CommonConstants.HTTP_PROTOCOL);
+    Preconditions.checkArgument(SUPPORTED_PROTOCOLS.contains(value),
+        "Unsupported %s protocol '%s'", property, value);
+    return value;
   }
 }
