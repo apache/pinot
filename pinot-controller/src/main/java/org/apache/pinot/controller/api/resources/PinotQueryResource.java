@@ -46,6 +46,7 @@ import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -63,11 +64,15 @@ public class PinotQueryResource {
   private static final Pql2Compiler PQL_QUERY_COMPILER = new Pql2Compiler();
   private static final CalciteSqlCompiler SQL_QUERY_COMPILER = new CalciteSqlCompiler();
   private static final Random RANDOM = new Random();
+
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
 
   @Inject
   AccessControlFactory _accessControlFactory;
+
+  @Inject
+  ControllerConf _controllerConf;
 
   @Deprecated
   @POST
@@ -196,10 +201,11 @@ public class PinotQueryResource {
       LOGGER.error("Instance {} not found", instanceId);
       return QueryException.INTERNAL_ERROR.toString();
     }
+
+    String protocol = _controllerConf.getControllerBrokerProtocol();
     String hostNameWithPrefix = instanceConfig.getHostName();
-    String url =
-        getQueryURL(hostNameWithPrefix.substring(hostNameWithPrefix.indexOf("_") + 1), instanceConfig.getPort(),
-            querySyntax);
+    String url = getQueryURL(protocol, hostNameWithPrefix.substring(hostNameWithPrefix.indexOf("_") + 1),
+        instanceConfig.getPort(), querySyntax);
     ObjectNode requestJson = getRequestJson(query, traceEnabled, queryOptions, querySyntax);
     return sendRequestRaw(url, query, requestJson);
   }
@@ -226,12 +232,12 @@ public class PinotQueryResource {
     return requestJson;
   }
 
-  private String getQueryURL(String hostName, String port, String querySyntax) {
+  private String getQueryURL(String protocol, String hostName, String port, String querySyntax) {
     switch (querySyntax) {
       case CommonConstants.Broker.Request.SQL:
-        return String.format("http://%s:%s/query/sql", hostName, port);
+        return String.format("%s://%s:%s/query/sql", protocol, hostName, port);
       case CommonConstants.Broker.Request.PQL:
-        return String.format("http://%s:%s/query", hostName, port);
+        return String.format("%s://%s:%s/query", protocol, hostName, port);
       default:
         throw new UnsupportedOperationException("Unsupported query syntax - " + querySyntax);
     }
