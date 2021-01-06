@@ -23,7 +23,8 @@ import io.swagger.jaxrs.config.BeanConfig;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.util.Optional;
+import java.util.Arrays;
+import java.util.List;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.routing.RoutingManager;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -41,6 +42,10 @@ import org.glassfish.jersey.server.ResourceConfig;
 
 
 public class BrokerAdminApiApplication extends ResourceConfig {
+  private static final List<String> SUPPORTED_PROTOCOLS = Arrays.asList(
+      CommonConstants.HTTP_PROTOCOL,
+      CommonConstants.HTTPS_PROTOCOL);
+
   private static final String RESOURCE_PACKAGE = "org.apache.pinot.broker.api.resources";
 
   private URI _baseUri;
@@ -104,9 +109,11 @@ public class BrokerAdminApiApplication extends ResourceConfig {
   }
 
   private static String getBrokerClientProtocol(PinotConfiguration brokerConf) {
-    return Optional.ofNullable(brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_CLIENT_PROTOCOL))
-        .filter(CommonConstants.HTTPS_PROTOCOL::equals)
-        .orElse(CommonConstants.HTTP_PROTOCOL);
+    String protocol = brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_CLIENT_PROTOCOL,
+        CommonConstants.HTTP_PROTOCOL);
+    Preconditions.checkArgument(SUPPORTED_PROTOCOLS.contains(protocol),
+        "Unsupported broker client protocol '%s'", protocol);
+    return protocol;
   }
 
   private void setupSwagger() {
