@@ -71,7 +71,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     int brokerQueryPort = brokerConf.getProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT,
         CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT);
 
-    Preconditions.checkArgument(brokerQueryPort > 0);
+    Preconditions.checkArgument(brokerQueryPort > 0, "broker client port must be > 0");
     _baseUri = URI.create(String.format("%s://0.0.0.0:%d/", getBrokerClientProtocol(brokerConf), brokerQueryPort));
 
     _httpServer = buildHttpsServer(brokerConf);
