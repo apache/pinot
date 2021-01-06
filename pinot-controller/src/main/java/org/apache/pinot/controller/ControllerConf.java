@@ -40,6 +40,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final String CONTROLLER_VIP_HOST = "controller.vip.host";
   public static final String CONTROLLER_VIP_PORT = "controller.vip.port";
   public static final String CONTROLLER_VIP_PROTOCOL = "controller.vip.protocol";
+  public static final String CONTROLLER_BROKER_PROTOCOL = "controller.broker.protocol";
   public static final String CONTROLLER_HOST = "controller.host";
   public static final String CONTROLLER_PORT = "controller.port";
   public static final String CONTROLLER_ACCESS_PROTOCOLS = "controller.access.protocols";
@@ -237,6 +238,10 @@ public class ControllerConf extends PinotConfiguration {
     setProperty(CONTROLLER_VIP_PROTOCOL, vipProtocol);
   }
 
+  public void setControllerBrokerProtocol(String protocol) {
+    setProperty(CONTROLLER_BROKER_PROTOCOL, protocol);
+  }
+
   public void setControllerPort(String port) {
     setProperty(CONTROLLER_PORT, port);
   }
@@ -361,6 +366,14 @@ public class ControllerConf extends PinotConfiguration {
 
   public String getControllerVipProtocol() {
     return Optional.ofNullable(getProperty(CONTROLLER_VIP_PROTOCOL))
+
+        .filter(protocol -> CommonConstants.HTTPS_PROTOCOL.equals(protocol))
+
+        .orElse(CommonConstants.HTTP_PROTOCOL);
+  }
+
+  public String getControllerBrokerProtocol() {
+    return Optional.ofNullable(getProperty(CONTROLLER_BROKER_PROTOCOL))
 
         .filter(protocol -> CommonConstants.HTTPS_PROTOCOL.equals(protocol))
 
