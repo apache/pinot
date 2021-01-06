@@ -22,6 +22,7 @@ package org.apache.pinot.controller.api.access;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.controller.api.resources.ControllerApplicationException;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 
 
@@ -29,17 +30,18 @@ public class AccessControlUtils {
 
   public static void validateWritePermission(HttpHeaders httpHeaders, String tableName,
       AccessControlFactory accessControlFactory, Logger logger) {
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     boolean hasWritePermission;
     try {
       AccessControl accessControl = accessControlFactory.create();
-      hasWritePermission = accessControl.hasWritePermission(httpHeaders, tableName);
+      hasWritePermission = accessControl.hasWritePermission(httpHeaders, rawTableName);
     } catch (Exception e) {
       throw new ControllerApplicationException(logger,
-          "Caught exception while validating write permission to table: " + tableName,
+          "Caught exception while validating write permission to table: " + rawTableName,
           Response.Status.INTERNAL_SERVER_ERROR, e);
     }
     if (!hasWritePermission) {
-      throw new ControllerApplicationException(logger, "No write permission to table: " + tableName,
+      throw new ControllerApplicationException(logger, "No write permission to table: " + rawTableName,
           Response.Status.FORBIDDEN);
     }
   }

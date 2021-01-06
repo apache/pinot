@@ -71,6 +71,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
+import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.api.upload.SegmentValidator;
 import org.apache.pinot.controller.api.upload.ZKOperator;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -244,6 +245,8 @@ public class PinotSegmentUploadDownloadRestletResource {
         rawTableName = segmentMetadata.getTableName();
         LOGGER.info("Uploading a segment {} to table: {}, push type {}, (Derived from segment metadata)", segmentName, tableName, uploadType);
       }
+
+      AccessControlUtils.validateWritePermission(headers, rawTableName, _accessControlFactory, LOGGER);
 
       String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
       String clientAddress = InetAddress.getByName(request.getRemoteAddr()).getHostName();
@@ -472,7 +475,8 @@ public class PinotSegmentUploadDownloadRestletResource {
   public Response startReplaceSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
-      StartReplaceSegmentsRequest startReplaceSegmentsRequest) {
+      StartReplaceSegmentsRequest startReplaceSegmentsRequest, @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, tableName, _accessControlFactory, LOGGER);
     try {
       String tableNameWithType =
           TableNameBuilder.forType(TableType.valueOf(tableTypeStr.toUpperCase())).tableNameWithType(tableName);
@@ -492,7 +496,9 @@ public class PinotSegmentUploadDownloadRestletResource {
   public Response endReplaceSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
-      @ApiParam(value = "Segment lineage entry id returned by startReplaceSegments API") @QueryParam("segmentLineageEntryId") String segmentLineageEntryId) {
+      @ApiParam(value = "Segment lineage entry id returned by startReplaceSegments API") @QueryParam("segmentLineageEntryId") String segmentLineageEntryId,
+      @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, tableName, _accessControlFactory, LOGGER);
     try {
       String tableNameWithType =
           TableNameBuilder.forType(TableType.valueOf(tableTypeStr.toUpperCase())).tableNameWithType(tableName);

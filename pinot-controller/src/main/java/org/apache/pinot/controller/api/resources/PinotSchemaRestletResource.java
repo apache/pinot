@@ -39,12 +39,16 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.controller.api.access.AccessControlFactory;
+import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
 import org.apache.pinot.controller.api.events.SchemaEventType;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -71,6 +75,9 @@ public class PinotSchemaRestletResource {
 
   @Inject
   MetadataEventNotifierFactory _metadataEventNotifierFactory;
+
+  @Inject
+  AccessControlFactory _accessControlFactory;
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
@@ -109,7 +116,8 @@ public class PinotSchemaRestletResource {
   @ApiOperation(value = "Delete a schema", notes = "Deletes a schema by name")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully deleted schema"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 409, message = "Schema is in use"), @ApiResponse(code = 500, message = "Error deleting schema")})
   public SuccessResponse deleteSchema(
-      @ApiParam(value = "Schema name", required = true) @PathParam("schemaName") String schemaName) {
+      @ApiParam(value = "Schema name", required = true) @PathParam("schemaName") String schemaName, @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, schemaName, _accessControlFactory, LOGGER);
     deleteSchemaInternal(schemaName);
     return new SuccessResponse("Schema " + schemaName + " deleted");
   }
@@ -122,7 +130,8 @@ public class PinotSchemaRestletResource {
   public SuccessResponse updateSchema(
       @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName,
       @ApiParam(value = "Whether to reload the table if the new schema is backward compatible") @DefaultValue("false") @QueryParam("reload") boolean reload,
-      FormDataMultiPart multiPart) {
+      FormDataMultiPart multiPart, @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, schemaName, _accessControlFactory, LOGGER);
     return updateSchema(schemaName, getSchemaFromMultiPart(multiPart), reload);
   }
 
@@ -135,7 +144,8 @@ public class PinotSchemaRestletResource {
   public SuccessResponse updateSchema(
       @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName,
       @ApiParam(value = "Whether to reload the table if the new schema is backward compatible") @DefaultValue("false") @QueryParam("reload") boolean reload,
-      Schema schema) {
+      Schema schema, @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, schemaName, _accessControlFactory, LOGGER);
     return updateSchema(schemaName, schema, reload);
   }
 
@@ -146,8 +156,10 @@ public class PinotSchemaRestletResource {
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully created schema"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
   public SuccessResponse addSchema(
       @ApiParam(value = "Whether to override the schema if the schema exists") @DefaultValue("true") @QueryParam("override") boolean override,
-      FormDataMultiPart multiPart) {
-    return addSchema(getSchemaFromMultiPart(multiPart), override);
+      FormDataMultiPart multiPart, @Context HttpHeaders httpHeaders) {
+    Schema schema = getSchemaFromMultiPart(multiPart);
+    AccessControlUtils.validateWritePermission(httpHeaders, schema.getSchemaName(), _accessControlFactory, LOGGER);
+    return addSchema(schema, override);
   }
 
   @POST
@@ -158,7 +170,8 @@ public class PinotSchemaRestletResource {
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully created schema"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
   public SuccessResponse addSchema(
       @ApiParam(value = "Whether to override the schema if the schema exists") @DefaultValue("true") @QueryParam("override") boolean override,
-      Schema schema) {
+      Schema schema, @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, schema.getSchemaName(), _accessControlFactory, LOGGER);
     return addSchema(schema, override);
   }
 

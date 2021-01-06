@@ -41,11 +41,15 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.controller.api.access.AccessControlFactory;
+import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -90,13 +94,17 @@ public class PinotTenantRestletResource {
   @Inject
   ControllerMetrics _controllerMetrics;
 
+  @Inject
+  AccessControlFactory _accessControlFactory;
+
   @POST
   @Path("/tenants")
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = " Create a tenant")
   @ApiResponses({@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Error creating tenant")})
-  public SuccessResponse createTenant(Tenant tenant) {
+  public SuccessResponse createTenant(Tenant tenant, @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, _accessControlFactory, LOGGER);
     PinotResourceManagerResponse response;
     switch (tenant.getTenantRole()) {
       case BROKER:
@@ -125,7 +133,8 @@ public class PinotTenantRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update a tenant")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Failed to update the tenant")})
-  public SuccessResponse updateTenant(Tenant tenant) {
+  public SuccessResponse updateTenant(Tenant tenant, @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, _accessControlFactory, LOGGER);
     PinotResourceManagerResponse response;
     switch (tenant.getTenantRole()) {
       case BROKER:
@@ -345,7 +354,9 @@ public class PinotTenantRestletResource {
   public String changeTenantState(
       @ApiParam(value = "Tenant name", required = true) @PathParam("tenantName") String tenantName,
       @ApiParam(value = "tenant type", required = false, defaultValue = "", allowableValues = "SERVER, BROKER") @QueryParam("type") String type,
-      @ApiParam(value = "state", required = true, defaultValue = "", allowableValues = "enable, disable, drop") @QueryParam("state") @DefaultValue("") String state) {
+      @ApiParam(value = "state", required = true, defaultValue = "", allowableValues = "enable, disable, drop") @QueryParam("state") @DefaultValue("") String state,
+      @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, _accessControlFactory, LOGGER);
     TenantMetadata tenantMetadata = getTenantMetadata(tenantName, type);
     Set<String> allInstances = new HashSet<>();
     if (tenantMetadata.brokerInstances != null) {
@@ -399,8 +410,9 @@ public class PinotTenantRestletResource {
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 400, message = "Tenant can not be deleted"), @ApiResponse(code = 404, message = "Tenant not found"), @ApiResponse(code = 500, message = "Error deleting tenant")})
   public SuccessResponse deleteTenant(
       @ApiParam(value = "Tenant name", required = true) @PathParam("tenantName") String tenantName,
-      @ApiParam(value = "Tenant type", required = true, allowableValues = "SERVER, BROKER") @QueryParam("type") @DefaultValue("") String type) {
-
+      @ApiParam(value = "Tenant type", required = true, allowableValues = "SERVER, BROKER") @QueryParam("type") @DefaultValue("") String type,
+      @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, _accessControlFactory, LOGGER);
     if (type == null || type.isEmpty()) {
       throw new ControllerApplicationException(LOGGER, "Tenant type (BROKER | SERVER) is required as query parameter",
           Response.Status.INTERNAL_SERVER_ERROR);

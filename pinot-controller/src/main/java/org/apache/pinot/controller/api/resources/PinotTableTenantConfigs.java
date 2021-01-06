@@ -28,9 +28,13 @@ import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.controller.api.access.AccessControlFactory;
+import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.slf4j.Logger;
@@ -44,6 +48,9 @@ public class PinotTableTenantConfigs {
   @Inject
   PinotHelixResourceManager _helixResourceManager;
 
+  @Inject
+  AccessControlFactory _accessControlFactory;
+
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTableTenantConfigs.class);
 
   @POST
@@ -52,7 +59,9 @@ public class PinotTableTenantConfigs {
   @ApiOperation(value = "Rebuild broker resource for table", notes = "when new brokers are added")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 400, message = "Bad request: table name has to be with table type"), @ApiResponse(code = 500, message = "Internal error rebuilding broker resource or serializing response")})
   public SuccessResponse rebuildBrokerResource(
-      @ApiParam(value = "Table name (with type)", required = true) @PathParam("tableName") String tableNameWithType) {
+      @ApiParam(value = "Table name (with type)", required = true) @PathParam("tableName") String tableNameWithType,
+      @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, tableNameWithType, _accessControlFactory, LOGGER);
     try {
       final PinotResourceManagerResponse pinotResourceManagerResponse =
           _helixResourceManager.rebuildBrokerResourceFromHelixTags(tableNameWithType);

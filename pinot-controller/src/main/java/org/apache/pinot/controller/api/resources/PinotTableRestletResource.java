@@ -121,11 +121,14 @@ public class PinotTableRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables")
   @ApiOperation(value = "Adds a table", notes = "Adds a table")
-  public SuccessResponse addTable(String tableConfigStr) {
+  public SuccessResponse addTable(String tableConfigStr, @Context HttpHeaders httpHeaders) {
     // TODO introduce a table config ctor with json string.
     TableConfig tableConfig;
+    String tableName;
     try {
       tableConfig = JsonUtils.stringToObject(tableConfigStr, TableConfig.class);
+      tableName = tableConfig.getTableName();
+      AccessControlUtils.validateWritePermission(httpHeaders, tableName, _accessControlFactory, LOGGER);
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
 
       TunerConfig tunerConfig = tableConfig.getTunerConfig();
@@ -143,7 +146,6 @@ public class PinotTableRestletResource {
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     }
-    String tableName = tableConfig.getTableName();
     try {
       ensureMinReplicas(tableConfig);
       verifyTableConfigs(tableConfig);
@@ -237,11 +239,13 @@ public class PinotTableRestletResource {
   public String alterTableStateOrListTableConfig(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "enable|disable|drop") @QueryParam("state") String stateStr,
-      @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
+      @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr, @Context HttpHeaders httpHeaders) {
     try {
       if (stateStr == null) {
         return listTableConfigs(tableName, tableTypeStr);
       }
+
+      AccessControlUtils.validateWritePermission(httpHeaders, tableName, _accessControlFactory, LOGGER);
 
       StateType stateType = Constants.validateState(stateStr);
       TableType tableType = Constants.validateTableType(tableTypeStr);
@@ -289,8 +293,8 @@ public class PinotTableRestletResource {
   public SuccessResponse deleteTable(
       @ApiParam(value = "Name of the table to delete", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr, @Context HttpHeaders httpHeaders) {
-    TableType tableType = Constants.validateTableType(tableTypeStr);
     AccessControlUtils.validateWritePermission(httpHeaders, tableName, _accessControlFactory, LOGGER);
+    TableType tableType = Constants.validateTableType(tableTypeStr);
     List<String> tablesDeleted = new LinkedList<>();
     try {
       boolean tableExist = false;
@@ -342,11 +346,13 @@ public class PinotTableRestletResource {
   @ApiOperation(value = "Updates table config for a table", notes = "Updates table config for a table")
   public SuccessResponse updateTableConfig(
       @ApiParam(value = "Name of the table to update", required = true) @PathParam("tableName") String tableName,
-      String tableConfigString)
+      String tableConfigString, @Context HttpHeaders httpHeaders)
       throws Exception {
     TableConfig tableConfig;
     try {
       tableConfig = JsonUtils.stringToObject(tableConfigString, TableConfig.class);
+      AccessControlUtils
+          .validateWritePermission(httpHeaders, tableConfig.getTableName(), _accessControlFactory, LOGGER);
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
@@ -527,7 +533,9 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Whether to rebalance table in bootstrap mode (regardless of minimum segment movement, reassign all segments in a round-robin fashion as if adding new segments to an empty table)") @DefaultValue("false") @QueryParam("bootstrap") boolean bootstrap,
       @ApiParam(value = "Whether to allow downtime for the rebalance") @DefaultValue("false") @QueryParam("downtime") boolean downtime,
       @ApiParam(value = "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or maximum number of replicas allowed to be unavailable if value is negative") @DefaultValue("1") @QueryParam("minAvailableReplicas") int minAvailableReplicas,
-      @ApiParam(value = "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime contract cannot be achieved)") @DefaultValue("false") @QueryParam("bestEfforts") boolean bestEfforts) {
+      @ApiParam(value = "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime contract cannot be achieved)") @DefaultValue("false") @QueryParam("bestEfforts") boolean bestEfforts,
+      @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, tableName, _accessControlFactory, LOGGER);
 
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
 
@@ -578,8 +586,7 @@ public class PinotTableRestletResource {
   @ApiOperation(value = "Get current table state", notes = "Get current table state")
   public String getTableState(
       @ApiParam(value = "Name of the table to get its state", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "realtime|offline", required = true) @QueryParam("type") String tableTypeStr
-  ) {
+      @ApiParam(value = "realtime|offline", required = true) @QueryParam("type") String tableTypeStr) {
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
     try {
       ObjectNode data = JsonUtils.newObjectNode();

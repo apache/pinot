@@ -38,11 +38,15 @@ import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.pinot.controller.api.access.AccessControlFactory;
+import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
@@ -56,6 +60,9 @@ public class PinotClusterConfigs {
 
   @Inject
   PinotHelixResourceManager pinotHelixResourceManager;
+
+  @Inject
+  AccessControlFactory _accessControlFactory;
 
   @GET
   @Path("/cluster/info")
@@ -91,7 +98,8 @@ public class PinotClusterConfigs {
   @ApiOperation(value = "Update cluster configuration")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Server error updating configuration")})
-  public SuccessResponse updateClusterConfig(String body) {
+  public SuccessResponse updateClusterConfig(String body, @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, _accessControlFactory, LOGGER);
     try {
       JsonNode jsonNode = JsonUtils.stringToJsonNode(body);
       HelixAdmin admin = pinotHelixResourceManager.getHelixAdmin();
@@ -119,7 +127,9 @@ public class PinotClusterConfigs {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Server error deleting configuration")})
   public SuccessResponse deleteClusterConfig(
-      @ApiParam(value = "Name of the config to delete", required = true) @PathParam("configName") String configName) {
+      @ApiParam(value = "Name of the config to delete", required = true) @PathParam("configName") String configName,
+      @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, _accessControlFactory, LOGGER);
     try {
       HelixAdmin admin = pinotHelixResourceManager.getHelixAdmin();
       HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)

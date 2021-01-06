@@ -38,11 +38,15 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.controller.api.access.AccessControlFactory;
+import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,6 +59,9 @@ public class PinotBrokerRestletResource {
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
+
+  @Inject
+  AccessControlFactory _accessControlFactory;
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
@@ -212,7 +219,9 @@ public class PinotBrokerRestletResource {
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 400, message = "Bad Request"), @ApiResponse(code = 404, message = "Instance not found"), @ApiResponse(code = 500, message = "Internal error")})
   public SuccessResponse toggleQueryRateLimiting(
       @ApiParam(value = "Broker instance name", required = true, example = "Broker_my.broker.com_30000") @PathParam("instanceName") String brokerInstanceName,
-      @ApiParam(value = "ENABLE|DISABLE", allowableValues = "ENABLE, DISABLE", required = true) @QueryParam("state") String state) {
+      @ApiParam(value = "ENABLE|DISABLE", allowableValues = "ENABLE, DISABLE", required = true) @QueryParam("state") String state,
+      @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, _accessControlFactory, LOGGER);
     if (brokerInstanceName == null || !brokerInstanceName.startsWith("Broker_")) {
       throw new ControllerApplicationException(LOGGER,
           String.format("'%s' is not a valid broker instance name.", brokerInstanceName), Response.Status.BAD_REQUEST);

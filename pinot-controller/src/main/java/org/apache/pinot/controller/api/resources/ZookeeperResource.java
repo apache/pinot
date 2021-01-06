@@ -37,11 +37,14 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.helix.AccessOption;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
+import org.apache.pinot.controller.api.access.AccessControlFactory;
+import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.zookeeper.data.Stat;
@@ -56,6 +59,9 @@ public class ZookeeperResource {
 
   @Inject
   PinotHelixResourceManager pinotHelixResourceManager;
+
+  @Inject
+  AccessControlFactory _accessControlFactory;
 
   ZNRecordSerializer _znRecordSerializer = new ZNRecordSerializer();
 
@@ -90,10 +96,10 @@ public class ZookeeperResource {
       @ApiResponse(code = 204, message = "No Content"), //
       @ApiResponse(code = 500, message = "Internal server error")})
   public SuccessResponse delete(
-      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path") @DefaultValue("") String path) {
-
+      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path") @DefaultValue("") String path,
+      @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, _accessControlFactory, LOGGER);
     path = validateAndNormalizeZKPath(path);
-
     boolean success = pinotHelixResourceManager.deleteZKPath(path);
     if (success) {
       return new SuccessResponse("Successfully deleted path: " + path);
@@ -116,7 +122,9 @@ public class ZookeeperResource {
       @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path") @DefaultValue("") String path,
       @ApiParam(value = "Content", required = true) @QueryParam("data") @DefaultValue("") String content,
       @ApiParam(value = "expectedVersion", required = true, defaultValue = "-1") @QueryParam("expectedVersion") @DefaultValue("-1") String expectedVersion,
-      @ApiParam(value = "accessOption", required = true, defaultValue = "1") @QueryParam("accessOption") @DefaultValue("1") String accessOption) {
+      @ApiParam(value = "accessOption", required = true, defaultValue = "1") @QueryParam("accessOption") @DefaultValue("1") String accessOption,
+      @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, _accessControlFactory, LOGGER);
     path = validateAndNormalizeZKPath(path);
     ZNRecord record = null;
     if (content != null) {

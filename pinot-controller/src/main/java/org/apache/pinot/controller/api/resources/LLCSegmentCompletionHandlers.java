@@ -35,6 +35,8 @@ import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
@@ -42,6 +44,8 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
+import org.apache.pinot.controller.api.access.AccessControlFactory;
+import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import org.apache.pinot.controller.util.SegmentCompletionUtils;
@@ -65,6 +69,9 @@ public class LLCSegmentCompletionHandlers {
 
   @Inject
   SegmentCompletionManager _segmentCompletionManager;
+
+  @Inject
+  AccessControlFactory _accessControlFactory;
 
   @VisibleForTesting
   public static String getScheme() {
@@ -267,8 +274,9 @@ public class LLCSegmentCompletionHandlers {
       @QueryParam(SegmentCompletionProtocol.PARAM_BUILD_TIME_MILLIS) long buildTimeMillis,
       @QueryParam(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS) long waitTimeMillis,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_SIZE_BYTES) long segmentSizeBytes,
-      @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows, FormDataMultiPart multiPart) {
-
+      @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows, @Context HttpHeaders httpHeaders,
+      FormDataMultiPart multiPart) {
+    AccessControlUtils.validateWritePermission(httpHeaders, _accessControlFactory, LOGGER);
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName)
         .withSegmentSizeBytes(segmentSizeBytes).withBuildTimeMillis(buildTimeMillis).withWaitTimeMillis(waitTimeMillis)
@@ -346,7 +354,8 @@ public class LLCSegmentCompletionHandlers {
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
       @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset,
       @QueryParam(SegmentCompletionProtocol.PARAM_STREAM_PARTITION_MSG_OFFSET) String streamPartitionMsgOffset,
-      FormDataMultiPart multiPart) {
+      @Context HttpHeaders httpHeaders, FormDataMultiPart multiPart) {
+    AccessControlUtils.validateWritePermission(httpHeaders, _accessControlFactory, LOGGER);
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName);
     extractOffsetFromParams(requestParams, streamPartitionMsgOffset, offset);
@@ -392,7 +401,8 @@ public class LLCSegmentCompletionHandlers {
       @QueryParam(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS) long waitTimeMillis,
       @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_SIZE_BYTES) long segmentSizeBytes,
-      FormDataMultiPart metadataFiles) {
+      @Context HttpHeaders httpHeaders, FormDataMultiPart metadataFiles) {
+    AccessControlUtils.validateWritePermission(httpHeaders, _accessControlFactory, LOGGER);
     if (instanceId == null || segmentName == null || segmentLocation == null || metadataFiles == null
       || (offset == -1 && streamPartitionMsgOffset == null)) {
       LOGGER.error("Invalid call: offset={}, segmentName={}, instanceId={}, segmentLocation={}, streamPartitionMsgOffset={}",

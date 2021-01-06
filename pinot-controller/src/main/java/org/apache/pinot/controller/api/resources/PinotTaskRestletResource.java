@@ -34,10 +34,16 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
 import org.apache.helix.task.TaskState;
+import org.apache.pinot.controller.api.access.AccessControlFactory;
+import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -59,6 +65,7 @@ import org.apache.pinot.core.minion.PinotTaskConfig;
 @Api(tags = Constants.TASK_TAG)
 @Path("/")
 public class PinotTaskRestletResource {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotTaskRestletResource.class);
   private static final String TASK_QUEUE_STATE_STOP = "STOP";
   private static final String TASK_QUEUE_STATE_RESUME = "RESUME";
 
@@ -67,6 +74,9 @@ public class PinotTaskRestletResource {
 
   @Inject
   PinotTaskManager _pinotTaskManager;
+
+  @Inject
+  AccessControlFactory _accessControlFactory;
 
   @GET
   @Path("/tasks/tasktypes")
@@ -171,7 +181,13 @@ public class PinotTaskRestletResource {
   @Path("/tasks/schedule")
   @ApiOperation("Schedule tasks and return a map from task type to task name scheduled")
   public Map<String, String> scheduleTasks(@ApiParam(value = "Task type") @QueryParam("taskType") String taskType,
-      @ApiParam(value = "Table name (with type suffix)") @QueryParam("tableName") String tableName) {
+      @ApiParam(value = "Table name (with type suffix)") @QueryParam("tableName") String tableName,
+      @Context HttpHeaders httpHeaders) {
+    if (tableName != null) {
+      AccessControlUtils.validateWritePermission(httpHeaders, tableName, _accessControlFactory, LOGGER);
+    } else {
+      AccessControlUtils.validateWritePermission(httpHeaders, _accessControlFactory, LOGGER);
+    }
     if (taskType != null) {
       // Schedule task for the given task type
       String taskName = tableName != null ? _pinotTaskManager.scheduleTask(taskType, tableName)
@@ -187,7 +203,8 @@ public class PinotTaskRestletResource {
   @PUT
   @Path("/tasks/scheduletasks")
   @ApiOperation("Schedule tasks (deprecated)")
-  public Map<String, String> scheduleTasksDeprecated() {
+  public Map<String, String> scheduleTasksDeprecated(@Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, _accessControlFactory, LOGGER);
     return _pinotTaskManager.scheduleTasks();
   }
 
@@ -195,7 +212,9 @@ public class PinotTaskRestletResource {
   @Path("/tasks/{taskType}/cleanup")
   @ApiOperation("Clean up finished tasks (COMPLETED, FAILED) for the given task type")
   public SuccessResponse cleanUpTasks(
-      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType) {
+      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
+      @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, _accessControlFactory, LOGGER);
     _pinotHelixTaskResourceManager.cleanUpTaskQueue(taskType);
     return new SuccessResponse("Successfully cleaned up tasks for task type: " + taskType);
   }
@@ -205,7 +224,9 @@ public class PinotTaskRestletResource {
   @Path("/tasks/cleanuptasks/{taskType}")
   @ApiOperation("Clean up finished tasks (COMPLETED, FAILED) for the given task type (deprecated)")
   public SuccessResponse cleanUpTasksDeprecated(
-      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType) {
+      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
+      @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, _accessControlFactory, LOGGER);
     _pinotHelixTaskResourceManager.cleanUpTaskQueue(taskType);
     return new SuccessResponse("Successfully cleaned up tasks for task type: " + taskType);
   }
@@ -214,7 +235,9 @@ public class PinotTaskRestletResource {
   @Path("/tasks/{taskType}/stop")
   @ApiOperation("Stop all running/pending tasks (as well as the task queue) for the given task type")
   public SuccessResponse stopTasks(
-      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType) {
+      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
+      @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, _accessControlFactory, LOGGER);
     _pinotHelixTaskResourceManager.stopTaskQueue(taskType);
     return new SuccessResponse("Successfully stopped tasks for task type: " + taskType);
   }
@@ -223,7 +246,9 @@ public class PinotTaskRestletResource {
   @Path("/tasks/{taskType}/resume")
   @ApiOperation("Resume all stopped tasks (as well as the task queue) for the given task type")
   public SuccessResponse resumeTasks(
-      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType) {
+      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
+      @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, _accessControlFactory, LOGGER);
     _pinotHelixTaskResourceManager.resumeTaskQueue(taskType);
     return new SuccessResponse("Successfully resumed tasks for task type: " + taskType);
   }
@@ -234,7 +259,9 @@ public class PinotTaskRestletResource {
   @ApiOperation("Stop/resume a task queue (deprecated)")
   public SuccessResponse toggleTaskQueueState(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
-      @ApiParam(value = "state", required = true) @QueryParam("state") String state) {
+      @ApiParam(value = "state", required = true) @QueryParam("state") String state,
+      @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, _accessControlFactory, LOGGER);
     switch (state.toUpperCase()) {
       case TASK_QUEUE_STATE_STOP:
         _pinotHelixTaskResourceManager.stopTaskQueue(taskType);
@@ -252,7 +279,9 @@ public class PinotTaskRestletResource {
   @ApiOperation("Delete all tasks (as well as the task queue) for the given task type")
   public SuccessResponse deleteTasks(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
-      @ApiParam(value = "Whether to force deleting the tasks (expert only option, enable with cautious") @DefaultValue("false") @QueryParam("forceDelete") boolean forceDelete) {
+      @ApiParam(value = "Whether to force deleting the tasks (expert only option, enable with cautious") @DefaultValue("false") @QueryParam("forceDelete") boolean forceDelete,
+      @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, _accessControlFactory, LOGGER);
     _pinotHelixTaskResourceManager.deleteTaskQueue(taskType, forceDelete);
     return new SuccessResponse("Successfully deleted tasks for task type: " + taskType);
   }
@@ -263,7 +292,9 @@ public class PinotTaskRestletResource {
   @ApiOperation("Delete a task queue (deprecated)")
   public SuccessResponse deleteTaskQueue(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
-      @ApiParam(value = "Whether to force delete the task queue (expert only option, enable with cautious") @DefaultValue("false") @QueryParam("forceDelete") boolean forceDelete) {
+      @ApiParam(value = "Whether to force delete the task queue (expert only option, enable with cautious") @DefaultValue("false") @QueryParam("forceDelete") boolean forceDelete,
+      @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, _accessControlFactory, LOGGER);
     _pinotHelixTaskResourceManager.deleteTaskQueue(taskType, forceDelete);
     return new SuccessResponse("Successfully deleted task queue for task type: " + taskType);
   }

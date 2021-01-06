@@ -38,12 +38,16 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.controller.api.access.AccessControlFactory;
+import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -62,6 +66,9 @@ public class PinotInstanceAssignmentRestletResource {
 
   @Inject
   PinotHelixResourceManager _resourceManager;
+
+  @Inject
+  AccessControlFactory _accessControlFactory;
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
@@ -118,7 +125,10 @@ public class PinotInstanceAssignmentRestletResource {
   public Map<InstancePartitionsType, InstancePartitions> assignInstances(
       @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|CONSUMING|COMPLETED") @QueryParam("type") @Nullable InstancePartitionsType instancePartitionsType,
-      @ApiParam(value = "Whether to do dry-run") @DefaultValue("false") @QueryParam("dryRun") boolean dryRun) {
+      @ApiParam(value = "Whether to do dry-run") @DefaultValue("false") @QueryParam("dryRun") boolean dryRun,
+      @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, tableName, _accessControlFactory, LOGGER);
+
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
     List<InstanceConfig> instanceConfigs = _resourceManager.getAllHelixInstanceConfigs();
 
@@ -200,7 +210,10 @@ public class PinotInstanceAssignmentRestletResource {
   @Path("/tables/{tableName}/instancePartitions")
   @ApiOperation(value = "Create/update the instance partitions")
   public Map<InstancePartitionsType, InstancePartitions> setInstancePartitions(
-      @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName, String instancePartitionsStr) {
+      @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName, String instancePartitionsStr,
+      @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, tableName, _accessControlFactory, LOGGER);
+
     InstancePartitions instancePartitions;
     try {
       instancePartitions = JsonUtils.stringToObject(instancePartitionsStr, InstancePartitions.class);
@@ -239,7 +252,9 @@ public class PinotInstanceAssignmentRestletResource {
   @ApiOperation(value = "Remove the instance partitions")
   public SuccessResponse removeInstancePartitions(
       @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|CONSUMING|COMPLETED") @QueryParam("type") @Nullable InstancePartitionsType instancePartitionsType) {
+      @ApiParam(value = "OFFLINE|CONSUMING|COMPLETED") @QueryParam("type") @Nullable InstancePartitionsType instancePartitionsType,
+      @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, tableName, _accessControlFactory, LOGGER);
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (tableType != TableType.REALTIME && (instancePartitionsType == InstancePartitionsType.OFFLINE
@@ -275,7 +290,9 @@ public class PinotInstanceAssignmentRestletResource {
       @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|CONSUMING|COMPLETED") @QueryParam("type") @Nullable InstancePartitionsType instancePartitionsType,
       @ApiParam(value = "Old instance to be replaced", required = true) @QueryParam("oldInstanceId") String oldInstanceId,
-      @ApiParam(value = "New instance to replace with", required = true) @QueryParam("newInstanceId") String newInstanceId) {
+      @ApiParam(value = "New instance to replace with", required = true) @QueryParam("newInstanceId") String newInstanceId,
+      @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, tableName, _accessControlFactory, LOGGER);
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
         getInstancePartitions(tableName, instancePartitionsType);
     Iterator<InstancePartitions> iterator = instancePartitionsMap.values().iterator();

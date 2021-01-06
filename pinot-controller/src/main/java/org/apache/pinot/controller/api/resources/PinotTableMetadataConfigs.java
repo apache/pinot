@@ -27,8 +27,12 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.controller.api.access.AccessControlFactory;
+import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.util.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -46,16 +50,21 @@ public class PinotTableMetadataConfigs {
   @Inject
   PinotHelixResourceManager pinotHelixResourceManager;
 
+  @Inject
+  AccessControlFactory _accessControlFactory;
+
   @Deprecated
   @PUT
   @Path("/tables/{tableName}/metadataConfigs")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update table metadata", notes = "Updates table configuration")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"), @ApiResponse(code = 404, message = "Table not found")})
-  public SuccessResponse updateTableMetadata(@PathParam("tableName") String tableName, String tableConfigString) {
+  public SuccessResponse updateTableMetadata(@PathParam("tableName") String tableName, String tableConfigString,
+      @Context HttpHeaders httpHeaders) {
     TableConfig tableConfig;
     try {
       tableConfig = JsonUtils.stringToObject(tableConfigString, TableConfig.class);
+      AccessControlUtils.validateWritePermission(httpHeaders, tableConfig.getTableName(), _accessControlFactory, LOGGER);
       Schema schema = pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {

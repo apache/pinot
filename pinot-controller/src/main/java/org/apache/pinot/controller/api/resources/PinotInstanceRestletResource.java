@@ -36,10 +36,14 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.utils.config.InstanceUtils;
+import org.apache.pinot.controller.api.access.AccessControlFactory;
+import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.spi.config.instance.Instance;
@@ -55,6 +59,9 @@ public class PinotInstanceRestletResource {
 
   @Inject
   PinotHelixResourceManager pinotHelixResourceManager;
+
+  @Inject
+  AccessControlFactory _accessControlFactory;
 
   public static class Instances {
     List<String> instances;
@@ -121,7 +128,8 @@ public class PinotInstanceRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Create a new instance", consumes = MediaType.APPLICATION_JSON, notes = "Creates a new instance with given instance config")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 409, message = "Instance already exists"), @ApiResponse(code = 500, message = "Internal error")})
-  public SuccessResponse addInstance(Instance instance) {
+  public SuccessResponse addInstance(Instance instance, @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, _accessControlFactory, LOGGER);
     LOGGER.info("Instance creation request received for instance: {}", InstanceUtils.getHelixInstanceId(instance));
     if (!pinotHelixResourceManager.addInstance(instance).isSuccessful()) {
       throw new ControllerApplicationException(LOGGER, "Instance already exists", Response.Status.CONFLICT);
@@ -137,7 +145,8 @@ public class PinotInstanceRestletResource {
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 400, message = "Bad Request"), @ApiResponse(code = 404, message = "Instance not found"), @ApiResponse(code = 409, message = "Instance cannot be dropped"), @ApiResponse(code = 500, message = "Internal error")})
   public SuccessResponse toggleInstanceState(
       @ApiParam(value = "Instance name", required = true, example = "Server_a.b.com_20000 | Broker_my.broker.com_30000") @PathParam("instanceName") String instanceName,
-      String state) {
+      String state, @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, _accessControlFactory, LOGGER);
     if (!pinotHelixResourceManager.instanceExists(instanceName)) {
       throw new ControllerApplicationException(LOGGER, "Instance " + instanceName + " not found",
           Response.Status.NOT_FOUND);
@@ -177,7 +186,9 @@ public class PinotInstanceRestletResource {
   @ApiOperation(value = "Drop an instance", notes = "Drop an instance")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Instance not found"), @ApiResponse(code = 409, message = "Instance cannot be dropped"), @ApiResponse(code = 500, message = "Internal error")})
   public SuccessResponse dropInstance(
-      @ApiParam(value = "Instance name", required = true, example = "Server_a.b.com_20000 | Broker_my.broker.com_30000") @PathParam("instanceName") String instanceName) {
+      @ApiParam(value = "Instance name", required = true, example = "Server_a.b.com_20000 | Broker_my.broker.com_30000") @PathParam("instanceName") String instanceName,
+      @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, _accessControlFactory, LOGGER);
     if (!pinotHelixResourceManager.instanceExists(instanceName)) {
       throw new ControllerApplicationException(LOGGER, "Instance " + instanceName + " not found",
           Response.Status.NOT_FOUND);
@@ -199,7 +210,8 @@ public class PinotInstanceRestletResource {
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal error")})
   public SuccessResponse updateInstance(
       @ApiParam(value = "Instance name", required = true, example = "Server_a.b.com_20000 | Broker_my.broker.com_30000") @PathParam("instanceName") String instanceName,
-      Instance instance) {
+      Instance instance, @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, _accessControlFactory, LOGGER);
     LOGGER.info("Instance update request received for instance: {}", instanceName);
     PinotResourceManagerResponse response = pinotHelixResourceManager.updateInstance(instanceName, instance);
     if (!response.isSuccessful()) {
@@ -217,7 +229,9 @@ public class PinotInstanceRestletResource {
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal error")})
   public SuccessResponse updateInstanceTags(
       @ApiParam(value = "Instance name", required = true, example = "Server_a.b.com_20000 | Broker_my.broker.com_30000") @PathParam("instanceName") String instanceName,
-      @ApiParam(value = "Comma separated tags list", required = true) @QueryParam("tags") String tags) {
+      @ApiParam(value = "Comma separated tags list", required = true) @QueryParam("tags") String tags,
+      @Context HttpHeaders httpHeaders) {
+    AccessControlUtils.validateWritePermission(httpHeaders, _accessControlFactory, LOGGER);
     LOGGER.info("Instance update request received for instance: {} and tags: {}", instanceName, tags);
     if (tags == null) {
       throw new ControllerApplicationException(LOGGER, "Must provide tags to update", Response.Status.BAD_REQUEST);
