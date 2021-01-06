@@ -23,6 +23,7 @@ import io.swagger.jaxrs.config.BeanConfig;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.Optional;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.routing.RoutingManager;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -37,9 +38,6 @@ import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
-
-import static org.apache.pinot.common.utils.CommonConstants.Broker.*;
-import static org.apache.pinot.common.utils.CommonConstants.HTTPS_PROTOCOL;
 
 
 public class BrokerAdminApiApplication extends ResourceConfig {
@@ -67,18 +65,16 @@ public class BrokerAdminApiApplication extends ResourceConfig {
   public void start(PinotConfiguration brokerConf) {
     int brokerQueryPort = brokerConf.getProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT,
         CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT);
-    String brokerQueryProtocol = brokerConf.getProperty(CONFIG_OF_BROKER_CLIENT_PROTOCOL,
-        DEFAULT_BROKER_CLIENT_PROTOCOL);
 
     Preconditions.checkArgument(brokerQueryPort > 0);
-    _baseUri = URI.create(String.format("%s://0.0.0.0:%d/", brokerQueryProtocol, brokerQueryPort));
+    _baseUri = URI.create(String.format("%s://0.0.0.0:%d/", getBrokerClientProtocol(brokerConf), brokerQueryPort));
 
     _httpServer = buildHttpsServer(brokerConf);
     setupSwagger();
   }
 
   private HttpServer buildHttpsServer(PinotConfiguration brokerConf) {
-    boolean isSecure = HTTPS_PROTOCOL.equals(brokerConf.getProperty(CONFIG_OF_BROKER_CLIENT_PROTOCOL));
+    boolean isSecure = CommonConstants.HTTPS_PROTOCOL.equals(getBrokerClientProtocol(brokerConf));
 
     if (isSecure) {
       return GrizzlyHttpServerFactory.createHttpServer(_baseUri, this, true, buildSSLConfig(brokerConf));
@@ -90,16 +86,27 @@ public class BrokerAdminApiApplication extends ResourceConfig {
   private SSLEngineConfigurator buildSSLConfig(PinotConfiguration brokerConf) {
     SSLContextConfigurator sslContextConfigurator = new SSLContextConfigurator();
 
-    sslContextConfigurator.setKeyStoreFile(brokerConf.getProperty(CONFIG_OF_BROKER_CLIENT_TLS_KEYSTORE_PATH));
-    sslContextConfigurator.setKeyStorePass(brokerConf.getProperty(CONFIG_OF_BROKER_CLIENT_TLS_KEYSTORE_PASSWORD));
-    sslContextConfigurator.setTrustStoreFile(brokerConf.getProperty(CONFIG_OF_BROKER_CLIENT_TLS_TRUSTSTORE_PATH));
-    sslContextConfigurator.setTrustStorePass(brokerConf.getProperty(CONFIG_OF_BROKER_CLIENT_TLS_TRUSTSTORE_PASSWORD));
+    sslContextConfigurator.setKeyStoreFile(brokerConf.getProperty(
+        CommonConstants.Broker.CONFIG_OF_BROKER_CLIENT_TLS_KEYSTORE_PATH));
+    sslContextConfigurator.setKeyStorePass(brokerConf.getProperty(
+        CommonConstants.Broker.CONFIG_OF_BROKER_CLIENT_TLS_KEYSTORE_PASSWORD));
+    sslContextConfigurator.setTrustStoreFile(brokerConf.getProperty(
+        CommonConstants.Broker.CONFIG_OF_BROKER_CLIENT_TLS_TRUSTSTORE_PATH));
+    sslContextConfigurator.setTrustStorePass(brokerConf.getProperty(
+        CommonConstants.Broker.CONFIG_OF_BROKER_CLIENT_TLS_TRUSTSTORE_PASSWORD));
 
-    boolean requiresClientAuth = brokerConf.getProperty(CONFIG_OF_BROKER_CLIENT_TLS_REQUIRES_CLIENT_AUTH,
-        DEFAULT_BROKER_CLIENT_TLS_REQUIRES_CLIENT_AUTH);
+    boolean requiresClientAuth = brokerConf.getProperty(
+        CommonConstants.Broker.CONFIG_OF_BROKER_CLIENT_TLS_CLIENT_AUTH,
+        CommonConstants.Broker.DEFAULT_BROKER_CLIENT_TLS_CLIENT_AUTH);
 
     return new SSLEngineConfigurator(sslContextConfigurator).setClientMode(false)
         .setWantClientAuth(requiresClientAuth).setEnabledProtocols(new String[] { "TLSv1.2" });
+  }
+
+  private static String getBrokerClientProtocol(PinotConfiguration brokerConf) {
+    return Optional.ofNullable(brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_CLIENT_PROTOCOL))
+        .filter(CommonConstants.HTTPS_PROTOCOL::equals)
+        .orElse(CommonConstants.HTTP_PROTOCOL);
   }
 
   private void setupSwagger() {

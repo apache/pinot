@@ -178,13 +178,12 @@ public class CommonConstants {
     public static final int DEFAULT_BROKER_GROUPBY_TRIM_THRESHOLD = 1_000_000;
 
     public static final String CONFIG_OF_BROKER_CLIENT_PROTOCOL = "pinot.broker.client.protocol";
-    public static final String DEFAULT_BROKER_CLIENT_PROTOCOL = "http";
     public static final String CONFIG_OF_BROKER_CLIENT_TLS_KEYSTORE_PATH = "pinot.broker.client.tls.keystore.path";
     public static final String CONFIG_OF_BROKER_CLIENT_TLS_KEYSTORE_PASSWORD = "pinot.broker.client.tls.keystore.password";
     public static final String CONFIG_OF_BROKER_CLIENT_TLS_TRUSTSTORE_PATH = "pinot.broker.client.tls.truststore.path";
     public static final String CONFIG_OF_BROKER_CLIENT_TLS_TRUSTSTORE_PASSWORD = "pinot.broker.client.tls.truststore.password";
-    public static final String CONFIG_OF_BROKER_CLIENT_TLS_REQUIRES_CLIENT_AUTH = "pinot.broker.client.tls.requires_client_auth";
-    public static final boolean DEFAULT_BROKER_CLIENT_TLS_REQUIRES_CLIENT_AUTH = false;
+    public static final String CONFIG_OF_BROKER_CLIENT_TLS_CLIENT_AUTH = "pinot.broker.client.tls.client.auth";
+    public static final boolean DEFAULT_BROKER_CLIENT_TLS_CLIENT_AUTH = false;
 
     public static class Request {
       public static final String PQL = "pql";
