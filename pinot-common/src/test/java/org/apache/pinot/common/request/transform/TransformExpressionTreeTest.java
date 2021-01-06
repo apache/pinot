@@ -94,6 +94,15 @@ public class TransformExpressionTreeTest {
   }
 
   @Test
+  public void testEscapeQuotes() {
+    String expression = "foo('a''b')";
+    TransformExpressionTree expressionTree = TransformExpressionTree.compileToExpressionTree(expression);
+    Assert.assertEquals(expressionTree.getChildren().get(0),
+        new TransformExpressionTree(TransformExpressionTree.ExpressionType.LITERAL, "a'b", null));
+    Assert.assertEquals(TransformExpressionTree.compileToExpressionTree(expressionTree.toString()), expressionTree);
+  }
+
+  @Test
   public void testUpperCase() {
     String expression = "foO(bAr('a',FOoBar(b,'c',123)),d)";
     Assert.assertTrue(equalsWithStandardExpressionTree(TransformExpressionTree.compileToExpressionTree(expression)));
@@ -103,7 +112,7 @@ public class TransformExpressionTreeTest {
   public void testNoArgFunction() {
     String expression = "now()";
     TransformExpressionTree expressionTree = TransformExpressionTree.compileToExpressionTree(expression);
-    Assert.assertEquals(expressionTree.isFunction(), true);
+    Assert.assertTrue(expressionTree.isFunction());
     Assert.assertEquals(expressionTree.getValue(), "now");
     Assert.assertEquals(expressionTree.getChildren().size(), 0);
   }

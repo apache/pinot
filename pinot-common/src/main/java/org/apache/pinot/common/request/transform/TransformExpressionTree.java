@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.pql.parsers.pql2.ast.AstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
@@ -224,7 +225,7 @@ public class TransformExpressionTree {
       case IDENTIFIER:
         return _value;
       case LITERAL:
-        return "\'" + _value + "\'";
+        return "'" + StringUtils.replace(_value, "'", "''") + "'";
       default:
         throw new IllegalStateException();
     }
