@@ -46,6 +46,7 @@ import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -63,11 +64,15 @@ public class PinotQueryResource {
   private static final Pql2Compiler PQL_QUERY_COMPILER = new Pql2Compiler();
   private static final CalciteSqlCompiler SQL_QUERY_COMPILER = new CalciteSqlCompiler();
   private static final Random RANDOM = new Random();
+
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
 
   @Inject
   AccessControlFactory _accessControlFactory;
+
+  @Inject
+  ControllerConf _controllerConf;
 
   @Deprecated
   @POST
@@ -198,7 +203,7 @@ public class PinotQueryResource {
     }
 
     // TODO extract protocol from Helix
-    String protocol = "http";
+    String protocol = _controllerConf.getControllerBrokerProtocol();
     String hostNameWithPrefix = instanceConfig.getHostName();
     String url = getQueryURL(protocol, hostNameWithPrefix.substring(hostNameWithPrefix.indexOf("_") + 1),
         instanceConfig.getPort(), querySyntax);

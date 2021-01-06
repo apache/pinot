@@ -29,11 +29,17 @@ import java.io.OutputStream;
 import java.io.Reader;
 import java.net.InetAddress;
 import java.net.URL;
+import java.security.GeneralSecurityException;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.NetUtil;
@@ -139,6 +145,7 @@ public class QuickstartRunner {
       prop.put("controller.helix.cluster.name", "QuickStartCluster");
       prop.put("controller.zk.str", ZK_ADDRESS);
 
+      prop.put("controller.broker.protocol", "https");
       prop.put("controller.access.protocols", "https");
       prop.put("controller.access.protocols.https.host", "0.0.0.0");
       prop.put("controller.access.protocols.https.port", String.valueOf(9443 + i));
@@ -233,6 +240,30 @@ public class QuickstartRunner {
 
   public void startAll()
       throws Exception {
+    // Create a trust manager that does not validate certificate chains
+    TrustManager[] trustAllCerts = new TrustManager[] {
+        new X509TrustManager() {
+          public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+            return new X509Certificate[0];
+          }
+          public void checkClientTrusted(
+              java.security.cert.X509Certificate[] certs, String authType) {
+          }
+          public void checkServerTrusted(
+              java.security.cert.X509Certificate[] certs, String authType) {
+          }
+        }
+    };
+
+    // Install the all-trusting trust manager
+    try {
+      SSLContext sc = SSLContext.getInstance("SSL");
+      sc.init(null, trustAllCerts, new java.security.SecureRandom());
+      HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
+    } catch (GeneralSecurityException ignore) {
+      // ignore
+    }
+
     registerDefaultPinotFS();
     startZookeeper();
     startControllers();
