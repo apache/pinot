@@ -22,10 +22,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
-
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.listeners.ListenerConfig;
-import org.apache.pinot.controller.api.listeners.TlsConfiguration;
+import org.apache.pinot.core.transport.TlsConfig;
+import org.apache.pinot.core.util.TlsUtils;
 
 
 /**
@@ -47,7 +48,8 @@ public abstract class ListenerConfigUtil {
 
     if (controllerConf.getControllerPort() != null) {
       listenerConfigs.add(
-          new ListenerConfig("http", "0.0.0.0", Integer.valueOf(controllerConf.getControllerPort()), "http", null));
+          new ListenerConfig("http", "0.0.0.0", Integer.parseInt(controllerConf.getControllerPort()),
+              "http", new TlsConfig()));
     }
 
     listenerConfigs.addAll(controllerConf.getControllerAccessProtocols().stream()
@@ -59,26 +61,13 @@ public abstract class ListenerConfigUtil {
     return listenerConfigs;
   }
 
-  private static Optional<TlsConfiguration> buildTlsConfiguration(String protocol, ControllerConf controllerConf) {
-    return Optional.ofNullable(controllerConf.getControllerAccessProtocolProperty(protocol, "tls.keystore.path"))
-
-        .map(keystore -> buildTlsConfiguration(protocol, keystore, controllerConf));
-  }
-
-  private static TlsConfiguration buildTlsConfiguration(String protocol, String keystore,
-      ControllerConf controllerConf) {
-    return new TlsConfiguration(keystore,
-        controllerConf.getControllerAccessProtocolProperty(protocol, "tls.keystore.password"),
-        controllerConf.getControllerAccessProtocolProperty(protocol, "tls.truststore.path"),
-        controllerConf.getControllerAccessProtocolProperty(protocol, "tls.truststore.password"), Boolean.parseBoolean(
-            controllerConf.getControllerAccessProtocolProperty(protocol, "tls.requires_client_auth", "false")));
-  }
-
   private static ListenerConfig buildListenerConfig(String protocol, ControllerConf controllerConf) {
+    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(controllerConf, "controller.access.protocols." + protocol);
+    tlsConfig.setEnabled(CommonConstants.HTTPS_PROTOCOL.equals(protocol));
+
     return new ListenerConfig(protocol,
         getHost(controllerConf.getControllerAccessProtocolProperty(protocol, "host", "0.0.0.0")),
-        getPort(controllerConf.getControllerAccessProtocolProperty(protocol, "port")), protocol,
-        buildTlsConfiguration(protocol, controllerConf).orElse(null));
+        getPort(controllerConf.getControllerAccessProtocolProperty(protocol, "port")), protocol, tlsConfig);
   }
 
   private static String getHost(String configuredHost) {

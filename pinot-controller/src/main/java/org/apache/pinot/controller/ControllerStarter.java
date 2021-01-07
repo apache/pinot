@@ -83,6 +83,7 @@ import org.apache.pinot.controller.validation.OfflineSegmentIntervalChecker;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
 import org.apache.pinot.core.periodictask.PeriodicTask;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
+import org.apache.pinot.core.util.TlsUtils;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -412,6 +413,12 @@ public class ControllerStarter implements ServiceStartable {
         bind(_leadControllerManager).to(LeadControllerManager.class);
       }
     });
+
+    // install default SSL context if necessary
+    if (CommonConstants.HTTPS_PROTOCOL.equals(_config.getProperty(ControllerConf.CONTROLLER_BROKER_PROTOCOL))) {
+      LOGGER.info("Installing default SSL context for broker relay requests");
+      TlsUtils.installDefaultSSLSocketFactory(TlsUtils.extractTlsConfig(_config, "controller.broker"));
+    }
 
     _adminApp.start(_listenerConfigs);
 

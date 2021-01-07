@@ -121,4 +121,8 @@ public class ServerConf {
   public String getMetricsPrefix() {
     return _serverConf.getProperty(PINOT_SERVER_METRICS_PREFIX, Server.DEFAULT_METRICS_PREFIX);
   }
+
+  public PinotConfiguration getPinotConfig() {
+    return _serverConf;
+  }
 }

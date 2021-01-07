@@ -29,6 +29,8 @@ import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.routing.RoutingManager;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.core.transport.TlsConfig;
+import org.apache.pinot.core.util.TlsUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpHandler;
@@ -73,7 +75,6 @@ public class BrokerAdminApiApplication extends ResourceConfig {
 
     Preconditions.checkArgument(brokerQueryPort > 0, "broker client port must be > 0");
     _baseUri = URI.create(String.format("%s://0.0.0.0:%d/", getBrokerClientProtocol(brokerConf), brokerQueryPort));
-
     _httpServer = buildHttpsServer(brokerConf);
     setupSwagger();
   }
@@ -81,31 +82,26 @@ public class BrokerAdminApiApplication extends ResourceConfig {
   private HttpServer buildHttpsServer(PinotConfiguration brokerConf) {
     boolean isSecure = CommonConstants.HTTPS_PROTOCOL.equals(getBrokerClientProtocol(brokerConf));
 
+    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(brokerConf, "pinot.broker.client");
+    tlsConfig.setEnabled(isSecure);
+
     if (isSecure) {
-      return GrizzlyHttpServerFactory.createHttpServer(_baseUri, this, true, buildSSLConfig(brokerConf));
+      return GrizzlyHttpServerFactory.createHttpServer(_baseUri, this, true, buildSSLConfig(tlsConfig));
     }
 
     return GrizzlyHttpServerFactory.createHttpServer(_baseUri, this);
   }
 
-  private SSLEngineConfigurator buildSSLConfig(PinotConfiguration brokerConf) {
+  private SSLEngineConfigurator buildSSLConfig(TlsConfig tlsConfig) {
     SSLContextConfigurator sslContextConfigurator = new SSLContextConfigurator();
 
-    sslContextConfigurator.setKeyStoreFile(brokerConf.getProperty(
-        CommonConstants.Broker.CONFIG_OF_BROKER_CLIENT_TLS_KEYSTORE_PATH));
-    sslContextConfigurator.setKeyStorePass(brokerConf.getProperty(
-        CommonConstants.Broker.CONFIG_OF_BROKER_CLIENT_TLS_KEYSTORE_PASSWORD));
-    sslContextConfigurator.setTrustStoreFile(brokerConf.getProperty(
-        CommonConstants.Broker.CONFIG_OF_BROKER_CLIENT_TLS_TRUSTSTORE_PATH));
-    sslContextConfigurator.setTrustStorePass(brokerConf.getProperty(
-        CommonConstants.Broker.CONFIG_OF_BROKER_CLIENT_TLS_TRUSTSTORE_PASSWORD));
-
-    boolean requiresClientAuth = brokerConf.getProperty(
-        CommonConstants.Broker.CONFIG_OF_BROKER_CLIENT_TLS_CLIENT_AUTH,
-        CommonConstants.Broker.DEFAULT_BROKER_CLIENT_TLS_CLIENT_AUTH);
+    sslContextConfigurator.setKeyStoreFile(tlsConfig.getKeyStorePath());
+    sslContextConfigurator.setKeyStorePass(tlsConfig.getKeyStorePassword());
+    sslContextConfigurator.setTrustStoreFile(tlsConfig.getTrustStorePath());
+    sslContextConfigurator.setTrustStorePass(tlsConfig.getTrustStorePassword());
 
     return new SSLEngineConfigurator(sslContextConfigurator).setClientMode(false)
-        .setWantClientAuth(requiresClientAuth).setEnabledProtocols(new String[] { "TLSv1.2" });
+        .setNeedClientAuth(tlsConfig.isClientAuth()).setEnabledProtocols(new String[] { "TLSv1.2" });
   }
 
   private static String getBrokerClientProtocol(PinotConfiguration brokerConf) {

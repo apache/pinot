@@ -174,7 +174,7 @@ public class ListenerConfigUtilTest {
     Assert.assertEquals(legacyListener.getHost(), "0.0.0.0");
     Assert.assertEquals(legacyListener.getPort(), 9000);
     Assert.assertEquals(legacyListener.getProtocol(), "http");
-    Assert.assertNull(legacyListener.getTlsConfiguration());
+    Assert.assertFalse(legacyListener.getTlsConfig().isEnabled());
   }
 
   private void assertHttpListener(ListenerConfig httpsListener, String host, int port) {
@@ -182,7 +182,7 @@ public class ListenerConfigUtilTest {
     Assert.assertEquals(httpsListener.getHost(), host);
     Assert.assertEquals(httpsListener.getPort(), port);
     Assert.assertEquals(httpsListener.getProtocol(), "http");
-    Assert.assertNull(httpsListener.getTlsConfiguration());
+    Assert.assertFalse(httpsListener.getTlsConfig().isEnabled());
   }
 
   private void assertHttpsListener(ListenerConfig httpsListener, String host, int port) {
@@ -190,12 +190,13 @@ public class ListenerConfigUtilTest {
     Assert.assertEquals(httpsListener.getHost(), host);
     Assert.assertEquals(httpsListener.getPort(), port);
     Assert.assertEquals(httpsListener.getProtocol(), "https");
-    Assert.assertNotNull(httpsListener.getTlsConfiguration());
-    Assert.assertEquals(httpsListener.getTlsConfiguration().getKeyStorePassword(), "a-password");
-    Assert.assertEquals(httpsListener.getTlsConfiguration().getKeyStorePath(), "/some-keystore-path");
-    Assert.assertEquals(httpsListener.getTlsConfiguration().isRequiresClientAuth(), true);
-    Assert.assertEquals(httpsListener.getTlsConfiguration().getTrustStorePassword(), "a-password");
-    Assert.assertEquals(httpsListener.getTlsConfiguration().getTrustStorePath(), "/some-truststore-path");
+    Assert.assertNotNull(httpsListener.getTlsConfig());
+    Assert.assertTrue(httpsListener.getTlsConfig().isEnabled());
+    Assert.assertEquals(httpsListener.getTlsConfig().getKeyStorePassword(), "a-password");
+    Assert.assertEquals(httpsListener.getTlsConfig().getKeyStorePath(), "/some-keystore-path");
+    Assert.assertTrue(httpsListener.getTlsConfig().isClientAuth());
+    Assert.assertEquals(httpsListener.getTlsConfig().getTrustStorePassword(), "a-password");
+    Assert.assertEquals(httpsListener.getTlsConfig().getTrustStorePath(), "/some-truststore-path");
   }
 
   private void configureHttpsProperties(ControllerConf controllerConf, String host, int port) {
@@ -205,7 +206,7 @@ public class ListenerConfigUtilTest {
     controllerConf.setProperty("controller.access.protocols.https.port", String.valueOf(port));
     controllerConf.setProperty("controller.access.protocols.https.tls.keystore.password", "a-password");
     controllerConf.setProperty("controller.access.protocols.https.tls.keystore.path", "/some-keystore-path");
-    controllerConf.setProperty("controller.access.protocols.https.tls.requires_client_auth", "true");
+    controllerConf.setProperty("controller.access.protocols.https.tls.client.auth", "true");
     controllerConf.setProperty("controller.access.protocols.https.tls.truststore.password", "a-password");
     controllerConf.setProperty("controller.access.protocols.https.tls.truststore.path", "/some-truststore-path");
   }

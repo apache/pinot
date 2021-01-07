@@ -48,10 +48,29 @@ public class QueryRouter {
   private final ServerChannels _serverChannels;
   private final ConcurrentHashMap<Long, AsyncQueryResponse> _asyncQueryResponseMap = new ConcurrentHashMap<>();
 
+  /**
+   * Create an unsecured query router
+   *
+   * @param brokerId broker id
+   * @param brokerMetrics broker metrics
+   */
   public QueryRouter(String brokerId, BrokerMetrics brokerMetrics) {
     _brokerId = brokerId;
     _brokerMetrics = brokerMetrics;
     _serverChannels = new ServerChannels(this, brokerMetrics);
+  }
+
+  /**
+   * Create a query router with TLS config
+   *
+   * @param brokerId broker id
+   * @param brokerMetrics broker metrics
+   * @param tlsConfig TLS config
+   */
+  public QueryRouter(String brokerId, BrokerMetrics brokerMetrics, TlsConfig tlsConfig) {
+    _brokerId = brokerId;
+    _brokerMetrics = brokerMetrics;
+    _serverChannels = new ServerChannels(this, brokerMetrics, tlsConfig);
   }
 
   public AsyncQueryResponse submitQuery(long requestId, String rawTableName,

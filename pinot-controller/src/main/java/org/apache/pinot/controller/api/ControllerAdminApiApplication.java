@@ -18,23 +18,20 @@
  */
 package org.apache.pinot.controller.api;
 
+import com.google.common.base.Preconditions;
+import io.swagger.jaxrs.config.BeanConfig;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.net.UnknownHostException;
-import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
-
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
-
-import org.apache.pinot.controller.api.listeners.ListenerConfig;
-import org.apache.pinot.controller.api.listeners.TlsConfiguration;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.controller.api.listeners.ListenerConfig;
+import org.apache.pinot.core.transport.TlsConfig;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.grizzly.http.server.NetworkListener;
@@ -49,10 +46,6 @@ import org.glassfish.jersey.process.JerseyProcessingUncaughtExceptionHandler;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.base.Preconditions;
-
-import io.swagger.jaxrs.config.BeanConfig;
 
 
 public class ControllerAdminApiApplication extends ResourceConfig {
@@ -76,16 +69,16 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     // property("jersey.config.server.tracing.threshold", "VERBOSE");
   }
 
-  private SSLEngineConfigurator buildSSLEngineConfigurator(TlsConfiguration tlsConfiguration) {
+  private SSLEngineConfigurator buildSSLEngineConfigurator(TlsConfig tlsConfig) {
     SSLContextConfigurator sslContextConfigurator = new SSLContextConfigurator();
 
-    sslContextConfigurator.setKeyStoreFile(tlsConfiguration.getKeyStorePath());
-    sslContextConfigurator.setKeyStorePass(tlsConfiguration.getKeyStorePassword());
-    sslContextConfigurator.setTrustStoreFile(tlsConfiguration.getTrustStorePath());
-    sslContextConfigurator.setTrustStorePass(tlsConfiguration.getTrustStorePassword());
+    sslContextConfigurator.setKeyStoreFile(tlsConfig.getKeyStorePath());
+    sslContextConfigurator.setKeyStorePass(tlsConfig.getKeyStorePassword());
+    sslContextConfigurator.setTrustStoreFile(tlsConfig.getTrustStorePath());
+    sslContextConfigurator.setTrustStorePass(tlsConfig.getTrustStorePassword());
 
     return new SSLEngineConfigurator(sslContextConfigurator).setClientMode(false)
-        .setWantClientAuth(tlsConfiguration.isRequiresClientAuth()).setEnabledProtocols(new String[] { "TLSv1.2 " });
+        .setNeedClientAuth(tlsConfig.isClientAuth()).setEnabledProtocols(new String[] { "TLSv1.2" });
   }
 
   public void registerBinder(AbstractBinder binder) {
@@ -100,10 +93,11 @@ public class ControllerAdminApiApplication extends ResourceConfig {
         .setThreadFactory(new ThreadFactoryBuilder().setNameFormat("grizzly-http-server-%d")
             .setUncaughtExceptionHandler(new JerseyProcessingUncaughtExceptionHandler()).build());
 
-    listener.setSecure(listenerConfig.getTlsConfiguration() != null);
-    if (listener.isSecure()) {
-      listener.setSSLEngineConfig(buildSSLEngineConfigurator(listenerConfig.getTlsConfiguration()));
+    if (listenerConfig.getTlsConfig().isEnabled()) {
+      listener.setSecure(true);
+      listener.setSSLEngineConfig(buildSSLEngineConfigurator(listenerConfig.getTlsConfig()));
     }
+
     httpServer.addListener(listener);
   }
 

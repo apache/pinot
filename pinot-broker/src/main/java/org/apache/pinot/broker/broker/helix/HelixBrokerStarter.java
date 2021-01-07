@@ -60,6 +60,8 @@ import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.TableCache;
+import org.apache.pinot.core.transport.TlsConfig;
+import org.apache.pinot.core.util.TlsUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
@@ -238,9 +240,11 @@ public class HelixBrokerStarter implements ServiceStartable {
     // Initialize FunctionRegistry before starting the broker request handler
     FunctionRegistry.init();
     TableCache tableCache = new TableCache(_propertyStore, caseInsensitive);
+    // Configure TLS
+    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(_brokerConf, "pinot.broker.netty");
     _brokerRequestHandler =
         new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory, queryQuotaManager,
-            tableCache, _brokerMetrics);
+            tableCache, _brokerMetrics, tlsConfig);
 
     int brokerQueryPort = _brokerConf.getProperty(Helix.KEY_OF_BROKER_QUERY_PORT, Helix.DEFAULT_BROKER_QUERY_PORT);
     LOGGER.info("Starting broker admin application on port: {}", brokerQueryPort);

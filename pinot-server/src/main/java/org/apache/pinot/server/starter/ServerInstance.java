@@ -34,7 +34,9 @@ import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.core.query.scheduler.QuerySchedulerFactory;
 import org.apache.pinot.core.transport.QueryServer;
+import org.apache.pinot.core.transport.TlsConfig;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
+import org.apache.pinot.core.util.TlsUtils;
 import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
@@ -90,10 +92,15 @@ public class ServerInstance {
         QuerySchedulerFactory.create(serverConf.getSchedulerConfig(), _queryExecutor, _serverMetrics, _latestQueryTime);
 
     int nettyPort = serverConf.getNettyPort();
-    LOGGER.info("Initializing Netty query server on port: {}", nettyPort);
-    _nettyQueryServer = new QueryServer(nettyPort, _queryScheduler, _serverMetrics);
+    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(serverConf.getPinotConfig(), "pinot.server.netty");
+    LOGGER.info("Initializing Netty query server on port: {} with tls: {}", nettyPort, tlsConfig.isEnabled());
+    _nettyQueryServer = new QueryServer(nettyPort, _queryScheduler, _serverMetrics, tlsConfig);
 
     if (serverConf.isEnableGrpcServer()) {
+      if (tlsConfig.isEnabled()) {
+        LOGGER.warn("gRPC query server does not support TLS yet");
+      }
+
       int grpcPort = serverConf.getGrpcPort();
       LOGGER.info("Initializing gRPC query server on port: {}", grpcPort);
       _grpcQueryServer = new GrpcQueryServer(grpcPort, _queryExecutor, _serverMetrics);
