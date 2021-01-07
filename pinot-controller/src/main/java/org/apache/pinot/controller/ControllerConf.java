@@ -46,6 +46,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final String CONTROLLER_VIP_PORT = "controller.vip.port";
   public static final String CONTROLLER_VIP_PROTOCOL = "controller.vip.protocol";
   public static final String CONTROLLER_BROKER_PROTOCOL = "controller.broker.protocol";
+  public static final String CONTROLLER_BROKER_PREFIX = "controller.broker";
   public static final String CONTROLLER_HOST = "controller.host";
   public static final String CONTROLLER_PORT = "controller.port";
   public static final String CONTROLLER_ACCESS_PROTOCOLS = "controller.access.protocols";

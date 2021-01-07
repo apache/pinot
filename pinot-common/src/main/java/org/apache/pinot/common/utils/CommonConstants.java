@@ -178,12 +178,9 @@ public class CommonConstants {
     public static final int DEFAULT_BROKER_GROUPBY_TRIM_THRESHOLD = 1_000_000;
 
     public static final String CONFIG_OF_BROKER_CLIENT_PROTOCOL = "pinot.broker.client.protocol";
-    public static final String CONFIG_OF_BROKER_CLIENT_TLS_KEYSTORE_PATH = "pinot.broker.client.tls.keystore.path";
-    public static final String CONFIG_OF_BROKER_CLIENT_TLS_KEYSTORE_PASSWORD = "pinot.broker.client.tls.keystore.password";
-    public static final String CONFIG_OF_BROKER_CLIENT_TLS_TRUSTSTORE_PATH = "pinot.broker.client.tls.truststore.path";
-    public static final String CONFIG_OF_BROKER_CLIENT_TLS_TRUSTSTORE_PASSWORD = "pinot.broker.client.tls.truststore.password";
-    public static final String CONFIG_OF_BROKER_CLIENT_TLS_CLIENT_AUTH = "pinot.broker.client.tls.client.auth";
-    public static final boolean DEFAULT_BROKER_CLIENT_TLS_CLIENT_AUTH = false;
+
+    public static final String BROKER_CLIENT_PREFIX = "pinot.broker.client";
+    public static final String BROKER_NETTY_PREFIX = "pinot.broker.netty";
 
     public static class Request {
       public static final String PQL = "pql";
@@ -291,6 +288,8 @@ public class CommonConstants {
     public static final String DEFAULT_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE = "ALL";
 
     public static final String PINOT_SERVER_METRICS_PREFIX = "pinot.server.metrics.prefix";
+
+    public static final String SERVER_NETTY_PREFIX = "pinot.server.netty";
 
     public static class SegmentCompletionProtocol {
       public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.server.segment.uploader";

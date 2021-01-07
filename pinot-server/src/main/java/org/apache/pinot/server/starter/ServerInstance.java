@@ -27,6 +27,7 @@ import org.apache.helix.HelixManager;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.metrics.MetricsHelper;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
@@ -92,7 +93,7 @@ public class ServerInstance {
         QuerySchedulerFactory.create(serverConf.getSchedulerConfig(), _queryExecutor, _serverMetrics, _latestQueryTime);
 
     int nettyPort = serverConf.getNettyPort();
-    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(serverConf.getPinotConfig(), "pinot.server.netty");
+    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_NETTY_PREFIX);
     LOGGER.info("Initializing Netty query server on port: {} with tls: {}", nettyPort, tlsConfig.isEnabled());
     _nettyQueryServer = new QueryServer(nettyPort, _queryScheduler, _serverMetrics, tlsConfig);
 

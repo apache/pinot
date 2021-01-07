@@ -62,7 +62,8 @@ public abstract class ListenerConfigUtil {
   }
 
   private static ListenerConfig buildListenerConfig(String protocol, ControllerConf controllerConf) {
-    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(controllerConf, "controller.access.protocols." + protocol);
+    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(controllerConf,
+        ControllerConf.CONTROLLER_ACCESS_PROTOCOLS + "." + protocol);
     tlsConfig.setEnabled(CommonConstants.HTTPS_PROTOCOL.equals(protocol));
 
     return new ListenerConfig(protocol,
