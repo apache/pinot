@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.stream;
 
 import java.io.Closeable;
+import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -64,7 +65,7 @@ public interface StreamMetadataProvider extends Closeable {
    */
   default List<PartitionGroupInfo> getPartitionGroupInfoList(String clientId, StreamConfig streamConfig,
       List<PartitionGroupMetadata> currentPartitionGroupsMetadata, int timeoutMillis)
-      throws TimeoutException {
+      throws TimeoutException, IOException {
     int partitionCount = fetchPartitionCount(timeoutMillis);
     List<PartitionGroupInfo> newPartitionGroupInfoList = new ArrayList<>(partitionCount);
 
