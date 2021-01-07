@@ -519,6 +519,11 @@ public class PinotLLCRealtimeSegmentManager {
       PartitionGroupMetadata currentPartitionGroupMetadata = currentGroupIdToMetadata.get(newPartitionGroupId);
       if (currentPartitionGroupMetadata == null) { // not present in current state. New partition found.
         // make new segment
+        // FIXME: flushThreshold of segment is actually (configured threshold/numPartitions)
+        //  In Kinesis, with every split/merge, we get new partitions, and an old partition gets deactivated.
+        //  However, the getPartitionGroupInfo call returns ALL shards, regardless of whether they're active or not.
+        //  So our numPartitions will forever keep increasing.
+        // TODO: can the getPartitionGroupInfo return the active partitions only, based on the checkpoints passed in current?
         String newLLCSegmentName =
             setupNewPartitionGroup(tableConfig, streamConfig, partitionGroupInfo, newSegmentCreationTimeMs,
                 instancePartitions, numPartitions, numReplicas);
@@ -534,6 +539,11 @@ public class PinotLLCRealtimeSegmentManager {
           createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, newSegmentCreationTimeMs,
               committingSegmentDescriptor, committingSegmentZKMetadata, instancePartitions, numPartitions, numReplicas);
           newConsumingSegmentNames.add(newLLCSegmentName.getSegmentName());
+
+          // FIXME: a new CONSUMING segment is created even if EOL for this shard has been reached.
+          //  the logic in getPartitionGroupInfo to prevent returning of EOLed shards isn't working
+          //  OPTION: Since consumer knows about it, it can pass param in request/committingSegmentDescriptor "isEndOfShard"
+          //  We can set that in metadata for validation manager to skip these partitions
         }
       }
     }
