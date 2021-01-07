@@ -258,7 +258,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final String _tableNameWithType;
   private final List<String> _invertedIndexColumns;
   private final List<String> _textIndexColumns;
-  private final List<H3IndexColumn> _h3IndexColumns;
   private final List<String> _fstIndexColumns;
   private final List<String> _noDictionaryColumns;
   private final List<String> _varLengthDictionaryColumns;
@@ -1189,10 +1188,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     Set<String> textIndexColumns = indexLoadingConfig.getTextIndexColumns();
     _textIndexColumns = new ArrayList<>(textIndexColumns);
 
-    _h3IndexColumns = indexLoadingConfig.getH3IndexColumns();
-
     Set<String> fstIndexColumns = indexLoadingConfig.getFSTIndexColumns();
     _fstIndexColumns = new ArrayList<>(fstIndexColumns);
+
+    List<H3IndexColumn> h3IndexColumns = indexLoadingConfig.getH3IndexColumns();
 
     // Start new realtime segment
     String consumerDir = realtimeTableDataManager.getConsumerDir();
@@ -1203,7 +1202,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setNoDictionaryColumns(indexLoadingConfig.getNoDictionaryColumns())
             .setVarLengthDictionaryColumns(indexLoadingConfig.getVarLengthDictionaryColumns())
             .setInvertedIndexColumns(invertedIndexColumns).setTextIndexColumns(textIndexColumns)
-            .setFSTIndexColumns(fstIndexColumns).setH3IndexColumns(_h3IndexColumns)
+            .setFSTIndexColumns(fstIndexColumns).setH3IndexColumns(h3IndexColumns)
             .setJsonIndexColumns(indexLoadingConfig.getJsonIndexColumns())
             .setRealtimeSegmentZKMetadata(segmentZKMetadata).setOffHeap(_isOffHeap).setMemoryManager(_memoryManager)
             .setStatsHistory(realtimeTableDataManager.getStatsHistory())
