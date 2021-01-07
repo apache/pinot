@@ -11,9 +11,11 @@
     padding-left: 10px;
     font-size: 14px;
     font-weight: 400;
+    cursor:pointer;
   }
 
   &__title:last-of-type {
     font-weight: 700;
+    cursor: auto;
   }
 }

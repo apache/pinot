@@ -53,8 +53,13 @@
       <div class="spinner-wrapper spinner-wrapper--card">
         {{ember-spinner lines=30 radius=20 length=0 width=10 opacity=0 trail=75 color="blue"}}
       </div>
-    {{else}}
-      {{composite-anomalies anomalies=anomalies alertId=model.alertId onBreadcrumbClick=(action "onBreadcrumbClick")}}
+    {{else}}  
+      {{composite-anomalies
+        anomalies=anomalies
+        alertId=model.alertId
+        onBreadcrumbClick=(action "onBreadcrumbClick")
+        onDrilldown=(action "onDrilldown")
+      }}
     {{/if}}
   </section>
 </section>

@@ -6,10 +6,13 @@
       }
       td, th {
           padding: 10px 10px 10px 20px;
-  
-          .details, .duration {
-              margin: 0;
-          } 
+      }
+      &__multi-line-column {
+          margin: 0;
+          color: black;
+      }
+      &__duration {
+          margin: 0;
       }
       margin-bottom: 20px;
   }
