@@ -34,8 +34,6 @@ import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
@@ -49,16 +47,15 @@ public class MutableSegmentImplAggregateMetricsTest {
   private static final String KEY_SEPARATOR = "\t\t";
   private static final int NUM_ROWS = 10001;
 
-
   @Test
-  public void testAggregateMetrics() {
+  public void testAggregateMetrics()
+      throws Exception {
     Schema schema = new Schema.SchemaBuilder().setSchemaName("testSchema")
         .addSingleValueDimension(DIMENSION_1, FieldSpec.DataType.INT)
         .addSingleValueDimension(DIMENSION_2, FieldSpec.DataType.STRING).addMetric(METRIC, FieldSpec.DataType.LONG)
         .addMetric(METRIC_2, FieldSpec.DataType.FLOAT)
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, TIME_COLUMN1), null)
-        .addDateTime(TIME_COLUMN2, FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS")
-        .build();
+        .addDateTime(TIME_COLUMN2, FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS").build();
     // Add virtual columns, which should not be aggregated
     DimensionFieldSpec virtualDimensionFieldSpec =
         new DimensionFieldSpec("$virtualDimension", FieldSpec.DataType.INT, true, Object.class);
@@ -73,14 +70,12 @@ public class MutableSegmentImplAggregateMetricsTest {
     testAggregateMetrics(mutableSegmentImpl);
     mutableSegmentImpl.destroy();
 
-
     schema = new Schema.SchemaBuilder().setSchemaName("testSchema")
         .addSingleValueDimension(DIMENSION_1, FieldSpec.DataType.INT)
         .addSingleValueDimension(DIMENSION_2, FieldSpec.DataType.STRING).addMetric(METRIC, FieldSpec.DataType.LONG)
         .addMetric(METRIC_2, FieldSpec.DataType.FLOAT)
         .addDateTime(TIME_COLUMN1, FieldSpec.DataType.INT, "1:DAYS:EPOCH", "1:DAYS")
-        .addDateTime(TIME_COLUMN2, FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS")
-        .build();
+        .addDateTime(TIME_COLUMN2, FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS").build();
     // Add virtual columns, which should not be aggregated
     schema.addField(virtualDimensionFieldSpec);
     schema.addField(virtualMetricFieldSpec);
@@ -92,7 +87,8 @@ public class MutableSegmentImplAggregateMetricsTest {
     mutableSegmentImpl.destroy();
   }
 
-  private void testAggregateMetrics(MutableSegmentImpl mutableSegmentImpl) {
+  private void testAggregateMetrics(MutableSegmentImpl mutableSegmentImpl)
+      throws Exception {
     String[] stringValues = new String[10];
     Float[] floatValues = new Float[10];
     Random random = new Random();

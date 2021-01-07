@@ -22,11 +22,13 @@ import java.io.File;
 import java.io.IOException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.core.realtime.impl.json.MutableJsonIndex;
 import org.apache.pinot.core.segment.creator.JsonIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.creator.impl.inv.json.OffHeapJsonIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.inv.json.OnHeapJsonIndexCreator;
 import org.apache.pinot.core.segment.index.readers.JsonIndexReader;
+import org.apache.pinot.core.segment.index.readers.json.ImmutableJsonIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -90,9 +92,13 @@ public class JsonIndexTest {
 
     try (PinotDataBuffer onHeapDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(onHeapIndexFile);
         PinotDataBuffer offHeapDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
-        JsonIndexReader onHeapIndexReader = new JsonIndexReader(onHeapDataBuffer, records.length);
-        JsonIndexReader offHeapIndexReader = new JsonIndexReader(offHeapDataBuffer, records.length)) {
-      JsonIndexReader[] indexReaders = new JsonIndexReader[]{onHeapIndexReader, offHeapIndexReader};
+        JsonIndexReader onHeapIndexReader = new ImmutableJsonIndexReader(onHeapDataBuffer, records.length);
+        JsonIndexReader offHeapIndexReader = new ImmutableJsonIndexReader(offHeapDataBuffer, records.length);
+        MutableJsonIndex mutableJsonIndex = new MutableJsonIndex()) {
+      for (String record : records) {
+        mutableJsonIndex.add(record);
+      }
+      JsonIndexReader[] indexReaders = new JsonIndexReader[]{onHeapIndexReader, offHeapIndexReader, mutableJsonIndex};
       for (JsonIndexReader indexReader : indexReaders) {
         MutableRoaringBitmap matchingDocIds = getMatchingDocIds(indexReader, "name='bob'");
         assertEquals(matchingDocIds.toArray(), new int[]{1});
@@ -169,9 +175,13 @@ public class JsonIndexTest {
 
     try (PinotDataBuffer onHeapDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(onHeapIndexFile);
         PinotDataBuffer offHeapDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
-        JsonIndexReader onHeapIndexReader = new JsonIndexReader(onHeapDataBuffer, records.length);
-        JsonIndexReader offHeapIndexReader = new JsonIndexReader(offHeapDataBuffer, records.length)) {
-      JsonIndexReader[] indexReaders = new JsonIndexReader[]{onHeapIndexReader, offHeapIndexReader};
+        JsonIndexReader onHeapIndexReader = new ImmutableJsonIndexReader(onHeapDataBuffer, records.length);
+        JsonIndexReader offHeapIndexReader = new ImmutableJsonIndexReader(offHeapDataBuffer, records.length);
+        MutableJsonIndex mutableJsonIndex = new MutableJsonIndex()) {
+      for (String record : records) {
+        mutableJsonIndex.add(record);
+      }
+      JsonIndexReader[] indexReaders = new JsonIndexReader[]{onHeapIndexReader, offHeapIndexReader, mutableJsonIndex};
       for (JsonIndexReader indexReader : indexReaders) {
         MutableRoaringBitmap matchingDocIds = getMatchingDocIds(indexReader, "name = 'adam-123'");
         assertEquals(matchingDocIds.toArray(), new int[]{123});
@@ -185,7 +195,8 @@ public class JsonIndexTest {
         matchingDocIds = getMatchingDocIds(indexReader, "addresses.street = 'us-456' AND addresses.country = 'ca'");
         assertEquals(matchingDocIds.toArray(), new int[0]);
 
-        matchingDocIds = getMatchingDocIds(indexReader, "name = 'adam-100000' AND addresses.street = 'us-100000' AND addresses.country = 'us'");
+        matchingDocIds = getMatchingDocIds(indexReader,
+            "name = 'adam-100000' AND addresses.street = 'us-100000' AND addresses.country = 'us'");
         assertEquals(matchingDocIds.toArray(), new int[]{100000});
 
         matchingDocIds = getMatchingDocIds(indexReader, "name = 'adam-100000' AND addresses.street = 'us-100001'");

@@ -334,7 +334,18 @@
             </program>
             <program>
               <mainClass>org.apache.pinot.tools.JsonIndexQuickStart</mainClass>
-              <name>quick-start-json-index</name>
+              <name>quick-start-json-index-batch</name>
+              <jvmSettings>
+                <initialMemorySize>1G</initialMemorySize>
+                <maxMemorySize>1G</maxMemorySize>
+                <extraArguments>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
+                </extraArguments>
+              </jvmSettings>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.tools.RealtimeJsonIndexQuickStart</mainClass>
+              <name>quick-start-json-index-streaming</name>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
