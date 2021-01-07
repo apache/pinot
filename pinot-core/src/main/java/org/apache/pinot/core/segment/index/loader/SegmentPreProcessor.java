@@ -123,6 +123,7 @@ public class SegmentPreProcessor implements AutoCloseable {
         h3IndexHandler.createH3Indices();
       }
 
+      // Create text indices according to the index config.
       Set<String> textIndexColumns = _indexLoadingConfig.getTextIndexColumns();
       if (!textIndexColumns.isEmpty()) {
         TextIndexHandler textIndexHandler =

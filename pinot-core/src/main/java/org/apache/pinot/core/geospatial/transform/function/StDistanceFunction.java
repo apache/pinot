@@ -121,7 +121,7 @@ public class StDistanceFunction extends BaseTransformFunction {
         .checkArgument(longitude >= MIN_LONGITUDE && longitude <= MAX_LONGITUDE, "Longitude must be between -180 and 180");
   }
 
-  public static double sphericalDistance(Geometry leftGeometry, Geometry rightGeometry) {
+  private static double sphericalDistance(Geometry leftGeometry, Geometry rightGeometry) {
     Preconditions.checkArgument(leftGeometry instanceof Point, "The left argument must be a point");
     Preconditions.checkArgument(rightGeometry instanceof Point, "The right argument must be a point");
     Point leftPoint = (Point) leftGeometry;
@@ -136,7 +136,7 @@ public class StDistanceFunction extends BaseTransformFunction {
    * This assumes a spherical Earth, and uses the Vincenty formula. (https://en.wikipedia
    * .org/wiki/Great-circle_distance)
    */
-  public static double greatCircleDistance(double latitude1, double longitude1, double latitude2, double longitude2) {
+  private static double greatCircleDistance(double latitude1, double longitude1, double latitude2, double longitude2) {
     checkLatitude(latitude1);
     checkLongitude(longitude1);
     checkLatitude(latitude2);

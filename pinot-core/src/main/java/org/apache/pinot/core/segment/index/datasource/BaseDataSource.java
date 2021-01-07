@@ -62,15 +62,6 @@ public abstract class BaseDataSource implements DataSource {
     _nullValueVector = nullValueVector;
   }
 
-  public BaseDataSource(DataSourceMetadata dataSourceMetadata, ForwardIndexReader<?> forwardIndex,
-      @Nullable Dictionary dictionary, @Nullable InvertedIndexReader<?> invertedIndex,
-      @Nullable InvertedIndexReader<?> rangeIndex, @Nullable TextIndexReader textIndex,
-      @Nullable TextIndexReader fstIndex, @Nullable BloomFilterReader bloomFilter,
-      @Nullable NullValueVectorReader nullValueVector) {
-    this(dataSourceMetadata, forwardIndex, dictionary, invertedIndex, rangeIndex, textIndex, fstIndex, null,
-        bloomFilter, nullValueVector, null);
-  }
-
   @Override
   public DataSourceMetadata getDataSourceMetadata() {
     return _dataSourceMetadata;
@@ -101,6 +92,12 @@ public abstract class BaseDataSource implements DataSource {
 
   @Nullable
   @Override
+  public H3IndexReader getH3Index() {
+    return _h3Index;
+  }
+
+  @Nullable
+  @Override
   public TextIndexReader getTextIndex() {
     return _textIndex;
   }
@@ -115,10 +112,6 @@ public abstract class BaseDataSource implements DataSource {
   @Override
   public JsonIndexReader getJsonIndex() {
     return _jsonIndex;
-  }
-
-  public H3IndexReader getH3Index() {
-    return _h3Index;
   }
 
   @Nullable
