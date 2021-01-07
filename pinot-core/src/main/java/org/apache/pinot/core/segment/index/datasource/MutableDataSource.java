@@ -37,7 +37,7 @@ import org.apache.pinot.spi.data.FieldSpec;
  * The {@code MutableDataSource} class is the data source for a column in the mutable segment.
  */
 @SuppressWarnings("rawtypes")
-public class MutableDataSource extends BaseDataSourcePhysicalColumnIndexContainer {
+public class MutableDataSource extends BaseDataSource {
   private final boolean _enableFST;
 
   public MutableDataSource(FieldSpec fieldSpec, int numDocs, int numValues, int maxNumValuesPerMVEntry,
