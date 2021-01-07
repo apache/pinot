@@ -241,7 +241,7 @@ public class HelixBrokerStarter implements ServiceStartable {
     FunctionRegistry.init();
     TableCache tableCache = new TableCache(_propertyStore, caseInsensitive);
     // Configure TLS
-    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(_brokerConf, Broker.BROKER_NETTY_PREFIX);
+    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(_brokerConf, Broker.BROKER_NETTY_TLS_PREFIX, Broker.BROKER_TLS_PREFIX);
     _brokerRequestHandler =
         new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory, queryQuotaManager,
             tableCache, _brokerMetrics, tlsConfig);

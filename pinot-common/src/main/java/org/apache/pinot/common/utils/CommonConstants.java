@@ -179,8 +179,9 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_BROKER_CLIENT_PROTOCOL = "pinot.broker.client.protocol";
 
-    public static final String BROKER_CLIENT_PREFIX = "pinot.broker.client";
-    public static final String BROKER_NETTY_PREFIX = "pinot.broker.netty";
+    public static final String BROKER_TLS_PREFIX = "pinot.broker.tls";
+    public static final String BROKER_CLIENT_TLS_PREFIX = "pinot.broker.client.tls";
+    public static final String BROKER_NETTY_TLS_PREFIX = "pinot.broker.netty.tls";
 
     public static class Request {
       public static final String PQL = "pql";
@@ -289,7 +290,8 @@ public class CommonConstants {
 
     public static final String PINOT_SERVER_METRICS_PREFIX = "pinot.server.metrics.prefix";
 
-    public static final String SERVER_NETTY_PREFIX = "pinot.server.netty";
+    public static final String SERVER_TLS_PREFIX = "pinot.server.tls";
+    public static final String SERVER_NETTY_TLS_PREFIX = "pinot.server.netty.tls";
 
     public static class SegmentCompletionProtocol {
       public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.server.segment.uploader";

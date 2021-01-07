@@ -93,7 +93,8 @@ public class ServerInstance {
         QuerySchedulerFactory.create(serverConf.getSchedulerConfig(), _queryExecutor, _serverMetrics, _latestQueryTime);
 
     int nettyPort = serverConf.getNettyPort();
-    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_NETTY_PREFIX);
+    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(serverConf.getPinotConfig(),
+        CommonConstants.Server.SERVER_NETTY_TLS_PREFIX, CommonConstants.Server.SERVER_TLS_PREFIX);
     LOGGER.info("Initializing Netty query server on port: {} with tls: {}", nettyPort, tlsConfig.isEnabled());
     _nettyQueryServer = new QueryServer(nettyPort, _queryScheduler, _serverMetrics, tlsConfig);
 

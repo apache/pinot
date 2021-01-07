@@ -417,7 +417,8 @@ public class ControllerStarter implements ServiceStartable {
     // install default SSL context if necessary
     if (CommonConstants.HTTPS_PROTOCOL.equals(_config.getProperty(ControllerConf.CONTROLLER_BROKER_PROTOCOL))) {
       LOGGER.info("Installing default SSL context for broker relay requests");
-      TlsUtils.installDefaultSSLSocketFactory(TlsUtils.extractTlsConfig(_config, ControllerConf.CONTROLLER_BROKER_PREFIX));
+      TlsUtils.installDefaultSSLSocketFactory(TlsUtils.extractTlsConfig(_config,
+          ControllerConf.CONTROLLER_BROKER_TLS_PREFIX, ControllerConf.CONTROLLER_TLS_PREFIX));
     }
 
     _adminApp.start(_listenerConfigs);

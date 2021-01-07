@@ -36,12 +36,12 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  * Utility class for shared TLS configuration logic
  */
 public final class TlsUtils {
-  private static final String TLS_ENABLED = "tls.enabled";
-  private static final String TLS_CIENT_AUTH = "tls.client.auth";
-  private static final String TLS_KEYSTORE_PATH = "tls.keystore.path";
-  private static final String TLS_KEYSTORE_PASSWORD = "tls.keystore.password";
-  private static final String TLS_TRUSTSTORE_PATH = "tls.truststore.path";
-  private static final String TLS_TRUSTSTORE_PASSWORD = "tls.truststore.password";
+  private static final String ENABLED = "enabled";
+  private static final String CLIENT_AUTH = "client.auth";
+  private static final String KEYSTORE_PATH = "keystore.path";
+  private static final String KEYSTORE_PASSWORD = "keystore.password";
+  private static final String TRUSTSTORE_PATH = "truststore.path";
+  private static final String TRUSTSTORE_PASSWORD = "truststore.password";
 
   private TlsUtils() {
     // left blank
@@ -49,23 +49,28 @@ public final class TlsUtils {
 
   /**
    * Extract a TlsConfig instance from a namespaced set of configuration keys.
-   * 
+   *
    * @param pinotConfig pinot configuration
    * @param prefix namespace prefix
-   *               
+   *
    * @return TlsConfig instance
    */
   public static TlsConfig extractTlsConfig(PinotConfiguration pinotConfig, String prefix) {
-    TlsConfig tlsConfig = new TlsConfig();
+    return extractTlsConfig(new TlsConfig(), pinotConfig, prefix);
+  }
 
-    tlsConfig.setEnabled(pinotConfig.getProperty(prefix + "." + TLS_ENABLED, false));
-    tlsConfig.setClientAuth(pinotConfig.getProperty(prefix + "." + TLS_CIENT_AUTH, false));
-    tlsConfig.setKeyStorePath(pinotConfig.getProperty(prefix + "." + TLS_KEYSTORE_PATH));
-    tlsConfig.setKeyStorePassword(pinotConfig.getProperty(prefix + "." + TLS_KEYSTORE_PASSWORD));
-    tlsConfig.setTrustStorePath(pinotConfig.getProperty(prefix + "." + TLS_TRUSTSTORE_PATH));
-    tlsConfig.setTrustStorePassword(pinotConfig.getProperty(prefix + "." + TLS_TRUSTSTORE_PASSWORD));
-
-    return tlsConfig;
+  /**
+   * Extract a TlsConfig instance from a namespaced set of configuration keys, with defaults pulled from an alternative
+   * namespace
+   *
+   * @param pinotConfig pinot configuration
+   * @param prefix namespace prefix
+   * @param prefixDefaults namespace prefix for defaults
+   *
+   * @return TlsConfig instance
+   */
+  public static TlsConfig extractTlsConfig(PinotConfiguration pinotConfig, String prefix, String prefixDefaults) {
+    return extractTlsConfig(extractTlsConfig(pinotConfig, prefixDefaults), pinotConfig, prefix);
   }
 
   /**
@@ -146,5 +151,32 @@ public final class TlsUtils {
     } catch (GeneralSecurityException ignore) {
       // ignore
     }
+  }
+
+  private static TlsConfig extractTlsConfig(TlsConfig tlsConfig, PinotConfiguration pinotConfig, String prefix) {
+    if (pinotConfig.containsKey(key(prefix, ENABLED))) {
+      tlsConfig.setEnabled(pinotConfig.getProperty(key(prefix, ENABLED), false));
+    }
+    if (pinotConfig.containsKey(key(prefix, CLIENT_AUTH))) {
+      tlsConfig.setClientAuth(pinotConfig.getProperty(key(prefix, CLIENT_AUTH), false));
+    }
+    if (pinotConfig.containsKey(key(prefix, KEYSTORE_PATH))) {
+      tlsConfig.setKeyStorePath(pinotConfig.getProperty(key(prefix, KEYSTORE_PATH)));
+    }
+    if (pinotConfig.containsKey(key(prefix, KEYSTORE_PASSWORD))) {
+      tlsConfig.setKeyStorePassword(pinotConfig.getProperty(key(prefix, KEYSTORE_PASSWORD)));
+    }
+    if (pinotConfig.containsKey(key(prefix, TRUSTSTORE_PATH))) {
+      tlsConfig.setTrustStorePath(pinotConfig.getProperty(key(prefix, TRUSTSTORE_PATH)));
+    }
+    if (pinotConfig.containsKey(key(prefix, TRUSTSTORE_PASSWORD))) {
+      tlsConfig.setTrustStorePassword(pinotConfig.getProperty(key(prefix, TRUSTSTORE_PASSWORD)));
+    }
+
+    return tlsConfig;
+  }
+
+  private static String key(String prefix, String suffix) {
+    return prefix + "." + suffix;
   }
 }

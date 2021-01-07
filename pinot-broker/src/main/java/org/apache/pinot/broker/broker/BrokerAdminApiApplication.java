@@ -82,7 +82,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
   private HttpServer buildHttpsServer(PinotConfiguration brokerConf) {
     boolean isSecure = CommonConstants.HTTPS_PROTOCOL.equals(getBrokerClientProtocol(brokerConf));
 
-    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(brokerConf, CommonConstants.Broker.BROKER_CLIENT_PREFIX);
+    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(brokerConf, CommonConstants.Broker.BROKER_CLIENT_TLS_PREFIX, CommonConstants.Broker.BROKER_TLS_PREFIX);
     tlsConfig.setEnabled(isSecure);
 
     if (isSecure) {
