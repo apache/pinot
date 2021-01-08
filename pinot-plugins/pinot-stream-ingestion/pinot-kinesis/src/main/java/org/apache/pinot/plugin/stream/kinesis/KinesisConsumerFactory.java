@@ -48,7 +48,7 @@ public class KinesisConsumerFactory extends StreamConsumerFactory {
 
   @Override
   public StreamMetadataProvider createStreamMetadataProvider(String clientId) {
-    return new KinesisStreamMetadataProvider(clientId, new KinesisConfig(_streamConfig));
+    return new KinesisStreamMetadataProvider(clientId, _streamConfig);
   }
 
   @Override

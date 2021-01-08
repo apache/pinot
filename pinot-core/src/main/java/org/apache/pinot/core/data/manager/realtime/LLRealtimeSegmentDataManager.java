@@ -240,6 +240,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   // Segment end criteria
   private volatile long _consumeEndTime = 0;
   private Checkpoint _finalOffset; // Used when we want to catch up to this one
+  private boolean _endOfPartitionGroup = false;
   private volatile boolean _shouldStop = false;
 
   // It takes 30s to locate controller leader, and more if there are multiple controller failures.
@@ -305,6 +306,13 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           segmentLogger.info("Stopping consumption due to row limit nRows={} numRowsIndexed={}, numRowsConsumed={}",
               _numRowsIndexed, _numRowsConsumed, _segmentMaxRowCount);
           _stopReason = SegmentCompletionProtocol.REASON_ROW_LIMIT;
+          return true;
+        } else if (_endOfPartitionGroup) {
+          segmentLogger.info("Stopping consumption due to end of partitionGroup reached nRows={} numRowsIndexed={}, numRowsConsumed={}",
+              _numRowsIndexed, _numRowsConsumed, _segmentMaxRowCount);
+          _stopReason = SegmentCompletionProtocol.REASON_END_OF_PARTITION_GROUP;
+          // fixme: what happens if reached endOfPartitionGroup but numDocsIndexed == 0
+          //  If we decide to only setupNewPartitions via ValidationManager, we don't need commit on endOfShard
           return true;
         }
         return false;
@@ -384,6 +392,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       try {
         messageBatch = _partitionGroupConsumer
             .fetchMessages(_currentOffset, null, _partitionLevelStreamConfig.getFetchTimeoutMillis());
+        _endOfPartitionGroup = messageBatch.isEndOfPartitionGroup();
         consecutiveErrorCount = 0;
       } catch (TransientConsumerException e) {
         handleTransientStreamErrors(e);
@@ -1245,9 +1254,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         //       long as the partition function is not changed.
         int numPartitions = columnPartitionConfig.getNumPartitions();
         try {
-          // fixme: get this from ideal state
-          int numStreamPartitions = _streamMetadataProvider
-              .getPartitionGroupInfoList(_clientId, _partitionLevelStreamConfig, Collections.emptyList(), 5000).size();
+          int numStreamPartitions = _streamMetadataProvider.fetchPartitionCount(/*maxWaitTimeMs=*/5000L);
           if (numStreamPartitions != numPartitions) {
             segmentLogger.warn(
                 "Number of stream partitions: {} does not match number of partitions in the partition config: {}, using number of stream partitions",
