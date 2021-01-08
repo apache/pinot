@@ -19,7 +19,6 @@
 package org.apache.pinot.spi.plugin;
 
 import java.io.IOException;
-import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.Enumeration;
@@ -36,18 +35,16 @@ public class PluginClassLoader extends URLClassLoader {
   public PluginClassLoader(URL[] urls, ClassLoader parent) {
     super(urls, parent);
     classLoader = PluginClassLoader.class.getClassLoader();
-    Method method = null;
-    try {
-      method = URLClassLoader.class.getDeclaredMethod("addURL", URL.class);
-
-    } catch (NoSuchMethodException e) {
-      //this should never happen
-      ExceptionUtils.rethrow(e);
-    }
-    method.setAccessible(true);
     for (URL url : urls) {
       try {
-        method.invoke(classLoader, url);
+        /**
+         * ClassLoader in java9+ does not extend URLClassLoader.
+         * If the class is not found in the parent classloader,
+         * it will be found in this classloader via findClass().
+         *
+         * @see https://community.oracle.com/tech/developers/discussion/4011800/base-classloader-no-longer-from-urlclassloader
+         */
+        super.addURL(url);
       } catch (Exception e) {
         ExceptionUtils.rethrow(e);
       }
