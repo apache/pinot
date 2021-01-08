@@ -307,11 +307,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           _stopReason = SegmentCompletionProtocol.REASON_ROW_LIMIT;
           return true;
         } else if (_endOfPartitionGroup) {
+          // FIXME: handle numDocsIndexed == 0 case
           segmentLogger.info("Stopping consumption due to end of partitionGroup reached nRows={} numRowsIndexed={}, numRowsConsumed={}",
               _numRowsIndexed, _numRowsConsumed, _segmentMaxRowCount);
           _stopReason = SegmentCompletionProtocol.REASON_END_OF_PARTITION_GROUP;
-          // fixme: what happens if reached endOfPartitionGroup but numDocsIndexed == 0
-          //  If we decide to only setupNewPartitions via ValidationManager, we don't need commit on endOfShard
           return true;
         }
         return false;
