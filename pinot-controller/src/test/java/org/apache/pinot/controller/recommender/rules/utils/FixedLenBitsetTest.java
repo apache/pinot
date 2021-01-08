@@ -31,8 +31,14 @@ import java.util.stream.Collectors;
 import org.testng.annotations.Test;
 
 
+/**
+ * Tests the {@link FixedLenBitset} class based on different scenarios.
+ */
 public class FixedLenBitsetTest {
 
+  /**
+   * Tests {@link FixedLenBitset#add(int)} with positive integer.
+   */
   @Test
   public void testAdd() {
     int size = 8;
@@ -45,8 +51,11 @@ public class FixedLenBitsetTest {
     assertEquals(fixedLenBitset.getSize(), size);
   }
 
+  /**
+   * Tests {@link FixedLenBitset#add(int)} with negative integer.
+   */
   @Test
-  public void testAdd_NegativeInteger() {
+  public void testAddNegativeInteger() {
     int size = 8;
     int integerToAdd = -1;
     FixedLenBitset fixedLenBitset = new FixedLenBitset(size);
@@ -56,8 +65,11 @@ public class FixedLenBitsetTest {
     assertEquals(fixedLenBitset.getSize(), size);
   }
 
+  /**
+   * Tests {@link FixedLenBitset#add(int)} with integer greater than bitset size.
+   */
   @Test
-  public void testAdd_IntegerGreaterThanSize() {
+  public void testAddIntegerGreaterThanSize() {
     int size = 8;
     int integerToAdd = 10;
     FixedLenBitset fixedLenBitset = new FixedLenBitset(size);
@@ -67,8 +79,11 @@ public class FixedLenBitsetTest {
     assertEquals(fixedLenBitset.getSize(), size);
   }
 
+  /**
+   * Tests {@link FixedLenBitset#add(int)} with already present integer.
+   */
   @Test
-  public void testAdd_IntegerAlreadyPresent() {
+  public void testAddAlreadyPresentInteger() {
     int size = 8;
     int integerToAdd = 2;
     FixedLenBitset fixedLenBitset = new FixedLenBitset(size);
@@ -83,6 +98,9 @@ public class FixedLenBitsetTest {
     assertEquals(fixedLenBitset.getSize(), size);
   }
 
+  /**
+   * Tests {@link FixedLenBitset#union(FixedLenBitset)}.
+   */
   @Test
   public void testUnion() {
     int size = 64;
@@ -115,8 +133,11 @@ public class FixedLenBitsetTest {
     }
   }
 
+  /**
+   * Tests {@link FixedLenBitset#union(FixedLenBitset)} with empty bitset.
+   */
   @Test
-  public void testUnion_EmptySecondBitset() {
+  public void testUnionWithEmptySecondBitset() {
     int size = 64;
 
     List<Integer> integerList1 = Arrays.asList(25, 16, 22, 25);
@@ -141,6 +162,9 @@ public class FixedLenBitsetTest {
     }
   }
 
+  /**
+   * Tests {@link FixedLenBitset#intersect(FixedLenBitset)}.
+   */
   @Test
   public void testIntersect() {
     int size = 64;
@@ -173,8 +197,11 @@ public class FixedLenBitsetTest {
     }
   }
 
+  /**
+   * Tests {@link FixedLenBitset#intersect(FixedLenBitset)} with empty bitset.
+   */
   @Test
-  public void testIntersect_EmptySecondBitset() {
+  public void testIntersectWithEmptySecondBitset() {
     int size = 64;
 
     List<Integer> integerList1 = Arrays.asList(25, 16, 22, 25);
@@ -198,8 +225,11 @@ public class FixedLenBitsetTest {
     }
   }
 
+  /**
+   * Tests {@link FixedLenBitset#contains(FixedLenBitset)} for true condition.
+   */
   @Test
-  public void testContains_TrueCase() {
+  public void testContainsTrueCase() {
     int size = 64;
 
     List<Integer> integerList1 = Arrays.asList(32, 60, 54, 25, 16);
@@ -220,8 +250,11 @@ public class FixedLenBitsetTest {
 
   }
 
+  /**
+   * Tests {@link FixedLenBitset#contains(FixedLenBitset)} with empty bitset.
+   */
   @Test
-  public void testContains_EmptySecondBitset() {
+  public void testContainsWithEmptySecondBitset() {
     int size = 64;
 
     List<Integer> integerList1 = Arrays.asList(32, 60, 54, 25, 16);
@@ -238,8 +271,11 @@ public class FixedLenBitsetTest {
 
   }
 
+  /**
+   * Tests {@link FixedLenBitset#contains(FixedLenBitset)} for false condition.
+   */
   @Test
-  public void testContains_FalseCase() {
+  public void testContainsFalseCase() {
     int size = 64;
 
     List<Integer> integerList1 = Arrays.asList(32, 54, 25, 16);
@@ -260,6 +296,9 @@ public class FixedLenBitsetTest {
 
   }
 
+  /**
+   * Tests {@link FixedLenBitset#getOffsets()}.
+   */
   @Test
   public void testGetOffsets() {
     int size = 64;
