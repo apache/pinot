@@ -64,11 +64,11 @@ public class RealtimeSegmentConfig {
   private RealtimeSegmentConfig(String tableNameWithType, String segmentName, String streamName, Schema schema,
       String timeColumnName, int capacity, int avgNumMultiValues, Set<String> noDictionaryColumns,
       Set<String> varLengthDictionaryColumns, Set<String> invertedIndexColumns, Set<String> textIndexColumns,
-      Set<String> fstIndexColumns, Set<String> jsonIndexColumns, RealtimeSegmentZKMetadata realtimeSegmentZKMetadata,
-      boolean offHeap, PinotDataBufferMemoryManager memoryManager, RealtimeSegmentStatsHistory statsHistory,
-      String partitionColumn, PartitionFunction partitionFunction, int partitionId, boolean aggregateMetrics,
-      boolean nullHandlingEnabled, String consumerDir, UpsertConfig.Mode upsertMode,
-      PartitionUpsertMetadataManager partitionUpsertMetadataManager, List<H3IndexColumn> h3IndexColumns) {
+      Set<String> fstIndexColumns, Set<String> jsonIndexColumns, List<H3IndexColumn> h3IndexColumns,
+      RealtimeSegmentZKMetadata realtimeSegmentZKMetadata, boolean offHeap, PinotDataBufferMemoryManager memoryManager,
+      RealtimeSegmentStatsHistory statsHistory, String partitionColumn, PartitionFunction partitionFunction,
+      int partitionId, boolean aggregateMetrics, boolean nullHandlingEnabled, String consumerDir,
+      UpsertConfig.Mode upsertMode, PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
     _tableNameWithType = tableNameWithType;
     _segmentName = segmentName;
     _streamName = streamName;
@@ -315,6 +315,11 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
+    public Builder setH3IndexColumns(List<H3IndexColumn> h3IndexColumns) {
+      _h3IndexColumns = h3IndexColumns;
+      return this;
+    }
+
     public Builder setRealtimeSegmentZKMetadata(RealtimeSegmentZKMetadata realtimeSegmentZKMetadata) {
       _realtimeSegmentZKMetadata = realtimeSegmentZKMetadata;
       return this;
@@ -375,17 +380,12 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
-    public Builder setH3IndexColumns(List<H3IndexColumn> h3IndexColumns) {
-      _h3IndexColumns = h3IndexColumns;
-      return this;
-    }
-
     public RealtimeSegmentConfig build() {
       return new RealtimeSegmentConfig(_tableNameWithType, _segmentName, _streamName, _schema, _timeColumnName,
           _capacity, _avgNumMultiValues, _noDictionaryColumns, _varLengthDictionaryColumns, _invertedIndexColumns,
-          _textIndexColumns, _fstIndexColumns, _jsonIndexColumns, _realtimeSegmentZKMetadata, _offHeap, _memoryManager,
-          _statsHistory, _partitionColumn, _partitionFunction, _partitionId, _aggregateMetrics, _nullHandlingEnabled,
-          _consumerDir, _upsertMode, _partitionUpsertMetadataManager, _h3IndexColumns);
+          _textIndexColumns, _fstIndexColumns, _jsonIndexColumns, _h3IndexColumns, _realtimeSegmentZKMetadata, _offHeap,
+          _memoryManager, _statsHistory, _partitionColumn, _partitionFunction, _partitionId, _aggregateMetrics,
+          _nullHandlingEnabled, _consumerDir, _upsertMode, _partitionUpsertMetadataManager);
     }
   }
 }

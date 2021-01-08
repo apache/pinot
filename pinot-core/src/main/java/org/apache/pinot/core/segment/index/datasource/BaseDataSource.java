@@ -37,10 +37,10 @@ public abstract class BaseDataSource implements DataSource {
   private final Dictionary _dictionary;
   private final InvertedIndexReader<?> _invertedIndex;
   private final InvertedIndexReader<?> _rangeIndex;
-  private final H3IndexReader _h3Index;
   private final TextIndexReader _textIndex;
   private final TextIndexReader _fstIndex;
   private final JsonIndexReader _jsonIndex;
+  private final H3IndexReader _h3Index;
   private final BloomFilterReader _bloomFilter;
   private final NullValueVectorReader _nullValueVector;
 

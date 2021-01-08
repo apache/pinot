@@ -321,7 +321,7 @@ public class MutableSegmentImpl implements MutableSegment {
         h3IndexReader = h3IndexColumnMap.containsKey(column) ? new RealtimeH3IndexReader(
             new H3IndexResolution(h3IndexColumnMap.get(column).getResolutions())) : null;
       } catch (IOException e) {
-        throw new RuntimeException(String.format("Failed to initiate H3 index reader for column %s", column), e);
+        throw new RuntimeException(String.format("Failed to initiate H3 index reader for column: %s", column), e);
       }
 
       // Text index

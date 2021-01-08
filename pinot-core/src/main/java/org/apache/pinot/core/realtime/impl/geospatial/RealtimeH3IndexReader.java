@@ -39,7 +39,7 @@ public class RealtimeH3IndexReader implements GeoSpatialIndexCreator, H3IndexRea
   private final H3Core _h3Core;
   private final Map<Long, ThreadSafeMutableRoaringBitmap> _h3IndexMap = new ConcurrentHashMap<>();
   private final H3IndexResolution _resolution;
-  private int _lowestResolution;
+  private final int _lowestResolution;
 
   public RealtimeH3IndexReader(H3IndexResolution resolution)
       throws IOException {
@@ -53,9 +53,7 @@ public class RealtimeH3IndexReader implements GeoSpatialIndexCreator, H3IndexRea
     // TODO support multiple resolutions
     Long h3Id = _h3Core.geoToH3(lat, lon, _lowestResolution);
     _h3IndexMap.computeIfAbsent(h3Id, k -> new ThreadSafeMutableRoaringBitmap());
-    synchronized (this) {
-      _h3IndexMap.get(h3Id).add(docId);
-    }
+    _h3IndexMap.get(h3Id).add(docId);
   }
 
   @Override

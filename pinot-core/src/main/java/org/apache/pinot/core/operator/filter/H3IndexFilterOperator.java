@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import com.google.common.base.Preconditions;
 import com.uber.h3core.H3Core;
 import com.uber.h3core.LengthUnit;
 import java.io.IOException;
@@ -49,15 +50,15 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 public class H3IndexFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "H3IndexFilterOperator";
 
-  private Predicate _predicate;
+  private final Predicate _predicate;
   private final DataSource _dataSource;
   private final int _numDocs;
   private final H3Core _h3Core;
   private final IndexSegment _segment;
   private final H3IndexReader _h3IndexReader;
   private final H3IndexResolution _resolution;
-  private Geometry _geometry;
-  private double _distance;
+  final private Geometry _geometry;
+  final private double _distance;
 
   public H3IndexFilterOperator(Predicate predicate, IndexSegment indexSegment, int numDocs) {
     _predicate = predicate;
@@ -80,14 +81,10 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
     _dataSource = indexSegment.getDataSource(columnName);
     _h3IndexReader = _dataSource.getH3Index();
     _resolution = _h3IndexReader.getH3IndexResolution();
-    switch (predicate.getType()) {
-      case RANGE:
-        RangePredicate rangePredicate = (RangePredicate) predicate;
-        _distance = Double.parseDouble(rangePredicate.getUpperBound());
-        break;
-      default:
-        throw new RuntimeException(String.format("H3 index does not support predicate type %s", predicate.getType()));
-    }
+    Preconditions.checkArgument(predicate instanceof RangePredicate,
+        String.format("H3 index does not support predicate type %s", predicate.getType()));
+    RangePredicate rangePredicate = (RangePredicate) predicate;
+    _distance = Double.parseDouble(rangePredicate.getUpperBound());
     _numDocs = numDocs;
     try {
       _h3Core = H3Core.newInstance();
@@ -104,7 +101,7 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
 
     // find the number of rings based on distance for full match
     // use the edge of the hexagon to determine the rings are within the distance. This is calculated by (1) divide the
-    // distance by edge length of the solution to get the number of contained rings (2) use the (floor of number - 1)
+    // distance by edge length of the resolution to get the number of contained rings (2) use the (floor of number - 1)
     // for fetching the rings since ring0 is the original hexagon
     double edgeLength = _h3Core.edgeLength(resolution, LengthUnit.m);
     int numFullMatchedRings = (int) Math.floor(_distance / edgeLength);
