@@ -334,6 +334,10 @@ body {
   &--dark {
     color: app-shade(black, 0.85);
   }
+
+  &--disable-click {
+    pointer-events: none;
+  }
 }
 
 .te-input {

@@ -149,6 +149,16 @@ export default Controller.extend({
      */
     onBreadcrumbClick(isRoot = false) {
       this.set('rootLevel', isRoot);
+    },
+
+    /**
+     * Function to disable the ability to select dates since user is not on root level
+     *
+     * @param {Boolean} isRoot
+     *   Tracks if we are working on root level of the tree
+     */
+    onDrilldown() {
+      this.set('rootLevel', false);
     }
   }
 });
