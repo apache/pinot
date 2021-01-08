@@ -881,7 +881,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       QueryContext pqlQueryContext = QueryContextConverterUtils.getQueryContextFromPQL(pqlQuery);
       BrokerResponseNative pqlResponse = queryServersWithDifferentSegments(pqlQueryContext);
       BrokerRequest sqlBrokerRequest = SQL_COMPILER.compileToBrokerRequest(sqlQuery);
-      sqlBrokerRequest.setQueryOptions(Collections.singletonMap("responseFormat", "sql"));
+      sqlBrokerRequest.getPinotQuery().setQueryOptions(Collections.singletonMap("responseFormat", "sql"));
       QueryContext sqlQueryContext = BrokerRequestToQueryContextConverter.convert(sqlBrokerRequest);
       BrokerResponseNative sqlResponse = queryServersWithDifferentSegments(sqlQueryContext);
 
