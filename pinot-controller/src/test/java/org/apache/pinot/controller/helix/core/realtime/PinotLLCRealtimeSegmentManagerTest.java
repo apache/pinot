@@ -850,7 +850,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     public void ensureAllPartitionsConsuming() {
-      ensureAllPartitionsConsuming(_tableConfig, _streamConfig, _idealState, _numPartitions);
+      ensureAllPartitionsConsuming(_tableConfig, _streamConfig, _idealState,
+          getPartitionGroupInfoList(_streamConfig, Collections.emptyList()));
     }
 
     @Override

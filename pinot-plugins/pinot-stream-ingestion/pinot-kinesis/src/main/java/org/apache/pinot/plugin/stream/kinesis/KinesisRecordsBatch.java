@@ -32,10 +32,12 @@ import software.amazon.awssdk.services.kinesis.model.Record;
 public class KinesisRecordsBatch implements MessageBatch<byte[]> {
   private final List<Record> _recordList;
   private final String _shardId;
+  private final boolean _endOfShard;
 
-  public KinesisRecordsBatch(List<Record> recordList, String shardId) {
+  public KinesisRecordsBatch(List<Record> recordList, String shardId, boolean endOfShard) {
     _recordList = recordList;
     _shardId = shardId;
+    _endOfShard = endOfShard;
   }
 
   @Override
@@ -67,5 +69,10 @@ public class KinesisRecordsBatch implements MessageBatch<byte[]> {
   @Override
   public long getNextStreamMessageOffsetAtIndex(int index) {
     throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public boolean isEndOfPartitionGroup() {
+    return _endOfShard;
   }
 }

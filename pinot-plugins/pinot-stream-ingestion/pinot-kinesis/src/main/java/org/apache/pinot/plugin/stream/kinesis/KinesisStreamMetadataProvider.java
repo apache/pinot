@@ -1,27 +1,45 @@
 package org.apache.pinot.plugin.stream.kinesis;
 
+import com.google.common.base.Preconditions;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.OffsetCriteria;
+import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupInfo;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConsumerFactory;
+import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import software.amazon.awssdk.services.kinesis.model.Shard;
 
 
 public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
   private final KinesisConnectionHandler _kinesisConnectionHandler;
+  private final StreamConsumerFactory _kinesisStreamConsumerFactory;
+  private final String _clientId;
+  private final int _fetchTimeoutMs;
 
-  public KinesisStreamMetadataProvider(String clientId, KinesisConfig kinesisConfig) {
+  public KinesisStreamMetadataProvider(String clientId, StreamConfig streamConfig) {
+    KinesisConfig kinesisConfig = new KinesisConfig(streamConfig);
     _kinesisConnectionHandler = new KinesisConnectionHandler(kinesisConfig.getStream(), kinesisConfig.getAwsRegion());
+    _kinesisStreamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
+    _clientId = clientId;
+    _fetchTimeoutMs = streamConfig.getFetchTimeoutMillis();
   }
 
   @Override
@@ -37,7 +55,7 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
   @Override
   public List<PartitionGroupInfo> getPartitionGroupInfoList(String clientId, StreamConfig streamConfig,
       List<PartitionGroupMetadata> currentPartitionGroupsMetadata, int timeoutMillis)
-      throws IOException {
+      throws IOException, TimeoutException {
 
     Map<Integer, PartitionGroupMetadata> currentPartitionGroupMap =
         currentPartitionGroupsMetadata.stream().collect(Collectors.toMap(PartitionGroupMetadata::getPartitionGroupId, p -> p));
@@ -45,10 +63,12 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
     List<PartitionGroupInfo> newPartitionGroupInfos = new ArrayList<>();
     List<Shard> shards = _kinesisConnectionHandler.getShards();
     for (Shard shard : shards) { // go over all shards
+      KinesisCheckpoint newStartCheckpoint;
+
       String shardId = shard.shardId();
       int partitionGroupId = getPartitionGroupIdFromShardId(shardId);
       PartitionGroupMetadata currentPartitionGroupMetadata = currentPartitionGroupMap.get(partitionGroupId);
-      KinesisCheckpoint newStartCheckpoint;
+
       if (currentPartitionGroupMetadata != null) { // existing shard
         KinesisCheckpoint currentEndCheckpoint = null;
         try {
@@ -59,15 +79,18 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
         if (currentEndCheckpoint != null) { // end checkpoint available i.e. committing segment
           String endingSequenceNumber = shard.sequenceNumberRange().endingSequenceNumber();
           if (endingSequenceNumber != null) { // shard has ended
-            // FIXME: this logic is not working
-            //  was expecting sequenceNumOfLastMsgInShard == endSequenceNumOfShard.
-            //  But it is much lesser than the endSeqNumOfShard
-            Map<String, String> shardToSequenceNumberMap = new HashMap<>();
-            shardToSequenceNumberMap.put(shardId, endingSequenceNumber);
-            KinesisCheckpoint shardEndCheckpoint = new KinesisCheckpoint(shardToSequenceNumberMap);
-            if (currentEndCheckpoint.compareTo(shardEndCheckpoint) >= 0) {
-              // shard has ended AND we have reached the end checkpoint.
-              // skip this partition group in the result
+            // check if segment has consumed all the messages already
+            PartitionGroupConsumer partitionGroupConsumer =
+                _kinesisStreamConsumerFactory.createPartitionGroupConsumer(_clientId, currentPartitionGroupMetadata);
+
+            MessageBatch messageBatch;
+            try {
+              messageBatch = partitionGroupConsumer.fetchMessages(currentEndCheckpoint, null, _fetchTimeoutMs);
+            } finally {
+              partitionGroupConsumer.close();
+            }
+            if (messageBatch.isEndOfPartitionGroup()) {
+              // shard has ended. Skip it from results
               continue;
             }
           }
@@ -80,6 +103,7 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
         shardToSequenceNumberMap.put(shardId, shard.sequenceNumberRange().startingSequenceNumber());
         newStartCheckpoint = new KinesisCheckpoint(shardToSequenceNumberMap);
       }
+
       newPartitionGroupInfos
           .add(new PartitionGroupInfo(partitionGroupId, newStartCheckpoint.serialize()));
     }

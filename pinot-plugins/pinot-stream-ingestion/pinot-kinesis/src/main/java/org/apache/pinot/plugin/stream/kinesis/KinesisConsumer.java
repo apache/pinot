@@ -125,8 +125,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
       if (nextStartSequenceNumber == null && recordList.size() > 0) {
         nextStartSequenceNumber = recordList.get(recordList.size() - 1).sequenceNumber();
       }
-
-      return new KinesisRecordsBatch(recordList, next.getKey());
+      return new KinesisRecordsBatch(recordList, next.getKey(), isEndOfShard);
     } catch (IllegalStateException e) {
       LOG.warn("Illegal state exception, connection is broken", e);
       return handleException(kinesisStartCheckpoint, recordList);
@@ -158,10 +157,9 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
       Map<String, String> newCheckpoint = new HashMap<>(start.getShardToStartSequenceMap());
       newCheckpoint.put(newCheckpoint.keySet().iterator().next(), nextStartSequenceNumber);
 
-      return new KinesisRecordsBatch(recordList, shardId);
+      return new KinesisRecordsBatch(recordList, shardId, false);
     } else {
-      return new KinesisRecordsBatch(recordList, shardId);
-
+      return new KinesisRecordsBatch(recordList, shardId, false);
     }
   }
 
