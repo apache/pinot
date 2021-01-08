@@ -157,7 +157,9 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
       config.setLastTimestamp(result.getLastTimestamp());
 
       for (MergedAnomalyResultDTO mergedAnomalyResultDTO : result.getAnomalies()) {
-        this.anomalyDAO.save(mergedAnomalyResultDTO);
+        if (!Double.isNaN(mergedAnomalyResultDTO.getAvgCurrentVal())){
+          this.anomalyDAO.save(mergedAnomalyResultDTO);
+        }
         if (mergedAnomalyResultDTO.getId() == null) {
           LOG.warn("Could not store anomaly:\n{}", mergedAnomalyResultDTO);
         }
