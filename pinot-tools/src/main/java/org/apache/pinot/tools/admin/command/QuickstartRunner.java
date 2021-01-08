@@ -203,8 +203,10 @@ public class QuickstartRunner {
   public void bootstrapTable()
       throws Exception {
     for (QuickstartTableRequest request : _tableRequests) {
-      if (!new BootstrapTableTool(InetAddress.getLocalHost().getHostName(), _controllerPorts.get(0), request.getBootstrapTableDir())
-          .execute()) {
+      // TODO get protocol from somewhere?
+      String protocol = CommonConstants.HTTP_PROTOCOL;
+      if (!new BootstrapTableTool(protocol, InetAddress.getLocalHost().getHostName(), _controllerPorts.get(0),
+          request.getBootstrapTableDir()).execute()) {
         throw new RuntimeException("Failed to bootstrap table with request - " + request);
       }
     }

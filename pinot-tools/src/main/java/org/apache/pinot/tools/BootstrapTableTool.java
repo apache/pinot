@@ -49,14 +49,17 @@ import org.yaml.snakeyaml.Yaml;
 public class BootstrapTableTool {
   private static final Logger LOGGER = LoggerFactory.getLogger(BootstrapTableTool.class);
   private static final String COMPLETED = "COMPLETED";
+  private final String _controllerProtocol;
   private final String _controllerHost;
   private final int _controllerPort;
   private final String _tableDir;
   private final MinionClient _minionClient;
 
-  public BootstrapTableTool(String controllerHost, int controllerPort, String tableDir) {
+  public BootstrapTableTool(String controllerProtocol, String controllerHost, int controllerPort, String tableDir) {
+    Preconditions.checkNotNull(controllerProtocol);
     Preconditions.checkNotNull(controllerHost);
     Preconditions.checkNotNull(tableDir);
+    _controllerProtocol = controllerProtocol;
     _controllerHost = controllerHost;
     _controllerPort = controllerPort;
     _tableDir = tableDir;
@@ -108,8 +111,9 @@ public class BootstrapTableTool {
   private boolean createTable(File schemaFile, File tableConfigFile)
       throws Exception {
     return new AddTableCommand().setSchemaFile(schemaFile.getAbsolutePath())
-        .setTableConfigFile(tableConfigFile.getAbsolutePath()).setControllerHost(_controllerHost)
-        .setControllerPort(String.valueOf(_controllerPort)).setExecute(true).execute();
+        .setTableConfigFile(tableConfigFile.getAbsolutePath()).setControllerProtocol(_controllerProtocol)
+        .setControllerHost(_controllerHost).setControllerPort(String.valueOf(_controllerPort)).setExecute(true)
+        .execute();
   }
 
   private boolean bootstrapOfflineTable(File setupTableTmpDir, String tableName, File schemaFile,
@@ -146,8 +150,8 @@ public class BootstrapTableTool {
     }
     if (ingestionJobSpecFile != null) {
       if (ingestionJobSpecFile.exists()) {
-        LOGGER.info("Launch data ingestion job to build index segment for table {} and push to controller [{}:{}]",
-            tableName, _controllerHost, _controllerPort);
+        LOGGER.info("Launch data ingestion job to build index segment for table {} and push to controller [{}://{}:{}]",
+            tableName, _controllerProtocol, _controllerHost, _controllerPort);
         try (Reader reader = new BufferedReader(new FileReader(ingestionJobSpecFile.getAbsolutePath()))) {
           SegmentGenerationJobSpec spec = new Yaml().loadAs(reader, SegmentGenerationJobSpec.class);
           String inputDirURI = spec.getInputDirURI();

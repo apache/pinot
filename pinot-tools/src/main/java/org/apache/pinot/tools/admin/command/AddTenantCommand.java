@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.tools.admin.command;
 
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.config.tenant.Tenant;
@@ -36,6 +37,9 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
 
   @Option(name = "-controllerPort", required = false, metaVar = "<int>", usage = "Port number to start the controller at.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
+
+  @Option(name = "-controllerProtocol", required = false, metaVar = "<String>", usage = "protocol for controller.")
+  private String _controllerProtocol = CommonConstants.HTTP_PROTOCOL;
 
   @Option(name = "-name", required = true, metaVar = "<string>", usage = "Name of the tenant to be created")
   private String _name;
@@ -102,7 +106,7 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
       if (_controllerHost == null) {
         _controllerHost = NetUtil.getHostAddress();
       }
-      _controllerAddress = "http://" + _controllerHost + ":" + _controllerPort;
+      _controllerAddress = _controllerProtocol + "://" + _controllerHost + ":" + _controllerPort;
     }
 
     if (!_exec) {
@@ -135,9 +139,10 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
   @Override
   public String toString() {
     String retString =
-        ("AddTenant -controllerHost " + _controllerHost + " -controllerPort " + _controllerPort + " -name " + _name
-            + " -role " + _role + " -instanceCount " + _instanceCount + " -offlineInstanceCount "
-            + _offlineInstanceCount + " -realTimeInstanceCount " + _realtimeInstanceCount);
+        ("AddTenant -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost
+            + " -controllerPort " + _controllerPort + " -name " + _name + " -role " + _role + " -instanceCount "
+            + _instanceCount + " -offlineInstanceCount " + _offlineInstanceCount + " -realTimeInstanceCount "
+            + _realtimeInstanceCount);
 
     return ((_exec) ? (retString + " -exec") : retString);
   }

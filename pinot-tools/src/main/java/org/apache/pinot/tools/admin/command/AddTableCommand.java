@@ -21,6 +21,7 @@ package org.apache.pinot.tools.admin.command;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
@@ -51,6 +52,9 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
   @Option(name = "-controllerPort", required = false, metaVar = "<int>", usage = "Port number to start the controller at.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
+  @Option(name = "-controllerProtocol", required = false, metaVar = "<String>", usage = "protocol for controller.")
+  private String _controllerProtocol = CommonConstants.HTTP_PROTOCOL;
+
   @Option(name = "-exec", required = false, metaVar = "<boolean>", usage = "Execute the command.")
   private boolean _exec;
 
@@ -78,7 +82,7 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
   public String toString() {
     String retString =
         ("AddTable -tableConfigFile " + _tableConfigFile + " -schemaFile " + _schemaFile + " -controllerHost "
-            + _controllerHost + " -controllerPort " + _controllerPort);
+            + " -controllerProtocol " + _controllerProtocol + _controllerHost + " -controllerPort " + _controllerPort);
     return ((_exec) ? (retString + " -exec") : retString);
   }
 
@@ -106,6 +110,11 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
     return this;
   }
 
+  public AddTableCommand setControllerProtocol(String controllerProtocol) {
+    _controllerProtocol = controllerProtocol;
+    return this;
+  }
+
   public AddTableCommand setExecute(boolean exec) {
     _exec = exec;
     return this;
@@ -124,7 +133,7 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
     }
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       fileUploadDownloadClient.addSchema(
-          FileUploadDownloadClient.getUploadSchemaHttpURI(_controllerHost, Integer.parseInt(_controllerPort)),
+          FileUploadDownloadClient.getUploadSchemaURI(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort)),
           schema.getSchemaName(), schemaFile);
     } catch (Exception e) {
       LOGGER.error("Got Exception to upload Pinot Schema: " + schema.getSchemaName(), e);
@@ -152,7 +161,7 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
     if (_controllerHost == null) {
       _controllerHost = NetUtil.getHostAddress();
     }
-    _controllerAddress = "http://" + _controllerHost + ":" + _controllerPort;
+    _controllerAddress = _controllerProtocol + "://" + _controllerHost + ":" + _controllerPort;
 
     LOGGER.info("Executing command: " + toString());
 
