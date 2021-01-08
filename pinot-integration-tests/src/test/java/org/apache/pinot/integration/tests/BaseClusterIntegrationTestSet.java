@@ -284,6 +284,11 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
           "SELECT COUNT(*) FROM mytable WHERE DestAirportID NOT IN (SELECT DestAirportID FROM mytable WHERE DaysSinceEpoch = 16430)";
       testSqlQuery(notInSubqueryQuery, Collections.singletonList(notInQuery));
     }
+
+    // Escape quotes
+    query = "SELECT DistanceGroup FROM mytable WHERE DATE_TIME_CONVERT(DaysSinceEpoch, '1:DAYS:EPOCH', '1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd''T''HH:mm:ss.SSS''Z''', '1:DAYS') = '2014-09-05T00:00:00.000Z'";
+    h2queries = Collections.singletonList("SELECT DistanceGroup FROM mytable WHERE DaysSinceEpoch = 16318 LIMIT 10000");
+    testSqlQuery(query, h2queries);
   }
 
   /**
