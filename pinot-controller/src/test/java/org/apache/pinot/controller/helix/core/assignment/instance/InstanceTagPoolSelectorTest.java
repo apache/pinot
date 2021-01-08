@@ -63,10 +63,14 @@ public class InstanceTagPoolSelectorTest {
     Map<Integer, List<InstanceConfig>> poolToInstanceConfigsMap = selector.selectInstances(instanceConfigs);
     List<InstanceConfig> instanceConfigresults = poolToInstanceConfigsMap.get(Integer.parseInt(poolNum));
 
+    //Number of selected instance is 1
     assertEquals(instanceConfigresults.size(), 1);
+    //Name of selected instance is testInstanceName
     assertEquals(instanceConfigresults.get(0).getInstanceName(), testInstanceName);
+    //poolNum is present in mapField
     assertEquals(instanceConfigresults.get(0).getRecord().getMapFields().get("pool").get(_tag), poolNum);
   }
+  
 
   /**
    * Tests {@link InstanceTagPoolSelector#selectInstances(List)} method for pool based tag config with multiple pools.
@@ -86,16 +90,63 @@ public class InstanceTagPoolSelectorTest {
     instanceConfigs.add(config2);
 
     //init tagPoolConfig as poolBased and empty pool
+    List<Integer> poolList = new ArrayList<>();
+    poolList.add(Integer.valueOf(poolNum));
+    poolList.add(Integer.valueOf(poolNum2));
+    _tagPoolConfig = prepareInstanceTagPoolConfigForTest(true, 1, poolList);
+    InstanceTagPoolSelector selector = new InstanceTagPoolSelector(_tagPoolConfig, _tableNameWithType);
+
+    //test the selectInstances method
+    Map<Integer, List<InstanceConfig>> poolToInstanceConfigsMap = selector.selectInstances(instanceConfigs);
+    List<InstanceConfig> instanceConfigresults = poolToInstanceConfigsMap.get(Integer.parseInt(poolNum));
+    List<InstanceConfig> instanceConfigresults2 = poolToInstanceConfigsMap.get(Integer.parseInt(poolNum2));
+
+    //Result map size is 2
+    assertEquals(poolToInstanceConfigsMap.size(), 2);
+    
+    //Verifying instanceConfig result
+    assertEquals(instanceConfigresults.size(), 1);
+    assertEquals(instanceConfigresults.get(0).getInstanceName(), testInstanceName);
+    assertEquals(instanceConfigresults.get(0).getRecord().getMapFields().get("pool").get(_tag), poolNum);
+    
+    //Verifying instanceConfig result
+    assertEquals(instanceConfigresults2.size(), 1);
+    assertEquals(instanceConfigresults2.get(0).getInstanceName(), testInstanceName2);
+    assertEquals(instanceConfigresults2.get(0).getRecord().getMapFields().get("pool").get(_tag), poolNum2);
+  }
+  
+  /**
+   * Tests {@link InstanceTagPoolSelector#selectInstances(List)} method for pool based tag config with multiple pools.
+   */
+  @Test
+  public void testPoolTagBasedInstancesSelectionWithMultiplePoolsAndEmptyPoolList() {
+    String poolNum = "1";
+    String poolNum2 = "2";
+    String testInstanceName = "testInstanceId";
+    String testInstanceName2 = "testInstanceId2";
+
+    //create multiple instanceConfigs
+    List<InstanceConfig> instanceConfigs = new ArrayList<>();
+    InstanceConfig config = prepareInstanceConfigForTest(testInstanceName, poolNum);
+    InstanceConfig config2 = prepareInstanceConfigForTest(testInstanceName2, poolNum2);
+    instanceConfigs.add(config);
+    instanceConfigs.add(config2);
+
+    //init tagPoolConfig as poolBased and empty pool
     _tagPoolConfig = prepareInstanceTagPoolConfigForTest(true, 1, new ArrayList<>());
     InstanceTagPoolSelector selector = new InstanceTagPoolSelector(_tagPoolConfig, _tableNameWithType);
 
     //test the selectInstances method
     Map<Integer, List<InstanceConfig>> poolToInstanceConfigsMap = selector.selectInstances(instanceConfigs);
-    List<InstanceConfig> instanceConfigresults = poolToInstanceConfigsMap.get(Integer.parseInt(poolNum2));
+    List<InstanceConfig> instanceConfigresults2 = poolToInstanceConfigsMap.get(Integer.parseInt(poolNum2));
 
-    assertEquals(instanceConfigresults.size(), 1);
-    assertEquals(instanceConfigresults.get(0).getInstanceName(), testInstanceName2);
-    assertEquals(instanceConfigresults.get(0).getRecord().getMapFields().get("pool").get(_tag), poolNum2);
+    //Result map size is 2
+    assertEquals(poolToInstanceConfigsMap.size(), 1);
+    
+    //Verifying instanceConfig result
+    assertEquals(instanceConfigresults2.size(), 1);
+    assertEquals(instanceConfigresults2.get(0).getInstanceName(), testInstanceName2);
+    assertEquals(instanceConfigresults2.get(0).getRecord().getMapFields().get("pool").get(_tag), poolNum2);
   }
 
   /**
@@ -119,6 +170,7 @@ public class InstanceTagPoolSelectorTest {
     Map<Integer, List<InstanceConfig>> poolToInstanceConfigsMap = selector.selectInstances(instanceConfigs);
     List<InstanceConfig> instanceConfigresults = poolToInstanceConfigsMap.get(0);
 
+    //Verifying instanceConfig result
     assertEquals(instanceConfigresults.size(), 1);
     assertEquals(instanceConfigresults.get(0).getInstanceName(), testInstanceName);
     assertEquals(instanceConfigresults.get(0).getRecord().getMapFields().get("pool").get(_tag), poolNum);
@@ -145,6 +197,7 @@ public class InstanceTagPoolSelectorTest {
     Map<Integer, List<InstanceConfig>> poolToInstanceConfigsMap = selector.selectInstances(instanceConfigs);
     List<InstanceConfig> instanceConfigresults = poolToInstanceConfigsMap.get(Integer.parseInt(poolNum));
 
+    //Verifying instanceConfig result
     assertEquals(instanceConfigresults.size(), 1);
     assertEquals(instanceConfigresults.get(0).getInstanceName(), testInstanceName);
     assertEquals(instanceConfigresults.get(0).getRecord().getMapFields().get("pool").get(_tag), poolNum);
@@ -171,6 +224,7 @@ public class InstanceTagPoolSelectorTest {
     Map<Integer, List<InstanceConfig>> poolToInstanceConfigsMap = selector.selectInstances(instanceConfigs);
     List<InstanceConfig> instanceConfigresults = poolToInstanceConfigsMap.get(Integer.parseInt(poolNum));
 
+    //Verifying instanceConfig result
     assertEquals(instanceConfigresults.size(), 1);
     assertEquals(instanceConfigresults.get(0).getInstanceName(), testInstanceName);
     assertEquals(instanceConfigresults.get(0).getRecord().getMapFields().get("pool").get(_tag), poolNum);
