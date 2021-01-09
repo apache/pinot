@@ -194,7 +194,7 @@ public class ListenerConfigUtilTest {
     Assert.assertTrue(httpsListener.getTlsConfig().isEnabled());
     Assert.assertEquals(httpsListener.getTlsConfig().getKeyStorePassword(), "a-password");
     Assert.assertEquals(httpsListener.getTlsConfig().getKeyStorePath(), "/some-keystore-path");
-    Assert.assertTrue(httpsListener.getTlsConfig().isClientAuth());
+    Assert.assertTrue(httpsListener.getTlsConfig().isClientAuthEnabled());
     Assert.assertEquals(httpsListener.getTlsConfig().getTrustStorePassword(), "a-password");
     Assert.assertEquals(httpsListener.getTlsConfig().getTrustStorePath(), "/some-truststore-path");
   }

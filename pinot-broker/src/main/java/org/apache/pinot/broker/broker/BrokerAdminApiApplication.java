@@ -75,17 +75,17 @@ public class BrokerAdminApiApplication extends ResourceConfig {
 
     Preconditions.checkArgument(brokerQueryPort > 0, "broker client port must be > 0");
     _baseUri = URI.create(String.format("%s://0.0.0.0:%d/", getBrokerClientProtocol(brokerConf), brokerQueryPort));
-    _httpServer = buildHttpsServer(brokerConf);
+    _httpServer = buildHttpServer(brokerConf);
     setupSwagger();
   }
 
-  private HttpServer buildHttpsServer(PinotConfiguration brokerConf) {
+  private HttpServer buildHttpServer(PinotConfiguration brokerConf) {
     boolean isSecure = CommonConstants.HTTPS_PROTOCOL.equals(getBrokerClientProtocol(brokerConf));
 
-    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(brokerConf, CommonConstants.Broker.BROKER_CLIENT_TLS_PREFIX, CommonConstants.Broker.BROKER_TLS_PREFIX);
-    tlsConfig.setEnabled(isSecure);
-
     if (isSecure) {
+      TlsConfig tlsConfig = TlsUtils.extractTlsConfig(brokerConf, CommonConstants.Broker.BROKER_CLIENT_TLS_PREFIX, CommonConstants.Broker.BROKER_TLS_PREFIX);
+      tlsConfig.setEnabled(true);
+
       return GrizzlyHttpServerFactory.createHttpServer(_baseUri, this, true, buildSSLConfig(tlsConfig));
     }
 
@@ -101,7 +101,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     sslContextConfigurator.setTrustStorePass(tlsConfig.getTrustStorePassword());
 
     return new SSLEngineConfigurator(sslContextConfigurator).setClientMode(false)
-        .setNeedClientAuth(tlsConfig.isClientAuth()).setEnabledProtocols(new String[] { "TLSv1.2" });
+        .setNeedClientAuth(tlsConfig.isClientAuthEnabled()).setEnabledProtocols(new String[] { "TLSv1.2" });
   }
 
   private static String getBrokerClientProtocol(PinotConfiguration brokerConf) {

@@ -28,8 +28,6 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
-import io.netty.handler.logging.LogLevel;
-import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContextBuilder;
 import java.util.concurrent.TimeUnit;
@@ -118,7 +116,7 @@ public class QueryServer {
         sslContextBuilder.trustManager(TlsUtils.createTrustManagerFactory(_tlsConfig));
       }
 
-      if (_tlsConfig.isClientAuth()) {
+      if (_tlsConfig.isClientAuthEnabled()) {
         sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
       }
 

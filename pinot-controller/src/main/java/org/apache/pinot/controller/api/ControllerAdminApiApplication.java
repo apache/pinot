@@ -78,7 +78,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     sslContextConfigurator.setTrustStorePass(tlsConfig.getTrustStorePassword());
 
     return new SSLEngineConfigurator(sslContextConfigurator).setClientMode(false)
-        .setNeedClientAuth(tlsConfig.isClientAuth()).setEnabledProtocols(new String[] { "TLSv1.2" });
+        .setNeedClientAuth(tlsConfig.isClientAuthEnabled()).setEnabledProtocols(new String[] { "TLSv1.2" });
   }
 
   public void registerBinder(AbstractBinder binder) {

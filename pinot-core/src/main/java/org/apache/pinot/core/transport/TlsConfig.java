@@ -23,7 +23,7 @@ package org.apache.pinot.core.transport;
  */
 public class TlsConfig {
   private boolean _enabled;
-  private boolean _clientAuth;
+  private boolean _clientAuthEnabled;
   private String _keyStorePath;
   private String _keyStorePassword;
   private String _trustStorePath;
@@ -37,12 +37,12 @@ public class TlsConfig {
     _enabled = enabled;
   }
 
-  public boolean isClientAuth() {
-    return _clientAuth;
+  public boolean isClientAuthEnabled() {
+    return _clientAuthEnabled;
   }
 
-  public void setClientAuth(boolean clientAuth) {
-    _clientAuth = clientAuth;
+  public void setClientAuthEnabled(boolean clientAuthEnabled) {
+    _clientAuthEnabled = clientAuthEnabled;
   }
 
   public String getKeyStorePath() {

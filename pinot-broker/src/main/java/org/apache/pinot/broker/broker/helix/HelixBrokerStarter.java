@@ -240,7 +240,7 @@ public class HelixBrokerStarter implements ServiceStartable {
     // Initialize FunctionRegistry before starting the broker request handler
     FunctionRegistry.init();
     TableCache tableCache = new TableCache(_propertyStore, caseInsensitive);
-    // Configure TLS
+    // Configure TLS for netty connection to server
     TlsConfig tlsConfig = TlsUtils.extractTlsConfig(_brokerConf, Broker.BROKER_NETTY_TLS_PREFIX, Broker.BROKER_TLS_PREFIX);
     _brokerRequestHandler =
         new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory, queryQuotaManager,

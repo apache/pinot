@@ -37,7 +37,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  */
 public final class TlsUtils {
   private static final String ENABLED = "enabled";
-  private static final String CLIENT_AUTH = "client.auth";
+  private static final String CLIENT_AUTH_ENABLED = "client.auth.enabled";
   private static final String KEYSTORE_PATH = "keystore.path";
   private static final String KEYSTORE_PASSWORD = "keystore.password";
   private static final String TRUSTSTORE_PATH = "truststore.path";
@@ -81,6 +81,7 @@ public final class TlsUtils {
    * @return KeyManagerFactory
    */
   public static KeyManagerFactory createKeyManagerFactory(TlsConfig tlsConfig) {
+    Preconditions.checkArgument(tlsConfig.isEnabled(), "tls is disabled");
     Preconditions.checkNotNull(tlsConfig.getKeyStorePath(), "key store path is null");
     Preconditions.checkNotNull(tlsConfig.getKeyStorePassword(), "key store password is null");
 
@@ -109,6 +110,7 @@ public final class TlsUtils {
    * @return TrustManagerFactory
    */
   public static TrustManagerFactory createTrustManagerFactory(TlsConfig tlsConfig) {
+    Preconditions.checkArgument(tlsConfig.isEnabled(), "tls is disabled");
     Preconditions.checkNotNull(tlsConfig.getTrustStorePath(), "trust store path is null");
     Preconditions.checkNotNull(tlsConfig.getTrustStorePassword(), "trust store password is null");
 
@@ -148,8 +150,8 @@ public final class TlsUtils {
       SSLContext sc = SSLContext.getInstance("SSL");
       sc.init(keyManagers, trustManagers, new java.security.SecureRandom());
       HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
-    } catch (GeneralSecurityException ignore) {
-      // ignore
+    } catch (GeneralSecurityException e) {
+      throw new IllegalStateException("Could not initialize SSL support", e);
     }
   }
 
@@ -157,8 +159,8 @@ public final class TlsUtils {
     if (pinotConfig.containsKey(key(prefix, ENABLED))) {
       tlsConfig.setEnabled(pinotConfig.getProperty(key(prefix, ENABLED), false));
     }
-    if (pinotConfig.containsKey(key(prefix, CLIENT_AUTH))) {
-      tlsConfig.setClientAuth(pinotConfig.getProperty(key(prefix, CLIENT_AUTH), false));
+    if (pinotConfig.containsKey(key(prefix, CLIENT_AUTH_ENABLED))) {
+      tlsConfig.setClientAuthEnabled(pinotConfig.getProperty(key(prefix, CLIENT_AUTH_ENABLED), false));
     }
     if (pinotConfig.containsKey(key(prefix, KEYSTORE_PATH))) {
       tlsConfig.setKeyStorePath(pinotConfig.getProperty(key(prefix, KEYSTORE_PATH)));
