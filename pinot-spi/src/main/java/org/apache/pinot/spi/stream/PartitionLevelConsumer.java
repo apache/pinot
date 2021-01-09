@@ -63,9 +63,9 @@ public interface PartitionLevelConsumer extends Closeable, PartitionGroupConsume
     return fetchMessages(startOffsetLong, endOffsetLong, timeoutMillis);
   }
 
-  default MessageBatch fetchMessages(Checkpoint startCheckpoint, Checkpoint endCheckpoint, int timeoutMillis)
+  default MessageBatch fetchMessages(Checkpoint startCheckpoint, Checkpoint endCheckpoint, int timeoutMs)
       throws java.util.concurrent.TimeoutException {
-    // TODO Issue 5359 remove this default implementation once all kafka consumers have migrated to use this API
-    return fetchMessages((StreamPartitionMsgOffset) startCheckpoint, (StreamPartitionMsgOffset) endCheckpoint, timeoutMillis);
+    return fetchMessages((StreamPartitionMsgOffset) startCheckpoint, (StreamPartitionMsgOffset) endCheckpoint,
+        timeoutMs);
   }
 }

@@ -908,29 +908,20 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     @Override
     void updateIdealStateOnSegmentCompletion(String realtimeTableName, String committingSegmentName,
-        List<String> newSegmentNames, SegmentAssignment segmentAssignment,
+        String newSegmentName, SegmentAssignment segmentAssignment,
         Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap) {
-      updateInstanceStatesForNewConsumingSegment(_idealState.getRecord().getMapFields(), committingSegmentName,
-          null, segmentAssignment, instancePartitionsMap);
-      for (String segmentName : newSegmentNames) {
-        updateInstanceStatesForNewConsumingSegment(_idealState.getRecord().getMapFields(), null,
-            segmentName, segmentAssignment, instancePartitionsMap);
-      }
+      updateInstanceStatesForNewConsumingSegment(_idealState.getRecord().getMapFields(), committingSegmentName, null,
+          segmentAssignment, instancePartitionsMap);
+      updateInstanceStatesForNewConsumingSegment(_idealState.getRecord().getMapFields(), null, newSegmentName,
+          segmentAssignment, instancePartitionsMap);
     }
 
     @Override
     List<PartitionGroupInfo> getPartitionGroupInfoList(StreamConfig streamConfig,
         List<PartitionGroupMetadata> currentPartitionGroupMetadataList) {
       return IntStream.range(0, _numPartitions).mapToObj(i -> new PartitionGroupInfo(i,
-          getPartitionOffset(streamConfig, OffsetCriteria.SMALLEST_OFFSET_CRITERIA, i).toString()))
+          PARTITION_OFFSET.toString()))
           .collect(Collectors.toList());
-    }
-
-    @Override
-    LongMsgOffset getPartitionOffset(StreamConfig streamConfig, OffsetCriteria offsetCriteria, int partitionGroupId) {
-      // The criteria for this test should always be SMALLEST (for default streaming config and new added partitions)
-      assertTrue(offsetCriteria.isSmallest());
-      return PARTITION_OFFSET;
     }
 
     @Override

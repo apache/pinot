@@ -28,6 +28,9 @@ import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
 
 
+/**
+ * {@link StreamConsumerFactory} implementation for the Kinesis stream
+ */
 public class KinesisConsumerFactory extends StreamConsumerFactory {
 
   @Override
@@ -43,7 +46,7 @@ public class KinesisConsumerFactory extends StreamConsumerFactory {
 
   @Override
   public StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition) {
-    return null;
+    throw new UnsupportedOperationException();
   }
 
   @Override
@@ -52,7 +55,8 @@ public class KinesisConsumerFactory extends StreamConsumerFactory {
   }
 
   @Override
-  public PartitionGroupConsumer createPartitionGroupConsumer(String clientId, PartitionGroupMetadata metadata) {
+  public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
+      PartitionGroupMetadata partitionGroupMetadata) {
     return new KinesisConsumer(new KinesisConfig(_streamConfig));
   }
 

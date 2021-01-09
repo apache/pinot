@@ -25,7 +25,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Fetches the partition count of a stream using the {@link StreamMetadataProvider}
+ * Creates a list of PartitionGroupInfo for all partition groups of the stream using the {@link StreamMetadataProvider}
  */
 public class PartitionGroupInfoFetcher implements Callable<Boolean> {
 

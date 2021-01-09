@@ -18,7 +18,12 @@
  */
 package org.apache.pinot.spi.stream;
 
+/**
+ * Keeps track of the consumption for a PartitionGroup
+ */
 public interface Checkpoint extends Comparable {
+
   String serialize();
+
   Checkpoint deserialize(String checkpointStr);
 }

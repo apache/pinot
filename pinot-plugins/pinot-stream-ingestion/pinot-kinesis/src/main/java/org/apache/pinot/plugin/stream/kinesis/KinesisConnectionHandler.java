@@ -27,14 +27,13 @@ import software.amazon.awssdk.services.kinesis.model.ListShardsResponse;
 import software.amazon.awssdk.services.kinesis.model.Shard;
 
 
+/**
+ * Manages the Kinesis stream connection, given the stream name and aws region
+ */
 public class KinesisConnectionHandler {
   KinesisClient _kinesisClient;
-  private String _stream;
-  private String _awsRegion;
-
-  public KinesisConnectionHandler() {
-
-  }
+  private final String _stream;
+  private final String _awsRegion;
 
   public KinesisConnectionHandler(String stream, String awsRegion) {
     _stream = stream;
@@ -42,12 +41,18 @@ public class KinesisConnectionHandler {
     createConnection();
   }
 
+  /**
+   * Lists all shards of the stream
+   */
   public List<Shard> getShards() {
     ListShardsResponse listShardsResponse =
         _kinesisClient.listShards(ListShardsRequest.builder().streamName(_stream).build());
     return listShardsResponse.shards();
   }
 
+  /**
+   * Creates a Kinesis client for the stream
+   */
   public void createConnection() {
     if (_kinesisClient == null) {
       _kinesisClient =

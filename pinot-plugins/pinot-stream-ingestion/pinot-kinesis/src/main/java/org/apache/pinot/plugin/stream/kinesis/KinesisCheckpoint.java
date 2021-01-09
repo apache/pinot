@@ -22,12 +22,17 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
 import java.util.Map;
+import org.apache.pinot.spi.stream.Checkpoint;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
+/**
+ * A {@link Checkpoint} implementation for the Kinesis partition group consumption
+ * A partition group consists of 1 or more shards. The KinesisCheckpoint maintains a Map of shards to the sequenceNumber
+ */
 public class KinesisCheckpoint implements StreamPartitionMsgOffset {
-  private Map<String, String> _shardToStartSequenceMap;
+  private final Map<String, String> _shardToStartSequenceMap;
 
   public KinesisCheckpoint(Map<String, String> shardToStartSequenceMap) {
     _shardToStartSequenceMap = shardToStartSequenceMap;
@@ -68,6 +73,7 @@ public class KinesisCheckpoint implements StreamPartitionMsgOffset {
 
   @Override
   public int compareTo(Object o) {
-    return this._shardToStartSequenceMap.values().iterator().next().compareTo(((KinesisCheckpoint) o)._shardToStartSequenceMap.values().iterator().next());
+    return this._shardToStartSequenceMap.values().iterator().next()
+        .compareTo(((KinesisCheckpoint) o)._shardToStartSequenceMap.values().iterator().next());
   }
 }

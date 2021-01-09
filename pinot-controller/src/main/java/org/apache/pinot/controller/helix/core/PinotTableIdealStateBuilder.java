@@ -117,6 +117,12 @@ public class PinotTableIdealStateBuilder {
     pinotLLCRealtimeSegmentManager.setUpNewTable(realtimeTableConfig, idealState);
   }
 
+  /**
+   * Fetches the list of {@link PartitionGroupInfo} for the stream, with the help of the current partitionGroups metadata
+   * This call will only skip partitions which have reached end of life and all messages from that partition have been consumed.
+   * The current partition group metadata is used to determine the offsets that have been consumed for a partition.
+   * The current partition group metadata is also used to know about existing partition groupings which should not be disturbed
+   */
   public static List<PartitionGroupInfo> getPartitionGroupInfoList(StreamConfig streamConfig,
       List<PartitionGroupMetadata> currentPartitionGroupMetadataList) {
     PartitionGroupInfoFetcher partitionGroupInfoFetcher =
@@ -126,7 +132,7 @@ public class PinotTableIdealStateBuilder {
       return partitionGroupInfoFetcher.getPartitionGroupInfoList();
     } catch (Exception e) {
       Exception fetcherException = partitionGroupInfoFetcher.getException();
-      LOGGER.error("Could not get partition count for {}", streamConfig.getTopicName(), fetcherException);
+      LOGGER.error("Could not get partition group info for {}", streamConfig.getTopicName(), fetcherException);
       throw new RuntimeException(fetcherException);
     }
   }
