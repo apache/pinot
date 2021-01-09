@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
@@ -240,7 +241,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   // Segment end criteria
   private volatile long _consumeEndTime = 0;
   private Checkpoint _finalOffset; // Used when we want to catch up to this one
-  private boolean _endOfPartitionGroup = false;
   private volatile boolean _shouldStop = false;
 
   // It takes 30s to locate controller leader, and more if there are multiple controller failures.
@@ -305,12 +305,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           segmentLogger.info("Stopping consumption due to row limit nRows={} numRowsIndexed={}, numRowsConsumed={}",
               _numRowsIndexed, _numRowsConsumed, _segmentMaxRowCount);
           _stopReason = SegmentCompletionProtocol.REASON_ROW_LIMIT;
-          return true;
-        } else if (_endOfPartitionGroup) {
-          // FIXME: handle numDocsIndexed == 0 case
-          segmentLogger.info("Stopping consumption due to end of partitionGroup reached nRows={} numRowsIndexed={}, numRowsConsumed={}",
-              _numRowsIndexed, _numRowsConsumed, _segmentMaxRowCount);
-          _stopReason = SegmentCompletionProtocol.REASON_END_OF_PARTITION_GROUP;
           return true;
         }
         return false;
@@ -390,8 +384,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       try {
         messageBatch = _partitionGroupConsumer
             .fetchMessages(_currentOffset, null, _partitionLevelStreamConfig.getFetchTimeoutMillis());
-        _endOfPartitionGroup = messageBatch.isEndOfPartitionGroup();
         consecutiveErrorCount = 0;
+      } catch (TimeoutException e) {
+        handleTransientStreamErrors(e);
+        continue;
       } catch (TransientConsumerException e) {
         handleTransientStreamErrors(e);
         continue;
@@ -1247,7 +1243,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         //       long as the partition function is not changed.
         int numPartitions = columnPartitionConfig.getNumPartitions();
         try {
-          int numStreamPartitions = _streamMetadataProvider.fetchPartitionCount(/*maxWaitTimeMs=*/5000L);
+          // TODO: currentPartitionGroupMetadata should be fetched from idealState + segmentZkMetadata, so that we get back accurate partitionGroups info
+          //  However this is not an issue for Kafka, since partitionGroups never expire and every partitionGroup has a single partition
+          //  Fix this before opening support for partitioning in Kinesis
+          int numStreamPartitions = _streamMetadataProvider
+              .getPartitionGroupInfoList(_clientId, _partitionLevelStreamConfig,
+                  Collections.emptyList(), /*maxWaitTimeMs=*/5000).size();
           if (numStreamPartitions != numPartitions) {
             segmentLogger.warn(
                 "Number of stream partitions: {} does not match number of partitions in the partition config: {}, using number of stream partitions",
@@ -1329,7 +1330,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       closeStreamMetadataProvider();
     }
     segmentLogger.info("Creating new stream metadata provider, reason: {}", reason);
-    _streamMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(_clientId, _partitionGroupId);
+    _streamMetadataProvider = _streamConsumerFactory.createStreamMetadataProvider(_clientId);
   }
 
   // This should be done during commit? We may not always commit when we build a segment....

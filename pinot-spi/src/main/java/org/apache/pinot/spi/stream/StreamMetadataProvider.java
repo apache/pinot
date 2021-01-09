@@ -60,7 +60,7 @@ public interface StreamMetadataProvider extends Closeable {
   }
 
   /**
-   * Fetch the partitionGroupMetadata list.
+   * Fetch the list of partition group info for the latest state of the stream
    * @param currentPartitionGroupsMetadata In case of Kafka, each partition group contains a single partition.
    */
   default List<PartitionGroupInfo> getPartitionGroupInfoList(String clientId, StreamConfig streamConfig,
@@ -69,14 +69,13 @@ public interface StreamMetadataProvider extends Closeable {
     int partitionCount = fetchPartitionCount(timeoutMillis);
     List<PartitionGroupInfo> newPartitionGroupInfoList = new ArrayList<>(partitionCount);
 
-    // add a PartitionGroupInfo into the list foreach partition already present in current.
-    // the end checkpoint is set as checkpoint
+    // Add a PartitionGroupInfo into the list foreach partition already present in current.
     for (PartitionGroupMetadata currentPartitionGroupMetadata : currentPartitionGroupsMetadata) {
       newPartitionGroupInfoList.add(new PartitionGroupInfo(currentPartitionGroupMetadata.getPartitionGroupId(),
           currentPartitionGroupMetadata.getEndCheckpoint()));
     }
-    // add PartitiongroupInfo for new partitions
-    // use offset criteria from stream config
+    // Add PartitionGroupInfo for new partitions
+    // Use offset criteria from stream config
     StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
     for (int i = currentPartitionGroupsMetadata.size(); i < partitionCount; i++) {
       StreamMetadataProvider partitionMetadataProvider =

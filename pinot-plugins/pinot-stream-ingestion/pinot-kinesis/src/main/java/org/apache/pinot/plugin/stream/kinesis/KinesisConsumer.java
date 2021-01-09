@@ -43,6 +43,9 @@ import software.amazon.awssdk.services.kinesis.model.ResourceNotFoundException;
 import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 
 
+/**
+ * A {@link PartitionGroupConsumer} implementation for the Kinesis stream
+ */
 public class KinesisConsumer extends KinesisConnectionHandler implements PartitionGroupConsumer {
   private final Logger LOG = LoggerFactory.getLogger(KinesisConsumer.class);
   String _stream;
@@ -58,16 +61,19 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     _executorService = Executors.newSingleThreadExecutor();
   }
 
+  /**
+   * Fetch records from the Kinesis stream between the start and end KinesisCheckpoint
+   */
   @Override
-  public KinesisRecordsBatch fetchMessages(Checkpoint start, Checkpoint end, int timeoutMs) {
+  public KinesisRecordsBatch fetchMessages(Checkpoint startCheckpoint, Checkpoint endCheckpoint, int timeoutMs) {
     List<Record> recordList = new ArrayList<>();
     Future<KinesisRecordsBatch> kinesisFetchResultFuture =
-        _executorService.submit(() -> getResult(start, end, recordList));
+        _executorService.submit(() -> getResult(startCheckpoint, endCheckpoint, recordList));
 
     try {
       return kinesisFetchResultFuture.get(timeoutMs, TimeUnit.MILLISECONDS);
     } catch (Exception e) {
-      return handleException((KinesisCheckpoint) start, recordList);
+      return handleException((KinesisCheckpoint) startCheckpoint, recordList);
     }
   }
 
@@ -81,6 +87,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
       }
 
       //TODO: iterate upon all the shardIds in the map
+      // Okay for now, since we have assumed that every partition group contains a single shard
       Map.Entry<String, String> next = kinesisStartCheckpoint.getShardToStartSequenceMap().entrySet().iterator().next();
       String shardIterator = getShardIterator(next.getKey(), next.getValue());
 
@@ -156,14 +163,11 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
       String nextStartSequenceNumber = recordList.get(recordList.size() - 1).sequenceNumber();
       Map<String, String> newCheckpoint = new HashMap<>(start.getShardToStartSequenceMap());
       newCheckpoint.put(newCheckpoint.keySet().iterator().next(), nextStartSequenceNumber);
-
-      return new KinesisRecordsBatch(recordList, shardId, false);
-    } else {
-      return new KinesisRecordsBatch(recordList, shardId, false);
     }
+    return new KinesisRecordsBatch(recordList, shardId, false);
   }
 
-  public String getShardIterator(String shardId, String sequenceNumber) {
+  private String getShardIterator(String shardId, String sequenceNumber) {
 
     GetShardIteratorRequest.Builder requestBuilder =
         GetShardIteratorRequest.builder().streamName(_stream).shardId(shardId).shardIteratorType(_shardIteratorType);

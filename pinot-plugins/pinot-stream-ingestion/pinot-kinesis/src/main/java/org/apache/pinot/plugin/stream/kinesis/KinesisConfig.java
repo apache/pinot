@@ -23,6 +23,9 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 
 
+/**
+ * Kinesis stream specific config
+ */
 public class KinesisConfig {
   public static final String STREAM = "stream";
   public static final String SHARD_ITERATOR_TYPE = "shard-iterator-type";

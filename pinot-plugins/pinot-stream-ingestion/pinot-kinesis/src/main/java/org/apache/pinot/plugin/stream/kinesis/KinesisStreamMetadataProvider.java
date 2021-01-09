@@ -1,21 +1,14 @@
 package org.apache.pinot.plugin.stream.kinesis;
 
-import com.google.common.base.Preconditions;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
@@ -28,6 +21,9 @@ import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import software.amazon.awssdk.services.kinesis.model.Shard;
 
 
+/**
+ * A {@link StreamMetadataProvider} implementation for the Kinesis stream
+ */
 public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
   private final KinesisConnectionHandler _kinesisConnectionHandler;
   private final StreamConsumerFactory _kinesisStreamConsumerFactory;
@@ -52,17 +48,23 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
     throw new UnsupportedOperationException();
   }
 
+  /**
+   * This call returns all active shards, taking into account the consumption status for those shards.
+   * PartitionGroupInfo is returned for a shard if:
+   * 1. It is a branch new shard i.e. no partitionGroupMetadata was found for it in the current list
+   * 2. It is still being actively consumed from i.e. the consuming partition has not reached the end of the shard
+   */
   @Override
   public List<PartitionGroupInfo> getPartitionGroupInfoList(String clientId, StreamConfig streamConfig,
       List<PartitionGroupMetadata> currentPartitionGroupsMetadata, int timeoutMillis)
       throws IOException, TimeoutException {
 
-    Map<Integer, PartitionGroupMetadata> currentPartitionGroupMap =
-        currentPartitionGroupsMetadata.stream().collect(Collectors.toMap(PartitionGroupMetadata::getPartitionGroupId, p -> p));
+    Map<Integer, PartitionGroupMetadata> currentPartitionGroupMap = currentPartitionGroupsMetadata.stream()
+        .collect(Collectors.toMap(PartitionGroupMetadata::getPartitionGroupId, p -> p));
 
     List<PartitionGroupInfo> newPartitionGroupInfos = new ArrayList<>();
     List<Shard> shards = _kinesisConnectionHandler.getShards();
-    for (Shard shard : shards) { // go over all shards
+    for (Shard shard : shards) {
       KinesisCheckpoint newStartCheckpoint;
 
       String shardId = shard.shardId();
@@ -76,7 +78,7 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
         } catch (Exception e) {
           // ignore. No end checkpoint yet for IN_PROGRESS segment
         }
-        if (currentEndCheckpoint != null) { // end checkpoint available i.e. committing segment
+        if (currentEndCheckpoint != null) { // end checkpoint available i.e. committing/committed segment
           String endingSequenceNumber = shard.sequenceNumberRange().endingSequenceNumber();
           if (endingSequenceNumber != null) { // shard has ended
             // check if segment has consumed all the messages already
@@ -104,8 +106,7 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
         newStartCheckpoint = new KinesisCheckpoint(shardToSequenceNumberMap);
       }
 
-      newPartitionGroupInfos
-          .add(new PartitionGroupInfo(partitionGroupId, newStartCheckpoint.serialize()));
+      newPartitionGroupInfos.add(new PartitionGroupInfo(partitionGroupId, newStartCheckpoint.serialize()));
     }
     return newPartitionGroupInfos;
   }

@@ -41,7 +41,6 @@ public abstract class StreamConsumerFactory {
    * @param partition the partition id of the partition for which this consumer is being created
    * @return
    */
-  @Deprecated
   public abstract PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition);
 
   /**
@@ -74,8 +73,11 @@ public abstract class StreamConsumerFactory {
     return new LongMsgOffsetFactory();
   }
 
-  // creates a consumer which consumes from a partition group
-  public PartitionGroupConsumer createPartitionGroupConsumer(String clientId, PartitionGroupMetadata metadata) {
-    return createPartitionLevelConsumer(clientId, metadata.getPartitionGroupId());
+  /**
+   * Creates a partition group consumer, which can fetch messages from a partition group
+   */
+  public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
+      PartitionGroupMetadata partitionGroupMetadata) {
+    return createPartitionLevelConsumer(clientId, partitionGroupMetadata.getPartitionGroupId());
   }
 }

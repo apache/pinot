@@ -22,7 +22,21 @@ import java.io.Closeable;
 import java.util.concurrent.TimeoutException;
 
 
+/**
+ * Consumer interface for consuming from a partition group of a stream
+ */
 public interface PartitionGroupConsumer extends Closeable {
-  MessageBatch fetchMessages(Checkpoint start, Checkpoint end, int timeout)
+
+  /**
+   * Fetch messages and offsets from the stream partition group
+   *
+   * @param startCheckpoint The offset of the first message desired, inclusive
+   * @param endCheckpoint The offset of the last message desired, exclusive, or null
+   * @param timeoutMs Timeout in milliseconds
+   * @throws java.util.concurrent.TimeoutException If the operation could not be completed within {@code timeoutMillis}
+   * milliseconds
+   * @return An iterable containing messages fetched from the stream partition and their offsets
+   */
+  MessageBatch fetchMessages(Checkpoint startCheckpoint, Checkpoint endCheckpoint, int timeoutMs)
       throws TimeoutException;
 }

@@ -18,32 +18,22 @@
  */
 package org.apache.pinot.spi.stream;
 
-import org.apache.pinot.spi.annotations.InterfaceStability;
-
-
 /**
  * An interface to be implemented by streams that are consumed using Pinot LLC consumption.
  */
-@InterfaceStability.Evolving
 public interface PartitionGroupCheckpointFactory {
   /**
    * Initialization, called once when the factory is created.
-   * @param streamConfig
    */
   void init(StreamConfig streamConfig);
 
   /**
-   * Construct an offset from the string provided.
-   * @param offsetStr
-   * @return StreamPartitionMsgOffset
+   * Construct a checkpoint from the string provided.
    */
   Checkpoint create(String offsetStr);
 
   /**
    * Construct an offset from another one provided, of the same type.
-   *
-   * @param other
-   * @return
    */
   Checkpoint create(Checkpoint other);
 }

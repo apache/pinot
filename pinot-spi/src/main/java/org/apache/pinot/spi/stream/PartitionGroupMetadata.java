@@ -18,12 +18,8 @@
  */
 package org.apache.pinot.spi.stream;
 
-import java.util.List;
-
-
 public class PartitionGroupMetadata {
 
-  // fixme: Make partitionGroupId string everywhere (LLCSegmentName, StreamMetadataProvider)
   private final int _partitionGroupId;
   private int _sequenceNumber;
   private String _startCheckpoint;

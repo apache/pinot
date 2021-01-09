@@ -18,18 +18,19 @@
  */
 package org.apache.pinot.spi.stream;
 
+/**
+ * A PartitionGroup is a group of partitions/shards that the same consumer should consume from.
+ * This class is a container for the metadata of a partition group. It consists of
+ * 1. A unique partition group id for this partition group
+ * 2. The start checkpoint to begin consumption for this partition group
+ */
 public class PartitionGroupInfo {
 
-  // fixme: Make partitionGroupId string everywhere (LLCSegmentName, StreamMetadataProvider)
   private final int _partitionGroupId;
-  private String _startCheckpoint;
+  private final String _startCheckpoint;
 
   public PartitionGroupInfo(int partitionGroupId, String startCheckpoint) {
     _partitionGroupId = partitionGroupId;
-    _startCheckpoint = startCheckpoint;
-  }
-
-  public void setStartCheckpoint(String startCheckpoint) {
     _startCheckpoint = startCheckpoint;
   }
 
