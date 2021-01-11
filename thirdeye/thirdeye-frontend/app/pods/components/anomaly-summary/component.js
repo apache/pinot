@@ -8,10 +8,10 @@ import { set, get, computed, getProperties } from '@ember/object';
 import { colorMapping, makeTime } from 'thirdeye-frontend/utils/rca-utils';
 import {
   getFormattedDuration,
-  anomalyResponseMapNew,
+  anomalyResponseMapAll,
   verifyAnomalyFeedback,
   anomalyResponseObj,
-  anomalyResponseObjNew,
+  reportedAnomalyResponseObj,
   updateAnomalyFeedback,
   anomalyTypeMapping
 } from 'thirdeye-frontend/utils/anomaly';
@@ -75,7 +75,7 @@ export default Component.extend({
   },
   isLoading: false,
   feedbackOptions: anomalyResponseObj.mapBy('name'),
-  labelMap: anomalyResponseMapNew,
+  labelMap: anomalyResponseMapAll,
   labelResponse: {},
 
   init() {
@@ -254,8 +254,6 @@ export default Component.extend({
       // Reset status icon
       set(this, 'renderStatusIcon', false);
       const responseObj = anomalyResponseObj.find((res) => res.name === selectedResponse);
-      // get the response object from anomalyResponseObjNew
-      const newFeedbackValue = anomalyResponseObjNew.find((res) => res.name === selectedResponse).value;
       try {
         // Save anomaly feedback
         await updateAnomalyFeedback(anomalyRecord.anomalyId, responseObj.value);
@@ -269,9 +267,11 @@ export default Component.extend({
             showResponseFailed: false
           });
 
-          // replace anomaly feedback with selectedFeedback
+          // get the response object from anomalyResponseObj and reportedAnomalyResponseObj
           anomalyData.feedback = {
-            feedbackType: newFeedbackValue
+            feedbackType: [...anomalyResponseObj, ...reportedAnomalyResponseObj].find(
+              (res) => res.name === selectedResponse
+            ).value
           };
 
           set(this, 'anomalyData', anomalyData);
