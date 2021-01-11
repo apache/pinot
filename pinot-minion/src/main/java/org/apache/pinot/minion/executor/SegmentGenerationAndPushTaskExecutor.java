@@ -97,7 +97,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
   private static final long DEFAULT_PUSH_RETRY_INTERVAL_MILLIS = 1000L;
 
   @Override
-  public Object executeTask(PinotTaskConfig pinotTaskConfig) {
+  public Object executeTask(PinotTaskConfig pinotTaskConfig) throws Exception {
     LOGGER.info("Executing SegmentGenerationAndPushTask with task config: {}", pinotTaskConfig);
     Map<String, String> taskConfigs = pinotTaskConfig.getConfigs();
     SegmentGenerationAndPushResult.Builder resultBuilder = new SegmentGenerationAndPushResult.Builder();
@@ -122,7 +122,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
           outputSegmentTarURI);
       resultBuilder.setSucceed(true);
     } catch (Exception e) {
-      resultBuilder.setException(e);
+      throw new RuntimeException("Failed to execute SegmentGenerationAndPushTask", e);
     } finally {
       // Cleanup output dir
       FileUtils.deleteQuietly(localTempDir);

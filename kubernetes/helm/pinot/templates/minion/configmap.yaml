@@ -18,18 +18,13 @@
 #
 
 apiVersion: v1
-appVersion: 0.2.3
-name: pinot
-description: Apache Pinot is a realtime distributed OLAP datastore, which is used to deliver scalable real time analytics with low latency. It can ingest data from offline data sources (such as Hadoop and flat files) as well as online sources (such as Kafka). Pinot is designed to scale horizontally.
-version: 0.2.3
-keywords:
-  - olap
-  - analytics
-  - database
-  - pinot
-home: https://pinot.apache.org/
-sources:
-  - https://github.com/apache/incubator-pinot
-maintainers:
-  - name: pinot-dev
-    email: dev@pinot.apache.org
+kind: ConfigMap
+metadata:
+  name: {{ include "pinot.minion.config" . }}
+data:
+  pinot-minion.conf: |-
+    pinot.minion.port={{ .Values.minion.port }}
+    {{- if .Values.minion.dataDir }}
+    dataDir={{ .Values.minion.dataDir }}
+    {{- end }}
+{{ .Values.minion.extra.configs | indent 4 }}

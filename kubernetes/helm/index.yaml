@@ -2,8 +2,36 @@ apiVersion: v1
 entries:
   pinot:
   - apiVersion: v1
+    appVersion: 0.2.3
+    created: "2021-01-10T20:34:46.225041-08:00"
+    dependencies:
+    - condition: pinot.zookeeper.enabled,zookeeper.enabled
+      name: zookeeper
+      repository: https://charts.helm.sh/incubator
+      version: 2.1.3
+    description: Apache Pinot is a realtime distributed OLAP datastore, which is used
+      to deliver scalable real time analytics with low latency. It can ingest data
+      from offline data sources (such as Hadoop and flat files) as well as online
+      sources (such as Kafka). Pinot is designed to scale horizontally.
+    digest: 5973bae14660ac6b127c6018e142938a0af13a1275960a7ebb1c11987335d0db
+    home: https://pinot.apache.org/
+    keywords:
+    - olap
+    - analytics
+    - database
+    - pinot
+    maintainers:
+    - email: dev@pinot.apache.org
+      name: pinot-dev
+    name: pinot
+    sources:
+    - https://github.com/apache/incubator-pinot/tree/master/kubernetes/helm
+    urls:
+    - pinot-0.2.3.tgz
+    version: 0.2.3
+  - apiVersion: v1
     appVersion: 0.2.2
-    created: "2020-09-29T00:03:26.751495-07:00"
+    created: "2021-01-10T20:34:46.221886-08:00"
     dependencies:
     - condition: pinot.zookeeper.enabled,zookeeper.enabled
       name: zookeeper
@@ -25,13 +53,13 @@ entries:
       name: pinot-dev
     name: pinot
     sources:
-    - https://github.com/apache/incubator-pinot
+    - https://github.com/apache/incubator-pinot/tree/master/kubernetes/helm
     urls:
     - pinot-0.2.2.tgz
     version: 0.2.2
   - apiVersion: v1
     appVersion: 0.2.1
-    created: "2020-09-29T00:03:26.748782-07:00"
+    created: "2021-01-10T20:34:46.218993-08:00"
     dependencies:
     - condition: pinot.zookeeper.enabled,zookeeper.enabled
       name: zookeeper
@@ -53,13 +81,13 @@ entries:
       name: pinot-dev
     name: pinot
     sources:
-    - https://github.com/apache/incubator-pinot
+    - https://github.com/apache/incubator-pinot/tree/master/kubernetes/helm
     urls:
     - pinot-0.2.1.tgz
     version: 0.2.1
   - apiVersion: v1
     appVersion: 0.2.0
-    created: "2020-09-29T00:03:26.745494-07:00"
+    created: "2021-01-10T20:34:46.213706-08:00"
     dependencies:
     - condition: pinot.zookeeper.enabled,zookeeper.enabled
       name: zookeeper
@@ -81,14 +109,14 @@ entries:
       name: pinot-dev
     name: pinot
     sources:
-    - https://github.com/apache/incubator-pinot
+    - https://github.com/apache/incubator-pinot/tree/master/kubernetes/helm
     urls:
     - pinot-0.2.0.tgz
     version: 0.2.0
   presto:
   - apiVersion: v1
     appVersion: 0.2.0
-    created: "2020-09-29T00:03:26.753701-07:00"
+    created: "2021-01-10T20:34:46.22658-08:00"
     description: Presto is an open source distributed SQL query engine for running
       interactive analytic queries against data sources of all sizes ranging from
       gigabytes to petabytes.
@@ -107,4 +135,4 @@ entries:
     urls:
     - presto-0.2.0.tgz
     version: 0.2.0
-generated: "2020-09-29T00:03:26.739572-07:00"
+generated: "2021-01-10T20:34:46.210113-08:00"
