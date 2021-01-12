@@ -1,4 +1,4 @@
-package org.apache.pinot.plugin.stream.kinesis; /**
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,6 +16,7 @@ package org.apache.pinot.plugin.stream.kinesis; /**
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.pinot.plugin.stream.kinesis;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -44,8 +45,7 @@ public class KinesisConsumerTest {
     for (Shard shard : shardList) {
       System.out.println("SHARD: " + shard.shardId());
 
-      KinesisConsumer kinesisConsumer =
-          new KinesisConsumer(kinesisConfig);
+      KinesisConsumer kinesisConsumer = new KinesisConsumer(kinesisConfig);
       System.out.println(
           "Kinesis Checkpoint Range: < " + shard.sequenceNumberRange().startingSequenceNumber() + ", " + shard
               .sequenceNumberRange().endingSequenceNumber() + " >");
@@ -57,7 +57,9 @@ public class KinesisConsumerTest {
 
       System.out.println("Found " + n + " messages ");
       for (int i = 0; i < n; i++) {
-        System.out.println("SEQ-NO: " + kinesisRecordsBatch.getMessageOffsetAtIndex(i) + ", DATA: " + kinesisRecordsBatch.getMessageAtIndex(i));
+        System.out.println(
+            "SEQ-NO: " + kinesisRecordsBatch.getMessageOffsetAtIndex(i) + ", DATA: " + kinesisRecordsBatch
+                .getMessageAtIndex(i));
       }
       kinesisConsumer.close();
     }
