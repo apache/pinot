@@ -35,9 +35,9 @@ public class FloatDictionary extends BaseImmutableDictionary {
     // numerical value represented as string to an int value.
     BigDecimal bigDecimal = new BigDecimal(stringValue);
 
-    // A value greater than Float.MAX_VALUE will downcast to Float.MAX_VALUE and a value less than Float.MIN_VALUE
-    // will downcast to Float.MIN_VALUE. This can cause binary search to return a match if the column actually contains
-    // Float.MIN_VALUE or Float.MAX_VALUE. We avoid this error by explicitly checking for overflow and underflow.
+    // A value greater than Float.MAX_VALUE will downcast to Float.MAX_VALUE and a value less than -Float.MAX_VALUE
+    // will downcast to -Float.MAX_VALUE. This can cause binary search to return a match if the column actually contains
+    // -Float.MAX_VALUE or Float.MAX_VALUE. We avoid this error by explicitly checking for overflow and underflow.
     if (bigDecimal.compareTo(BigDecimal.valueOf(Float.MAX_VALUE)) > 0) {
       // Binary search insert position of value greater than Float.MAX_VALUE
       return -(length()+1);

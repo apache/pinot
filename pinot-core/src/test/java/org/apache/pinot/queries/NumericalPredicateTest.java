@@ -111,7 +111,10 @@ public class NumericalPredicateTest extends BaseQueriesTest {
     records.add(createRecord(25, 1609046359848l, 25.1f, 25.01d, "minnie"));
     records.add(createRecord(40, 1609046659848l, 40.1f, 40.11d, "donald"));
     records.add(createRecord(15, 1609046219848l, 15.1f, 10.01d, "goofy"));
-    records.add(createRecord(45, 1609046279848l, 45.1f, 45.11d, "daffy"));
+    records.add(createRecord(45, 1609046279848l, 45.1f, 45.11d, "daffy1"));
+    records.add(createRecord(45, 1609046279848l, -45.1f, 45.11d, "daffy2"));
+    records.add(createRecord(45, 1609046279848l, -15.1f, 45.11d, "daffy3"));
+    records.add(createRecord(45, 1609046279848l, -2.1f, 45.11d, "daffy4"));
     records.add(createRecord(Integer.MAX_VALUE, Long.MAX_VALUE, 47.1f, 47.01d, "pluto"));
     records.add(createRecord(Integer.MIN_VALUE, Long.MIN_VALUE, 49.1f, 49.11d, "daisy"));
 
@@ -136,7 +139,7 @@ public class NumericalPredicateTest extends BaseQueriesTest {
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     List<Object> result = block.getAggregationResult();
     Assert.assertEquals(result.size(), 1);
-    Assert.assertEquals(result.get(0), 5l);
+    Assert.assertEquals(result.get(0), 8l);
   }
 
   /** Check if we can compare an INT column with a decimal value. */
@@ -166,7 +169,7 @@ public class NumericalPredicateTest extends BaseQueriesTest {
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     List<Object> result = block.getAggregationResult();
     Assert.assertEquals(result.size(), 1);
-    Assert.assertEquals(result.get(0), 7l);
+    Assert.assertEquals(result.get(0), 10l);
   }
 
   /** Check if we can use columns of different numerical types in calculations. */
@@ -196,7 +199,7 @@ public class NumericalPredicateTest extends BaseQueriesTest {
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     List<Object> result = block.getAggregationResult();
     Assert.assertEquals(result.size(), 1);
-    Assert.assertEquals(result.get(0), 8l);
+    Assert.assertEquals(result.get(0), 11l);
   }
 
   /** Check integer comparison with value less than integer maximum. */
@@ -206,7 +209,7 @@ public class NumericalPredicateTest extends BaseQueriesTest {
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     List<Object> result = block.getAggregationResult();
     Assert.assertEquals(result.size(), 1);
-    Assert.assertEquals(result.get(0), 8l);
+    Assert.assertEquals(result.get(0), 11l);
   }
 
   /** Check integer comparison with value exceeding integer maximum. */
@@ -216,7 +219,7 @@ public class NumericalPredicateTest extends BaseQueriesTest {
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     List<Object> result = block.getAggregationResult();
     Assert.assertEquals(result.size(), 1);
-    Assert.assertEquals(result.get(0), 8l);
+    Assert.assertEquals(result.get(0), 11l);
   }
 
   /** Check integer comparison with value less than integer maximum. */
@@ -226,7 +229,7 @@ public class NumericalPredicateTest extends BaseQueriesTest {
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     List<Object> result = block.getAggregationResult();
     Assert.assertEquals(result.size(), 1);
-    Assert.assertEquals(result.get(0), 8l);
+    Assert.assertEquals(result.get(0), 11l);
   }
 
   /** Check integer comparison with value exceeding integer maximum. */
@@ -267,6 +270,26 @@ public class NumericalPredicateTest extends BaseQueriesTest {
     List<Object> result = block.getAggregationResult();
     Assert.assertEquals(result.size(), 1);
     Assert.assertEquals(result.get(0), 0l);
+  }
+
+  /**  Check float comparison with negative values. */
+  @Test
+  public void testCompareFloatWithNegativeFloatValue() {
+    Operator operator = getOperatorForSqlQuery("select count(*) from scores where floatColumn > -10.0");
+    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
+    List<Object> result = block.getAggregationResult();
+    Assert.assertEquals(result.size(), 1);
+    Assert.assertEquals(result.get(0), 9l);
+  }
+
+  /**  Check float comparison with negative values. */
+  @Test
+  public void testCompareFloatWithNegativeLongValue() {
+    Operator operator = getOperatorForSqlQuery("select count(*) from scores where floatColumn > 5000000001.0 + -5000000046.05");
+    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
+    List<Object> result = block.getAggregationResult();
+    Assert.assertEquals(result.size(), 1);
+    Assert.assertEquals(result.get(0), 10l);
   }
 
   @AfterClass
