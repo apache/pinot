@@ -20,6 +20,7 @@ package org.apache.pinot.core.transport;
 
 import com.google.common.net.InternetDomainName;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.spi.config.table.TableType;
@@ -37,14 +38,20 @@ public class ServerRoutingInstance {
   private static final String SHORT_REALTIME_SUFFIX = "_R";
   private static final Map<String, String> SHORT_HOSTNAME_MAP = new ConcurrentHashMap<>();
 
+  private final boolean _tls;
   private final String _hostname;
   private final int _port;
   private final TableType _tableType;
 
   public ServerRoutingInstance(String hostname, int port, TableType tableType) {
+    this(hostname, port, tableType, false);
+  }
+
+  public ServerRoutingInstance(String hostname, int port, TableType tableType, boolean tls) {
     _hostname = hostname;
     _port = port;
     _tableType = tableType;
+    _tls = tls;
   }
 
   public String getHostname() {
@@ -71,21 +78,26 @@ public class ServerRoutingInstance {
     return shortHostname + (_tableType == TableType.OFFLINE ? SHORT_OFFLINE_SUFFIX : SHORT_REALTIME_SUFFIX);
   }
 
-  @Override
-  public int hashCode() {
-    return 31 * 31 * _hostname.hashCode() + 31 * _port + _tableType.hashCode();
+  public boolean isTls() {
+    return _tls;
   }
 
   @Override
-  public boolean equals(Object obj) {
-    if (this == obj) {
+  public boolean equals(Object o) {
+    if (this == o) {
       return true;
     }
-    if (obj instanceof ServerRoutingInstance) {
-      ServerRoutingInstance that = (ServerRoutingInstance) obj;
-      return _hostname.equals(that._hostname) && _port == that._port && _tableType == that._tableType;
+    if (o == null || getClass() != o.getClass()) {
+      return false;
     }
-    return false;
+    ServerRoutingInstance that = (ServerRoutingInstance) o;
+    return _tls == that._tls && _port == that._port && _hostname.equals(that._hostname)
+        && _tableType == that._tableType;
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(_tls, _hostname, _port, _tableType);
   }
 
   @Override

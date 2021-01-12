@@ -30,6 +30,7 @@ public class ServerInstance {
 
   private final String _hostname;
   private final int _port;
+  private final int _tlsPort;
 
   /**
    * By default (auto joined instances), server instance name is of format: {@code Server_<hostname>_<port>}, e.g.
@@ -52,12 +53,19 @@ public class ServerInstance {
       _hostname = hostnameAndPort[0];
       _port = Integer.parseInt(hostnameAndPort[1]);
     }
+
+    int tlsPort = -1;
+    if (instanceConfig.getRecord() != null) {
+      tlsPort = instanceConfig.getRecord().getIntField(Helix.KEY_OF_SERVER_NETTYTLS_PORT, -1);
+    }
+    this._tlsPort = tlsPort;
   }
 
   @VisibleForTesting
   ServerInstance(String hostname, int port) {
     _hostname = hostname;
     _port = port;
+    _tlsPort = -1;
   }
 
   public String getHostname() {
@@ -70,6 +78,18 @@ public class ServerInstance {
 
   public ServerRoutingInstance toServerRoutingInstance(TableType tableType) {
     return new ServerRoutingInstance(_hostname, _port, tableType);
+  }
+
+  public ServerRoutingInstance toServerRoutingInstance(TableType tableType, boolean preferTls) {
+    if (!preferTls) {
+      return toServerRoutingInstance(tableType);
+    }
+
+    if (_tlsPort <= 0) {
+      return toServerRoutingInstance(tableType);
+    }
+
+    return new ServerRoutingInstance(_hostname, _tlsPort, tableType, true);
   }
 
   @Override

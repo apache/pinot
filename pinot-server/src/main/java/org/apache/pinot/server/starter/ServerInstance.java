@@ -57,6 +57,7 @@ public class ServerInstance {
   private final LongAccumulator _latestQueryTime;
   private final QueryScheduler _queryScheduler;
   private final QueryServer _nettyQueryServer;
+  private final QueryServer _nettyTlsQueryServer;
   private final GrpcQueryServer _grpcQueryServer;
 
   private boolean _started = false;
@@ -92,14 +93,30 @@ public class ServerInstance {
     _queryScheduler =
         QuerySchedulerFactory.create(serverConf.getSchedulerConfig(), _queryExecutor, _serverMetrics, _latestQueryTime);
 
-    int nettyPort = serverConf.getNettyPort();
-    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(serverConf.getPinotConfig(),
-        CommonConstants.Server.SERVER_NETTY_TLS_PREFIX, CommonConstants.Server.SERVER_TLS_PREFIX);
-    LOGGER.info("Initializing Netty query server on port: {} with tls: {}", nettyPort, tlsConfig.isEnabled());
-    _nettyQueryServer = new QueryServer(nettyPort, _queryScheduler, _serverMetrics, tlsConfig);
+    TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(serverConf.getPinotConfig(),
+        CommonConstants.Server.SERVER_TLS_PREFIX);
+
+    if (serverConf.isNettyServerEnabled()) {
+      int nettyPort = serverConf.getNettyPort();
+      LOGGER.info("Initializing Netty query server on port: {}", nettyPort);
+      _nettyQueryServer = new QueryServer(nettyPort, _queryScheduler, _serverMetrics);
+    } else {
+      _nettyQueryServer = null;
+    }
+
+    if (serverConf.isNettyTlsServerEnabled()) {
+      int nettySecPort = serverConf.getNettyTlsPort();
+      TlsConfig tlsConfig = TlsUtils.extractTlsConfig(tlsDefaults, serverConf.getPinotConfig(),
+          CommonConstants.Server.SERVER_NETTYTLS_PREFIX);
+      tlsConfig.setEnabled(true);
+      LOGGER.info("Initializing TLS-secured Netty query server on port: {}", nettySecPort);
+      _nettyTlsQueryServer = new QueryServer(nettySecPort, _queryScheduler, _serverMetrics, tlsConfig);
+    } else {
+      _nettyTlsQueryServer = null;
+    }
 
     if (serverConf.isEnableGrpcServer()) {
-      if (tlsConfig.isEnabled()) {
+      if (tlsDefaults.isEnabled()) {
         LOGGER.warn("gRPC query server does not support TLS yet");
       }
 
@@ -141,8 +158,14 @@ public class ServerInstance {
     _queryExecutor.start();
     LOGGER.info("Starting query scheduler");
     _queryScheduler.start();
-    LOGGER.info("Starting Netty query server");
-    _nettyQueryServer.start();
+    if (_nettyQueryServer != null) {
+      LOGGER.info("Starting Netty query server");
+      _nettyQueryServer.start();
+    }
+    if (_nettyTlsQueryServer != null) {
+      LOGGER.info("Starting TLS-secured Netty query server");
+      _nettyTlsQueryServer.start();
+    }
     if (_grpcQueryServer != null) {
       LOGGER.info("Starting gRPC query server");
       _grpcQueryServer.start();
@@ -156,12 +179,18 @@ public class ServerInstance {
     Preconditions.checkState(_started, "Server instance is not running");
     LOGGER.info("Shutting down server instance");
 
+    if (_nettyTlsQueryServer != null) {
+      LOGGER.info("Shutting down TLS-secured Netty query server");
+      _nettyTlsQueryServer.shutDown();
+    }
     if (_grpcQueryServer != null) {
       LOGGER.info("Shutting down gRPC query server");
       _grpcQueryServer.shutdown();
     }
-    LOGGER.info("Shutting down Netty query server");
-    _nettyQueryServer.shutDown();
+    if (_nettyQueryServer != null) {
+      LOGGER.info("Shutting down Netty query server");
+      _nettyQueryServer.shutDown();
+    }
     LOGGER.info("Shutting down query scheduler");
     _queryScheduler.stop();
     LOGGER.info("Shutting down query executor");

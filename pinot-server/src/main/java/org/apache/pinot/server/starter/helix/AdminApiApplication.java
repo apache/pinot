@@ -21,20 +21,21 @@ package org.apache.pinot.server.starter.helix;
 import io.swagger.jaxrs.config.BeanConfig;
 import java.io.IOException;
 import java.net.InetAddress;
-import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.net.UnknownHostException;
+import java.util.List;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.core.transport.ListenerConfig;
+import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.server.api.access.AccessControlFactory;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
-import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.slf4j.Logger;
@@ -46,7 +47,6 @@ public class AdminApiApplication extends ResourceConfig {
 
   private final ServerInstance serverInstance;
   private final AccessControlFactory accessControlFactory;
-  private URI baseUri;
   private boolean started = false;
   private HttpServer httpServer;
   public static final String RESOURCE_PACKAGE = "org.apache.pinot.server.api.resources";
@@ -77,21 +77,12 @@ public class AdminApiApplication extends ResourceConfig {
     });
   }
 
-  public boolean start(int httpPort) {
-    if (httpPort <= 0) {
-      LOGGER.warn("Invalid admin API port: {}. Not starting admin service", httpPort);
-      return false;
-    }
+  public boolean start(List<ListenerConfig> listenerConfigs) {
+    httpServer = ListenerConfigUtil.buildHttpServer(this, listenerConfigs);
 
-    baseUri = URI.create("http://0.0.0.0:" + Integer.toString(httpPort) + "/");
-    httpServer = GrizzlyHttpServerFactory.createHttpServer(baseUri, this);
     setupSwagger(httpServer);
     started = true;
     return true;
-  }
-
-  public URI getBaseUri() {
-    return baseUri;
   }
 
   private void setupSwagger(HttpServer httpServer) {
@@ -101,7 +92,7 @@ public class AdminApiApplication extends ResourceConfig {
     beanConfig.setContact("https://github.com/apache/incubator-pinot");
     beanConfig.setVersion("1.0");
     beanConfig.setSchemes(new String[]{CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL});
-    beanConfig.setBasePath(baseUri.getPath());
+    beanConfig.setBasePath("/");
     beanConfig.setResourcePackage(RESOURCE_PACKAGE);
     beanConfig.setScan(true);
     try {

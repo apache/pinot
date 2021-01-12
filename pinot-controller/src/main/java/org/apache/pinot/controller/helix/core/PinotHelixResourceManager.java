@@ -87,6 +87,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.BrokerResourceStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
@@ -194,9 +195,21 @@ public class PinotHelixResourceManager {
                 if (hostname.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
                   hostname = hostname.substring(Helix.PREFIX_OF_SERVER_INSTANCE.length());
                 }
+
+                // default http connection
+                String protocol = CommonConstants.HTTP_PROTOCOL;
                 int adminPort = instanceConfig.getRecord()
                     .getIntField(Helix.Instance.ADMIN_PORT_KEY, Server.DEFAULT_ADMIN_API_PORT);
-                return hostname + ":" + adminPort;
+
+                // optional https
+                int adminHttpsPort = instanceConfig.getRecord()
+                    .getIntField(Helix.Instance.ADMIN_PORT_HTTPS_KEY, -1);
+                if (adminHttpsPort > 0) {
+                  protocol = CommonConstants.HTTPS_PROTOCOL;
+                  adminPort = adminHttpsPort;
+                }
+
+                return String.format("%s://%s:%d", protocol, hostname, adminPort);
               }
             });
     _tableUpdaterLocks = new Object[DEFAULT_TABLE_UPDATER_LOCKERS_SIZE];

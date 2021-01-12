@@ -16,10 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.api.listeners;
-
-import org.apache.pinot.core.transport.TlsConfig;
-
+package org.apache.pinot.core.transport;
 
 /**
  * Provides configuration settings expected by an Http Server to 

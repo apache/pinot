@@ -96,6 +96,7 @@ private[pinot] class PinotServerDataFetcher(
     val instanceConfig = new InstanceConfig(nullZkId)
     instanceConfig.setHostName(pinotSplit.serverAndSegments.serverHost)
     instanceConfig.setPort(pinotSplit.serverAndSegments.serverPort)
+    // TODO: support grpc and netty-sec
     val serverInstance = new ServerInstance(instanceConfig)
     Map(
       serverInstance -> pinotSplit.serverAndSegments.segments.asJava

@@ -62,7 +62,7 @@ import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.api.ControllerAdminApiApplication;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
-import org.apache.pinot.controller.api.listeners.ListenerConfig;
+import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.controller.api.resources.ControllerFilePathProvider;
 import org.apache.pinot.controller.api.resources.InvalidControllerConfigException;
 import org.apache.pinot.controller.helix.SegmentStatusChecker;
@@ -77,7 +77,7 @@ import org.apache.pinot.controller.helix.core.retention.RetentionManager;
 import org.apache.pinot.controller.helix.core.statemodel.LeadControllerResourceMasterSlaveStateModelFactory;
 import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
-import org.apache.pinot.controller.util.ListenerConfigUtil;
+import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.controller.validation.BrokerResourceValidationManager;
 import org.apache.pinot.controller.validation.OfflineSegmentIntervalChecker;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
@@ -149,8 +149,8 @@ public class ControllerStarter implements ServiceStartable {
     // Helix related settings.
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(_config.getZkStr());
     _helixClusterName = _config.getHelixClusterName();
-    _listenerConfigs = ListenerConfigUtil.buildListenerConfigs(_config);
-    
+    _listenerConfigs = ListenerConfigUtil.buildControllerConfigs(_config);
+
     String host = conf.getControllerHost();
     int port = inferPort();
     
@@ -194,8 +194,6 @@ public class ControllerStarter implements ServiceStartable {
 
   private int inferPort() {
     return Optional.ofNullable(_config.getControllerPort()).map(Integer::parseInt)
-
-        // Fall back to protocol listeners if legacy controller.port is undefined. 
         .orElseGet(() -> _listenerConfigs.stream().findFirst().map(ListenerConfig::getPort).get());
   }
 
@@ -415,20 +413,21 @@ public class ControllerStarter implements ServiceStartable {
       }
     });
 
+    TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_config, ControllerConf.CONTROLLER_TLS_PREFIX);
+
     // install default SSL context if necessary
     if (CommonConstants.HTTPS_PROTOCOL.equals(_config.getProperty(ControllerConf.CONTROLLER_BROKER_PROTOCOL))) {
       LOGGER.info("Installing default SSL context for broker relay requests");
-      TlsConfig tlsConfig = TlsUtils.extractTlsConfig(_config, ControllerConf.CONTROLLER_BROKER_TLS_PREFIX,
-          ControllerConf.CONTROLLER_TLS_PREFIX);
+      TlsConfig tlsConfig = TlsUtils.extractTlsConfig(tlsDefaults, _config, ControllerConf.CONTROLLER_BROKER_TLS_PREFIX);
       tlsConfig.setEnabled(true);
 
       TlsUtils.installDefaultSSLSocketFactory(tlsConfig);
     }
 
-    _adminApp.start(_listenerConfigs);
+    // TODO tls for HttpConnectionManager? (controller-server connections)
 
-    _listenerConfigs.stream().forEach(listenerConfig -> LOGGER.info("Controller services available at {}://{}:{}/",
-        listenerConfig.getProtocol(), listenerConfig.getHost(), listenerConfig.getPort()));
+    LOGGER.info("Starting controller admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
+    _adminApp.start(_listenerConfigs);
 
     _controllerMetrics.addCallbackGauge("dataDir.exists", () -> new File(_config.getDataDir()).exists() ? 1L : 0L);
     _controllerMetrics.addCallbackGauge("dataDir.fileOpLatencyMs", () -> {

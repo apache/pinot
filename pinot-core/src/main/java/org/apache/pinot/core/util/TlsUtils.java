@@ -48,29 +48,59 @@ public final class TlsUtils {
   }
 
   /**
-   * Extract a TlsConfig instance from a namespaced set of configuration keys.
+   * Extract a TlsConfig instance from a namespaced set of configuration key, with optional defaults.
    *
    * @param pinotConfig pinot configuration
-   * @param prefix namespace prefix
+   * @param namespace namespace prefix
    *
    * @return TlsConfig instance
    */
-  public static TlsConfig extractTlsConfig(PinotConfiguration pinotConfig, String prefix) {
-    return extractTlsConfig(new TlsConfig(), pinotConfig, prefix);
+  public static TlsConfig extractTlsConfig(TlsConfig tlsDefaults, PinotConfiguration pinotConfig, String namespace) {
+    TlsConfig tlsConfig = new TlsConfig();
+    tlsConfig.setEnabled(tlsDefaults.isEnabled());
+    tlsConfig.setClientAuthEnabled(tlsDefaults.isClientAuthEnabled());
+    tlsConfig.setKeyStorePath(tlsDefaults.getKeyStorePath());
+    tlsConfig.setKeyStorePassword(tlsDefaults.getKeyStorePassword());
+    tlsConfig.setTrustStorePath(tlsDefaults.getTrustStorePath());
+    tlsConfig.setTrustStorePassword(tlsDefaults.getTrustStorePassword());
+
+    if (pinotConfig.containsKey(key(namespace, ENABLED))) {
+      tlsConfig.setEnabled(pinotConfig.getProperty(key(namespace, ENABLED), false));
+    }
+
+    if (pinotConfig.containsKey(key(namespace, CLIENT_AUTH_ENABLED))) {
+      tlsConfig.setClientAuthEnabled(pinotConfig.getProperty(key(namespace, CLIENT_AUTH_ENABLED), false));
+    }
+
+    if (pinotConfig.containsKey(key(namespace, KEYSTORE_PATH))) {
+      tlsConfig.setKeyStorePath(pinotConfig.getProperty(key(namespace, KEYSTORE_PATH)));
+    }
+
+    if (pinotConfig.containsKey(key(namespace, KEYSTORE_PASSWORD))) {
+      tlsConfig.setKeyStorePassword(pinotConfig.getProperty(key(namespace, KEYSTORE_PASSWORD)));
+    }
+
+    if (pinotConfig.containsKey(key(namespace, TRUSTSTORE_PATH))) {
+      tlsConfig.setTrustStorePath(pinotConfig.getProperty(key(namespace, TRUSTSTORE_PATH)));
+    }
+
+    if (pinotConfig.containsKey(key(namespace, TRUSTSTORE_PASSWORD))) {
+      tlsConfig.setTrustStorePassword(pinotConfig.getProperty(key(namespace, TRUSTSTORE_PASSWORD)));
+    }
+
+    return tlsConfig;
   }
 
   /**
-   * Extract a TlsConfig instance from a namespaced set of configuration keys, with defaults pulled from an alternative
-   * namespace
+   * Extract a TlsConfig instance from a namespaced set of configuration keys.
    *
    * @param pinotConfig pinot configuration
-   * @param prefix namespace prefix
-   * @param prefixDefaults namespace prefix for defaults
+   * @param namespace namespace prefix
    *
    * @return TlsConfig instance
    */
-  public static TlsConfig extractTlsConfig(PinotConfiguration pinotConfig, String prefix, String prefixDefaults) {
-    return extractTlsConfig(extractTlsConfig(pinotConfig, prefixDefaults), pinotConfig, prefix);
+  public static TlsConfig extractTlsConfig(PinotConfiguration pinotConfig, String namespace) {
+    return extractTlsConfig(new TlsConfig(), pinotConfig, namespace);
   }
 
   /**
@@ -155,30 +185,7 @@ public final class TlsUtils {
     }
   }
 
-  private static TlsConfig extractTlsConfig(TlsConfig tlsConfig, PinotConfiguration pinotConfig, String prefix) {
-    if (pinotConfig.containsKey(key(prefix, ENABLED))) {
-      tlsConfig.setEnabled(pinotConfig.getProperty(key(prefix, ENABLED), false));
-    }
-    if (pinotConfig.containsKey(key(prefix, CLIENT_AUTH_ENABLED))) {
-      tlsConfig.setClientAuthEnabled(pinotConfig.getProperty(key(prefix, CLIENT_AUTH_ENABLED), false));
-    }
-    if (pinotConfig.containsKey(key(prefix, KEYSTORE_PATH))) {
-      tlsConfig.setKeyStorePath(pinotConfig.getProperty(key(prefix, KEYSTORE_PATH)));
-    }
-    if (pinotConfig.containsKey(key(prefix, KEYSTORE_PASSWORD))) {
-      tlsConfig.setKeyStorePassword(pinotConfig.getProperty(key(prefix, KEYSTORE_PASSWORD)));
-    }
-    if (pinotConfig.containsKey(key(prefix, TRUSTSTORE_PATH))) {
-      tlsConfig.setTrustStorePath(pinotConfig.getProperty(key(prefix, TRUSTSTORE_PATH)));
-    }
-    if (pinotConfig.containsKey(key(prefix, TRUSTSTORE_PASSWORD))) {
-      tlsConfig.setTrustStorePassword(pinotConfig.getProperty(key(prefix, TRUSTSTORE_PASSWORD)));
-    }
-
-    return tlsConfig;
-  }
-
-  private static String key(String prefix, String suffix) {
-    return prefix + "." + suffix;
+  private static String key(String namespace, String suffix) {
+    return namespace + "." + suffix;
   }
 }

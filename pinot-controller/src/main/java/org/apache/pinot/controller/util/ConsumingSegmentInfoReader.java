@@ -128,7 +128,7 @@ public class ConsumingSegmentInfoReader {
   }
 
   private String generateServerURL(String tableNameWithType, String endpoint) {
-    return String.format("http://%s/tables/%s/consumingSegmentsInfo", endpoint, tableNameWithType);
+    return String.format("%s/tables/%s/consumingSegmentsInfo", endpoint, tableNameWithType);
   }
 
   /**

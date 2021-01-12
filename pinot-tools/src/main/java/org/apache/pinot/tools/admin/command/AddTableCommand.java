@@ -82,7 +82,7 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
   public String toString() {
     String retString =
         ("AddTable -tableConfigFile " + _tableConfigFile + " -schemaFile " + _schemaFile + " -controllerProtocol "
-            + _controllerProtocol + " -controllerHost" + _controllerHost + " -controllerPort " + _controllerPort);
+            + _controllerProtocol + " -controllerHost " + _controllerHost + " -controllerPort " + _controllerPort);
     return ((_exec) ? (retString + " -exec") : retString);
   }
 

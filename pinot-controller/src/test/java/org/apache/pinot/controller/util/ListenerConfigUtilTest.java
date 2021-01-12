@@ -21,7 +21,8 @@ package org.apache.pinot.controller.util;
 import java.util.List;
 
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.api.listeners.ListenerConfig;
+import org.apache.pinot.core.transport.ListenerConfig;
+import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -40,7 +41,7 @@ public class ListenerConfigUtilTest {
     controllerConf.setProperty("controller.port", "9000");
     controllerConf.setProperty("controller.query.console.useHttps", "true");
 
-    List<ListenerConfig> listenerConfigs = ListenerConfigUtil.buildListenerConfigs(controllerConf);
+    List<ListenerConfig> listenerConfigs = ListenerConfigUtil.buildControllerConfigs(controllerConf);
 
     Assert.assertEquals(listenerConfigs.size(), 1);
 
@@ -59,7 +60,7 @@ public class ListenerConfigUtilTest {
 
     configureHttpsProperties(controllerConf, "10.0.0.10", 9443);
 
-    List<ListenerConfig> listenerConfigs = ListenerConfigUtil.buildListenerConfigs(controllerConf);
+    List<ListenerConfig> listenerConfigs = ListenerConfigUtil.buildControllerConfigs(controllerConf);
 
     Assert.assertEquals(listenerConfigs.size(), 2);
 
@@ -83,7 +84,35 @@ public class ListenerConfigUtilTest {
 
     controllerConf.setProperty("controller.access.protocols.http.port", "9000");
 
-    List<ListenerConfig> listenerConfigs = ListenerConfigUtil.buildListenerConfigs(controllerConf);
+    List<ListenerConfig> listenerConfigs = ListenerConfigUtil.buildControllerConfigs(controllerConf);
+
+    Assert.assertEquals(listenerConfigs.size(), 2);
+
+    ListenerConfig httpListener = getListener("http", listenerConfigs);
+    ListenerConfig httpsListener = getListener("https", listenerConfigs);
+
+    Assert.assertEquals(httpListener.getHost(), "0.0.0.0");
+
+    assertHttpListener(httpListener, "0.0.0.0", 9000);
+    assertHttpsListener(httpsListener, "0.0.0.0", 9443);
+  }
+
+  /**
+   * Asserts that https and https can be configured separately and that TLS defaults apply to https (only)
+   */
+  @Test
+  public void assertHttpAndHttpsWithTlsDefaults() {
+    ControllerConf controllerConf = new ControllerConf();
+
+    controllerConf.setProperty("controller.access.protocols", "http,https");
+    controllerConf.setProperty("controller.access.protocols.https.port", "9443");
+    controllerConf.setProperty("controller.access.protocols.https.tls.client.auth.enabled", "true");
+
+    configureTlsDefaultProperties(controllerConf);
+
+    controllerConf.setProperty("controller.access.protocols.http.port", "9000");
+
+    List<ListenerConfig> listenerConfigs = ListenerConfigUtil.buildControllerConfigs(controllerConf);
 
     Assert.assertEquals(listenerConfigs.size(), 2);
 
@@ -107,7 +136,7 @@ public class ListenerConfigUtilTest {
 
     configureHttpsProperties(controllerConf, 9443);
 
-    List<ListenerConfig> listenerConfigs = ListenerConfigUtil.buildListenerConfigs(controllerConf);
+    List<ListenerConfig> listenerConfigs = ListenerConfigUtil.buildControllerConfigs(controllerConf);
 
     Assert.assertEquals(listenerConfigs.size(), 1);
 
@@ -125,7 +154,7 @@ public class ListenerConfigUtilTest {
 
     configureHttpsProperties(controllerConf, "", 9443);
 
-    ListenerConfigUtil.buildListenerConfigs(controllerConf);
+    ListenerConfigUtil.buildControllerConfigs(controllerConf);
   }
 
   /**
@@ -140,7 +169,7 @@ public class ListenerConfigUtilTest {
     configureHttpsProperties(controllerConf, "", 9443);
     controllerConf.setProperty("controller.access.protocol.https.port", "10.10");
 
-    ListenerConfigUtil.buildListenerConfigs(controllerConf);
+    ListenerConfigUtil.buildControllerConfigs(controllerConf);
   }
 
   /**
@@ -153,7 +182,7 @@ public class ListenerConfigUtilTest {
     controllerConf.setProperty("controller.access.protocols", "http");
     controllerConf.setProperty("controller.access.protocols.http.port", "");
 
-    ListenerConfigUtil.buildListenerConfigs(controllerConf);
+    ListenerConfigUtil.buildControllerConfigs(controllerConf);
   }
 
   /**
@@ -166,7 +195,7 @@ public class ListenerConfigUtilTest {
     controllerConf.setProperty("controller.access.protocols", "https");
     controllerConf.setProperty("controller.access.protocols.https.port", "");
 
-    ListenerConfigUtil.buildListenerConfigs(controllerConf);
+    ListenerConfigUtil.buildControllerConfigs(controllerConf);
   }
 
   private void assertLegacyListener(ListenerConfig legacyListener) {
@@ -206,9 +235,16 @@ public class ListenerConfigUtilTest {
     controllerConf.setProperty("controller.access.protocols.https.port", String.valueOf(port));
     controllerConf.setProperty("controller.access.protocols.https.tls.keystore.password", "a-password");
     controllerConf.setProperty("controller.access.protocols.https.tls.keystore.path", "/some-keystore-path");
-    controllerConf.setProperty("controller.access.protocols.https.tls.client.auth", "true");
+    controllerConf.setProperty("controller.access.protocols.https.tls.client.auth.enabled", "true");
     controllerConf.setProperty("controller.access.protocols.https.tls.truststore.password", "a-password");
     controllerConf.setProperty("controller.access.protocols.https.tls.truststore.path", "/some-truststore-path");
+  }
+
+  private void configureTlsDefaultProperties(ControllerConf controllerConf) {
+    controllerConf.setProperty("controller.tls.keystore.password", "a-password");
+    controllerConf.setProperty("controller.tls.keystore.path", "/some-keystore-path");
+    controllerConf.setProperty("controller.tls.truststore.password", "a-password");
+    controllerConf.setProperty("controller.tls.truststore.path", "/some-truststore-path");
   }
 
   private void configureHttpsProperties(ControllerConf controllerConf, int port) {

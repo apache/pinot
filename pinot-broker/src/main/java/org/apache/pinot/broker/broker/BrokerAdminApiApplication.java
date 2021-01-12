@@ -18,39 +18,27 @@
  */
 package org.apache.pinot.broker.broker;
 
-import com.google.common.base.Preconditions;
 import io.swagger.jaxrs.config.BeanConfig;
-import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.routing.RoutingManager;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.core.transport.TlsConfig;
-import org.apache.pinot.core.util.TlsUtils;
-import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.core.transport.ListenerConfig;
+import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
-import org.glassfish.grizzly.ssl.SSLContextConfigurator;
-import org.glassfish.grizzly.ssl.SSLEngineConfigurator;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
-import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
 
 
 public class BrokerAdminApiApplication extends ResourceConfig {
-  private static final List<String> SUPPORTED_PROTOCOLS = Arrays.asList(
-      CommonConstants.HTTP_PROTOCOL,
-      CommonConstants.HTTPS_PROTOCOL);
-
   private static final String RESOURCE_PACKAGE = "org.apache.pinot.broker.api.resources";
 
-  private URI _baseUri;
   private HttpServer _httpServer;
 
   public BrokerAdminApiApplication(RoutingManager routingManager, BrokerRequestHandler brokerRequestHandler,
@@ -69,47 +57,9 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     registerClasses(io.swagger.jaxrs.listing.SwaggerSerializers.class);
   }
 
-  public void start(PinotConfiguration brokerConf) {
-    int brokerQueryPort = brokerConf.getProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT,
-        CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT);
-
-    Preconditions.checkArgument(brokerQueryPort > 0, "broker client port must be > 0");
-    _baseUri = URI.create(String.format("%s://0.0.0.0:%d/", getBrokerClientProtocol(brokerConf), brokerQueryPort));
-    _httpServer = buildHttpServer(brokerConf);
+  public void start(List<ListenerConfig> listenerConfigs) {
+    _httpServer = ListenerConfigUtil.buildHttpServer(this, listenerConfigs);
     setupSwagger();
-  }
-
-  private HttpServer buildHttpServer(PinotConfiguration brokerConf) {
-    boolean isSecure = CommonConstants.HTTPS_PROTOCOL.equals(getBrokerClientProtocol(brokerConf));
-
-    if (isSecure) {
-      TlsConfig tlsConfig = TlsUtils.extractTlsConfig(brokerConf, CommonConstants.Broker.BROKER_CLIENT_TLS_PREFIX, CommonConstants.Broker.BROKER_TLS_PREFIX);
-      tlsConfig.setEnabled(true);
-
-      return GrizzlyHttpServerFactory.createHttpServer(_baseUri, this, true, buildSSLConfig(tlsConfig));
-    }
-
-    return GrizzlyHttpServerFactory.createHttpServer(_baseUri, this);
-  }
-
-  private SSLEngineConfigurator buildSSLConfig(TlsConfig tlsConfig) {
-    SSLContextConfigurator sslContextConfigurator = new SSLContextConfigurator();
-
-    sslContextConfigurator.setKeyStoreFile(tlsConfig.getKeyStorePath());
-    sslContextConfigurator.setKeyStorePass(tlsConfig.getKeyStorePassword());
-    sslContextConfigurator.setTrustStoreFile(tlsConfig.getTrustStorePath());
-    sslContextConfigurator.setTrustStorePass(tlsConfig.getTrustStorePassword());
-
-    return new SSLEngineConfigurator(sslContextConfigurator).setClientMode(false)
-        .setNeedClientAuth(tlsConfig.isClientAuthEnabled()).setEnabledProtocols(new String[] { "TLSv1.2" });
-  }
-
-  private static String getBrokerClientProtocol(PinotConfiguration brokerConf) {
-    String protocol = brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_CLIENT_PROTOCOL,
-        CommonConstants.HTTP_PROTOCOL);
-    Preconditions.checkArgument(SUPPORTED_PROTOCOLS.contains(protocol),
-        "Unsupported broker client protocol '%s'", protocol);
-    return protocol;
   }
 
   private void setupSwagger() {
@@ -118,8 +68,8 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     beanConfig.setDescription("APIs for accessing Pinot broker information");
     beanConfig.setContact("https://github.com/apache/incubator-pinot");
     beanConfig.setVersion("1.0");
-    beanConfig.setSchemes(new String[] { _baseUri.getScheme() });
-    beanConfig.setBasePath(_baseUri.getPath());
+    beanConfig.setSchemes(new String[]{CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL});
+    beanConfig.setBasePath("/");
     beanConfig.setResourcePackage(RESOURCE_PACKAGE);
     beanConfig.setScan(true);
 
