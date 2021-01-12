@@ -43,7 +43,7 @@ public class FloatDictionary extends BaseImmutableDictionary {
       return -(length()+1);
     }
 
-    if (bigDecimal.compareTo(BigDecimal.valueOf(-Float.MIN_VALUE)) < 0) {
+    if (bigDecimal.compareTo(BigDecimal.valueOf(-Float.MAX_VALUE)) < 0) {
       // Binary search Insert position of value less than -Float.MIN_VALUE
       return -1;
     }
