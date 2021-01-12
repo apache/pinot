@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.minion.MinionClient;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.ingestion.batch.BatchConfig;
@@ -54,6 +55,16 @@ public class BootstrapTableTool {
   private final int _controllerPort;
   private final String _tableDir;
   private final MinionClient _minionClient;
+
+  public BootstrapTableTool(String controllerHost, int controllerPort, String tableDir) {
+    Preconditions.checkNotNull(controllerHost);
+    Preconditions.checkNotNull(tableDir);
+    _controllerProtocol = CommonConstants.HTTP_PROTOCOL;
+    _controllerHost = controllerHost;
+    _controllerPort = controllerPort;
+    _tableDir = tableDir;
+    _minionClient = new MinionClient(controllerHost, String.valueOf(controllerPort));
+  }
 
   public BootstrapTableTool(String controllerProtocol, String controllerHost, int controllerPort, String tableDir) {
     Preconditions.checkNotNull(controllerProtocol);

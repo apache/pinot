@@ -22,29 +22,26 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableMap;
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.io.Reader;
 import java.net.InetAddress;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.tools.BootstrapTableTool;
 import org.apache.pinot.tools.QuickstartTableRequest;
+import org.apache.pinot.tools.BootstrapTableTool;
 import org.apache.pinot.tools.utils.JarUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -120,43 +117,10 @@ public class QuickstartRunner {
   private void startControllers()
       throws Exception {
     for (int i = 0; i < _numControllers; i++) {
-      String configFileName = String.format("./controller_%d.properties", i);
-
-      Properties prop = new Properties();
-      prop.put("cluster.tenant.isolation.enable", "true");
-      prop.put("controller.mode", "DUAL");
-      prop.put("controller.data.dir", new File(_tempDir, DEFAULT_CONTROLLER_DIR + i).getAbsolutePath());
-      prop.put("controller.retention.frequencyInSeconds", "21600");
-      prop.put("controller.port", String.valueOf(DEFAULT_CONTROLLER_PORT + i));
-      prop.put("controller.host", NetUtil.getHostAddress());
-      prop.put("controller.offline.segment.interval.checker.frequencyInSeconds", "3600");
-      prop.put("controller.realtime.segment.validation.frequencyInSeconds", "3600");
-      prop.put("controller.vip.host", NetUtil.getHostAddress());
-      prop.put("controller.broker.resource.validation.frequencyInSeconds", "3600");
-      prop.put("controller.helix.cluster.name", "QuickStartCluster");
-      prop.put("controller.zk.str", ZK_ADDRESS);
-
-      prop.put("controller.tls.keystore.path", "/Users/alex/projects/incubator-pinot/truststore/generated.keystore.jks");
-      prop.put("controller.tls.keystore.password", "changeit");
-      prop.put("controller.tls.truststore.path", "/Users/alex/projects/incubator-pinot/truststore/generated.truststore.jks");
-      prop.put("controller.tls.truststore.password", "changeit");
-
-      prop.put("controller.broker.protocol", "http");
-
-      prop.put("controller.access.protocols", "http");
-      prop.put("controller.access.protocols.http.host", "0.0.0.0");
-      prop.put("controller.access.protocols.http.port", String.valueOf(9443 + i));
-      prop.put("controller.access.protocols.http.vip", "false");
-
-      try (OutputStream os = new FileOutputStream(configFileName)) {
-        prop.store(os, "");
-      }
-
       StartControllerCommand controllerStarter = new StartControllerCommand();
       controllerStarter.setControllerPort(String.valueOf(DEFAULT_CONTROLLER_PORT + i)).setZkAddress(ZK_ADDRESS)
           .setClusterName(CLUSTER_NAME).setTenantIsolation(_enableTenantIsolation)
-          .setDataDir(new File(_tempDir, DEFAULT_CONTROLLER_DIR + i).getAbsolutePath())
-          .setConfigFileName(configFileName);
+          .setDataDir(new File(_tempDir, DEFAULT_CONTROLLER_DIR + i).getAbsolutePath());
       controllerStarter.execute();
       _controllerPorts.add(DEFAULT_CONTROLLER_PORT + i);
     }
@@ -165,27 +129,8 @@ public class QuickstartRunner {
   private void startBrokers()
       throws Exception {
     for (int i = 0; i < _numBrokers; i++) {
-      String configFileName = String.format("./broker_%d.properties", i);
-
-      Properties prop = new Properties();
-      prop.put("pinot.broker.client.queryPort", String.valueOf(DEFAULT_BROKER_PORT + i));
-
-      prop.put("pinot.broker.tls.keystore.path", "/Users/alex/projects/incubator-pinot/truststore/generated.keystore.jks");
-      prop.put("pinot.broker.tls.keystore.password", "changeit");
-      prop.put("pinot.broker.tls.truststore.path", "/Users/alex/projects/incubator-pinot/truststore/generated.truststore.jks");
-      prop.put("pinot.broker.tls.truststore.password", "changeit");
-
-      prop.put("pinot.broker.client.protocol", "http");
-
-      prop.put("pinot.broker.netty.tls.enabled", "true");
-
-      try (OutputStream os = new FileOutputStream(configFileName)) {
-        prop.store(os, "");
-      }
-
       StartBrokerCommand brokerStarter = new StartBrokerCommand();
-      brokerStarter.setPort(DEFAULT_BROKER_PORT + i).setZkAddress(ZK_ADDRESS).setClusterName(CLUSTER_NAME)
-          .setConfigFileName(configFileName);
+      brokerStarter.setPort(DEFAULT_BROKER_PORT + i).setZkAddress(ZK_ADDRESS).setClusterName(CLUSTER_NAME);
       brokerStarter.execute();
       _brokerPorts.add(DEFAULT_BROKER_PORT + i);
     }
@@ -194,33 +139,11 @@ public class QuickstartRunner {
   private void startServers()
       throws Exception {
     for (int i = 0; i < _numServers; i++) {
-      String configFileName = String.format("./server_%d.properties", i);
-
-      Properties prop = new Properties();
-      prop.put("pinot.server.netty.host", NetUtil.getHostAddress());
-      prop.put("pinot.server.instance.dataDir", new File(_tempDir, DEFAULT_SERVER_DATA_DIR + i).getAbsolutePath());
-      prop.put("pinot.server.instance.segmentTarDir", new File(_tempDir, DEFAULT_SERVER_SEGMENT_DIR + i).getAbsolutePath());
-      prop.put("pinot.server.netty.port", String.valueOf(DEFAULT_SERVER_NETTY_PORT + i));
-      prop.put("pinot.server.adminapi.port", String.valueOf(DEFAULT_SERVER_ADMIN_API_PORT + i));
-
-      prop.put("pinot.server.tls.keystore.path", "/Users/alex/projects/incubator-pinot/truststore/generated.keystore.jks");
-      prop.put("pinot.server.tls.keystore.password", "changeit");
-      prop.put("pinot.server.tls.truststore.path", "/Users/alex/projects/incubator-pinot/truststore/generated.truststore.jks");
-      prop.put("pinot.server.tls.truststore.password", "changeit");
-
-      prop.put("pinot.server.netty.tls.enabled", "true");
-      prop.put("pinot.server.netty.tls.client.auth", "true");
-
-      try (OutputStream os = new FileOutputStream(configFileName)) {
-        prop.store(os, "");
-      }
-
       StartServerCommand serverStarter = new StartServerCommand();
       serverStarter.setPort(DEFAULT_SERVER_NETTY_PORT + i).setAdminPort(DEFAULT_SERVER_ADMIN_API_PORT + i)
           .setZkAddress(ZK_ADDRESS).setClusterName(CLUSTER_NAME)
           .setDataDir(new File(_tempDir, DEFAULT_SERVER_DATA_DIR + i).getAbsolutePath())
-          .setSegmentDir(new File(_tempDir, DEFAULT_SERVER_SEGMENT_DIR + i).getAbsolutePath())
-          .setConfigFileName(configFileName);
+          .setSegmentDir(new File(_tempDir, DEFAULT_SERVER_SEGMENT_DIR + i).getAbsolutePath());
       serverStarter.execute();
     }
   }
@@ -264,13 +187,24 @@ public class QuickstartRunner {
     _isStopped = true;
   }
 
+  public void createServerTenantWith(int numOffline, int numRealtime, String tenantName)
+      throws Exception {
+    new AddTenantCommand().setControllerUrl("http://localhost:" + _controllerPorts.get(0)).setName(tenantName)
+        .setOffline(numOffline).setRealtime(numRealtime).setInstances(numOffline + numRealtime)
+        .setRole(TenantRole.SERVER).setExecute(true).execute();
+  }
+
+  public void createBrokerTenantWith(int number, String tenantName)
+      throws Exception {
+    new AddTenantCommand().setControllerUrl("http://localhost:" + _controllerPorts.get(0)).setName(tenantName)
+        .setInstances(number).setRole(TenantRole.BROKER).setExecute(true).execute();
+  }
+
   public void bootstrapTable()
       throws Exception {
     for (QuickstartTableRequest request : _tableRequests) {
-      // TODO get protocol from somewhere?
-      String protocol = CommonConstants.HTTP_PROTOCOL;
-      if (!new BootstrapTableTool(protocol, InetAddress.getLocalHost().getHostName(), _controllerPorts.get(0),
-          request.getBootstrapTableDir()).execute()) {
+      if (!new BootstrapTableTool(InetAddress.getLocalHost().getHostName(), _controllerPorts.get(0), request.getBootstrapTableDir())
+          .execute()) {
         throw new RuntimeException("Failed to bootstrap table with request - " + request);
       }
     }
@@ -315,7 +249,7 @@ public class QuickstartRunner {
       throws Exception {
     int brokerPort = _brokerPorts.get(RANDOM.nextInt(_brokerPorts.size()));
     return JsonUtils.stringToJsonNode(new PostQueryCommand().setBrokerPort(String.valueOf(brokerPort))
-        .setBrokerProtocol("http").setQueryType(CommonConstants.Broker.Request.SQL).setQuery(query).run());
+        .setQueryType(CommonConstants.Broker.Request.SQL).setQuery(query).run());
   }
 
   public static void registerDefaultPinotFS() {

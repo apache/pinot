@@ -203,7 +203,7 @@ public class PinotHelixResourceManager {
 
                 // optional https
                 int adminHttpsPort = instanceConfig.getRecord()
-                    .getIntField(Helix.Instance.ADMIN_PORT_HTTPS_KEY, -1);
+                    .getIntField(Helix.Instance.ADMIN_HTTPS_PORT_KEY, -1);
                 if (adminHttpsPort > 0) {
                   protocol = CommonConstants.HTTPS_PROTOCOL;
                   adminPort = adminHttpsPort;

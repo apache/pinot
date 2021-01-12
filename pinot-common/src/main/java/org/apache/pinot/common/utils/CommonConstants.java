@@ -108,7 +108,7 @@ public class CommonConstants {
       public static final String INSTANCE_ID_KEY = "instanceId";
       public static final String DATA_DIR_KEY = "dataDir";
       public static final String ADMIN_PORT_KEY = "adminPort";
-      public static final String ADMIN_PORT_HTTPS_KEY = "adminPortHttps";
+      public static final String ADMIN_HTTPS_PORT_KEY = "adminHttpsPort";
       public static final String GRPC_PORT_KEY = "grpcPort";
       public static final String NETTYTLS_PORT_KEY = "nettyTlsPort";
     }
@@ -214,7 +214,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_EXECUTOR_TIMEOUT = "pinot.server.query.executor.timeout";
     public static final String CONFIG_OF_QUERY_EXECUTOR_CLASS = "pinot.server.query.executor.class";
     public static final String CONFIG_OF_REQUEST_HANDLER_FACTORY_CLASS = "pinot.server.requestHandlerFactory.class";
-    public static final String CONFIG_OF_NETTY_SERVER_ENABLED = "pinot.server.netty.enable";
+    public static final String CONFIG_OF_NETTY_SERVER_ENABLED = "pinot.server.netty.enabled";
     public static final boolean DEFAULT_NETTY_SERVER_ENABLED = true;
     public static final String CONFIG_OF_NETTY_PORT = "pinot.server.netty.port";
     public static final String CONFIG_OF_ENABLE_GRPC_SERVER = "pinot.server.grpc.enable";

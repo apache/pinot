@@ -20,6 +20,7 @@ package org.apache.pinot.core.transport;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.config.table.TableType;
 
@@ -56,7 +57,7 @@ public class ServerInstance {
 
     int tlsPort = -1;
     if (instanceConfig.getRecord() != null) {
-      tlsPort = instanceConfig.getRecord().getIntField(Helix.KEY_OF_SERVER_NETTYTLS_PORT, -1);
+      tlsPort = instanceConfig.getRecord().getIntField(Helix.Instance.NETTYTLS_PORT_KEY, -1);
     }
     this._tlsPort = tlsPort;
   }

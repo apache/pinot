@@ -82,6 +82,7 @@ public class QueryRouter {
       long timeoutMs) {
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
 
+    // can prefer but not require TLS until all servers guaranteed to be on TLS
     boolean preferTls = _serverChannelsTls != null;
 
     // Build map from server to request based on the routing table
@@ -110,7 +111,6 @@ public class QueryRouter {
     for (Map.Entry<ServerRoutingInstance, InstanceRequest> entry : requestMap.entrySet()) {
       ServerRoutingInstance serverRoutingInstance = entry.getKey();
       ServerChannels serverChannels = serverRoutingInstance.isTls() ? _serverChannelsTls : _serverChannels;
-      System.out.println(serverRoutingInstance.isTls()); // TODO refresh routing table
       try {
         serverChannels.sendRequest(serverRoutingInstance, entry.getValue());
         asyncQueryResponse.markRequestSubmitted(serverRoutingInstance);

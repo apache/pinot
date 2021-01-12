@@ -424,7 +424,7 @@ public class ControllerStarter implements ServiceStartable {
       TlsUtils.installDefaultSSLSocketFactory(tlsConfig);
     }
 
-    // TODO tls for HttpConnectionManager? (controller-server connections)
+    // TODO dedicated TLS for HttpConnectionManager? (controller-server connections)
 
     LOGGER.info("Starting controller admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _adminApp.start(_listenerConfigs);

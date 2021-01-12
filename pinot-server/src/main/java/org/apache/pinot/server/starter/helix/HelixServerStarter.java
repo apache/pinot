@@ -367,9 +367,9 @@ public class HelixServerStarter implements ServiceStartable {
         .filter(listener -> CommonConstants.HTTPS_PROTOCOL.equals(listener.getProtocol())).findFirst();
     if (adminApiHttps.isPresent()) {
       _helixAdmin.setConfig(_instanceConfigScope,
-          Collections.singletonMap(Instance.ADMIN_PORT_HTTPS_KEY, String.valueOf(adminApiHttps.get().getPort())));
+          Collections.singletonMap(Instance.ADMIN_HTTPS_PORT_KEY, String.valueOf(adminApiHttps.get().getPort())));
     } else {
-      _helixAdmin.removeConfig(_instanceConfigScope, Collections.singletonList(Instance.ADMIN_PORT_HTTPS_KEY));
+      _helixAdmin.removeConfig(_instanceConfigScope, Collections.singletonList(Instance.ADMIN_HTTPS_PORT_KEY));
     }
 
     // Update nettytls port
