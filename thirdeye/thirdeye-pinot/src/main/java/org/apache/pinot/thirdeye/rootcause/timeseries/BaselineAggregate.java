@@ -235,6 +235,27 @@ public class BaselineAggregate implements Baseline {
   }
 
   /**
+   * Returns an instance of BaselineAggregate for the specified type and {@code numYears} offsets
+   * computed on a consecutive year-over-year basis starting with a lag of {@code offsetYears}.
+   * <br/><b>NOTE:</b> this will apply DST correction
+   *
+   * @see BaselineAggregateType
+   *
+   * @param type aggregation type
+   * @param numYears number of consecutive years
+   * @param offsetYears lag for starting consecutive years
+   * @param timeZone time zone
+   * @return BaselineAggregate with given type and yearly offsets
+   */
+  public static BaselineAggregate fromYearOverYear(BaselineAggregateType type, int numYears, int offsetYears, DateTimeZone timeZone) {
+    List<Period> offsets = new ArrayList<>();
+    for (int i = 0; i < numYears; i++) {
+      offsets.add(new Period(0, -1 * 12 * (i + offsetYears), 0, 0, 0, 0, 0, 0, PeriodType.months()));
+    }
+    return new BaselineAggregate(type, offsets, timeZone, PeriodType.months());
+  }
+
+  /**
    * Returns an instance of BaselineAggregate for the specified type and {@code numMonths} offsets
    * computed on a consecutive month-over-month basis starting with a lag of {@code offsetMonths}.
    * <br/><b>NOTE:</b> this will apply DST correction

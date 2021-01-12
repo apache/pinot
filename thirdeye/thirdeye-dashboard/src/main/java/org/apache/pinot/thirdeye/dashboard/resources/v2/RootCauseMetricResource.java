@@ -22,9 +22,11 @@ package org.apache.pinot.thirdeye.dashboard.resources.v2;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ListMultimap;
 import java.lang.reflect.Constructor;
+import java.util.Arrays;
 import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
 import org.apache.pinot.thirdeye.dataframe.LongSeries;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
@@ -113,6 +115,8 @@ public class RootCauseMetricResource {
   private static final String OFFSET_DEFAULT = "current";
   private static final String TIMEZONE_DEFAULT = "UTC";
   private static final String OFFSET_FORECAST = "forecast";
+  private static final String OFFSET_UPPER = "upper";
+  private static final String OFFSET_LOWER = "lower";
   private static final String GRANULARITY_DEFAULT = MetricSlice.NATIVE_GRANULARITY.toAggregationGranularityString();
   private static final int LIMIT_DEFAULT = 100;
 
@@ -284,11 +288,54 @@ public class RootCauseMetricResource {
     urns = ResourceUtils.parseListParams(urns);
     offsets = ResourceUtils.parseListParams(offsets);
     List<MetricSlice> slices = new ArrayList<>();
+    List<String> forecastOffsets = Arrays.asList(OFFSET_FORECAST, OFFSET_LOWER, OFFSET_UPPER);
+    Map<Pair<String, String>, Double> offsetToForecastAggregate = new HashMap<>();
+
+    if(offsets.contains(OFFSET_FORECAST)) {
+      String forecastClassName = DetectionRegistry.getInstance().lookup("FORECAST");
+      InputDataFetcher dataFetcher = new DefaultInputDataFetcher(dataProvider, -1);
+      Map<String, Object> componentSpec = new HashMap<>();
+
+      Constructor<?> constructor = Class.forName(forecastClassName).getConstructor();
+      BaselineProvider forecastProvider = (BaselineProvider) constructor.newInstance();
+
+      Class clazz = Class.forName(forecastClassName);
+      Class<AbstractSpec> specClazz = (Class<AbstractSpec>) Class.forName(getSpecClassName(clazz));
+      AbstractSpec forecastSpec = AbstractSpec.fromProperties(componentSpec, specClazz);
+
+      forecastProvider.init(forecastSpec, dataFetcher);
+
+
+      for (String urn : urns) {
+        MetricSlice baseSlice = alignSlice(makeSlice(urn, start, end), timezone);
+        try {
+          TimeSeries forecastResponse = forecastProvider.computePredictedTimeSeries(baseSlice);
+          Pair<String, String> forecastKey = Pair.of(urn, OFFSET_FORECAST);
+          Pair<String, String> upperKey = Pair.of(urn, OFFSET_UPPER);
+          Pair<String, String> lowerKey = Pair.of(urn, OFFSET_LOWER);
+
+          DoubleSeries forecast = forecastResponse.getPredictedBaseline();
+          DoubleSeries upper = forecastResponse.getPredictedUpperBound();
+          DoubleSeries lower = forecastResponse.getPredictedLowerBound();
+
+          offsetToForecastAggregate.put(forecastKey, forecast.sum().value());
+          offsetToForecastAggregate.put(upperKey, upper.sum().value());
+          offsetToForecastAggregate.put(lowerKey, lower.sum().value());
+        }
+        catch (Exception e) {
+          LOG.info("Failed to get Forecast baseline");
+        }
+      }
+    }
 
     Map<Pair<String, String>, MetricSlice> offsetToBaseSlice = new HashMap<>();
     Map<Pair<String, String>, Baseline> tupleToRange = new HashMap<>();
     for (String urn : urns) {
       for (String offset : offsets) {
+        // skip upper, lower, and forecast offsets
+        if (forecastOffsets.contains(offset))
+          continue;
+
         Pair<String, String> key = Pair.of(urn, offset);
 
         MetricSlice baseSlice = alignSlice(makeSlice(urn, start, end), timezone);
@@ -311,11 +358,17 @@ public class RootCauseMetricResource {
     for (String urn : urns) {
       for (String offset : offsets) {
         Pair<String, String> key = Pair.of(urn, offset);
-        DataFrame result = tupleToRange.get(key).gather(offsetToBaseSlice.get(key), data);
-        if (result.isEmpty()) {
-          aggregateValues.put(urn, Double.NaN);
+
+        if (forecastOffsets.contains(offset)) {
+          Double value = offsetToForecastAggregate.getOrDefault(key, Double.NaN);
+          aggregateValues.put(urn, value);
         } else {
-          aggregateValues.put(urn, result.getDouble(COL_VALUE, 0));
+          DataFrame result = tupleToRange.get(key).gather(offsetToBaseSlice.get(key), data);
+          if (result.isEmpty()) {
+            aggregateValues.put(urn, Double.NaN);
+          } else {
+            aggregateValues.put(urn, result.getDouble(COL_VALUE, 0));
+          }
         }
       }
     }
