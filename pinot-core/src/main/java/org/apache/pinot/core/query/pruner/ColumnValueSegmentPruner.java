@@ -242,7 +242,7 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
 
   /**
    * Convert String value to specified numerical type. We first verify that the input string contains a number by parsing
-   * it as Double. The resulting Double is then downcast to specified numerical type. This allows us to create predicates
+   * it as BigDecimal. The resulting BigDecimal is then downcast to specified numerical type. This allows us to create predicates
    * which allow for comparing values of two different numerical types such as:
    * SELECT * FROM table WHERE a > 5.0
    * SELECT * FROM table WHERE timestamp > NOW() - 5.0.
