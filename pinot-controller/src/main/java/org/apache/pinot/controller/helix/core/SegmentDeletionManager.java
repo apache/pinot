@@ -176,7 +176,7 @@ public class SegmentDeletionManager {
     }
     if (_dataDir != null) {
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-      URI fileToMoveURI = URIUtils.getUri(_dataDir, rawTableName, URIUtils.encode(segmentId));
+      URI fileToMoveURI = URIUtils.getUri(_dataDir, tableNameWithType, URIUtils.encode(segmentId));
       URI deletedSegmentDestURI = URIUtils.getUri(_dataDir, DELETED_SEGMENTS, rawTableName, URIUtils.encode(segmentId));
       PinotFS pinotFS = PinotFSFactory.create(fileToMoveURI.getScheme());
 
