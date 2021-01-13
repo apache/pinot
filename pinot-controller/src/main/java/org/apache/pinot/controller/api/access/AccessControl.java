@@ -37,7 +37,7 @@ public interface AccessControl {
   boolean hasDataAccess(HttpHeaders httpHeaders, String tableName);
 
   /**
-   * Return whether the client has write permission to the give table
+   * Return whether the client has write permission to the given table
    *
    * @param httpHeaders http headers
    * @param tableName name of the table to be accessed
