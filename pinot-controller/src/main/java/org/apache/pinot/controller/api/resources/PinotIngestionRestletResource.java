@@ -34,9 +34,13 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.container.AsyncResponse;
 import javax.ws.rs.container.Suspended;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.api.access.AccessControlFactory;
+import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.FileIngestionHelper;
 import org.apache.pinot.controller.util.FileIngestionHelper.DataPayload;
@@ -87,6 +91,9 @@ public class PinotIngestionRestletResource {
   @Inject
   ControllerConf _controllerConf;
 
+  @Inject
+  AccessControlFactory _accessControlFactory;
+
   /**
    * API to upload a file and ingest it into a Pinot table.
    * This call will copy the file locally, create a segment and push the segment to Pinot.
@@ -118,9 +125,9 @@ public class PinotIngestionRestletResource {
   public void ingestFromFile(
       @ApiParam(value = "Name of the table to upload the file to", required = true) @QueryParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Batch config Map as json string. Must pass inputFormat, and optionally record reader properties. e.g. {\"inputFormat\":\"json\"}", required = true) @QueryParam("batchConfigMapStr") String batchConfigMapStr,
-      FormDataMultiPart fileUpload, @Suspended final AsyncResponse asyncResponse) {
+      FormDataMultiPart fileUpload, @Suspended final AsyncResponse asyncResponse, @Context HttpHeaders httpHeaders) {
     try {
-      asyncResponse.resume(ingestData(tableNameWithType, batchConfigMapStr, new DataPayload(fileUpload)));
+      asyncResponse.resume(ingestData(tableNameWithType, batchConfigMapStr, new DataPayload(fileUpload), httpHeaders));
     } catch (Exception e) {
       asyncResponse.resume(new ControllerApplicationException(LOGGER,
           String.format("Caught exception when ingesting file into table: %s. %s", tableNameWithType, e.getMessage()),
@@ -161,9 +168,10 @@ public class PinotIngestionRestletResource {
       @ApiParam(value = "Name of the table to upload the file to", required = true) @QueryParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Batch config Map as json string. Must pass inputFormat, and optionally input FS properties. e.g. {\"inputFormat\":\"json\"}", required = true) @QueryParam("batchConfigMapStr") String batchConfigMapStr,
       @ApiParam(value = "URI of file to upload", required = true) @QueryParam("sourceURIStr") String sourceURIStr,
-      @Suspended final AsyncResponse asyncResponse) {
+      @Suspended final AsyncResponse asyncResponse, @Context HttpHeaders httpHeaders) {
     try {
-      asyncResponse.resume(ingestData(tableNameWithType, batchConfigMapStr, new DataPayload(new URI(sourceURIStr))));
+      asyncResponse.resume(
+          ingestData(tableNameWithType, batchConfigMapStr, new DataPayload(new URI(sourceURIStr)), httpHeaders));
     } catch (Exception e) {
       asyncResponse.resume(new ControllerApplicationException(LOGGER,
           String.format("Caught exception when ingesting file into table: %s. %s", tableNameWithType, e.getMessage()),
@@ -171,8 +179,10 @@ public class PinotIngestionRestletResource {
     }
   }
 
-  private SuccessResponse ingestData(String tableNameWithType, String batchConfigMapStr, DataPayload payload)
+  private SuccessResponse ingestData(String tableNameWithType, String batchConfigMapStr, DataPayload payload,
+      HttpHeaders httpHeaders)
       throws Exception {
+    AccessControlUtils.validateWritePermission(httpHeaders, tableNameWithType, _accessControlFactory, LOGGER);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     Preconditions
         .checkState(tableType != null, "Must provide table name with type suffix for table: %s", tableNameWithType);
