@@ -1,4 +1,4 @@
-import { computed, getProperties, set } from '@ember/object';
+import { computed, getProperties, set, get } from '@ember/object';
 import Component from '@ember/component';
 import {
   toCurrentUrn,
@@ -13,23 +13,14 @@ import {
   makeSortable,
   isExclusionWarning
 } from 'thirdeye-frontend/utils/rca-utils';
-import {
-  humanizeChange,
-  humanizeFloat,
-  humanizeScore
-} from 'thirdeye-frontend/utils/utils';
+import { humanizeChange, humanizeFloat, humanizeScore } from 'thirdeye-frontend/utils/utils';
 import METRICS_TABLE_COLUMNS from 'thirdeye-frontend/shared/metricsTableColumns';
+import METRIC_FUNNEL_COLUMNS from 'thirdeye-frontend/shared/metricFunnelColumns';
 import _ from 'lodash';
+const FORECAST_MODE = 'forecast';
 
 export default Component.extend({
   classNames: ['rootcause-metrics'],
-
-  /**
-   * Columns for metrics table
-   * @type Object[]
-   */
-  // TODO move this to shared
-  metricsTableColumns: METRICS_TABLE_COLUMNS,
 
   //
   // external properties
@@ -65,9 +56,28 @@ export default Component.extend({
    */
   onSelection: null, // function (Set, state)
 
+  context: null, // Object {}
+
+  compareMode: null, // String ""
+
+  didReceiveAttrs() {
+    const context = get(this, 'context');
+
+    set(this, 'compareMode', (context || {}).compareMode);
+  },
+
   //
   // internal properties
   //
+
+  /**
+   * Columns for metrics table
+   * @type Object[]
+   */
+  metricsTableColumns: computed('compareMode', function () {
+    const compareMode = get(this, 'compareMode');
+    return compareMode === FORECAST_MODE ? METRIC_FUNNEL_COLUMNS : METRICS_TABLE_COLUMNS;
+  }),
 
   /**
    * A mapping of each metric and its url(s)
@@ -82,74 +92,89 @@ export default Component.extend({
    *  ]
    * }
    */
-  links: computed(
-    'entities',
-    function() {
-      const { entities } = getProperties(this, 'entities');
-      let metricUrlMapping = {};
+  links: computed('entities', function () {
+    const { entities } = getProperties(this, 'entities');
+    let metricUrlMapping = {};
 
-      filterPrefix(Object.keys(entities), 'thirdeye:metric:')
-        .forEach(urn => {
-          const attributes = entities[urn].attributes;
-          const { externalUrls = [] } = attributes;
-          let urlArr = [];
+    filterPrefix(Object.keys(entities), 'thirdeye:metric:').forEach((urn) => {
+      const attributes = entities[urn].attributes;
+      const { externalUrls = [] } = attributes;
+      let urlArr = [];
 
-          // Add the list of urls for each url type
-          externalUrls.forEach(urlLabel => {
-            urlArr.push({
-              [urlLabel]: attributes[urlLabel][0] // each type should only have 1 url
-            });
-          });
+      // Add the list of urls for each url type
+      urlArr = externalUrls.map((urlLabel) => {
+        return { [urlLabel]: attributes[urlLabel][0] }; // each type should only have 1 url
+      });
 
-          // Map all the url lists to a metric urn
-          metricUrlMapping[urn] = urlArr;
-        });
+      // Map all the url lists to a metric urn
+      metricUrlMapping[urn] = urlArr;
+    });
 
-      return metricUrlMapping;
-    }
-  ),
+    return metricUrlMapping;
+  }),
 
   /**
    * Data for metrics table
    * @type Object[] - array of objects, each corresponding to a row in the table
    */
-  metricsTableData: computed(
-    'selectedUrns',
-    'entities',
-    'aggregates',
-    'scores',
-    'links',
-    function() {
-      const { selectedUrns, entities, aggregates, scores, links } =
-        getProperties(this, 'selectedUrns', 'entities', 'aggregates', 'scores', 'links');
+  metricsTableData: computed('selectedUrns', 'entities', 'aggregates', 'scores', 'links', 'compareMode', function () {
+    const { selectedUrns, entities, aggregates, scores, links, compareMode } = getProperties(
+      this,
+      'selectedUrns',
+      'entities',
+      'aggregates',
+      'scores',
+      'links',
+      'compareMode'
+    );
+    let rows;
 
-      const rows = filterPrefix(Object.keys(entities), 'thirdeye:metric:')
-        .map(urn => {
-          return {
-            urn,
-            links: links[urn],
-            isSelected: selectedUrns.has(urn),
-            label: toMetricLabel(urn, entities),
-            dataset: toMetricDataset(urn, entities),
-            score: humanizeScore(scores[urn]),
-            current: this._makeRecord(urn, 'current', entities, aggregates),
-            baseline: this._makeRecord(urn, 'baseline', entities, aggregates),
-            wo1w: this._makeRecord(urn, 'wo1w', entities, aggregates),
-            wo2w: this._makeRecord(urn, 'wo2w', entities, aggregates),
-            sortable_current: this._makeChange(urn, 'current', aggregates),
-            sortable_baseline: this._makeChange(urn, 'baseline', aggregates),
-            sortable_wo1w: this._makeChange(urn, 'wo1w', aggregates),
-            sortable_wo2w: this._makeChange(urn, 'wo2w', aggregates),
-            isExclusionWarning: isExclusionWarning(urn, entities)
-          };
-        });
-
-      return _.sortBy(rows, (row) => row.label);
+    if (compareMode === FORECAST_MODE) {
+      rows = filterPrefix(Object.keys(entities), 'thirdeye:metric:').map((urn) => {
+        return {
+          urn,
+          isSelected: selectedUrns.has(urn),
+          label: toMetricLabel(urn, entities),
+          dataset: toMetricDataset(urn, entities),
+          score: humanizeScore(scores[urn]),
+          current: this._makeRecord(urn, 'current', entities, aggregates),
+          baseline: this._makeRecord(urn, 'baseline', entities, aggregates),
+          yo1y: this._makeRecord(urn, 'yo1y', entities, aggregates),
+          interval: this._makeIntervalString(urn, aggregates),
+          inInterval: this._isInInterval(urn, aggregates),
+          sortable_current: this._makeChange(urn, 'current', aggregates),
+          sortable_baseline: this._makeChange(urn, 'baseline', aggregates),
+          sortable_yo1y: this._makeChange(urn, 'yo1y', aggregates),
+          isExclusionWarning: isExclusionWarning(urn, entities)
+        };
+      });
+    } else {
+      rows = filterPrefix(Object.keys(entities), 'thirdeye:metric:').map((urn) => {
+        return {
+          urn,
+          links: links[urn],
+          isSelected: selectedUrns.has(urn),
+          label: toMetricLabel(urn, entities),
+          dataset: toMetricDataset(urn, entities),
+          score: humanizeScore(scores[urn]),
+          current: this._makeRecord(urn, 'current', entities, aggregates),
+          baseline: this._makeRecord(urn, 'baseline', entities, aggregates),
+          wo1w: this._makeRecord(urn, 'wo1w', entities, aggregates),
+          wo2w: this._makeRecord(urn, 'wo2w', entities, aggregates),
+          sortable_current: this._makeChange(urn, 'current', aggregates),
+          sortable_baseline: this._makeChange(urn, 'baseline', aggregates),
+          sortable_wo1w: this._makeChange(urn, 'wo1w', aggregates),
+          sortable_wo2w: this._makeChange(urn, 'wo2w', aggregates),
+          isExclusionWarning: isExclusionWarning(urn, entities)
+        };
+      });
     }
-  ),
+
+    return _.sortBy(rows, (row) => row.label);
+  }),
 
   /**
-   * Returns a table record with value, change, and change direciton.
+   * Returns a table record with value, change, and change direction.
    * @param {string} urn metric urn
    * @param {string} offset offset identifier
    * @param {object} aggregates aggregates cache
@@ -167,6 +192,41 @@ export default Component.extend({
       change: humanizeChange(change),
       direction: toColorDirection(change, isInverse(urn, entities))
     };
+  },
+
+  /**
+   * Returns '(lower, upper)' or '-'. Example: upper= 2.4, lower = 4.1, return (2.4, 4.1)
+   * @param {string} urn metric urn
+   * @param {object} aggregates aggregates cache
+   * @return {string}
+   * @private
+   */
+  _makeIntervalString(urn, aggregates) {
+    const upper = aggregates[toOffsetUrn(urn, 'upper')] || Number.NaN;
+    const lower = aggregates[toOffsetUrn(urn, 'lower')] || Number.NaN;
+
+    if (upper && lower) {
+      return `(${humanizeFloat(lower)}, ${humanizeFloat(upper)})`;
+    }
+    return '-';
+  },
+
+  /**
+   * Returns 'Y' 'N' or '-' depending on if the forecast is within interval, '-' if upper or lower missing.
+   * @param {string} urn metric urn
+   * @param {object} aggregates aggregates cache
+   * @return {string}
+   * @private
+   */
+  _isInInterval(urn, aggregates) {
+    const upper = aggregates[toOffsetUrn(urn, 'upper')] || Number.NaN;
+    const lower = aggregates[toOffsetUrn(urn, 'lower')] || Number.NaN;
+    const current = aggregates[toOffsetUrn(urn, 'current')] || Number.NaN;
+
+    if (upper && lower && current) {
+      return current <= upper && current >= lower ? 'Y' : 'N';
+    }
+    return '-';
   },
 
   /**
@@ -189,10 +249,10 @@ export default Component.extend({
    * @type {Array}
    */
   preselectedItems: computed({
-    get () {
+    get() {
       return [];
     },
-    set () {
+    set() {
       // ignore
     }
   }),
@@ -203,17 +263,17 @@ export default Component.extend({
      * Updates the currently selected urns based on user selection on the table
      * @param {Object} e
      */
-    displayDataChanged (e) {
-      if (_.isEmpty(e.selectedItems)) { return; }
-
+    displayDataChanged(e) {
       const { selectedUrns, onSelection } = getProperties(this, 'selectedUrns', 'onSelection');
 
-      if (!onSelection) { return; }
+      if (_.isEmpty(e.selectedItems) || !onSelection) {
+        return;
+      }
 
       const urn = e.selectedItems[0].urn;
       const state = !selectedUrns.has(urn);
 
-      const updates = {[urn]: state};
+      const updates = { [urn]: state };
       if (hasPrefix(urn, 'thirdeye:metric:')) {
         updates[toCurrentUrn(urn)] = state;
         updates[toBaselineUrn(urn)] = state;
