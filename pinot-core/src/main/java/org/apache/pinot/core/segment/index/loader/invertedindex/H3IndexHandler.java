@@ -18,32 +18,34 @@
  */
 package org.apache.pinot.core.segment.index.loader.invertedindex;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.geospatial.serde.GeometrySerializer;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
-import org.apache.pinot.core.segment.creator.impl.geospatial.H3IndexCreator;
-import org.apache.pinot.core.segment.creator.impl.geospatial.H3IndexResolution;
+import org.apache.pinot.core.segment.creator.impl.inv.geospatial.H3IndexConfig;
+import org.apache.pinot.core.segment.creator.impl.inv.geospatial.OffHeapH3IndexCreator;
+import org.apache.pinot.core.segment.index.column.PhysicalColumnIndexContainer;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.loader.LoaderUtils;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
-import org.apache.pinot.core.segment.index.readers.forward.FixedBitMVForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
 import org.apache.pinot.core.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.sorted.SortedIndexReaderImpl;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
-import org.apache.pinot.spi.config.table.H3IndexColumn;
-import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.Geometry;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,7 +59,7 @@ public class H3IndexHandler {
   private final String _segmentName;
   private final SegmentVersion _segmentVersion;
   private final Set<ColumnMetadata> _h3IndexColumns = new HashSet<>();
-  private final HashMap<String, H3IndexColumn> _h3IndexMap = new HashMap<>();
+  private final Map<String, H3IndexConfig> _h3IndexConfigs = new HashMap<>();
 
   public H3IndexHandler(File indexDir, SegmentMetadataImpl segmentMetadata, IndexLoadingConfig indexLoadingConfig,
       SegmentDirectory.Writer segmentWriter) {
@@ -66,12 +68,12 @@ public class H3IndexHandler {
     _segmentName = segmentMetadata.getName();
     _segmentVersion = SegmentVersion.valueOf(segmentMetadata.getVersion());
 
-    // Only create H3 index on non-dictionary-encoded columns
-    for (H3IndexColumn h3IndexConfig : indexLoadingConfig.getH3IndexColumns()) {
-      ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(h3IndexConfig.getName());
+    for (Map.Entry<String, H3IndexConfig> entry : indexLoadingConfig.getH3IndexConfigs().entrySet()) {
+      String column = entry.getKey();
+      ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
       if (columnMetadata != null) {
         _h3IndexColumns.add(columnMetadata);
-        _h3IndexMap.put(h3IndexConfig.getName(), h3IndexConfig);
+        _h3IndexConfigs.put(column, entry.getValue());
       }
     }
   }
@@ -86,14 +88,16 @@ public class H3IndexHandler {
   private void createH3IndexForColumn(ColumnMetadata columnMetadata)
       throws Exception {
     String column = columnMetadata.getColumnName();
-    File inProgress = new File(_indexDir, column + ".h3.inprogress");
+    File inProgress = new File(_indexDir, column + V1Constants.Indexes.H3_INDEX_FILE_EXTENSION + ".inprogress");
     File h3IndexFile = new File(_indexDir, column + V1Constants.Indexes.H3_INDEX_FILE_EXTENSION);
 
     if (!inProgress.exists()) {
       // Marker file does not exist, which means last run ended normally.
+
       if (_segmentWriter.hasIndexFor(column, ColumnIndexType.H3_INDEX)) {
-        // Skip creating range index if already exists.
-        LOGGER.info("Found h3 index for segment: {}, column: {}", _segmentName, column);
+        // Skip creating H3 index if already exists.
+
+        LOGGER.info("Found H3 index for segment: {}, column: {}", _segmentName, column);
         return;
       }
 
@@ -101,20 +105,23 @@ public class H3IndexHandler {
       FileUtils.touch(inProgress);
     } else {
       // Marker file exists, which means last run gets interrupted.
-      // Remove range index if exists.
+
+      // Remove H3 index if exists.
       // For v1 and v2, it's the actual range index. For v3, it's the temporary range index.
       FileUtils.deleteQuietly(h3IndexFile);
     }
 
-    // Create new range index for the column.
-    LOGGER.info("Creating new h3 index for segment: {}, column: {}", _segmentName, column);
+    // Create new H3 index for the column.
+    LOGGER.info("Creating new H3 index for segment: {}, column: {}", _segmentName, column);
+    Preconditions
+        .checkState(columnMetadata.getDataType() == DataType.BYTES, "H3 index can only be applied to BYTES columns");
     if (columnMetadata.hasDictionary()) {
-      throw new UnsupportedOperationException("The geospatial column does not support dictionary");
+      handleDictionaryBasedColumn(columnMetadata);
     } else {
       handleNonDictionaryBasedColumn(columnMetadata);
     }
 
-    // For v3, write the generated range index file into the single file and remove it.
+    // For v3, write the generated H3 index file into the single file and remove it.
     if (_segmentVersion == SegmentVersion.v3) {
       LoaderUtils.writeIndexToV3Format(_segmentWriter, column, h3IndexFile, ColumnIndexType.H3_INDEX);
     }
@@ -122,36 +129,36 @@ public class H3IndexHandler {
     // Delete the marker file.
     FileUtils.deleteQuietly(inProgress);
 
-    LOGGER.info("Created range index for segment: {}, column: {}", _segmentName, column);
+    LOGGER.info("Created H3 index for segment: {}, column: {}", _segmentName, column);
+  }
+
+  private void handleDictionaryBasedColumn(ColumnMetadata columnMetadata)
+      throws IOException {
+    String columnName = columnMetadata.getColumnName();
+    try (ForwardIndexReader forwardIndexReader = getForwardIndexReader(columnMetadata, _segmentWriter);
+        ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
+        Dictionary dictionary = getDictionary(columnMetadata, _segmentWriter);
+        OffHeapH3IndexCreator h3IndexCreator = new OffHeapH3IndexCreator(_indexDir, columnName,
+            _h3IndexConfigs.get(columnName).getResolution())) {
+      int numDocs = columnMetadata.getTotalDocs();
+      for (int i = 0; i < numDocs; i++) {
+        int dictId = forwardIndexReader.getDictId(i, readerContext);
+        h3IndexCreator.add(GeometrySerializer.deserialize(dictionary.getBytesValue(dictId)));
+      }
+      h3IndexCreator.seal();
+    }
   }
 
   private void handleNonDictionaryBasedColumn(ColumnMetadata columnMetadata)
       throws Exception {
-    int numDocs = columnMetadata.getTotalDocs();
+    String columnName = columnMetadata.getColumnName();
     try (ForwardIndexReader forwardIndexReader = getForwardIndexReader(columnMetadata, _segmentWriter);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
-        H3IndexCreator h3IndexCreator = new H3IndexCreator(_indexDir, columnMetadata.getFieldSpec(),
-            new H3IndexResolution(_h3IndexMap.get(columnMetadata.getColumnName()).getResolutions()))) {
-      if (columnMetadata.isSingleValue()) {
-        // Single-value column.
-        switch (columnMetadata.getDataType()) {
-          case BYTES:
-            for (int i = 0; i < numDocs; i++) {
-              byte[] bytes = forwardIndexReader.getBytes(i, readerContext);
-              Geometry geometry = GeometrySerializer.deserialize(bytes);
-              //todo:check if its a point
-              Coordinate coordinate = geometry.getCoordinate();
-              h3IndexCreator.add(i, coordinate.x, coordinate.y);
-            }
-            break;
-          default:
-            throw new IllegalStateException("Unsupported data type: " + columnMetadata.getDataType());
-        }
-      } else {
-        // Multi-value column
-        //TODO
-        throw new IllegalStateException(
-            "H3 indexing is not supported for Multivalue column : " + columnMetadata.getDataType());
+        OffHeapH3IndexCreator h3IndexCreator = new OffHeapH3IndexCreator(_indexDir, columnName,
+            _h3IndexConfigs.get(columnName).getResolution())) {
+      int numDocs = columnMetadata.getTotalDocs();
+      for (int i = 0; i < numDocs; i++) {
+        h3IndexCreator.add(GeometrySerializer.deserialize(forwardIndexReader.getBytes(i, readerContext)));
       }
       h3IndexCreator.seal();
     }
@@ -160,22 +167,23 @@ public class H3IndexHandler {
   private ForwardIndexReader<?> getForwardIndexReader(ColumnMetadata columnMetadata,
       SegmentDirectory.Writer segmentWriter)
       throws IOException {
-    PinotDataBuffer buffer = segmentWriter.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.FORWARD_INDEX);
-    int numRows = columnMetadata.getTotalDocs();
-    int numBitsPerValue = columnMetadata.getBitsPerElement();
-    if (columnMetadata.isSingleValue()) {
-      if (columnMetadata.hasDictionary()) {
-        return new FixedBitSVForwardIndexReaderV2(buffer, numRows, numBitsPerValue);
+    PinotDataBuffer dataBuffer =
+        segmentWriter.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.FORWARD_INDEX);
+    if (columnMetadata.hasDictionary()) {
+      if (columnMetadata.isSorted()) {
+        return new SortedIndexReaderImpl(dataBuffer, columnMetadata.getCardinality());
       } else {
-        return new VarByteChunkSVForwardIndexReader(buffer, columnMetadata.getDataType());
+        return new FixedBitSVForwardIndexReaderV2(dataBuffer, columnMetadata.getTotalDocs(),
+            columnMetadata.getBitsPerElement());
       }
     } else {
-      if (columnMetadata.hasDictionary()) {
-        return new FixedBitMVForwardIndexReader(buffer, numRows, columnMetadata.getTotalNumberOfEntries(),
-            numBitsPerValue);
-      } else {
-        throw new IllegalStateException("Raw index on multi-value column is not supported");
-      }
+      return new VarByteChunkSVForwardIndexReader(dataBuffer, DataType.BYTES);
     }
+  }
+
+  private Dictionary getDictionary(ColumnMetadata columnMetadata, SegmentDirectory.Writer segmentWriter)
+      throws IOException {
+    PinotDataBuffer dataBuffer = segmentWriter.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.DICTIONARY);
+    return PhysicalColumnIndexContainer.loadDictionary(dataBuffer, columnMetadata, false);
   }
 }

@@ -116,13 +116,6 @@ public class SegmentPreProcessor implements AutoCloseable {
           new RangeIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
       rangeIndexHandler.createRangeIndices();
 
-      // Create column H3 indices according to the index config.
-      if (_indexLoadingConfig.getH3IndexColumns() != null) {
-        H3IndexHandler h3IndexHandler =
-            new H3IndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
-        h3IndexHandler.createH3Indices();
-      }
-
       // Create text indices according to the index config.
       Set<String> textIndexColumns = _indexLoadingConfig.getTextIndexColumns();
       if (!textIndexColumns.isEmpty()) {
@@ -142,6 +135,13 @@ public class SegmentPreProcessor implements AutoCloseable {
       JsonIndexHandler jsonIndexHandler =
           new JsonIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
       jsonIndexHandler.createJsonIndices();
+
+      // Create H3 indices according to the index config.
+      if (_indexLoadingConfig.getH3IndexConfigs() != null) {
+        H3IndexHandler h3IndexHandler =
+            new H3IndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
+        h3IndexHandler.createH3Indices();
+      }
 
       // Create bloom filter if required
       BloomFilterHandler bloomFilterHandler =

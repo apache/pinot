@@ -33,6 +33,7 @@ import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.core.data.partition.PartitionFunction;
+import org.apache.pinot.core.geospatial.serde.GeometrySerializer;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.io.util.PinotDataBitSet;
@@ -40,6 +41,7 @@ import org.apache.pinot.core.io.writer.impl.BaseChunkSVForwardIndexWriter;
 import org.apache.pinot.core.segment.creator.ColumnIndexCreationInfo;
 import org.apache.pinot.core.segment.creator.DictionaryBasedInvertedIndexCreator;
 import org.apache.pinot.core.segment.creator.ForwardIndexCreator;
+import org.apache.pinot.core.segment.creator.GeoSpatialIndexCreator;
 import org.apache.pinot.core.segment.creator.JsonIndexCreator;
 import org.apache.pinot.core.segment.creator.SegmentCreator;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationInfo;
@@ -52,6 +54,10 @@ import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForward
 import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.inv.OnHeapBitmapInvertedIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.inv.geospatial.H3IndexConfig;
+import org.apache.pinot.core.segment.creator.impl.inv.geospatial.H3IndexResolution;
+import org.apache.pinot.core.segment.creator.impl.inv.geospatial.OffHeapH3IndexCreator;
+import org.apache.pinot.core.segment.creator.impl.inv.geospatial.OnHeapH3IndexCreator;
 import org.apache.pinot.core.segment.creator.impl.inv.json.OffHeapJsonIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.inv.json.OnHeapJsonIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneFSTIndexCreator;
@@ -94,6 +100,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private final Map<String, TextIndexCreator> _textIndexCreatorMap = new HashMap<>();
   private final Map<String, TextIndexCreator> _fstIndexCreatorMap = new HashMap<>();
   private final Map<String, JsonIndexCreator> _jsonIndexCreatorMap = new HashMap<>();
+  private final Map<String, GeoSpatialIndexCreator> _h3IndexCreatorMap = new HashMap<>();
   private final Map<String, NullValueVectorCreator> _nullValueVectorCreatorMap = new HashMap<>();
   private String segmentName;
   private Schema schema;
@@ -148,6 +155,13 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       Preconditions.checkState(schema.hasColumn(columnName),
           "Cannot create text index for column: %s because it is not in schema", columnName);
       jsonIndexColumns.add(columnName);
+    }
+
+    Map<String, H3IndexConfig> h3IndexConfigs = config.getH3IndexConfigs();
+    for (String columnName : h3IndexConfigs.keySet()) {
+      Preconditions
+          .checkState(schema.hasColumn(columnName), "Cannot create H3 index for column: %s because it is not in schema",
+              columnName);
     }
 
     // Initialize creators for dictionary, forward index and inverted index
@@ -258,6 +272,19 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
             segmentCreationSpec.isOnHeap() ? new OnHeapJsonIndexCreator(_indexDir, columnName)
                 : new OffHeapJsonIndexCreator(_indexDir, columnName);
         _jsonIndexCreatorMap.put(columnName, jsonIndexCreator);
+      }
+
+      H3IndexConfig h3IndexConfig = h3IndexConfigs.get(columnName);
+      if (h3IndexConfig != null) {
+        Preconditions
+            .checkState(fieldSpec.isSingleValueField(), "H3 index is currently only supported on single-value columns");
+        Preconditions.checkState(fieldSpec.getDataType() == DataType.BYTES,
+            "H3 index is currently only supported on BYTES columns");
+        H3IndexResolution resolution = h3IndexConfig.getResolution();
+        GeoSpatialIndexCreator h3IndexCreator =
+            segmentCreationSpec.isOnHeap() ? new OnHeapH3IndexCreator(_indexDir, columnName, resolution)
+                : new OffHeapH3IndexCreator(_indexDir, columnName, resolution);
+        _h3IndexCreatorMap.put(columnName, h3IndexCreator);
       }
 
       _nullHandlingEnabled = config.isNullHandlingEnabled();
@@ -376,6 +403,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         if (jsonIndexCreator != null) {
           jsonIndexCreator.add((String) columnValueToIndex);
         }
+        GeoSpatialIndexCreator h3IndexCreator = _h3IndexCreatorMap.get(columnName);
+        if (h3IndexCreator != null) {
+          h3IndexCreator.add(GeometrySerializer.deserialize((byte[]) columnValueToIndex));
+        }
         if (dictionaryCreator != null) {
           // dictionary encoded SV column
           // get dictID from dictionary
@@ -445,12 +476,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private boolean shouldStoreRawValueForTextIndex(String column) {
     if (_columnProperties != null) {
       Map<String, String> props = _columnProperties.get(column);
-      if (props != null && Boolean.parseBoolean(props.get(FieldConfig.TEXT_INDEX_NO_RAW_DATA))) {
-        // by default always store the raw value
-        // if the config is set to true, don't store the actual raw value
-        // there will be a dummy value
-        return false;
-      }
+      // by default always store the raw value
+      // if the config is set to true, don't store the actual raw value
+      // there will be a dummy value
+      return props == null || !Boolean.parseBoolean(props.get(FieldConfig.TEXT_INDEX_NO_RAW_DATA));
     }
 
     return true;
@@ -475,6 +504,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
     for (JsonIndexCreator jsonIndexCreator : _jsonIndexCreatorMap.values()) {
       jsonIndexCreator.seal();
+    }
+    for (GeoSpatialIndexCreator h3IndexCreator : _h3IndexCreatorMap.values()) {
+      h3IndexCreator.seal();
     }
     for (NullValueVectorCreator nullValueVectorCreator : _nullValueVectorCreatorMap.values()) {
       nullValueVectorCreator.seal();
@@ -712,6 +744,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       throws IOException {
     FileUtils.close(Iterables
         .concat(_dictionaryCreatorMap.values(), _forwardIndexCreatorMap.values(), _invertedIndexCreatorMap.values(),
-            _textIndexCreatorMap.values(), _jsonIndexCreatorMap.values(), _nullValueVectorCreatorMap.values()));
+            _textIndexCreatorMap.values(), _fstIndexCreatorMap.values(), _jsonIndexCreatorMap.values(),
+            _h3IndexCreatorMap.values(), _nullValueVectorCreatorMap.values()));
   }
 }

@@ -20,18 +20,14 @@ package org.apache.pinot.tools;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 import java.io.File;
 import java.net.URL;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.ZkStarter;
-import org.apache.pinot.plugin.inputformat.csv.CSVRecordReader;
-import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.apache.pinot.tools.Quickstart.Color;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
-import org.apache.pinot.tools.streams.githubevents.PullRequestMergedEventsStream;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -124,11 +120,18 @@ public class GenericQuickstart {
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q1)));
     printStatus(Color.GREEN, "***************************************************");
 
-    String q2 = "select address, ST_DISTANCE(location_st_point, ST_Point(37, -122,1)) \n"
-        + "from starbucksStores WHERE ST_DISTANCE(location_st_point, ST_Point(37, -122, 1)) < 5000 limit 1000";
+    String q2 = "select address, ST_DISTANCE(location_st_point, ST_Point(-122, 37, 1)) from starbucksStores"
+        + " WHERE ST_DISTANCE(location_st_point, ST_Point(-122, 37, 1)) < 5000 limit 1000";
     printStatus(Color.YELLOW, "Starbucks stores within 5km of the given point in bay area");
-    printStatus(Color.CYAN, "Query : " + q1);
+    printStatus(Color.CYAN, "Query : " + q2);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q2)));
+    printStatus(Color.GREEN, "***************************************************");
+
+    String q3 = "select address, ST_DISTANCE(location_st_point, ST_Point(-122, 37, 1)) from starbucksStores"
+        + " WHERE ST_DISTANCE(location_st_point, ST_Point(-122, 37, 1)) between 5000 and 10000 limit 1000";
+    printStatus(Color.YELLOW, "Starbucks stores with distance of 5km to 10km from the given point in bay area");
+    printStatus(Color.CYAN, "Query : " + q3);
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q3)));
     printStatus(Color.GREEN, "***************************************************");
 
     printStatus(Color.GREEN, "You can always go to http://localhost:9000 to play around in the query console");
@@ -140,9 +143,7 @@ public class GenericQuickstart {
     URL resource = classLoader.getResource("examples/batch/starbucksStores");
     String tableDirectoryPath = resource.getPath();
 
-    GenericQuickstart quickstart = new GenericQuickstart(
-        tableDirectoryPath,
-        "starbucksStores");
+    GenericQuickstart quickstart = new GenericQuickstart(tableDirectoryPath, "starbucksStores");
     quickstart.execute();
   }
 }

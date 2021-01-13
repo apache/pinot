@@ -64,12 +64,6 @@ public interface DataSource {
   InvertedIndexReader<?> getRangeIndex();
 
   /**
-   * Returns the H3 index for the geospatial column if exists, or {@code null} if not.
-   */
-  @Nullable
-  H3IndexReader getH3Index();
-
-  /**
    * Returns the text index for the column if exists, or {@code null} if not.
    */
   @Nullable
@@ -86,6 +80,12 @@ public interface DataSource {
    */
   @Nullable
   JsonIndexReader getJsonIndex();
+
+  /**
+   * Returns the H3 index for the geospatial column if exists, or {@code null} if not.
+   */
+  @Nullable
+  H3IndexReader getH3Index();
 
   /**
    * Returns the bloom filter for the column if exists, or {@code null} if not.

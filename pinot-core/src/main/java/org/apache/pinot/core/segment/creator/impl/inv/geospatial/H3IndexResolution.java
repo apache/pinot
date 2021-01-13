@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.creator.impl.geospatial;
+package org.apache.pinot.core.segment.creator.impl.inv.geospatial;
 
 import java.util.ArrayList;
 import java.util.List;

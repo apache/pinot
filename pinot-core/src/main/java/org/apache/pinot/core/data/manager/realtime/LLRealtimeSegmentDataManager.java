@@ -65,7 +65,6 @@ import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.CompletionConfig;
-import org.apache.pinot.spi.config.table.H3IndexColumn;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -1191,8 +1190,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     Set<String> fstIndexColumns = indexLoadingConfig.getFSTIndexColumns();
     _fstIndexColumns = new ArrayList<>(fstIndexColumns);
 
-    List<H3IndexColumn> h3IndexColumns = indexLoadingConfig.getH3IndexColumns();
-
     // Start new realtime segment
     String consumerDir = realtimeTableDataManager.getConsumerDir();
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
@@ -1202,9 +1199,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setNoDictionaryColumns(indexLoadingConfig.getNoDictionaryColumns())
             .setVarLengthDictionaryColumns(indexLoadingConfig.getVarLengthDictionaryColumns())
             .setInvertedIndexColumns(invertedIndexColumns).setTextIndexColumns(textIndexColumns)
-            .setFSTIndexColumns(fstIndexColumns).setH3IndexColumns(h3IndexColumns)
-            .setJsonIndexColumns(indexLoadingConfig.getJsonIndexColumns())
-            .setRealtimeSegmentZKMetadata(segmentZKMetadata).setOffHeap(_isOffHeap).setMemoryManager(_memoryManager)
+            .setFSTIndexColumns(fstIndexColumns).setJsonIndexColumns(indexLoadingConfig.getJsonIndexColumns())
+            .setH3IndexConfigs(indexLoadingConfig.getH3IndexConfigs()).setRealtimeSegmentZKMetadata(segmentZKMetadata)
+            .setOffHeap(_isOffHeap).setMemoryManager(_memoryManager)
             .setStatsHistory(realtimeTableDataManager.getStatsHistory())
             .setAggregateMetrics(indexingConfig.isAggregateMetrics()).setNullHandlingEnabled(_nullHandlingEnabled)
             .setConsumerDir(consumerDir).setUpsertMode(tableConfig.getUpsertMode())

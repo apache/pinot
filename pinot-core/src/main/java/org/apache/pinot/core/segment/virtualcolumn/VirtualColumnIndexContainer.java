@@ -23,11 +23,11 @@ import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.H3IndexReader;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.JsonIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReaderImpl;
 import org.apache.pinot.core.segment.index.readers.TextIndexReader;
-import org.apache.pinot.core.segment.index.readers.geospatial.ImmutableH3IndexReader;
 
 
 /**
@@ -76,6 +76,11 @@ public class VirtualColumnIndexContainer implements ColumnIndexContainer {
   }
 
   @Override
+  public H3IndexReader getH3Index() {
+    return null;
+  }
+
+  @Override
   public Dictionary getDictionary() {
     return _dictionary;
   }
@@ -87,11 +92,6 @@ public class VirtualColumnIndexContainer implements ColumnIndexContainer {
 
   @Override
   public NullValueVectorReaderImpl getNullValueVector() {
-    return null;
-  }
-
-  @Override
-  public ImmutableH3IndexReader getH3Index() {
     return null;
   }
 

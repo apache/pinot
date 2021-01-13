@@ -54,10 +54,10 @@ public abstract class BaseDataSource implements DataSource {
     _dictionary = dictionary;
     _invertedIndex = invertedIndex;
     _rangeIndex = rangeIndex;
-    _h3Index = h3Index;
     _textIndex = textIndex;
     _fstIndex = fstIndex;
     _jsonIndex = jsonIndex;
+    _h3Index = h3Index;
     _bloomFilter = bloomFilter;
     _nullValueVector = nullValueVector;
   }
@@ -92,12 +92,6 @@ public abstract class BaseDataSource implements DataSource {
 
   @Nullable
   @Override
-  public H3IndexReader getH3Index() {
-    return _h3Index;
-  }
-
-  @Nullable
-  @Override
   public TextIndexReader getTextIndex() {
     return _textIndex;
   }
@@ -112,6 +106,12 @@ public abstract class BaseDataSource implements DataSource {
   @Override
   public JsonIndexReader getJsonIndex() {
     return _jsonIndex;
+  }
+
+  @Nullable
+  @Override
+  public H3IndexReader getH3Index() {
+    return _h3Index;
   }
 
   @Nullable

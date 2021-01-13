@@ -27,6 +27,16 @@
       "realtime.segment.flush.threshold.rows": 30
     }
   },
+  "fieldConfigList": [
+    {
+      "name": "location",
+      "encodingType":"RAW",
+      "indexType":"H3",
+      "properties": {
+        "resolutions": "5"
+      }
+    }
+  ],
   "metadata": {
     "customConfigs": {}
   },

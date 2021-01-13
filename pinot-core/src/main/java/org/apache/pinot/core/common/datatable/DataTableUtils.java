@@ -159,7 +159,7 @@ public class DataTableUtils {
         DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(columnNames, columnDataTypes));
         for (AggregationFunction aggregationFunction : aggregationFunctions) {
           dataTableBuilder.startRow();
-          // NOTE: For backward-compatibility, use AggregationFunction.getColumn() for PQL format response
+          // NOTE: For backward-compatibility, use AggregationFunction.getColumnName() for PQL format response
           dataTableBuilder.setColumn(0, aggregationFunction.getColumnName());
           dataTableBuilder.setColumn(1, Collections.emptyMap());
           dataTableBuilder.finishRow();
@@ -174,7 +174,7 @@ public class DataTableUtils {
       Object[] aggregationResults = new Object[numAggregations];
       for (int i = 0; i < numAggregations; i++) {
         AggregationFunction aggregationFunction = aggregationFunctions[i];
-        // NOTE: For backward-compatibility, use AggregationFunction.getColumn() for aggregation only query
+        // NOTE: For backward-compatibility, use AggregationFunction.getColumnName() for aggregation only query
         aggregationColumnNames[i] = aggregationFunction.getColumnName();
         columnDataTypes[i] = aggregationFunction.getIntermediateResultColumnType();
         aggregationResults[i] =

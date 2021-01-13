@@ -18,29 +18,25 @@
  */
 package org.apache.pinot.core.operator.filter;
 
-import com.google.common.base.Preconditions;
-import com.uber.h3core.H3Core;
 import com.uber.h3core.LengthUnit;
-import java.io.IOException;
-import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
-import org.apache.pinot.core.common.DataSource;
+import java.util.Set;
 import org.apache.pinot.core.geospatial.serde.GeometrySerializer;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
-import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
+import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
+import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.FunctionContext;
 import org.apache.pinot.core.query.request.context.predicate.Predicate;
 import org.apache.pinot.core.query.request.context.predicate.RangePredicate;
-import org.apache.pinot.core.segment.creator.impl.geospatial.H3IndexResolution;
 import org.apache.pinot.core.segment.index.readers.H3IndexReader;
-import org.apache.pinot.core.segment.index.readers.geospatial.ImmutableH3IndexReader;
+import org.apache.pinot.core.util.H3Utils;
 import org.apache.pinot.spi.utils.BytesUtils;
-import org.locationtech.jts.geom.Geometry;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.locationtech.jts.geom.Coordinate;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -50,94 +46,164 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 public class H3IndexFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "H3IndexFilterOperator";
 
-  private final Predicate _predicate;
-  private final DataSource _dataSource;
-  private final int _numDocs;
-  private final H3Core _h3Core;
   private final IndexSegment _segment;
+  private final Predicate _predicate;
+  private final int _numDocs;
   private final H3IndexReader _h3IndexReader;
-  private final H3IndexResolution _resolution;
-  final private Geometry _geometry;
-  final private double _distance;
+  private final long _h3Id;
+  private final double _edgeLength;
+  private final double _lowerBound;
+  private final double _upperBound;
 
-  public H3IndexFilterOperator(Predicate predicate, IndexSegment indexSegment, int numDocs) {
+  public H3IndexFilterOperator(IndexSegment segment, Predicate predicate, int numDocs) {
+    _segment = segment;
     _predicate = predicate;
-    _segment = indexSegment;
-    FunctionContext function = predicate.getLhs().getFunction();
-    String columnName;
-
-    // TODO: handle composite function that contains ST_DISTANCE
-    if (function.getArguments().get(0).getType() == ExpressionContext.Type.IDENTIFIER) {
-      columnName = function.getArguments().get(0).getIdentifier();
-      byte[] bytes = BytesUtils.toBytes(function.getArguments().get(1).getLiteral());
-      _geometry = GeometrySerializer.deserialize(bytes);
-    } else if (function.getArguments().get(1).getType() == ExpressionContext.Type.IDENTIFIER) {
-      columnName = function.getArguments().get(1).getIdentifier();
-      byte[] bytes = BytesUtils.toBytes(function.getArguments().get(0).getLiteral());
-      _geometry = GeometrySerializer.deserialize(bytes);
-    } else {
-      throw new RuntimeException("Expecting one of the arguments of ST_DISTANCE to be an identifier");
-    }
-    _dataSource = indexSegment.getDataSource(columnName);
-    _h3IndexReader = _dataSource.getH3Index();
-    _resolution = _h3IndexReader.getH3IndexResolution();
-    Preconditions.checkArgument(predicate instanceof RangePredicate,
-        String.format("H3 index does not support predicate type %s", predicate.getType()));
-    RangePredicate rangePredicate = (RangePredicate) predicate;
-    _distance = Double.parseDouble(rangePredicate.getUpperBound());
     _numDocs = numDocs;
-    try {
-      _h3Core = H3Core.newInstance();
-    } catch (IOException e) {
-      throw new RuntimeException("Unable to instantiate H3 instance", e);
+
+    List<ExpressionContext> arguments = predicate.getLhs().getFunction().getArguments();
+    Coordinate coordinate;
+    if (arguments.get(0).getType() == ExpressionContext.Type.IDENTIFIER) {
+      _h3IndexReader = segment.getDataSource(arguments.get(0).getIdentifier()).getH3Index();
+      coordinate = GeometrySerializer.deserialize(BytesUtils.toBytes(arguments.get(1).getLiteral())).getCoordinate();
+    } else {
+      _h3IndexReader = segment.getDataSource(arguments.get(1).getIdentifier()).getH3Index();
+      coordinate = GeometrySerializer.deserialize(BytesUtils.toBytes(arguments.get(0).getLiteral())).getCoordinate();
+    }
+    assert _h3IndexReader != null;
+    int resolution = _h3IndexReader.getH3IndexResolution().getLowestResolution();
+    _h3Id = H3Utils.H3_CORE.geoToH3(coordinate.y, coordinate.x, resolution);
+    _edgeLength = H3Utils.H3_CORE.edgeLength(resolution, LengthUnit.m);
+
+    RangePredicate rangePredicate = (RangePredicate) predicate;
+    if (!rangePredicate.getLowerBound().equals(RangePredicate.UNBOUNDED)) {
+      _lowerBound = Double.parseDouble(rangePredicate.getLowerBound());
+    } else {
+      _lowerBound = Double.NaN;
+    }
+    if (!rangePredicate.getUpperBound().equals(RangePredicate.UNBOUNDED)) {
+      _upperBound = Double.parseDouble(rangePredicate.getUpperBound());
+    } else {
+      _upperBound = Double.NaN;
     }
   }
 
   @Override
   protected FilterBlock getNextBlock() {
-    int resolution = _resolution.getLowestResolution();
-    long h3Id = _h3Core.geoToH3(_geometry.getCoordinate().x, _geometry.getCoordinate().y, resolution);
-    assert _h3IndexReader != null;
+    if (_upperBound < 0 || _lowerBound > _upperBound) {
+      // Invalid upper bound
 
-    // find the number of rings based on distance for full match
-    // use the edge of the hexagon to determine the rings are within the distance. This is calculated by (1) divide the
-    // distance by edge length of the resolution to get the number of contained rings (2) use the (floor of number - 1)
-    // for fetching the rings since ring0 is the original hexagon
-    double edgeLength = _h3Core.edgeLength(resolution, LengthUnit.m);
-    int numFullMatchedRings = (int) Math.floor(_distance / edgeLength);
-    MutableRoaringBitmap fullMatchedDocIds = new MutableRoaringBitmap();
-    List<Long> fullMatchRings = new ArrayList<>();
-    if (numFullMatchedRings > 0) {
-      fullMatchRings = _h3Core.kRing(h3Id, numFullMatchedRings - 1);
-      for (long id : fullMatchRings) {
-        ImmutableRoaringBitmap docIds = _h3IndexReader.getDocIds(id);
-        fullMatchedDocIds.or(docIds);
+      return new FilterBlock(EmptyDocIdSet.getInstance());
+    }
+
+    if (Double.isNaN(_lowerBound) || _lowerBound < 0) {
+      // No lower bound
+
+      if (Double.isNaN(_upperBound)) {
+        // No upper bound
+        return new FilterBlock(new MatchAllDocIdSet(_numDocs));
       }
+
+      List<Long> fullMatchH3Ids = getFullMatchH3Ids(_upperBound);
+      HashSet<Long> partialMatchH3Ids = new HashSet<>(getPartialMatchH3Ids(_upperBound));
+      partialMatchH3Ids.removeAll(fullMatchH3Ids);
+
+      MutableRoaringBitmap fullMatchDocIds = new MutableRoaringBitmap();
+      for (long fullMatchH3Id : fullMatchH3Ids) {
+        fullMatchDocIds.or(_h3IndexReader.getDocIds(fullMatchH3Id));
+      }
+
+      MutableRoaringBitmap partialMatchDocIds = new MutableRoaringBitmap();
+      for (long partialMatchH3Id : partialMatchH3Ids) {
+        partialMatchDocIds.or(_h3IndexReader.getDocIds(partialMatchH3Id));
+      }
+
+      return getFilterBlock(fullMatchDocIds, partialMatchDocIds);
     }
 
-    // partial matchedRings
-    // use the previous number + 1 to get the partial ring, which is the ceiling of the number
-    int numPartialMatchedRings = numFullMatchedRings + 1;
-    List<Long> partialMatchedRings = _h3Core.kRing(h3Id, numPartialMatchedRings - 1);
-    partialMatchedRings.removeAll(fullMatchRings);
-    final MutableRoaringBitmap partialMatchDocIds = new MutableRoaringBitmap();
-    for (long id : partialMatchedRings) {
-      ImmutableRoaringBitmap docIds = _h3IndexReader.getDocIds(id);
-      partialMatchDocIds.or(docIds);
+    if (Double.isNaN(_upperBound)) {
+      // No upper bound
+
+      List<Long> notMatchH3Ids = getFullMatchH3Ids(_lowerBound);
+      Set<Long> partialMatchH3Ids = new HashSet<>(getPartialMatchH3Ids(_lowerBound));
+
+      MutableRoaringBitmap fullMatchDocIds = new MutableRoaringBitmap();
+      for (long partialMatchH3Id : partialMatchH3Ids) {
+        fullMatchDocIds.or(_h3IndexReader.getDocIds(partialMatchH3Id));
+      }
+      fullMatchDocIds.flip(0L, _numDocs);
+
+      partialMatchH3Ids.removeAll(notMatchH3Ids);
+      MutableRoaringBitmap partialMatchDocIds = new MutableRoaringBitmap();
+      for (long partialMatchH3Id : partialMatchH3Ids) {
+        partialMatchDocIds.or(_h3IndexReader.getDocIds(partialMatchH3Id));
+      }
+
+      return getFilterBlock(fullMatchDocIds, partialMatchDocIds);
     }
 
+    // Both lower bound and upper bound exist
+    List<Long> lowerFullMatchH3Ids = getFullMatchH3Ids(_lowerBound);
+    List<Long> lowerPartialMatchH3Ids = getPartialMatchH3Ids(_lowerBound);
+    List<Long> upperFullMatchH3Ids = getFullMatchH3Ids(_upperBound);
+    List<Long> upperPartialMatchH3Ids = getPartialMatchH3Ids(_upperBound);
+
+    Set<Long> fullMatchH3Ids;
+    if (upperFullMatchH3Ids.size() > lowerPartialMatchH3Ids.size()) {
+      fullMatchH3Ids = new HashSet<>(upperFullMatchH3Ids);
+      fullMatchH3Ids.removeAll(lowerPartialMatchH3Ids);
+    } else {
+      fullMatchH3Ids = Collections.emptySet();
+    }
+    MutableRoaringBitmap fullMatchDocIds = new MutableRoaringBitmap();
+    for (long fullMatchH3Id : fullMatchH3Ids) {
+      fullMatchDocIds.or(_h3IndexReader.getDocIds(fullMatchH3Id));
+    }
+
+    Set<Long> partialMatchH3Ids = new HashSet<>(upperPartialMatchH3Ids);
+    partialMatchH3Ids.removeAll(lowerFullMatchH3Ids);
+    partialMatchH3Ids.removeAll(fullMatchH3Ids);
+    MutableRoaringBitmap partialMatchDocIds = new MutableRoaringBitmap();
+    for (long partialMatchH3Id : partialMatchH3Ids) {
+      partialMatchDocIds.or(_h3IndexReader.getDocIds(partialMatchH3Id));
+    }
+
+    return getFilterBlock(fullMatchDocIds, partialMatchDocIds);
+  }
+
+  /**
+   * Returns the H3 ids that is ALWAYS fully covered by the circle with the given distance as the radius and a point
+   * within the _h3Id hexagon as the center.
+   */
+  private List<Long> getFullMatchH3Ids(double distance) {
+    // NOTE: Pick a constant slightly larger than sqrt(3) to be conservative
+    int numRings = (int) Math.floor((distance / _edgeLength - 2) / 1.7321);
+    if (numRings >= 0) {
+      return H3Utils.H3_CORE.kRing(_h3Id, numRings);
+    } else {
+      return Collections.emptyList();
+    }
+  }
+
+  /**
+   * Returns the H3 ids that MIGHT BE partially/fully covered by the circle with the given distance as the radius and a
+   * point within the _h3Id hexagon as the center.
+   */
+  private List<Long> getPartialMatchH3Ids(double distance) {
+    // NOTE: Add a small delta (0.001) to be conservative
+    int numRings = (int) Math.floor((distance / _edgeLength + 2) / 1.5 + 0.001);
+    return H3Utils.H3_CORE.kRing(_h3Id, numRings);
+  }
+
+  private FilterBlock getFilterBlock(MutableRoaringBitmap fullMatchDocIds, MutableRoaringBitmap partialMatchDocIds) {
     ExpressionFilterOperator expressionFilterOperator = new ExpressionFilterOperator(_segment, _predicate, _numDocs);
-    FilterBlockDocIdSet filterBlockDocIdSet = expressionFilterOperator.getNextBlock().getBlockDocIdSet();
-    MutableRoaringBitmap filteredPartialMatchDocIds =
-        ((ScanBasedDocIdIterator) filterBlockDocIdSet.iterator()).applyAnd(partialMatchDocIds);
-
-    MutableRoaringBitmap result = ImmutableRoaringBitmap.or(fullMatchedDocIds, filteredPartialMatchDocIds);
+    ScanBasedDocIdIterator docIdIterator =
+        (ScanBasedDocIdIterator) expressionFilterOperator.getNextBlock().getBlockDocIdSet().iterator();
+    MutableRoaringBitmap result = docIdIterator.applyAnd(partialMatchDocIds);
+    result.or(fullMatchDocIds);
     return new FilterBlock(new BitmapDocIdSet(result, _numDocs) {
-
-      // Override this method to reflect the entries scanned
       @Override
       public long getNumEntriesScannedInFilter() {
-        return partialMatchDocIds.getCardinality();
+        return docIdIterator.getNumEntriesScanned();
       }
     });
   }

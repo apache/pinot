@@ -22,7 +22,7 @@
     {
       "dataType": "BYTES",
       "name": "location_st_point",
-      "transformFunction": "toSphericalGeography(stPoint(lat,lon))"
+      "transformFunction": "toSphericalGeography(stPoint(lon,lat))"
     }
   ],
   "schemaName": "starbucksStores"

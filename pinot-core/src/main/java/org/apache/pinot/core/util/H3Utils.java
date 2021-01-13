@@ -16,20 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.creator.impl.geospatial;
+package org.apache.pinot.core.util;
 
-import org.testng.Assert;
-import org.testng.annotations.Test;
-import org.testng.collections.Lists;
+import com.uber.h3core.H3Core;
+import java.io.IOException;
 
 
-public class H3IndexResolutionTest {
+public class H3Utils {
+  private H3Utils() {
+  }
 
-  @Test
-  public void testH3IndexResolution() {
-    H3IndexResolution resolution = new H3IndexResolution(Lists.newArrayList(13, 5, 6));
-    Assert.assertEquals(resolution.size(), 3);
-    Assert.assertEquals(resolution.getLowestResolution(), 5);
-    Assert.assertEquals(resolution.getResolutions(), Lists.newArrayList(5, 6, 13));
+  public static final H3Core H3_CORE;
+
+  static {
+    try {
+      H3_CORE = H3Core.newInstance();
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to instantiate H3 instance", e);
+    }
   }
 }

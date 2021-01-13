@@ -49,7 +49,7 @@
     {
       "dataType": "BYTES",
       "name": "location",
-      "transformFunction": "toSphericalGeography(stPoint(group_lat, group_lon))"
+      "transformFunction": "toSphericalGeography(stPoint(group_lon,group_lat))"
     }
   ],
   "dateTimeFieldSpecs": [

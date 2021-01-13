@@ -16,27 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.creator;
+package org.apache.pinot.core.segment.creator.impl.inv.geospatial;
 
-import java.io.Closeable;
-import java.io.IOException;
-import org.locationtech.jts.geom.Geometry;
+import org.testng.Assert;
+import org.testng.annotations.Test;
+import org.testng.collections.Lists;
 
 
-/**
- * Index creator for geospatial index.
- */
-public interface GeoSpatialIndexCreator extends Closeable {
+public class H3IndexResolutionTest {
 
-  /**
-   * Adds the next geospatial value.
-   */
-  void add(Geometry geometry)
-      throws IOException;
-
-  /**
-   * Seals the index and flushes it to disk.
-   */
-  void seal()
-      throws IOException;
+  @Test
+  public void testH3IndexResolution() {
+    H3IndexResolution resolution = new H3IndexResolution(Lists.newArrayList(13, 5, 6));
+    Assert.assertEquals(resolution.size(), 3);
+    Assert.assertEquals(resolution.getLowestResolution(), 5);
+    Assert.assertEquals(resolution.getResolutions(), Lists.newArrayList(5, 6, 13));
+  }
 }

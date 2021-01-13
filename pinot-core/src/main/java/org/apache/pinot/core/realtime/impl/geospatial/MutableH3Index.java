@@ -18,16 +18,17 @@
  */
 package org.apache.pinot.core.realtime.impl.geospatial;
 
-import com.uber.h3core.H3Core;
+import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
-import org.apache.pinot.core.segment.creator.GeoSpatialIndexCreator;
-import org.apache.pinot.core.segment.creator.impl.geospatial.H3IndexResolution;
+import org.apache.pinot.core.segment.creator.impl.inv.geospatial.H3IndexResolution;
 import org.apache.pinot.core.segment.index.readers.H3IndexReader;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.apache.pinot.core.util.H3Utils;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.Point;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -35,31 +36,35 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  * A H3 index reader for the real-time H3 index values on the fly.
  * <p>This class is thread-safe for single writer multiple readers.
  */
-public class RealtimeH3IndexReader implements GeoSpatialIndexCreator, H3IndexReader {
-  private final H3Core _h3Core;
-  private final Map<Long, ThreadSafeMutableRoaringBitmap> _h3IndexMap = new ConcurrentHashMap<>();
+public class MutableH3Index implements H3IndexReader {
   private final H3IndexResolution _resolution;
   private final int _lowestResolution;
+  private final Map<Long, ThreadSafeMutableRoaringBitmap> _bitmaps = new ConcurrentHashMap<>();
 
-  public RealtimeH3IndexReader(H3IndexResolution resolution)
+  private int _nextDocId;
+
+  public MutableH3Index(H3IndexResolution resolution)
       throws IOException {
     _resolution = resolution;
     _lowestResolution = resolution.getLowestResolution();
-    _h3Core = H3Core.newInstance();
+  }
+
+  /**
+   * Adds the next geospatial value.
+   */
+  public void add(Geometry geometry) {
+    Preconditions.checkState(geometry instanceof Point, "H3 index can only be applied to Point, got: %s",
+        geometry.getGeometryType());
+    Coordinate coordinate = geometry.getCoordinate();
+    // TODO: support multiple resolutions
+    long h3Id = H3Utils.H3_CORE.geoToH3(coordinate.y, coordinate.x, _lowestResolution);
+    _bitmaps.computeIfAbsent(h3Id, k -> new ThreadSafeMutableRoaringBitmap()).add(_nextDocId++);
   }
 
   @Override
-  public void add(int docId, double lat, double lon) {
-    // TODO support multiple resolutions
-    Long h3Id = _h3Core.geoToH3(lat, lon, _lowestResolution);
-    _h3IndexMap.computeIfAbsent(h3Id, k -> new ThreadSafeMutableRoaringBitmap());
-    _h3IndexMap.get(h3Id).add(docId);
-  }
-
-  @Override
-  public ImmutableRoaringBitmap getDocIds(long h3IndexId) {
-    return _h3IndexMap.containsKey(h3IndexId) ? _h3IndexMap.get(h3IndexId).getMutableRoaringBitmap()
-        : new MutableRoaringBitmap();
+  public MutableRoaringBitmap getDocIds(long h3Id) {
+    ThreadSafeMutableRoaringBitmap bitmap = _bitmaps.get(h3Id);
+    return bitmap != null ? bitmap.getMutableRoaringBitmap() : new MutableRoaringBitmap();
   }
 
   @Override
@@ -68,7 +73,6 @@ public class RealtimeH3IndexReader implements GeoSpatialIndexCreator, H3IndexRea
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() {
   }
 }

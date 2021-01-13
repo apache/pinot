@@ -39,13 +39,13 @@ import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.FSTBasedRegexpPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
+import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.FunctionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.predicate.JsonMatchPredicate;
 import org.apache.pinot.core.query.request.context.predicate.Predicate;
-import org.apache.pinot.core.query.request.context.predicate.RangePredicate;
 import org.apache.pinot.core.query.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.core.query.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.core.segment.index.datasource.MutableDataSource;
@@ -93,27 +93,37 @@ public class FilterPlanNode implements PlanNode {
     }
   }
 
+  /**
+   * H3 index can be applied iff:
+   * <ul>
+   *   <li>Predicate is of type RANGE</li>
+   *   <li>Left-hand-side of the predicate is an ST_Distance function</li>
+   *   <li>One argument of the ST_Distance function is an identifier, the other argument is an literal</li>
+   *   <li>The identifier column has H3 index</li>
+   * </ul>
+   */
   private boolean canApplyH3Index(Predicate predicate, FunctionContext function) {
-    if (function.getFunctionName().equalsIgnoreCase(StDistanceFunction.FUNCTION_NAME)) {
-      Predicate.Type type = predicate.getType();
-      if (type != Predicate.Type.RANGE) {
-        return false;
-      }
-      RangePredicate rangePredicate = (RangePredicate) predicate;
-      // TODO(https://github.com/apache/incubator-pinot/issues/6417): support lower bound
-      if (rangePredicate.getUpperBound().equals(RangePredicate.UNBOUNDED) || !rangePredicate.getLowerBound()
-          .equals(RangePredicate.UNBOUNDED)) {
-        return false;
-      }
-      if (function.getArguments().get(0).getType() != ExpressionContext.Type.IDENTIFIER) {
-        // TODO: handle nested geography/geometry conversion functions
-        return false;
-      }
-      String columnName = function.getArguments().get(0).getIdentifier();
-      DataSource dataSource = _indexSegment.getDataSource(columnName);
-      return dataSource.getH3Index() != null;
+    if (predicate.getType() != Predicate.Type.RANGE) {
+      return false;
     }
-    return false;
+    if (!function.getFunctionName().equalsIgnoreCase(StDistanceFunction.FUNCTION_NAME)) {
+      return false;
+    }
+    List<ExpressionContext> arguments = function.getArguments();
+    if (arguments.size() != 2) {
+      throw new BadQueryRequestException("Expect 2 arguments for function: " + StDistanceFunction.FUNCTION_NAME);
+    }
+    // TODO: handle nested geography/geometry conversion functions
+    String columnName = null;
+    boolean findLiteral = false;
+    for (ExpressionContext argument : arguments) {
+      if (argument.getType() == ExpressionContext.Type.IDENTIFIER) {
+        columnName = argument.getIdentifier();
+      } else if (argument.getType() == ExpressionContext.Type.LITERAL) {
+        findLiteral = true;
+      }
+    }
+    return columnName != null && _indexSegment.getDataSource(columnName).getH3Index() != null && findLiteral;
   }
 
   /**
@@ -154,9 +164,8 @@ public class FilterPlanNode implements PlanNode {
         Predicate predicate = filter.getPredicate();
         ExpressionContext lhs = predicate.getLhs();
         if (lhs.getType() == ExpressionContext.Type.FUNCTION) {
-          FunctionContext function = lhs.getFunction();
-          if (canApplyH3Index(predicate, function)) {
-            return new H3IndexFilterOperator(predicate, _indexSegment, _numDocs);
+          if (canApplyH3Index(predicate, lhs.getFunction())) {
+            return new H3IndexFilterOperator(_indexSegment, predicate, _numDocs);
           }
           // TODO: ExpressionFilterOperator does not support predicate types without PredicateEvaluator (IS_NULL,
           //       IS_NOT_NULL, TEXT_MATCH)

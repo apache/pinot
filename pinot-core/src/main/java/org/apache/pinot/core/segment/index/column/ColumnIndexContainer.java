@@ -22,11 +22,11 @@ import java.io.Closeable;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.H3IndexReader;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.JsonIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReaderImpl;
 import org.apache.pinot.core.segment.index.readers.TextIndexReader;
-import org.apache.pinot.core.segment.index.readers.geospatial.ImmutableH3IndexReader;
 
 
 /**
@@ -50,11 +50,6 @@ public interface ColumnIndexContainer extends Closeable {
   InvertedIndexReader<?> getRangeIndex();
 
   /**
-   * Returns the H3 index for the column, or {@code null} if it does not exist.
-   */
-  ImmutableH3IndexReader getH3Index();
-
-  /**
    * Returns the text index for the column, or {@code null} if it does not exist.
    */
   TextIndexReader getTextIndex();
@@ -68,6 +63,11 @@ public interface ColumnIndexContainer extends Closeable {
    * Returns the json index for the column, or {@code null} if it does not exist.
    */
   JsonIndexReader getJsonIndex();
+
+  /**
+   * Returns the H3 index for the column, or {@code null} if it does not exist.
+   */
+  H3IndexReader getH3Index();
 
   /**
    * Returns the dictionary for the column, or {@code null} if it does not exist.
