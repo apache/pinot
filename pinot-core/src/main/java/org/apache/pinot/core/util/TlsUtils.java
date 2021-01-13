@@ -20,14 +20,26 @@ package org.apache.pinot.core.util;
 
 import com.google.common.base.Preconditions;
 import java.io.FileInputStream;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.net.SocketAddress;
+import java.net.UnknownHostException;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
+import org.apache.commons.httpclient.ConnectTimeoutException;
+import org.apache.commons.httpclient.params.HttpConnectionParams;
+import org.apache.commons.httpclient.protocol.Protocol;
+import org.apache.commons.httpclient.protocol.SecureProtocolSocketFactory;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.core.transport.TlsConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
@@ -179,7 +191,14 @@ public final class TlsUtils {
     try {
       SSLContext sc = SSLContext.getInstance("SSL");
       sc.init(keyManagers, trustManagers, new java.security.SecureRandom());
+
+      // HttpsURLConnection
       HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
+
+      // Apache HTTP client 3.x
+      Protocol.registerProtocol("https", new Protocol(CommonConstants.HTTPS_PROTOCOL,
+          new CustomApacheHttpSocketFactory(sc.getSocketFactory()), 443));
+
     } catch (GeneralSecurityException e) {
       throw new IllegalStateException("Could not initialize SSL support", e);
     }
@@ -187,5 +206,53 @@ public final class TlsUtils {
 
   private static String key(String namespace, String suffix) {
     return namespace + "." + suffix;
+  }
+
+  /**
+   * Adapted from: https://svn.apache.org/viewvc/httpcomponents/oac.hc3x/trunk/src/contrib/org/apache/commons/httpclient/contrib/ssl/AuthSSLProtocolSocketFactory.java?view=markup
+   */
+  private static class CustomApacheHttpSocketFactory implements SecureProtocolSocketFactory {
+    final SSLSocketFactory _sslSocketFactory;
+
+    public CustomApacheHttpSocketFactory(SSLSocketFactory sslSocketFactory) {
+      _sslSocketFactory = sslSocketFactory;
+    }
+
+    @Override
+    public Socket createSocket(Socket socket, String host, int port, boolean autoClose)
+        throws IOException, UnknownHostException {
+      return _sslSocketFactory.createSocket(socket, host, port, autoClose);
+    }
+
+    @Override
+    public Socket createSocket(String host, int port, InetAddress localAddress, int localPort)
+        throws IOException, UnknownHostException {
+      return _sslSocketFactory.createSocket(host, port, localAddress, localPort);
+    }
+
+    @Override
+    public Socket createSocket(String host, int port, InetAddress localAddress, int localPort,
+        HttpConnectionParams params)
+        throws IOException, UnknownHostException, ConnectTimeoutException {
+      Preconditions.checkNotNull(params);
+
+      int timeout = params.getConnectionTimeout();
+      if (timeout <= 0) {
+        return _sslSocketFactory.createSocket(host, port, localAddress, localPort);
+      }
+
+      Socket socket = _sslSocketFactory.createSocket();
+      SocketAddress localaddr = new InetSocketAddress(localAddress, localPort);
+      SocketAddress remoteaddr = new InetSocketAddress(host, port);
+      socket.bind(localaddr);
+      socket.connect(remoteaddr, timeout);
+      return socket;
+    }
+
+    @Override
+    public Socket createSocket(String host, int port)
+        throws IOException, UnknownHostException {
+      return _sslSocketFactory.createSocket(host, port);
+    }
   }
 }

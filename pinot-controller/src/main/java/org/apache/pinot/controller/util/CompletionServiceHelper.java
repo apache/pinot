@@ -64,7 +64,8 @@ public class CompletionServiceHelper {
       try {
         getMethod = completionService.take().get();
         URI uri = getMethod.getURI();
-        String instance = _endpointsToServers.get(uri.getHost() + ":" + uri.getPort());
+        String instance = _endpointsToServers.get(
+            String.format("%s://%s:%d", uri.getScheme(), uri.getHost(), uri.getPort()));
         if (getMethod.getStatusCode() >= 300) {
           LOGGER.error("Server: {} returned error: {}", instance, getMethod.getStatusCode());
           completionServiceResponse._failedResponseCount++;
@@ -72,8 +73,8 @@ public class CompletionServiceHelper {
         }
         completionServiceResponse._httpResponses.put(instance, getMethod.getResponseBodyAsString());
       } catch (Exception e) {
-        // Ignore individual exceptions because the exception has been logged in MultiGetRequest
-        // Log the number of failed servers after gathering all responses
+        LOGGER.error("Connection error", e);
+        completionServiceResponse._failedResponseCount++;
       } finally {
         if (getMethod != null) {
           getMethod.releaseConnection();
