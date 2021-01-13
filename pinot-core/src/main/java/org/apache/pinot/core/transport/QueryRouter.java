@@ -21,6 +21,7 @@ package org.apache.pinot.core.transport;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -73,7 +74,8 @@ public class QueryRouter {
     _brokerId = brokerId;
     _brokerMetrics = brokerMetrics;
     _serverChannels = new ServerChannels(this, brokerMetrics);
-    _serverChannelsTls = tlsConfig.isEnabled() ? new ServerChannels(this, brokerMetrics, tlsConfig) : null;
+    _serverChannelsTls = Optional.ofNullable(tlsConfig).filter(TlsConfig::isEnabled)
+        .map(conf -> new ServerChannels(this, brokerMetrics, conf)).orElse(null);
   }
 
   public AsyncQueryResponse submitQuery(long requestId, String rawTableName,
