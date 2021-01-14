@@ -112,6 +112,7 @@ public class ColumnMetadataTest {
     Assert.assertFalse(col3Meta.hasNulls());
     Assert.assertTrue(col3Meta.hasDictionary());
     Assert.assertTrue(col3Meta.hasInvertedIndex());
+    Assert.assertFalse(col3Meta.hasFSTIndex());
     Assert.assertTrue(col3Meta.isSingleValue());
     Assert.assertEquals(col3Meta.getMaxNumberOfMultiValues(), 0);
     Assert.assertEquals(col3Meta.getTotalNumberOfEntries(), 100000);

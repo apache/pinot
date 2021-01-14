@@ -491,11 +491,11 @@ public final class TableConfigUtils {
       Preconditions.checkState(schema.getFieldSpecFor(columnName) != null,
           "Column Name " + columnName + " defined in field config list must be a valid column defined in the schema");
 
-      if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY) {
+      if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY &&
+          indexingConfigs.getNoDictionaryColumns() != null) {
         Preconditions.checkArgument(!indexingConfigs.getNoDictionaryColumns().contains(columnName),
             "FieldConfig encoding type is different from indexingConfig for column: " + columnName);
       }
-
       // FST Index is only available on dictionary encoded columns.
       if (fieldConfig.getIndexType() == FieldConfig.IndexType.FST) {
         Preconditions.checkArgument(fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY,
