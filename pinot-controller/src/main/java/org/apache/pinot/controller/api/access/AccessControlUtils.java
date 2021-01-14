@@ -34,7 +34,7 @@ public class AccessControlUtils {
     boolean hasWritePermission;
     try {
       AccessControl accessControl = accessControlFactory.create();
-      hasWritePermission = accessControl.hasWritePermission(httpHeaders, rawTableName);
+      hasWritePermission = accessControl.hasAccess(AccessType.WRITE, httpHeaders, rawTableName);
     } catch (Exception e) {
       throw new ControllerApplicationException(logger,
           "Caught exception while validating write permission to table: " + rawTableName,
@@ -51,7 +51,7 @@ public class AccessControlUtils {
     boolean hasWritePermission;
     try {
       AccessControl accessControl = accessControlFactory.create();
-      hasWritePermission = accessControl.hasWritePermission(httpHeaders);
+      hasWritePermission = accessControl.hasAccess(AccessType.WRITE, httpHeaders);
     } catch (Exception e) {
       throw new ControllerApplicationException(logger,
           "Caught exception while validating write permission to the endpoint", Response.Status.INTERNAL_SERVER_ERROR,
