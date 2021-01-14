@@ -19,11 +19,14 @@
 
 package org.apache.pinot.thirdeye.dashboard.resources.v2;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import io.dropwizard.auth.Auth;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -47,6 +50,7 @@ import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.rootcause.Entity;
 import org.apache.pinot.thirdeye.rootcause.RCAFramework;
 import org.apache.pinot.thirdeye.rootcause.RCAFrameworkExecutionResult;
+import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.apache.pinot.thirdeye.rootcause.impl.TimeRangeEntity;
 import org.apache.pinot.thirdeye.rootcause.util.EntityUtils;
 import org.slf4j.Logger;
@@ -89,14 +93,17 @@ public class RootCauseResource {
     Map<String, Object> responseMessage = new HashMap<>();
     MergedAnomalyResultDTO anomalyDTO = DAORegistry.getInstance().getMergedAnomalyResultDAO().findById(anomalyId);
     Preconditions.checkNotNull(anomalyDTO, "Anomaly doesn't exist in ThirdEye's repository");
-
+    MetricEntity metricEntity = MetricEntity.fromURN(anomalyDTO.getMetricUrn());
+    ObjectMapper objectMapper = new ObjectMapper();
+    String filterJson = URLEncoder.encode(
+        objectMapper.writeValueAsString(metricEntity.getFilters().asMap()), StandardCharsets.UTF_8.toString());
     // In the highlights api we retrieve only the top 3 results across 3 dimensions.
     // TODO: polish the results to make it more meaningful
     Map<String, Object> cubeHighlights = this.summaryResource.getDataCubeSummary(
         anomalyDTO.getMetricUrn(), anomalyDTO.getCollection(), anomalyDTO.getMetric(),
         anomalyDTO.getStartTime(), anomalyDTO.getEndTime(),
         anomalyDTO.getStartTime() - TimeUnit.DAYS.toMillis(7),
-        anomalyDTO.getEndTime() - TimeUnit.DAYS.toMillis(7), Strings.EMPTY, Strings.EMPTY,
+        anomalyDTO.getEndTime() - TimeUnit.DAYS.toMillis(7), Strings.EMPTY, filterJson,
         DEFAULT_HIGHLIGHT_CUBE_SUMMARY_SIZE, DEFAULT_HIGHLIGHT_CUBE_DEPTH, SummaryResource.DEFAULT_HIERARCHIES,
         false, DEFAULT_EXCLUDED_DIMENSIONS, SummaryResource.DEFAULT_TIMEZONE_ID);
     responseMessage.put("cubeResults", cubeHighlights);
