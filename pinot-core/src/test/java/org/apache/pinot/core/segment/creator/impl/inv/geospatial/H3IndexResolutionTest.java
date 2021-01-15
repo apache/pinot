@@ -16,36 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.store;
+package org.apache.pinot.core.segment.creator.impl.inv.geospatial;
 
-public enum ColumnIndexType {
-  DICTIONARY("dictionary"),
-  FORWARD_INDEX("forward_index"),
-  INVERTED_INDEX("inverted_index"),
-  BLOOM_FILTER("bloom_filter"),
-  NULLVALUE_VECTOR("nullvalue_vector"),
-  TEXT_INDEX("text_index"),
-  FST_INDEX("fst_index"),
-  JSON_INDEX("json_index"),
-  RANGE_INDEX("range_index"),
-  H3_INDEX("h3_index");
+import org.testng.Assert;
+import org.testng.annotations.Test;
+import org.testng.collections.Lists;
 
-  private final String indexName;
 
-  ColumnIndexType(String name) {
-    indexName = name;
-  }
+public class H3IndexResolutionTest {
 
-  public String getIndexName() {
-    return indexName;
-  }
-
-  public static ColumnIndexType getValue(String val) {
-    for (ColumnIndexType type : values()) {
-      if (type.getIndexName().equalsIgnoreCase(val)) {
-        return type;
-      }
-    }
-    throw new IllegalArgumentException("Unknown value: " + val);
+  @Test
+  public void testH3IndexResolution() {
+    H3IndexResolution resolution = new H3IndexResolution(Lists.newArrayList(13, 5, 6));
+    Assert.assertEquals(resolution.size(), 3);
+    Assert.assertEquals(resolution.getLowestResolution(), 5);
+    Assert.assertEquals(resolution.getResolutions(), Lists.newArrayList(5, 6, 13));
   }
 }

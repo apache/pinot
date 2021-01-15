@@ -48,10 +48,10 @@ public class StDistanceFunctionTest extends GeoFunctionTest {
   @Test
   public void testGeogDistance()
       throws Exception {
-    assertDistance("POINT(36.12 -86.67)", "POINT(33.94 -118.40)", 2886448.9734367016, false);
-    assertDistance("POINT(33.94 -118.40)", "POINT(36.12 -86.67)", 2886448.9734367016, false);
-    assertDistance("POINT(42.3601 -71.0589)", "POINT(42.4430 -71.2290)", 16734.69743457383, false);
-    assertDistance("POINT(36.12 -86.67)", "POINT(36.12 -86.67)", 0.0, false);
+    assertDistance("POINT(-86.67 36.12)", "POINT(-118.40 33.94)", 2886448.9734367016, false);
+    assertDistance("POINT(-118.40 33.94)", "POINT(-86.67 36.12)", 2886448.9734367016, false);
+    assertDistance("POINT(-71.0589 42.3601)", "POINT(-71.2290 42.4430)", 16734.69743457383, false);
+    assertDistance("POINT(-86.67 36.12)", "POINT(-86.67 36.12)", 0.0, false);
 
     //  (FIXME): the follow testings require null handling
 //    assertDistance("POINT EMPTY", "POINT (40 30)", null);

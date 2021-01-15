@@ -16,36 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.store;
+package org.apache.pinot.core.util;
 
-public enum ColumnIndexType {
-  DICTIONARY("dictionary"),
-  FORWARD_INDEX("forward_index"),
-  INVERTED_INDEX("inverted_index"),
-  BLOOM_FILTER("bloom_filter"),
-  NULLVALUE_VECTOR("nullvalue_vector"),
-  TEXT_INDEX("text_index"),
-  FST_INDEX("fst_index"),
-  JSON_INDEX("json_index"),
-  RANGE_INDEX("range_index"),
-  H3_INDEX("h3_index");
+import com.uber.h3core.H3Core;
+import java.io.IOException;
 
-  private final String indexName;
 
-  ColumnIndexType(String name) {
-    indexName = name;
+public class H3Utils {
+  private H3Utils() {
   }
 
-  public String getIndexName() {
-    return indexName;
-  }
+  public static final H3Core H3_CORE;
 
-  public static ColumnIndexType getValue(String val) {
-    for (ColumnIndexType type : values()) {
-      if (type.getIndexName().equalsIgnoreCase(val)) {
-        return type;
-      }
+  static {
+    try {
+      H3_CORE = H3Core.newInstance();
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to instantiate H3 instance", e);
     }
-    throw new IllegalArgumentException("Unknown value: " + val);
   }
 }

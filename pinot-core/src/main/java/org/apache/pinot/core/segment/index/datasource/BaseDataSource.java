@@ -24,6 +24,7 @@ import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.H3IndexReader;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.JsonIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
@@ -39,14 +40,15 @@ public abstract class BaseDataSource implements DataSource {
   private final TextIndexReader _textIndex;
   private final TextIndexReader _fstIndex;
   private final JsonIndexReader _jsonIndex;
+  private final H3IndexReader _h3Index;
   private final BloomFilterReader _bloomFilter;
   private final NullValueVectorReader _nullValueVector;
 
   public BaseDataSource(DataSourceMetadata dataSourceMetadata, ForwardIndexReader<?> forwardIndex,
       @Nullable Dictionary dictionary, @Nullable InvertedIndexReader<?> invertedIndex,
       @Nullable InvertedIndexReader<?> rangeIndex, @Nullable TextIndexReader textIndex,
-      @Nullable TextIndexReader fstIndex, @Nullable JsonIndexReader jsonIndex, @Nullable BloomFilterReader bloomFilter,
-      @Nullable NullValueVectorReader nullValueVector) {
+      @Nullable TextIndexReader fstIndex, @Nullable JsonIndexReader jsonIndex, @Nullable H3IndexReader h3Index,
+      @Nullable BloomFilterReader bloomFilter, @Nullable NullValueVectorReader nullValueVector) {
     _dataSourceMetadata = dataSourceMetadata;
     _forwardIndex = forwardIndex;
     _dictionary = dictionary;
@@ -55,6 +57,7 @@ public abstract class BaseDataSource implements DataSource {
     _textIndex = textIndex;
     _fstIndex = fstIndex;
     _jsonIndex = jsonIndex;
+    _h3Index = h3Index;
     _bloomFilter = bloomFilter;
     _nullValueVector = nullValueVector;
   }
@@ -103,6 +106,12 @@ public abstract class BaseDataSource implements DataSource {
   @Override
   public JsonIndexReader getJsonIndex() {
     return _jsonIndex;
+  }
+
+  @Nullable
+  @Override
+  public H3IndexReader getH3Index() {
+    return _h3Index;
   }
 
   @Nullable
