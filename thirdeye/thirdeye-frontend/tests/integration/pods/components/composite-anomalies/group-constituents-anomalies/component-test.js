@@ -70,7 +70,9 @@ test('it renders', function (assert) {
   // Check other values based on feedback
 
   this.feedbackOptionNames.forEach((option, index) => {
-    this.tableData[0].feedback = this.feedbackOptionValues[index];
+    this.tableData[0].feedback = {
+      feedbackType: this.feedbackOptionValues[index]
+    };
 
     this.render(hbs`
       {{composite-anomalies/group-constituents-anomalies data=tableData}}

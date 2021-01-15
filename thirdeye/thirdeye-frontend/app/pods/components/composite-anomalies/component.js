@@ -1,7 +1,7 @@
 import Component from '@ember/component';
 import { A as EmberArray } from '@ember/array';
 
-import { parseRoot, parseSubtree } from 'thirdeye-frontend/utils/anomalies-tree-parser';
+import { parseRoot, parseSubtree, updateAnomalyFeedback } from 'thirdeye-frontend/utils/anomalies-tree-parser';
 import pubSub from 'thirdeye-frontend/utils/pub-sub';
 
 export default Component.extend({
@@ -82,7 +82,7 @@ export default Component.extend({
     this.set('data', output);
 
     //Processing on each drilldown
-    const subscription = pubSub.subscribe('onAnomalyDrilldown', (anomalyId) => {
+    const anomalyDrilldownSubscription = pubSub.subscribe('onAnomalyDrilldown', (anomalyId) => {
       const { output, breadcrumbInfo } = parseSubtree(anomalyId, this.anomalies);
 
       this.set('breadcrumbList', [...this.breadcrumbList, breadcrumbInfo]);
@@ -91,7 +91,12 @@ export default Component.extend({
       this.onDrilldown();
     });
 
-    this.set('subscription', subscription);
+    const feedbackSubscription = pubSub.subscribe('onFeedback', ({ anomalyId, feedbackType, cascade }) => {
+      updateAnomalyFeedback(anomalyId, feedbackType, cascade, this.anomalies);
+    });
+
+    this.set('anomalyDrilldownSubscription', anomalyDrilldownSubscription);
+    this.set('feedbackSubscription', feedbackSubscription);
   },
 
   /**
@@ -101,7 +106,8 @@ export default Component.extend({
    * @override
    */
   willDestroyElement() {
-    this.subscription.unSubscribe();
+    this.anomalyDrilldownSubscription.unSubscribe();
+    this.feedbackSubscription.unSubscribe();
     this._super(...arguments);
   },
 
