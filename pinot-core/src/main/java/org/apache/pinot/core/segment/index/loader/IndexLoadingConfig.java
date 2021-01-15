@@ -328,6 +328,11 @@ public class IndexLoadingConfig {
   }
 
   @VisibleForTesting
+  public void setH3IndexConfigs(Map<String, H3IndexConfig> h3IndexConfigs) {
+    _h3IndexConfigs = h3IndexConfigs;
+  }
+
+  @VisibleForTesting
   public void setBloomFilterConfigs(Map<String, BloomFilterConfig> bloomFilterConfigs) {
     _bloomFilterConfigs = bloomFilterConfigs;
   }

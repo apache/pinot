@@ -107,7 +107,7 @@ public class H3IndexHandler {
       // Marker file exists, which means last run gets interrupted.
 
       // Remove H3 index if exists.
-      // For v1 and v2, it's the actual range index. For v3, it's the temporary range index.
+      // For v1 and v2, it's the actual H3 index. For v3, it's the temporary H3 index.
       FileUtils.deleteQuietly(h3IndexFile);
     }
 
