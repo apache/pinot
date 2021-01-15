@@ -117,7 +117,7 @@ public class CommonConstants {
 
     public static final String KEY_OF_SERVER_NETTY_PORT = "pinot.server.netty.port";
     public static final int DEFAULT_SERVER_NETTY_PORT = 8098;
-    public static final String KEY_OF_SERVER_NETTYTLS_PORT = "pinot.server.nettytls.port";
+    public static final String KEY_OF_SERVER_NETTYTLS_PORT = Server.SERVER_NETTYTLS_PREFIX + ".port";
     public static final int DEFAULT_SERVER_NETTYTLS_PORT = 8091;
     public static final String KEY_OF_BROKER_QUERY_PORT = "pinot.broker.client.queryPort";
     public static final int DEFAULT_BROKER_QUERY_PORT = 8099;

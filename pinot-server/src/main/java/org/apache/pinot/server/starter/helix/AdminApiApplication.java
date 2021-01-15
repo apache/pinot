@@ -80,6 +80,12 @@ public class AdminApiApplication extends ResourceConfig {
   public boolean start(List<ListenerConfig> listenerConfigs) {
     httpServer = ListenerConfigUtil.buildHttpServer(this, listenerConfigs);
 
+    try {
+      httpServer.start();
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to start http server", e);
+    }
+
     setupSwagger(httpServer);
     started = true;
     return true;

@@ -62,6 +62,7 @@ public final class TlsUtils {
   /**
    * Extract a TlsConfig instance from a namespaced set of configuration key, with optional defaults.
    *
+   * @param tlsDefaults default values for TLS settings
    * @param pinotConfig pinot configuration
    * @param namespace namespace prefix
    *

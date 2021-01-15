@@ -38,7 +38,7 @@ public class ServerRoutingInstance {
   private static final String SHORT_REALTIME_SUFFIX = "_R";
   private static final Map<String, String> SHORT_HOSTNAME_MAP = new ConcurrentHashMap<>();
 
-  private final boolean _tls;
+  private final boolean _tlsEnabled;
   private final String _hostname;
   private final int _port;
   private final TableType _tableType;
@@ -47,11 +47,11 @@ public class ServerRoutingInstance {
     this(hostname, port, tableType, false);
   }
 
-  public ServerRoutingInstance(String hostname, int port, TableType tableType, boolean tls) {
+  public ServerRoutingInstance(String hostname, int port, TableType tableType, boolean tlsEnabled) {
     _hostname = hostname;
     _port = port;
     _tableType = tableType;
-    _tls = tls;
+    _tlsEnabled = tlsEnabled;
   }
 
   public String getHostname() {
@@ -78,8 +78,8 @@ public class ServerRoutingInstance {
     return shortHostname + (_tableType == TableType.OFFLINE ? SHORT_OFFLINE_SUFFIX : SHORT_REALTIME_SUFFIX);
   }
 
-  public boolean isTls() {
-    return _tls;
+  public boolean isTlsEnabled() {
+    return _tlsEnabled;
   }
 
   @Override
@@ -91,13 +91,13 @@ public class ServerRoutingInstance {
       return false;
     }
     ServerRoutingInstance that = (ServerRoutingInstance) o;
-    return _tls == that._tls && _port == that._port && _hostname.equals(that._hostname)
+    return _tlsEnabled == that._tlsEnabled && _port == that._port && _hostname.equals(that._hostname)
         && _tableType == that._tableType;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_tls, _hostname, _port, _tableType);
+    return Objects.hash(_tlsEnabled, _hostname, _port, _tableType);
   }
 
   @Override

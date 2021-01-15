@@ -112,7 +112,7 @@ public class QueryRouter {
     _asyncQueryResponseMap.put(requestId, asyncQueryResponse);
     for (Map.Entry<ServerRoutingInstance, InstanceRequest> entry : requestMap.entrySet()) {
       ServerRoutingInstance serverRoutingInstance = entry.getKey();
-      ServerChannels serverChannels = serverRoutingInstance.isTls() ? _serverChannelsTls : _serverChannels;
+      ServerChannels serverChannels = serverRoutingInstance.isTlsEnabled() ? _serverChannelsTls : _serverChannels;
       try {
         serverChannels.sendRequest(serverRoutingInstance, entry.getValue());
         asyncQueryResponse.markRequestSubmitted(serverRoutingInstance);

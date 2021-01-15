@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.broker;
 
 import io.swagger.jaxrs.config.BeanConfig;
+import java.io.IOException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.List;
@@ -59,6 +60,13 @@ public class BrokerAdminApiApplication extends ResourceConfig {
 
   public void start(List<ListenerConfig> listenerConfigs) {
     _httpServer = ListenerConfigUtil.buildHttpServer(this, listenerConfigs);
+
+    try {
+      _httpServer.start();
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to start http server", e);
+    }
+
     setupSwagger();
   }
 

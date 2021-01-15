@@ -19,7 +19,6 @@
 package org.apache.pinot.core.util;
 
 import com.google.common.base.Preconditions;
-import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -48,9 +47,13 @@ import org.glassfish.jersey.server.ResourceConfig;
  * Utility class that generates Http {@link ListenerConfig} instances 
  * based on the properties provided by a property namespace in {@link PinotConfiguration}.
  */
-public abstract class ListenerConfigUtil {
+public final class ListenerConfigUtil {
   private static final String DEFAULT_HOST = "0.0.0.0";
   private static final String DOT_ACCESS_PROTOCOLS = ".access.protocols";
+
+  private ListenerConfigUtil() {
+    // left blank
+  }
 
   public static final Set<String> SUPPORTED_PROTOCOLS = new HashSet<>(
       Arrays.asList(CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL));
@@ -132,7 +135,7 @@ public abstract class ListenerConfigUtil {
       TlsConfig tlsDefaults) {
     String protocolNamespace = namespace + DOT_ACCESS_PROTOCOLS + "." + protocol;
 
-    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(tlsDefaults, config, protocolNamespace + ".tls");
+    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(tlsDefaults, config, protocolNamespace);
     tlsConfig.setEnabled(CommonConstants.HTTPS_PROTOCOL.equals(protocol));
 
     return new ListenerConfig(protocol,
@@ -157,15 +160,10 @@ public abstract class ListenerConfigUtil {
     HttpServer httpServer = GrizzlyHttpServerFactory.createHttpServer(URI.create("http://0.0.0.0/"), resConfig, false);
 
     // Listeners cannot be configured with the factory. Manual overrides are required as instructed by Javadoc.
+    // @see org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory.createHttpServer(java.net.URI, org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpContainer, boolean, org.glassfish.grizzly.ssl.SSLEngineConfigurator, boolean)
     httpServer.removeListener("grizzly");
 
     listenerConfigs.forEach(listenerConfig -> configureListener(httpServer, listenerConfig));
-
-    try {
-      httpServer.start();
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to start http server", e);
-    }
 
     return httpServer;
   }

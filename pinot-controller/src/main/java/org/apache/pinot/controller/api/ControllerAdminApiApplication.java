@@ -67,6 +67,12 @@ public class ControllerAdminApiApplication extends ResourceConfig {
   public void start(List<ListenerConfig> listenerConfigs) {
     _httpServer = ListenerConfigUtil.buildHttpServer(this, listenerConfigs);
 
+    try {
+      _httpServer.start();
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to start http server", e);
+    }
+
     setupSwagger(_httpServer);
 
     ClassLoader classLoader = ControllerAdminApiApplication.class.getClassLoader();
