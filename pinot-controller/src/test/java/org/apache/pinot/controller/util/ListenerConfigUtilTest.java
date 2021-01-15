@@ -106,7 +106,7 @@ public class ListenerConfigUtilTest {
 
     controllerConf.setProperty("controller.access.protocols", "http,https");
     controllerConf.setProperty("controller.access.protocols.https.port", "9443");
-    controllerConf.setProperty("controller.access.protocols.https.tls.client.auth.enabled", "true");
+    controllerConf.setProperty("controller.access.protocols.https.client.auth.enabled", "true");
 
     configureTlsDefaultProperties(controllerConf);
 
@@ -233,11 +233,11 @@ public class ListenerConfigUtilTest {
       controllerConf.setProperty("controller.access.protocols.https.host", host);
     }
     controllerConf.setProperty("controller.access.protocols.https.port", String.valueOf(port));
-    controllerConf.setProperty("controller.access.protocols.https.tls.keystore.password", "a-password");
-    controllerConf.setProperty("controller.access.protocols.https.tls.keystore.path", "/some-keystore-path");
-    controllerConf.setProperty("controller.access.protocols.https.tls.client.auth.enabled", "true");
-    controllerConf.setProperty("controller.access.protocols.https.tls.truststore.password", "a-password");
-    controllerConf.setProperty("controller.access.protocols.https.tls.truststore.path", "/some-truststore-path");
+    controllerConf.setProperty("controller.access.protocols.https.keystore.password", "a-password");
+    controllerConf.setProperty("controller.access.protocols.https.keystore.path", "/some-keystore-path");
+    controllerConf.setProperty("controller.access.protocols.https.client.auth.enabled", "true");
+    controllerConf.setProperty("controller.access.protocols.https.truststore.password", "a-password");
+    controllerConf.setProperty("controller.access.protocols.https.truststore.path", "/some-truststore-path");
   }
 
   private void configureTlsDefaultProperties(ControllerConf controllerConf) {
