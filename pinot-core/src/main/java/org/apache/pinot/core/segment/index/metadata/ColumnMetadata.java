@@ -98,7 +98,7 @@ public class ColumnMetadata {
     builder.setContainsNulls(config.getBoolean(getKeyFor(column, HAS_NULL_VALUE)));
     builder.setHasDictionary(config.getBoolean(getKeyFor(column, HAS_DICTIONARY), true));
     builder.setHasInvertedIndex(config.getBoolean(getKeyFor(column, HAS_INVERTED_INDEX)));
-    builder.setHasFSTIndex(config.getBoolean(getKeyFor(column, HAS_INVERTED_INDEX), false));
+    builder.setHasFSTIndex(config.getBoolean(getKeyFor(column, HAS_FST_INDEX), false));
     builder.setSingleValue(config.getBoolean(getKeyFor(column, IS_SINGLE_VALUED)));
     builder.setMaxNumberOfMultiValues(config.getInt(getKeyFor(column, MAX_MULTI_VALUE_ELEMTS)));
     builder.setTotalNumberOfEntries(config.getInt(getKeyFor(column, TOTAL_NUMBER_OF_ENTRIES)));
