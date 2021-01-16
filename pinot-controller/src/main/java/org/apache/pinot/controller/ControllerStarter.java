@@ -38,6 +38,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
@@ -321,6 +322,14 @@ public class ControllerStarter implements ServiceStartable {
   }
 
   private void setUpPinotController() {
+    // install default SSL context if necessary (even if not force-enabled everywhere)
+    TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_config, ControllerConf.CONTROLLER_TLS_PREFIX);
+    if (StringUtils.isNotBlank(tlsDefaults.getKeyStorePath())
+        || StringUtils.isNotBlank(tlsDefaults.getTrustStorePath())) {
+      LOGGER.info("Installing default SSL context for any client requests");
+      TlsUtils.installDefaultSSLSocketFactory(tlsDefaults);
+    }
+
     // Set up Pinot cluster in Helix if needed
     HelixSetupUtils.setupPinotCluster(_helixClusterName, _helixZkURL, _isUpdateStateModel, _enableBatchMessageMode,
         _config.getLeadControllerResourceRebalanceStrategy());
@@ -412,19 +421,6 @@ public class ControllerStarter implements ServiceStartable {
         bind(_leadControllerManager).to(LeadControllerManager.class);
       }
     });
-
-    TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_config, ControllerConf.CONTROLLER_TLS_PREFIX);
-
-    // install default SSL context if necessary
-    if (CommonConstants.HTTPS_PROTOCOL.equals(_config.getProperty(ControllerConf.CONTROLLER_BROKER_PROTOCOL))) {
-      LOGGER.info("Installing default SSL context for forwarding console query requests to broker");
-      TlsConfig tlsConfig = TlsUtils.extractTlsConfig(tlsDefaults, _config, ControllerConf.CONTROLLER_BROKER_TLS_PREFIX);
-      tlsConfig.setEnabled(true);
-
-      TlsUtils.installDefaultSSLSocketFactory(tlsConfig);
-    }
-
-    // TODO dedicated TLS for HttpConnectionManager? (controller-server connections)
 
     LOGGER.info("Starting controller admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _adminApp.start(_listenerConfigs);

@@ -196,20 +196,23 @@ public class PinotHelixResourceManager {
                   hostname = hostname.substring(Helix.PREFIX_OF_SERVER_INSTANCE.length());
                 }
 
-                // default http connection
                 String protocol = CommonConstants.HTTP_PROTOCOL;
-                int adminPort = instanceConfig.getRecord()
-                    .getIntField(Helix.Instance.ADMIN_PORT_KEY, Server.DEFAULT_ADMIN_API_PORT);
+                int port = Server.DEFAULT_ADMIN_API_PORT;
 
-                // optional https
-                int adminHttpsPort = instanceConfig.getRecord()
-                    .getIntField(Helix.Instance.ADMIN_HTTPS_PORT_KEY, -1);
-                if (adminHttpsPort > 0) {
+                int adminPort = instanceConfig.getRecord().getIntField(Helix.Instance.ADMIN_PORT_KEY, -1);
+                int adminHttpsPort = instanceConfig.getRecord().getIntField(Helix.Instance.ADMIN_HTTPS_PORT_KEY, -1);
+
+                // NOTE: preference for insecure is sub-optimal, but required for incremental upgrade scenarios
+                if (adminPort > 0) {
+                  protocol = CommonConstants.HTTP_PROTOCOL;
+                  port = adminPort;
+
+                } else if (adminHttpsPort > 0) {
                   protocol = CommonConstants.HTTPS_PROTOCOL;
-                  adminPort = adminHttpsPort;
+                  port = adminHttpsPort;
                 }
 
-                return String.format("%s://%s:%d", protocol, hostname, adminPort);
+                return String.format("%s://%s:%d", protocol, hostname, port);
               }
             });
     _tableUpdaterLocks = new Object[DEFAULT_TABLE_UPDATER_LOCKERS_SIZE];

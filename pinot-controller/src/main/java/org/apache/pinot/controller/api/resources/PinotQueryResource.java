@@ -202,10 +202,13 @@ public class PinotQueryResource {
       return QueryException.INTERNAL_ERROR.toString();
     }
 
-    String protocol = _controllerConf.getControllerBrokerProtocol();
     String hostNameWithPrefix = instanceConfig.getHostName();
+
+    String protocol = _controllerConf.getControllerBrokerProtocol();
+    int port = _controllerConf.getControllerBrokerPortOverride() > 0 ? _controllerConf.getControllerBrokerPortOverride()
+        : Integer.parseInt(instanceConfig.getPort());
     String url = getQueryURL(protocol, hostNameWithPrefix.substring(hostNameWithPrefix.indexOf("_") + 1),
-        instanceConfig.getPort(), querySyntax);
+        String.valueOf(port), querySyntax);
     ObjectNode requestJson = getRequestJson(query, traceEnabled, queryOptions, querySyntax);
     return sendRequestRaw(url, query, requestJson);
   }

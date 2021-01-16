@@ -74,6 +74,11 @@ import org.slf4j.LoggerFactory;
 public class FileUploadDownloadClient implements Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(FileUploadDownloadClient.class);
 
+  /**
+   * optional default SSL context for FileUploadDownloadClient operations
+   */
+  public static SSLContext _defaultSSLContext;
+
   public static class CustomHeaders {
     public static final String UPLOAD_TYPE = "UPLOAD_TYPE";
     public static final String DOWNLOAD_URI = "DOWNLOAD_URI";
@@ -114,7 +119,7 @@ public class FileUploadDownloadClient implements Closeable {
    * Construct the client with default settings.
    */
   public FileUploadDownloadClient() {
-    this(null);
+    this(_defaultSSLContext);
   }
 
   /**
@@ -727,5 +732,14 @@ public class FileUploadDownloadClient implements Closeable {
   public void close()
       throws IOException {
     _httpClient.close();
+  }
+
+  /**
+   * Install a default SSLContext for all FileUploadDownloadClients instantiated.
+   *
+   * @param sslContext default ssl context
+   */
+  public static void installDefaultSSLContext(SSLContext sslContext) {
+    _defaultSSLContext = sslContext;
   }
 }

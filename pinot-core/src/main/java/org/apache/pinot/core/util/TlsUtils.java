@@ -38,8 +38,9 @@ import javax.net.ssl.TrustManagerFactory;
 import org.apache.commons.httpclient.ConnectTimeoutException;
 import org.apache.commons.httpclient.params.HttpConnectionParams;
 import org.apache.commons.httpclient.protocol.Protocol;
-import org.apache.commons.httpclient.protocol.SecureProtocolSocketFactory;
+import org.apache.commons.httpclient.protocol.ProtocolSocketFactory;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.core.transport.TlsConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
@@ -117,7 +118,7 @@ public final class TlsUtils {
   }
 
   /**
-   * Create a KeyManagerFactory instance from a given TlsConfig.
+   * Create a KeyManagerFactory instance for a given TlsConfig
    *
    * @param tlsConfig TLS config
    *
@@ -125,23 +126,34 @@ public final class TlsUtils {
    */
   public static KeyManagerFactory createKeyManagerFactory(TlsConfig tlsConfig) {
     Preconditions.checkArgument(tlsConfig.isEnabled(), "tls is disabled");
-    Preconditions.checkNotNull(tlsConfig.getKeyStorePath(), "key store path is null");
-    Preconditions.checkNotNull(tlsConfig.getKeyStorePassword(), "key store password is null");
+    return createKeyManagerFactory(tlsConfig.getKeyStorePath(), tlsConfig.getKeyStorePassword());
+  }
+
+  /**
+   * Create a KeyManagerFactory instance for a given path and key password
+   *
+   * @param keyStorePath store path
+   * @param keyStorePassword password
+   *
+   * @return KeyManagerFactory
+   */
+  public static KeyManagerFactory createKeyManagerFactory(String keyStorePath, String keyStorePassword) {
+    Preconditions.checkNotNull(keyStorePath, "key store path must not be null");
+    Preconditions.checkNotNull(keyStorePassword, "key store password must not be null");
 
     try {
       KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
-      try (FileInputStream is = new FileInputStream(tlsConfig.getKeyStorePath())) {
-        keyStore.load(is, tlsConfig.getKeyStorePassword().toCharArray());
+      try (FileInputStream is = new FileInputStream(keyStorePath)) {
+        keyStore.load(is, keyStorePassword.toCharArray());
       }
 
       KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-      keyManagerFactory.init(keyStore, tlsConfig.getKeyStorePassword().toCharArray());
+      keyManagerFactory.init(keyStore, keyStorePassword.toCharArray());
 
       return keyManagerFactory;
 
     } catch (Exception e) {
-      throw new RuntimeException(String.format("Could not create key manager factory '%s'",
-          tlsConfig.getKeyStorePath()), e);
+      throw new RuntimeException(String.format("Could not create key manager factory '%s'", keyStorePath), e);
     }
   }
 
@@ -154,13 +166,25 @@ public final class TlsUtils {
    */
   public static TrustManagerFactory createTrustManagerFactory(TlsConfig tlsConfig) {
     Preconditions.checkArgument(tlsConfig.isEnabled(), "tls is disabled");
-    Preconditions.checkNotNull(tlsConfig.getTrustStorePath(), "trust store path is null");
-    Preconditions.checkNotNull(tlsConfig.getTrustStorePassword(), "trust store password is null");
+    return createTrustManagerFactory(tlsConfig.getTrustStorePath(), tlsConfig.getTrustStorePassword());
+  }
+
+  /**
+   * Create a TrustManagerFactory instance from a given path and key password
+   *
+   * @param trustStorePath store path
+   * @param trustStorePassword password
+   *
+   * @return TrustManagerFactory
+   */
+  public static TrustManagerFactory createTrustManagerFactory(String trustStorePath, String trustStorePassword) {
+    Preconditions.checkNotNull(trustStorePath, "trust store path must not be null");
+    Preconditions.checkNotNull(trustStorePassword, "trust store password must not be null");
 
     try {
       KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
-      try (FileInputStream is = new FileInputStream(tlsConfig.getTrustStorePath())) {
-        keyStore.load(is, tlsConfig.getTrustStorePassword().toCharArray());
+      try (FileInputStream is = new FileInputStream(trustStorePath)) {
+        keyStore.load(is, trustStorePassword.toCharArray());
       }
 
       TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
@@ -168,8 +192,7 @@ public final class TlsUtils {
 
       return trustManagerFactory;
     } catch (Exception e) {
-      throw new RuntimeException(String.format("Could not create trust manager factory '%s'",
-          tlsConfig.getTrustStorePath()), e);
+      throw new RuntimeException(String.format("Could not create trust manager factory '%s'", trustStorePath), e);
     }
   }
 
@@ -179,14 +202,29 @@ public final class TlsUtils {
    * @param tlsConfig TLS config
    */
   public static void installDefaultSSLSocketFactory(TlsConfig tlsConfig) {
+    installDefaultSSLSocketFactory(tlsConfig.getKeyStorePath(), tlsConfig.getKeyStorePassword(),
+        tlsConfig.getTrustStorePath(), tlsConfig.getTrustStorePassword());
+  }
+
+  /**
+   * Installs a default TLS socket factory for all HttpsURLConnection instances based on a given set of key and trust
+   * store paths and passwords
+   *
+   * @param keyStorePath key store path
+   * @param keyStorePassword key password
+   * @param trustStorePath trust store path
+   * @param trustStorePassword trust password
+   */
+  public static void installDefaultSSLSocketFactory(String keyStorePath, String keyStorePassword,
+      String trustStorePath, String trustStorePassword) {
     KeyManager[] keyManagers = null;
-    if (tlsConfig.getKeyStorePath() != null) {
-      keyManagers = createKeyManagerFactory(tlsConfig).getKeyManagers();
+    if (keyStorePath != null) {
+      keyManagers = createKeyManagerFactory(keyStorePath, keyStorePassword).getKeyManagers();
     }
 
     TrustManager[] trustManagers = null;
-    if (tlsConfig.getTrustStorePath() != null) {
-      trustManagers = createTrustManagerFactory(tlsConfig).getTrustManagers();
+    if (trustStorePath != null) {
+      trustManagers = createTrustManagerFactory(trustStorePath, trustStorePassword).getTrustManagers();
     }
 
     try {
@@ -198,7 +236,10 @@ public final class TlsUtils {
 
       // Apache HTTP client 3.x
       Protocol.registerProtocol("https", new Protocol(CommonConstants.HTTPS_PROTOCOL,
-          new CustomApacheHttpSocketFactory(sc.getSocketFactory()), 443));
+          new PinotProtocolSocketFactory(sc.getSocketFactory()), 443));
+
+      // FileUploadDownloadClient
+      FileUploadDownloadClient.installDefaultSSLContext(sc);
 
     } catch (GeneralSecurityException e) {
       throw new IllegalStateException("Could not initialize SSL support", e);
@@ -212,17 +253,11 @@ public final class TlsUtils {
   /**
    * Adapted from: https://svn.apache.org/viewvc/httpcomponents/oac.hc3x/trunk/src/contrib/org/apache/commons/httpclient/contrib/ssl/AuthSSLProtocolSocketFactory.java?view=markup
    */
-  private static class CustomApacheHttpSocketFactory implements SecureProtocolSocketFactory {
+  private static class PinotProtocolSocketFactory implements ProtocolSocketFactory {
     final SSLSocketFactory _sslSocketFactory;
 
-    public CustomApacheHttpSocketFactory(SSLSocketFactory sslSocketFactory) {
+    public PinotProtocolSocketFactory(SSLSocketFactory sslSocketFactory) {
       _sslSocketFactory = sslSocketFactory;
-    }
-
-    @Override
-    public Socket createSocket(Socket socket, String host, int port, boolean autoClose)
-        throws IOException, UnknownHostException {
-      return _sslSocketFactory.createSocket(socket, host, port, autoClose);
     }
 
     @Override

@@ -46,6 +46,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final String CONTROLLER_VIP_PORT = "controller.vip.port";
   public static final String CONTROLLER_VIP_PROTOCOL = "controller.vip.protocol";
   public static final String CONTROLLER_BROKER_PROTOCOL = "controller.broker.protocol";
+  public static final String CONTROLLER_BROKER_PORT_OVERRIDE = "controller.broker.port.override";
   public static final String CONTROLLER_BROKER_TLS_PREFIX = "controller.broker.tls";
   public static final String CONTROLLER_TLS_PREFIX = "controller.tls";
   public static final String CONTROLLER_HOST = "controller.host";
@@ -659,6 +660,10 @@ public class ControllerConf extends PinotConfiguration {
 
   public String getMetricsPrefix() {
     return getProperty(CONFIG_OF_CONTROLLER_METRICS_PREFIX, DEFAULT_METRICS_PREFIX);
+  }
+
+  public int getControllerBrokerPortOverride() {
+    return getProperty(CONTROLLER_BROKER_PORT_OVERRIDE, -1);
   }
 
   private long convertPeriodToSeconds(String timeStr) {
