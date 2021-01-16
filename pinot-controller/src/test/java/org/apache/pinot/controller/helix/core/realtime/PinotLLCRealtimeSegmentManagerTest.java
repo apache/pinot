@@ -920,7 +920,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     List<PartitionGroupInfo> getPartitionGroupInfoList(StreamConfig streamConfig,
         List<PartitionGroupMetadata> currentPartitionGroupMetadataList) {
       return IntStream.range(0, _numPartitions).mapToObj(i -> new PartitionGroupInfo(i,
-          PARTITION_OFFSET.toString()))
+          PARTITION_OFFSET))
           .collect(Collectors.toList());
     }
 

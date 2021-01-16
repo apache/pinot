@@ -82,7 +82,7 @@ public interface StreamMetadataProvider extends Closeable {
           streamConsumerFactory.createPartitionMetadataProvider(clientId, i);
       StreamPartitionMsgOffset streamPartitionMsgOffset =
           partitionMetadataProvider.fetchStreamPartitionOffset(streamConfig.getOffsetCriteria(), timeoutMillis);
-      newPartitionGroupInfoList.add(new PartitionGroupInfo(i, streamPartitionMsgOffset.toString()));
+      newPartitionGroupInfoList.add(new PartitionGroupInfo(i, streamPartitionMsgOffset));
     }
     return newPartitionGroupInfoList;
   }

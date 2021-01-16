@@ -22,12 +22,12 @@ public class PartitionGroupMetadata {
 
   private final int _partitionGroupId;
   private int _sequenceNumber;
-  private String _startCheckpoint;
-  private String _endCheckpoint;
+  private Checkpoint _startCheckpoint;
+  private Checkpoint _endCheckpoint;
   private String _status;
 
-  public PartitionGroupMetadata(int partitionGroupId, int sequenceNumber, String startCheckpoint,
-      String endCheckpoint, String status) {
+  public PartitionGroupMetadata(int partitionGroupId, int sequenceNumber, Checkpoint startCheckpoint,
+      Checkpoint endCheckpoint, String status) {
     _partitionGroupId = partitionGroupId;
     _sequenceNumber = sequenceNumber;
     _startCheckpoint = startCheckpoint;
@@ -47,19 +47,19 @@ public class PartitionGroupMetadata {
     _sequenceNumber = sequenceNumber;
   }
 
-  public String getStartCheckpoint() {
+  public Checkpoint getStartCheckpoint() {
     return _startCheckpoint;
   }
 
-  public void setStartCheckpoint(String startCheckpoint) {
+  public void setStartCheckpoint(Checkpoint startCheckpoint) {
     _startCheckpoint = startCheckpoint;
   }
 
-  public String getEndCheckpoint() {
+  public Checkpoint getEndCheckpoint() {
     return _endCheckpoint;
   }
 
-  public void setEndCheckpoint(String endCheckpoint) {
+  public void setEndCheckpoint(Checkpoint endCheckpoint) {
     _endCheckpoint = endCheckpoint;
   }
 

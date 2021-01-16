@@ -78,6 +78,7 @@ import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.stream.Checkpoint;
 import org.apache.pinot.spi.stream.OffsetCriteria;
+import org.apache.pinot.spi.stream.PartitionGroupCheckpointFactory;
 import org.apache.pinot.spi.stream.PartitionGroupInfo;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
@@ -166,7 +167,8 @@ public class PinotLLCRealtimeSegmentManager {
    * Using the ideal state and segment metadata, return a list of {@link PartitionGroupMetadata}
    * for latest segment of each partition group
    */
-  public List<PartitionGroupMetadata> getCurrentPartitionGroupMetadataList(IdealState idealState) {
+  public List<PartitionGroupMetadata> getCurrentPartitionGroupMetadataList(IdealState idealState,
+      StreamConfig streamConfig) {
     List<PartitionGroupMetadata> partitionGroupMetadataList = new ArrayList<>();
 
     // From all segment names in the ideal state, find unique partition group ids and their latest segment
@@ -185,6 +187,8 @@ public class PinotLLCRealtimeSegmentManager {
     }
 
     // Create a PartitionGroupMetadata for each latest segment
+    PartitionGroupCheckpointFactory checkpointFactory =
+        StreamConsumerFactoryProvider.create(streamConfig).createStreamMsgOffsetFactory();
     for (Map.Entry<Integer, LLCSegmentName> entry : partitionGroupIdToLatestSegment.entrySet()) {
       int partitionGroupId = entry.getKey();
       LLCSegmentName llcSegmentName = entry.getValue();
@@ -195,7 +199,9 @@ public class PinotLLCRealtimeSegmentManager {
           (LLCRealtimeSegmentZKMetadata) realtimeSegmentZKMetadata;
       PartitionGroupMetadata partitionGroupMetadata =
           new PartitionGroupMetadata(partitionGroupId, llcSegmentName.getSequenceNumber(),
-              llRealtimeSegmentZKMetadata.getStartOffset(), llRealtimeSegmentZKMetadata.getEndOffset(),
+              checkpointFactory.create(llRealtimeSegmentZKMetadata.getStartOffset()),
+              llRealtimeSegmentZKMetadata.getEndOffset() == null ? null
+                  : checkpointFactory.create(llRealtimeSegmentZKMetadata.getEndOffset()),
               llRealtimeSegmentZKMetadata.getStatus().toString());
       partitionGroupMetadataList.add(partitionGroupMetadata);
     }
@@ -498,9 +504,10 @@ public class PinotLLCRealtimeSegmentManager {
     // Example: Say we currently were consuming from 2 shards A, B. Of those, A is the one committing.
 
     // Get current partition groups - this gives current state of latest segments for each partition [A - DONE], [B - IN_PROGRESS]
-    List<PartitionGroupMetadata> currentPartitionGroupMetadataList = getCurrentPartitionGroupMetadataList(idealState);
     PartitionLevelStreamConfig streamConfig = new PartitionLevelStreamConfig(tableConfig.getTableName(),
         IngestionConfigUtils.getStreamConfigMap(tableConfig));
+    List<PartitionGroupMetadata> currentPartitionGroupMetadataList =
+        getCurrentPartitionGroupMetadataList(idealState, streamConfig);
 
     // Find new partition groups [A],[B],[C],[D] (assume A split into C D)
     // If segment has consumed all of A, we will receive B,C,D
@@ -610,9 +617,7 @@ public class PinotLLCRealtimeSegmentManager {
       int numPartitions, int numReplicas) {
     String realtimeTableName = tableConfig.getTableName();
     String segmentName = newLLCSegmentName.getSegmentName();
-    StreamPartitionMsgOffsetFactory offsetFactory =
-        StreamConsumerFactoryProvider.create(streamConfig).createStreamMsgOffsetFactory();
-    StreamPartitionMsgOffset startOffset = offsetFactory.create(committingSegmentDescriptor.getNextOffset());
+    String startOffset = committingSegmentDescriptor.getNextOffset();
     LOGGER
         .info("Creating segment ZK metadata for new CONSUMING segment: {} with start offset: {} and creation time: {}",
             segmentName, startOffset, creationTimeMs);
@@ -621,7 +626,7 @@ public class PinotLLCRealtimeSegmentManager {
     newSegmentZKMetadata.setTableName(realtimeTableName);
     newSegmentZKMetadata.setSegmentName(segmentName);
     newSegmentZKMetadata.setCreationTime(creationTimeMs);
-    newSegmentZKMetadata.setStartOffset(startOffset.toString());
+    newSegmentZKMetadata.setStartOffset(startOffset);
     // Leave maxOffset as null.
     newSegmentZKMetadata.setNumReplicas(numReplicas);
     newSegmentZKMetadata.setStatus(Status.IN_PROGRESS);
@@ -808,7 +813,7 @@ public class PinotLLCRealtimeSegmentManager {
       assert idealState != null;
       if (idealState.isEnabled()) {
         List<PartitionGroupMetadata> currentPartitionGroupMetadataList =
-            getCurrentPartitionGroupMetadataList(idealState);
+            getCurrentPartitionGroupMetadataList(idealState, streamConfig);
         List<PartitionGroupInfo> newPartitionGroupInfoList =
             getPartitionGroupInfoList(streamConfig, currentPartitionGroupMetadataList);
         return ensureAllPartitionsConsuming(tableConfig, streamConfig, idealState, newPartitionGroupInfoList);
@@ -1102,7 +1107,7 @@ public class PinotLLCRealtimeSegmentManager {
     return idealState;
   }
 
-  private StreamPartitionMsgOffset getPartitionGroupStartCheckpoint(StreamConfig streamConfig, int partitionGroupId) {
+  private Checkpoint getPartitionGroupStartCheckpoint(StreamConfig streamConfig, int partitionGroupId) {
     Map<String, String> streamConfigMapWithSmallestOffsetCriteria = new HashMap<>(streamConfig.getStreamConfigsMap());
     streamConfigMapWithSmallestOffsetCriteria.put(StreamConfigProperties
             .constructStreamProperty(streamConfig.getType(), StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA),
@@ -1111,12 +1116,10 @@ public class PinotLLCRealtimeSegmentManager {
         new StreamConfig(streamConfig.getTableNameWithType(), streamConfigMapWithSmallestOffsetCriteria);
     List<PartitionGroupInfo> smallestOffsetCriteriaPartitionGroupInfo =
         getPartitionGroupInfoList(smallestOffsetCriteriaStreamConfig, Collections.emptyList());
-    StreamPartitionMsgOffset partitionStartOffset = null;
+    Checkpoint partitionStartOffset = null;
     for (PartitionGroupInfo info : smallestOffsetCriteriaPartitionGroupInfo) {
       if (info.getPartitionGroupId() == partitionGroupId) {
-        StreamPartitionMsgOffsetFactory factory =
-            StreamConsumerFactoryProvider.create(streamConfig).createStreamMsgOffsetFactory();
-        partitionStartOffset = factory.create(info.getStartCheckpoint());
+        partitionStartOffset = info.getStartCheckpoint();
         break;
       }
     }
@@ -1136,7 +1139,7 @@ public class PinotLLCRealtimeSegmentManager {
       long creationTimeMs, InstancePartitions instancePartitions, int numPartitionGroups, int numReplicas) {
     String realtimeTableName = tableConfig.getTableName();
     int partitionGroupId = partitionGroupInfo.getPartitionGroupId();
-    String startCheckpoint = partitionGroupInfo.getStartCheckpoint();
+    String startCheckpoint = partitionGroupInfo.getStartCheckpoint().toString();
     LOGGER.info("Setting up new partition group: {} for table: {}", partitionGroupId, realtimeTableName);
 
     String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
