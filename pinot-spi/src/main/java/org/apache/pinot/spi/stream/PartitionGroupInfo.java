@@ -27,9 +27,9 @@ package org.apache.pinot.spi.stream;
 public class PartitionGroupInfo {
 
   private final int _partitionGroupId;
-  private final String _startCheckpoint;
+  private final Checkpoint _startCheckpoint;
 
-  public PartitionGroupInfo(int partitionGroupId, String startCheckpoint) {
+  public PartitionGroupInfo(int partitionGroupId, Checkpoint startCheckpoint) {
     _partitionGroupId = partitionGroupId;
     _startCheckpoint = startCheckpoint;
   }
@@ -38,7 +38,7 @@ public class PartitionGroupInfo {
     return _partitionGroupId;
   }
 
-  public String getStartCheckpoint() {
+  public Checkpoint getStartCheckpoint() {
     return _startCheckpoint;
   }
 }
