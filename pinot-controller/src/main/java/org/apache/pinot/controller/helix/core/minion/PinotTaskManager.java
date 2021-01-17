@@ -21,10 +21,13 @@ package org.apache.pinot.controller.helix.core.minion;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -36,6 +39,18 @@ import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorRegi
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableTaskConfig;
+import org.quartz.CronScheduleBuilder;
+import org.quartz.JobBuilder;
+import org.quartz.JobDataMap;
+import org.quartz.JobDetail;
+import org.quartz.JobKey;
+import org.quartz.Scheduler;
+import org.quartz.SchedulerException;
+import org.quartz.Trigger;
+import org.quartz.TriggerBuilder;
+import org.quartz.TriggerKey;
+import org.quartz.impl.StdSchedulerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,9 +64,21 @@ import org.slf4j.LoggerFactory;
 public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTaskManager.class);
 
+  public final static String PINOT_TASK_MANAGER_KEY = "PinotTaskManager";
+  public final static String LEAD_CONTROLLER_MANAGER_KEY = "LeadControllerManager";
+  private static final String TABLE_CONFIG_PARENT_PATH = "/CONFIGS/TABLE";
+  private static final String TABLE_CONFIG_PATH_PREFIX = "/CONFIGS/TABLE/";
+
+  private final static String SCHEDULE_KEY = "schedule";
+  private final static String TABLE_TASK_TYPE_SPLIT = "\t\t";
+
   private final PinotHelixTaskResourceManager _helixTaskResourceManager;
   private final ClusterInfoAccessor _clusterInfoAccessor;
   private final TaskGeneratorRegistry _taskGeneratorRegistry;
+  private final Map<String, Map<String, String>> _tableTaskTypeToCronExpressionMap = new ConcurrentHashMap<>();
+  private final Map<String, TableTaskSchedulerUpdater> _tableTaskSchedulerUpdaterMap = new ConcurrentHashMap<>();
+
+  private Scheduler _scheduledExecutorService;
 
   public PinotTaskManager(PinotHelixTaskResourceManager helixTaskResourceManager,
       PinotHelixResourceManager helixResourceManager, LeadControllerManager leadControllerManager,
@@ -62,6 +89,255 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     _helixTaskResourceManager = helixTaskResourceManager;
     _clusterInfoAccessor = new ClusterInfoAccessor(helixResourceManager, helixTaskResourceManager, controllerConf);
     _taskGeneratorRegistry = new TaskGeneratorRegistry(_clusterInfoAccessor);
+    try {
+      _scheduledExecutorService = new StdSchedulerFactory().getScheduler();
+      _scheduledExecutorService.start();
+      LOGGER.info("Subscribe to tables change under PropertyStore path: {}", TABLE_CONFIG_PARENT_PATH);
+      _pinotHelixResourceManager.getPropertyStore()
+          .subscribeChildChanges(TABLE_CONFIG_PARENT_PATH, (parentPath, currentChilds) -> {
+            for (String tableWithType : currentChilds) {
+              subscribeTableConfigChanges(tableWithType);
+            }
+            Set<String> tableToDelete = new HashSet(_tableTaskSchedulerUpdaterMap.keySet());
+            tableToDelete.removeAll(currentChilds);
+            if (!tableToDelete.isEmpty()) {
+              LOGGER.info("Found tables to clean up cron task scheduler: {}", tableToDelete);
+              for (String tableWithType : tableToDelete) {
+                cleanUpCronTaskSchedulerForTable(tableWithType);
+              }
+            }
+          });
+      for (String tableWithType : helixResourceManager.getAllTables()) {
+        subscribeTableConfigChanges(tableWithType);
+      }
+    } catch (SchedulerException e) {
+      LOGGER.error("Unable to create a scheduler.", e);
+      _scheduledExecutorService = null;
+    }
+  }
+
+  private String getPropertyStorePathForTable(String tableWithType) {
+    return TABLE_CONFIG_PATH_PREFIX + tableWithType;
+  }
+
+  protected synchronized void cleanupCronTaskScheduler() {
+    try {
+      _scheduledExecutorService.clear();
+    } catch (SchedulerException e) {
+      LOGGER.error("Failed to clear all tasks in scheduler", e);
+    }
+  }
+
+  public synchronized void cleanUpCronTaskSchedulerForTable(String tableWithType) {
+    LOGGER.info("Cleaning up task in scheduler for table {}", tableWithType);
+    TableTaskSchedulerUpdater tableTaskSchedulerUpdater = _tableTaskSchedulerUpdaterMap.get(tableWithType);
+    _pinotHelixResourceManager.getPropertyStore()
+        .unsubscribeDataChanges(getPropertyStorePathForTable(tableWithType), tableTaskSchedulerUpdater);
+    for (String taskType : _tableTaskTypeToCronExpressionMap.get(tableWithType).keySet()) {
+      try {
+        _scheduledExecutorService.deleteJob(JobKey.jobKey(tableWithType, taskType));
+      } catch (SchedulerException e) {
+        LOGGER.error("Failed to delete job for table {}, task type {}", tableWithType, taskType, e);
+      }
+    }
+    _tableTaskSchedulerUpdaterMap.remove(tableWithType);
+  }
+
+  public synchronized void subscribeTableConfigChanges(String tableWithType) {
+    if (_tableTaskSchedulerUpdaterMap.containsKey(tableWithType)) {
+      return;
+    }
+    TableTaskSchedulerUpdater tableTaskSchedulerUpdater = new TableTaskSchedulerUpdater(tableWithType, this);
+    _pinotHelixResourceManager.getPropertyStore()
+        .subscribeDataChanges(getPropertyStorePathForTable(tableWithType), tableTaskSchedulerUpdater);
+    _tableTaskSchedulerUpdaterMap.put(tableWithType, tableTaskSchedulerUpdater);
+    LOGGER.info("Trying to update task schedule for table: {}", tableWithType);
+    try {
+      updateCronTaskScheduler(tableWithType);
+    } catch (Exception e) {
+      LOGGER.error("Got exception during updateCronTaskScheduler for {}", tableWithType, e);
+    }
+  }
+
+  public synchronized void updateCronTaskScheduler(String tableWithType) {
+    if (_scheduledExecutorService == null) {
+      return;
+    }
+    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableWithType);
+    TableTaskConfig taskConfig = tableConfig.getTaskConfig();
+    if (taskConfig == null) {
+      LOGGER.info("taskConfig is null, trying to remove all the tasks for table {} if any", tableWithType);
+      removeAllTasksFromCronExpressions(tableWithType);
+      return;
+    }
+    Map<String, Map<String, String>> taskTypeConfigsMap = taskConfig.getTaskTypeConfigsMap();
+    if (taskTypeConfigsMap == null) {
+      LOGGER.info("taskTypeConfigsMap is null, trying to remove all the tasks for table {} if any", tableWithType);
+      removeAllTasksFromCronExpressions(tableWithType);
+      return;
+    }
+    Map<String, String> taskToCronExpressionMap = getTaskToCronExpressionMap(taskTypeConfigsMap);
+    LOGGER.info("Got taskToCronExpressionMap {} ", taskToCronExpressionMap);
+    updateCronTaskScheduler(tableWithType, taskToCronExpressionMap);
+  }
+
+  private void updateCronTaskScheduler(String tableWithType, Map<String, String> taskToCronExpressionMap) {
+    if (_scheduledExecutorService == null) {
+      return;
+    }
+    if (_tableTaskTypeToCronExpressionMap.containsKey(tableWithType)) {
+      Map<String, String> existingScheduledTasks = _tableTaskTypeToCronExpressionMap.get(tableWithType);
+      for (String existingTaskType : existingScheduledTasks.keySet()) {
+        // Task should be removed
+        if (!taskToCronExpressionMap.containsKey(existingTaskType)) {
+          try {
+            _scheduledExecutorService.deleteJob(JobKey.jobKey(tableWithType, existingTaskType));
+          } catch (SchedulerException e) {
+            LOGGER.error("Failed to delete scheduled job for table {}, task type {}", tableWithType,
+                existingScheduledTasks, e);
+          }
+          continue;
+        }
+        String existingCronExpression = existingScheduledTasks.get(existingTaskType);
+        String newCronExpression = taskToCronExpressionMap.get(existingTaskType);
+        // Schedule new job
+        if (existingCronExpression == null) {
+          try {
+            scheduleJob(tableWithType, existingTaskType, newCronExpression);
+          } catch (SchedulerException e) {
+            LOGGER.error("Failed to schedule cron task for table {}, task {}, cron expr {}", tableWithType,
+                existingTaskType, newCronExpression, e);
+          }
+          continue;
+        }
+        // Update existing task with new cron expr
+        if (!existingCronExpression.equalsIgnoreCase(newCronExpression)) {
+          try {
+            TriggerKey triggerKey = TriggerKey.triggerKey(tableWithType, existingTaskType);
+            Trigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerKey)
+                .withSchedule(CronScheduleBuilder.cronSchedule(newCronExpression)).build();
+            _scheduledExecutorService.rescheduleJob(triggerKey, trigger);
+          } catch (SchedulerException e) {
+            LOGGER.error("Failed to delete scheduled job for table {}, task type {}", tableWithType,
+                existingScheduledTasks, e);
+          }
+          continue;
+        }
+      }
+    } else {
+      for (String taskType : taskToCronExpressionMap.keySet()) {
+        // Schedule new job
+        String cronExpr = taskToCronExpressionMap.get(taskType);
+        try {
+          scheduleJob(tableWithType, taskType, cronExpr);
+        } catch (SchedulerException e) {
+          LOGGER.error("Failed to schedule cron task for table {}, task {}, cron expr {}", tableWithType, taskType,
+              cronExpr, e);
+        }
+      }
+    }
+    _tableTaskTypeToCronExpressionMap.put(tableWithType, taskToCronExpressionMap);
+  }
+
+  private void scheduleJob(String tableWithType, String taskType, String cronExprStr)
+      throws SchedulerException {
+    if (_scheduledExecutorService == null) {
+      return;
+    }
+    boolean exists = false;
+    try {
+      exists = _scheduledExecutorService.checkExists(JobKey.jobKey(tableWithType, taskType));
+    } catch (SchedulerException e) {
+      LOGGER.error("Failed to check job existence for job key - table: {}, task: {} ", tableWithType, taskType, e);
+    }
+    if (!exists) {
+      LOGGER
+          .info("Trying to put cron expression: {} for table {}, task type: {}", cronExprStr, tableWithType, taskType);
+      Trigger trigger = TriggerBuilder.newTrigger().withIdentity(TriggerKey.triggerKey(tableWithType, taskType))
+          .withSchedule(CronScheduleBuilder.cronSchedule(cronExprStr)).build();
+      JobDataMap jobDataMap = new JobDataMap();
+      jobDataMap.put(PINOT_TASK_MANAGER_KEY, this);
+      jobDataMap.put(LEAD_CONTROLLER_MANAGER_KEY, this._leadControllerManager);
+      JobDetail jobDetail =
+          JobBuilder.newJob(CronJobScheduleJob.class).withIdentity(tableWithType, taskType).setJobData(jobDataMap)
+              .build();
+      try {
+        _scheduledExecutorService.scheduleJob(jobDetail, trigger);
+      } catch (Exception e) {
+        LOGGER.error("Failed to parse Cron expression - " + cronExprStr, e);
+        throw e;
+      }
+      Date nextRuntime = trigger.getNextFireTime();
+      LOGGER
+          .info("Scheduled task for table: {}, task type: {}, next runtime: {}", tableWithType, taskType, nextRuntime);
+    }
+  }
+
+  private Map<String, String> getTaskToCronExpressionMap(Map<String, Map<String, String>> taskTypeConfigsMap) {
+    Map<String, String> taskToCronExpressionMap = new HashMap<>();
+    for (String taskType : taskTypeConfigsMap.keySet()) {
+      Map<String, String> taskTypeConfig = taskTypeConfigsMap.get(taskType);
+      if (taskTypeConfig == null || !taskTypeConfig.containsKey(SCHEDULE_KEY)) {
+        continue;
+      }
+      String cronExprStr = taskTypeConfig.get(SCHEDULE_KEY);
+      if (cronExprStr == null) {
+        continue;
+      }
+      taskToCronExpressionMap.put(taskType, cronExprStr);
+    }
+    return taskToCronExpressionMap;
+  }
+
+  private void removeAllTasksFromCronExpressions(String tableWithType) {
+    Map<String, String> toRemove = _tableTaskTypeToCronExpressionMap.remove(tableWithType);
+    if (toRemove == null) {
+      return;
+    }
+    for (String taskType : toRemove.keySet()) {
+      try {
+        _scheduledExecutorService.deleteJob(JobKey.jobKey(tableWithType, taskType));
+      } catch (SchedulerException e) {
+        LOGGER.error("Got exception when deleting the scheduled job - table {}, task type {}", tableWithType, taskType,
+            e);
+      }
+    }
+  }
+
+  public Map<String, Map<String, Date>> getTableTaskTypeToNextRuntimeMap()
+      throws SchedulerException {
+    Map<String, Map<String, Date>> tableTaskTypeToNextRuntimeMap = new HashMap<>();
+    for (String table : _tableTaskTypeToCronExpressionMap.keySet()) {
+      for (String taskType : _tableTaskTypeToCronExpressionMap.get(table).keySet()) {
+        TriggerKey triggerKey = TriggerKey.triggerKey(table, taskType);
+        Trigger trigger = _scheduledExecutorService.getTrigger(triggerKey);
+        if (trigger == null || trigger.getJobKey() == null) {
+          continue;
+        }
+        Date nextFireTime = trigger.getNextFireTime();
+        if (!tableTaskTypeToNextRuntimeMap.containsKey(table)) {
+          tableTaskTypeToNextRuntimeMap.put(table, new HashMap<>());
+        }
+        tableTaskTypeToNextRuntimeMap.get(table).put(taskType, nextFireTime);
+      }
+    }
+    return tableTaskTypeToNextRuntimeMap;
+  }
+
+  public Map<String, Map<String, String>> getTableTaskTypeToCronExpressionMap() {
+    return _tableTaskTypeToCronExpressionMap;
+  }
+
+  public static String getTableTaskType(String tableWithType, String taskType) {
+    return tableWithType + TABLE_TASK_TYPE_SPLIT + taskType;
+  }
+
+  public static String getTableNameFromTableTaskType(String tableTaskType) {
+    return tableTaskType.split(TABLE_TASK_TYPE_SPLIT, 2)[0];
+  }
+
+  public static String getTaskTypeFromTableTaskType(String tableTaskType) {
+    return tableTaskType.split(TABLE_TASK_TYPE_SPLIT, 2)[1];
   }
 
   /**

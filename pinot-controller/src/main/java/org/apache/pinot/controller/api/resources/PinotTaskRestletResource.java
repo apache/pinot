@@ -22,6 +22,8 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -38,6 +40,7 @@ import org.apache.helix.task.TaskState;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.quartz.SchedulerException;
 
 
 /**
@@ -165,6 +168,63 @@ public class PinotTaskRestletResource {
   public List<PinotTaskConfig> getTaskConfigsDeprecated(
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName) {
     return _pinotHelixTaskResourceManager.getTaskConfigs(taskName);
+  }
+
+  @GET
+  @Path("/tasks/cron/schedules")
+  @ApiOperation("Fetch cron tasks schedule")
+  public Map<String, Map<String, String>> getCronSchedules(
+      @ApiParam(value = "Task type") @QueryParam("taskType") String taskType,
+      @ApiParam(value = "Table name (with type suffix)") @QueryParam("tableName") String tableName) {
+    Map<String, Map<String, String>> tableTaskTypeToCronExpressionMap = _pinotTaskManager.getTableTaskTypeToCronExpressionMap();
+    Map<String, Map<String, String>> results = new HashMap<>();
+    for (String table : tableTaskTypeToCronExpressionMap.keySet()) {
+      if (tableName != null && !table.equalsIgnoreCase(table)) {
+        continue;
+      }
+      Map<String, String> taskTypeToCronExpressionMap = tableTaskTypeToCronExpressionMap.get(table);
+      for (String task : taskTypeToCronExpressionMap.keySet()) {
+        if (taskType != null && !task.equalsIgnoreCase(taskType)) {
+          continue;
+        }
+        if (!results.containsKey(table)) {
+          results.put(table, new HashMap<>());
+        }
+        results.get(table).put(task, taskTypeToCronExpressionMap.get(task));
+      }
+    }
+    return results;
+  }
+
+  @GET
+  @Path("/tasks/cron/nextruntimes")
+  @ApiOperation("Fetch cron tasks next runtimes")
+  public Map<String, Map<String, Date>> getCronNextRuntimes(
+      @ApiParam(value = "Task type") @QueryParam("taskType") String taskType,
+      @ApiParam(value = "Table name (with type suffix)") @QueryParam("tableName") String tableName) {
+    try {
+      Map<String, Map<String, Date>> tableTaskTypeToNextRuntimeMap =
+          _pinotTaskManager.getTableTaskTypeToNextRuntimeMap();
+      Map<String, Map<String, Date>> results = new HashMap<>();
+      for (String table : tableTaskTypeToNextRuntimeMap.keySet()) {
+        if (tableName != null && !table.equalsIgnoreCase(table)) {
+          continue;
+        }
+        Map<String, Date> taskTypeToNextRuntimeMap = tableTaskTypeToNextRuntimeMap.get(table);
+        for (String task : taskTypeToNextRuntimeMap.keySet()) {
+          if (taskType != null && !task.equalsIgnoreCase(taskType)) {
+            continue;
+          }
+          if (!results.containsKey(table)) {
+            results.put(table, new HashMap<>());
+          }
+          results.get(table).put(task, taskTypeToNextRuntimeMap.get(task));
+        }
+      }
+      return results;
+    } catch (SchedulerException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @POST
