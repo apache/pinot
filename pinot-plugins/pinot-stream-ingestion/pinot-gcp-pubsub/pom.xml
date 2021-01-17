@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!--
 
     Licensed to the Apache Software Foundation (ASF) under one
@@ -24,25 +24,46 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <artifactId>pinot-plugins</artifactId>
+    <artifactId>pinot-stream-ingestion</artifactId>
     <groupId>org.apache.pinot</groupId>
     <version>0.7.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
-  <artifactId>pinot-stream-ingestion</artifactId>
-  <packaging>pom</packaging>
-  <name>Pinot Stream Ingestion</name>
+
+  <artifactId>pinot-gcppubsub</artifactId>
+  <name>Pinot GCP Pubsub</name>
   <url>https://pinot.apache.org/</url>
   <properties>
-    <pinot.root>${basedir}/../..</pinot.root>
-    <plugin.type>pinot-stream-ingestion</plugin.type>
+    <pinot.root>${basedir}/../../..</pinot.root>
+    <google.bom>16.1.0</google.bom>
+    <google.guava.version>30.0-jre</google.guava.version>
+    <google.pubsub.version>1.109.0</google.pubsub.version>
+    <junit.version>4.11</junit.version>
+    <phase.prop>package</phase.prop>
   </properties>
 
-  <modules>
-    <module>pinot-kafka-base</module>
-    <module>pinot-kafka-0.9</module>
-    <module>pinot-kafka-2.0</module>
-    <module>pinot-gcp-pubsub</module>
-  </modules>
-
+  <dependencies>
+    <dependency>
+        <groupId>com.google.cloud</groupId>
+        <artifactId>google-cloud-pubsub</artifactId>
+        <version>${google.pubsub.version}</version>
+    </dependency>
+    <dependency>
+        <groupId>junit</groupId>
+        <artifactId>junit</artifactId>
+        <version>${junit.version}</version>
+        <scope>test</scope>
+    </dependency>
+  </dependencies>
+  <dependencyManagement>
+      <dependencies>
+          <dependency>
+              <groupId>com.google.cloud</groupId>
+              <artifactId>libraries-bom</artifactId>
+              <version>${google.bom}</version>
+              <type>pom</type>
+              <scope>import</scope>
+          </dependency>
+      </dependencies>
+  </dependencyManagement>
 </project>
