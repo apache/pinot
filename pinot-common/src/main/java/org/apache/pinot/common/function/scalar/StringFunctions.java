@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.text.Normalizer;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
@@ -155,11 +158,48 @@ public class StringFunctions {
    * @param input
    * @param find substring to find
    * @param instance Integer denoting the instance no.
-   * @return start index of the Nth instance of subtring in main string
+   * @return start index of the Nth instance of substring in main string
    */
   @ScalarFunction
   public static int strpos(String input, String find, int instance) {
     return StringUtils.ordinalIndexOf(input, find, instance);
+  }
+
+  /**
+   * @see StringUtils#indexOf(CharSequence, CharSequence)
+   * Return the 1st occurence of a substring within the String
+   * @param input
+   * @param find substring to find
+   * @return start index of the 1st instance of substring in main string
+   */
+  @ScalarFunction
+  public static int strpos(String input, String find) {
+    return StringUtils.indexOf(input, find);
+  }
+
+  /**
+   * @see StringUtils#lastIndexOf(CharSequence, CharSequence)
+   * Return the last occurence of a substring within the String
+   * @param input
+   * @param find substring to find
+   * @return start index of the last instance of substring in main string
+   */
+  @ScalarFunction
+  public static int strrpos(String input, String find) {
+    return StringUtils.lastIndexOf(input, find);
+  }
+
+  /**
+   * @see StringUtils#lastIndexOf(CharSequence, CharSequence, int)
+   * Return the Nth occurence of a substring in string starting from the end of the string.
+   * @param input
+   * @param find substring to find
+   * @param instance Integer denoting the instance no.
+   * @return start index of the Nth instance of substring in main string starting from the end of the string.
+   */
+  @ScalarFunction
+  public static int strrpos(String input, String find, int instance) {
+    return StringUtils.lastIndexOf(input, find, instance);
   }
 
   /**
@@ -227,5 +267,87 @@ public class StringFunctions {
   public static String chr(int codepoint) {
     char[] result = Character.toChars(codepoint);
     return new String(result);
+  }
+
+  /**
+   * @see StandardCharsets#UTF_8#encode(String)
+   * @param input
+   * @return bytes
+   */
+  @ScalarFunction
+  public static byte[] to_utf8(String input) {
+    return input.getBytes(StandardCharsets.UTF_8);
+  }
+
+  /**
+   * see Normalizer#normalize(String, Form)
+   * @param input
+   * @return transforms string with NFC normalization form.
+   */
+  @ScalarFunction
+  public static String normalize(String input) {
+    return Normalizer.normalize(input, Normalizer.Form.NFC);
+  }
+
+  /**
+   * see Normalizer#normalize(String, Form)
+   * @param input
+   * @param form
+   * @return transforms string with the specified normalization form
+   */
+  @ScalarFunction
+  public static String normalize(String input, String form) {
+    Normalizer.Form targetForm = Normalizer.Form.valueOf(form);
+    return Normalizer.normalize(input, targetForm);
+  }
+
+  /**
+   * see String#split(String)
+   * @param input
+   * @param delimiter
+   * @return splits string on delimiter and returns an array.
+   */
+  @ScalarFunction
+  public static String[] split(String input, String delimiter) {
+    return input.split(delimiter);
+  }
+
+  /**
+   * see String#replaceAll(String, String)
+   * @param input
+   * @param search
+   * @return removes all instances of search from string
+   */
+  @ScalarFunction
+  public static String replace(String input, String search) {
+    return input.replaceAll(search, "");
+  }
+
+  /**
+   * @param input1
+   * @param input2
+   * @return returns the Hamming distance of input1 and input2, note that the two strings must have the same length.
+   */
+  @ScalarFunction
+  public static int hammingDistance(String input1, String input2) {
+    if (input1.length() != input2.length()) {
+      return -1;
+    }
+    int distance = 0;
+    for (int i = 0; i < input1.length(); i++) {
+      if (input1.charAt(i) != input2.charAt(i)) distance++;
+    }
+    return distance;
+  }
+
+  /**
+   * see String#contains(String)
+   * @param input
+   * @param substring
+   * @return returns true if substring present in main string else false.
+   */
+  @ScalarFunction
+  public static Boolean contains(String input, String substring) {
+    return input.contains(substring);
   }
 }
