@@ -211,6 +211,9 @@ public class ControllerRequestURLBuilder {
     }
     return url;
   }
+  public String forTableSchemaGet(String tableName) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "schema");
+  }
 
   public String forTableExternalView(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "externalview");
