@@ -187,6 +187,56 @@ server:
     configs: |-
       pinot.set.instance.id.to.hostname=true
       pinot.server.instance.realtime.alloc.offheap=true
+
+minion:
+  name: minion
+
+  port: 9514
+
+  replicaCount: 1
+
+  dataDir: /var/pinot/minion/data
+  jvmOpts: "-Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCApplicationStoppedTime -XX:+PrintGCApplicationConcurrentTime -Xloggc:/opt/pinot/gc-pinot-minion.log"
+
+  log4j2ConfFile: /opt/pinot/conf/pinot-minion-log4j2.xml
+  pluginsDir: /opt/pinot/plugins
+
+  persistence:
+    enabled: true
+    accessMode: ReadWriteOnce
+    size: 4G
+    mountPath: /var/pinot/minion/data
+    storageClass: ""
+    #storageClass: "ssd"
+
+  service:
+    annotations: {}
+    clusterIP: ""
+    externalIPs: []
+    loadBalancerIP: ""
+    loadBalancerSourceRanges: []
+    type: ClusterIP
+    port: 9514
+    nodePort: ""
+
+  resources: {}
+
+  nodeSelector: {}
+
+  affinity: {}
+
+  tolerations: []
+
+  podAnnotations: {}
+
+  updateStrategy:
+    type: RollingUpdate
+
+  # Extra configs will be appended to pinot-minion.conf file
+  extra:
+    configs: |-
+      pinot.set.instance.id.to.hostname=true
+
 # ------------------------------------------------------------------------------
 # Zookeeper:
 # ------------------------------------------------------------------------------

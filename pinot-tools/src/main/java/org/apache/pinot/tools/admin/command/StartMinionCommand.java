@@ -52,7 +52,6 @@ public class StartMinionCommand extends AbstractBaseAdminCommand implements Comm
   private String _clusterName = "PinotCluster";
   @Option(name = "-configFileName", required = false, metaVar = "<Config File Name>", usage = "Minion Starter Config file.", forbids = {"-minionHost", "-minionPort"})
   private String _configFileName;
-  private MinionStarter _minionStarter;
 
   public boolean getHelp() {
     return _help;
@@ -74,9 +73,6 @@ public class StartMinionCommand extends AbstractBaseAdminCommand implements Comm
 
   @Override
   public void cleanup() {
-    if (_minionStarter != null) {
-      _minionStarter.stop();
-    }
   }
 
   @Override
@@ -129,5 +125,9 @@ public class StartMinionCommand extends AbstractBaseAdminCommand implements Comm
   public StartMinionCommand setClusterName(String clusterName) {
     _clusterName = clusterName;
     return this;
+  }
+
+  public void setConfigFileName(String configFileName) {
+    _configFileName = configFileName;
   }
 }
