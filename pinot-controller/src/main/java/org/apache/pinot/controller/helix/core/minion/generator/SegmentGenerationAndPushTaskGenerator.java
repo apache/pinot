@@ -34,6 +34,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.core.common.MinionConstants;
@@ -152,8 +153,9 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
           if (BatchConfigProperties.SegmentIngestionType.APPEND.name().equalsIgnoreCase(batchSegmentIngestionType)) {
             offlineSegmentsMetadata = this._clusterInfoAccessor.getOfflineSegmentsMetadata(offlineTableName);
           }
-          List<URI> inputFileURIs = getInputFilesFromDirectory(batchConfigMap, inputDirURI,
-              getExistingSegmentInputFiles(offlineSegmentsMetadata));
+          Set<String> existingSegmentInputFiles = getExistingSegmentInputFiles(offlineSegmentsMetadata);
+          existingSegmentInputFiles.addAll(getInputFilesFromRunningTasks());
+          List<URI> inputFileURIs = getInputFilesFromDirectory(batchConfigMap, inputDirURI, existingSegmentInputFiles);
 
           for (URI inputFileURI : inputFileURIs) {
             Map<String, String> singleFileGenerationTaskConfig =
@@ -174,6 +176,31 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
       }
     }
     return pinotTaskConfigs;
+  }
+
+  private Set<String> getInputFilesFromRunningTasks() {
+    Set<String> inputFilesFromRunningTasks = new HashSet<>();
+    Map<String, TaskState> taskStates =
+        _clusterInfoAccessor.getTaskStates(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE);
+    for (String taskName : taskStates.keySet()) {
+      switch (taskStates.get(taskName)) {
+        case FAILED:
+        case ABORTED:
+        case STOPPED:
+        case COMPLETED:
+          continue;
+      }
+      List<PinotTaskConfig> taskConfigs = _clusterInfoAccessor.getTaskConfigs(taskName);
+      for (PinotTaskConfig taskConfig : taskConfigs) {
+        if (MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE.equalsIgnoreCase(taskConfig.getTaskType())) {
+          String inputFileURI = taskConfig.getConfigs().get(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY);
+          if (inputFileURI != null) {
+            inputFilesFromRunningTasks.add(inputFileURI);
+          }
+        }
+      }
+    }
+    return inputFilesFromRunningTasks;
   }
 
   private Map<String, String> getSingleFileGenerationTaskConfig(String offlineTableName, int sequenceID,

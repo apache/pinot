@@ -51,6 +51,7 @@ import org.quartz.Trigger;
 import org.quartz.TriggerBuilder;
 import org.quartz.TriggerKey;
 import org.quartz.impl.StdSchedulerFactory;
+import org.quartz.impl.matchers.GroupMatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,11 +67,10 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
 
   public final static String PINOT_TASK_MANAGER_KEY = "PinotTaskManager";
   public final static String LEAD_CONTROLLER_MANAGER_KEY = "LeadControllerManager";
+  public final static String SCHEDULE_KEY = "schedule";
+
   private static final String TABLE_CONFIG_PARENT_PATH = "/CONFIGS/TABLE";
   private static final String TABLE_CONFIG_PATH_PREFIX = "/CONFIGS/TABLE/";
-
-  private final static String SCHEDULE_KEY = "schedule";
-  private final static String TABLE_TASK_TYPE_SPLIT = "\t\t";
 
   private final PinotHelixTaskResourceManager _helixTaskResourceManager;
   private final ClusterInfoAccessor _clusterInfoAccessor;
@@ -95,7 +95,9 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       LOGGER.info("Subscribe to tables change under PropertyStore path: {}", TABLE_CONFIG_PARENT_PATH);
       _pinotHelixResourceManager.getPropertyStore()
           .subscribeChildChanges(TABLE_CONFIG_PARENT_PATH, (parentPath, currentChilds) -> {
-            for (String tableWithType : currentChilds) {
+            Set<String> tableToAdd = new HashSet(currentChilds);
+            tableToAdd.removeAll(_tableTaskSchedulerUpdaterMap.keySet());
+            for (String tableWithType : tableToAdd) {
               subscribeTableConfigChanges(tableWithType);
             }
             Set<String> tableToDelete = new HashSet(_tableTaskSchedulerUpdaterMap.keySet());
@@ -133,14 +135,28 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     TableTaskSchedulerUpdater tableTaskSchedulerUpdater = _tableTaskSchedulerUpdaterMap.get(tableWithType);
     _pinotHelixResourceManager.getPropertyStore()
         .unsubscribeDataChanges(getPropertyStorePathForTable(tableWithType), tableTaskSchedulerUpdater);
-    for (String taskType : _tableTaskTypeToCronExpressionMap.get(tableWithType).keySet()) {
-      try {
-        _scheduledExecutorService.deleteJob(JobKey.jobKey(tableWithType, taskType));
-      } catch (SchedulerException e) {
-        LOGGER.error("Failed to delete job for table {}, task type {}", tableWithType, taskType, e);
+    removeAllTasksFromCronExpressions(tableWithType);
+    _tableTaskSchedulerUpdaterMap.remove(tableWithType);
+  }
+
+  private synchronized void removeAllTasksFromCronExpressions(String tableWithType) {
+    Set<JobKey> jobKeys;
+    try {
+      jobKeys = _scheduledExecutorService.getJobKeys(GroupMatcher.anyJobGroup());
+    } catch (SchedulerException e) {
+      LOGGER.error("Got exception when fetching all jobKeys", e);
+      return;
+    }
+    for (JobKey jobKey : jobKeys) {
+      if (jobKey.getName().equalsIgnoreCase(tableWithType)) {
+        try {
+          _scheduledExecutorService.deleteJob(jobKey);
+        } catch (SchedulerException e) {
+          LOGGER.error("Got exception when deleting the scheduled job - {}", jobKey, e);
+        }
       }
     }
-    _tableTaskSchedulerUpdaterMap.remove(tableWithType);
+    _tableTaskTypeToCronExpressionMap.remove(tableWithType);
   }
 
   public synchronized void subscribeTableConfigChanges(String tableWithType) {
@@ -287,21 +303,6 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       taskToCronExpressionMap.put(taskType, cronExprStr);
     }
     return taskToCronExpressionMap;
-  }
-
-  private void removeAllTasksFromCronExpressions(String tableWithType) {
-    Map<String, String> toRemove = _tableTaskTypeToCronExpressionMap.remove(tableWithType);
-    if (toRemove == null) {
-      return;
-    }
-    for (String taskType : toRemove.keySet()) {
-      try {
-        _scheduledExecutorService.deleteJob(JobKey.jobKey(tableWithType, taskType));
-      } catch (SchedulerException e) {
-        LOGGER.error("Got exception when deleting the scheduled job - table {}, task type {}", tableWithType, taskType,
-            e);
-      }
-    }
   }
 
   /**

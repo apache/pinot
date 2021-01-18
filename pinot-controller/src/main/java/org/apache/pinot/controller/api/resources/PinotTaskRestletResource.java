@@ -236,7 +236,7 @@ public class PinotTaskRestletResource {
       throws SchedulerException {
     Scheduler scheduler = _pinotTaskManager.getScheduler();
     JobKey jobKey = JobKey.jobKey(tableName, taskType);
-    if (scheduler.checkExists(jobKey)) {
+    if (!scheduler.checkExists(jobKey)) {
       throw new NotFoundException(
           "Unable to find job detail for table name - " + tableName + ", task type - " + taskType);
     }
