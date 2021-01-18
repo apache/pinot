@@ -182,7 +182,7 @@ public class CommonConstants {
     public static final int DEFAULT_BROKER_GROUPBY_TRIM_THRESHOLD = 1_000_000;
 
     public static final String BROKER_TLS_PREFIX = "pinot.broker.tls";
-    public static final String BROKER_NETTYTLS_PREFIX = "pinot.broker.nettytls";
+    public static final String BROKER_NETTYTLS_ENABLED = "pinot.broker.nettytls.enabled";
 
     public static class Request {
       public static final String PQL = "pql";

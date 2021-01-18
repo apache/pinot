@@ -33,11 +33,13 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.minion.MinionClient;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.core.util.TlsUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
+import org.apache.pinot.spi.ingestion.batch.spec.TlsSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.tools.admin.command.AddTableCommand;
@@ -177,6 +179,13 @@ public class BootstrapTableTool {
               spec.setInputDirURI(resolvedInputDirURI.toString());
             }
           }
+
+          TlsSpec tlsSpec = spec.getTlsSpec();
+          if (tlsSpec != null) {
+            TlsUtils.installDefaultSSLSocketFactory(tlsSpec.getKeyStorePath(), tlsSpec.getKeyStorePassword(),
+                tlsSpec.getTrustStorePath(), tlsSpec.getTrustStorePassword());
+          }
+
           IngestionJobLauncher.runIngestionJob(spec);
         }
       } else {

@@ -252,10 +252,14 @@ public class HelixBrokerStarter implements ServiceStartable {
     TableCache tableCache = new TableCache(_propertyStore, caseInsensitive);
     // Configure TLS for netty connection to server
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_brokerConf, Broker.BROKER_TLS_PREFIX);
-    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(tlsDefaults, _brokerConf, Broker.BROKER_NETTYTLS_PREFIX);
-    _brokerRequestHandler =
-        new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory, queryQuotaManager,
-            tableCache, _brokerMetrics, tlsConfig);
+
+    if (_brokerConf.getProperty(Broker.BROKER_NETTYTLS_ENABLED, false)) {
+      _brokerRequestHandler = new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager,
+          _accessControlFactory, queryQuotaManager, tableCache, _brokerMetrics, tlsDefaults);
+    } else {
+      _brokerRequestHandler = new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager,
+          _accessControlFactory, queryQuotaManager, tableCache, _brokerMetrics, null);
+    }
 
     LOGGER.info("Starting broker admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _brokerAdminApplication = new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics);

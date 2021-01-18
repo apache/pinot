@@ -102,7 +102,7 @@ public class ServerChannels {
           .handler(new ChannelInitializer<SocketChannel>() {
             @Override
             protected void initChannel(SocketChannel ch) {
-              if (_tlsConfig != null && _tlsConfig.isEnabled()) {
+              if (_tlsConfig != null) {
                 attachSSLHandler(ch);
               }
 

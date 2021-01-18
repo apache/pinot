@@ -74,7 +74,7 @@ public class QueryRouter {
     _brokerId = brokerId;
     _brokerMetrics = brokerMetrics;
     _serverChannels = new ServerChannels(this, brokerMetrics);
-    _serverChannelsTls = Optional.ofNullable(tlsConfig).filter(TlsConfig::isEnabled)
+    _serverChannelsTls = Optional.ofNullable(tlsConfig)
         .map(conf -> new ServerChannels(this, brokerMetrics, conf)).orElse(null);
   }
 

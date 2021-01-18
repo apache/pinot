@@ -16,62 +16,47 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.transport;
-
-import org.apache.commons.lang3.StringUtils;
-
+package org.apache.pinot.spi.ingestion.batch.spec;
 
 /**
- * Container object for TLS/SSL configuration of pinot clients and servers (netty, grizzly, etc.)
+ * TLS key and trust-store specification for ingestion jobs
+ * (Enables access to TLS-protected controller APIs, etc.)
  */
-public class TlsConfig {
-  private boolean _clientAuthEnabled;
-  private String _keyStorePath;
-  private String _keyStorePassword;
-  private String _trustStorePath;
-  private String _trustStorePassword;
-
-  public boolean isClientAuthEnabled() {
-    return _clientAuthEnabled;
-  }
-
-  public void setClientAuthEnabled(boolean clientAuthEnabled) {
-    _clientAuthEnabled = clientAuthEnabled;
-  }
+public class TlsSpec {
+  String keyStorePath;
+  String keyStorePassword;
+  String trustStorePath;
+  String trustStorePassword;
 
   public String getKeyStorePath() {
-    return _keyStorePath;
+    return keyStorePath;
   }
 
   public void setKeyStorePath(String keyStorePath) {
-    _keyStorePath = keyStorePath;
+    this.keyStorePath = keyStorePath;
   }
 
   public String getKeyStorePassword() {
-    return _keyStorePassword;
+    return keyStorePassword;
   }
 
   public void setKeyStorePassword(String keyStorePassword) {
-    _keyStorePassword = keyStorePassword;
+    this.keyStorePassword = keyStorePassword;
   }
 
   public String getTrustStorePath() {
-    return _trustStorePath;
+    return trustStorePath;
   }
 
   public void setTrustStorePath(String trustStorePath) {
-    _trustStorePath = trustStorePath;
+    this.trustStorePath = trustStorePath;
   }
 
   public String getTrustStorePassword() {
-    return _trustStorePassword;
+    return trustStorePassword;
   }
 
   public void setTrustStorePassword(String trustStorePassword) {
-    _trustStorePassword = trustStorePassword;
-  }
-
-  public boolean isCustomized() {
-    return StringUtils.isNoneBlank(_keyStorePath) || StringUtils.isNoneBlank(_trustStorePath);
+    this.trustStorePassword = trustStorePassword;
   }
 }

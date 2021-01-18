@@ -86,7 +86,7 @@ public class QueryServer {
           .childHandler(new ChannelInitializer<SocketChannel>() {
             @Override
             protected void initChannel(SocketChannel ch) {
-              if (_tlsConfig != null && _tlsConfig.isEnabled()) {
+              if (_tlsConfig != null) {
                 attachSSLHandler(ch);
               }
 

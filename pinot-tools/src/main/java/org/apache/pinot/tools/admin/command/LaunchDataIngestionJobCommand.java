@@ -20,8 +20,10 @@ package org.apache.pinot.tools.admin.command;
 
 import java.util.Arrays;
 import java.util.List;
+import org.apache.pinot.core.util.TlsUtils;
 import org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
+import org.apache.pinot.spi.ingestion.batch.spec.TlsSpec;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.GroovyTemplateUtils;
 import org.apache.pinot.tools.Command;
@@ -119,6 +121,13 @@ public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand impl
       LOGGER.error("Got exception to generate IngestionJobSpec for data ingestion job - ", e);
       throw e;
     }
+
+    TlsSpec tlsSpec = spec.getTlsSpec();
+    if (tlsSpec != null) {
+      TlsUtils.installDefaultSSLSocketFactory(tlsSpec.getKeyStorePath(), tlsSpec.getKeyStorePassword(),
+          tlsSpec.getTrustStorePath(), tlsSpec.getTrustStorePassword());
+    }
+
     try {
       IngestionJobLauncher.runIngestionJob(spec);
     } catch (Exception e) {

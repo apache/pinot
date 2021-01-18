@@ -93,8 +93,7 @@ public class ServerInstance {
     _queryScheduler =
         QuerySchedulerFactory.create(serverConf.getSchedulerConfig(), _queryExecutor, _serverMetrics, _latestQueryTime);
 
-    TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(serverConf.getPinotConfig(),
-        CommonConstants.Server.SERVER_TLS_PREFIX);
+    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_TLS_PREFIX);
 
     if (serverConf.isNettyServerEnabled()) {
       int nettyPort = serverConf.getNettyPort();
@@ -106,9 +105,6 @@ public class ServerInstance {
 
     if (serverConf.isNettyTlsServerEnabled()) {
       int nettySecPort = serverConf.getNettyTlsPort();
-      TlsConfig tlsConfig = TlsUtils.extractTlsConfig(tlsDefaults, serverConf.getPinotConfig(),
-          CommonConstants.Server.SERVER_NETTYTLS_PREFIX);
-      tlsConfig.setEnabled(true);
       LOGGER.info("Initializing TLS-secured Netty query server on port: {}", nettySecPort);
       _nettyTlsQueryServer = new QueryServer(nettySecPort, _queryScheduler, _serverMetrics, tlsConfig);
     } else {
@@ -116,7 +112,7 @@ public class ServerInstance {
     }
 
     if (serverConf.isEnableGrpcServer()) {
-      if (tlsDefaults.isEnabled()) {
+      if (tlsConfig.isCustomized()) {
         LOGGER.warn("gRPC query server does not support TLS yet");
       }
 

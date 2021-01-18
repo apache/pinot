@@ -45,7 +45,6 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerResponse;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.transport.TlsConfig;
-import org.apache.pinot.core.util.TlsUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 

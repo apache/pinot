@@ -61,26 +61,15 @@ public final class TlsUtils {
   }
 
   /**
-   * Extract a TlsConfig instance from a namespaced set of configuration key, with optional defaults.
+   * Extract a TlsConfig instance from a namespaced set of configuration keys.
    *
-   * @param tlsDefaults default values for TLS settings
    * @param pinotConfig pinot configuration
    * @param namespace namespace prefix
    *
    * @return TlsConfig instance
    */
-  public static TlsConfig extractTlsConfig(TlsConfig tlsDefaults, PinotConfiguration pinotConfig, String namespace) {
+  public static TlsConfig extractTlsConfig(PinotConfiguration pinotConfig, String namespace) {
     TlsConfig tlsConfig = new TlsConfig();
-    tlsConfig.setEnabled(tlsDefaults.isEnabled());
-    tlsConfig.setClientAuthEnabled(tlsDefaults.isClientAuthEnabled());
-    tlsConfig.setKeyStorePath(tlsDefaults.getKeyStorePath());
-    tlsConfig.setKeyStorePassword(tlsDefaults.getKeyStorePassword());
-    tlsConfig.setTrustStorePath(tlsDefaults.getTrustStorePath());
-    tlsConfig.setTrustStorePassword(tlsDefaults.getTrustStorePassword());
-
-    if (pinotConfig.containsKey(key(namespace, ENABLED))) {
-      tlsConfig.setEnabled(pinotConfig.getProperty(key(namespace, ENABLED), false));
-    }
 
     if (pinotConfig.containsKey(key(namespace, CLIENT_AUTH_ENABLED))) {
       tlsConfig.setClientAuthEnabled(pinotConfig.getProperty(key(namespace, CLIENT_AUTH_ENABLED), false));
@@ -106,18 +95,6 @@ public final class TlsUtils {
   }
 
   /**
-   * Extract a TlsConfig instance from a namespaced set of configuration keys.
-   *
-   * @param pinotConfig pinot configuration
-   * @param namespace namespace prefix
-   *
-   * @return TlsConfig instance
-   */
-  public static TlsConfig extractTlsConfig(PinotConfiguration pinotConfig, String namespace) {
-    return extractTlsConfig(new TlsConfig(), pinotConfig, namespace);
-  }
-
-  /**
    * Create a KeyManagerFactory instance for a given TlsConfig
    *
    * @param tlsConfig TLS config
@@ -125,7 +102,6 @@ public final class TlsUtils {
    * @return KeyManagerFactory
    */
   public static KeyManagerFactory createKeyManagerFactory(TlsConfig tlsConfig) {
-    Preconditions.checkArgument(tlsConfig.isEnabled(), "tls is disabled");
     return createKeyManagerFactory(tlsConfig.getKeyStorePath(), tlsConfig.getKeyStorePassword());
   }
 
@@ -165,7 +141,6 @@ public final class TlsUtils {
    * @return TrustManagerFactory
    */
   public static TrustManagerFactory createTrustManagerFactory(TlsConfig tlsConfig) {
-    Preconditions.checkArgument(tlsConfig.isEnabled(), "tls is disabled");
     return createTrustManagerFactory(tlsConfig.getTrustStorePath(), tlsConfig.getTrustStorePassword());
   }
 

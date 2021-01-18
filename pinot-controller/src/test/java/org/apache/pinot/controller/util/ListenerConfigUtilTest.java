@@ -98,34 +98,6 @@ public class ListenerConfigUtilTest {
   }
 
   /**
-   * Asserts that https and https can be configured separately and that TLS defaults apply to https (only)
-   */
-  @Test
-  public void assertHttpAndHttpsWithTlsDefaults() {
-    ControllerConf controllerConf = new ControllerConf();
-
-    controllerConf.setProperty("controller.access.protocols", "http,https");
-    controllerConf.setProperty("controller.access.protocols.https.port", "9443");
-    controllerConf.setProperty("controller.access.protocols.https.client.auth.enabled", "true");
-
-    configureTlsDefaultProperties(controllerConf);
-
-    controllerConf.setProperty("controller.access.protocols.http.port", "9000");
-
-    List<ListenerConfig> listenerConfigs = ListenerConfigUtil.buildControllerConfigs(controllerConf);
-
-    Assert.assertEquals(listenerConfigs.size(), 2);
-
-    ListenerConfig httpListener = getListener("http", listenerConfigs);
-    ListenerConfig httpsListener = getListener("https", listenerConfigs);
-
-    Assert.assertEquals(httpListener.getHost(), "0.0.0.0");
-
-    assertHttpListener(httpListener, "0.0.0.0", 9000);
-    assertHttpsListener(httpsListener, "0.0.0.0", 9443);
-  }
-
-  /**
    * Asserts that a single listener configuration is generated with a secured TLS port.
    */
   @Test
@@ -203,7 +175,6 @@ public class ListenerConfigUtilTest {
     Assert.assertEquals(legacyListener.getHost(), "0.0.0.0");
     Assert.assertEquals(legacyListener.getPort(), 9000);
     Assert.assertEquals(legacyListener.getProtocol(), "http");
-    Assert.assertFalse(legacyListener.getTlsConfig().isEnabled());
   }
 
   private void assertHttpListener(ListenerConfig httpsListener, String host, int port) {
@@ -211,7 +182,6 @@ public class ListenerConfigUtilTest {
     Assert.assertEquals(httpsListener.getHost(), host);
     Assert.assertEquals(httpsListener.getPort(), port);
     Assert.assertEquals(httpsListener.getProtocol(), "http");
-    Assert.assertFalse(httpsListener.getTlsConfig().isEnabled());
   }
 
   private void assertHttpsListener(ListenerConfig httpsListener, String host, int port) {
@@ -220,7 +190,6 @@ public class ListenerConfigUtilTest {
     Assert.assertEquals(httpsListener.getPort(), port);
     Assert.assertEquals(httpsListener.getProtocol(), "https");
     Assert.assertNotNull(httpsListener.getTlsConfig());
-    Assert.assertTrue(httpsListener.getTlsConfig().isEnabled());
     Assert.assertEquals(httpsListener.getTlsConfig().getKeyStorePassword(), "a-password");
     Assert.assertEquals(httpsListener.getTlsConfig().getKeyStorePath(), "/some-keystore-path");
     Assert.assertTrue(httpsListener.getTlsConfig().isClientAuthEnabled());
@@ -233,14 +202,8 @@ public class ListenerConfigUtilTest {
       controllerConf.setProperty("controller.access.protocols.https.host", host);
     }
     controllerConf.setProperty("controller.access.protocols.https.port", String.valueOf(port));
-    controllerConf.setProperty("controller.access.protocols.https.keystore.password", "a-password");
-    controllerConf.setProperty("controller.access.protocols.https.keystore.path", "/some-keystore-path");
-    controllerConf.setProperty("controller.access.protocols.https.client.auth.enabled", "true");
-    controllerConf.setProperty("controller.access.protocols.https.truststore.password", "a-password");
-    controllerConf.setProperty("controller.access.protocols.https.truststore.path", "/some-truststore-path");
-  }
 
-  private void configureTlsDefaultProperties(ControllerConf controllerConf) {
+    controllerConf.setProperty("controller.tls.client.auth.enabled", "true");
     controllerConf.setProperty("controller.tls.keystore.password", "a-password");
     controllerConf.setProperty("controller.tls.keystore.path", "/some-keystore-path");
     controllerConf.setProperty("controller.tls.truststore.password", "a-password");

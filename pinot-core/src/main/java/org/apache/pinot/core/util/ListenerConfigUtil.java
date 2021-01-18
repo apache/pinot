@@ -132,11 +132,8 @@ public final class ListenerConfigUtil {
   }
 
   private static ListenerConfig buildListenerConfig(PinotConfiguration config, String namespace, String protocol,
-      TlsConfig tlsDefaults) {
+      TlsConfig tlsConfig) {
     String protocolNamespace = namespace + DOT_ACCESS_PROTOCOLS + "." + protocol;
-
-    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(tlsDefaults, config, protocolNamespace);
-    tlsConfig.setEnabled(CommonConstants.HTTPS_PROTOCOL.equals(protocol));
 
     return new ListenerConfig(protocol,
         getHost(config.getProperty(protocolNamespace + ".host", DEFAULT_HOST)),
@@ -176,7 +173,7 @@ public final class ListenerConfigUtil {
         .setThreadFactory(new ThreadFactoryBuilder().setNameFormat("grizzly-http-server-%d")
             .setUncaughtExceptionHandler(new JerseyProcessingUncaughtExceptionHandler()).build());
 
-    if (listenerConfig.getTlsConfig().isEnabled()) {
+    if (CommonConstants.HTTPS_PROTOCOL.equals(listenerConfig.getProtocol())) {
       listener.setSecure(true);
       listener.setSSLEngineConfig(buildSSLConfig(listenerConfig.getTlsConfig()));
     }
@@ -187,10 +184,16 @@ public final class ListenerConfigUtil {
   private static SSLEngineConfigurator buildSSLConfig(TlsConfig tlsConfig) {
     SSLContextConfigurator sslContextConfigurator = new SSLContextConfigurator();
 
-    sslContextConfigurator.setKeyStoreFile(tlsConfig.getKeyStorePath());
-    sslContextConfigurator.setKeyStorePass(tlsConfig.getKeyStorePassword());
-    sslContextConfigurator.setTrustStoreFile(tlsConfig.getTrustStorePath());
-    sslContextConfigurator.setTrustStorePass(tlsConfig.getTrustStorePassword());
+    if (tlsConfig.getKeyStorePath() != null) {
+      Preconditions.checkNotNull(tlsConfig.getKeyStorePassword(), "key store password required");
+      sslContextConfigurator.setKeyStoreFile(tlsConfig.getKeyStorePath());
+      sslContextConfigurator.setKeyStorePass(tlsConfig.getKeyStorePassword());
+    }
+    if (tlsConfig.getTrustStorePath() != null) {
+      Preconditions.checkNotNull(tlsConfig.getKeyStorePassword(), "trust store password required");
+      sslContextConfigurator.setTrustStoreFile(tlsConfig.getTrustStorePath());
+      sslContextConfigurator.setTrustStorePass(tlsConfig.getTrustStorePassword());
+    }
 
     return new SSLEngineConfigurator(sslContextConfigurator).setClientMode(false)
         .setNeedClientAuth(tlsConfig.isClientAuthEnabled()).setEnabledProtocols(new String[] { "TLSv1.2" });
