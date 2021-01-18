@@ -84,10 +84,7 @@ export default function SchemaComponent({
   schemaObj,
 }: Props) {
   const classes = useStyles();
-  const defaultColumnObj = {
-    columnName: '',
-    type: '',
-    dataType: '',
+  const defaultOptionalColumnObj = {
     multiValue: 'false',
     maxLength: '',
     virtualColumnProvider: '',
@@ -97,6 +94,12 @@ export default function SchemaComponent({
     timePattern: '',
     granularityUnit: '',
     granularityInterval: ''
+  };
+  const defaultColumnObj = {
+    columnName: '',
+    type: '',
+    dataType: '',
+    ...defaultOptionalColumnObj
   };
   const defaultSchemaObj = {
     schemaName,
@@ -109,12 +112,43 @@ export default function SchemaComponent({
     metric: ["INT", "LONG", "DOUBLE", "FLOAT", "BYTES"],
     datetime: ["STRING", "INT", "LONG"]
   };
+  const preFilledData = {
+    dimension: {
+      dataType: "STRING",
+      multiValue: "false"
+    },
+    metric: {
+      dataType: "LONG"
+    },
+    datetime: {
+      dataType: "LONG",
+      timeUnit: "MILLISECONDS",
+      timeFormat: "EPOCH",
+      granularityInterval: "1",
+      granularityUnit: "MILLISECONDS"
+    },
+  };
   
   const [columnList, setColumnList] = useState([{...defaultColumnObj}]);
+
+  const setPreFilledData = (index, fieldName, value, colList) => {
+    switch (fieldName) {
+      case "type": {
+        colList[index] = {
+          ...colList[index],
+          ...defaultOptionalColumnObj,
+          ...preFilledData[value]
+        }
+
+        break;
+      }
+    }
+  }
 
   const changeHandler = (index, fieldName, value) => {
     let newColumnList = [...columnList];
     newColumnList[index][fieldName] = value;
+    setPreFilledData(index, fieldName, value, newColumnList);
     setColumnList(newColumnList);
   };
 
