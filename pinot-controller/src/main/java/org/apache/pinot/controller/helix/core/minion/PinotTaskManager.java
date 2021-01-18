@@ -304,42 +304,6 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     }
   }
 
-  public Map<String, Map<String, Date>> getTableTaskTypeToNextRuntimeMap()
-      throws SchedulerException {
-    Map<String, Map<String, Date>> tableTaskTypeToNextRuntimeMap = new HashMap<>();
-    for (String table : _tableTaskTypeToCronExpressionMap.keySet()) {
-      for (String taskType : _tableTaskTypeToCronExpressionMap.get(table).keySet()) {
-        TriggerKey triggerKey = TriggerKey.triggerKey(table, taskType);
-        Trigger trigger = _scheduledExecutorService.getTrigger(triggerKey);
-        if (trigger == null || trigger.getJobKey() == null) {
-          continue;
-        }
-        Date nextFireTime = trigger.getNextFireTime();
-        if (!tableTaskTypeToNextRuntimeMap.containsKey(table)) {
-          tableTaskTypeToNextRuntimeMap.put(table, new HashMap<>());
-        }
-        tableTaskTypeToNextRuntimeMap.get(table).put(taskType, nextFireTime);
-      }
-    }
-    return tableTaskTypeToNextRuntimeMap;
-  }
-
-  public Map<String, Map<String, String>> getTableTaskTypeToCronExpressionMap() {
-    return _tableTaskTypeToCronExpressionMap;
-  }
-
-  public static String getTableTaskType(String tableWithType, String taskType) {
-    return tableWithType + TABLE_TASK_TYPE_SPLIT + taskType;
-  }
-
-  public static String getTableNameFromTableTaskType(String tableTaskType) {
-    return tableTaskType.split(TABLE_TASK_TYPE_SPLIT, 2)[0];
-  }
-
-  public static String getTaskTypeFromTableTaskType(String tableTaskType) {
-    return tableTaskType.split(TABLE_TASK_TYPE_SPLIT, 2)[1];
-  }
-
   /**
    * Returns the cluster info accessor.
    * <p>Cluster info accessor can be used to initialize the task generator.
@@ -491,5 +455,9 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     for (String taskType : _taskGeneratorRegistry.getAllTaskTypes()) {
       _taskGeneratorRegistry.getTaskGenerator(taskType).nonLeaderCleanUp();
     }
+  }
+
+  public Scheduler getScheduler() {
+    return _scheduledExecutorService;
   }
 }
