@@ -77,8 +77,8 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
   @Option(name = "-tempDir", metaVar = "<string>", usage = "Temporary directory used to hold data during segment creation.")
   private String _tempDir = new File(FileUtils.getTempDirectory(), getClass().getSimpleName()).getAbsolutePath();
 
-  @Option(name = "-extraConfigs", metaVar = "<extra configs>", handler = StringArrayOptionHandler.class, usage = "Extra configs to be set.")
-  private List<String> _extraConfigs;
+  @Option(name = "-additionalConfigs", metaVar = "<additional configs>", handler = StringArrayOptionHandler.class, usage = "Additional configs to be set.")
+  private List<String> _additionalConfigs;
 
   @SuppressWarnings("FieldCanBeLocal")
   @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
@@ -121,12 +121,12 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
     return this;
   }
 
-  public List<String> getExtraConfigs() {
-    return _extraConfigs;
+  public List<String> getAdditionalConfigs() {
+    return _additionalConfigs;
   }
 
-  public ImportDataCommand setExtraConfigs(List<String> extraConfigs) {
-    _extraConfigs = extraConfigs;
+  public ImportDataCommand setAdditionalConfigs(List<String> additionalConfigs) {
+    _additionalConfigs = additionalConfigs;
     return this;
   }
 
@@ -155,8 +155,8 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
     String results = String
         .format("InsertData -dataFilePath %s -format %s -table %s -controllerURI %s -tempDir %s", _dataFilePath,
             _format, _table, _controllerURI, _tempDir);
-    if (_extraConfigs != null) {
-      results += " -extraConfigs " + Arrays.toString(_extraConfigs.toArray());
+    if (_additionalConfigs != null) {
+      results += " -additionalConfigs " + Arrays.toString(_additionalConfigs.toArray());
     }
     return results;
   }
@@ -215,7 +215,7 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
   }
 
   private SegmentGenerationJobSpec generateSegmentGenerationJobSpec() {
-    Map<String, String> extraConfigs = getExtraConfigs(_extraConfigs);
+    Map<String, String> additionalConfigs = getAdditionalConfigs(_additionalConfigs);
 
     SegmentGenerationJobSpec spec = new SegmentGenerationJobSpec();
     URI dataFileURI = URI.create(_dataFilePath);
@@ -241,8 +241,8 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
     pinotFSSpecs.add(getPinotFSSpec("file", "org.apache.pinot.spi.filesystem.LocalPinotFS", Collections.emptyMap()));
     String inputFileScheme = dataFileURI.getScheme();
     if ((inputFileScheme != null) && (!PinotFSFactory.isSchemeSupported(inputFileScheme))) {
-      pinotFSSpecs.add(getPinotFSSpec(inputFileScheme, getPinotFSClassName(inputFileScheme, extraConfigs),
-          getPinotFSConfigs(inputFileScheme, extraConfigs)));
+      pinotFSSpecs.add(getPinotFSSpec(inputFileScheme, getPinotFSClassName(inputFileScheme, additionalConfigs),
+          getPinotFSConfigs(inputFileScheme, additionalConfigs)));
     }
     spec.setPinotFSSpecs(pinotFSSpecs);
 
@@ -251,7 +251,7 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
     recordReaderSpec.setDataFormat(_format.name());
     recordReaderSpec.setClassName(getRecordReaderClass(_format));
     recordReaderSpec.setConfigClassName(getRecordReaderConfigClass(_format));
-    recordReaderSpec.setConfigs(IngestionConfigUtils.getRecordReaderProps(extraConfigs));
+    recordReaderSpec.setConfigs(IngestionConfigUtils.getRecordReaderProps(additionalConfigs));
     spec.setRecordReaderSpec(recordReaderSpec);
 
     // set TableSpec
@@ -263,9 +263,9 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
 
     // set SegmentNameGeneratorSpec
     SegmentNameGeneratorSpec segmentNameGeneratorSpec = new SegmentNameGeneratorSpec();
-    String segmentNameGeneratorType = getSegmentNameGeneratorType(extraConfigs);
+    String segmentNameGeneratorType = getSegmentNameGeneratorType(additionalConfigs);
     segmentNameGeneratorSpec.setType(segmentNameGeneratorType);
-    segmentNameGeneratorSpec.setConfigs(getSegmentNameGeneratorConfig(segmentNameGeneratorType, extraConfigs));
+    segmentNameGeneratorSpec.setConfigs(getSegmentNameGeneratorConfig(segmentNameGeneratorType, additionalConfigs));
     spec.setSegmentNameGeneratorSpec(segmentNameGeneratorSpec);
 
     // set PinotClusterSpecs
@@ -283,8 +283,8 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
     return spec;
   }
 
-  private Map<String, String> getSegmentNameGeneratorConfig(String type, Map<String, String> extraConfigs) {
-    Map<String, String> segmentNameGeneratorConfig = new HashMap<>(extraConfigs);
+  private Map<String, String> getSegmentNameGeneratorConfig(String type, Map<String, String> additionalConfigs) {
+    Map<String, String> segmentNameGeneratorConfig = new HashMap<>(additionalConfigs);
     if ((BatchConfigProperties.SegmentNameGeneratorType.FIXED.equalsIgnoreCase(type)) && (!segmentNameGeneratorConfig
         .containsKey(SEGMENT_NAME))) {
       segmentNameGeneratorConfig
@@ -293,17 +293,17 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
     return segmentNameGeneratorConfig;
   }
 
-  private String getSegmentNameGeneratorType(Map<String, String> extraConfigs) {
+  private String getSegmentNameGeneratorType(Map<String, String> additionalConfigs) {
     if (_segmentNameGeneratorType == null) {
-      return extraConfigs.getOrDefault(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE,
+      return additionalConfigs.getOrDefault(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE,
           BatchConfigProperties.SegmentNameGeneratorType.FIXED);
     }
     return _segmentNameGeneratorType;
   }
 
-  private Map<String, String> getPinotFSConfigs(String scheme, Map<String, String> extraConfigs) {
+  private Map<String, String> getPinotFSConfigs(String scheme, Map<String, String> additionalConfigs) {
     Map<String, String> fsConfigs = new HashMap<>();
-    fsConfigs.putAll(IngestionConfigUtils.getConfigMapWithPrefix(extraConfigs, String.format("fs.%s.", scheme)));
+    fsConfigs.putAll(IngestionConfigUtils.getConfigMapWithPrefix(additionalConfigs, String.format("fs.%s.", scheme)));
     switch (scheme) {
       case "s3":
         fsConfigs.putIfAbsent("region", System.getProperty("AWS_REGION", "us-west-2"));
@@ -312,8 +312,8 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
     return fsConfigs;
   }
 
-  private String getPinotFSClassName(String scheme, Map<String, String> extraConfigs) {
-    String fsClassName = extraConfigs.get(String.format("fs.%s.className", scheme));
+  private String getPinotFSClassName(String scheme, Map<String, String> additionalConfigs) {
+    String fsClassName = additionalConfigs.get(String.format("fs.%s.className", scheme));
     if (fsClassName != null) {
       return fsClassName;
     }
@@ -333,12 +333,12 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
     return pinotFSSpec;
   }
 
-  private Map<String, String> getExtraConfigs(List<String> extraConfigs) {
-    if (extraConfigs == null) {
+  private Map<String, String> getAdditionalConfigs(List<String> additionalConfigs) {
+    if (additionalConfigs == null) {
       return Collections.emptyMap();
     }
     Map<String, String> recordReaderConfigs = new HashMap<>();
-    for (String kvPair : extraConfigs) {
+    for (String kvPair : additionalConfigs) {
       String[] splits = kvPair.split("=", 2);
       if ((splits.length == 2) && (splits[0] != null) && (splits[1] != null)) {
         recordReaderConfigs.put(splits[0], splits[1]);
