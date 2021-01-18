@@ -439,8 +439,8 @@ public class InbuiltFunctionsTest {
     inputs.add(
         new Object[]{"array_contains_string(stringArray, '2')", Collections.singletonList("stringArray"), row, true});
 
-    inputs.add(new Object[]{"array_slice_int(intArray, 1, 2)", Collections.singletonList(
-        "intArray"), row, new int[]{2}});
+    inputs
+        .add(new Object[]{"array_slice_int(intArray, 1, 2)", Collections.singletonList("intArray"), row, new int[]{2}});
     inputs.add(new Object[]{"array_slice_int(integerArray, 1, 2)", Collections.singletonList(
         "integerArray"), row, new int[]{2}});
     inputs.add(new Object[]{"array_slice_string(stringArray, 1, 2)", Collections.singletonList(
@@ -461,11 +461,11 @@ public class InbuiltFunctionsTest {
         "stringArray"), row, new String[]{"3", "10", "6", "1", "12"}});
 
     inputs.add(new Object[]{"array_union_int(intArray, intArray)", Lists.newArrayList("intArray",
-        "intArray"), row, new int[]{1, 2, 3, 6, 10, 12}});
+        "intArray"), row, new int[]{3, 2, 10, 6, 1, 12}});
     inputs.add(new Object[]{"array_union_int(integerArray, integerArray)", Lists.newArrayList("integerArray",
-        "integerArray"), row, new int[]{1, 2, 3, 6, 10, 12}});
+        "integerArray"), row, new int[]{3, 2, 10, 6, 1, 12}});
     inputs.add(new Object[]{"array_union_string(stringArray, stringArray)", Lists.newArrayList("stringArray",
-        "stringArray"), row, new String[]{"1", "12", "2", "3", "6", "10"}});
+        "stringArray"), row, new String[]{"3", "2", "10", "6", "1", "12"}});
 
     inputs.add(new Object[]{"array_concat_int(intArray, intArray)", Lists.newArrayList("intArray",
         "intArray"), row, new int[]{3, 2, 10, 6, 1, 12, 3, 2, 10, 6, 1, 12}});

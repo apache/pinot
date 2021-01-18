@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.ints.IntLinkedOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
+import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
@@ -93,12 +95,12 @@ public class ArrayFunctions {
 
   @ScalarFunction
   public static int[] arrayDistinctInt(int[] values) {
-    return Arrays.stream(values).distinct().toArray();
+    return new IntLinkedOpenHashSet(values).toIntArray();
   }
 
   @ScalarFunction
   public static String[] arrayDistinctString(String[] values) {
-    return Arrays.stream(values).distinct().toArray(String[]::new);
+    return new ObjectLinkedOpenHashSet<>(values).toArray(new String[0]);
   }
 
   @ScalarFunction
@@ -113,16 +115,16 @@ public class ArrayFunctions {
 
   @ScalarFunction
   public static int[] arrayUnionInt(int[] values1, int[] values2) {
-    Set<Integer> set = new HashSet<>(Arrays.asList(ArrayUtils.toObject(values1)));
-    set.addAll(Arrays.asList(ArrayUtils.toObject(values2)));
-    return set.stream().mapToInt(Integer::intValue).toArray();
+    IntSet set = new IntLinkedOpenHashSet(values1);
+    set.addAll(IntArrayList.wrap(values2));
+    return set.toIntArray();
   }
 
   @ScalarFunction
   public static String[] arrayUnionString(String[] values1, String[] values2) {
-    Set<String> set = new HashSet<>(Arrays.asList(values1));
+    ObjectSet<String> set = new ObjectLinkedOpenHashSet<>(values1);
     set.addAll(Arrays.asList(values2));
-    return set.stream().toArray(String[]::new);
+    return set.toArray(new String[0]);
   }
 
   @ScalarFunction
