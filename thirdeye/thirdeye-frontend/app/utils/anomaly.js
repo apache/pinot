@@ -69,11 +69,12 @@ export const anomalyResponseMapAll = {};
  * @method updateAnomalyFeedback
  * @param {Number} anomalyId - the id of the anomaly to update
  * @param {String} feedbackType - key for feedback type
+ * @param {Boolean} propagate - whether or not feedback is to be propagated
  * @return {Ember.RSVP.Promise}
  */
-export function updateAnomalyFeedback(anomalyId, feedbackType) {
+export function updateAnomalyFeedback(anomalyId, feedbackType, propagate) {
   const url = `/dashboard/anomaly-merged-result/feedback/${anomalyId}`;
-  const data = { feedbackType, comment: '' };
+  const data = { feedbackType, comment: '', propagate };
   return fetch(url, postProps(data)).then((res) => checkStatus(res, 'post'));
 }
 

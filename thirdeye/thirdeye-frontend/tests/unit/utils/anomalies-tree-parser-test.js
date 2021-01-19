@@ -1,6 +1,6 @@
 import { mockData } from 'thirdeye-frontend/mocks/compositeAnomalies';
 import { module, test } from 'qunit';
-import { parseRoot, parseSubtree } from 'thirdeye-frontend/utils/anomalies-tree-parser';
+import { parseRoot, parseSubtree, updateAnomalyFeedback } from 'thirdeye-frontend/utils/anomalies-tree-parser';
 
 module('Unit | Utility | Anomalies tree parser utils', function () {
   test('it parses root level parent anomalies correctly', function (assert) {
@@ -124,6 +124,7 @@ module('Unit | Utility | Anomalies tree parser utils', function () {
             startTime: 1599462000000,
             endTime: 1599462000000,
             metric: 'metric_one',
+            dimensions: undefined,
             feedback: null,
             currentPredicted: {
               current: '4.00',
@@ -137,6 +138,7 @@ module('Unit | Utility | Anomalies tree parser utils', function () {
             startTime: 1599462000000,
             endTime: 1599462000000,
             metric: 'metric_one',
+            dimensions: undefined,
             feedback: null,
             currentPredicted: {
               current: '4.00',
@@ -150,6 +152,7 @@ module('Unit | Utility | Anomalies tree parser utils', function () {
             startTime: 1599462000000,
             endTime: 1599462000000,
             metric: 'metric_two',
+            dimensions: undefined,
             feedback: null,
             currentPredicted: {
               current: '4.00',
@@ -266,6 +269,7 @@ module('Unit | Utility | Anomalies tree parser utils', function () {
             startTime: 1599462000000,
             endTime: 1599462000000,
             metric: 'metric_three',
+            dimensions: undefined,
             feedback: null,
             currentPredicted: {
               current: '4.00',
@@ -288,5 +292,71 @@ module('Unit | Utility | Anomalies tree parser utils', function () {
 
     //output tests
     assert.deepEqual(output, expectedOutput);
+  });
+
+  test('it updates anomaly feedback correctly when cascading is not selected)', function (assert) {
+    const anomalyId = 18;
+    const feedbackType = 'ANOMALY';
+    const cascade = false;
+    const secondLevelChildNodes = mockData[0].children.length;
+
+    updateAnomalyFeedback(anomalyId, feedbackType, cascade, mockData);
+
+    const expectedOutput = {
+      id: 18,
+      startTime: 1599462000000,
+      endTime: 1599462000000,
+      feedback: { feedbackType },
+      metric: null,
+      properties: {},
+      children: [
+        {
+          id: 19,
+          startTime: 1599462000000,
+          endTime: 1599462000000,
+          avgCurrentVal: 4,
+          avgBaselineVal: 2,
+          feedback: null,
+          children: [],
+          metric: 'metric_three'
+        }
+      ]
+    };
+
+    //output tests
+    assert.deepEqual(mockData[0].children[secondLevelChildNodes - 1], expectedOutput);
+  });
+
+  test('it updates anomaly feedback correctly when cascading is selected)', function (assert) {
+    const anomalyId = 18;
+    const feedbackType = 'ANOMALY';
+    const cascade = true;
+    const secondLevelChildNodes = mockData[0].children.length;
+
+    updateAnomalyFeedback(anomalyId, feedbackType, cascade, mockData);
+
+    const expectedOutput = {
+      id: 18,
+      startTime: 1599462000000,
+      endTime: 1599462000000,
+      feedback: { feedbackType },
+      metric: null,
+      properties: {},
+      children: [
+        {
+          id: 19,
+          startTime: 1599462000000,
+          endTime: 1599462000000,
+          avgCurrentVal: 4,
+          avgBaselineVal: 2,
+          feedback: { feedbackType },
+          children: [],
+          metric: 'metric_three'
+        }
+      ]
+    };
+
+    //output tests
+    assert.deepEqual(mockData[0].children[secondLevelChildNodes - 1], expectedOutput);
   });
 });

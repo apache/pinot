@@ -38,7 +38,7 @@ export const getAnomaliesStartDuration = (start, end, showLink = false) => {
  */
 export const getFeedback = (feedback) => {
   const selectedFeedback = feedback
-    ? anomalyUtil.anomalyResponseObj.find((f) => f.value === feedback)
+    ? anomalyUtil.anomalyResponseObj.find((f) => f.value === feedback.feedbackType)
     : anomalyUtil.anomalyResponseObj[0];
 
   return {
