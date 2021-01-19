@@ -156,8 +156,8 @@ public class AnomalyResource {
    *                        eg. payload
    *                        <p/>
    *                        { "feedbackType": "NOT_ANOMALY", "comment": "this is not an anomaly" }
-   * @param propagate       : a flag whether it should propagate the same feedback value to the parent of this anomaly
-   *                        and all its siblings if they exist
+   * @param propagate       : a flag whether it should propagate the same feedback value to its children of this anomaly
+   *                        if they exists
    */
   @POST
   @Path(value = "anomaly-merged-result/feedback/{anomaly_merged_result_id}")
@@ -167,38 +167,26 @@ public class AnomalyResource {
       @QueryParam("propagate") @DefaultValue("true") boolean propagate,
       String payload) {
     try {
-      MergedAnomalyResultDTO result = anomalyMergedResultDAO.findById(anomalyResultId);
-      if (result == null) {
+      MergedAnomalyResultDTO anomaly = anomalyMergedResultDAO.findById(anomalyResultId);
+      if (anomaly == null) {
         throw new IllegalArgumentException("AnomalyResult not found with id " + anomalyResultId);
       }
       AnomalyFeedbackDTO feedbackRequest = OBJECT_MAPPER.readValue(payload, AnomalyFeedbackDTO.class);
-      if (propagate && result.isChild()) {
-        // propagate the feedback to its parent and siblings
-        MergedAnomalyResultDTO parent = anomalyMergedResultDAO.findParent(result);
-        if (parent != null) {
-          updateAnomalyFeedback(parent, feedbackRequest);
-        } else {
-          LOG.warn("Cannot find parent for anomaly : {}, thus only updating the feedback of it", result.getId());
-          updateAnomalyFeedback(result, feedbackRequest);
-        }
-      } else {
-        updateAnomalyFeedback(result, feedbackRequest);
+
+      AnomalyFeedback feedback = anomaly.getFeedback();
+      if (feedback == null) {
+        feedback = new AnomalyFeedbackDTO();
+        anomaly.setFeedback(feedback);
       }
+
+      feedback.setComment(feedbackRequest.getComment());
+      if (feedbackRequest.getFeedbackType() != null) {
+        feedback.setFeedbackType(feedbackRequest.getFeedbackType());
+      }
+
+      anomalyMergedResultDAO.updateAnomalyFeedback(anomaly, propagate);
     } catch (IOException e) {
       throw new IllegalArgumentException("Invalid payload " + payload, e);
     }
-  }
-
-  private void updateAnomalyFeedback(MergedAnomalyResultDTO anomaly, AnomalyFeedbackDTO newFeedback) {
-    AnomalyFeedback feedback = anomaly.getFeedback();
-    if (feedback == null) {
-      feedback = new AnomalyFeedbackDTO();
-      anomaly.setFeedback(feedback);
-    }
-    feedback.setComment(newFeedback.getComment());
-    if (newFeedback.getFeedbackType() != null) {
-      feedback.setFeedbackType(newFeedback.getFeedbackType());
-    }
-    anomalyMergedResultDAO.updateAnomalyFeedback(anomaly);
   }
 }

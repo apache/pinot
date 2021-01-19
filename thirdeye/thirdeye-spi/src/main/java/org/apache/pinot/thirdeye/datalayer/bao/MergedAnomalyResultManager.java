@@ -81,6 +81,8 @@ public interface MergedAnomalyResultManager extends AbstractManager<MergedAnomal
 
   void updateAnomalyFeedback(MergedAnomalyResultDTO entity);
 
+  void updateAnomalyFeedback(MergedAnomalyResultDTO entity, boolean propagate);
+
   MergedAnomalyResultBean convertMergeAnomalyDTO2Bean(MergedAnomalyResultDTO entity);
 
   MergedAnomalyResultDTO convertMergedAnomalyBean2DTO(MergedAnomalyResultBean mergedAnomalyResultBean, Set<Long> visitedAnomalyIds);
