@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.nio.charset.StandardCharsets;
+import java.text.Normalizer;
 import it.unimi.dsi.fastutil.ints.IntLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import java.util.Arrays;
@@ -127,7 +129,7 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     assertEquals(transformFunction.getName(), "replace");
     String[] expectedValues = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = _stringAlphaNumericSVValues[i].replaceAll("A", "B");
+      expectedValues[i] = StringUtils.replace(_stringAlphaNumericSVValues[i], "A", "B");
     }
     testTransformFunction(transformFunction, expectedValues);
   }
@@ -233,6 +235,130 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     String[] expectedValues = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedValues[i] = DigestUtils.md5Hex(_bytesSVValues[i]);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testStringContainsTransformFunction() {
+    ExpressionContext expression =
+        QueryContextConverterUtils.getExpression(String.format("contains(%s, 'a')", STRING_ALPHANUM_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "contains");
+    String[] expectedValues = new String[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = String.valueOf(_stringAlphaNumericSVValues[i].contains("a"));
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testStringSplitTransformFunction() {
+    ExpressionContext expression =
+        QueryContextConverterUtils.getExpression(String.format("split(%s, ',')", STRING_ALPHANUM_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "split");
+    String[][] expectedValues = new String[NUM_ROWS][];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = StringUtils.split(_stringAlphaNumericSVValues[i], ",");
+    }
+    testTransformFunctionMV(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testStringHammingDistanceTransformFunction() {
+    ExpressionContext expression =
+        QueryContextConverterUtils.getExpression(String.format("hamming_distance(%s, %s)", STRING_ALPHANUM_SV_COLUMN,
+            STRING_ALPHANUM_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "hammingDistance");
+    int[] expectedValues = new int[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      int distance = 0;
+      for (int j = 0; j < _stringAlphaNumericSVValues[i].length(); j++) {
+        if (_stringAlphaNumericSVValues[i].charAt(j) != _stringAlphaNumericSVValues[i].charAt(j)) distance++;
+      }
+      expectedValues[i] = distance;
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testStringToUTFTransformFunction() {
+    ExpressionContext expression =
+        QueryContextConverterUtils.getExpression(String.format("to_utf8(%s)", STRING_ALPHANUM_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "toUtf8");
+    byte[][] expectedValues = new byte[NUM_ROWS][];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = _stringAlphaNumericSVValues[i].getBytes(StandardCharsets.UTF_8);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testStringStrPositionTransformFunction() {
+    ExpressionContext expression =
+        QueryContextConverterUtils.getExpression(String.format("str_pos(%s, 'A')", STRING_ALPHANUM_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "strpos");
+    int[] expectedValues = new int[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = StringUtils.indexOf(_stringAlphaNumericSVValues[i], 'A');
+    }
+    testTransformFunction(transformFunction, expectedValues);
+
+
+    expression =
+        QueryContextConverterUtils.getExpression(String.format("str_r_pos(%s, 'A')", STRING_ALPHANUM_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "strrpos");
+    expectedValues = new int[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = StringUtils.lastIndexOf(_stringAlphaNumericSVValues[i], 'A');
+    }
+    testTransformFunction(transformFunction, expectedValues);
+
+
+    expression =
+        QueryContextConverterUtils.getExpression(String.format("str_r_pos(%s, 'A', 1)", STRING_ALPHANUM_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "strrpos");
+    expectedValues = new int[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = StringUtils.lastIndexOf(_stringAlphaNumericSVValues[i], 'A', 1);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testStringNormalizeTransformFunction() {
+    ExpressionContext expression =
+        QueryContextConverterUtils.getExpression(String.format("normalize(%s)", STRING_ALPHANUM_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "normalize");
+    String[] expectedValues = new String[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = Normalizer.normalize(_stringAlphaNumericSVValues[i], Normalizer.Form.NFC);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+
+    expression = QueryContextConverterUtils.getExpression(String.format("normalize(%s, 'NFC')", STRING_ALPHANUM_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "normalize");
+    expectedValues = new String[NUM_ROWS];
+    Normalizer.Form targetForm = Normalizer.Form.valueOf("NFC");
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = Normalizer.normalize(_stringAlphaNumericSVValues[i], targetForm);
     }
     testTransformFunction(transformFunction, expectedValues);
   }
