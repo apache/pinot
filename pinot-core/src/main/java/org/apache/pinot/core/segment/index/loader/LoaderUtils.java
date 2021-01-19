@@ -27,9 +27,19 @@ import javax.annotation.Nonnull;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.core.segment.index.column.PhysicalColumnIndexContainer;
+import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
+import org.apache.pinot.core.segment.index.readers.BaseImmutableDictionary;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.forward.FixedBitMVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
+import org.apache.pinot.core.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.sorted.SortedIndexReaderImpl;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,6 +49,43 @@ public class LoaderUtils {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(LoaderUtils.class);
+
+  /**
+   * Returns the forward index reader for the given column.
+   */
+  public static ForwardIndexReader<?> getForwardIndexReader(SegmentDirectory.Reader segmentReader,
+      ColumnMetadata columnMetadata)
+      throws IOException {
+    PinotDataBuffer dataBuffer =
+        segmentReader.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.FORWARD_INDEX);
+    if (columnMetadata.hasDictionary()) {
+      if (columnMetadata.isSingleValue()) {
+        if (columnMetadata.isSorted()) {
+          return new SortedIndexReaderImpl(dataBuffer, columnMetadata.getCardinality());
+        } else {
+          return new FixedBitSVForwardIndexReaderV2(dataBuffer, columnMetadata.getTotalDocs(),
+              columnMetadata.getBitsPerElement());
+        }
+      } else {
+        return new FixedBitMVForwardIndexReader(dataBuffer, columnMetadata.getTotalDocs(),
+            columnMetadata.getTotalNumberOfEntries(), columnMetadata.getBitsPerElement());
+      }
+    } else {
+      DataType dataType = columnMetadata.getDataType();
+      return dataType.isFixedWidth() ? new FixedByteChunkSVForwardIndexReader(dataBuffer, dataType)
+          : new VarByteChunkSVForwardIndexReader(dataBuffer, dataType);
+    }
+  }
+
+  /**
+   * Returns the dictionary for the given column.
+   */
+  public static BaseImmutableDictionary getDictionary(SegmentDirectory.Reader segmentReader,
+      ColumnMetadata columnMetadata)
+      throws IOException {
+    PinotDataBuffer dataBuffer = segmentReader.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.DICTIONARY);
+    return PhysicalColumnIndexContainer.loadDictionary(dataBuffer, columnMetadata, false);
+  }
 
   /**
    * Write an index file to v3 format single index file and remove the old one.

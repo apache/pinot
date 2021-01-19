@@ -32,10 +32,6 @@ import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
-import org.apache.pinot.core.segment.index.readers.forward.FixedBitMVForwardIndexReader;
-import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
-import org.apache.pinot.core.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -123,7 +119,7 @@ public class RangeIndexHandler {
   private void handleDictionaryBasedColumn(ColumnMetadata columnMetadata)
       throws IOException {
     int numDocs = columnMetadata.getTotalDocs();
-    try (ForwardIndexReader forwardIndexReader = getForwardIndexReader(columnMetadata, _segmentWriter);
+    try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(_segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         RangeIndexCreator rangeIndexCreator = new RangeIndexCreator(_indexDir, columnMetadata.getFieldSpec(),
             FieldSpec.DataType.INT, -1, -1, numDocs, columnMetadata.getTotalNumberOfEntries())) {
@@ -147,7 +143,7 @@ public class RangeIndexHandler {
   private void handleNonDictionaryBasedColumn(ColumnMetadata columnMetadata)
       throws IOException {
     int numDocs = columnMetadata.getTotalDocs();
-    try (ForwardIndexReader forwardIndexReader = getForwardIndexReader(columnMetadata, _segmentWriter);
+    try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(_segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         RangeIndexCreator rangeIndexCreator = new RangeIndexCreator(_indexDir, columnMetadata.getFieldSpec(),
             columnMetadata.getDataType(), -1, -1, numDocs, columnMetadata.getTotalNumberOfEntries())) {
@@ -214,28 +210,6 @@ public class RangeIndexHandler {
         }
       }
       rangeIndexCreator.seal();
-    }
-  }
-
-  private ForwardIndexReader<?> getForwardIndexReader(ColumnMetadata columnMetadata,
-      SegmentDirectory.Writer segmentWriter)
-      throws IOException {
-    PinotDataBuffer buffer = segmentWriter.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.FORWARD_INDEX);
-    int numRows = columnMetadata.getTotalDocs();
-    int numBitsPerValue = columnMetadata.getBitsPerElement();
-    if (columnMetadata.isSingleValue()) {
-      if (columnMetadata.hasDictionary()) {
-        return new FixedBitSVForwardIndexReaderV2(buffer, numRows, numBitsPerValue);
-      } else {
-        return new FixedByteChunkSVForwardIndexReader(buffer, columnMetadata.getDataType());
-      }
-    } else {
-      if (columnMetadata.hasDictionary()) {
-        return new FixedBitMVForwardIndexReader(buffer, numRows, columnMetadata.getTotalNumberOfEntries(),
-            numBitsPerValue);
-      } else {
-        throw new IllegalStateException("Raw index on multi-value column is not supported");
-      }
     }
   }
 }

@@ -32,9 +32,6 @@ import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
-import org.apache.pinot.core.segment.index.readers.forward.FixedBitMVForwardIndexReader;
-import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.slf4j.Logger;
@@ -107,7 +104,7 @@ public class InvertedIndexHandler {
     try (OffHeapBitmapInvertedIndexCreator creator = new OffHeapBitmapInvertedIndexCreator(_indexDir,
         columnMetadata.getFieldSpec(), columnMetadata.getCardinality(), numDocs,
         columnMetadata.getTotalNumberOfEntries())) {
-      try (ForwardIndexReader forwardIndexReader = getForwardIndexReader(columnMetadata, _segmentWriter);
+      try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(_segmentWriter, columnMetadata);
           ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
         if (columnMetadata.isSingleValue()) {
           // Single-value column.
@@ -135,19 +132,5 @@ public class InvertedIndexHandler {
     FileUtils.deleteQuietly(inProgress);
 
     LOGGER.info("Created inverted index for segment: {}, column: {}", _segmentName, column);
-  }
-
-  private ForwardIndexReader<?> getForwardIndexReader(ColumnMetadata columnMetadata,
-      SegmentDirectory.Writer segmentWriter)
-      throws IOException {
-    PinotDataBuffer buffer = segmentWriter.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.FORWARD_INDEX);
-    int numRows = columnMetadata.getTotalDocs();
-    int numBitsPerValue = columnMetadata.getBitsPerElement();
-    if (columnMetadata.isSingleValue()) {
-      return new FixedBitSVForwardIndexReaderV2(buffer, numRows, numBitsPerValue);
-    } else {
-      return new FixedBitMVForwardIndexReader(buffer, numRows, columnMetadata.getTotalNumberOfEntries(),
-          numBitsPerValue);
-    }
   }
 }
