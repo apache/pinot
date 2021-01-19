@@ -145,7 +145,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       throws Exception {
     this.config = config;
     recordReader = dataSource.getRecordReader();
-    Preconditions.checkState(recordReader.hasNext(), "No record in data source");
     dataSchema = config.getSchema();
 
     _recordTransformer = recordTransformer;
@@ -240,8 +239,14 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     ColumnStatistics timeColumnStatistics = segmentStats.getColumnProfileFor(config.getTimeColumnName());
     int sequenceId = config.getSequenceId();
     if (timeColumnStatistics != null) {
-      segmentName = config.getSegmentNameGenerator()
-          .generateSegmentName(sequenceId, timeColumnStatistics.getMinValue(), timeColumnStatistics.getMaxValue());
+      if (totalDocs > 0) {
+        segmentName = config.getSegmentNameGenerator()
+            .generateSegmentName(sequenceId, timeColumnStatistics.getMinValue(), timeColumnStatistics.getMaxValue());
+      } else {
+        // Generate a unique name for a segment with no rows
+        long now = System.currentTimeMillis();
+        segmentName = config.getSegmentNameGenerator().generateSegmentName(sequenceId, now, now);
+      }
     } else {
       segmentName = config.getSegmentNameGenerator().generateSegmentName(sequenceId, null, null);
     }
@@ -272,7 +277,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     convertFormatIfNecessary(segmentOutputDir);
 
     // Build star-tree V2 if necessary
-    buildStarTreeV2IfNecessary(segmentOutputDir);
+    if (totalDocs > 0) {
+      buildStarTreeV2IfNecessary(segmentOutputDir);
+    }
 
     // Compute CRC and creation time
     long crc = CrcUtils.forAllFilesInFolder(segmentOutputDir).computeCrc();

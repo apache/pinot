@@ -507,10 +507,12 @@ public class PinotLLCRealtimeSegmentManager {
     committingSegmentZKMetadata.setDownloadUrl(isPeerURL(committingSegmentDescriptor.getSegmentLocation())
         ? CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD : committingSegmentDescriptor.getSegmentLocation());
     committingSegmentZKMetadata.setCrc(Long.valueOf(segmentMetadata.getCrc()));
-    Preconditions.checkNotNull(segmentMetadata.getTimeInterval(),
-        "start/end time information is not correctly written to the segment for table: " + realtimeTableName);
-    committingSegmentZKMetadata.setStartTime(segmentMetadata.getTimeInterval().getStartMillis());
-    committingSegmentZKMetadata.setEndTime(segmentMetadata.getTimeInterval().getEndMillis());
+    if (segmentMetadata.getTotalDocs() > 0) {
+      Preconditions.checkNotNull(segmentMetadata.getTimeInterval(),
+          "start/end time information is not correctly written to the segment for table: " + realtimeTableName);
+      committingSegmentZKMetadata.setStartTime(segmentMetadata.getTimeInterval().getStartMillis());
+      committingSegmentZKMetadata.setEndTime(segmentMetadata.getTimeInterval().getEndMillis());
+    }
     committingSegmentZKMetadata.setTimeUnit(TimeUnit.MILLISECONDS);
     committingSegmentZKMetadata.setIndexVersion(segmentMetadata.getVersion());
     committingSegmentZKMetadata.setTotalDocs(segmentMetadata.getTotalDocs());

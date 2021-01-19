@@ -105,32 +105,34 @@ public class ImmutableSegmentLoader {
     // Load the segment
     ReadMode readMode = indexLoadingConfig.getReadMode();
     SegmentDirectory segmentDirectory = SegmentDirectory.createFromLocalFS(indexDir, segmentMetadata, readMode);
-    SegmentDirectory.Reader segmentReader = segmentDirectory.createReader();
     Map<String, ColumnIndexContainer> indexContainerMap = new HashMap<>();
-    for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
-      indexContainerMap.put(entry.getKey(),
-          new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig, indexDir));
-    }
-
-    // Instantiate virtual columns
-    Schema segmentSchema = segmentMetadata.getSchema();
-    VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(segmentSchema, segmentName);
-    for (FieldSpec fieldSpec : segmentSchema.getAllFieldSpecs()) {
-      if (fieldSpec.isVirtualColumn()) {
-        String columnName = fieldSpec.getName();
-        VirtualColumnContext context = new VirtualColumnContext(fieldSpec, segmentMetadata.getTotalDocs());
-        VirtualColumnProvider provider = VirtualColumnProviderFactory.buildProvider(context);
-        indexContainerMap.put(columnName, provider.buildColumnIndexContainer(context));
-        segmentMetadata.getColumnMetadataMap().put(columnName, provider.buildMetadata(context));
-      }
-    }
-
-    // Load star-tree index if it exists
     StarTreeIndexContainer starTreeIndexContainer = null;
-    if (segmentMetadata.getStarTreeV2MetadataList() != null) {
-      starTreeIndexContainer =
-          new StarTreeIndexContainer(SegmentDirectoryPaths.findSegmentDirectory(indexDir), segmentMetadata,
-              indexContainerMap, readMode);
+
+    if (segmentMetadata.getTotalDocs() > 0) {
+      SegmentDirectory.Reader segmentReader = segmentDirectory.createReader();
+      for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
+        indexContainerMap.put(entry.getKey(), new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig, indexDir));
+      }
+
+      // Instantiate virtual columns
+      Schema segmentSchema = segmentMetadata.getSchema();
+      VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(segmentSchema, segmentName);
+      for (FieldSpec fieldSpec : segmentSchema.getAllFieldSpecs()) {
+        if (fieldSpec.isVirtualColumn()) {
+          String columnName = fieldSpec.getName();
+          VirtualColumnContext context = new VirtualColumnContext(fieldSpec, segmentMetadata.getTotalDocs());
+          VirtualColumnProvider provider = VirtualColumnProviderFactory.buildProvider(context);
+          indexContainerMap.put(columnName, provider.buildColumnIndexContainer(context));
+          segmentMetadata.getColumnMetadataMap().put(columnName, provider.buildMetadata(context));
+        }
+      }
+
+      // Load star-tree index if it exists
+      if (segmentMetadata.getStarTreeV2MetadataList() != null) {
+        starTreeIndexContainer =
+            new StarTreeIndexContainer(SegmentDirectoryPaths.findSegmentDirectory(indexDir), segmentMetadata,
+                indexContainerMap, readMode);
+      }
     }
 
     ImmutableSegmentImpl segment =

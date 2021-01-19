@@ -127,6 +127,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
     this.schema = schema;
     this.totalDocs = segmentIndexCreationInfo.getTotalDocs();
+    if (totalDocs == 0) {
+      return;
+    }
 
     Collection<FieldSpec> fieldSpecs = schema.getAllFieldSpecs();
     Set<String> invertedIndexColumns = new HashSet<>();
@@ -531,7 +534,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     properties.setProperty(SEGMENT_TOTAL_DOCS, String.valueOf(totalDocs));
 
     // Write time related metadata (start time, end time, time unit)
-    if (timeColumnName != null) {
+    if (timeColumnName != null && totalDocs > 0) {
       ColumnIndexCreationInfo timeColumnIndexCreationInfo = indexCreationInfoMap.get(timeColumnName);
       if (timeColumnIndexCreationInfo != null) {
         long startTime;
@@ -656,10 +659,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
 
     // NOTE: Min/max could be null for real-time aggregate metrics.
-    Object min = columnIndexCreationInfo.getMin();
-    Object max = columnIndexCreationInfo.getMax();
-    if (min != null && max != null) {
-      addColumnMinMaxValueInfo(properties, column, min.toString(), max.toString());
+    if (totalDocs > 0) {
+      Object min = columnIndexCreationInfo.getMin();
+      Object max = columnIndexCreationInfo.getMax();
+      if (min != null && max != null) {
+        addColumnMinMaxValueInfo(properties, column, min.toString(), max.toString());
+      }
     }
 
     String defaultNullValue = columnIndexCreationInfo.getDefaultNullValue().toString();

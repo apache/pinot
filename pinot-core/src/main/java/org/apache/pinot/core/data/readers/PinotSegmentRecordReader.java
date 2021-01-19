@@ -81,25 +81,29 @@ public class PinotSegmentRecordReader implements RecordReader {
         _schema = new SegmentMetadataImpl(indexDir).getSchema();
         Collection<String> columnNames = _schema.getColumnNames();
         _columnReaderMap = new HashMap<>(columnNames.size());
-        for (String columnName : columnNames) {
-          _columnReaderMap.put(columnName, new PinotSegmentColumnReader(_immutableSegment, columnName));
+        if (_numDocs > 0) {
+          for (String columnName : columnNames) {
+            _columnReaderMap.put(columnName, new PinotSegmentColumnReader(_immutableSegment, columnName));
+          }
         }
       } else {
         _schema = schema;
         Schema segmentSchema = segmentMetadata.getSchema();
         Collection<FieldSpec> fieldSpecs = _schema.getAllFieldSpecs();
         _columnReaderMap = new HashMap<>(fieldSpecs.size());
-        for (FieldSpec fieldSpec : fieldSpecs) {
-          String columnName = fieldSpec.getName();
-          FieldSpec segmentFieldSpec = segmentSchema.getFieldSpecFor(columnName);
-          Preconditions.checkState(fieldSpec.equals(segmentFieldSpec),
-              "Field spec mismatch for column: %s, in the given schema: %s, in the segment schema: %s", columnName,
-              fieldSpec, segmentFieldSpec);
-          _columnReaderMap.put(columnName, new PinotSegmentColumnReader(_immutableSegment, columnName));
+        if (_numDocs > 0) {
+          for (FieldSpec fieldSpec : fieldSpecs) {
+            String columnName = fieldSpec.getName();
+            FieldSpec segmentFieldSpec = segmentSchema.getFieldSpecFor(columnName);
+            Preconditions.checkState(fieldSpec.equals(segmentFieldSpec),
+                "Field spec mismatch for column: %s, in the given schema: %s, in the segment schema: %s", columnName,
+                fieldSpec, segmentFieldSpec);
+            _columnReaderMap.put(columnName, new PinotSegmentColumnReader(_immutableSegment, columnName));
+          }
         }
       }
       // Initialize sorted doc ids
-      if (sortOrder != null && !sortOrder.isEmpty()) {
+      if (sortOrder != null && !sortOrder.isEmpty() && _numDocs > 0) {
         _docIdsInSortedColumnOrder =
             new PinotSegmentSorter(_numDocs, _schema, _columnReaderMap).getSortedDocIds(sortOrder);
       } else {
