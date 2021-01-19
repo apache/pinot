@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.function.scalar;
 
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.util.regex.Pattern;
@@ -305,7 +304,7 @@ public class StringFunctions {
    * see String#split(String)
    * @param input
    * @param delimiter
-   * @return splits string on delimiter and returns an array.
+   * @return splits string on specified delimiter and returns an array.
    */
   @ScalarFunction
   public static String[] split(String input, String delimiter) {
