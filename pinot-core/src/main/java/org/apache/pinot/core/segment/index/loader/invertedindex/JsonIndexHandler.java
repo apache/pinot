@@ -28,7 +28,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.creator.impl.inv.json.OffHeapJsonIndexCreator;
-import org.apache.pinot.core.segment.index.column.PhysicalColumnIndexContainer;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.loader.LoaderUtils;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
@@ -36,8 +35,6 @@ import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
-import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReader;
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -132,9 +129,9 @@ public class JsonIndexHandler {
   private void handleDictionaryBasedColumn(ColumnMetadata columnMetadata)
       throws IOException {
     String columnName = columnMetadata.getColumnName();
-    try (ForwardIndexReader forwardIndexReader = getForwardIndexReader(columnMetadata, _segmentWriter);
+    try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(_segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
-        Dictionary dictionary = getDictionary(columnMetadata, _segmentWriter);
+        Dictionary dictionary = LoaderUtils.getDictionaryReader(_segmentWriter, columnMetadata);
         OffHeapJsonIndexCreator jsonIndexCreator = new OffHeapJsonIndexCreator(_indexDir, columnName)) {
       int numDocs = columnMetadata.getTotalDocs();
       for (int i = 0; i < numDocs; i++) {
@@ -148,7 +145,7 @@ public class JsonIndexHandler {
   private void handleNonDictionaryBasedColumn(ColumnMetadata columnMetadata)
       throws IOException {
     String columnName = columnMetadata.getColumnName();
-    try (ForwardIndexReader forwardIndexReader = getForwardIndexReader(columnMetadata, _segmentWriter);
+    try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(_segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         OffHeapJsonIndexCreator jsonIndexCreator = new OffHeapJsonIndexCreator(_indexDir, columnName)) {
       int numDocs = columnMetadata.getTotalDocs();
@@ -157,20 +154,5 @@ public class JsonIndexHandler {
       }
       jsonIndexCreator.seal();
     }
-  }
-
-  private ForwardIndexReader<?> getForwardIndexReader(ColumnMetadata columnMetadata,
-      SegmentDirectory.Writer segmentWriter)
-      throws IOException {
-    PinotDataBuffer dataBuffer =
-        segmentWriter.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.FORWARD_INDEX);
-    return new FixedBitSVForwardIndexReader(dataBuffer, columnMetadata.getTotalDocs(),
-        columnMetadata.getBitsPerElement());
-  }
-
-  private Dictionary getDictionary(ColumnMetadata columnMetadata, SegmentDirectory.Writer segmentWriter)
-      throws IOException {
-    PinotDataBuffer dataBuffer = segmentWriter.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.DICTIONARY);
-    return PhysicalColumnIndexContainer.loadDictionary(dataBuffer, columnMetadata, false);
   }
 }

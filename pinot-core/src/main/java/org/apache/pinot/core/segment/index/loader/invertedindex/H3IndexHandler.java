@@ -31,7 +31,6 @@ import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.creator.impl.inv.geospatial.H3IndexConfig;
 import org.apache.pinot.core.segment.creator.impl.inv.geospatial.OffHeapH3IndexCreator;
-import org.apache.pinot.core.segment.index.column.PhysicalColumnIndexContainer;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.loader.LoaderUtils;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
@@ -39,10 +38,6 @@ import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
-import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
-import org.apache.pinot.core.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
-import org.apache.pinot.core.segment.index.readers.sorted.SortedIndexReaderImpl;
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -135,9 +130,9 @@ public class H3IndexHandler {
   private void handleDictionaryBasedColumn(ColumnMetadata columnMetadata)
       throws IOException {
     String columnName = columnMetadata.getColumnName();
-    try (ForwardIndexReader forwardIndexReader = getForwardIndexReader(columnMetadata, _segmentWriter);
+    try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(_segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
-        Dictionary dictionary = getDictionary(columnMetadata, _segmentWriter);
+        Dictionary dictionary = LoaderUtils.getDictionaryReader(_segmentWriter, columnMetadata);
         OffHeapH3IndexCreator h3IndexCreator = new OffHeapH3IndexCreator(_indexDir, columnName,
             _h3IndexConfigs.get(columnName).getResolution())) {
       int numDocs = columnMetadata.getTotalDocs();
@@ -152,7 +147,7 @@ public class H3IndexHandler {
   private void handleNonDictionaryBasedColumn(ColumnMetadata columnMetadata)
       throws Exception {
     String columnName = columnMetadata.getColumnName();
-    try (ForwardIndexReader forwardIndexReader = getForwardIndexReader(columnMetadata, _segmentWriter);
+    try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(_segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         OffHeapH3IndexCreator h3IndexCreator = new OffHeapH3IndexCreator(_indexDir, columnName,
             _h3IndexConfigs.get(columnName).getResolution())) {
@@ -162,28 +157,5 @@ public class H3IndexHandler {
       }
       h3IndexCreator.seal();
     }
-  }
-
-  private ForwardIndexReader<?> getForwardIndexReader(ColumnMetadata columnMetadata,
-      SegmentDirectory.Writer segmentWriter)
-      throws IOException {
-    PinotDataBuffer dataBuffer =
-        segmentWriter.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.FORWARD_INDEX);
-    if (columnMetadata.hasDictionary()) {
-      if (columnMetadata.isSorted()) {
-        return new SortedIndexReaderImpl(dataBuffer, columnMetadata.getCardinality());
-      } else {
-        return new FixedBitSVForwardIndexReaderV2(dataBuffer, columnMetadata.getTotalDocs(),
-            columnMetadata.getBitsPerElement());
-      }
-    } else {
-      return new VarByteChunkSVForwardIndexReader(dataBuffer, DataType.BYTES);
-    }
-  }
-
-  private Dictionary getDictionary(ColumnMetadata columnMetadata, SegmentDirectory.Writer segmentWriter)
-      throws IOException {
-    PinotDataBuffer dataBuffer = segmentWriter.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.DICTIONARY);
-    return PhysicalColumnIndexContainer.loadDictionary(dataBuffer, columnMetadata, false);
   }
 }
