@@ -24,8 +24,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.function.Consumer;
-import javax.naming.ldap.Control;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;

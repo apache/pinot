@@ -476,11 +476,13 @@ public class PinotTableRestletResource {
 
       if (quotaConfig == null) {
         // set a default storage quota
+        LOGGER.info("Assigning default storage quota for dimension table: {}", tableConfig.getTableName());
         tableConfig.setQuotaConfig(
             new QuotaConfig(maxAllowedSize, null));
       } else {
         if (quotaConfig.getStorage() == null) {
           // set a default storage quota and keep the RPS value
+          LOGGER.info("Assigning default storage quota for dimension table: {}", tableConfig.getTableName());
           tableConfig.setQuotaConfig(
               new QuotaConfig(maxAllowedSize, quotaConfig.getMaxQueriesPerSecond())
           );
