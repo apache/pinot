@@ -154,9 +154,14 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
             offlineSegmentsMetadata = this._clusterInfoAccessor.getOfflineSegmentsMetadata(offlineTableName);
           }
           Set<String> existingSegmentInputFiles = getExistingSegmentInputFiles(offlineSegmentsMetadata);
-          existingSegmentInputFiles.addAll(getInputFilesFromRunningTasks());
+          Set<String> inputFilesFromRunningTasks = getInputFilesFromRunningTasks();
+          existingSegmentInputFiles.addAll(inputFilesFromRunningTasks);
+          LOGGER.info("Trying to extract input files from path: {}, "
+                  + "and exclude input files from existing segments metadata: {}, "
+                  + "and input files from running tasks: {}", inputDirURI, existingSegmentInputFiles,
+              inputFilesFromRunningTasks);
           List<URI> inputFileURIs = getInputFilesFromDirectory(batchConfigMap, inputDirURI, existingSegmentInputFiles);
-
+          LOGGER.info("Final input files for task config generation: {}", inputFileURIs);
           for (URI inputFileURI : inputFileURIs) {
             Map<String, String> singleFileGenerationTaskConfig =
                 getSingleFileGenerationTaskConfig(offlineTableName, tableNumTasks, batchConfigMap, inputFileURI);
@@ -279,23 +284,32 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
     }
     List<URI> inputFileURIs = new ArrayList<>();
     for (String file : files) {
+      LOGGER.debug("Processing file: {}", file);
       if (includeFilePathMatcher != null) {
         if (!includeFilePathMatcher.matches(Paths.get(file))) {
+          LOGGER.debug("Exclude file {} as it's not matching includeFilePathMatcher: {}", file, includeFileNamePattern);
           continue;
         }
       }
       if (excludeFilePathMatcher != null) {
         if (excludeFilePathMatcher.matches(Paths.get(file))) {
+          LOGGER.debug("Exclude file {} as it's matching excludeFilePathMatcher: {}", file, excludeFileNamePattern);
           continue;
         }
       }
       try {
         URI inputFileURI = getFileURI(file, inputDirURI);
-        if (inputDirFS.isDirectory(inputFileURI) || existingSegmentInputFileURIs.contains(inputFileURI.toString())) {
+        if (existingSegmentInputFileURIs.contains(inputFileURI.toString())) {
+          LOGGER.debug("Skipping already processed inputFileURI: {}", inputFileURI);
+          continue;
+        }
+        if (inputDirFS.isDirectory(inputFileURI)) {
+          LOGGER.debug("Skipping directory: {}", inputFileURI);
           continue;
         }
         inputFileURIs.add(inputFileURI);
       } catch (Exception e) {
+        LOGGER.error("Failed to construct inputFileURI for path: {}, parent directory URI: {}", file, inputDirURI, e);
         continue;
       }
     }

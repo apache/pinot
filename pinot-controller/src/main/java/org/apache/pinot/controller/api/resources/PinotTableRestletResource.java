@@ -481,6 +481,22 @@ public class PinotTableRestletResource {
       }
     }
 
+    // Check if task schedule is valid.
+    TableTaskConfig taskConfig = newTableConfig.getTaskConfig();
+    if (taskConfig != null && taskConfig.isTaskTypeEnabled(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE)) {
+      Map<String, String> taskTypeConfig =
+          taskConfig.getConfigsForTaskType(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE);
+      if (taskTypeConfig != null && taskTypeConfig.containsKey(PinotTaskManager.SCHEDULE_KEY)) {
+        String cronExprStr = taskTypeConfig.get(PinotTaskManager.SCHEDULE_KEY);
+        try {
+          CronScheduleBuilder.cronSchedule(cronExprStr);
+        } catch (Exception e) {
+          throw new PinotHelixResourceManager.InvalidTableConfigException(
+              String.format("SegmentGenerationAndPushTask contains an invalid cron schedule: %s", cronExprStr), e);
+        }
+      }
+    }
+
     // Check if it is a hybrid table or not. If not, there's no need to verify anything.
     if (tableConfigToCompare == null) {
       LOGGER.info(
@@ -508,21 +524,6 @@ public class PinotTableRestletResource {
               existingTimeColumnType, newTimeColumnType));
     }
 
-    // Check if task schedule is valid.
-    TableTaskConfig taskConfig = newTableConfig.getTaskConfig();
-    if (taskConfig != null && taskConfig.isTaskTypeEnabled(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE)) {
-      Map<String, String> taskTypeConfig =
-          taskConfig.getConfigsForTaskType(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE);
-      if (taskTypeConfig != null && taskTypeConfig.containsKey(PinotTaskManager.SCHEDULE_KEY)) {
-        String cronExprStr = taskTypeConfig.get(PinotTaskManager.SCHEDULE_KEY);
-        try {
-          CronScheduleBuilder.cronSchedule(cronExprStr);
-        } catch (Exception e) {
-          throw new PinotHelixResourceManager.InvalidTableConfigException(
-              String.format("Task type contains an invalid cron schedule: %s", cronExprStr), e);
-        }
-      }
-    }
     // TODO: validate time unit size but now there's no metadata for that in table config.
     LOGGER.info("Finished validating tables config for Table: {}", rawTableName);
   }

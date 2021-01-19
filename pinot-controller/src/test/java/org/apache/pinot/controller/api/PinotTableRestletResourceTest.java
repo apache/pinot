@@ -20,14 +20,18 @@ package org.apache.pinot.controller.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.collect.ImmutableMap;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.controller.ControllerTestUtils;
+import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
+import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -170,6 +174,48 @@ public class PinotTableRestletResourceTest {
     // TODO: check whether we should allow POST request to create REALTIME table that already exists
     // Create a REALTIME table that already exists which should succeed
     ControllerTestUtils.sendPostRequest(_createTableUrl, realtimeTableConfigString);
+  }
+
+  @Test
+  public void testTableCronSchedule() {
+    String rawTableName = "test_table_cron_schedule";
+    // Failed to create a table
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setTaskConfig(
+        new TableTaskConfig(ImmutableMap.of(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
+            ImmutableMap.of(PinotTaskManager.SCHEDULE_KEY, "* * * * * * *")))).build();
+    try {
+      ControllerTestUtils.sendPostRequest(_createTableUrl, tableConfig.toJsonString());
+      Assert.fail("Creation of an OFFLINE table with an invalid cron expression does not fail");
+    } catch (IOException e) {
+      // Expected 400 Bad Request
+      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+    }
+
+    // Succeed to create a table
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setTaskConfig(
+        new TableTaskConfig(ImmutableMap.of(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
+            ImmutableMap.of(PinotTaskManager.SCHEDULE_KEY, "0 */10 * ? * * *")))).build();
+    try {
+      String response = ControllerTestUtils.sendPostRequest(_createTableUrl, tableConfig.toJsonString());
+      Assert.assertEquals(response, "{\"status\":\"Table test_table_cron_schedule_OFFLINE succesfully added\"}");
+    } catch (IOException e) {
+      // Expected 400 Bad Request
+      Assert.fail("This is a valid table config with cron schedule");
+    }
+
+    // Failed to update the table
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setTaskConfig(
+        new TableTaskConfig(ImmutableMap.of(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
+            ImmutableMap.of(PinotTaskManager.SCHEDULE_KEY, "5 5 5 5 5 5 5")))).build();
+    try {
+      ControllerTestUtils
+          .sendPutRequest(ControllerTestUtils.getControllerRequestURLBuilder().forUpdateTableConfig(rawTableName),
+              tableConfig.toJsonString());
+      Assert.fail("Update of an OFFLINE table with an invalid cron expression does not fail");
+    } catch (IOException e) {
+      // Expected 400 Bad Request
+      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+    }
   }
 
   @Test

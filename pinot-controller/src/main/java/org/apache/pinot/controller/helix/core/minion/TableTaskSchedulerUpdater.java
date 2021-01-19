@@ -19,9 +19,12 @@
 package org.apache.pinot.controller.helix.core.minion;
 
 import org.I0Itec.zkclient.IZkDataListener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class TableTaskSchedulerUpdater implements IZkDataListener {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TableTaskSchedulerUpdater.class);
   private final String _tableWithType;
   private final PinotTaskManager _pinotTaskManager;
 
@@ -33,12 +36,22 @@ public class TableTaskSchedulerUpdater implements IZkDataListener {
   @Override
   public void handleDataChange(String dataPath, Object data)
       throws Exception {
-    _pinotTaskManager.updateCronTaskScheduler(_tableWithType);
+    try {
+      _pinotTaskManager.updateCronTaskScheduler(_tableWithType);
+    } catch (Exception e) {
+      LOGGER.error("Failed to update cron task scheduler for table {}", _tableWithType, e);
+      throw e;
+    }
   }
 
   @Override
   public void handleDataDeleted(String dataPath)
       throws Exception {
-    _pinotTaskManager.cleanUpCronTaskSchedulerForTable(_tableWithType);
+    try {
+      _pinotTaskManager.cleanUpCronTaskSchedulerForTable(_tableWithType);
+    } catch (Exception e) {
+      LOGGER.error("Failed to delete cron task scheduler for table {}", _tableWithType, e);
+      throw e;
+    }
   }
 }

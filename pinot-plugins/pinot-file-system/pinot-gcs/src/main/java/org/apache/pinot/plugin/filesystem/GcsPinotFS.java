@@ -322,7 +322,9 @@ public class GcsPinotFS  extends PinotFS {
               }
             }
           });
-      return builder.build().toArray(new String[0]);
+      String[] listedFiles = builder.build().toArray(new String[0]);
+      LOGGER.info("Listed {} files from URI: {}, is recursive: {}", listedFiles.length, fileUri, recursive);
+      return listedFiles;
     } catch (Throwable t) {
       throw new IOException(t);
     }

@@ -20,7 +20,9 @@ package org.apache.pinot.controller.helix.core.minion;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -49,20 +51,29 @@ public class PinotTaskManagerTest extends ControllerTest {
   public void setup()
       throws Exception {
     startZk();
-    startController();
-    addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
-    addFakeServerInstancesToAutoJoinHelixCluster(1, true);
+  }
 
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
-        .addSingleValueDimension("myMap", FieldSpec.DataType.STRING)
-        .addSingleValueDimension("myMapStr", FieldSpec.DataType.STRING)
-        .addSingleValueDimension("complexMapStr", FieldSpec.DataType.STRING).build();
-    addSchema(schema);
+  @Test
+  public void testDefaultPinotTaskManagerNoScheduler() {
+    startController();
+    PinotTaskManager taskManager = _controllerStarter.getTaskManager();
+    Assert.assertNull(taskManager.getScheduler());
+    stopController();
   }
 
   @Test
   public void testPinotTaskManagerSchedulerWithUpdate()
       throws Exception {
+    Map<String, Object> properties = getDefaultControllerConfiguration();
+    properties.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, true);
+    startController(properties);
+    addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
+    addFakeServerInstancesToAutoJoinHelixCluster(1, true);
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addSingleValueDimension("myMap", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("myMapStr", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("complexMapStr", FieldSpec.DataType.STRING).build();
+    addSchema(schema);
     PinotTaskManager taskManager = _controllerStarter.getTaskManager();
     Scheduler scheduler = taskManager.getScheduler();
     Assert.assertNotNull(scheduler);
@@ -124,11 +135,11 @@ public class PinotTaskManagerTest extends ControllerTest {
     dropOfflineTable(RAW_TABLE_NAME);
     jobGroupNames = scheduler.getJobGroupNames();
     Assert.assertTrue(jobGroupNames.isEmpty());
+    stopController();
   }
 
   @AfterClass
   public void teardown() {
-    stopController();
     stopZk();
   }
 }
