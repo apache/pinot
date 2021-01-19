@@ -486,7 +486,6 @@ public class PinotTableRestletResource {
           );
         } else {
           if (quotaConfig.getStorageInBytes() > maxAllowedSizeInBytes) {
-            LOGGER.error("quota exceeded max");
             throw new PinotHelixResourceManager.InvalidTableConfigException(
                 "Invalid value for table storage quota. Max allowed is " + maxAllowedSize
             );
@@ -494,8 +493,6 @@ public class PinotTableRestletResource {
         }
       }
     }
-
-    LOGGER.error("Successfully returning from storage quota ensurance");
   }
 
   /**

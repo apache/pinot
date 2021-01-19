@@ -20,11 +20,8 @@ package org.apache.pinot.controller.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-<<<<<<< Updated upstream
 import com.google.common.collect.ImmutableMap;
-=======
 import com.google.common.collect.Lists;
->>>>>>> Stashed changes
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.function.Consumer;
@@ -304,8 +301,6 @@ public class PinotTableRestletResourceTest {
     String tableConfigString = ControllerTestUtils.sendGetRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableGet(tableName));
     return JsonUtils.jsonNodeToObject(JsonUtils.stringToJsonNode(tableConfigString).get(tableType), TableConfig.class);
   }
-
-
 
   @Test
   public void testUpdateTableConfig() throws Exception {
