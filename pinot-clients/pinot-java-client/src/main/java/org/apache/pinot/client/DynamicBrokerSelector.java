@@ -96,7 +96,6 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
     refresh();
   }
 
-
   @Override
   public void handleDataDeleted(String dataPath)
       throws Exception {

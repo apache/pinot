@@ -79,7 +79,7 @@ public class GroupByResultSetTest {
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
-  public void testGetString_exception() {
+  public void testGetStringExceptionState() {
     // Run the test
     final String result = groupByResultSetUnderTest.getString(0, 1);
   }
