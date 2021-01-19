@@ -42,6 +42,11 @@
         <Pattern>%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</Pattern>
       </PatternLayout>
     </RandomAccessFile>
+    <RandomAccessFile name="minionLog" fileName="pinotMinion.log" immediateFlush="false">
+      <PatternLayout>
+        <Pattern>%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</Pattern>
+      </PatternLayout>
+    </RandomAccessFile>
 
   </Appenders>
   <Loggers>
@@ -78,6 +83,9 @@
     </AsyncLogger>
     <AsyncLogger name="org.apache.pinot.core.query" level="info" additivity="false">
       <AppenderRef ref="serverLog"/>
+    </AsyncLogger>
+    <AsyncLogger name="org.apache.pinot.minion" level="info" additivity="false">
+      <AppenderRef ref="minionLog"/>
     </AsyncLogger>
     <AsyncLogger name="org.reflections" level="error" additivity="false"/>
     <AsyncLogger name="org.apache.pinot.spi.plugin" level="error" additivity="false">
