@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
@@ -52,20 +53,24 @@ import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.recommender.RecommenderDriver;
+import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.util.ReplicationUtils;
 import org.apache.pinot.core.util.TableConfigUtils;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStats;
+import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TunerConfig;
 import org.apache.pinot.spi.config.table.tuner.TableConfigTuner;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.quartz.CronScheduleBuilder;
 import org.slf4j.LoggerFactory;
 
 
@@ -473,6 +478,22 @@ public class PinotTableRestletResource {
     } else {
       if (_pinotHelixResourceManager.hasRealtimeTable(rawTableName)) {
         tableConfigToCompare = _pinotHelixResourceManager.getRealtimeTableConfig(rawTableName);
+      }
+    }
+
+    // Check if task schedule is valid.
+    TableTaskConfig taskConfig = newTableConfig.getTaskConfig();
+    if (taskConfig != null && taskConfig.isTaskTypeEnabled(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE)) {
+      Map<String, String> taskTypeConfig =
+          taskConfig.getConfigsForTaskType(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE);
+      if (taskTypeConfig != null && taskTypeConfig.containsKey(PinotTaskManager.SCHEDULE_KEY)) {
+        String cronExprStr = taskTypeConfig.get(PinotTaskManager.SCHEDULE_KEY);
+        try {
+          CronScheduleBuilder.cronSchedule(cronExprStr);
+        } catch (Exception e) {
+          throw new PinotHelixResourceManager.InvalidTableConfigException(
+              String.format("SegmentGenerationAndPushTask contains an invalid cron schedule: %s", cronExprStr), e);
+        }
       }
     }
 

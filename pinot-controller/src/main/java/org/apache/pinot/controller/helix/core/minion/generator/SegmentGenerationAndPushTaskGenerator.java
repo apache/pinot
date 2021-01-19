@@ -34,6 +34,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.core.common.MinionConstants;
@@ -152,9 +153,15 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
           if (BatchConfigProperties.SegmentIngestionType.APPEND.name().equalsIgnoreCase(batchSegmentIngestionType)) {
             offlineSegmentsMetadata = this._clusterInfoAccessor.getOfflineSegmentsMetadata(offlineTableName);
           }
-          List<URI> inputFileURIs = getInputFilesFromDirectory(batchConfigMap, inputDirURI,
-              getExistingSegmentInputFiles(offlineSegmentsMetadata));
-
+          Set<String> existingSegmentInputFiles = getExistingSegmentInputFiles(offlineSegmentsMetadata);
+          Set<String> inputFilesFromRunningTasks = getInputFilesFromRunningTasks();
+          existingSegmentInputFiles.addAll(inputFilesFromRunningTasks);
+          LOGGER.info("Trying to extract input files from path: {}, "
+                  + "and exclude input files from existing segments metadata: {}, "
+                  + "and input files from running tasks: {}", inputDirURI, existingSegmentInputFiles,
+              inputFilesFromRunningTasks);
+          List<URI> inputFileURIs = getInputFilesFromDirectory(batchConfigMap, inputDirURI, existingSegmentInputFiles);
+          LOGGER.info("Final input files for task config generation: {}", inputFileURIs);
           for (URI inputFileURI : inputFileURIs) {
             Map<String, String> singleFileGenerationTaskConfig =
                 getSingleFileGenerationTaskConfig(offlineTableName, tableNumTasks, batchConfigMap, inputFileURI);
@@ -174,6 +181,31 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
       }
     }
     return pinotTaskConfigs;
+  }
+
+  private Set<String> getInputFilesFromRunningTasks() {
+    Set<String> inputFilesFromRunningTasks = new HashSet<>();
+    Map<String, TaskState> taskStates =
+        _clusterInfoAccessor.getTaskStates(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE);
+    for (String taskName : taskStates.keySet()) {
+      switch (taskStates.get(taskName)) {
+        case FAILED:
+        case ABORTED:
+        case STOPPED:
+        case COMPLETED:
+          continue;
+      }
+      List<PinotTaskConfig> taskConfigs = _clusterInfoAccessor.getTaskConfigs(taskName);
+      for (PinotTaskConfig taskConfig : taskConfigs) {
+        if (MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE.equalsIgnoreCase(taskConfig.getTaskType())) {
+          String inputFileURI = taskConfig.getConfigs().get(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY);
+          if (inputFileURI != null) {
+            inputFilesFromRunningTasks.add(inputFileURI);
+          }
+        }
+      }
+    }
+    return inputFilesFromRunningTasks;
   }
 
   private Map<String, String> getSingleFileGenerationTaskConfig(String offlineTableName, int sequenceID,
@@ -252,23 +284,32 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
     }
     List<URI> inputFileURIs = new ArrayList<>();
     for (String file : files) {
+      LOGGER.debug("Processing file: {}", file);
       if (includeFilePathMatcher != null) {
         if (!includeFilePathMatcher.matches(Paths.get(file))) {
+          LOGGER.debug("Exclude file {} as it's not matching includeFilePathMatcher: {}", file, includeFileNamePattern);
           continue;
         }
       }
       if (excludeFilePathMatcher != null) {
         if (excludeFilePathMatcher.matches(Paths.get(file))) {
+          LOGGER.debug("Exclude file {} as it's matching excludeFilePathMatcher: {}", file, excludeFileNamePattern);
           continue;
         }
       }
       try {
         URI inputFileURI = getFileURI(file, inputDirURI);
-        if (inputDirFS.isDirectory(inputFileURI) || existingSegmentInputFileURIs.contains(inputFileURI.toString())) {
+        if (existingSegmentInputFileURIs.contains(inputFileURI.toString())) {
+          LOGGER.debug("Skipping already processed inputFileURI: {}", inputFileURI);
+          continue;
+        }
+        if (inputDirFS.isDirectory(inputFileURI)) {
+          LOGGER.debug("Skipping directory: {}", inputFileURI);
           continue;
         }
         inputFileURIs.add(inputFileURI);
       } catch (Exception e) {
+        LOGGER.error("Failed to construct inputFileURI for path: {}, parent directory URI: {}", file, inputDirURI, e);
         continue;
       }
     }
