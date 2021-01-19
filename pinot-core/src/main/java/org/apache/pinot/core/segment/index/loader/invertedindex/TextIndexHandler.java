@@ -162,7 +162,7 @@ public class TextIndexHandler {
         // text index on dictionary encoded SV column
         // read forward index to get dictId
         // read the raw value from dictionary using dictId
-        try (Dictionary dictionary = LoaderUtils.getDictionaryReader(_segmentWriter, columnMetadata)) {
+        try (Dictionary dictionary = LoaderUtils.getDictionary(_segmentWriter, columnMetadata)) {
           for (int docId = 0; docId < numDocs; docId++) {
             int dictId = forwardIndexReader.getDictId(docId, readerContext);
             textIndexCreator.add(dictionary.getStringValue(dictId));

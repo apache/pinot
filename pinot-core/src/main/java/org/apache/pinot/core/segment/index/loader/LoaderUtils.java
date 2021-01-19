@@ -78,9 +78,9 @@ public class LoaderUtils {
   }
 
   /**
-   * Returns the dictionary reader for the given column.
+   * Returns the dictionary for the given column.
    */
-  public static BaseImmutableDictionary getDictionaryReader(SegmentDirectory.Reader segmentReader,
+  public static BaseImmutableDictionary getDictionary(SegmentDirectory.Reader segmentReader,
       ColumnMetadata columnMetadata)
       throws IOException {
     PinotDataBuffer dataBuffer = segmentReader.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.DICTIONARY);

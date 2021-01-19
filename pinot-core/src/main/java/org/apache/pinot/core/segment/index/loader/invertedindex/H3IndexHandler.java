@@ -132,7 +132,7 @@ public class H3IndexHandler {
     String columnName = columnMetadata.getColumnName();
     try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(_segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
-        Dictionary dictionary = LoaderUtils.getDictionaryReader(_segmentWriter, columnMetadata);
+        Dictionary dictionary = LoaderUtils.getDictionary(_segmentWriter, columnMetadata);
         OffHeapH3IndexCreator h3IndexCreator = new OffHeapH3IndexCreator(_indexDir, columnName,
             _h3IndexConfigs.get(columnName).getResolution())) {
       int numDocs = columnMetadata.getTotalDocs();

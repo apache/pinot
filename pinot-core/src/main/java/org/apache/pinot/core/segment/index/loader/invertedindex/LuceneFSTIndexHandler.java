@@ -127,7 +127,7 @@ public class LuceneFSTIndexHandler {
     LOGGER.info("Creating new FST index for column: {} in segment: {}, cardinality: {}", column, _segmentName,
         columnMetadata.getCardinality());
     LuceneFSTIndexCreator luceneFSTIndexCreator = new LuceneFSTIndexCreator(_indexDir, column, null);
-    try (Dictionary dictionary = LoaderUtils.getDictionaryReader(_segmentWriter, columnMetadata)) {
+    try (Dictionary dictionary = LoaderUtils.getDictionary(_segmentWriter, columnMetadata)) {
       for (int dictId = 0; dictId < dictionary.length(); dictId++) {
         luceneFSTIndexCreator.add(dictionary.getStringValue(dictId));
       }
