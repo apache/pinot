@@ -471,25 +471,27 @@ public class PinotTableRestletResource {
     // Dim tables must adhere to cluster level storage size limits
     if (tableConfig.isDimTable()) {
       QuotaConfig quotaConfig = tableConfig.getQuotaConfig();
-      String maxAllowedSize = this._controllerConf.getDimTableMaxSize();
+      String maxAllowedSize = _controllerConf.getDimTableMaxSize();
       long maxAllowedSizeInBytes = DataSizeUtils.toBytes(maxAllowedSize);
 
       if (quotaConfig == null) {
         // set a default storage quota
-        LOGGER.info("Assigning default storage quota for dimension table: {}", tableConfig.getTableName());
         tableConfig.setQuotaConfig(
             new QuotaConfig(maxAllowedSize, null));
+        LOGGER.info("Assigning default storage quota ({}) for dimension table: {}",
+            maxAllowedSize, tableConfig.getTableName());
       } else {
         if (quotaConfig.getStorage() == null) {
           // set a default storage quota and keep the RPS value
-          LOGGER.info("Assigning default storage quota for dimension table: {}", tableConfig.getTableName());
           tableConfig.setQuotaConfig(
-              new QuotaConfig(maxAllowedSize, quotaConfig.getMaxQueriesPerSecond())
-          );
+              new QuotaConfig(maxAllowedSize, quotaConfig.getMaxQueriesPerSecond()));
+          LOGGER.info("Assigning default storage quota ({}) for dimension table: {}",
+              maxAllowedSize, tableConfig.getTableName());
         } else {
           if (quotaConfig.getStorageInBytes() > maxAllowedSizeInBytes) {
             throw new PinotHelixResourceManager.InvalidTableConfigException(
-                "Invalid value for table storage quota. Max allowed is " + maxAllowedSize
+                String.format("Invalid storage quota: %d, max allowed size: %d",
+                    quotaConfig.getStorageInBytes(), maxAllowedSizeInBytes)
             );
           }
         }

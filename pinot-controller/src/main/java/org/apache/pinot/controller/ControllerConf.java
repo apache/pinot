@@ -145,7 +145,7 @@ public class ControllerConf extends PinotConfiguration {
   // If it's set to false, existing HLC realtime tables will stop consumption, and creation of new HLC tables will be disallowed.
   // Please make sure there is no HLC table running in the cluster before disallowing it.
   public static final String ALLOW_HLC_TABLES = "controller.allow.hlc.tables";
-  private static final String DIM_TABLE_MAX_SIZE = "controller.dimTable.maxSize";
+  public static final String DIM_TABLE_MAX_SIZE = "controller.dimTable.maxSize";
 
   // Defines the kind of storage and the underlying PinotFS implementation
   private static final String PINOT_FS_FACTORY_CLASS_LOCAL = "controller.storage.factory.class.file";
