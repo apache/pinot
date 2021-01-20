@@ -106,11 +106,11 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
 
   @Override
   public int getNumConcurrentTasksPerInstance() {
-    String numConcurrentTasksPerInstance = _clusterInfoAccessor
+    String numConcurrentTasksPerInstanceStr = _clusterInfoAccessor
         .getClusterConfig(MinionConstants.SegmentGenerationAndPushTask.CONFIG_NUMBER_CONCURRENT_TASKS_PER_INSTANCE);
-    if (numConcurrentTasksPerInstance != null) {
+    if (numConcurrentTasksPerInstanceStr != null) {
       try {
-        return Integer.parseInt(numConcurrentTasksPerInstance);
+        return Integer.parseInt(numConcurrentTasksPerInstanceStr);
       } catch (Exception e) {
         LOGGER.error("Failed to parse cluster config: {}",
             MinionConstants.SegmentGenerationAndPushTask.CONFIG_NUMBER_CONCURRENT_TASKS_PER_INSTANCE, e);

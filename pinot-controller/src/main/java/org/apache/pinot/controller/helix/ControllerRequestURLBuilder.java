@@ -332,4 +332,8 @@ public class ControllerRequestURLBuilder {
             .collect(Collectors.joining(",", "{", "}"));
     return forIngestFromURI(tableNameWithType, batchConfigMapStr, sourceURIStr);
   }
+
+  public String forClusterConfigs() {
+    return StringUtil.join("/", _baseUrl, "cluster/configs");
+  }
 }

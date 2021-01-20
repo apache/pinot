@@ -162,7 +162,7 @@ public class ClusterInfoAccessor {
   }
 
   /**
-   * Get the cluster config for a given cluster config.
+   * Get the cluster config for a given config name, return null if not found.
    *
    * @return cluster config
    */
