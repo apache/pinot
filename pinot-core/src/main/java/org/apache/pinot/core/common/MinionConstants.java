@@ -92,6 +92,8 @@ public class MinionConstants {
   // Generate segment and push to controller based on batch ingestion configs
   public static class SegmentGenerationAndPushTask {
     public static final String TASK_TYPE = "SegmentGenerationAndPushTask";
+    public static final String CONFIG_NUMBER_CONCURRENT_TASKS_PER_INSTANCE =
+        "pinot.minion.task.generator.SegmentGenerationAndPushTask.numConcurrentTasksPerInstance";
   }
 
 }

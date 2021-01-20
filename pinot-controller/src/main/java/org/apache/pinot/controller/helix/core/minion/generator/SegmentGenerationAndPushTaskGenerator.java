@@ -34,6 +34,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.helix.task.JobConfig;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
@@ -101,6 +102,21 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
   @Override
   public String getTaskType() {
     return MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE;
+  }
+
+  @Override
+  public int getNumConcurrentTasksPerInstance() {
+    String numConcurrentTasksPerInstance = _clusterInfoAccessor
+        .getClusterConfig(MinionConstants.SegmentGenerationAndPushTask.CONFIG_NUMBER_CONCURRENT_TASKS_PER_INSTANCE);
+    if (numConcurrentTasksPerInstance != null) {
+      try {
+        return Integer.parseInt(numConcurrentTasksPerInstance);
+      } catch (Exception e) {
+        LOGGER.error("Failed to parse cluster config: {}",
+            MinionConstants.SegmentGenerationAndPushTask.CONFIG_NUMBER_CONCURRENT_TASKS_PER_INSTANCE, e);
+      }
+    }
+    return JobConfig.DEFAULT_NUM_CONCURRENT_TASKS_PER_INSTANCE;
   }
 
   @Override
