@@ -60,6 +60,7 @@ import org.apache.pinot.controller.recommender.RecommenderDriver;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.util.ReplicationUtils;
 import org.apache.pinot.core.util.TableConfigUtils;
+import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStats;
@@ -68,6 +69,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TunerConfig;
 import org.apache.pinot.spi.config.table.tuner.TableConfigTuner;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.quartz.CronScheduleBuilder;
@@ -144,6 +146,7 @@ public class PinotTableRestletResource {
     String tableName = tableConfig.getTableName();
     try {
       ensureMinReplicas(tableConfig);
+      ensureStorageQuotaConstraints(tableConfig);
       verifyTableConfigs(tableConfig);
       _pinotHelixResourceManager.addTable(tableConfig);
       // TODO: validate that table was created successfully
@@ -367,6 +370,7 @@ public class PinotTableRestletResource {
       }
 
       ensureMinReplicas(tableConfig);
+      ensureStorageQuotaConstraints(tableConfig);
       verifyTableConfigs(tableConfig);
       _pinotHelixResourceManager.updateTableConfig(tableConfig);
     } catch (PinotHelixResourceManager.InvalidTableConfigException e) {
@@ -459,6 +463,38 @@ public class PinotTableRestletResource {
       } catch (NumberFormatException e) {
         throw new PinotHelixResourceManager.InvalidTableConfigException(
             "Invalid value for replicasPerPartition: '" + replicasPerPartitionStr + "'", e);
+      }
+    }
+  }
+
+  private void ensureStorageQuotaConstraints(TableConfig tableConfig) {
+    // Dim tables must adhere to cluster level storage size limits
+    if (tableConfig.isDimTable()) {
+      QuotaConfig quotaConfig = tableConfig.getQuotaConfig();
+      String maxAllowedSize = _controllerConf.getDimTableMaxSize();
+      long maxAllowedSizeInBytes = DataSizeUtils.toBytes(maxAllowedSize);
+
+      if (quotaConfig == null) {
+        // set a default storage quota
+        tableConfig.setQuotaConfig(
+            new QuotaConfig(maxAllowedSize, null));
+        LOGGER.info("Assigning default storage quota ({}) for dimension table: {}",
+            maxAllowedSize, tableConfig.getTableName());
+      } else {
+        if (quotaConfig.getStorage() == null) {
+          // set a default storage quota and keep the RPS value
+          tableConfig.setQuotaConfig(
+              new QuotaConfig(maxAllowedSize, quotaConfig.getMaxQueriesPerSecond()));
+          LOGGER.info("Assigning default storage quota ({}) for dimension table: {}",
+              maxAllowedSize, tableConfig.getTableName());
+        } else {
+          if (quotaConfig.getStorageInBytes() > maxAllowedSizeInBytes) {
+            throw new PinotHelixResourceManager.InvalidTableConfigException(
+                String.format("Invalid storage quota: %d, max allowed size: %d",
+                    quotaConfig.getStorageInBytes(), maxAllowedSizeInBytes)
+            );
+          }
+        }
       }
     }
   }

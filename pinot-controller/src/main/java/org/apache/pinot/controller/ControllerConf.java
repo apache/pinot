@@ -145,6 +145,7 @@ public class ControllerConf extends PinotConfiguration {
   // If it's set to false, existing HLC realtime tables will stop consumption, and creation of new HLC tables will be disallowed.
   // Please make sure there is no HLC table running in the cluster before disallowing it.
   public static final String ALLOW_HLC_TABLES = "controller.allow.hlc.tables";
+  public static final String DIM_TABLE_MAX_SIZE = "controller.dimTable.maxSize";
 
   // Defines the kind of storage and the underlying PinotFS implementation
   private static final String PINOT_FS_FACTORY_CLASS_LOCAL = "controller.storage.factory.class.file";
@@ -165,6 +166,7 @@ public class ControllerConf extends PinotConfiguration {
   private static final String DEFAULT_CONTROLLER_MODE = ControllerMode.DUAL.name();
   private static final String DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY =
       AutoRebalanceStrategy.class.getName();
+  private static final String DEFAULT_DIM_TABLE_MAX_SIZE = "200M";
 
   private static final String DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL = LocalPinotFS.class.getName();
 
@@ -253,6 +255,14 @@ public class ControllerConf extends PinotConfiguration {
 
   public void setZkStr(String zkStr) {
     setProperty(ZK_STR, zkStr);
+  }
+
+  public void setDimTableMaxSize(String size) {
+    setProperty(DIM_TABLE_MAX_SIZE, size);
+  }
+
+  public String getDimTableMaxSize() {
+    return getProperty(DIM_TABLE_MAX_SIZE, DEFAULT_DIM_TABLE_MAX_SIZE);
   }
 
   // A boolean to decide whether Jersey API should be the primary one. For now, we set this to be false,

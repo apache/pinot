@@ -21,6 +21,7 @@ package org.apache.pinot.controller.api;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import org.apache.pinot.common.utils.StringUtil;
@@ -33,6 +34,8 @@ import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -246,6 +249,50 @@ public class PinotTableRestletResourceTest {
 
     ControllerTestUtils.getHelixResourceManager().deleteOfflineTable(tableName);
     ControllerTestUtils.getHelixResourceManager().deleteRealtimeTable(tableName);
+  }
+
+  @Test
+  public void testDimTableStorageQuotaConstraints() throws Exception {
+    // Controller assigns default quota if none provided
+    String tableName = "myDimTable_basic";
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(tableName).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
+    ControllerTestUtils.addSchema(schema);
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(tableName).setIsDimTable(true).build();
+    ControllerTestUtils.sendPostRequest(_createTableUrl, tableConfig.toJsonString());
+    tableConfig = getTableConfig(tableName, "OFFLINE");
+    Assert.assertEquals(tableConfig.getQuotaConfig().getStorage(),
+        ControllerTestUtils.getControllerConfig().getDimTableMaxSize());
+
+    // Controller throws exception if quote exceed configured max value
+    tableName = "myDimTable_broken";
+    schema = new Schema.SchemaBuilder().setSchemaName(tableName).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
+    ControllerTestUtils.addSchema(schema);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(tableName).setIsDimTable(true)
+        .setQuotaConfig(new QuotaConfig("500G", null)).build();
+    try {
+      ControllerTestUtils.sendPostRequest(_createTableUrl, tableConfig.toJsonString());
+      Assert.fail("Creation of a DIMENSION table with larger than allowed storage quota should fail");
+    } catch (IOException e) {
+      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+    }
+
+    // Successful creation with proper quota
+    tableName = "myDimTable_good";
+    schema = new Schema.SchemaBuilder().setSchemaName(tableName).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
+    ControllerTestUtils.addSchema(schema);
+    String goodQuota = "100M";
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(tableName).setIsDimTable(true)
+        .setQuotaConfig(new QuotaConfig(goodQuota, null)).build();
+    ControllerTestUtils.sendPostRequest(_createTableUrl, tableConfig.toJsonString());
+    tableConfig = getTableConfig(tableName, "OFFLINE");
+    Assert.assertEquals(tableConfig.getQuotaConfig().getStorage(), goodQuota);
   }
 
   private TableConfig getTableConfig(String tableName, String tableType) throws Exception {
