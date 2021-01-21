@@ -292,7 +292,15 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
           "Missing schema for segment generation job: please set `schema` or `schemaURI` in task config.");
     }
     taskSpec.setSchema(schema);
-    JsonNode tableConfig = JsonUtils.stringToJsonNode(taskConfigs.get(BatchConfigProperties.TABLE_CONFIGS));
+    JsonNode tableConfig;
+    if (taskConfigs.containsKey(BatchConfigProperties.TABLE_CONFIGS)) {
+      tableConfig = JsonUtils.stringToJsonNode(taskConfigs.get(BatchConfigProperties.TABLE_CONFIGS));
+    } else if (taskConfigs.containsKey(BatchConfigProperties.TABLE_CONFIGS_URI)) {
+      tableConfig = SegmentGenerationUtils.getTableConfig(taskConfigs.get(BatchConfigProperties.TABLE_CONFIGS_URI)).toJsonNode();
+    } else {
+      throw new RuntimeException(
+          "Missing schema for segment generation job: please set `tableConfigs` or `tableConfigsURI` in task config.");
+    }
     taskSpec.setTableConfig(tableConfig);
     taskSpec.setSequenceId(Integer.parseInt(taskConfigs.get(BatchConfigProperties.SEQUENCE_ID)));
     SegmentNameGeneratorSpec segmentNameGeneratorSpec = new SegmentNameGeneratorSpec();

@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
@@ -225,10 +226,10 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
       URI outputSegmentDirURI = getRelativeOutputPath(inputDirURI, inputFileURI, outputDirURI);
       singleFileGenerationTaskConfig.put(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI, outputSegmentDirURI.toString());
     }
-    singleFileGenerationTaskConfig.put(BatchConfigProperties.SCHEMA,
-        JsonUtils.objectToString(_clusterInfoAccessor.getTableSchema(offlineTableName)));
-    singleFileGenerationTaskConfig.put(BatchConfigProperties.TABLE_CONFIGS,
-        JsonUtils.objectToString(_clusterInfoAccessor.getTableConfig(offlineTableName)));
+    ControllerRequestURLBuilder controllerRequestURLBuilder =
+        ControllerRequestURLBuilder.baseUrl(_clusterInfoAccessor.getVipUrl());
+    singleFileGenerationTaskConfig.put(BatchConfigProperties.SCHEMA_URI, controllerRequestURLBuilder.forTableSchemaGet(offlineTableName));
+    singleFileGenerationTaskConfig.put(BatchConfigProperties.TABLE_CONFIGS_URI, controllerRequestURLBuilder.forTableGet(offlineTableName));
     singleFileGenerationTaskConfig.put(BatchConfigProperties.SEQUENCE_ID, String.valueOf(sequenceID));
     singleFileGenerationTaskConfig
         .put(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE, BatchConfigProperties.SegmentNameGeneratorType.SIMPLE);
