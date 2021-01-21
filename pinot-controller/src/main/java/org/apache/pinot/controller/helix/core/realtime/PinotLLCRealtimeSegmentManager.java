@@ -515,21 +515,20 @@ public class PinotLLCRealtimeSegmentManager {
     // If there were no splits/merges we would receive A,B
     List<PartitionGroupInfo> newPartitionGroupInfoList =
         getPartitionGroupInfoList(streamConfig, currentPartitionGroupMetadataList);
+    Set<Integer> newPartitionGroupSet =
+        newPartitionGroupInfoList.stream().map(PartitionGroupInfo::getPartitionGroupId).collect(Collectors.toSet());
     int numPartitions = newPartitionGroupInfoList.size();
 
     // Only if committingSegment's partitionGroup is present in the newPartitionGroupInfoList, we create new segment metadata
     String newConsumingSegmentName = null;
     String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
     long newSegmentCreationTimeMs = getCurrentTimeMs();
-    for (PartitionGroupInfo partitionGroupInfo : newPartitionGroupInfoList) {
-      if (partitionGroupInfo.getPartitionGroupId() == committingSegmentPartitionGroupId) {
-        LLCSegmentName newLLCSegment = new LLCSegmentName(rawTableName, committingSegmentPartitionGroupId,
-            committingLLCSegment.getSequenceNumber() + 1, newSegmentCreationTimeMs);
-        createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegment, newSegmentCreationTimeMs,
-            committingSegmentDescriptor, committingSegmentZKMetadata, instancePartitions, numPartitions, numReplicas);
-        newConsumingSegmentName = newLLCSegment.getSegmentName();
-        break;
-      }
+    if (newPartitionGroupSet.contains(committingSegmentPartitionGroupId)) {
+      LLCSegmentName newLLCSegment = new LLCSegmentName(rawTableName, committingSegmentPartitionGroupId,
+          committingLLCSegment.getSequenceNumber() + 1, newSegmentCreationTimeMs);
+      createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegment, newSegmentCreationTimeMs,
+          committingSegmentDescriptor, committingSegmentZKMetadata, instancePartitions, numPartitions, numReplicas);
+      newConsumingSegmentName = newLLCSegment.getSegmentName();
     }
 
     // TODO: create new partition groups also here
@@ -943,7 +942,10 @@ public class PinotLLCRealtimeSegmentManager {
    * a) metadata status is IN_PROGRESS, segment state is CONSUMING - happy path
    * b) metadata status is IN_PROGRESS, segment state is OFFLINE - create new metadata and new CONSUMING segment
    * c) metadata status is DONE, segment state is OFFLINE - create new metadata and new CONSUMING segment
-   * d) metadata status is DONE, segment state is CONSUMING - create new metadata and new CONSUMING segment
+   * d) metadata status is DONE, segment state is CONSUMING -
+   * If shard not reached end of life, create new metadata and new CONSUMING segment. Update current segment to ONLINE in ideal state.
+   * If shard reached end of life, do not create new metadata and CONSUMING segment. Simply update current segment to ONLINE in ideal state
+   *
    * 2) Segment is absent from ideal state - add new segment to ideal state
    *
    * Also checks if it is too soon to correct (could be in the process of committing segment)
@@ -985,8 +987,8 @@ public class PinotLLCRealtimeSegmentManager {
     // Possible things to repair:
     // 1. The latest metadata is in DONE state, but the idealstate says segment is CONSUMING:
     //    a. Create metadata for next segment and find hosts to assign it to.
-    //    b. update current segment in idealstate to ONLINE
-    //    c. add new segment in idealstate to CONSUMING on the hosts.
+    //    b. update current segment in idealstate to ONLINE (only if partition is present in newPartitionGroupInfo)
+    //    c. add new segment in idealstate to CONSUMING on the hosts (only if partition is present in newPartitionGroupInfo)
     // 2. The latest metadata is IN_PROGRESS, but segment is not there in idealstate.
     //    a. change prev segment to ONLINE in idealstate
     //    b. add latest segment to CONSUMING in idealstate.

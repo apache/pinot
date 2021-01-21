@@ -35,6 +35,7 @@ import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
@@ -147,6 +148,7 @@ public class LLRealtimeSegmentDataManagerTest {
     segmentZKMetadata.setSegmentName(_segmentNameStr);
     segmentZKMetadata.setStartOffset(_startOffset.toString());
     segmentZKMetadata.setCreationTime(System.currentTimeMillis());
+    segmentZKMetadata.setStatus(Status.IN_PROGRESS);
     return segmentZKMetadata;
   }
 
@@ -771,7 +773,7 @@ public class LLRealtimeSegmentDataManagerTest {
     public Field _state;
     public Field _shouldStop;
     public Field _stopReason;
-    private Field _streamMsgOffsetFactory;
+    private final Field _checkpointFactory;
     public LinkedList<LongMsgOffset> _consumeOffsets = new LinkedList<>();
     public LinkedList<SegmentCompletionProtocol.Response> _responses = new LinkedList<>();
     public boolean _commitSegmentCalled = false;
@@ -810,9 +812,9 @@ public class LLRealtimeSegmentDataManagerTest {
       _stopReason = LLRealtimeSegmentDataManager.class.getDeclaredField("_stopReason");
       _stopReason.setAccessible(true);
       _semaphoreMap = semaphoreMap;
-      _streamMsgOffsetFactory = LLRealtimeSegmentDataManager.class.getDeclaredField("_streamPartitionMsgOffsetFactory");
-      _streamMsgOffsetFactory.setAccessible(true);
-      _streamMsgOffsetFactory.set(this, new LongMsgOffsetFactory());
+      _checkpointFactory = LLRealtimeSegmentDataManager.class.getDeclaredField("_checkpointFactory");
+      _checkpointFactory.setAccessible(true);
+      _checkpointFactory.set(this, new LongMsgOffsetFactory());
     }
 
     public String getStopReason() {
