@@ -50,6 +50,7 @@ import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 import org.slf4j.Logger;
@@ -281,6 +282,9 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     recordReaderSpec.setClassName(taskConfigs.get(BatchConfigProperties.RECORD_READER_CLASS));
     recordReaderSpec.setConfigClassName(taskConfigs.get(BatchConfigProperties.RECORD_READER_CONFIG_CLASS));
     taskSpec.setRecordReaderSpec(recordReaderSpec);
+
+    String rawTableName = taskConfigs.get(BatchConfigProperties.TABLE_NAME);
+    String tableNameWithType = rawTableName != null ? TableNameBuilder.OFFLINE.tableNameWithType(rawTableName) : null;
     Schema schema;
     if (taskConfigs.containsKey(BatchConfigProperties.SCHEMA)) {
       schema = JsonUtils
@@ -288,8 +292,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     } else if (taskConfigs.containsKey(BatchConfigProperties.SCHEMA_URI)) {
       schema = SegmentGenerationUtils.getSchema(taskConfigs.get(BatchConfigProperties.SCHEMA_URI));
     } else {
-      throw new RuntimeException(
-          "Missing schema for segment generation job: please set `schema` or `schemaURI` in task config.");
+      schema = getSchema(tableNameWithType);
     }
     taskSpec.setSchema(schema);
     JsonNode tableConfig;
@@ -298,8 +301,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     } else if (taskConfigs.containsKey(BatchConfigProperties.TABLE_CONFIGS_URI)) {
       tableConfig = SegmentGenerationUtils.getTableConfig(taskConfigs.get(BatchConfigProperties.TABLE_CONFIGS_URI)).toJsonNode();
     } else {
-      throw new RuntimeException(
-          "Missing schema for segment generation job: please set `tableConfigs` or `tableConfigsURI` in task config.");
+      tableConfig = getTableConfig(tableNameWithType).toJsonNode();
     }
     taskSpec.setTableConfig(tableConfig);
     taskSpec.setSequenceId(Integer.parseInt(taskConfigs.get(BatchConfigProperties.SEQUENCE_ID)));
