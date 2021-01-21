@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.minion;
 
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -170,10 +170,7 @@ public class ClusterInfoAccessor {
     HelixConfigScope helixConfigScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
         .forCluster(_pinotHelixResourceManager.getHelixClusterName()).build();
     Map<String, String> configMap =
-        _pinotHelixResourceManager.getHelixAdmin().getConfig(helixConfigScope, Arrays.asList(configName));
-    if (configMap == null || !configMap.containsKey(configName)) {
-      return null;
-    }
-    return configMap.get(configName);
+        _pinotHelixResourceManager.getHelixAdmin().getConfig(helixConfigScope, Collections.singletonList(configName));
+    return configMap != null ? configMap.get(configName) : null;
   }
 }

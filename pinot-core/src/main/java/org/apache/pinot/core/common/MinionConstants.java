@@ -93,7 +93,7 @@ public class MinionConstants {
   public static class SegmentGenerationAndPushTask {
     public static final String TASK_TYPE = "SegmentGenerationAndPushTask";
     public static final String CONFIG_NUMBER_CONCURRENT_TASKS_PER_INSTANCE =
-        "pinot.minion.task.generator.SegmentGenerationAndPushTask.numConcurrentTasksPerInstance";
+        "SegmentGenerationAndPushTask.numConcurrentTasksPerInstance";
   }
 
 }
