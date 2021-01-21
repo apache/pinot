@@ -187,7 +187,7 @@ public abstract class BaseQueriesTest {
     Map<String, String> queryOptions = brokerRequest.getQueryOptions();
     if (queryOptions == null) {
       queryOptions = new HashMap<>();
-      brokerRequest.setQueryOptions(queryOptions);
+      brokerRequest.getPinotQuery().setQueryOptions(queryOptions);
     }
     queryOptions.put(Request.QueryOptionKey.GROUP_BY_MODE, Request.SQL);
     queryOptions.put(Request.QueryOptionKey.RESPONSE_FORMAT, Request.SQL);

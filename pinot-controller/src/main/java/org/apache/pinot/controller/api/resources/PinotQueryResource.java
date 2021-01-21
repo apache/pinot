@@ -44,7 +44,6 @@ import javax.ws.rs.core.HttpHeaders;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
@@ -151,34 +150,35 @@ public class PinotQueryResource {
   public String getQueryResponse(String query, String traceEnabled, String queryOptions, HttpHeaders httpHeaders,
       String querySyntax) {
     // Get resource table name.
-    BrokerRequest brokerRequest;
+    String tableName;
     try {
+      String inputTableName;
       switch (querySyntax) {
         case CommonConstants.Broker.Request.SQL:
-          brokerRequest = SQL_QUERY_COMPILER.compileToBrokerRequest(query);
+          inputTableName =
+              SQL_QUERY_COMPILER.compileToBrokerRequest(query).getPinotQuery().getDataSource().getTableName();
           break;
         case CommonConstants.Broker.Request.PQL:
-          brokerRequest = PQL_QUERY_COMPILER.compileToBrokerRequest(query);
+          inputTableName = PQL_QUERY_COMPILER.compileToBrokerRequest(query).getQuerySource().getTableName();
           break;
         default:
           throw new UnsupportedOperationException("Unsupported query syntax - " + querySyntax);
       }
-      String inputTableName = brokerRequest.getQuerySource().getTableName();
-      brokerRequest.getQuerySource().setTableName(_pinotHelixResourceManager.getActualTableName(inputTableName));
+      tableName = _pinotHelixResourceManager.getActualTableName(inputTableName);
     } catch (Exception e) {
       LOGGER.error("Caught exception while compiling {} query: {}", querySyntax.toUpperCase(), query, e);
       return QueryException.getException(QueryException.PQL_PARSING_ERROR, e).toString();
     }
-    String tableName = TableNameBuilder.extractRawTableName(brokerRequest.getQuerySource().getTableName());
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
 
     // Validate data access
     AccessControl accessControl = _accessControlFactory.create();
-    if (!accessControl.hasDataAccess(httpHeaders, tableName)) {
+    if (!accessControl.hasDataAccess(httpHeaders, rawTableName)) {
       return QueryException.ACCESS_DENIED_ERROR.toString();
     }
 
     // Get brokers for the resource table.
-    List<String> instanceIds = _pinotHelixResourceManager.getBrokerInstancesFor(tableName);
+    List<String> instanceIds = _pinotHelixResourceManager.getBrokerInstancesFor(rawTableName);
     if (instanceIds.isEmpty()) {
       return QueryException.BROKER_RESOURCE_MISSING_ERROR.toString();
     }
