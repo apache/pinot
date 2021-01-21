@@ -124,8 +124,7 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(jsonResponse.get("columns").size(), 0);
 
     jsonResponse = JsonUtils.stringToJsonNode(
-        _webTarget.path(segmentMetadataPath)
-            .queryParam("columns", "column1").queryParam("columns", "column2").request()
+        _webTarget.path(segmentMetadataPath).queryParam("columns", "column1").queryParam("columns", "column2").request()
             .get(String.class));
     Assert.assertEquals(jsonResponse.get("columns").size(), 2);
 
@@ -195,7 +194,7 @@ public class TablesResourceTest extends BaseResourceTest {
     File segmentFile = response.readEntity(File.class);
 
     File tempMetadataDir = new File(FileUtils.getTempDirectory(), "segment_metadata");
-    Assert.assertTrue(tempMetadataDir.mkdirs());
+    FileUtils.forceMkdir(tempMetadataDir);
 
     // Extract metadata.properties
     TarGzCompressionUtils.untarOneFile(segmentFile, V1Constants.MetadataKeys.METADATA_FILE_NAME,
@@ -207,13 +206,14 @@ public class TablesResourceTest extends BaseResourceTest {
 
     // Load segment metadata
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(tempMetadataDir);
-    Assert.assertEquals(tableNameWithType, metadata.getTableName());
+    Assert.assertEquals(metadata.getTableName(), TableNameBuilder.extractRawTableName(tableNameWithType));
 
     FileUtils.forceDelete(tempMetadataDir);
   }
 
   @Test
-  public void testOfflineTableSegmentMetadata() throws Exception {
+  public void testOfflineTableSegmentMetadata()
+      throws Exception {
     IndexSegment defaultSegment = _offlineIndexSegments.get(0);
     String segmentMetadataPath =
         "/tables/" + TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME) + "/segments/" + defaultSegment
@@ -238,10 +238,8 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(jsonResponse.get("columns").size(), 0);
     Assert.assertEquals(jsonResponse.get("indexes").size(), 17);
 
-
     jsonResponse = JsonUtils.stringToJsonNode(
-        _webTarget.path(segmentMetadataPath)
-            .queryParam("columns", "column1").queryParam("columns", "column2").request()
+        _webTarget.path(segmentMetadataPath).queryParam("columns", "column1").queryParam("columns", "column2").request()
             .get(String.class));
     Assert.assertEquals(jsonResponse.get("columns").size(), 2);
     Assert.assertEquals(jsonResponse.get("indexes").size(), 17);

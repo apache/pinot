@@ -51,6 +51,7 @@ import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.joda.time.format.DateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,7 +82,7 @@ public class SegmentGeneratorConfig implements Serializable {
   private FileFormat _format = FileFormat.AVRO;
   private String _recordReaderPath = null; //TODO: this should be renamed to recordReaderClass or even better removed
   private String _outDir = null;
-  private String _tableName = null;
+  private String _rawTableName = null;
   private String _segmentName = null;
   private String _segmentNamePostfix = null;
   private String _segmentTimeColumnName = null;
@@ -127,6 +128,7 @@ public class SegmentGeneratorConfig implements Serializable {
     setSchema(schema);
 
     _tableConfig = tableConfig;
+    setTableName(tableConfig.getTableName());
 
     // NOTE: SegmentGeneratorConfig#setSchema doesn't set the time column anymore. timeColumnName is expected to be read from table config.
     String timeColumnName = null;
@@ -436,11 +438,11 @@ public class SegmentGeneratorConfig implements Serializable {
   }
 
   public String getTableName() {
-    return _tableName;
+    return _rawTableName;
   }
 
   public void setTableName(String tableName) {
-    _tableName = tableName;
+    _rawTableName = tableName != null ? TableNameBuilder.extractRawTableName(tableName) : null;
   }
 
   public String getSegmentName() {
@@ -587,7 +589,7 @@ public class SegmentGeneratorConfig implements Serializable {
     if (_segmentName != null) {
       return new FixedSegmentNameGenerator(_segmentName);
     }
-    return new SimpleSegmentNameGenerator(_tableName, _segmentNamePostfix);
+    return new SimpleSegmentNameGenerator(_rawTableName, _segmentNamePostfix);
   }
 
   public void setSegmentNameGenerator(SegmentNameGenerator segmentNameGenerator) {

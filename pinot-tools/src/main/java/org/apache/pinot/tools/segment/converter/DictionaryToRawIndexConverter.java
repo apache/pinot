@@ -43,6 +43,7 @@ import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
@@ -247,7 +248,8 @@ public class DictionaryToRawIndexConverter {
     PropertiesConfiguration properties = new PropertiesConfiguration(metadataFile);
 
     if (tableName != null) {
-      properties.setProperty(V1Constants.MetadataKeys.Segment.TABLE_NAME, tableName);
+      properties
+          .setProperty(V1Constants.MetadataKeys.Segment.TABLE_NAME, TableNameBuilder.extractRawTableName(tableName));
     }
 
     for (String column : columns) {

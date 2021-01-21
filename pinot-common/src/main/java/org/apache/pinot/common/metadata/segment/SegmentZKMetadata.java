@@ -29,6 +29,7 @@ import org.apache.pinot.common.metadata.ZKMetadata;
 import org.apache.pinot.common.utils.CommonConstants.Segment;
 import org.apache.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
 import org.slf4j.Logger;
@@ -55,7 +56,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
   private Map<String, String> _customMap;
 
   @Deprecated
-  private String _tableName;
+  private String _rawTableName;
 
   public SegmentZKMetadata() {
   }
@@ -88,7 +89,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     _customMap = znRecord.getMapField(Segment.CUSTOM_MAP);
 
     // For backward-compatibility
-    _tableName = znRecord.getSimpleField(Segment.TABLE_NAME);
+    setTableName(znRecord.getSimpleField(Segment.TABLE_NAME));
   }
 
   public String getSegmentName() {
@@ -201,12 +202,12 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
 
   @Deprecated
   public String getTableName() {
-    return _tableName;
+    return _rawTableName;
   }
 
   @Deprecated
   public void setTableName(String tableName) {
-    _tableName = tableName;
+    _rawTableName = tableName != null ? TableNameBuilder.extractRawTableName(tableName) : null;
   }
 
   @Deprecated
@@ -253,13 +254,13 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
         && _segmentType == that._segmentType && _timeUnit == that._timeUnit && Objects
         .equals(_indexVersion, that._indexVersion) && Objects.equals(_partitionMetadata, that._partitionMetadata)
         && Objects.equals(_crypterName, that._crypterName) && Objects.equals(_customMap, that._customMap) && Objects
-        .equals(_tableName, that._tableName);
+        .equals(_rawTableName, that._rawTableName);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(_segmentName, _segmentType, _startTime, _endTime, _timeUnit, _indexVersion, _totalDocs, _crc,
-        _creationTime, _partitionMetadata, _segmentUploadStartTime, _crypterName, _customMap, _tableName);
+        _creationTime, _partitionMetadata, _segmentUploadStartTime, _crypterName, _customMap, _rawTableName);
   }
 
   @Override
@@ -297,8 +298,8 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     }
 
     // For backward-compatibility
-    if (_tableName != null) {
-      znRecord.setSimpleField(Segment.TABLE_NAME, _tableName);
+    if (_rawTableName != null) {
+      znRecord.setSimpleField(Segment.TABLE_NAME, _rawTableName);
     }
 
     return znRecord;
@@ -342,8 +343,8 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     }
 
     // For backward-compatibility
-    if (_tableName != null) {
-      configMap.put(Segment.TABLE_NAME, _tableName);
+    if (_rawTableName != null) {
+      configMap.put(Segment.TABLE_NAME, _rawTableName);
     }
 
     return configMap;

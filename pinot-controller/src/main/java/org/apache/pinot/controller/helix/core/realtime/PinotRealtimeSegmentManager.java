@@ -76,8 +76,8 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
   private static final String REALTIME_TABLE_CONFIG_PROPERTY_STORE_PATH_PATTERN = ".*/TABLE/.*REALTIME";
   private static final String CONTROLLER_LEADER_CHANGE = "CONTROLLER LEADER CHANGE";
 
-  private String _propertyStorePath;
-  private String _tableConfigPath;
+  private final String _propertyStorePath;
+  private final String _tableConfigPath;
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private ZkClient _zkClient;
   private ControllerMetrics _controllerMetrics;
@@ -248,7 +248,7 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
           // No, add it
           // Create the realtime segment metadata
           RealtimeSegmentZKMetadata realtimeSegmentMetadataToAdd = new RealtimeSegmentZKMetadata();
-          realtimeSegmentMetadataToAdd.setTableName(TableNameBuilder.extractRawTableName(resourceName));
+          realtimeSegmentMetadataToAdd.setTableName(resourceName);
           realtimeSegmentMetadataToAdd.setSegmentType(SegmentType.REALTIME);
           realtimeSegmentMetadataToAdd.setStatus(Status.IN_PROGRESS);
           realtimeSegmentMetadataToAdd.setSegmentName(segmentId);
@@ -335,8 +335,8 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
         String znRecordId = tableConfigZnRecord.getId();
         if (TableNameBuilder.getTableTypeFromTableName(znRecordId) == TableType.REALTIME) {
           TableConfig tableConfig = TableConfigUtils.fromZNRecord(tableConfigZnRecord);
-          StreamConfig metadata = new StreamConfig(tableConfig.getTableName(),
-              IngestionConfigUtils.getStreamConfigMap(tableConfig));
+          StreamConfig metadata =
+              new StreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMap(tableConfig));
           if (metadata.hasHighLevelConsumerType()) {
             String realtimeTable = tableConfig.getTableName();
             String realtimeSegmentsPathForTable = _propertyStorePath + SEGMENTS_PATH + "/" + realtimeTable;

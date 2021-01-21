@@ -241,7 +241,7 @@ public class PinotSegmentUploadDownloadRestletResource {
         LOGGER.info("Uploading a segment {} to table: {}, push type {}, (Derived from API parameter)", segmentName, tableName, uploadType);
       } else {
         // TODO: remove this when we completely deprecate the table name from segment metadata
-        rawTableName = TableNameBuilder.extractRawTableName(segmentMetadata.getTableName());
+        rawTableName = segmentMetadata.getTableName();
         LOGGER.info("Uploading a segment {} to table: {}, push type {}, (Derived from segment metadata)", segmentName, tableName, uploadType);
       }
 
