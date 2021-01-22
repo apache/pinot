@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.minion.executor;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -33,6 +32,7 @@ import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentPushUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
@@ -97,7 +97,8 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
   private static final long DEFAULT_PUSH_RETRY_INTERVAL_MILLIS = 1000L;
 
   @Override
-  public Object executeTask(PinotTaskConfig pinotTaskConfig) throws Exception {
+  public Object executeTask(PinotTaskConfig pinotTaskConfig)
+      throws Exception {
     LOGGER.info("Executing SegmentGenerationAndPushTask with task config: {}", pinotTaskConfig);
     Map<String, String> taskConfigs = pinotTaskConfig.getConfigs();
     SegmentGenerationAndPushResult.Builder resultBuilder = new SegmentGenerationAndPushResult.Builder();
@@ -118,8 +119,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
 
       resultBuilder.setSegmentName(segmentName);
       // Segment push task
-      pushSegment(taskSpec.getTableConfig().get(BatchConfigProperties.TABLE_NAME).asText(), taskConfigs,
-          outputSegmentTarURI);
+      pushSegment(taskSpec.getTableConfig().getTableName(), taskConfigs, outputSegmentTarURI);
       resultBuilder.setSucceed(true);
     } catch (Exception e) {
       throw new RuntimeException("Failed to execute SegmentGenerationAndPushTask", e);
@@ -281,6 +281,8 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     recordReaderSpec.setClassName(taskConfigs.get(BatchConfigProperties.RECORD_READER_CLASS));
     recordReaderSpec.setConfigClassName(taskConfigs.get(BatchConfigProperties.RECORD_READER_CONFIG_CLASS));
     taskSpec.setRecordReaderSpec(recordReaderSpec);
+
+    String tableNameWithType = taskConfigs.get(BatchConfigProperties.TABLE_NAME);
     Schema schema;
     if (taskConfigs.containsKey(BatchConfigProperties.SCHEMA)) {
       schema = JsonUtils
@@ -288,11 +290,17 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     } else if (taskConfigs.containsKey(BatchConfigProperties.SCHEMA_URI)) {
       schema = SegmentGenerationUtils.getSchema(taskConfigs.get(BatchConfigProperties.SCHEMA_URI));
     } else {
-      throw new RuntimeException(
-          "Missing schema for segment generation job: please set `schema` or `schemaURI` in task config.");
+      schema = getSchema(tableNameWithType);
     }
     taskSpec.setSchema(schema);
-    JsonNode tableConfig = JsonUtils.stringToJsonNode(taskConfigs.get(BatchConfigProperties.TABLE_CONFIGS));
+    TableConfig tableConfig;
+    if (taskConfigs.containsKey(BatchConfigProperties.TABLE_CONFIGS)) {
+      tableConfig = JsonUtils.stringToObject(taskConfigs.get(BatchConfigProperties.TABLE_CONFIGS), TableConfig.class);
+    } else if (taskConfigs.containsKey(BatchConfigProperties.TABLE_CONFIGS_URI)) {
+      tableConfig = SegmentGenerationUtils.getTableConfig(taskConfigs.get(BatchConfigProperties.TABLE_CONFIGS_URI));
+    } else {
+      tableConfig = getTableConfig(tableNameWithType);
+    }
     taskSpec.setTableConfig(tableConfig);
     taskSpec.setSequenceId(Integer.parseInt(taskConfigs.get(BatchConfigProperties.SEQUENCE_ID)));
     SegmentNameGeneratorSpec segmentNameGeneratorSpec = new SegmentNameGeneratorSpec();
