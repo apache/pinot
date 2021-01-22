@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.request.context.predicate;
 
 import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.utils.CommonConstants.Query.Range;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 
 
@@ -28,14 +29,15 @@ import org.apache.pinot.core.query.request.context.ExpressionContext;
  * <p>Pinot uses RANGE to represent '>', '>=', '<', '<=', BETWEEN so that intersection of multiple ranges can be merged.
  */
 public class RangePredicate implements Predicate {
-  public static final char DELIMITER = '\0';
-  // TODO: Remove the legacy delimiter after releasing 0.6.0
-  public static final String LEGACY_DELIMITER = "\t\t";
-  public static final char LOWER_INCLUSIVE = '[';
-  public static final char LOWER_EXCLUSIVE = '(';
-  public static final char UPPER_INCLUSIVE = ']';
-  public static final char UPPER_EXCLUSIVE = ')';
-  public static final String UNBOUNDED = "*";
+  public static final char DELIMITER = Range.DELIMITER;
+  public static final char LOWER_EXCLUSIVE = Range.LOWER_EXCLUSIVE;
+  public static final char LOWER_INCLUSIVE = Range.LOWER_INCLUSIVE;
+  public static final char UPPER_EXCLUSIVE = Range.UPPER_EXCLUSIVE;
+  public static final char UPPER_INCLUSIVE = Range.UPPER_INCLUSIVE;
+  public static final String UNBOUNDED = Range.UNBOUNDED;
+
+  // For backward-compatibility
+  private static final String LEGACY_DELIMITER = "\t\t";
 
   private final ExpressionContext _lhs;
   private final boolean _lowerInclusive;

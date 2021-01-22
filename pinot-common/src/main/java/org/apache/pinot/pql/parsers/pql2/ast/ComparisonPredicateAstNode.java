@@ -22,6 +22,7 @@ import java.util.Collections;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.common.utils.CommonConstants.Query.Range;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.Pql2CompilationException;
@@ -88,27 +89,27 @@ public class ComparisonPredicateAstNode extends PredicateAstNode {
     }
     if ("<".equals(_operand)) {
       if (identifierIsOnLeft) {
-        comparison = "(*\t\t" + value + ")";
+        comparison = Range.LOWER_UNBOUNDED + value + Range.UPPER_EXCLUSIVE;
       } else {
-        comparison = "(" + value + "\t\t*)";
+        comparison = Range.LOWER_EXCLUSIVE + value + Range.UPPER_UNBOUNDED;
       }
     } else if ("<=".equals(_operand)) {
       if (identifierIsOnLeft) {
-        comparison = "(*\t\t" + value + "]";
+        comparison = Range.LOWER_UNBOUNDED + value + Range.UPPER_INCLUSIVE;
       } else {
-        comparison = "[" + value + "\t\t*)";
+        comparison = Range.LOWER_INCLUSIVE + value + Range.UPPER_UNBOUNDED;
       }
     } else if (">".equals(_operand)) {
       if (identifierIsOnLeft) {
-        comparison = "(" + value + "\t\t*)";
+        comparison = Range.LOWER_EXCLUSIVE + value + Range.UPPER_UNBOUNDED;
       } else {
-        comparison = "(*\t\t" + value + "*)";
+        comparison = Range.LOWER_UNBOUNDED + value + Range.UPPER_EXCLUSIVE;
       }
     } else if (">=".equals(_operand)) {
       if (identifierIsOnLeft) {
-        comparison = "[" + value + "\t\t*)";
+        comparison = Range.LOWER_INCLUSIVE + value + Range.UPPER_UNBOUNDED;
       } else {
-        comparison = "(*\t\t" + value + "*)";
+        comparison = Range.LOWER_UNBOUNDED + value + Range.UPPER_INCLUSIVE;
       }
     }
     return comparison;

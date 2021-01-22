@@ -34,42 +34,42 @@ public class NoDictionaryRangePredicateEvaluatorTest {
 
   @Test
   public void testIntPredicateEvaluator() {
-    PredicateEvaluator predicateEvaluator = buildRangePredicate("[-10\t\t10]", FieldSpec.DataType.INT);
+    PredicateEvaluator predicateEvaluator = buildRangePredicate("[-10\00010]", FieldSpec.DataType.INT);
     for (int i = -20; i < 20; i++) {
       Assert.assertEquals(predicateEvaluator.applySV(i), (i >= -10 && i <= 10));
     }
 
-    predicateEvaluator = buildRangePredicate("(-10\t\t10]", FieldSpec.DataType.INT);
+    predicateEvaluator = buildRangePredicate("(-10\00010]", FieldSpec.DataType.INT);
     for (int i = -20; i < 20; i++) {
       Assert.assertEquals(predicateEvaluator.applySV(i), (i > -10 && i <= 10));
     }
 
-    predicateEvaluator = buildRangePredicate("(-10\t\t10)", FieldSpec.DataType.INT);
+    predicateEvaluator = buildRangePredicate("(-10\00010)", FieldSpec.DataType.INT);
     for (int i = -20; i < 20; i++) {
       Assert.assertEquals(predicateEvaluator.applySV(i), (i > -10 && i < 10));
     }
 
-    predicateEvaluator = buildRangePredicate("(*\t\t10]", FieldSpec.DataType.INT);
+    predicateEvaluator = buildRangePredicate("(*\00010]", FieldSpec.DataType.INT);
     for (int i = -20; i < 20; i++) {
       Assert.assertEquals(predicateEvaluator.applySV(i), (i <= 10));
     }
 
-    predicateEvaluator = buildRangePredicate("(*\t\t10)", FieldSpec.DataType.INT);
+    predicateEvaluator = buildRangePredicate("(*\00010)", FieldSpec.DataType.INT);
     for (int i = -20; i < 20; i++) {
       Assert.assertEquals(predicateEvaluator.applySV(i), (i < 10));
     }
 
-    predicateEvaluator = buildRangePredicate("[10\t\t*]", FieldSpec.DataType.INT);
+    predicateEvaluator = buildRangePredicate("[10\000*]", FieldSpec.DataType.INT);
     for (int i = -20; i < 20; i++) {
       Assert.assertEquals(predicateEvaluator.applySV(i), (i >= 10));
     }
 
-    predicateEvaluator = buildRangePredicate("(10\t\t*)", FieldSpec.DataType.INT);
+    predicateEvaluator = buildRangePredicate("(10\000*)", FieldSpec.DataType.INT);
     for (int i = -20; i < 20; i++) {
       Assert.assertEquals(predicateEvaluator.applySV(i), (i > 10));
     }
 
-    predicateEvaluator = buildRangePredicate("(*\t\t*)", FieldSpec.DataType.INT);
+    predicateEvaluator = buildRangePredicate("(*\000*)", FieldSpec.DataType.INT);
     for (int i = -20; i < 20; i++) {
       Assert.assertTrue(predicateEvaluator.applySV(i));
     }
@@ -77,7 +77,7 @@ public class NoDictionaryRangePredicateEvaluatorTest {
     Assert.assertTrue(predicateEvaluator.applySV(Integer.MAX_VALUE));
 
     predicateEvaluator =
-        buildRangePredicate(String.format("(%d\t\t%d)", Integer.MIN_VALUE, Integer.MAX_VALUE), FieldSpec.DataType.INT);
+        buildRangePredicate(String.format("(%d\000%d)", Integer.MIN_VALUE, Integer.MAX_VALUE), FieldSpec.DataType.INT);
     for (int i = -20; i < 20; i++) {
       Assert.assertTrue(predicateEvaluator.applySV(i));
     }
@@ -87,42 +87,42 @@ public class NoDictionaryRangePredicateEvaluatorTest {
 
   @Test
   public void testLongPredicateEvaluator() {
-    PredicateEvaluator predicateEvaluator = buildRangePredicate("[-10\t\t10]", FieldSpec.DataType.LONG);
+    PredicateEvaluator predicateEvaluator = buildRangePredicate("[-10\00010]", FieldSpec.DataType.LONG);
     for (int i = -20; i < 20; i++) {
       Assert.assertEquals(predicateEvaluator.applySV((long) i), (i >= -10 && i <= 10));
     }
 
-    predicateEvaluator = buildRangePredicate("(-10\t\t10]", FieldSpec.DataType.LONG);
+    predicateEvaluator = buildRangePredicate("(-10\00010]", FieldSpec.DataType.LONG);
     for (int i = -20; i < 20; i++) {
       Assert.assertEquals(predicateEvaluator.applySV((long) i), (i > -10 && i <= 10));
     }
 
-    predicateEvaluator = buildRangePredicate("(-10\t\t10)", FieldSpec.DataType.LONG);
+    predicateEvaluator = buildRangePredicate("(-10\00010)", FieldSpec.DataType.LONG);
     for (int i = -20; i < 20; i++) {
       Assert.assertEquals(predicateEvaluator.applySV((long) i), (i > -10 && i < 10));
     }
 
-    predicateEvaluator = buildRangePredicate("(*\t\t10]", FieldSpec.DataType.LONG);
+    predicateEvaluator = buildRangePredicate("(*\00010]", FieldSpec.DataType.LONG);
     for (int i = -20; i < 20; i++) {
       Assert.assertEquals(predicateEvaluator.applySV((long) i), (i <= 10));
     }
 
-    predicateEvaluator = buildRangePredicate("(*\t\t10)", FieldSpec.DataType.LONG);
+    predicateEvaluator = buildRangePredicate("(*\00010)", FieldSpec.DataType.LONG);
     for (int i = -20; i < 20; i++) {
       Assert.assertEquals(predicateEvaluator.applySV((long) i), (i < 10));
     }
 
-    predicateEvaluator = buildRangePredicate("[10\t\t*)", FieldSpec.DataType.LONG);
+    predicateEvaluator = buildRangePredicate("[10\000*)", FieldSpec.DataType.LONG);
     for (int i = -20; i < 20; i++) {
       Assert.assertEquals(predicateEvaluator.applySV((long) i), (i >= 10));
     }
 
-    predicateEvaluator = buildRangePredicate("(10\t\t*)", FieldSpec.DataType.LONG);
+    predicateEvaluator = buildRangePredicate("(10\000*)", FieldSpec.DataType.LONG);
     for (int i = -20; i < 20; i++) {
       Assert.assertEquals(predicateEvaluator.applySV((long) i), (i > 10));
     }
 
-    predicateEvaluator = buildRangePredicate("(*\t\t*)", FieldSpec.DataType.LONG);
+    predicateEvaluator = buildRangePredicate("(*\000*)", FieldSpec.DataType.LONG);
     for (int i = -20; i < 20; i++) {
       Assert.assertTrue(predicateEvaluator.applySV((long) i));
     }
@@ -130,7 +130,7 @@ public class NoDictionaryRangePredicateEvaluatorTest {
     Assert.assertTrue(predicateEvaluator.applySV(Long.MAX_VALUE));
 
     predicateEvaluator =
-        buildRangePredicate(String.format("(%d\t\t%d)", Long.MIN_VALUE, Long.MAX_VALUE), FieldSpec.DataType.LONG);
+        buildRangePredicate(String.format("(%d\000%d)", Long.MIN_VALUE, Long.MAX_VALUE), FieldSpec.DataType.LONG);
     for (int i = -20; i < 20; i++) {
       Assert.assertTrue(predicateEvaluator.applySV((long) i));
     }
@@ -140,42 +140,42 @@ public class NoDictionaryRangePredicateEvaluatorTest {
 
   @Test
   public void testFloatPredicateEvaluator() {
-    PredicateEvaluator predicateEvaluator = buildRangePredicate("[-10\t\t10]", FieldSpec.DataType.FLOAT);
+    PredicateEvaluator predicateEvaluator = buildRangePredicate("[-10\00010]", FieldSpec.DataType.FLOAT);
     for (int i = -20; i < 20; i++) {
       Assert.assertEquals(predicateEvaluator.applySV((float) i), (i >= -10 && i <= 10));
     }
 
-    predicateEvaluator = buildRangePredicate("(-10\t\t10]", FieldSpec.DataType.FLOAT);
+    predicateEvaluator = buildRangePredicate("(-10\00010]", FieldSpec.DataType.FLOAT);
     for (int i = -20; i < 20; i++) {
       Assert.assertEquals(predicateEvaluator.applySV((float) i), (i > -10 && i <= 10));
     }
 
-    predicateEvaluator = buildRangePredicate("(-10\t\t10)", FieldSpec.DataType.FLOAT);
+    predicateEvaluator = buildRangePredicate("(-10\00010)", FieldSpec.DataType.FLOAT);
     for (int i = -20; i < 20; i++) {
       Assert.assertEquals(predicateEvaluator.applySV((float) i), (i > -10 && i < 10));
     }
 
-    predicateEvaluator = buildRangePredicate("(*\t\t10]", FieldSpec.DataType.FLOAT);
+    predicateEvaluator = buildRangePredicate("(*\00010]", FieldSpec.DataType.FLOAT);
     for (int i = -20; i < 20; i++) {
       Assert.assertEquals(predicateEvaluator.applySV((float) i), (i <= 10), "Value: " + i);
     }
 
-    predicateEvaluator = buildRangePredicate("(*\t\t10)", FieldSpec.DataType.FLOAT);
+    predicateEvaluator = buildRangePredicate("(*\00010)", FieldSpec.DataType.FLOAT);
     for (int i = -20; i < 20; i++) {
       Assert.assertEquals(predicateEvaluator.applySV((float) i), (i < 10));
     }
 
-    predicateEvaluator = buildRangePredicate("[10\t\t*)", FieldSpec.DataType.FLOAT);
+    predicateEvaluator = buildRangePredicate("[10\000*)", FieldSpec.DataType.FLOAT);
     for (int i = -20; i < 20; i++) {
       Assert.assertEquals(predicateEvaluator.applySV((float) i), (i >= 10), "Value: " + i);
     }
 
-    predicateEvaluator = buildRangePredicate("(10\t\t*)", FieldSpec.DataType.FLOAT);
+    predicateEvaluator = buildRangePredicate("(10\000*)", FieldSpec.DataType.FLOAT);
     for (int i = -20; i < 20; i++) {
       Assert.assertEquals(predicateEvaluator.applySV((float) i), (i > 10));
     }
 
-    predicateEvaluator = buildRangePredicate("(*\t\t*)", FieldSpec.DataType.FLOAT);
+    predicateEvaluator = buildRangePredicate("(*\000*)", FieldSpec.DataType.FLOAT);
     for (int i = -20; i < 20; i++) {
       Assert.assertTrue(predicateEvaluator.applySV((float) i));
     }
@@ -183,7 +183,7 @@ public class NoDictionaryRangePredicateEvaluatorTest {
     Assert.assertTrue(predicateEvaluator.applySV(Float.POSITIVE_INFINITY));
 
     predicateEvaluator =
-        buildRangePredicate(String.format("(%f\t\t%f)", Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY),
+        buildRangePredicate(String.format("(%f\000%f)", Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY),
             FieldSpec.DataType.FLOAT);
     for (int i = -20; i < 20; i++) {
       Assert.assertTrue(predicateEvaluator.applySV((float) i));
@@ -194,42 +194,42 @@ public class NoDictionaryRangePredicateEvaluatorTest {
 
   @Test
   public void testDoublePredicateEvaluator() {
-    PredicateEvaluator predicateEvaluator = buildRangePredicate("[-10\t\t10]", FieldSpec.DataType.DOUBLE);
+    PredicateEvaluator predicateEvaluator = buildRangePredicate("[-10\00010]", FieldSpec.DataType.DOUBLE);
     for (int i = -20; i < 20; i++) {
       Assert.assertEquals(predicateEvaluator.applySV((double) i), (i >= -10 && i <= 10));
     }
 
-    predicateEvaluator = buildRangePredicate("(-10\t\t10]", FieldSpec.DataType.DOUBLE);
+    predicateEvaluator = buildRangePredicate("(-10\00010]", FieldSpec.DataType.DOUBLE);
     for (int i = -20; i < 20; i++) {
       Assert.assertEquals(predicateEvaluator.applySV((double) i), (i > -10 && i <= 10));
     }
 
-    predicateEvaluator = buildRangePredicate("(-10\t\t10)", FieldSpec.DataType.DOUBLE);
+    predicateEvaluator = buildRangePredicate("(-10\00010)", FieldSpec.DataType.DOUBLE);
     for (int i = -20; i < 20; i++) {
       Assert.assertEquals(predicateEvaluator.applySV((double) i), (i > -10 && i < 10));
     }
 
-    predicateEvaluator = buildRangePredicate("(*\t\t10]", FieldSpec.DataType.DOUBLE);
+    predicateEvaluator = buildRangePredicate("(*\00010]", FieldSpec.DataType.DOUBLE);
     for (int i = -20; i < 20; i++) {
       Assert.assertEquals(predicateEvaluator.applySV((double) i), (i <= 10), "Value: " + i);
     }
 
-    predicateEvaluator = buildRangePredicate("(*\t\t10)", FieldSpec.DataType.DOUBLE);
+    predicateEvaluator = buildRangePredicate("(*\00010)", FieldSpec.DataType.DOUBLE);
     for (int i = -20; i < 20; i++) {
       Assert.assertEquals(predicateEvaluator.applySV((double) i), (i < 10));
     }
 
-    predicateEvaluator = buildRangePredicate("[10\t\t*)", FieldSpec.DataType.FLOAT);
+    predicateEvaluator = buildRangePredicate("[10\000*)", FieldSpec.DataType.FLOAT);
     for (int i = -20; i < 20; i++) {
       Assert.assertEquals(predicateEvaluator.applySV((float) i), (i >= 10), "Value: " + i);
     }
 
-    predicateEvaluator = buildRangePredicate("(10\t\t*)", FieldSpec.DataType.FLOAT);
+    predicateEvaluator = buildRangePredicate("(10\000*)", FieldSpec.DataType.FLOAT);
     for (int i = -20; i < 20; i++) {
       Assert.assertEquals(predicateEvaluator.applySV((float) i), (i > 10));
     }
 
-    predicateEvaluator = buildRangePredicate("(*\t\t*)", FieldSpec.DataType.DOUBLE);
+    predicateEvaluator = buildRangePredicate("(*\000*)", FieldSpec.DataType.DOUBLE);
     for (int i = -20; i < 20; i++) {
       Assert.assertTrue(predicateEvaluator.applySV((double) i));
     }
@@ -237,7 +237,7 @@ public class NoDictionaryRangePredicateEvaluatorTest {
     Assert.assertTrue(predicateEvaluator.applySV(Double.POSITIVE_INFINITY));
 
     predicateEvaluator =
-        buildRangePredicate(String.format("(%f\t\t%f)", Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY),
+        buildRangePredicate(String.format("(%f\000%f)", Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY),
             FieldSpec.DataType.DOUBLE);
     for (int i = -20; i < 20; i++) {
       Assert.assertTrue(predicateEvaluator.applySV((double) i));
@@ -248,51 +248,51 @@ public class NoDictionaryRangePredicateEvaluatorTest {
 
   @Test
   public void testStringPredicateEvaluator() {
-    PredicateEvaluator predicateEvaluator = buildRangePredicate("[-10\t\t10]", FieldSpec.DataType.STRING);
+    PredicateEvaluator predicateEvaluator = buildRangePredicate("[-10\00010]", FieldSpec.DataType.STRING);
     for (int i = -20; i < 20; i++) {
       String value = Integer.toString(i);
       Assert
           .assertEquals(predicateEvaluator.applySV(value), (value.compareTo("-10") >= 0 && value.compareTo("10") <= 0));
     }
 
-    predicateEvaluator = buildRangePredicate("(-10\t\t10]", FieldSpec.DataType.STRING);
+    predicateEvaluator = buildRangePredicate("(-10\00010]", FieldSpec.DataType.STRING);
     for (int i = -20; i < 20; i++) {
       String value = Integer.toString(i);
       Assert
           .assertEquals(predicateEvaluator.applySV(value), (value.compareTo("-10") > 0 && value.compareTo("10") <= 0));
     }
 
-    predicateEvaluator = buildRangePredicate("(-10\t\t10)", FieldSpec.DataType.STRING);
+    predicateEvaluator = buildRangePredicate("(-10\00010)", FieldSpec.DataType.STRING);
     for (int i = -20; i < 20; i++) {
       String value = Integer.toString(i);
       Assert.assertEquals(predicateEvaluator.applySV(value), (value.compareTo("-10") > 0 && value.compareTo("10") < 0));
     }
 
-    predicateEvaluator = buildRangePredicate("(*\t\t10]", FieldSpec.DataType.STRING);
+    predicateEvaluator = buildRangePredicate("(*\00010]", FieldSpec.DataType.STRING);
     for (int i = -20; i < 20; i++) {
       String value = Integer.toString(i);
       Assert.assertEquals(predicateEvaluator.applySV(value), (value.compareTo("10") <= 0));
     }
 
-    predicateEvaluator = buildRangePredicate("(*\t\t10)", FieldSpec.DataType.STRING);
+    predicateEvaluator = buildRangePredicate("(*\00010)", FieldSpec.DataType.STRING);
     for (int i = -20; i < 20; i++) {
       String value = Integer.toString(i);
       Assert.assertEquals(predicateEvaluator.applySV(value), (value.compareTo("10") < 0));
     }
 
-    predicateEvaluator = buildRangePredicate("[10\t\t*)", FieldSpec.DataType.STRING);
+    predicateEvaluator = buildRangePredicate("[10\000*)", FieldSpec.DataType.STRING);
     for (int i = -20; i < 20; i++) {
       String value = Integer.toString(i);
       Assert.assertEquals(predicateEvaluator.applySV(value), (value.compareTo("10") >= 0));
     }
 
-    predicateEvaluator = buildRangePredicate("(10\t\t*)", FieldSpec.DataType.STRING);
+    predicateEvaluator = buildRangePredicate("(10\000*)", FieldSpec.DataType.STRING);
     for (int i = -20; i < 20; i++) {
       String value = Integer.toString(i);
       Assert.assertEquals(predicateEvaluator.applySV(value), (value.compareTo("10") > 0));
     }
 
-    predicateEvaluator = buildRangePredicate("(*\t\t*)", FieldSpec.DataType.STRING);
+    predicateEvaluator = buildRangePredicate("(*\000*)", FieldSpec.DataType.STRING);
     for (int i = -20; i < 20; i++) {
       Assert.assertTrue(predicateEvaluator.applySV(Integer.toString(i)));
     }
@@ -300,52 +300,52 @@ public class NoDictionaryRangePredicateEvaluatorTest {
 
   @Test
   public void testBytesPredicateEvaluator() {
-    PredicateEvaluator predicateEvaluator = buildRangePredicate("[10\t\t20]", FieldSpec.DataType.BYTES);
+    PredicateEvaluator predicateEvaluator = buildRangePredicate("[10\00020]", FieldSpec.DataType.BYTES);
     for (int i = 0x00; i < 0x30; i++) {
       byte[] value = Integer.toString(i).getBytes();
       Assert.assertEquals(predicateEvaluator.applySV(value),
           (ByteArray.compare(value, new byte[]{0x10}) >= 0 && ByteArray.compare(value, new byte[]{0x20}) <= 0));
     }
 
-    predicateEvaluator = buildRangePredicate("(10\t\t20]", FieldSpec.DataType.BYTES);
+    predicateEvaluator = buildRangePredicate("(10\00020]", FieldSpec.DataType.BYTES);
     for (int i = 0x00; i < 0x30; i++) {
       byte[] value = Integer.toString(i).getBytes();
       Assert.assertEquals(predicateEvaluator.applySV(value),
           (ByteArray.compare(value, new byte[]{0x10}) > 0 && ByteArray.compare(value, new byte[]{0x20}) <= 0));
     }
 
-    predicateEvaluator = buildRangePredicate("(10\t\t20)", FieldSpec.DataType.BYTES);
+    predicateEvaluator = buildRangePredicate("(10\00020)", FieldSpec.DataType.BYTES);
     for (int i = 0x00; i < 0x30; i++) {
       byte[] value = Integer.toString(i).getBytes();
       Assert.assertEquals(predicateEvaluator.applySV(value),
           (ByteArray.compare(value, new byte[]{0x10}) > 0 && ByteArray.compare(value, new byte[]{0x20}) < 0));
     }
 
-    predicateEvaluator = buildRangePredicate("(*\t\t10]", FieldSpec.DataType.BYTES);
+    predicateEvaluator = buildRangePredicate("(*\00010]", FieldSpec.DataType.BYTES);
     for (int i = 0x00; i < 0x30; i++) {
       byte[] value = Integer.toString(i).getBytes();
       Assert.assertEquals(predicateEvaluator.applySV(value), ByteArray.compare(value, new byte[]{0x10}) <= 0);
     }
 
-    predicateEvaluator = buildRangePredicate("(*\t\t10)", FieldSpec.DataType.BYTES);
+    predicateEvaluator = buildRangePredicate("(*\00010)", FieldSpec.DataType.BYTES);
     for (int i = 0x00; i < 0x30; i++) {
       byte[] value = Integer.toString(i).getBytes();
       Assert.assertEquals(predicateEvaluator.applySV(value), ByteArray.compare(value, new byte[]{0x10}) < 0);
     }
 
-    predicateEvaluator = buildRangePredicate("[10\t\t*)", FieldSpec.DataType.BYTES);
+    predicateEvaluator = buildRangePredicate("[10\000*)", FieldSpec.DataType.BYTES);
     for (int i = 0x00; i < 0x30; i++) {
       byte[] value = Integer.toString(i).getBytes();
       Assert.assertEquals(predicateEvaluator.applySV(value), ByteArray.compare(value, new byte[]{0x10}) >= 0);
     }
 
-    predicateEvaluator = buildRangePredicate("(10\t\t*)", FieldSpec.DataType.BYTES);
+    predicateEvaluator = buildRangePredicate("(10\000*)", FieldSpec.DataType.BYTES);
     for (int i = 0x00; i < 0x30; i++) {
       byte[] value = Integer.toString(i).getBytes();
       Assert.assertEquals(predicateEvaluator.applySV(value), ByteArray.compare(value, new byte[]{0x10}) > 0);
     }
 
-    predicateEvaluator = buildRangePredicate("(*\t\t*)", FieldSpec.DataType.BYTES);
+    predicateEvaluator = buildRangePredicate("(*\000*)", FieldSpec.DataType.BYTES);
     for (int i = 0x00; i < 0x30; i++) {
       byte[] value = Integer.toString(i).getBytes();
       Assert.assertTrue(predicateEvaluator.applySV(value));

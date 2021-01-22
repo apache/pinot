@@ -23,6 +23,7 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.common.utils.CommonConstants.Query.Range;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.Pql2CompilationException;
@@ -59,9 +60,9 @@ public class BetweenPredicateAstNode extends PredicateAstNode {
       try {
         LiteralAstNode left = (LiteralAstNode) getChildren().get(0);
         LiteralAstNode right = (LiteralAstNode) getChildren().get(1);
-        return new FilterQueryTree(_identifier,
-            Collections.singletonList("[" + left.getValueAsString() + "\t\t" + right.getValueAsString() + "]"),
-            FilterOperator.RANGE, null);
+        return new FilterQueryTree(_identifier, Collections.singletonList(
+            Range.LOWER_INCLUSIVE + left.getValueAsString() + Range.DELIMITER + right.getValueAsString()
+                + Range.UPPER_INCLUSIVE), FilterOperator.RANGE, null);
       } catch (ClassCastException e) {
         throw new Pql2CompilationException(
             "BETWEEN clause was expecting two literal AST nodes, got " + getChildren().get(0) + " and " + getChildren()
