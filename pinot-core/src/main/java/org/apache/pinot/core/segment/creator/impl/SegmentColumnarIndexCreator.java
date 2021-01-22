@@ -648,7 +648,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     properties.setProperty(getKeyFor(column, HAS_FST_INDEX), String.valueOf(hasFSTIndex));
     properties.setProperty(getKeyFor(column, HAS_JSON_INDEX), String.valueOf(hasJsonIndex));
     properties.setProperty(getKeyFor(column, IS_SINGLE_VALUED), String.valueOf(fieldSpec.isSingleValueField()));
-    properties.setProperty(getKeyFor(column, MAX_MULTI_VALUE_ELEMTS),
+    properties.setProperty(getKeyFor(column, MAX_MULTI_VALUE_ELEMENTS),
         String.valueOf(columnIndexCreationInfo.getMaxNumberOfMultiValueElements()));
     properties.setProperty(getKeyFor(column, TOTAL_NUMBER_OF_ENTRIES),
         String.valueOf(columnIndexCreationInfo.getTotalNumberOfEntries()));
