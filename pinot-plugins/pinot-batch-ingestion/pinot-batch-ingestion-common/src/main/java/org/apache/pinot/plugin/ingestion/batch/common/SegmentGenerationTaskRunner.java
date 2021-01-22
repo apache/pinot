@@ -70,7 +70,7 @@ public class SegmentGenerationTaskRunner implements Serializable {
 
   public String run()
       throws Exception {
-    TableConfig tableConfig = JsonUtils.jsonNodeToObject(_taskSpec.getTableConfig(), TableConfig.class);
+    TableConfig tableConfig = _taskSpec.getTableConfig();
     String tableName = tableConfig.getTableName();
     Schema schema = _taskSpec.getSchema();
 
@@ -109,9 +109,8 @@ public class SegmentGenerationTaskRunner implements Serializable {
     return segmentIndexCreationDriver.getSegmentName();
   }
 
-  private SegmentNameGenerator getSegmentNameGenerator()
-      throws IOException {
-    TableConfig tableConfig = JsonUtils.jsonNodeToObject(_taskSpec.getTableConfig(), TableConfig.class);
+  private SegmentNameGenerator getSegmentNameGenerator() {
+    TableConfig tableConfig = _taskSpec.getTableConfig();
     String tableName = tableConfig.getTableName();
 
     Schema schema = _taskSpec.getSchema();

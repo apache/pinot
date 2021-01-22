@@ -186,7 +186,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
         taskSpec.setOutputDirectoryPath(localOutputTempDir.getAbsolutePath());
         taskSpec.setRecordReaderSpec(_spec.getRecordReaderSpec());
         taskSpec.setSchema(schema);
-        taskSpec.setTableConfig(tableConfig.toJsonNode());
+        taskSpec.setTableConfig(tableConfig);
         taskSpec.setSequenceId(i);
         taskSpec.setSegmentNameGeneratorSpec(_spec.getSegmentNameGeneratorSpec());
         taskSpec.setCustomProperty(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, inputFileURI.toString());

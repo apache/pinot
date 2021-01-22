@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core.minion.generator;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
@@ -220,8 +219,8 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
     String pushMode = IngestionConfigUtils.getPushMode(batchConfigMap);
 
     Map<String, String> singleFileGenerationTaskConfig = new HashMap<>(batchConfigMap);
-    singleFileGenerationTaskConfig.put(BatchConfigProperties.TABLE_NAME,
-        TableNameBuilder.extractRawTableName(offlineTableName));
+    singleFileGenerationTaskConfig
+        .put(BatchConfigProperties.TABLE_NAME, TableNameBuilder.OFFLINE.tableNameWithType(offlineTableName));
     singleFileGenerationTaskConfig.put(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, inputFileURI.toString());
     if (outputDirURI != null) {
       URI outputSegmentDirURI = getRelativeOutputPath(inputDirURI, inputFileURI, outputDirURI);

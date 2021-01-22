@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.minion.executor;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -33,6 +32,7 @@ import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentPushUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
@@ -50,7 +50,6 @@ import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 import org.slf4j.Logger;
@@ -98,7 +97,8 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
   private static final long DEFAULT_PUSH_RETRY_INTERVAL_MILLIS = 1000L;
 
   @Override
-  public Object executeTask(PinotTaskConfig pinotTaskConfig) throws Exception {
+  public Object executeTask(PinotTaskConfig pinotTaskConfig)
+      throws Exception {
     LOGGER.info("Executing SegmentGenerationAndPushTask with task config: {}", pinotTaskConfig);
     Map<String, String> taskConfigs = pinotTaskConfig.getConfigs();
     SegmentGenerationAndPushResult.Builder resultBuilder = new SegmentGenerationAndPushResult.Builder();
@@ -119,8 +119,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
 
       resultBuilder.setSegmentName(segmentName);
       // Segment push task
-      pushSegment(taskSpec.getTableConfig().get(BatchConfigProperties.TABLE_NAME).asText(), taskConfigs,
-          outputSegmentTarURI);
+      pushSegment(taskSpec.getTableConfig().getTableName(), taskConfigs, outputSegmentTarURI);
       resultBuilder.setSucceed(true);
     } catch (Exception e) {
       throw new RuntimeException("Failed to execute SegmentGenerationAndPushTask", e);
@@ -283,8 +282,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     recordReaderSpec.setConfigClassName(taskConfigs.get(BatchConfigProperties.RECORD_READER_CONFIG_CLASS));
     taskSpec.setRecordReaderSpec(recordReaderSpec);
 
-    String rawTableName = taskConfigs.get(BatchConfigProperties.TABLE_NAME);
-    String tableNameWithType = rawTableName != null ? TableNameBuilder.OFFLINE.tableNameWithType(rawTableName) : null;
+    String tableNameWithType = taskConfigs.get(BatchConfigProperties.TABLE_NAME);
     Schema schema;
     if (taskConfigs.containsKey(BatchConfigProperties.SCHEMA)) {
       schema = JsonUtils
@@ -295,13 +293,13 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
       schema = getSchema(tableNameWithType);
     }
     taskSpec.setSchema(schema);
-    JsonNode tableConfig;
+    TableConfig tableConfig;
     if (taskConfigs.containsKey(BatchConfigProperties.TABLE_CONFIGS)) {
-      tableConfig = JsonUtils.stringToJsonNode(taskConfigs.get(BatchConfigProperties.TABLE_CONFIGS));
+      tableConfig = JsonUtils.stringToObject(taskConfigs.get(BatchConfigProperties.TABLE_CONFIGS), TableConfig.class);
     } else if (taskConfigs.containsKey(BatchConfigProperties.TABLE_CONFIGS_URI)) {
-      tableConfig = SegmentGenerationUtils.getTableConfig(taskConfigs.get(BatchConfigProperties.TABLE_CONFIGS_URI)).toJsonNode();
+      tableConfig = SegmentGenerationUtils.getTableConfig(taskConfigs.get(BatchConfigProperties.TABLE_CONFIGS_URI));
     } else {
-      tableConfig = getTableConfig(tableNameWithType).toJsonNode();
+      tableConfig = getTableConfig(tableNameWithType);
     }
     taskSpec.setTableConfig(tableConfig);
     taskSpec.setSequenceId(Integer.parseInt(taskConfigs.get(BatchConfigProperties.SEQUENCE_ID)));
