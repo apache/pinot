@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
@@ -52,20 +53,26 @@ import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.recommender.RecommenderDriver;
+import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.util.ReplicationUtils;
 import org.apache.pinot.core.util.TableConfigUtils;
+import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStats;
+import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TunerConfig;
 import org.apache.pinot.spi.config.table.tuner.TableConfigTuner;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.quartz.CronScheduleBuilder;
 import org.slf4j.LoggerFactory;
 
 
@@ -139,6 +146,7 @@ public class PinotTableRestletResource {
     String tableName = tableConfig.getTableName();
     try {
       ensureMinReplicas(tableConfig);
+      ensureStorageQuotaConstraints(tableConfig);
       verifyTableConfigs(tableConfig);
       _pinotHelixResourceManager.addTable(tableConfig);
       // TODO: validate that table was created successfully
@@ -362,6 +370,7 @@ public class PinotTableRestletResource {
       }
 
       ensureMinReplicas(tableConfig);
+      ensureStorageQuotaConstraints(tableConfig);
       verifyTableConfigs(tableConfig);
       _pinotHelixResourceManager.updateTableConfig(tableConfig);
     } catch (PinotHelixResourceManager.InvalidTableConfigException e) {
@@ -458,6 +467,38 @@ public class PinotTableRestletResource {
     }
   }
 
+  private void ensureStorageQuotaConstraints(TableConfig tableConfig) {
+    // Dim tables must adhere to cluster level storage size limits
+    if (tableConfig.isDimTable()) {
+      QuotaConfig quotaConfig = tableConfig.getQuotaConfig();
+      String maxAllowedSize = _controllerConf.getDimTableMaxSize();
+      long maxAllowedSizeInBytes = DataSizeUtils.toBytes(maxAllowedSize);
+
+      if (quotaConfig == null) {
+        // set a default storage quota
+        tableConfig.setQuotaConfig(
+            new QuotaConfig(maxAllowedSize, null));
+        LOGGER.info("Assigning default storage quota ({}) for dimension table: {}",
+            maxAllowedSize, tableConfig.getTableName());
+      } else {
+        if (quotaConfig.getStorage() == null) {
+          // set a default storage quota and keep the RPS value
+          tableConfig.setQuotaConfig(
+              new QuotaConfig(maxAllowedSize, quotaConfig.getMaxQueriesPerSecond()));
+          LOGGER.info("Assigning default storage quota ({}) for dimension table: {}",
+              maxAllowedSize, tableConfig.getTableName());
+        } else {
+          if (quotaConfig.getStorageInBytes() > maxAllowedSizeInBytes) {
+            throw new PinotHelixResourceManager.InvalidTableConfigException(
+                String.format("Invalid storage quota: %d, max allowed size: %d",
+                    quotaConfig.getStorageInBytes(), maxAllowedSizeInBytes)
+            );
+          }
+        }
+      }
+    }
+  }
+
   /**
    * Verify table configs if it's a hybrid table, i.e. having both offline and real-time sub-tables.
    */
@@ -473,6 +514,22 @@ public class PinotTableRestletResource {
     } else {
       if (_pinotHelixResourceManager.hasRealtimeTable(rawTableName)) {
         tableConfigToCompare = _pinotHelixResourceManager.getRealtimeTableConfig(rawTableName);
+      }
+    }
+
+    // Check if task schedule is valid.
+    TableTaskConfig taskConfig = newTableConfig.getTaskConfig();
+    if (taskConfig != null && taskConfig.isTaskTypeEnabled(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE)) {
+      Map<String, String> taskTypeConfig =
+          taskConfig.getConfigsForTaskType(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE);
+      if (taskTypeConfig != null && taskTypeConfig.containsKey(PinotTaskManager.SCHEDULE_KEY)) {
+        String cronExprStr = taskTypeConfig.get(PinotTaskManager.SCHEDULE_KEY);
+        try {
+          CronScheduleBuilder.cronSchedule(cronExprStr);
+        } catch (Exception e) {
+          throw new PinotHelixResourceManager.InvalidTableConfigException(
+              String.format("SegmentGenerationAndPushTask contains an invalid cron schedule: %s", cronExprStr), e);
+        }
       }
     }
 

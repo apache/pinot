@@ -118,6 +118,13 @@ public class JoinQuickStart
         printStatus(Quickstart.Color.YELLOW, prettyPrintResponse(runner.runQuery(q2)));
         printStatus(Quickstart.Color.GREEN, "***************************************************");
 
+        String q3 = "select playerName, teamID, lookup('dimBaseballTeams', 'teamName', 'teamID', teamID) from baseballStats limit 10";
+        printStatus(Quickstart.Color.YELLOW, "Baseball Stats with joined team names");
+        printStatus(Quickstart.Color.CYAN, "Query : " + q3);
+        printStatus(Quickstart.Color.YELLOW, prettyPrintResponse(runner.runQuery(q3)));
+        printStatus(Quickstart.Color.GREEN, "***************************************************");
+
+
         printStatus(Quickstart.Color.GREEN, "You can always go to http://localhost:9000 to play around in the query console");
 
     }

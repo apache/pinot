@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.controller.helix.core.minion;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.helix.model.HelixConfigScope;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
@@ -156,5 +159,18 @@ public class ClusterInfoAccessor {
    */
   public String getVipUrl() {
     return _controllerConf.generateVipUrl();
+  }
+
+  /**
+   * Get the cluster config for a given config name, return null if not found.
+   *
+   * @return cluster config
+   */
+  public String getClusterConfig(String configName) {
+    HelixConfigScope helixConfigScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
+        .forCluster(_pinotHelixResourceManager.getHelixClusterName()).build();
+    Map<String, String> configMap =
+        _pinotHelixResourceManager.getHelixAdmin().getConfig(helixConfigScope, Collections.singletonList(configName));
+    return configMap != null ? configMap.get(configName) : null;
   }
 }

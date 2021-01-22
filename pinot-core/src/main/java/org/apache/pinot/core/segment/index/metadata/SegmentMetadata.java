@@ -33,6 +33,10 @@ import org.joda.time.Interval;
 @InterfaceAudience.Private
 public interface SegmentMetadata {
 
+  /**
+   * Returns the raw table name (without the type suffix).
+   */
+  @Deprecated
   String getTableName();
 
   String getTimeColumn();

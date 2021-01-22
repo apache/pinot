@@ -107,6 +107,15 @@ We truncate at 63 chars because some Kubernetes name fields are limited to this 
 {{ template "pinot.fullname" . }}-{{ .Values.server.name }}
 {{- end -}}
 
+
+{{/*
+Create a default fully qualified pinot minion name.
+We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
+*/}}
+{{- define "pinot.minion.fullname" -}}
+{{ template "pinot.fullname" . }}-{{ .Values.minion.name }}
+{{- end -}}
+
 {{/*
 The name of the pinot controller headless service.
 */}}
@@ -126,6 +135,13 @@ The name of the pinot server headless service.
 */}}
 {{- define "pinot.server.headless" -}}
 {{- printf "%s-headless" (include "pinot.server.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
+The name of the pinot minion headless service.
+*/}}
+{{- define "pinot.minion.headless" -}}
+{{- printf "%s-headless" (include "pinot.minion.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
 {{/*
@@ -161,4 +177,11 @@ The name of the pinot server config.
 */}}
 {{- define "pinot.server.config" -}}
 {{- printf "%s-config" (include "pinot.server.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
+The name of the pinot minion config.
+*/}}
+{{- define "pinot.minion.config" -}}
+{{- printf "%s-config" (include "pinot.minion.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}

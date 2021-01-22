@@ -24,8 +24,9 @@ import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.H3IndexReader;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
-import org.apache.pinot.core.segment.index.readers.LuceneFSTIndexReader;
+import org.apache.pinot.core.segment.index.readers.JsonIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
 import org.apache.pinot.core.segment.index.readers.TextIndexReader;
 
@@ -38,16 +39,16 @@ public abstract class BaseDataSource implements DataSource {
   private final InvertedIndexReader<?> _rangeIndex;
   private final TextIndexReader _textIndex;
   private final TextIndexReader _fstIndex;
+  private final JsonIndexReader _jsonIndex;
+  private final H3IndexReader _h3Index;
   private final BloomFilterReader _bloomFilter;
   private final NullValueVectorReader _nullValueVector;
 
   public BaseDataSource(DataSourceMetadata dataSourceMetadata, ForwardIndexReader<?> forwardIndex,
-                        @Nullable Dictionary dictionary, @Nullable InvertedIndexReader<?> invertedIndex,
-                        @Nullable InvertedIndexReader<?> rangeIndex,
-                        @Nullable TextIndexReader textIndex,
-                        @Nullable TextIndexReader fstIndex,
-                        @Nullable BloomFilterReader bloomFilter,
-                        @Nullable NullValueVectorReader nullValueVector) {
+      @Nullable Dictionary dictionary, @Nullable InvertedIndexReader<?> invertedIndex,
+      @Nullable InvertedIndexReader<?> rangeIndex, @Nullable TextIndexReader textIndex,
+      @Nullable TextIndexReader fstIndex, @Nullable JsonIndexReader jsonIndex, @Nullable H3IndexReader h3Index,
+      @Nullable BloomFilterReader bloomFilter, @Nullable NullValueVectorReader nullValueVector) {
     _dataSourceMetadata = dataSourceMetadata;
     _forwardIndex = forwardIndex;
     _dictionary = dictionary;
@@ -55,6 +56,8 @@ public abstract class BaseDataSource implements DataSource {
     _rangeIndex = rangeIndex;
     _textIndex = textIndex;
     _fstIndex = fstIndex;
+    _jsonIndex = jsonIndex;
+    _h3Index = h3Index;
     _bloomFilter = bloomFilter;
     _nullValueVector = nullValueVector;
   }
@@ -89,14 +92,26 @@ public abstract class BaseDataSource implements DataSource {
 
   @Nullable
   @Override
+  public TextIndexReader getTextIndex() {
+    return _textIndex;
+  }
+
+  @Nullable
+  @Override
   public TextIndexReader getFSTIndex() {
     return _fstIndex;
   }
 
   @Nullable
   @Override
-  public TextIndexReader getTextIndex() {
-    return _textIndex;
+  public JsonIndexReader getJsonIndex() {
+    return _jsonIndex;
+  }
+
+  @Nullable
+  @Override
+  public H3IndexReader getH3Index() {
+    return _h3Index;
   }
 
   @Nullable

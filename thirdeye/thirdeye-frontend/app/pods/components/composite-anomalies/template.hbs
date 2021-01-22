@@ -1,8 +1,9 @@
 {{yield}}
-
 <section>
-  {{breadcrumb-list
-    items=breadcrumbList
-    onBreadcrumbClick=(action "onBreadcrumbClick")
-  }}
+  {{breadcrumb-list items=breadcrumbList onBreadcrumbClick=(action "onBreadcrumbClick")}}
+</section>
+<section>
+  {{#each data as |cmpt|}}
+    {{component cmpt.componentPath title=cmpt.title data=cmpt.data}}
+  {{/each}}
 </section>

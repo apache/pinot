@@ -21,16 +21,15 @@ package org.apache.pinot.minion.taskfactory;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
 import org.apache.helix.task.Task;
 import org.apache.helix.task.TaskConfig;
 import org.apache.helix.task.TaskFactory;
 import org.apache.helix.task.TaskResult;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.MinionContext;
-import org.apache.pinot.minion.events.EventObserverFactoryRegistry;
-import org.apache.pinot.minion.events.MinionEventObserver;
-import org.apache.pinot.minion.events.MinionEventObserverFactory;
+import org.apache.pinot.minion.event.EventObserverFactoryRegistry;
+import org.apache.pinot.minion.event.MinionEventObserver;
+import org.apache.pinot.minion.event.MinionEventObserverFactory;
 import org.apache.pinot.minion.exception.FatalException;
 import org.apache.pinot.minion.exception.TaskCancelledException;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
@@ -52,12 +51,11 @@ public class TaskFactoryRegistry {
 
   private final Map<String, TaskFactory> _taskFactoryRegistry = new HashMap<>();
 
-  public TaskFactoryRegistry(@Nonnull TaskExecutorFactoryRegistry taskExecutorFactoryRegistry,
-      @Nonnull EventObserverFactoryRegistry eventObserverFactoryRegistry) {
-    for (final String taskType : taskExecutorFactoryRegistry.getAllTaskTypes()) {
-      final PinotTaskExecutorFactory taskExecutorFactory = taskExecutorFactoryRegistry.getTaskExecutorFactory(taskType);
-      final MinionEventObserverFactory eventObserverFactory =
-          eventObserverFactoryRegistry.getEventObserverFactory(taskType);
+  public TaskFactoryRegistry(TaskExecutorFactoryRegistry taskExecutorFactoryRegistry,
+      EventObserverFactoryRegistry eventObserverFactoryRegistry) {
+    for (String taskType : taskExecutorFactoryRegistry.getAllTaskTypes()) {
+      PinotTaskExecutorFactory taskExecutorFactory = taskExecutorFactoryRegistry.getTaskExecutorFactory(taskType);
+      MinionEventObserverFactory eventObserverFactory = eventObserverFactoryRegistry.getEventObserverFactory(taskType);
 
       LOGGER.info("Registering {} with task executor factory: {}, event observer factory: {}", taskType,
           taskExecutorFactory.getClass().getSimpleName(), eventObserverFactory.getClass().getSimpleName());
@@ -121,9 +119,7 @@ public class TaskFactoryRegistry {
   }
 
   /**
-   * Get the task factory registry.
-   *
-   * @return Task factory registry
+   * Returns the task factory registry.
    */
   public Map<String, TaskFactory> getTaskFactoryRegistry() {
     return _taskFactoryRegistry;

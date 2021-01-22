@@ -95,7 +95,7 @@ public class TimeSegmentPruner implements SegmentPruner {
     int numSegments = onlineSegments.size();
     List<String> segments = new ArrayList<>(numSegments);
     List<String> segmentZKMetadataPaths = new ArrayList<>(numSegments);
-    for (String segment : segments) {
+    for (String segment : onlineSegments) {
       segments.add(segment);
       segmentZKMetadataPaths.add(_segmentZKMetadataPathPrefix + segment);
     }
@@ -214,6 +214,16 @@ public class TimeSegmentPruner implements SegmentPruner {
         if (filterQueryTree.getColumn().equals(_timeColumn)) {
           long timeStamp = _timeFormatSpec.fromFormatToMillis(filterQueryTree.getValue().get(0));
           return Collections.singletonList(new Interval(timeStamp, timeStamp));
+        }
+        return null;
+      case IN:
+        if (filterQueryTree.getColumn().equals(_timeColumn)) {
+          List<Interval> intervals = new ArrayList<>(filterQueryTree.getValue().size());
+          for (String value: filterQueryTree.getValue()) {
+            long timeStamp = _timeFormatSpec.fromFormatToMillis(value);
+            intervals.add(new Interval(timeStamp, timeStamp));
+          }
+          return intervals;
         }
         return null;
       case RANGE:

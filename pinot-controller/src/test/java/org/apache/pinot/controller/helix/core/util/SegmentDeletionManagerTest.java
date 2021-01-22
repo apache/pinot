@@ -46,11 +46,10 @@ import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.joda.time.DateTime;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import com.google.common.io.Files;
-
-import junit.framework.Assert;
 
 
 public class SegmentDeletionManagerTest {

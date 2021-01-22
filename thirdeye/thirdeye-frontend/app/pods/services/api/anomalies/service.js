@@ -6,43 +6,45 @@ import { humanizeFloat, humanizeChange } from 'thirdeye-frontend/utils/utils';
 import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
 import {
   getFormattedDuration,
-  anomalyResponseObjNew,
+  anomalyResponseObj,
+  reportedAnomalyResponseObj,
   anomalySeverityLevelObj
 } from 'thirdeye-frontend/utils/anomaly';
 
-const HumanizedAnomaly = EmberObject.extend({// ex: record.humanizedChangeDisplay (humanized), record.anomaly.start (raw)
+const HumanizedAnomaly = EmberObject.extend({
+  // ex: record.humanizedChangeDisplay (humanized), record.anomaly.start (raw)
   id: computed.alias('anomaly.id'),
-  _changeFloat: computed('anomaly.{current,baseline}', function() {
+  _changeFloat: computed('anomaly.{current,baseline}', function () {
     const current = get(this, 'anomaly.current');
     const baseline = get(this, 'anomaly.baseline');
     return Number((current - baseline) / baseline);
   }),
-  change: computed('_changeFloat', function() {
+  change: computed('_changeFloat', function () {
     return floatToPercent(get(this, '_changeFloat'));
   }),
-  humanizedChangeDisplay: computed('_changeFloat', function() {
+  humanizedChangeDisplay: computed('_changeFloat', function () {
     return humanizeChange(get(this, '_changeFloat'));
   }),
-  duration: computed('anomaly.{start,end}', function() {
+  duration: computed('anomaly.{start,end}', function () {
     return getFormattedDuration(get(this, 'anomaly.start'), get(this, 'anomaly.end'));
   }),
-  current: computed('anomaly.current', function() {
+  current: computed('anomaly.current', function () {
     return humanizeFloat(get(this, 'anomaly.current'));
   }),
-  baseline: computed('anomaly.baseline', function() {
+  baseline: computed('anomaly.baseline', function () {
     return humanizeFloat(get(this, 'anomaly.baseline'));
   }),
-  isUserReported: computed('anomaly.rule', function() {
-    return (get(this, 'anomaly.rule') === 'User Reported');
+  isUserReported: computed('anomaly.rule', function () {
+    return get(this, 'anomaly.rule') === 'User Reported';
   }),
   modifiedBy: computed.alias('anomaly.modifiedBy'),
   updateTime: computed.alias('anomaly.updateTime'),
   rule: computed.alias('anomaly.rule'),
   dimensionStr: computed.alias('anomaly.dimensionStr'),
-  severity: computed('anomaly.severity', function() {
+  severity: computed('anomaly.severity', function () {
     return humanizeFloat(get(this, 'anomaly.severity'));
   }),
-  source: computed('anomaly.source', function() {
+  source: computed('anomaly.source', function () {
     return humanizeFloat(get(this, 'anomaly.source'));
   }),
   startDateStr: computed.alias('anomaly.startDateStr'),
@@ -50,19 +52,24 @@ const HumanizedAnomaly = EmberObject.extend({// ex: record.humanizedChangeDispla
   settings: computed.alias('anomaly.settings'),
   settingsNum: computed.alias('anomaly.settingsNum'),
   severityLabel: computed('anomaly.severityLabel', function () {
-    return get(this, 'anomaly.severityLabel') ? anomalySeverityLevelObj.find(
-      res => res.value == get(this, 'anomaly.severityLabel')).name : 'Default'
+    return get(this, 'anomaly.severityLabel')
+      ? anomalySeverityLevelObj.find((res) => res.value == get(this, 'anomaly.severityLabel')).name
+      : 'Default';
   }),
-  anomalyFeedback: computed('anomaly.feedback', function() {
-    return get(this, 'anomaly.feedback') ? anomalyResponseObjNew.find(res => res.value === get(this, 'anomaly.feedback')).name : '';
+  anomalyFeedback: computed('anomaly.feedback', function () {
+    return get(this, 'anomaly.feedback')
+      ? [...anomalyResponseObj, ...reportedAnomalyResponseObj].find(
+          (res) => res.value === get(this, 'anomaly.feedback')
+        ).name
+      : '';
   }),
-  queryDuration: computed('humanizedObject.queryDuration', function() {
+  queryDuration: computed('humanizedObject.queryDuration', function () {
     return get(this, 'humanizedObject.queryDuration');
   }),
-  queryStart: computed('humanizedObject.queryStart', function() {
+  queryStart: computed('humanizedObject.queryStart', function () {
     return get(this, 'humanizedObject.queryStart');
   }),
-  queryEnd: computed('humanizedObject.queryEnd', function() {
+  queryEnd: computed('humanizedObject.queryEnd', function () {
     return get(this, 'humanizedObject.queryEnd');
   }),
   classification: computed('anomaly.classification', function () {
@@ -81,7 +88,7 @@ export default Service.extend({
 
   init() {
     this._super();
-    this._humanizedAnomaliesCache = Object.create(null);//create our humanized cache for this service (store humanized anomalies)
+    this._humanizedAnomaliesCache = Object.create(null); //create our humanized cache for this service (store humanized anomalies)
   },
 
   /**
@@ -115,10 +122,16 @@ export default Service.extend({
   getHumanizedEntity(anomaly, humanizedObject) {
     assert('you must pass anomaly record.', anomaly);
 
-    let cacheKey = get(anomaly, 'id') + get(anomaly, 'start') + get(anomaly, 'end') + get(anomaly, 'current') + get(anomaly, 'baseline') + get(anomaly, 'settings');
-    let humanizedEntity = this._humanizedAnomaliesCache[cacheKey];//retrieve the anomaly from cache if exists
+    let cacheKey =
+      get(anomaly, 'id') +
+      get(anomaly, 'start') +
+      get(anomaly, 'end') +
+      get(anomaly, 'current') +
+      get(anomaly, 'baseline') +
+      get(anomaly, 'settings');
+    let humanizedEntity = this._humanizedAnomaliesCache[cacheKey]; //retrieve the anomaly from cache if exists
     if (!humanizedEntity) {
-      humanizedEntity = this._humanizedAnomaliesCache[cacheKey] = HumanizedAnomaly.create({ anomaly, humanizedObject });// add to our dictionary
+      humanizedEntity = this._humanizedAnomaliesCache[cacheKey] = HumanizedAnomaly.create({ anomaly, humanizedObject }); // add to our dictionary
     }
 
     return humanizedEntity;
@@ -134,7 +147,7 @@ export default Service.extend({
   async queryApplications() {
     const queryCache = this.get('queryCache');
     const modelName = 'application';
-    const cacheKey = queryCache.urlForQueryKey(modelName, {});//TODO: Won't pass all the `query` here. The `cacheKey` do not need to be uniqued, since all apps has the same list of apps.
+    const cacheKey = queryCache.urlForQueryKey(modelName, {}); //TODO: Won't pass all the `query` here. The `cacheKey` do not need to be uniqued, since all apps has the same list of apps.
     const applications = await queryCache.query(modelName, {}, { reload: false, cacheKey });
     return applications;
   },
@@ -172,7 +185,10 @@ export default Service.extend({
     const queryCache = this.get('queryCache');
     const modelName = 'anomalies';
     const query = { application: appName, start, end };
-    const anomalies = await queryCache.query(modelName, query, { reload: false, cacheKey: queryCache.urlForQueryKey(modelName, query) });
+    const anomalies = await queryCache.query(modelName, query, {
+      reload: false,
+      cacheKey: queryCache.urlForQueryKey(modelName, query)
+    });
     return anomalies;
   },
 
@@ -194,7 +210,10 @@ export default Service.extend({
     const queryCache = this.get('queryCache');
     const modelName = 'anomalies';
     const query = { group: subGroup, start, end };
-    const anomalies = await queryCache.query(modelName, query, { reload: false, cacheKey: queryCache.urlForQueryKey(modelName, query) });
+    const anomalies = await queryCache.query(modelName, query, {
+      reload: false,
+      cacheKey: queryCache.urlForQueryKey(modelName, query)
+    });
     return anomalies;
   },
 
@@ -218,7 +237,10 @@ export default Service.extend({
     const queryCache = this.get('queryCache');
     const modelName = 'anomalies';
     const query = { application: appName, group: subGroup, start, end };
-    const anomalies = await queryCache.query(modelName, query, { reload: false, cacheKey: queryCache.urlForQueryKey(modelName, query) });
+    const anomalies = await queryCache.query(modelName, query, {
+      reload: false,
+      cacheKey: queryCache.urlForQueryKey(modelName, query)
+    });
     return anomalies;
   }
 });

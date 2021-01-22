@@ -38,6 +38,8 @@ public class V1Constants {
     public static final String BITMAP_INVERTED_INDEX_FILE_EXTENSION = ".bitmap.inv";
     public static final String BITMAP_RANGE_INDEX_FILE_EXTENSION = ".bitmap.range";
     public static final String FST_INDEX_FILE_EXTENSION = ".lucene.fst";
+    public static final String JSON_INDEX_FILE_EXTENSION = ".json.idx";
+    public static final String H3_INDEX_FILE_EXTENSION = ".h3.idx";
     public static final String BLOOM_FILTER_FILE_EXTENSION = ".bloom";
     public static final String NULLVALUE_VECTOR_FILE_EXTENSION = ".bitmap.nullvalue";
   }
@@ -79,6 +81,7 @@ public class V1Constants {
       public static final String HAS_DICTIONARY = "hasDictionary";
       public static final String HAS_INVERTED_INDEX = "hasInvertedIndex";
       public static final String HAS_FST_INDEX = "hasFSTIndex";
+      public static final String HAS_JSON_INDEX = "hasJsonIndex";
       public static final String IS_SINGLE_VALUED = "isSingleValues";
       public static final String MAX_MULTI_VALUE_ELEMTS = "maxNumberOfMultiValues";
       public static final String TOTAL_NUMBER_OF_ENTRIES = "totalNumberOfEntries";

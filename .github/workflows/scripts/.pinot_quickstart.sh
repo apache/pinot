@@ -90,6 +90,33 @@ if [ "${PASS}" -eq 0 ]; then
   exit 1
 fi
 
+# Test quick-start-batch-with-minion
+bin/quick-start-batch-with-minion.sh &
+PID=$!
+
+PASS=0
+
+# Wait for 30 seconds for table to be set up, then at most 5 minutes to reach the desired state
+sleep 30
+for i in $(seq 1 150)
+do
+  QUERY_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from baseballStats limit 1","trace":false}' http://localhost:8000/query/sql`
+  if [ $? -eq 0 ]; then
+    COUNT_STAR_RES=`echo "${QUERY_RES}" | jq '.resultTable.rows[0][0]'`
+    if [[ "${COUNT_STAR_RES}" =~ ^[0-9]+$ ]] && [ "${COUNT_STAR_RES}" -eq 97889 ]; then
+      PASS=1
+      break
+    fi
+  fi
+  sleep 2
+done
+
+cleanup "${PID}"
+if [ "${PASS}" -eq 0 ]; then
+  echo 'Batch Quickstart with Minion failed: Cannot get correct result for count star query.'
+  exit 1
+fi
+
 # Test quick-start-streaming
 bin/quick-start-streaming.sh &
 PID=$!

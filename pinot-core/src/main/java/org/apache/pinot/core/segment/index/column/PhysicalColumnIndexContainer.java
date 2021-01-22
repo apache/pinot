@@ -31,8 +31,10 @@ import org.apache.pinot.core.segment.index.readers.BytesDictionary;
 import org.apache.pinot.core.segment.index.readers.DoubleDictionary;
 import org.apache.pinot.core.segment.index.readers.FloatDictionary;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.H3IndexReader;
 import org.apache.pinot.core.segment.index.readers.IntDictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.apache.pinot.core.segment.index.readers.JsonIndexReader;
 import org.apache.pinot.core.segment.index.readers.LongDictionary;
 import org.apache.pinot.core.segment.index.readers.LuceneFSTIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReaderImpl;
@@ -50,6 +52,8 @@ import org.apache.pinot.core.segment.index.readers.forward.FixedBitMVForwardInde
 import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
 import org.apache.pinot.core.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.geospatial.ImmutableH3IndexReader;
+import org.apache.pinot.core.segment.index.readers.json.ImmutableJsonIndexReader;
 import org.apache.pinot.core.segment.index.readers.sorted.SortedIndexReaderImpl;
 import org.apache.pinot.core.segment.index.readers.text.LuceneTextIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
@@ -69,6 +73,8 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   private final InvertedIndexReader<?> _rangeIndex;
   private final TextIndexReader _textIndex;
   private final TextIndexReader _fstIndex;
+  private final JsonIndexReader _jsonIndex;
+  private final H3IndexReader _h3Index;
   private final BaseImmutableDictionary _dictionary;
   private final BloomFilterReader _bloomFilter;
   private final NullValueVectorReaderImpl _nullValueVectorReader;
@@ -80,9 +86,11 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     boolean loadInvertedIndex = indexLoadingConfig.getInvertedIndexColumns().contains(columnName);
     boolean loadRangeIndex = indexLoadingConfig.getRangeIndexColumns().contains(columnName);
     boolean loadTextIndex = indexLoadingConfig.getTextIndexColumns().contains(columnName);
+    boolean loadFSTIndex = indexLoadingConfig.getFSTIndexColumns().contains(columnName);
+    boolean loadJsonIndex = indexLoadingConfig.getJsonIndexColumns().contains(columnName);
+    boolean loadH3Index = indexLoadingConfig.getH3IndexConfigs().containsKey(columnName);
     boolean loadOnHeapDictionary = indexLoadingConfig.getOnHeapDictionaryColumns().contains(columnName);
     BloomFilterConfig bloomFilterConfig = indexLoadingConfig.getBloomFilterConfigs().get(columnName);
-    boolean loadFSTIndex = indexLoadingConfig.getFSTIndexColumns().contains(columnName);
 
     if (segmentReader.hasIndexFor(columnName, ColumnIndexType.NULLVALUE_VECTOR)) {
       PinotDataBuffer nullValueVectorBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.NULLVALUE_VECTOR);
@@ -100,17 +108,31 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       _textIndex = null;
     }
 
-    PinotDataBuffer fwdIndexBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.FORWARD_INDEX);
+    if (loadJsonIndex) {
+      Preconditions.checkState(segmentReader.hasIndexFor(columnName, ColumnIndexType.JSON_INDEX));
+      PinotDataBuffer jsonIndexBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.JSON_INDEX);
+      _jsonIndex = new ImmutableJsonIndexReader(jsonIndexBuffer, metadata.getTotalDocs());
+    } else {
+      _jsonIndex = null;
+    }
 
+    if (loadH3Index) {
+      Preconditions.checkState(segmentReader.hasIndexFor(columnName, ColumnIndexType.H3_INDEX));
+      PinotDataBuffer h3IndexBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.H3_INDEX);
+      _h3Index = new ImmutableH3IndexReader(h3IndexBuffer);
+    } else {
+      _h3Index = null;
+    }
+
+    if (bloomFilterConfig != null) {
+      PinotDataBuffer bloomFilterBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.BLOOM_FILTER);
+      _bloomFilter = BloomFilterReaderFactory.getBloomFilterReader(bloomFilterBuffer, bloomFilterConfig.isLoadOnHeap());
+    } else {
+      _bloomFilter = null;
+    }
+
+    PinotDataBuffer fwdIndexBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.FORWARD_INDEX);
     if (metadata.hasDictionary()) {
-      //bloom filter
-      if (bloomFilterConfig != null) {
-        PinotDataBuffer bloomFilterBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.BLOOM_FILTER);
-        _bloomFilter =
-            BloomFilterReaderFactory.getBloomFilterReader(bloomFilterBuffer, bloomFilterConfig.isLoadOnHeap());
-      } else {
-        _bloomFilter = null;
-      }
       // Dictionary-based index
       _dictionary = loadDictionary(segmentReader.getIndexFor(columnName, ColumnIndexType.DICTIONARY), metadata,
           loadOnHeapDictionary);
@@ -142,10 +164,8 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
         _invertedIndex = null;
       }
 
-
       if (loadFSTIndex) {
-        _fstIndex = new LuceneFSTIndexReader(
-            segmentReader.getIndexFor(columnName, ColumnIndexType.FST_INDEX));
+        _fstIndex = new LuceneFSTIndexReader(segmentReader.getIndexFor(columnName, ColumnIndexType.FST_INDEX));
       } else {
         _fstIndex = null;
       }
@@ -159,7 +179,6 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       // Raw index
       _forwardIndex = loadRawForwardIndex(fwdIndexBuffer, metadata.getDataType());
       _dictionary = null;
-      _bloomFilter = null;
       _rangeIndex = null;
       _invertedIndex = null;
       _fstIndex = null;
@@ -184,6 +203,16 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   @Override
   public TextIndexReader getTextIndex() {
     return _textIndex;
+  }
+
+  @Override
+  public JsonIndexReader getJsonIndex() {
+    return _jsonIndex;
+  }
+
+  @Override
+  public H3IndexReader getH3Index() {
+    return _h3Index;
   }
 
   @Override
@@ -280,11 +309,17 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     if (_textIndex != null) {
       _textIndex.close();
     }
-    if (_bloomFilter != null) {
-      _bloomFilter.close();
-    }
     if (_fstIndex != null) {
       _fstIndex.close();
+    }
+    if (_jsonIndex != null) {
+      _jsonIndex.close();
+    }
+    if (_h3Index != null) {
+      _h3Index.close();
+    }
+    if (_bloomFilter != null) {
+      _bloomFilter.close();
     }
   }
 }

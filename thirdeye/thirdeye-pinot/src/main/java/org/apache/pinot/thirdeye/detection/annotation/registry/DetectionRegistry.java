@@ -54,14 +54,23 @@ public class DetectionRegistry {
   private static final String KEY_CLASS_NAME = "className";
   private static final String KEY_ANNOTATION = "annotation";
   private static final String KEY_IS_BASELINE_PROVIDER = "isBaselineProvider";
-
+  // default package name for reflection to scan
+  private static final String DEFAULT_PACKAGE_LIST = "org.apache.pinot.thirdeye";
+  // list of package names for reflection to scan
+  private static List<String> packageList = new ArrayList<>();
+  // singleton instance
   private static DetectionRegistry INSTANCE;
 
   public static DetectionRegistry getInstance() {
     if (INSTANCE == null) {
-      INSTANCE = new DetectionRegistry();
+      synchronized (DetectionRegistry.class) {
+        // another check after acquiring the lock before initializing
+        if (INSTANCE == null) {
+          packageList.add(DEFAULT_PACKAGE_LIST);
+          INSTANCE = new DetectionRegistry();
+        }
+      }
     }
-
     return INSTANCE;
   }
 
@@ -73,7 +82,10 @@ public class DetectionRegistry {
    * Read all the components, tune, and yaml annotations and initialize the registry.
    */
   private static void init() {
-    try (ScanResult scanResult = new ClassGraph().enableAnnotationInfo().enableClassInfo().scan()) {
+    try (ScanResult scanResult = new ClassGraph()
+        .acceptPackages(packageList.toArray(new String[packageList.size()]))
+        .enableAnnotationInfo()
+        .enableClassInfo().scan()) {
       // register components
       ClassInfoList classes = scanResult.getClassesImplementing(BaseComponent.class.getName());
       for (ClassInfo classInfo : classes) {
@@ -194,5 +206,9 @@ public class DetectionRegistry {
 
   private static boolean isBaselineProvider(Class<?> clazz) {
     return BaselineProvider.class.isAssignableFrom(clazz);
+  }
+
+  public static void setPackageList(List<String> packageList) {
+    DetectionRegistry.packageList = packageList;
   }
 }

@@ -155,20 +155,18 @@ public class FilterOperatorUtils {
         if (filterOperator instanceof BitmapBasedFilterOperator) {
           return 1;
         }
-        if (filterOperator instanceof RangeIndexBasedFilterOperator) {
+        if (filterOperator instanceof RangeIndexBasedFilterOperator || filterOperator instanceof TextMatchFilterOperator
+            || filterOperator instanceof JsonMatchFilterOperator || filterOperator instanceof H3IndexFilterOperator) {
           return 2;
         }
-        if (filterOperator instanceof TextMatchFilterOperator) {
+        if (filterOperator instanceof AndFilterOperator) {
           return 3;
         }
-        if (filterOperator instanceof AndFilterOperator) {
+        if (filterOperator instanceof OrFilterOperator) {
           return 4;
         }
-        if (filterOperator instanceof OrFilterOperator) {
-          return 5;
-        }
         if (filterOperator instanceof ScanBasedFilterOperator) {
-          return getScanBasedFilterPriority((ScanBasedFilterOperator) filterOperator, 6, debugOptions);
+          return getScanBasedFilterPriority((ScanBasedFilterOperator) filterOperator, 5, debugOptions);
         }
         if (filterOperator instanceof ExpressionFilterOperator) {
           return 10;

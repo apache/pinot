@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.core.segment.creator;
 
-public class SegmentIndexCreationInfo {
+import java.io.Serializable;
+
+
+public class SegmentIndexCreationInfo implements Serializable {
   private int totalDocs;
 
   public int getTotalDocs() {

@@ -35,6 +35,7 @@ import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.RealtimeToOfflineSegmentsTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -72,15 +73,17 @@ import org.slf4j.LoggerFactory;
  *
  *  - A PinotTaskConfig is created, with segment information, execution window, and any config specific to the task
  */
+@TaskGenerator
 public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeToOfflineSegmentsTaskGenerator.class);
 
   private static final String DEFAULT_BUCKET_PERIOD = "1d";
   private static final String DEFAULT_BUFFER_PERIOD = "2d";
 
-  private final ClusterInfoAccessor _clusterInfoAccessor;
+  private ClusterInfoAccessor _clusterInfoAccessor;
 
-  public RealtimeToOfflineSegmentsTaskGenerator(ClusterInfoAccessor clusterInfoAccessor) {
+  @Override
+  public void init(ClusterInfoAccessor clusterInfoAccessor) {
     _clusterInfoAccessor = clusterInfoAccessor;
   }
 
@@ -101,7 +104,8 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
         LOGGER.warn("Skip generating task: {} for non-REALTIME table: {}", taskType, realtimeTableName);
         continue;
       }
-      StreamConfig streamConfig = new StreamConfig(realtimeTableName, IngestionConfigUtils.getStreamConfigMap(tableConfig));
+      StreamConfig streamConfig =
+          new StreamConfig(realtimeTableName, IngestionConfigUtils.getStreamConfigMap(tableConfig));
       if (streamConfig.hasHighLevelConsumerType()) {
         LOGGER.warn("Skip generating task: {} for HLC REALTIME table: {}", taskType, realtimeTableName);
         continue;

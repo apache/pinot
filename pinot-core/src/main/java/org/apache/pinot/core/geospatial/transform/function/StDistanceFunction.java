@@ -19,8 +19,9 @@
 package org.apache.pinot.core.geospatial.transform.function;
 
 import com.google.common.base.Preconditions;
+import java.util.List;
+import java.util.Map;
 import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.geospatial.GeometryType;
 import org.apache.pinot.core.geospatial.GeometryUtils;
 import org.apache.pinot.core.geospatial.serde.GeometrySerializer;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
@@ -32,17 +33,6 @@ import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Point;
-
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
-import static java.lang.Math.atan2;
-import static java.lang.Math.cos;
-import static java.lang.Math.sin;
-import static java.lang.Math.sqrt;
-import static java.lang.Math.toRadians;
 
 
 /**
@@ -117,8 +107,8 @@ public class StDistanceFunction extends BaseTransformFunction {
   }
 
   private static void checkLongitude(double longitude) {
-    Preconditions
-        .checkArgument(longitude >= MIN_LONGITUDE && longitude <= MAX_LONGITUDE, "Longitude must be between -180 and 180");
+    Preconditions.checkArgument(longitude >= MIN_LONGITUDE && longitude <= MAX_LONGITUDE,
+        "Longitude must be between -180 and 180");
   }
 
   private static double sphericalDistance(Geometry leftGeometry, Geometry rightGeometry) {
@@ -136,26 +126,26 @@ public class StDistanceFunction extends BaseTransformFunction {
    * This assumes a spherical Earth, and uses the Vincenty formula. (https://en.wikipedia
    * .org/wiki/Great-circle_distance)
    */
-  private static double greatCircleDistance(double latitude1, double longitude1, double latitude2, double longitude2) {
+  private static double greatCircleDistance(double longitude1, double latitude1, double longitude2, double latitude2) {
     checkLatitude(latitude1);
     checkLongitude(longitude1);
     checkLatitude(latitude2);
     checkLongitude(longitude2);
 
-    double radianLatitude1 = toRadians(latitude1);
-    double radianLatitude2 = toRadians(latitude2);
+    double radianLatitude1 = Math.toRadians(latitude1);
+    double radianLatitude2 = Math.toRadians(latitude2);
 
-    double sin1 = sin(radianLatitude1);
-    double cos1 = cos(radianLatitude1);
-    double sin2 = sin(radianLatitude2);
-    double cos2 = cos(radianLatitude2);
+    double sin1 = Math.sin(radianLatitude1);
+    double cos1 = Math.cos(radianLatitude1);
+    double sin2 = Math.sin(radianLatitude2);
+    double cos2 = Math.cos(radianLatitude2);
 
-    double deltaLongitude = toRadians(longitude1) - toRadians(longitude2);
-    double cosDeltaLongitude = cos(deltaLongitude);
+    double deltaLongitude = Math.toRadians(longitude1) - Math.toRadians(longitude2);
+    double cosDeltaLongitude = Math.cos(deltaLongitude);
 
-    double t1 = cos2 * sin(deltaLongitude);
+    double t1 = cos2 * Math.sin(deltaLongitude);
     double t2 = cos1 * sin2 - sin1 * cos2 * cosDeltaLongitude;
     double t3 = sin1 * sin2 + cos1 * cos2 * cosDeltaLongitude;
-    return atan2(sqrt(t1 * t1 + t2 * t2), t3) * GeometryUtils.EARTH_RADIUS_M;
+    return Math.atan2(Math.sqrt(t1 * t1 + t2 * t2), t3) * GeometryUtils.EARTH_RADIUS_M;
   }
 }

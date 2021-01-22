@@ -40,6 +40,7 @@ import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.parsers.AbstractCompiler;
 import org.apache.pinot.parsers.utils.BrokerRequestComparisonUtils;
 import org.apache.pinot.pql.parsers.pql2.ast.AstNode;
+import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -136,17 +137,23 @@ public class Pql2Compiler implements AbstractCompiler {
   }
 
   public AstNode parseToAstNode(String expression) {
-    CharStream charStream = new ANTLRInputStream(expression);
-    PQL2Lexer lexer = new PQL2Lexer(charStream);
-    lexer.setTokenFactory(new CommonTokenFactory(true));
-    TokenStream tokenStream = new UnbufferedTokenStream<CommonToken>(lexer);
-    PQL2Parser parser = new PQL2Parser(tokenStream);
-    parser.setErrorHandler(new BailErrorStrategy());
+    try {
+      CharStream charStream = new ANTLRInputStream(expression);
+      PQL2Lexer lexer = new PQL2Lexer(charStream);
+      lexer.setTokenFactory(new CommonTokenFactory(true));
+      TokenStream tokenStream = new UnbufferedTokenStream<CommonToken>(lexer);
+      PQL2Parser parser = new PQL2Parser(tokenStream);
+      parser.setErrorHandler(new BailErrorStrategy());
+      parser.removeErrorListeners();
 
-    // Parse
-    Pql2AstListener listener = new Pql2AstListener(expression);
-    new ParseTreeWalker().walk(listener, parser.expression());
-    return listener.getRootNode();
+      // Parse
+      Pql2AstListener listener = new Pql2AstListener(expression);
+      new ParseTreeWalker().walk(listener, parser.expression());
+      return listener.getRootNode();
+    } catch (Exception e) {
+      // NOTE: Treat reserved keys as identifiers. E.g. '*', 'group', 'order', etc.
+      return new IdentifierAstNode(expression);
+    }
   }
 
   public TransformExpressionTree compileToExpressionTree(String expression) {

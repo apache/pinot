@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.core.segment.name.FixedSegmentNameGenerator;
 import org.apache.pinot.core.segment.name.NormalizedDateSegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SimpleSegmentNameGenerator;
@@ -44,8 +45,12 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 public class SegmentGenerationTaskRunner implements Serializable {
 
+  public static final String FIXED_SEGMENT_NAME_GENERATOR = "fixed";
   public static final String SIMPLE_SEGMENT_NAME_GENERATOR = "simple";
   public static final String NORMALIZED_DATE_SEGMENT_NAME_GENERATOR = "normalizedDate";
+
+  // For FixedSegmentNameGenerator
+  public static final String SEGMENT_NAME = "segment.name";
 
   // For SimpleSegmentNameGenerator
   public static final String SEGMENT_NAME_POSTFIX = "segment.name.postfix";
@@ -123,6 +128,8 @@ public class SegmentGenerationTaskRunner implements Serializable {
       segmentNameGeneratorConfigs = new HashMap<>();
     }
     switch (segmentNameGeneratorType) {
+      case FIXED_SEGMENT_NAME_GENERATOR:
+        return new FixedSegmentNameGenerator(segmentNameGeneratorConfigs.get(SEGMENT_NAME));
       case SIMPLE_SEGMENT_NAME_GENERATOR:
         return new SimpleSegmentNameGenerator(tableName, segmentNameGeneratorConfigs.get(SEGMENT_NAME_POSTFIX));
       case NORMALIZED_DATE_SEGMENT_NAME_GENERATOR:

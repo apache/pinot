@@ -55,17 +55,17 @@ import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.util.Utf8;
 import org.apache.commons.lang3.math.NumberUtils;
-import org.apache.pinot.common.request.PinotQuery;
-import org.apache.pinot.core.requesthandler.PinotQueryParserFactory;
-import org.apache.pinot.core.requesthandler.PinotQueryRequest;
 import org.apache.pinot.client.Request;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.requesthandler.PinotQueryParserFactory;
+import org.apache.pinot.core.requesthandler.PinotQueryRequest;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
@@ -73,7 +73,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.testng.Assert;
@@ -284,7 +283,7 @@ public class ClusterIntegrationTestUtils {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGeneratorConfig.setInputFilePath(avroFile.getPath());
     segmentGeneratorConfig.setOutDir(segmentDir.getPath());
-    segmentGeneratorConfig.setTableName(TableNameBuilder.extractRawTableName(tableConfig.getTableName()));
+    segmentGeneratorConfig.setTableName(tableConfig.getTableName());
     // Test segment with space and special character in the file name
     segmentGeneratorConfig.setSegmentNamePostfix(segmentIndex + " %");
 
@@ -670,13 +669,14 @@ public class ClusterIntegrationTestUtils {
       Set<String> expectedValues = new HashSet<>();
       List<String> expectedOrderByValues = new ArrayList<>();
 
-      int h2NumRows = getH2ExpectedValues(expectedValues, expectedOrderByValues, h2ResultSet, h2MetaData, orderByColumns);
+      int h2NumRows =
+          getH2ExpectedValues(expectedValues, expectedOrderByValues, h2ResultSet, h2MetaData, orderByColumns);
 
       org.apache.pinot.client.ResultSet pinotSelectionResultSet = pinotResultSetGroup.getResultSet(0);
 
       // Only compare exhausted results
-      comparePinotResultsWithExpectedValues(expectedValues, expectedOrderByValues, pinotSelectionResultSet, orderByColumns,
-          pinotQuery, sqlQueries, h2NumRows, pinotNumRecordsSelected);
+      comparePinotResultsWithExpectedValues(expectedValues, expectedOrderByValues, pinotSelectionResultSet,
+          orderByColumns, pinotQuery, sqlQueries, h2NumRows, pinotNumRecordsSelected);
     } else {
       // Neither aggregation or selection results
       String failureMessage = "No aggregation or selection results found for query: " + pinotQuery;
@@ -705,7 +705,8 @@ public class ClusterIntegrationTestUtils {
         PinotQueryParserFactory.get(CommonConstants.Broker.Request.SQL).compileToBrokerRequest(pinotQuery);
 
     List<String> orderByColumns = new ArrayList<>();
-    if (isSelectionQuery(brokerRequest) && brokerRequest.getOrderBy() != null && brokerRequest.getOrderBy().size() > 0) {
+    if (isSelectionQuery(brokerRequest) && brokerRequest.getOrderBy() != null
+        && brokerRequest.getOrderBy().size() > 0) {
       orderByColumns.addAll(CalciteSqlParser.extractIdentifiers(brokerRequest.getPinotQuery().getOrderByList(), false));
     }
 
@@ -735,10 +736,11 @@ public class ClusterIntegrationTestUtils {
     if (isSelectionQuery(brokerRequest)) { // selection
       Set<String> expectedValues = new HashSet<>();
       List<String> expectedOrderByValues = new ArrayList<>();
-      int h2NumRows = getH2ExpectedValues(expectedValues, expectedOrderByValues, h2ResultSet, h2ResultSet.getMetaData(), orderByColumns);
+      int h2NumRows = getH2ExpectedValues(expectedValues, expectedOrderByValues, h2ResultSet, h2ResultSet.getMetaData(),
+          orderByColumns);
 
-      comparePinotResultsWithExpectedValues(expectedValues, expectedOrderByValues, resultTableResultSet,
-          orderByColumns, pinotQuery, sqlQueries, h2NumRows, pinotNumRecordsSelected);
+      comparePinotResultsWithExpectedValues(expectedValues, expectedOrderByValues, resultTableResultSet, orderByColumns,
+          pinotQuery, sqlQueries, h2NumRows, pinotNumRecordsSelected);
     } else { // aggregation
       if (!brokerRequest.isSetGroupBy()) { // aggregation only
         // compare the single row
@@ -808,7 +810,8 @@ public class ClusterIntegrationTestUtils {
     if (brokerRequest.getSelections() != null) {
       return true;
     }
-    if (brokerRequest.getAggregationsInfo() != null && brokerRequest.getAggregationsInfo().get(0).getAggregationType().equalsIgnoreCase("DISTINCT")) {
+    if (brokerRequest.getAggregationsInfo() != null && brokerRequest.getAggregationsInfo().get(0).getAggregationType()
+        .equalsIgnoreCase("DISTINCT")) {
       return true;
     }
     return false;
@@ -821,7 +824,8 @@ public class ClusterIntegrationTestUtils {
   }
 
   private static int getH2ExpectedValues(Set<String> expectedValues, List<String> expectedOrderByValues,
-      ResultSet h2ResultSet, ResultSetMetaData h2MetaData, Collection<String> orderByColumns) throws SQLException {
+      ResultSet h2ResultSet, ResultSetMetaData h2MetaData, Collection<String> orderByColumns)
+      throws SQLException {
     Map<String, String> reusableExpectedValueMap = new HashMap<>();
     Map<String, List<String>> reusableMultiValuesMap = new HashMap<>();
     List<String> reusableColumnOrder = new ArrayList<>();
@@ -846,7 +850,8 @@ public class ClusterIntegrationTestUtils {
 
         // Handle multi-value columns
         int length = columnName.length();
-        if (length > H2_MULTI_VALUE_SUFFIX_LENGTH && columnName.substring(length - H2_MULTI_VALUE_SUFFIX_LENGTH, length - 1).equals("__MV")) {
+        if (length > H2_MULTI_VALUE_SUFFIX_LENGTH && columnName
+            .substring(length - H2_MULTI_VALUE_SUFFIX_LENGTH, length - 1).equals("__MV")) {
           // Multi-value column
           String multiValueColumnName = columnName.substring(0, length - H2_MULTI_VALUE_SUFFIX_LENGTH);
           List<String> multiValue = reusableMultiValuesMap.get(multiValueColumnName);
@@ -889,13 +894,15 @@ public class ClusterIntegrationTestUtils {
     return h2NumRows;
   }
 
-  private static void comparePinotResultsWithExpectedValues(Set<String> expectedValues, List<String> expectedOrderByValues,
-      org.apache.pinot.client.ResultSet connectionResultSet, Collection<String> orderByColumns, String pinotQuery, List<String> sqlQueries,
-      int h2NumRows, long pinotNumRecordsSelected) throws IOException, SQLException {
+  private static void comparePinotResultsWithExpectedValues(Set<String> expectedValues,
+      List<String> expectedOrderByValues, org.apache.pinot.client.ResultSet connectionResultSet,
+      Collection<String> orderByColumns, String pinotQuery, List<String> sqlQueries, int h2NumRows,
+      long pinotNumRecordsSelected)
+      throws IOException, SQLException {
 
     int pinotNumRows = connectionResultSet.getRowCount();
     // No record selected in H2
-    if (h2NumRows== 0) {
+    if (h2NumRows == 0) {
       if (pinotNumRows != 0) {
         String failureMessage = "No record selected in H2 but number of records selected in Pinot: " + pinotNumRows;
         failure(pinotQuery, sqlQueries, failureMessage);
@@ -966,7 +973,8 @@ public class ClusterIntegrationTestUtils {
         String actualOrderByValue = actualOrderByValueBuilder.toString();
         // Check actual value in expected values set, skip comparison if query response is truncated by limit
         if ((!isLimitSet || limit > h2NumRows) && !expectedValues.contains(actualValue)) {
-          String failureMessage = "Selection result returned in Pinot but not in H2: " + actualValue + ", " + expectedValues;
+          String failureMessage =
+              "Selection result returned in Pinot but not in H2: " + actualValue + ", " + expectedValues;
           failure(pinotQuery, sqlQueries, failureMessage);
           return;
         }
@@ -986,7 +994,8 @@ public class ClusterIntegrationTestUtils {
 
   private static String removeTrailingZeroForNumber(String value, String type) {
     // remove trailing zero after decimal point to compare decimal numbers with h2 data
-    if (type == null || type.toUpperCase().equals("FLOAT") || type.toUpperCase().equals("DOUBLE") || type.toUpperCase().equals("BIGINT")) {
+    if (type == null || type.toUpperCase().equals("FLOAT") || type.toUpperCase().equals("DOUBLE") || type.toUpperCase()
+        .equals("BIGINT")) {
       try {
         return (new BigDecimal(value)).stripTrailingZeros().toPlainString();
       } catch (NumberFormatException e) {
@@ -999,11 +1008,11 @@ public class ClusterIntegrationTestUtils {
     final int FIRST_COLUMN_INDEX = 7;
     List<String> resultRequests = new ArrayList<>();
     StringBuilder columnsString = new StringBuilder();
-    for (String column: columns) {
+    for (String column : columns) {
       columnsString.append(column + ", ");
     }
 
-    for (String request: requests) {
+    for (String request : requests) {
       String resultRequest = "Select " + columnsString + request.trim().substring(FIRST_COLUMN_INDEX);
       resultRequests.add(resultRequest);
     }

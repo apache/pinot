@@ -32,7 +32,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /**
@@ -84,7 +83,7 @@ public class PinotOutputFormat<T> extends FileOutputFormat<NullWritable, T> {
     Schema schema = getSchema(job);
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGeneratorConfig.setOutDir(getTempSegmentDir(job) + "/segmentDir");
-    segmentGeneratorConfig.setTableName(TableNameBuilder.extractRawTableName(tableConfig.getTableName()));
+    segmentGeneratorConfig.setTableName(tableConfig.getTableName());
     segmentGeneratorConfig.setFormat(FileFormat.JSON);
     return segmentGeneratorConfig;
   }

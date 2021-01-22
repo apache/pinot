@@ -1,0 +1,43 @@
+{
+  "tableName": "baseballStats",
+  "tableType": "OFFLINE",
+  "segmentsConfig": {
+    "segmentPushType": "APPEND",
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+    "schemaName": "baseball",
+    "replication": "1"
+  },
+  "tenants": {
+  },
+  "tableIndexConfig": {
+    "loadMode": "HEAP",
+    "invertedIndexColumns": [
+      "playerID",
+      "teamID"
+    ]
+  },
+  "metadata": {
+    "customConfigs": {
+    }
+  },
+  "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "APPEND",
+      "segmentIngestionFrequency": "DAILY",
+      "batchConfigMaps": [
+        {
+          "inputDirURI": "examples/minions/batch/baseballStats/rawdata",
+          "inputFormat": "csv"
+        }
+      ],
+      "segmentNameSpec": {},
+      "pushSpec": {}
+    }
+  },
+  "task": {
+    "taskTypeConfigsMap": {
+      "SegmentGenerationAndPushTask": {
+      }
+    }
+  }
+}

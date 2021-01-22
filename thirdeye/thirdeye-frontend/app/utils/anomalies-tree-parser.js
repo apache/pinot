@@ -2,21 +2,22 @@ import { isEmpty } from '@ember/utils';
 import { set } from '@ember/object';
 import moment from 'moment';
 import { BREADCRUMB_TIME_DISPLAY_FORMAT } from 'thirdeye-frontend/utils/constants';
+import { humanizeFloat, humanizeChange } from 'thirdeye-frontend/utils/utils';
 
 const CLASSIFICATIONS = {
   METRICS: {
     KEY: 'metrics',
-    COMPONENT_PATH: 'entity-metrics',
+    COMPONENT_PATH: 'composite-anomalies/entity-metrics-anomalies',
     DEFAULT_TITLE: 'Metric Anomalies'
   },
   GROUPS: {
     KEY: 'groups',
-    COMPONENT_PATH: 'entity-groups',
+    COMPONENT_PATH: 'composite-anomalies/group-constituents-anomalies',
     DEFAULT_TITLE: 'ENTITY:'
   },
   ENTITIES: {
     KEY: 'entities',
-    COMPONENT_PATH: 'parent-anomalies',
+    COMPONENT_PATH: 'composite-anomalies/parent-anomalies',
     DEFAULT_TITLE: 'Entity'
   }
 };
@@ -154,16 +155,23 @@ const setMetricsBucket = (buckets, anomaly, metric) => {
     METRICS: { KEY: metricKey, DEFAULT_TITLE, COMPONENT_PATH }
   } = CLASSIFICATIONS;
   const { [metricKey]: { data } = {} } = buckets;
-  const { id, startTime, endTime, feedback, avgCurrentVal: current, avgBaselineVal: predicted } = anomaly;
+  const { id, startTime, endTime, feedback, dimensions, avgCurrentVal: current, avgBaselineVal: predicted } = anomaly;
 
   const metricTableRow = {
     id,
     startTime,
     endTime,
     metric,
+    dimensions,
     feedback,
-    current,
-    predicted
+    currentPredicted: {
+      current: humanizeFloat(current),
+      predicted: humanizeFloat(predicted),
+      deviation: Number((current - predicted) / predicted),
+      get deviationPercent() {
+        return humanizeChange(this.deviation);
+      }
+    }
   };
 
   if (isEmpty(data)) {
@@ -211,8 +219,14 @@ const setGroupsBucket = (buckets, anomaly, subEntityName, groupName) => {
     endTime,
     feedback,
     criticality,
-    current,
-    predicted
+    currentPredicted: {
+      current: humanizeFloat(current),
+      predicted: humanizeFloat(predicted),
+      deviation: Number((current - predicted) / predicted),
+      get deviationPercent() {
+        return humanizeChange(this.deviation);
+      }
+    }
   };
 
   if ([groupKey] in buckets) {
@@ -362,7 +376,7 @@ const parseGroupAnomaly = (input) => {
   const output = [];
   const data = [];
   const {
-    GROUPS: { DEFAULT_TITLE, COMPONENT_PATH }
+    METRICS: { DEFAULT_TITLE, COMPONENT_PATH }
   } = CLASSIFICATIONS;
   const {
     id,
@@ -393,8 +407,14 @@ const parseGroupAnomaly = (input) => {
       feedback,
       metric,
       dimensions,
-      current,
-      predicted
+      currentPredicted: {
+        current: humanizeFloat(current),
+        predicted: humanizeFloat(predicted),
+        deviation: Number((current - predicted) / predicted),
+        get deviationPercent() {
+          return humanizeChange(this.deviation);
+        }
+      }
     });
   }
 
@@ -443,6 +463,32 @@ const parseCompositeAnomaly = (input) => {
   }
 
   return { breadcrumbInfo, output };
+};
+
+/**
+ * Update the feedback on current node and then use DFS to recursively update the feedback
+ * for the entire subree if the cascading option is selected
+ *
+ * @param {Object} anomaly
+ *   The starting node(root of a subtree) to update the feedback
+ * @param {String} feedbackType
+ *   The feedback to update to
+ * @param {Boolean} cascade
+ *   Whether or not the feedback should be cascaded downstream
+ */
+const setTreeFeedback = (anomaly, feedbackType, cascade) => {
+  anomaly.feedback = {
+    ...anomaly.feedback,
+    feedbackType: feedbackType
+  };
+
+  if (cascade) {
+    const { children = [] } = anomaly;
+
+    for (const child of children) {
+      setTreeFeedback(child, feedbackType, cascade);
+    }
+  }
 };
 
 /**
@@ -515,8 +561,8 @@ export const parseRoot = (explorationId, input) => {
  *   The anomaly id
  * @param {Array<Object> or Object} input
  *   The tree structure hosting the anomaly referenced by the id.
- *      -If the entire tree is being passed, it would in array form
- *      -If a subtree is being passed, it would be in object form
+ *      -If the entire tree is being passed, it would be in an array form
+ *      -If a subtree is being passed, it would be in an object form
  *
  * @return {Object}
  *   The breadcrumb info and data for instantiating tables at any level in tree
@@ -538,4 +584,33 @@ export const parseSubtree = (id, input) => {
   } else if (isEmpty(metric)) {
     return parseCompositeAnomaly(anomaly);
   }
+};
+
+/**
+ * Update anomaly feedback for the current node and subtree nodes, provided the subtree nodes are not already
+ * explicitly tagged with feedback
+ *
+ * @param {Number} id
+ *   The anomaly id
+ * @param {String} feedback
+ *   The feedback submitted by the user
+ * @param {Boolean} cascade
+ *   Whether or not the feedback should be cascaded downstream
+ * @param {Array<Object> or Object} input
+ *   The tree structure hosting the anomaly referenced by the id.
+ *      -If the entire tree is being passed, it would be in an array form
+ *      -If a subtree is being passed, it would be in an object form
+ *
+ */
+export const updateAnomalyFeedback = (id, feedback, cascade, input) => {
+  let anomaly;
+  if (Array.isArray(input)) {
+    for (const entry of input) {
+      anomaly = findAnomaly(id, entry);
+    }
+  } else {
+    anomaly = findAnomaly(id, input);
+  }
+
+  setTreeFeedback(anomaly, feedback, cascade);
 };

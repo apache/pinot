@@ -19,33 +19,41 @@
 package org.apache.pinot.core.plan;
 
 import java.math.BigDecimal;
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.geospatial.transform.function.StDistanceFunction;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
 import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
 import org.apache.pinot.core.operator.filter.ExpressionFilterOperator;
 import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
+import org.apache.pinot.core.operator.filter.H3IndexFilterOperator;
+import org.apache.pinot.core.operator.filter.JsonMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.FSTBasedRegexpPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
+import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.FilterContext;
+import org.apache.pinot.core.query.request.context.FunctionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.predicate.EqPredicate;
 import org.apache.pinot.core.query.request.context.predicate.NotEqPredicate;
+import org.apache.pinot.core.query.request.context.predicate.JsonMatchPredicate;
 import org.apache.pinot.core.query.request.context.predicate.Predicate;
 import org.apache.pinot.core.query.request.context.predicate.RangePredicate;
 import org.apache.pinot.core.query.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.core.query.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.core.segment.index.datasource.MutableDataSource;
+import org.apache.pinot.core.segment.index.readers.JsonIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
 import org.apache.pinot.core.segment.index.readers.ValidDocIndexReader;
 import org.apache.pinot.core.util.QueryOptions;
@@ -91,6 +99,39 @@ public class FilterPlanNode implements PlanNode {
   }
 
   /**
+   * H3 index can be applied iff:
+   * <ul>
+   *   <li>Predicate is of type RANGE</li>
+   *   <li>Left-hand-side of the predicate is an ST_Distance function</li>
+   *   <li>One argument of the ST_Distance function is an identifier, the other argument is an literal</li>
+   *   <li>The identifier column has H3 index</li>
+   * </ul>
+   */
+  private boolean canApplyH3Index(Predicate predicate, FunctionContext function) {
+    if (predicate.getType() != Predicate.Type.RANGE) {
+      return false;
+    }
+    if (!function.getFunctionName().equalsIgnoreCase(StDistanceFunction.FUNCTION_NAME)) {
+      return false;
+    }
+    List<ExpressionContext> arguments = function.getArguments();
+    if (arguments.size() != 2) {
+      throw new BadQueryRequestException("Expect 2 arguments for function: " + StDistanceFunction.FUNCTION_NAME);
+    }
+    // TODO: handle nested geography/geometry conversion functions
+    String columnName = null;
+    boolean findLiteral = false;
+    for (ExpressionContext argument : arguments) {
+      if (argument.getType() == ExpressionContext.Type.IDENTIFIER) {
+        columnName = argument.getIdentifier();
+      } else if (argument.getType() == ExpressionContext.Type.LITERAL) {
+        findLiteral = true;
+      }
+    }
+    return columnName != null && _indexSegment.getDataSource(columnName).getH3Index() != null && findLiteral;
+  }
+
+  /**
    * Helper method to build the operator tree from the filter.
    */
   private BaseFilterOperator constructPhysicalOperator(FilterContext filter,
@@ -128,33 +169,34 @@ public class FilterPlanNode implements PlanNode {
         Predicate predicate = filter.getPredicate();
         ExpressionContext lhs = predicate.getLhs();
         if (lhs.getType() == ExpressionContext.Type.FUNCTION) {
+          if (canApplyH3Index(predicate, lhs.getFunction())) {
+            return new H3IndexFilterOperator(_indexSegment, predicate, _numDocs);
+          }
           // TODO: ExpressionFilterOperator does not support predicate types without PredicateEvaluator (IS_NULL,
           //       IS_NOT_NULL, TEXT_MATCH)
           return new ExpressionFilterOperator(_indexSegment, predicate, _numDocs);
         } else {
-          DataSource dataSource = _indexSegment.getDataSource(lhs.getIdentifier());
+          String column = lhs.getIdentifier();
+          DataSource dataSource = _indexSegment.getDataSource(column);
           switch (predicate.getType()) {
             case TEXT_MATCH:
               return new TextMatchFilterOperator(dataSource.getTextIndex(), ((TextMatchPredicate) predicate).getValue(),
                   _numDocs);
             case REGEXP_LIKE:
-              PredicateEvaluator evaluator = null;
-
-              // FST Index is available only for rolled out segments. So, we use different
-              // evaluator for rolled out and consuming segments.
+              // FST Index is available only for rolled out segments. So, we use different evaluator for rolled out and
+              // consuming segments.
               //
               // Rolled out segments (immutable): FST Index reader is available use FSTBasedEvaluator
               // else use regular flow of getting predicate evaluator.
               //
-              // Consuming segments: when FSTIndex is enabled use AutomatonBasedEvaluator so that regexp
-              // matching logic is similar to that of FSTBasedEvaluator else use regular flow of getting
-              // predicate evaluator.
+              // Consuming segments: When FST is enabled, use AutomatonBasedEvaluator so that regexp matching logic is
+              // similar to that of FSTBasedEvaluator, else use regular flow of getting predicate evaluator.
+              PredicateEvaluator evaluator;
               if (dataSource.getFSTIndex() != null) {
                 evaluator = FSTBasedRegexpPredicateEvaluatorFactory
                     .newFSTBasedEvaluator(dataSource.getFSTIndex(), dataSource.getDictionary(),
                         ((RegexpLikePredicate) predicate).getValue());
-              } else if (dataSource instanceof MutableDataSource && ((MutableDataSource) dataSource)
-                  .hasFSTIndexEnabled()) {
+              } else if (dataSource instanceof MutableDataSource && ((MutableDataSource) dataSource).isFSTEnabled()) {
                 evaluator = FSTBasedRegexpPredicateEvaluatorFactory
                     .newAutomatonBasedEvaluator(dataSource.getDictionary(),
                         ((RegexpLikePredicate) predicate).getValue());
@@ -163,6 +205,11 @@ public class FilterPlanNode implements PlanNode {
                     dataSource.getDataSourceMetadata().getDataType());
               }
               return FilterOperatorUtils.getLeafFilterOperator(evaluator, dataSource, _numDocs);
+            case JSON_MATCH:
+              JsonIndexReader jsonIndex = dataSource.getJsonIndex();
+              Preconditions
+                  .checkState(jsonIndex != null, "Cannot apply JSON_MATCH on column: %s without json index", column);
+              return new JsonMatchFilterOperator(jsonIndex, ((JsonMatchPredicate) predicate).getValue(), _numDocs);
             case IS_NULL:
               NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
               if (nullValueVector != null) {

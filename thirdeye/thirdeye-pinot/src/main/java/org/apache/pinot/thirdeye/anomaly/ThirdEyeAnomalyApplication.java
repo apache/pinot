@@ -37,6 +37,8 @@ import org.apache.pinot.thirdeye.datalayer.dto.SessionDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.pinot.resources.PinotDataSourceResource;
+import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionAlertRegistry;
+import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
 import org.apache.pinot.thirdeye.model.download.ModelDownloaderManager;
 import org.apache.pinot.thirdeye.scheduler.DetectionCronScheduler;
 import org.apache.pinot.thirdeye.scheduler.SubscriptionCronScheduler;
@@ -100,9 +102,14 @@ public class ThirdEyeAnomalyApplication
   public void run(final ThirdEyeAnomalyConfiguration config, final Environment env)
       throws Exception {
     LOG.info("Starting ThirdeyeAnomalyApplication : Scheduler {} Worker {}", config.isScheduler(), config.isWorker());
+    if (config.getComponentPackageList() != null) {
+      DetectionRegistry.setPackageList(config.getComponentPackageList());
+      DetectionAlertRegistry.setPackageList(config.getComponentPackageList());
+    }
     super.initDAOs();
     try {
       ThirdEyeCacheRegistry.initializeCaches(config);
+
     } catch (Exception e) {
       LOG.error("Exception while loading caches", e);
     }

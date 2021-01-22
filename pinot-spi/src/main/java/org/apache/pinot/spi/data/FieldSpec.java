@@ -20,6 +20,7 @@ package org.apache.pinot.spi.data;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.Serializable;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.EqualityUtils;
@@ -38,7 +39,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * <p>- <code>VirtualColumnProvider</code>: the virtual column provider to use for this field.
  */
 @SuppressWarnings("unused")
-public abstract class FieldSpec implements Comparable<FieldSpec> {
+public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   private static final int DEFAULT_MAX_LENGTH = 512;
 
   // TODO: revisit to see if we allow 0-length byte array

@@ -18,7 +18,22 @@
  */
 package org.apache.pinot.minion.executor;
 
+import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.spi.annotations.minion.TaskExecutorFactory;
+
+
+@TaskExecutorFactory
 public class MergeRollupTaskExecutorFactory implements PinotTaskExecutorFactory {
+
+  @Override
+  public void init(MinionTaskZkMetadataManager zkMetadataManager) {
+  }
+
+  @Override
+  public String getTaskType() {
+    return MinionConstants.MergeRollupTask.TASK_TYPE;
+  }
+
   @Override
   public PinotTaskExecutor create() {
     return new MergeRollupTaskExecutor();

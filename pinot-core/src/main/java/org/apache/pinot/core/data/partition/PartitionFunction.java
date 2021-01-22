@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.core.data.partition;
 
+import java.io.Serializable;
+
+
 /**
  * Interface for partition function.
  */
-public interface PartitionFunction {
+public interface PartitionFunction extends Serializable {
 
   /**
    * Method to compute and return partition id for the given value.

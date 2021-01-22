@@ -16,5 +16,5 @@ test('it renders', function (assert) {
 
   this.render(hbs`{{composite-anomalies alertId=alertId anomalies=anomalies}}`);
 
-  assert.equal(this.$().text().trim(), 'Alert Anomalies');
+  assert.ok(this.$().text().trim().includes('Alert Anomalies'));
 });

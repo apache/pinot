@@ -21,6 +21,7 @@ package org.apache.pinot.core.data.manager.offline;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.net.URL;
+import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.AccessOption;
@@ -159,6 +160,10 @@ public class DimensionTableDataManagerTest {
     Assert.assertNotNull(spec, "Should return spec for existing column");
     Assert.assertEquals(spec.getDataType(), FieldSpec.DataType.STRING,
         "Should return correct data type for teamName column");
+
+    // Confirm we can read primary column list
+    List<String> pkColumns = mgr.getPrimaryKeyColumns();
+    Assert.assertEquals(pkColumns, Arrays.asList("teamID"), "Should return PK column list");
 
     // Remove the segment
     List<SegmentDataManager> segmentManagers = mgr.acquireAllSegments();

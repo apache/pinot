@@ -37,6 +37,7 @@ import org.apache.pinot.core.query.request.context.predicate.EqPredicate;
 import org.apache.pinot.core.query.request.context.predicate.InPredicate;
 import org.apache.pinot.core.query.request.context.predicate.IsNotNullPredicate;
 import org.apache.pinot.core.query.request.context.predicate.IsNullPredicate;
+import org.apache.pinot.core.query.request.context.predicate.JsonMatchPredicate;
 import org.apache.pinot.core.query.request.context.predicate.NotEqPredicate;
 import org.apache.pinot.core.query.request.context.predicate.NotInPredicate;
 import org.apache.pinot.core.query.request.context.predicate.RangePredicate;
@@ -290,6 +291,9 @@ public class QueryContextConverterUtils {
       case TEXT_MATCH:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new TextMatchPredicate(getExpression(node.getColumn()), node.getValue().get(0)));
+      case JSON_MATCH:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new JsonMatchPredicate(getExpression(node.getColumn()), node.getValue().get(0)));
       case IS_NULL:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new IsNullPredicate(getExpression(node.getColumn())));

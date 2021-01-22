@@ -21,6 +21,7 @@ package org.apache.pinot.core.indexsegment.generator;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -34,6 +35,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
+import org.apache.pinot.core.segment.creator.impl.inv.geospatial.H3IndexConfig;
 import org.apache.pinot.core.segment.name.FixedSegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SimpleSegmentNameGenerator;
@@ -49,6 +51,7 @@ import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.joda.time.format.DateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,7 +60,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Configuration properties used in the creation of index segments.
  */
-public class SegmentGeneratorConfig {
+public class SegmentGeneratorConfig implements Serializable {
   public enum TimeColumnType {
     EPOCH, SIMPLE_DATE
   }
@@ -65,19 +68,21 @@ public class SegmentGeneratorConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGeneratorConfig.class);
 
   private TableConfig _tableConfig;
-  private Map<String, String> _customProperties = new HashMap<>();
-  private Set<String> _rawIndexCreationColumns = new HashSet<>();
-  private Map<String, ChunkCompressorFactory.CompressionType> _rawIndexCompressionType = new HashMap<>();
-  private List<String> _invertedIndexCreationColumns = new ArrayList<>();
-  private List<String> _textIndexCreationColumns = new ArrayList<>();
-  private List<String> _fstIndexCreationColumns = new ArrayList<>();
-  private List<String> _columnSortOrder = new ArrayList<>();
+  private final Map<String, String> _customProperties = new HashMap<>();
+  private final Set<String> _rawIndexCreationColumns = new HashSet<>();
+  private final Map<String, ChunkCompressorFactory.CompressionType> _rawIndexCompressionType = new HashMap<>();
+  private final List<String> _invertedIndexCreationColumns = new ArrayList<>();
+  private final List<String> _textIndexCreationColumns = new ArrayList<>();
+  private final List<String> _fstIndexCreationColumns = new ArrayList<>();
+  private final List<String> _jsonIndexCreationColumns = new ArrayList<>();
+  private final Map<String, H3IndexConfig> _h3IndexConfigs = new HashMap<>();
+  private final List<String> _columnSortOrder = new ArrayList<>();
   private List<String> _varLengthDictionaryColumns = new ArrayList<>();
   private String _inputFilePath = null;
   private FileFormat _format = FileFormat.AVRO;
   private String _recordReaderPath = null; //TODO: this should be renamed to recordReaderClass or even better removed
   private String _outDir = null;
-  private String _tableName = null;
+  private String _rawTableName = null;
   private String _segmentName = null;
   private String _segmentNamePostfix = null;
   private String _segmentTimeColumnName = null;
@@ -123,6 +128,7 @@ public class SegmentGeneratorConfig {
     setSchema(schema);
 
     _tableConfig = tableConfig;
+    setTableName(tableConfig.getTableName());
 
     // NOTE: SegmentGeneratorConfig#setSchema doesn't set the time column anymore. timeColumnName is expected to be read from table config.
     String timeColumnName = null;
@@ -146,9 +152,8 @@ public class SegmentGeneratorConfig {
 
         if (noDictionaryColumnMap != null) {
           Map<String, ChunkCompressorFactory.CompressionType> serializedNoDictionaryColumnMap =
-              noDictionaryColumnMap.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
-                  e -> (ChunkCompressorFactory.CompressionType) ChunkCompressorFactory.CompressionType
-                      .valueOf(e.getValue())));
+              noDictionaryColumnMap.entrySet().stream().collect(Collectors
+                  .toMap(Map.Entry::getKey, e -> ChunkCompressorFactory.CompressionType.valueOf(e.getValue())));
           this.setRawIndexCompressionType(serializedNoDictionaryColumnMap);
         }
       }
@@ -165,10 +170,16 @@ public class SegmentGeneratorConfig {
       //       - Set 'generate.inverted.index.before.push' to 'true' in custom config (deprecated)
       //       - Enable 'createInvertedIndexDuringSegmentGeneration' in indexing config
       // TODO: Clean up the table configs with the deprecated settings, and always use the one in the indexing config
-      Map<String, String> customConfigs = tableConfig.getCustomConfig().getCustomConfigs();
-      if ((customConfigs != null && Boolean.parseBoolean(customConfigs.get("generate.inverted.index.before.push")))
-          || indexingConfig.isCreateInvertedIndexDuringSegmentGeneration()) {
-        _invertedIndexCreationColumns = indexingConfig.getInvertedIndexColumns();
+      if (indexingConfig.getInvertedIndexColumns() != null) {
+        Map<String, String> customConfigs = tableConfig.getCustomConfig().getCustomConfigs();
+        if ((customConfigs != null && Boolean.parseBoolean(customConfigs.get("generate.inverted.index.before.push")))
+            || indexingConfig.isCreateInvertedIndexDuringSegmentGeneration()) {
+          _invertedIndexCreationColumns.addAll(indexingConfig.getInvertedIndexColumns());
+        }
+      }
+
+      if (indexingConfig.getJsonIndexColumns() != null) {
+        _jsonIndexCreationColumns.addAll(indexingConfig.getJsonIndexColumns());
       }
 
       List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
@@ -180,6 +191,7 @@ public class SegmentGeneratorConfig {
 
       extractTextIndexColumnsFromTableConfig(tableConfig);
       extractFSTIndexColumnsFromTableConfig(tableConfig);
+      extractH3IndexConfigsFromTableConfig(tableConfig);
 
       _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
     }
@@ -237,6 +249,18 @@ public class SegmentGeneratorConfig {
     }
   }
 
+  private void extractH3IndexConfigsFromTableConfig(TableConfig tableConfig) {
+    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+    if (fieldConfigList != null) {
+      for (FieldConfig fieldConfig : fieldConfigList) {
+        if (fieldConfig.getIndexType() == FieldConfig.IndexType.H3) {
+          //noinspection ConstantConditions
+          _h3IndexConfigs.put(fieldConfig.getName(), new H3IndexConfig(fieldConfig.getProperties()));
+        }
+      }
+    }
+  }
+
   public Map<String, String> getCustomProperties() {
     return _customProperties;
   }
@@ -288,6 +312,14 @@ public class SegmentGeneratorConfig {
 
   public List<String> getFSTIndexCreationColumns() {
     return _fstIndexCreationColumns;
+  }
+
+  public List<String> getJsonIndexCreationColumns() {
+    return _jsonIndexCreationColumns;
+  }
+
+  public Map<String, H3IndexConfig> getH3IndexConfigs() {
+    return _h3IndexConfigs;
   }
 
   public List<String> getColumnSortOrder() {
@@ -406,11 +438,11 @@ public class SegmentGeneratorConfig {
   }
 
   public String getTableName() {
-    return _tableName;
+    return _rawTableName;
   }
 
   public void setTableName(String tableName) {
-    _tableName = tableName;
+    _rawTableName = tableName != null ? TableNameBuilder.extractRawTableName(tableName) : null;
   }
 
   public String getSegmentName() {
@@ -557,7 +589,7 @@ public class SegmentGeneratorConfig {
     if (_segmentName != null) {
       return new FixedSegmentNameGenerator(_segmentName);
     }
-    return new SimpleSegmentNameGenerator(_tableName, _segmentNamePostfix);
+    return new SimpleSegmentNameGenerator(_rawTableName, _segmentNamePostfix);
   }
 
   public void setSegmentNameGenerator(SegmentNameGenerator segmentNameGenerator) {

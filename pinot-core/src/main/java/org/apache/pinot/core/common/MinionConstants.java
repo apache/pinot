@@ -88,4 +88,12 @@ public class MinionConstants {
     public static final String AGGREGATION_TYPE_KEY_SUFFIX = ".aggregationType";
     public static final String MAX_NUM_RECORDS_PER_SEGMENT_KEY = "maxNumRecordsPerSegment";
   }
+
+  // Generate segment and push to controller based on batch ingestion configs
+  public static class SegmentGenerationAndPushTask {
+    public static final String TASK_TYPE = "SegmentGenerationAndPushTask";
+    public static final String CONFIG_NUMBER_CONCURRENT_TASKS_PER_INSTANCE =
+        "SegmentGenerationAndPushTask.numConcurrentTasksPerInstance";
+  }
+
 }

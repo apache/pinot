@@ -211,6 +211,13 @@ public class ControllerRequestURLBuilder {
     }
     return url;
   }
+  public String forTableSchemaGet(String tableName) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "schema");
+  }
+
+  public String forTableExternalView(String tableName) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "externalview");
+  }
 
   public String forSchemaCreate() {
     return StringUtil.join("/", _baseUrl, "schemas");
@@ -228,8 +235,8 @@ public class ControllerRequestURLBuilder {
     return URIUtils.constructDownloadUrl(_baseUrl, tableName, segmentName);
   }
 
-  public String forSegmentDelete(String resourceName, String segmentName) {
-    return StringUtil.join("/", _baseUrl, "datafiles", resourceName, segmentName);
+  public String forSegmentDelete(String tableName, String segmentName) {
+    return StringUtil.join("/", _baseUrl, "segments", tableName, segmentName);
   }
 
   public String forSegmentDeleteAPI(String tableName, String segmentName, String tableType) {
@@ -297,8 +304,9 @@ public class ControllerRequestURLBuilder {
 
   public String forIngestFromFile(String tableNameWithType, String batchConfigMapStr)
       throws UnsupportedEncodingException {
-    return String.format("%s?tableNameWithType=%s&batchConfigMapStr=%s", StringUtil.join("/", _baseUrl, "ingestFromFile"),
-        tableNameWithType, URLEncoder.encode(batchConfigMapStr, StandardCharsets.UTF_8.toString()));
+    return String
+        .format("%s?tableNameWithType=%s&batchConfigMapStr=%s", StringUtil.join("/", _baseUrl, "ingestFromFile"),
+            tableNameWithType, URLEncoder.encode(batchConfigMapStr, StandardCharsets.UTF_8.toString()));
   }
 
   public String forIngestFromFile(String tableNameWithType, Map<String, String> batchConfigMap)
@@ -323,5 +331,9 @@ public class ControllerRequestURLBuilder {
         batchConfigMap.entrySet().stream().map(e -> String.format("\"%s\":\"%s\"", e.getKey(), e.getValue()))
             .collect(Collectors.joining(",", "{", "}"));
     return forIngestFromURI(tableNameWithType, batchConfigMapStr, sourceURIStr);
+  }
+
+  public String forClusterConfigs() {
+    return StringUtil.join("/", _baseUrl, "cluster/configs");
   }
 }

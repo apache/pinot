@@ -1,0 +1,29 @@
+{
+  "metricFieldSpecs": [
+
+  ],
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "FLOAT",
+      "name": "lon"
+    },
+    {
+      "dataType": "FLOAT",
+      "name": "lat"
+    },
+    {
+      "dataType": "STRING",
+      "name": "name"
+    },
+    {
+      "dataType": "STRING",
+      "name": "address"
+    },
+    {
+      "dataType": "BYTES",
+      "name": "location_st_point",
+      "transformFunction": "toSphericalGeography(stPoint(lon,lat))"
+    }
+  ],
+  "schemaName": "starbucksStores"
+}

@@ -19,6 +19,7 @@
 package org.apache.pinot.tools.admin.command;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.collect.ImmutableMap;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -28,21 +29,27 @@ import java.net.InetAddress;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.tenant.TenantRole;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.QuickstartTableRequest;
 import org.apache.pinot.tools.BootstrapTableTool;
 import org.apache.pinot.tools.utils.JarUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
 
 public class QuickstartRunner {
+  private static final Logger LOGGER = LoggerFactory.getLogger(QuickstartRunner.class.getName());
   private static final Random RANDOM = new Random();
   private static final String CLUSTER_NAME = "QuickStartCluster";
 
@@ -53,6 +60,8 @@ public class QuickstartRunner {
   private static final int DEFAULT_SERVER_ADMIN_API_PORT = 7500;
   private static final int DEFAULT_BROKER_PORT = 8000;
   private static final int DEFAULT_CONTROLLER_PORT = 9000;
+  private static final int DEFAULT_MINION_PORT = 6000;
+
 
   private static final String DEFAULT_ZK_DIR = "PinotZkDir";
   private static final String DEFAULT_CONTROLLER_DIR = "PinotControllerDir";
@@ -63,6 +72,7 @@ public class QuickstartRunner {
   private final int _numServers;
   private final int _numBrokers;
   private final int _numControllers;
+  private final int _numMinions;
   private final File _tempDir;
   private final boolean _enableTenantIsolation;
 
@@ -74,10 +84,17 @@ public class QuickstartRunner {
   public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numServers, int numBrokers,
       int numControllers, File tempDir, boolean enableIsolation)
       throws Exception {
+    this(tableRequests, numServers, numBrokers, numControllers, 1, tempDir, enableIsolation);
+  }
+
+  public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numServers, int numBrokers,
+      int numControllers, int numMinions, File tempDir, boolean enableIsolation)
+      throws Exception {
     _tableRequests = tableRequests;
     _numServers = numServers;
     _numBrokers = numBrokers;
     _numControllers = numControllers;
+    _numMinions = numMinions;
     _tempDir = tempDir;
     _enableTenantIsolation = enableIsolation;
     clean();
@@ -131,6 +148,16 @@ public class QuickstartRunner {
     }
   }
 
+  private void startMinions()
+      throws Exception {
+    for (int i = 0; i < _numMinions; i++) {
+      StartMinionCommand minionStarter = new StartMinionCommand();
+      minionStarter.setMinionPort(DEFAULT_MINION_PORT + i)
+          .setZkAddress(ZK_ADDRESS).setClusterName(CLUSTER_NAME);
+      minionStarter.execute();
+    }
+  }
+
   private void clean()
       throws Exception {
     FileUtils.cleanDirectory(_tempDir);
@@ -138,10 +165,12 @@ public class QuickstartRunner {
 
   public void startAll()
       throws Exception {
+    registerDefaultPinotFS();
     startZookeeper();
     startControllers();
     startBrokers();
     startServers();
+    startMinions();
   }
 
   public void stop()
@@ -221,5 +250,22 @@ public class QuickstartRunner {
     int brokerPort = _brokerPorts.get(RANDOM.nextInt(_brokerPorts.size()));
     return JsonUtils.stringToJsonNode(new PostQueryCommand().setBrokerPort(String.valueOf(brokerPort))
         .setQueryType(CommonConstants.Broker.Request.SQL).setQuery(query).run());
+  }
+
+  public static void registerDefaultPinotFS() {
+    registerPinotFS("s3", "org.apache.pinot.plugin.filesystem.S3PinotFS", ImmutableMap.of("region", System.getProperty("AWS_REGION", "us-west-2")));
+  }
+
+  public static void registerPinotFS(String scheme, String fsClassName, Map<String, Object> configs) {
+    if (PinotFSFactory.isSchemeSupported(scheme)) {
+      LOGGER.info("PinotFS for scheme: {} is already registered.", scheme);
+      return;
+    }
+    try {
+      PinotFSFactory.register(scheme, fsClassName, new PinotConfiguration(configs));
+      LOGGER.info("Registered PinotFS for scheme: {}", scheme);
+    } catch (Exception e) {
+      LOGGER.info("Unable to init PinotFS for scheme: {}, class name: {}, configs: {}, Error: {}", scheme, fsClassName, configs, e);
+    }
   }
 }

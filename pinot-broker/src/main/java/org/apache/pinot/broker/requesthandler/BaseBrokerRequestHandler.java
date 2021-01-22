@@ -26,6 +26,7 @@ import com.google.common.base.Splitter;
 import com.google.common.util.concurrent.RateLimiter;
 import java.net.InetAddress;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -77,14 +78,16 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.helix.TableCache;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
 import org.apache.pinot.core.query.utils.idset.IdSets;
-import org.apache.pinot.core.requesthandler.BrokerRequestOptimizer;
 import org.apache.pinot.core.requesthandler.PinotQueryParserFactory;
 import org.apache.pinot.core.requesthandler.PinotQueryRequest;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.QueryOptions;
+import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -107,7 +110,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final BrokerMetrics _brokerMetrics;
 
   protected final AtomicLong _requestIdGenerator = new AtomicLong();
-  protected final BrokerRequestOptimizer _brokerRequestOptimizer = new BrokerRequestOptimizer();
+  protected final QueryOptimizer _queryOptimizer = new QueryOptimizer();
   protected final BrokerReduceService _brokerReduceService;
 
   protected final String _brokerId;
@@ -193,6 +196,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
     setOptions(requestId, query, request, brokerRequest);
 
+    // TODO: Separate the handling of SQL and PQL, and only rewrite one format after releasing 0.7.0. Currently need to
+    //       handle both of them for backward-compatibility.
+
     if (isLiteralOnlyQuery(brokerRequest)) {
       LOGGER.debug("Request {} contains only Literal, skipping server query: {}", requestId, query);
       try {
@@ -204,12 +210,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
                 e.getMessage());
       }
     }
-
-    // TODO:
-    //   Separate the query rewrite for SQL and PQL and only rewrite one format (PinotQuery for SQL, BrokerRequest for
-    //   PQL) to save the unnecessary overhead.
-    //   Prerequisite:
-    //     Support filter optimizer for SQL. Currently the filter is always picked from the BrokerRequest.
 
     try {
       handleSubquery(brokerRequest, request, requesterIdentity, requestStatistics);
@@ -307,26 +307,27 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e));
     }
 
-    // Optimize the query
-    // TODO: get time column name from schema or table config so that we can apply it for REALTIME only case
-    // We get timeColumnName from time boundary service currently, which only exists for offline table
-    String timeColumn = getTimeColumnName(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName));
+    // Prepare offline and real-time requests
     BrokerRequest offlineBrokerRequest = null;
     BrokerRequest realtimeBrokerRequest = null;
     if ((offlineTableName != null) && (realtimeTableName != null)) {
       // Hybrid
-      offlineBrokerRequest = _brokerRequestOptimizer.optimize(getOfflineBrokerRequest(brokerRequest), timeColumn);
-      realtimeBrokerRequest = _brokerRequestOptimizer.optimize(getRealtimeBrokerRequest(brokerRequest), timeColumn);
+      offlineBrokerRequest = getOfflineBrokerRequest(brokerRequest);
+      optimize(offlineBrokerRequest, rawTableName);
+      realtimeBrokerRequest = getRealtimeBrokerRequest(brokerRequest);
+      optimize(realtimeBrokerRequest, rawTableName);
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.HYBRID);
     } else if (offlineTableName != null) {
       // OFFLINE only
-      brokerRequest.getQuerySource().setTableName(offlineTableName);
-      offlineBrokerRequest = _brokerRequestOptimizer.optimize(brokerRequest, timeColumn);
+      setTableName(brokerRequest, offlineTableName);
+      optimize(brokerRequest, rawTableName);
+      offlineBrokerRequest = brokerRequest;
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.OFFLINE);
     } else {
       // REALTIME only
-      brokerRequest.getQuerySource().setTableName(realtimeTableName);
-      realtimeBrokerRequest = _brokerRequestOptimizer.optimize(brokerRequest, timeColumn);
+      setTableName(brokerRequest, realtimeTableName);
+      optimize(brokerRequest, rawTableName);
+      realtimeBrokerRequest = brokerRequest;
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.REALTIME);
     }
 
@@ -1050,16 +1051,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    */
   @VisibleForTesting
   static void setOptions(long requestId, String query, JsonNode jsonRequest, BrokerRequest brokerRequest) {
-    if (jsonRequest.has(Broker.Request.TRACE) && jsonRequest.get(Broker.Request.TRACE).asBoolean()) {
-      LOGGER.debug("Enable trace for request {}: {}", requestId, query);
-      brokerRequest.setEnableTrace(true);
-    }
-
-    if (jsonRequest.has(Broker.Request.DEBUG_OPTIONS)) {
-      Map<String, String> debugOptions = getOptionsFromJson(jsonRequest, Broker.Request.DEBUG_OPTIONS);
-      LOGGER.debug("Debug options are set to: {} for request {}: {}", debugOptions, requestId, query);
-      brokerRequest.setDebugOptions(debugOptions);
-    }
+    PinotQuery pinotQuery = brokerRequest.getPinotQuery();
 
     Map<String, String> queryOptions = new HashMap<>();
     if (jsonRequest.has(Broker.Request.QUERY_OPTIONS)) {
@@ -1070,11 +1062,29 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (queryOptionsFromBrokerRequest != null) {
       queryOptions.putAll(queryOptionsFromBrokerRequest);
     }
+    boolean enableTrace = jsonRequest.has(Broker.Request.TRACE) && jsonRequest.get(Broker.Request.TRACE).asBoolean();
+    if (enableTrace) {
+      brokerRequest.setEnableTrace(true);
+      queryOptions.put(Broker.Request.TRACE, "true");
+    }
     // NOTE: Always set query options because we will put 'timeoutMs' later
     brokerRequest.setQueryOptions(queryOptions);
+    if (pinotQuery != null) {
+      pinotQuery.setQueryOptions(queryOptions);
+    }
     if (!queryOptions.isEmpty()) {
-      LOGGER
-          .debug("Query options are set to: {} for request {}: {}", brokerRequest.getQueryOptions(), requestId, query);
+      LOGGER.debug("Query options are set to: {} for request {}: {}", queryOptions, requestId, query);
+    }
+
+    if (jsonRequest.has(Broker.Request.DEBUG_OPTIONS)) {
+      Map<String, String> debugOptions = getOptionsFromJson(jsonRequest, Broker.Request.DEBUG_OPTIONS);
+      if (!debugOptions.isEmpty()) {
+        LOGGER.debug("Debug options are set to: {} for request {}: {}", debugOptions, requestId, query);
+        brokerRequest.setDebugOptions(debugOptions);
+        if (pinotQuery != null) {
+          pinotQuery.setDebugOptions(debugOptions);
+        }
+      }
     }
   }
 
@@ -1246,15 +1256,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   /**
-   * Helper method to get the time column name for the OFFLINE table name from the time boundary service, or
-   * <code>null</code> if the time boundary service does not have the information.
-   */
-  private String getTimeColumnName(String offlineTableName) {
-    TimeBoundaryInfo timeBoundaryInfo = _routingManager.getTimeBoundaryInfo(offlineTableName);
-    return timeBoundaryInfo != null ? timeBoundaryInfo.getTimeColumn() : null;
-  }
-
-  /**
    * Helper method to create an OFFLINE broker request from the given hybrid broker request.
    * <p>This step will attach the time boundary to the request.
    */
@@ -1262,7 +1263,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     BrokerRequest offlineRequest = hybridBrokerRequest.deepCopy();
     String rawTableName = hybridBrokerRequest.getQuerySource().getTableName();
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
-    offlineRequest.getQuerySource().setTableName(offlineTableName);
+    setTableName(offlineRequest, offlineTableName);
     attachTimeBoundary(rawTableName, offlineRequest, true);
     return offlineRequest;
   }
@@ -1275,7 +1276,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     BrokerRequest realtimeRequest = hybridBrokerRequest.deepCopy();
     String rawTableName = hybridBrokerRequest.getQuerySource().getTableName();
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
-    realtimeRequest.getQuerySource().setTableName(realtimeTableName);
+    setTableName(realtimeRequest, realtimeTableName);
     attachTimeBoundary(rawTableName, realtimeRequest, false);
     return realtimeRequest;
   }
@@ -1291,12 +1292,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return;
     }
 
+    String timeColumn = timeBoundaryInfo.getTimeColumn();
+    String timeValue = timeBoundaryInfo.getTimeValue();
+
     // Create a time range filter
     FilterQuery timeFilterQuery = new FilterQuery();
     // Use -1 to prevent collision with other filters
     timeFilterQuery.setId(-1);
-    timeFilterQuery.setColumn(timeBoundaryInfo.getTimeColumn());
-    String timeValue = timeBoundaryInfo.getTimeValue();
+    timeFilterQuery.setColumn(timeColumn);
     String filterValue = isOfflineRequest ? "(*\t\t" + timeValue + "]" : "(" + timeValue + "\t\t*)";
     timeFilterQuery.setValue(Collections.singletonList(filterValue));
     timeFilterQuery.setOperator(FilterOperator.RANGE);
@@ -1324,6 +1327,35 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       filterSubQueryMap.putToFilterQueryMap(-1, timeFilterQuery);
       brokerRequest.setFilterQuery(timeFilterQuery);
       brokerRequest.setFilterSubQueryMap(filterSubQueryMap);
+    }
+
+    PinotQuery pinotQuery = brokerRequest.getPinotQuery();
+    if (pinotQuery != null) {
+      Expression timeFilterExpression = RequestUtils.getFunctionExpression(
+          isOfflineRequest ? FilterKind.LESS_THAN_OR_EQUAL.name() : FilterKind.GREATER_THAN.name());
+      timeFilterExpression.getFunctionCall().setOperands(Arrays
+          .asList(RequestUtils.createIdentifierExpression(timeColumn), RequestUtils.getLiteralExpression(timeValue)));
+
+      Expression filterExpression = pinotQuery.getFilterExpression();
+      if (filterExpression != null) {
+        Expression andFilterExpression = RequestUtils.getFunctionExpression(FilterKind.AND.name());
+        andFilterExpression.getFunctionCall().setOperands(Arrays.asList(filterExpression, timeFilterExpression));
+        pinotQuery.setFilterExpression(andFilterExpression);
+      } else {
+        pinotQuery.setFilterExpression(timeFilterExpression);
+      }
+    }
+  }
+
+  /**
+   * Helper method to optimize the given broker request.
+   */
+  private void optimize(BrokerRequest brokerRequest, String rawTableName) {
+    Schema schema = _tableCache.getSchema(rawTableName);
+    _queryOptimizer.optimize(brokerRequest, schema);
+    PinotQuery pinotQuery = brokerRequest.getPinotQuery();
+    if (pinotQuery != null) {
+      _queryOptimizer.optimize(pinotQuery, schema);
     }
   }
 

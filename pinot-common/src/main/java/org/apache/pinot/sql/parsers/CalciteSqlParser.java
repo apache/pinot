@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.sql.parsers;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -30,7 +29,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.config.Lex;
 import org.apache.calcite.sql.SqlBasicCall;
@@ -665,10 +663,15 @@ public class CalciteSqlParser {
 
   private static void applyAlias(Map<Identifier, Expression> aliasMap, Expression expression) {
     Identifier identifierKey = expression.getIdentifier();
-    if (identifierKey != null && aliasMap.containsKey(identifierKey)) {
+    if (identifierKey != null) {
       Expression aliasExpression = aliasMap.get(identifierKey);
-      expression.setType(aliasExpression.getType()).setIdentifier(aliasExpression.getIdentifier())
-          .setFunctionCall(aliasExpression.getFunctionCall()).setLiteral(aliasExpression.getLiteral());
+      if (aliasExpression != null) {
+        expression.setType(aliasExpression.getType());
+        expression.setIdentifier(aliasExpression.getIdentifier());
+        expression.setFunctionCall(aliasExpression.getFunctionCall());
+        expression.setLiteral(aliasExpression.getLiteral());
+      }
+      return;
     }
     Function function = expression.getFunctionCall();
     if (function != null) {
@@ -763,11 +766,9 @@ public class CalciteSqlParser {
   private static Expression convertDistinctAndSelectListToFunctionExpression(SqlNodeList selectList) {
     String functionName = AggregationFunctionType.DISTINCT.getName();
     Expression functionExpression = RequestUtils.getFunctionExpression(functionName);
-    Iterator<SqlNode> iterator = selectList.iterator();
-    while (iterator.hasNext()) {
-      SqlNode next = iterator.next();
-      Expression columnExpression = toExpression(next);
-      if (columnExpression.getType() == ExpressionType.IDENTIFIER && columnExpression.getIdentifier().name
+    for (SqlNode node : selectList) {
+      Expression columnExpression = toExpression(node);
+      if (columnExpression.getType() == ExpressionType.IDENTIFIER && columnExpression.getIdentifier().getName()
           .equals("*")) {
         throw new SqlCompilationException(
             "Syntax error: Pinot currently does not support DISTINCT with *. Please specify each column name after DISTINCT keyword");

@@ -1,9 +1,11 @@
 import Component from '@ember/component';
 import { A as EmberArray } from '@ember/array';
 
-import { parseRoot } from 'thirdeye-frontend/utils/anomalies-tree-parser';
+import { parseRoot, parseSubtree, updateAnomalyFeedback } from 'thirdeye-frontend/utils/anomalies-tree-parser';
+import pubSub from 'thirdeye-frontend/utils/pub-sub';
 
 export default Component.extend({
+  data: EmberArray(),
   /**
    * @public
    * @templateProps
@@ -32,6 +34,14 @@ export default Component.extend({
    */
   onBreadcrumbClick: () => {},
 
+  /**
+   * The callback function to invoke when anomaly is drilled down
+   *
+   * @public
+   * @type {Function}
+   */
+  onDrilldown: () => {},
+
   /** Internal states */
 
   /**
@@ -41,6 +51,10 @@ export default Component.extend({
    * @type {Array<Object>}
    */
   breadcrumbList: EmberArray(),
+
+  onAnomalyDrilldown(anomalyId) {
+    this.set('data', parseSubtree(anomalyId, this.anomalies));
+  },
 
   /**
    * Ember component life hook.
@@ -53,17 +67,50 @@ export default Component.extend({
 
   /**
    * Ember component life hook.
-   * Call the tree parser to fetch the component information for the root level
+   * Call the tree parser to fetch the component information for the root level and
+   * subscribe to drilldown updates.
    *
    * @override
    */
   didReceiveAttrs() {
     this._super(...arguments);
 
-    const { breadcrumbInfo } = parseRoot(this.alertId, this.anomalies);
+    //Initial Processing
+    const { output, breadcrumbInfo } = parseRoot(this.alertId, this.anomalies);
 
     this.breadcrumbList.push(breadcrumbInfo);
+    this.set('data', output);
+
+    //Processing on each drilldown
+    const anomalyDrilldownSubscription = pubSub.subscribe('onAnomalyDrilldown', (anomalyId) => {
+      const { output, breadcrumbInfo } = parseSubtree(anomalyId, this.anomalies);
+
+      this.set('breadcrumbList', [...this.breadcrumbList, breadcrumbInfo]);
+      this.set('data', output);
+
+      this.onDrilldown();
+    });
+
+    const feedbackSubscription = pubSub.subscribe('onFeedback', ({ anomalyId, feedbackType, cascade }) => {
+      updateAnomalyFeedback(anomalyId, feedbackType, cascade, this.anomalies);
+    });
+
+    this.set('anomalyDrilldownSubscription', anomalyDrilldownSubscription);
+    this.set('feedbackSubscription', feedbackSubscription);
   },
+
+  /**
+   * Ember component life hook.
+   * Delete the callback subscribed to for anomaly drilldowns
+   *
+   * @override
+   */
+  willDestroyElement() {
+    this.anomalyDrilldownSubscription.unSubscribe();
+    this.feedbackSubscription.unSubscribe();
+    this._super(...arguments);
+  },
+
   /**
    * Event handlers
    */
@@ -78,7 +125,10 @@ export default Component.extend({
      * @param {Number} index
      *   The index of the breadcrumb that was clicked
      */
-    onBreadcrumbClick({ isRoot = false }, index) {
+    onBreadcrumbClick({ id, isRoot = false }, index) {
+      const { output } = isRoot ? parseRoot(id, this.anomalies) : parseSubtree(id, this.anomalies);
+
+      this.set('data', output);
       this.set('breadcrumbList', this.breadcrumbList.splice(0, index + 1));
 
       this.onBreadcrumbClick(isRoot);

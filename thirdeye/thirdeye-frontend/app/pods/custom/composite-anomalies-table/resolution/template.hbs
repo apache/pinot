@@ -1,11 +1,54 @@
-{{#power-select
-  triggerId=record.anomalyId
-  triggerClass="te-anomaly-table__select te-anomaly-table__select--margin-left"
-  options=record.feedback.options
-  searchEnabled=false
-  selected=record.feedback.selected
-  onchange=(action "onChangeAnomalyResponse" record)
-  as |response|
-}}
-  {{response}}
-{{/power-select}}
+<div class="composite-anomalies-table-form__feedback-selections">
+  <div class="composite-anomalies-table-form__selection-groups">
+    <div
+      class="composite-anomalies-table-form__selection-groups composite-anomalies-table-form__selection-groups--dropdown-group"
+    >
+      <div class="te-anomaly-table__icon-wrapper">
+        {{#if renderStatusIcon}}
+          {{#if showResponseSaved}}
+            <i class="te-anomaly-table__icon--status-no-margin glyphicon glyphicon-ok-circle"></i>
+          {{/if}}
+          {{#if showResponseFailed}}
+            <i
+              class="te-anomaly-table__icon--status-no-margin te-anomaly-table__icon--error glyphicon glyphicon-remove-circle"
+            ></i>
+          {{/if}}
+        {{/if}}
+      </div>
+      {{#power-select
+        triggerId=record.anomalyId
+        triggerClass="te-anomaly-table__select te-anomaly-table__select--margin-left"
+        options=record.feedback.options
+        searchEnabled=false
+        selected=record.feedback.selected
+        onchange=(action "onChangeAnomalyResponse" record) as |response|
+      }}
+        {{response}}
+      {{/power-select}}
+    </div>
+    {{#unless record.isLeaf}}
+      <div
+        class="composite-anomalies-table-form__selection-groups composite-anomalies-table-form__selection-groups--radio-group"
+      >
+        {{#radio-button value=true groupValue=cascadeSelection changed=(action "onSelectCascade")}}
+          Cascade down
+        {{/radio-button}}
+        {{#tooltip-on-element class="te-tooltip"}}
+          This will overwrite all the child feedbacks
+        {{/tooltip-on-element}}
+        {{#radio-button value=false groupValue=cascadeSelection changed=(action "onSelectCascade")}}
+          Don't cascade
+        {{/radio-button}}
+      </div>
+    {{/unless}}
+  </div>
+  {{#unless record.isLeaf}}
+    {{bs-button
+      defaultText="Submit"
+      type="primary"
+      buttonType="submit"
+      onClick=(action "onSubmit")
+      class="te-button te-button--submit"
+    }}
+  {{/unless}}
+</div>

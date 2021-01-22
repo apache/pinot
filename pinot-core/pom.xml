@@ -54,6 +54,10 @@
   </build>
   <dependencies>
     <dependency>
+      <groupId>com.uber</groupId>
+      <artifactId>h3</artifactId>
+    </dependency>
+    <dependency>
       <groupId>me.lemire.integercompression</groupId>
       <artifactId>JavaFastPFOR</artifactId>
     </dependency>
@@ -120,10 +124,6 @@
     <dependency>
       <groupId>io.netty</groupId>
       <artifactId>netty-all</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>it.unimi.dsi</groupId>
-      <artifactId>fastutil</artifactId>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>

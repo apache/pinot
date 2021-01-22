@@ -18,13 +18,16 @@
  */
 package org.apache.pinot.integration.tests;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.api.ControllerAdminApiApplication;
+import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -36,11 +39,21 @@ public class AdminConsoleIntegrationTest extends BaseClusterIntegrationTest {
 
   @BeforeClass
   public void setUp() throws Exception {
+    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
     // Start an empty Pinot cluster
     startZk();
     startController();
     startBroker();
     startServer();
+  }
+
+  @AfterClass
+  public void tearDown() throws Exception {
+    stopServer();
+    stopBroker();
+    stopController();
+    stopZk();
+    FileUtils.deleteQuietly(_tempDir);
   }
 
   /**

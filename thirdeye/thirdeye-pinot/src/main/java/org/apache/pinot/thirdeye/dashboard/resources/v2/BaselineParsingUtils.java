@@ -36,6 +36,7 @@ public class BaselineParsingUtils {
   private static final Pattern PATTERN_DAY_OVER_DAY = Pattern.compile("do([1-9][0-9]*)d");
   private static final Pattern PATTERN_WEEK_OVER_WEEK = Pattern.compile("wo([1-9][0-9]*)w");
   private static final Pattern PATTERN_MONTH_OVER_MONTH = Pattern.compile("mo([1-9][0-9]*)m");
+  private static final Pattern PATTERN_YEAR_OVER_YEAR = Pattern.compile("yo([1-9][0-9]*)y");
   private static final Pattern PATTERN_MEAN = Pattern.compile("mean([1-9][0-9]*)(h|d|w|m)");
   private static final Pattern PATTERN_MEDIAN = Pattern.compile("median([1-9][0-9]*)(h|d|w|m)");
   private static final Pattern PATTERN_MIN = Pattern.compile("min([1-9][0-9]*)(h|d|w|m)");
@@ -45,7 +46,8 @@ public class BaselineParsingUtils {
     HOUR("h"),
     DAY("d"),
     WEEK("w"),
-    MONTH("m");
+    MONTH("m"),
+    YEAR("y");
 
     final String unit;
 
@@ -75,6 +77,7 @@ public class BaselineParsingUtils {
    *   doXd      day-over-day data points with a lag of X days)
    *   woXw      week-over-week data points with a lag of X weeks)
    *   moXm      month-over-month data points with a lag of X months)
+   *   yoXy      year-over-year data points with a lag of X years)
    *   meanXU    average of data points from the the past X units (hour, day, month, week), with a lag of 1 unit)
    *   medianXU  median of data points from the the past X units (hour, day, month, week), with a lag of 1 unit)
    *   minXU     minimum of data points from the the past X units (hour, day, month, week), with a lag of 1 unit)
@@ -142,6 +145,14 @@ public class BaselineParsingUtils {
       unit = Unit.MONTH;
     }
 
+    Matcher mYearOverYear = PATTERN_YEAR_OVER_YEAR.matcher(offset);
+    if (mYearOverYear.find()) {
+      agg = BaselineAggregateType.SUM;
+      shift = Integer.valueOf(mYearOverYear.group(1));
+      count = 1;
+      unit = Unit.YEAR;
+    }
+
     Matcher mMean = PATTERN_MEAN.matcher(offset);
     if (mMean.find()) {
       agg = BaselineAggregateType.MEAN;
@@ -187,6 +198,8 @@ public class BaselineParsingUtils {
         return BaselineAggregate.fromWeekOverWeek(agg, count, shift, timeZone);
       case MONTH:
         return BaselineAggregate.fromMonthOverMonth(agg, count, shift, timeZone);
+      case YEAR:
+        return BaselineAggregate.fromYearOverYear(agg, count, shift, timeZone);
       default:
         throw new IllegalArgumentException(String.format("Unsupported unit '%s'", unit));
     }

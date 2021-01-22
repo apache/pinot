@@ -251,14 +251,14 @@ kubectl get all -n pinot-quickstart
 - For helm v3.0.0
 
 ```bash
-helm repo add incubator http://storage.googleapis.com/kubernetes-charts-incubator
+helm repo add incubator https://charts.helm.sh/incubator
 helm install -n pinot-quickstart kafka incubator/kafka --set replicas=1
 ```
 
 - For helm v2.12.1
 
 ```bash
-helm repo add incubator http://storage.googleapis.com/kubernetes-charts-incubator
+helm repo add incubator https://charts.helm.sh/incubator
 helm install --namespace "pinot-quickstart"  --name kafka incubator/kafka --set replicas=1
 ```
 
@@ -364,6 +364,27 @@ following configurable parameters:
 | `server.podAnnotations`                        | Annotations to be added to server pod                                                                                                                                      | `{}`                                                               |
 | `server.updateStrategy.type`                   | StatefulSet update strategy to use.                                                                                                                                        | `RollingUpdate`                                                    |
 | `server.extra.configs`                         | Extra configs append to 'pinot-server.conf' file to start Pinot Server                                                                                                     | `pinot.set.instance.id.to.hostname=true`                           |
+|------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------|
+| `minion.name`                                  | Name of Pinot Minion                                                                                                                                                       | `minion`                                                           |
+| `minion.port`                                  | Pinot minion netty port                                                                                                                                                    | `9514`                                                             |
+| `minion.replicaCount`                          | Pinot minion replicas                                                                                                                                                      | `1`                                                                |
+| `minion.dataDir`                               | Pinot minion data directory, should be same as `minion.persistence.mountPath` or a sub directory of it                                                                     | `/var/pinot/minion/data`                                           |
+| `minion.persistence.enabled`                   | Use a PVC to persist Pinot minion data                                                                                                                                     | `true`                                                             |
+| `minion.persistence.accessMode`                | Access mode of data volume                                                                                                                                                 | `ReadWriteOnce`                                                    |
+| `minion.persistence.size`                      | Size of data volume                                                                                                                                                        | `4G`                                                               |
+| `minion.persistence.mountPath`                 | Mount path of minion data volume                                                                                                                                           | `/var/pinot/minion/data`                                           |
+| `minion.persistence.storageClass`              | Storage class of backing PVC                                                                                                                                               | `""`                                                               |
+| `minion.jvmOpts`                               | Pinot minion JVM Options                                                                                                                                                   | `-Xms512M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCApplicationStoppedTime -XX:+PrintGCApplicationConcurrentTime -Xloggc:/opt/pinot/gc-pinot-minion.log` |
+| `minion.log4j2ConfFile`                        | Pinot minion log4j2 configuration file                                                                                                                                     | `/opt/pinot/conf/pinot-minion-log4j2.xml`                          |
+| `minion.pluginsDir`                            | Pinot minion plugins directory                                                                                                                                             | `/opt/pinot/plugins`                                               |
+| `minion.service.port`                          | Service Port                                                                                                                                                               | `9514`                                                             |
+| `minion.resources`                             | Pinot minion resource requests and limits                                                                                                                                  | `{}`                                                               |
+| `minion.nodeSelector`                          | Node labels for minion pod assignment                                                                                                                                      | `{}`                                                               |
+| `minion.affinity`                              | Defines affinities and anti-affinities for pods as defined in: <https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity> preferences | `{}`                                                               |
+| `minion.tolerations`                           | List of node tolerations for the pods. <https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/>                                                           | `[]`                                                               |
+| `minion.podAnnotations`                        | Annotations to be added to minion pod                                                                                                                                      | `{}`                                                               |
+| `minion.updateStrategy.type`                   | StatefulSet update strategy to use.                                                                                                                                        | `RollingUpdate`                                                    |
+| `minion.extra.configs`                         | Extra configs append to 'pinot-minion.conf' file to start Pinot Minion                                                                                                     | `pinot.set.instance.id.to.hostname=true`                           |
 |------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------|
 | `zookeeper.enabled`                            | If True, installs Zookeeper Chart                                                                                                                                          | `true`                                                             |
 | `zookeeper.resources`                          | Zookeeper resource requests and limits                                                                                                                                     | `{}`                                                               |

@@ -57,6 +57,11 @@ public class ThirdEyeConfiguration extends Configuration {
   private boolean cors = false;
 
   /**
+   * Package names where component classes are stored
+   */
+  private List<String> componentPackageList;
+
+  /**
    * Convert relative path to absolute URL
    *
    * Supported cases:
@@ -175,5 +180,13 @@ public class ThirdEyeConfiguration extends Configuration {
 
   public void setModelDownloaderConfig(List<ModelDownloaderConfiguration> modelDownloaderConfig) {
     this.modelDownloaderConfig = modelDownloaderConfig;
+  }
+
+  public List<String> getComponentPackageList() {
+    return componentPackageList;
+  }
+
+  public void setComponentPackageList(List<String> componentPackageList) {
+    this.componentPackageList = componentPackageList;
   }
 }

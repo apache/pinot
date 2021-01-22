@@ -29,6 +29,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.core.segment.creator.impl.inv.geospatial.H3IndexConfig;
 import org.apache.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -47,9 +48,11 @@ public class IndexLoadingConfig {
   private ReadMode _readMode = ReadMode.DEFAULT_MODE;
   private List<String> _sortedColumns = Collections.emptyList();
   private Set<String> _invertedIndexColumns = new HashSet<>();
+  private Set<String> _rangeIndexColumns = new HashSet<>();
   private Set<String> _textIndexColumns = new HashSet<>();
   private Set<String> _fstIndexColumns = new HashSet<>();
-  private Set<String> _rangeIndexColumns = new HashSet<>();
+  private Set<String> _jsonIndexColumns = new HashSet<>();
+  private Map<String, H3IndexConfig> _h3IndexConfigs = new HashMap<>();
   private Set<String> _noDictionaryColumns = new HashSet<>(); // TODO: replace this by _noDictionaryConfig.
   private Map<String, String> _noDictionaryConfig = new HashMap<>();
   private Set<String> _varLengthDictionaryColumns = new HashSet<>();
@@ -93,6 +96,11 @@ public class IndexLoadingConfig {
       _invertedIndexColumns.addAll(invertedIndexColumns);
     }
 
+    List<String> jsonIndexColumns = indexingConfig.getJsonIndexColumns();
+    if (jsonIndexColumns != null) {
+      _jsonIndexColumns.addAll(jsonIndexColumns);
+    }
+
     List<String> rangeIndexColumns = indexingConfig.getRangeIndexColumns();
     if (rangeIndexColumns != null) {
       _rangeIndexColumns.addAll(rangeIndexColumns);
@@ -123,6 +131,7 @@ public class IndexLoadingConfig {
 
     extractTextIndexColumnsFromTableConfig(tableConfig);
     extractFSTIndexColumnsFromTableConfig(tableConfig);
+    extractH3IndexConfigsFromTableConfig(tableConfig);
 
     Map<String, String> noDictionaryConfig = indexingConfig.getNoDictionaryConfig();
     if (noDictionaryConfig != null) {
@@ -187,6 +196,18 @@ public class IndexLoadingConfig {
     }
   }
 
+  private void extractH3IndexConfigsFromTableConfig(TableConfig tableConfig) {
+    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+    if (fieldConfigList != null) {
+      for (FieldConfig fieldConfig : fieldConfigList) {
+        if (fieldConfig.getIndexType() == FieldConfig.IndexType.H3) {
+          //noinspection ConstantConditions
+          _h3IndexConfigs.put(fieldConfig.getName(), new H3IndexConfig(fieldConfig.getProperties()));
+        }
+      }
+    }
+  }
+
   private void extractFromInstanceConfig(InstanceDataManagerConfig instanceDataManagerConfig) {
     ReadMode instanceReadMode = instanceDataManagerConfig.getReadMode();
     if (instanceReadMode != null) {
@@ -240,14 +261,6 @@ public class IndexLoadingConfig {
     return _rangeIndexColumns;
   }
 
-  public Map<String, Map<String, String>> getColumnProperties() {
-    return _columnProperties;
-  }
-
-  public void setColumnProperties(Map<String, Map<String, String>> columnProperties) {
-    _columnProperties = columnProperties;
-  }
-
   /**
    * Used in two places:
    * (1) In {@link org.apache.pinot.core.segment.index.column.PhysicalColumnIndexContainer}
@@ -264,6 +277,22 @@ public class IndexLoadingConfig {
 
   public Set<String> getFSTIndexColumns() {
     return _fstIndexColumns;
+  }
+
+  public Set<String> getJsonIndexColumns() {
+    return _jsonIndexColumns;
+  }
+
+  public Map<String, H3IndexConfig> getH3IndexConfigs() {
+    return _h3IndexConfigs;
+  }
+
+  public Map<String, Map<String, String>> getColumnProperties() {
+    return _columnProperties;
+  }
+
+  public void setColumnProperties(Map<String, Map<String, String>> columnProperties) {
+    _columnProperties = columnProperties;
   }
 
   /**
@@ -294,12 +323,18 @@ public class IndexLoadingConfig {
   }
 
   @VisibleForTesting
-  public void setBloomFilterConfigs(Map<String, BloomFilterConfig> bloomFilterConfigs) {
-    _bloomFilterConfigs = bloomFilterConfigs;
-  }
-
   public void setFSTIndexColumns(Set<String> fstIndexColumns) {
     _fstIndexColumns = fstIndexColumns;
+  }
+
+  @VisibleForTesting
+  public void setH3IndexConfigs(Map<String, H3IndexConfig> h3IndexConfigs) {
+    _h3IndexConfigs = h3IndexConfigs;
+  }
+
+  @VisibleForTesting
+  public void setBloomFilterConfigs(Map<String, BloomFilterConfig> bloomFilterConfigs) {
+    _bloomFilterConfigs = bloomFilterConfigs;
   }
 
   @VisibleForTesting

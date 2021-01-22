@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.Function;
@@ -57,6 +58,7 @@ public class ParserUtils {
     FILTER_OPERATOR_MAP.put(FilterKind.IS_NULL, FilterOperator.IS_NULL);
     FILTER_OPERATOR_MAP.put(FilterKind.IS_NOT_NULL, FilterOperator.IS_NOT_NULL);
     FILTER_OPERATOR_MAP.put(FilterKind.TEXT_MATCH, FilterOperator.TEXT_MATCH);
+    FILTER_OPERATOR_MAP.put(FilterKind.JSON_MATCH, FilterOperator.JSON_MATCH);
   }
 
   /**
@@ -187,14 +189,19 @@ public class ParserUtils {
     switch (expression.getType()) {
       case LITERAL:
         Literal literal = expression.getLiteral();
-        // Force single quote on non-string literal inside a function.
-        if (forceSingleQuoteOnNonStringLiteral && !literal.isSetStringValue()) {
-          return "'" + literal.getFieldValue() + "'";
-        }
-        if (treatLiteralAsIdentifier || !literal.isSetStringValue()) {
-          return literal.getFieldValue().toString();
+        String literalString = literal.getFieldValue().toString();
+        if (literal.isSetStringValue()) {
+          if (treatLiteralAsIdentifier) {
+            return literalString;
+          } else {
+            return "'" + StringUtils.replace(literalString, "'", "''") + "'";
+          }
         } else {
-          return "'" + literal.getFieldValue() + "'";
+          if (forceSingleQuoteOnNonStringLiteral) {
+            return "'" + literalString + "'";
+          } else {
+            return literalString;
+          }
         }
       case IDENTIFIER:
         return expression.getIdentifier().getName();

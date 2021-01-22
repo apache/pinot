@@ -104,7 +104,7 @@ public class SegmentLocalFSDirectoryTest {
       Assert.assertNotNull(writer);
       PinotDataBuffer buffer = writer.newIndexFor("newColumn", ColumnIndexType.FORWARD_INDEX, 1024);
       loadData(buffer);
-      writer.saveAndClose();
+      writer.save();
     }
     try (SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
       Assert.assertNotNull(reader);

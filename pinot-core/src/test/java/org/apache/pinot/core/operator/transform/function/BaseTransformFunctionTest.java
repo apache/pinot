@@ -247,6 +247,27 @@ public abstract class BaseTransformFunctionTest {
     }
   }
 
+  protected void testTransformFunctionMV(TransformFunction transformFunction, long[][] expectedValues) {
+    long[][] longMVValues = transformFunction.transformToLongValuesMV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      Assert.assertEquals(longMVValues[i], expectedValues[i]);
+    }
+  }
+
+  protected void testTransformFunctionMV(TransformFunction transformFunction, float[][] expectedValues) {
+    float[][] floatMVValues = transformFunction.transformToFloatValuesMV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      Assert.assertEquals(floatMVValues[i], expectedValues[i]);
+    }
+  }
+
+  protected void testTransformFunctionMV(TransformFunction transformFunction, double[][] expectedValues) {
+    double[][] doubleMVValues = transformFunction.transformToDoubleValuesMV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      Assert.assertEquals(doubleMVValues[i], expectedValues[i]);
+    }
+  }
+
   protected void testTransformFunctionMV(TransformFunction transformFunction, String[][] expectedValues) {
     String[][] stringMVValues = transformFunction.transformToStringValuesMV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {

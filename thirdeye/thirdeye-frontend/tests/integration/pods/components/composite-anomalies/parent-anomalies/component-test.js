@@ -36,29 +36,31 @@ test('it renders', function (assert) {
 
   this.render(hbs`{{composite-anomalies/parent-anomalies}}`);
 
-  assert.equal(this.$('h4.panel-title').html(), this.tableTitle);
-  assert.equal(this.$('p.composite-anomalies-no-records').html(), this.noAnmalies);
+  assert.equal(this.$('h4.panel-title').html().trim(), this.tableTitle);
+  assert.equal(this.$('p.composite-anomalies-no-records').html().trim(), this.noAnmalies);
 
   this.render(hbs`
     {{composite-anomalies/parent-anomalies title=tableTitle}}
   `);
 
-  assert.equal(this.$('.panel-title').html(), this.tableTitle);
-  assert.equal(this.$('.composite-anomalies-no-records').html(), this.noAnmalies);
+  assert.equal(this.$('.panel-title').html().trim(), this.tableTitle);
+  assert.equal(this.$('.composite-anomalies-no-records').html().trim(), this.noAnmalies);
 
   this.render(hbs`
     {{composite-anomalies/parent-anomalies data=tableData}}
   `);
 
   // assert.equal($('.start-time').html(), 'Sep 7th, 12:00 ');
-  assert.equal(this.$('.duration').html(), '72 hours');
-  assert.equal(this.$('.details').html(), 'oe_viral_detection (2)');
+  assert.equal(this.$('.te-anomaly-table__duration').html(), '72 hours');
+  assert.equal(this.$('.te-anomaly-table__details').html(), 'oe_viral_detection (2)');
   assert.equal(this.$('.ember-power-select-selected-item').html().trim(), this.feedbackOptionNames[0]);
 
   // Check other values based on feedback
 
   this.feedbackOptionNames.forEach((option, index) => {
-    this.tableData[0].feedback = this.feedbackOptionValues[index];
+    this.tableData[0].feedback = {
+      feedbackType: this.feedbackOptionValues[index]
+    };
 
     this.render(hbs`
       {{composite-anomalies/parent-anomalies data=tableData}}

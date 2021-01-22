@@ -1,0 +1,34 @@
+{
+  "tableName": "starbucksStores",
+  "tableType": "OFFLINE",
+  "segmentsConfig": {
+    "retentionTimeUnit": "DAYS",
+    "retentionTimeValue": "1",
+    "segmentPushType": "APPEND",
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+    "schemaName": "starbucksStores",
+    "replication": "1"
+  },
+  "tenants": {
+  },
+  "fieldConfigList": [
+    {
+      "name": "location_st_point",
+      "encodingType":"RAW",
+      "indexType":"H3",
+      "properties": {
+        "resolutions": "5"
+      }
+    }
+  ],
+  "tableIndexConfig": {
+    "loadMode": "MMAP",
+    "noDictionaryColumns": [
+      "location_st_point"
+    ]
+  },
+  "metadata": {
+    "customConfigs": {
+    }
+  }
+}

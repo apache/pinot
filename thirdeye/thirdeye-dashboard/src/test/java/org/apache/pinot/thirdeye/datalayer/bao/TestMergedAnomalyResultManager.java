@@ -16,6 +16,7 @@
 
 package org.apache.pinot.thirdeye.datalayer.bao;
 
+import java.util.Set;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
@@ -69,6 +70,24 @@ public class TestMergedAnomalyResultManager{
     //verify feedback
     MergedAnomalyResultDTO mergedResult1 = mergedAnomalyResultDAO.findById(mergedResult.getId());
     Assert.assertEquals(mergedResult1.getFeedback().getFeedbackType(), AnomalyFeedbackType.ANOMALY);
+  }
+
+  @Test(dependsOnMethods = {"testSaveChildren"})
+  public void testFeedbackPropagate() {
+    MergedAnomalyResultDTO anomalyMergedResult = mergedAnomalyResultDAO.findById(mergedResult.getId());
+    AnomalyFeedbackDTO feedback = new AnomalyFeedbackDTO();
+    feedback.setComment("this is a good find");
+    feedback.setFeedbackType(AnomalyFeedbackType.ANOMALY);
+    anomalyMergedResult.setFeedback(feedback);
+    // now we need to make explicit call to anomaly update in order to update the feedback
+    mergedAnomalyResultDAO.updateAnomalyFeedback(anomalyMergedResult, true);
+
+    //verify child feedback
+    MergedAnomalyResultDTO mergedResult1 = mergedAnomalyResultDAO.findById(mergedResult.getId());
+    mergedResult1.getChildren().forEach(child -> {
+        Assert.assertEquals(mergedResult1.getFeedback().getFeedbackType(), child.getFeedback().getFeedbackType());
+        Assert.assertEquals(mergedResult1.getFeedback().getComment(), child.getFeedback().getComment());
+      });
   }
 
   @Test
