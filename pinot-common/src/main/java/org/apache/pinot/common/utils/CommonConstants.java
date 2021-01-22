@@ -444,5 +444,16 @@ public class CommonConstants {
         public static final String NON_STREAMING = "nonStreaming";
       }
     }
+
+    public static class Range {
+      public static final char DELIMITER = '\0';
+      public static final char LOWER_EXCLUSIVE = '(';
+      public static final char LOWER_INCLUSIVE = '[';
+      public static final char UPPER_EXCLUSIVE = ')';
+      public static final char UPPER_INCLUSIVE = ']';
+      public static final String UNBOUNDED = "*";
+      public static final String LOWER_UNBOUNDED = LOWER_EXCLUSIVE + UNBOUNDED + DELIMITER;
+      public static final String UPPER_UNBOUNDED = DELIMITER + UNBOUNDED + UPPER_EXCLUSIVE;
+    }
   }
 }

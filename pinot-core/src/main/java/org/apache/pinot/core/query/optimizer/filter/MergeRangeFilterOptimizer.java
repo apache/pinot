@@ -120,7 +120,7 @@ public class MergeRangeFilterOptimizer implements FilterOptimizer {
    * {@link RangePredicate} for details.
    */
   private static Range getRange(String rangeString, DataType dataType) {
-    String[] split = StringUtils.split(rangeString, RangePredicate.LEGACY_DELIMITER);
+    String[] split = StringUtils.split(rangeString, RangePredicate.DELIMITER);
     String lower = split[0];
     boolean lowerInclusive = lower.charAt(0) == RangePredicate.LOWER_INCLUSIVE;
     String stringLowerBound = lower.substring(1);
@@ -340,8 +340,7 @@ public class MergeRangeFilterOptimizer implements FilterOptimizer {
         stringBuilder.append(_lowerInclusive ? RangePredicate.LOWER_INCLUSIVE : RangePredicate.LOWER_EXCLUSIVE);
         stringBuilder.append(_lowerBound.toString());
       }
-      // TODO: Switch to RangePredicate.DELIMITER after releasing 0.6.0
-      stringBuilder.append(RangePredicate.LEGACY_DELIMITER);
+      stringBuilder.append(RangePredicate.DELIMITER);
       if (_upperBound == null) {
         stringBuilder.append(RangePredicate.UNBOUNDED).append(RangePredicate.UPPER_EXCLUSIVE);
       } else {

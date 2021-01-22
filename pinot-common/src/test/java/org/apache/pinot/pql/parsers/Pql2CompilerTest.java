@@ -101,7 +101,7 @@ public class Pql2CompilerTest {
     BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest("select * from vegetables where a > 1");
     Assert.assertEquals(brokerRequest.getFilterQuery().getColumn(), "a");
     Assert.assertEquals(brokerRequest.getFilterQuery().getOperator(), FilterOperator.RANGE);
-    Assert.assertEquals(brokerRequest.getFilterQuery().getValue().get(0), "(1\t\t*)");
+    Assert.assertEquals(brokerRequest.getFilterQuery().getValue().get(0), "(1\000*)");
     // Test PinotQuery
     Function func = brokerRequest.getPinotQuery().getFilterExpression().getFunctionCall();
     Assert.assertEquals(func.getOperator(), FilterKind.GREATER_THAN.name());
@@ -111,7 +111,7 @@ public class Pql2CompilerTest {
     brokerRequest = COMPILER.compileToBrokerRequest("select * from vegetables where b < 100");
     Assert.assertEquals(brokerRequest.getFilterQuery().getColumn(), "b");
     Assert.assertEquals(brokerRequest.getFilterQuery().getOperator(), FilterOperator.RANGE);
-    Assert.assertEquals(brokerRequest.getFilterQuery().getValue().get(0), "(*\t\t100)");
+    Assert.assertEquals(brokerRequest.getFilterQuery().getValue().get(0), "(*\000100)");
     // Test PinotQuery
     func = brokerRequest.getPinotQuery().getFilterExpression().getFunctionCall();
     Assert.assertEquals(func.getOperator(), FilterKind.LESS_THAN.name());
@@ -121,7 +121,7 @@ public class Pql2CompilerTest {
     brokerRequest = COMPILER.compileToBrokerRequest("select * from vegetables where c >= 10");
     Assert.assertEquals(brokerRequest.getFilterQuery().getColumn(), "c");
     Assert.assertEquals(brokerRequest.getFilterQuery().getOperator(), FilterOperator.RANGE);
-    Assert.assertEquals(brokerRequest.getFilterQuery().getValue().get(0), "[10\t\t*)");
+    Assert.assertEquals(brokerRequest.getFilterQuery().getValue().get(0), "[10\000*)");
     // Test PinotQuery
     func = brokerRequest.getPinotQuery().getFilterExpression().getFunctionCall();
     Assert.assertEquals(func.getOperator(), FilterKind.GREATER_THAN_OR_EQUAL.name());
@@ -131,7 +131,7 @@ public class Pql2CompilerTest {
     brokerRequest = COMPILER.compileToBrokerRequest("select * from vegetables where d <= 50");
     Assert.assertEquals(brokerRequest.getFilterQuery().getColumn(), "d");
     Assert.assertEquals(brokerRequest.getFilterQuery().getOperator(), FilterOperator.RANGE);
-    Assert.assertEquals(brokerRequest.getFilterQuery().getValue().get(0), "(*\t\t50]");
+    Assert.assertEquals(brokerRequest.getFilterQuery().getValue().get(0), "(*\00050]");
     // Test PinotQuery
     func = brokerRequest.getPinotQuery().getFilterExpression().getFunctionCall();
     Assert.assertEquals(func.getOperator(), FilterKind.LESS_THAN_OR_EQUAL.name());
@@ -141,7 +141,7 @@ public class Pql2CompilerTest {
     brokerRequest = COMPILER.compileToBrokerRequest("select * from vegetables where e BETWEEN 70 AND 80");
     Assert.assertEquals(brokerRequest.getFilterQuery().getColumn(), "e");
     Assert.assertEquals(brokerRequest.getFilterQuery().getOperator(), FilterOperator.RANGE);
-    Assert.assertEquals(brokerRequest.getFilterQuery().getValue().get(0), "[70\t\t80]");
+    Assert.assertEquals(brokerRequest.getFilterQuery().getValue().get(0), "[70\00080]");
     // Test PinotQuery
     func = brokerRequest.getPinotQuery().getFilterExpression().getFunctionCall();
     Assert.assertEquals(func.getOperator(), FilterKind.BETWEEN.name());
