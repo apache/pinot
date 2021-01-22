@@ -306,16 +306,6 @@ public class NumericalIntPredicateTest extends BaseQueriesTest {
     Assert.assertEquals(result.get(0), 0l);
   }
 
-  /** Check if we can compare an INT column with a decimal value. */
-  //@Test TODO
-  public void testIntColumnNotEqualToEqualDecimalValue() {
-    Operator operator = getOperatorForSqlQuery("SELECT count(*) FROM testTable WHERE intColumn = 40.00000000000");
-    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
-    List<Object> result = block.getAggregationResult();
-    Assert.assertEquals(result.size(), 1);
-    Assert.assertEquals(result.get(0), 0l);
-  }
-
   /** Check if we can compare two INT columns. */
   @Test
   public void testIntColumnLessThanAnotherIntColumn() {
@@ -324,6 +314,16 @@ public class NumericalIntPredicateTest extends BaseQueriesTest {
     List<Object> result = block.getAggregationResult();
     Assert.assertEquals(result.size(), 1);
     Assert.assertEquals(result.get(0), 6l);
+  }
+
+  /** Check if we can do arithmetic on INT column. */
+  @Test
+  public void testIntColumnLessThanIntSubstraction() {
+    Operator operator = getOperatorForSqlQuery("select count(*) from scores where intColumn < 5 - 4");
+    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
+    List<Object> result = block.getAggregationResult();
+    Assert.assertEquals(result.size(), 1);
+    Assert.assertEquals(result.get(0), 2l);
   }
 
   /** Check if we can do arithmetic on LONG column. */

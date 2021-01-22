@@ -25,7 +25,7 @@ import org.apache.pinot.core.query.request.context.ExpressionContext;
 /**
  * Predicate for JSON_MATCH.
  */
-public class JsonMatchPredicate implements Predicate {
+public class JsonMatchPredicate extends BasePredicate implements Predicate {
   private final ExpressionContext _lhs;
   private final String _value;
 
