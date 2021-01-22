@@ -116,6 +116,11 @@ public class SegmentGenerationJobSpec implements Serializable {
    */
   private boolean _cleanUpOutputDir;
 
+  /**
+   * TLS setting for controller access
+   */
+  private TlsSpec _tlsSpec;
+
   public ExecutionFrameworkSpec getExecutionFrameworkSpec() {
     return _executionFrameworkSpec;
   }
@@ -259,6 +264,14 @@ public class SegmentGenerationJobSpec implements Serializable {
 
   public boolean isCleanUpOutputDir() {
     return _cleanUpOutputDir;
+  }
+
+  public TlsSpec getTlsSpec() {
+    return _tlsSpec;
+  }
+
+  public void setTlsSpec(TlsSpec tlsSpec) {
+    _tlsSpec = tlsSpec;
   }
 }
 

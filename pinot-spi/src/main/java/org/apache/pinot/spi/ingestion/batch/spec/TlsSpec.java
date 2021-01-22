@@ -1,5 +1,3 @@
-package org.apache.pinot.controller.api.listeners;
-
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,46 +16,47 @@ package org.apache.pinot.controller.api.listeners;
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.pinot.spi.ingestion.batch.spec;
 
 /**
- * Holds TLS configuration settings. Used as a vessel to configure Https Listeners. 
- * 
- * @author Daniel Lavoie
- * @since 0.4.0
+ * TLS key and trust-store specification for ingestion jobs
+ * (Enables access to TLS-protected controller APIs, etc.)
  */
-public class TlsConfiguration {
-  private final String keyStorePath;
-  private final String keyStorePassword;
-  private final String trustStorePath;
-  private final String trustStorePassword;
-  private final boolean requiresClientAuth;
-
-  public TlsConfiguration(String keyStorePath, String keyStorePassword, String trustStorePath,
-      String trustStorePassword, boolean requiresClientAuth) {
-    this.keyStorePath = keyStorePath;
-    this.keyStorePassword = keyStorePassword;
-    this.trustStorePath = trustStorePath;
-    this.trustStorePassword = trustStorePassword;
-    this.requiresClientAuth = requiresClientAuth;
-  }
+public class TlsSpec {
+  String keyStorePath;
+  String keyStorePassword;
+  String trustStorePath;
+  String trustStorePassword;
 
   public String getKeyStorePath() {
     return keyStorePath;
+  }
+
+  public void setKeyStorePath(String keyStorePath) {
+    this.keyStorePath = keyStorePath;
   }
 
   public String getKeyStorePassword() {
     return keyStorePassword;
   }
 
+  public void setKeyStorePassword(String keyStorePassword) {
+    this.keyStorePassword = keyStorePassword;
+  }
+
   public String getTrustStorePath() {
     return trustStorePath;
+  }
+
+  public void setTrustStorePath(String trustStorePath) {
+    this.trustStorePath = trustStorePath;
   }
 
   public String getTrustStorePassword() {
     return trustStorePassword;
   }
 
-  public boolean isRequiresClientAuth() {
-    return requiresClientAuth;
+  public void setTrustStorePassword(String trustStorePassword) {
+    this.trustStorePassword = trustStorePassword;
   }
 }

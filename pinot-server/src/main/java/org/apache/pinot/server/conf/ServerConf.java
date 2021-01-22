@@ -26,9 +26,9 @@ import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Server;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
-import static org.apache.pinot.common.utils.CommonConstants.Server.DEFAULT_ENABLE_TABLE_LEVEL_METRICS;
-import static org.apache.pinot.common.utils.CommonConstants.Server.CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS;
 import static org.apache.pinot.common.utils.CommonConstants.Server.CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS;
+import static org.apache.pinot.common.utils.CommonConstants.Server.CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS;
+import static org.apache.pinot.common.utils.CommonConstants.Server.DEFAULT_ENABLE_TABLE_LEVEL_METRICS;
 
 
 /**
@@ -74,8 +74,20 @@ public class ServerConf {
     return _serverConf.subset(PINOT_SERVER_METRICS);
   }
 
+  public boolean isNettyServerEnabled() {
+    return _serverConf.getProperty(Server.CONFIG_OF_NETTY_SERVER_ENABLED, Server.DEFAULT_NETTY_SERVER_ENABLED);
+  }
+
   public int getNettyPort() {
     return _serverConf.getProperty(Helix.KEY_OF_SERVER_NETTY_PORT, Helix.DEFAULT_SERVER_NETTY_PORT);
+  }
+
+  public boolean isNettyTlsServerEnabled() {
+    return _serverConf.getProperty(Server.CONFIG_OF_NETTYTLS_SERVER_ENABLED, Server.DEFAULT_NETTYTLS_SERVER_ENABLED);
+  }
+
+  public int getNettyTlsPort() {
+    return _serverConf.getProperty(Helix.KEY_OF_SERVER_NETTYTLS_PORT, Helix.DEFAULT_SERVER_NETTYTLS_PORT);
   }
 
   public boolean isEnableGrpcServer() {
@@ -120,5 +132,9 @@ public class ServerConf {
 
   public String getMetricsPrefix() {
     return _serverConf.getProperty(PINOT_SERVER_METRICS_PREFIX, Server.DEFAULT_METRICS_PREFIX);
+  }
+
+  public PinotConfiguration getPinotConfig() {
+    return _serverConf;
   }
 }

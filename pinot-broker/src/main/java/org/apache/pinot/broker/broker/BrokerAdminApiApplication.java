@@ -18,20 +18,21 @@
  */
 package org.apache.pinot.broker.broker;
 
-import com.google.common.base.Preconditions;
 import io.swagger.jaxrs.config.BeanConfig;
-import java.net.URI;
+import java.io.IOException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.List;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.routing.RoutingManager;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.core.transport.ListenerConfig;
+import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
-import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
 
@@ -39,7 +40,6 @@ import org.glassfish.jersey.server.ResourceConfig;
 public class BrokerAdminApiApplication extends ResourceConfig {
   private static final String RESOURCE_PACKAGE = "org.apache.pinot.broker.api.resources";
 
-  private URI _baseUri;
   private HttpServer _httpServer;
 
   public BrokerAdminApiApplication(RoutingManager routingManager, BrokerRequestHandler brokerRequestHandler,
@@ -58,10 +58,15 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     registerClasses(io.swagger.jaxrs.listing.SwaggerSerializers.class);
   }
 
-  public void start(int httpPort) {
-    Preconditions.checkArgument(httpPort > 0);
-    _baseUri = URI.create("http://0.0.0.0:" + httpPort + "/");
-    _httpServer = GrizzlyHttpServerFactory.createHttpServer(_baseUri, this);
+  public void start(List<ListenerConfig> listenerConfigs) {
+    _httpServer = ListenerConfigUtil.buildHttpServer(this, listenerConfigs);
+
+    try {
+      _httpServer.start();
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to start http server", e);
+    }
+
     setupSwagger();
   }
 
@@ -72,7 +77,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     beanConfig.setContact("https://github.com/apache/incubator-pinot");
     beanConfig.setVersion("1.0");
     beanConfig.setSchemes(new String[]{CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL});
-    beanConfig.setBasePath(_baseUri.getPath());
+    beanConfig.setBasePath("/");
     beanConfig.setResourcePackage(RESOURCE_PACKAGE);
     beanConfig.setScan(true);
 

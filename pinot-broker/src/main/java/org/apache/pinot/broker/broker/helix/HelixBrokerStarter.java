@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixConstants.ChangeType;
@@ -60,6 +61,10 @@ import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.TableCache;
+import org.apache.pinot.core.transport.ListenerConfig;
+import org.apache.pinot.core.transport.TlsConfig;
+import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.core.util.TlsUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
@@ -72,6 +77,7 @@ public class HelixBrokerStarter implements ServiceStartable {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixBrokerStarter.class);
 
   private final PinotConfiguration _brokerConf;
+  private final List<ListenerConfig> _listenerConfigs;
   private final String _clusterName;
   private final String _zkServers;
   private final String _brokerId;
@@ -106,6 +112,7 @@ public class HelixBrokerStarter implements ServiceStartable {
       @Nullable String brokerHost)
       throws Exception {
     _brokerConf = brokerConf;
+    _listenerConfigs = ListenerConfigUtil.buildBrokerConfigs(brokerConf);
     setupHelixSystemProperties();
 
     _clusterName = clusterName;
@@ -117,11 +124,18 @@ public class HelixBrokerStarter implements ServiceStartable {
       brokerHost = _brokerConf.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtil
           .getHostnameOrAddress() : NetUtil.getHostAddress();
     }
+
     _brokerId = _brokerConf.getProperty(Helix.Instance.INSTANCE_ID_KEY,
-        Helix.PREFIX_OF_BROKER_INSTANCE + brokerHost + "_" + _brokerConf
-            .getProperty(Helix.KEY_OF_BROKER_QUERY_PORT, Helix.DEFAULT_BROKER_QUERY_PORT));
+        Helix.PREFIX_OF_BROKER_INSTANCE + brokerHost + "_" + inferPort());
 
     _brokerConf.addProperty(Broker.CONFIG_OF_BROKER_ID, _brokerId);
+  }
+
+  private int inferPort() {
+    return Optional.ofNullable(_brokerConf.getProperty(Helix.KEY_OF_BROKER_QUERY_PORT)).map(Integer::parseInt)
+        .orElseGet(() -> _listenerConfigs.stream().findFirst().map(ListenerConfig::getPort).orElseThrow(() ->
+            new IllegalStateException(String.format("Requires at least one ingress config or '%s'",
+                Helix.KEY_OF_BROKER_QUERY_PORT))));
   }
 
   private void setupHelixSystemProperties() {
@@ -238,14 +252,20 @@ public class HelixBrokerStarter implements ServiceStartable {
     // Initialize FunctionRegistry before starting the broker request handler
     FunctionRegistry.init();
     TableCache tableCache = new TableCache(_propertyStore, caseInsensitive);
-    _brokerRequestHandler =
-        new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory, queryQuotaManager,
-            tableCache, _brokerMetrics);
+    // Configure TLS for netty connection to server
+    TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_brokerConf, Broker.BROKER_TLS_PREFIX);
 
-    int brokerQueryPort = _brokerConf.getProperty(Helix.KEY_OF_BROKER_QUERY_PORT, Helix.DEFAULT_BROKER_QUERY_PORT);
-    LOGGER.info("Starting broker admin application on port: {}", brokerQueryPort);
+    if (_brokerConf.getProperty(Broker.BROKER_NETTYTLS_ENABLED, false)) {
+      _brokerRequestHandler = new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager,
+          _accessControlFactory, queryQuotaManager, tableCache, _brokerMetrics, tlsDefaults);
+    } else {
+      _brokerRequestHandler = new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager,
+          _accessControlFactory, queryQuotaManager, tableCache, _brokerMetrics, null);
+    }
+
+    LOGGER.info("Starting broker admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _brokerAdminApplication = new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics);
-    _brokerAdminApplication.start(brokerQueryPort);
+    _brokerAdminApplication.start(_listenerConfigs);
 
     LOGGER.info("Initializing cluster change mediator");
     for (ClusterChangeHandler externalViewChangeHandler : _externalViewChangeHandlers) {

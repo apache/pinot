@@ -70,7 +70,7 @@ public class ServerTableSizeReaderTest {
       throws IOException {
     for (int i = 0; i < serverCount; i++) {
       serverList.add("server_" + i);
-      endpointList.add("localhost:" + (serverPortStart + i));
+      endpointList.add("http://localhost:" + (serverPortStart + i));
     }
 
     server1Segments = Arrays.asList(1, 3, 5);
