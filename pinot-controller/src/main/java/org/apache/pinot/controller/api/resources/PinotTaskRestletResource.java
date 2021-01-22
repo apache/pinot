@@ -186,6 +186,9 @@ public class PinotTaskRestletResource {
   public Map<String, Object> getCronSchedulerInformation()
       throws SchedulerException {
     Scheduler scheduler = _pinotTaskManager.getScheduler();
+    if (scheduler == null) {
+      throw new NotFoundException("Task scheduler is disabled");
+    }
     SchedulerMetaData metaData = scheduler.getMetaData();
     Map<String, Object> schedulerMetaData = new HashMap<>();
     schedulerMetaData.put("Version", metaData.getVersion());
@@ -219,8 +222,11 @@ public class PinotTaskRestletResource {
   @ApiOperation("Fetch cron scheduler job keys")
   public List<JobKey> getCronSchedulerJobKeys()
       throws SchedulerException {
-    List<JobKey> jobKeys = new ArrayList<>();
     Scheduler scheduler = _pinotTaskManager.getScheduler();
+    if (scheduler == null) {
+      throw new NotFoundException("Task scheduler is disabled");
+    }
+    List<JobKey> jobKeys = new ArrayList<>();
     for (String group : scheduler.getTriggerGroupNames()) {
       jobKeys.addAll(scheduler.getJobKeys(GroupMatcher.groupEquals(group)));
     }
@@ -235,6 +241,9 @@ public class PinotTaskRestletResource {
       @ApiParam(value = "Task type") @QueryParam("taskType") String taskType)
       throws SchedulerException {
     Scheduler scheduler = _pinotTaskManager.getScheduler();
+    if (scheduler == null) {
+      throw new NotFoundException("Task scheduler is disabled");
+    }
     JobKey jobKey = JobKey.jobKey(tableName, taskType);
     if (!scheduler.checkExists(jobKey)) {
       throw new NotFoundException(
