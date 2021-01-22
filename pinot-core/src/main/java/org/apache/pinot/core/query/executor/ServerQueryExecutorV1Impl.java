@@ -132,17 +132,17 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       }
     }
 
-//    // Query scheduler wait time already exceeds query timeout, directly return
-//    if (querySchedulingTimeMs >= queryTimeoutMs) {
-//      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.SCHEDULING_TIMEOUT_EXCEPTIONS, 1);
-//      String errorMessage = String
-//          .format("Query scheduling took %dms (longer than query timeout of %dms)", querySchedulingTimeMs,
-//              queryTimeoutMs);
-//      DataTable dataTable = new DataTableImplV2();
-//      dataTable.addException(QueryException.getException(QueryException.QUERY_SCHEDULING_TIMEOUT_ERROR, errorMessage));
-//      LOGGER.error("{} while processing requestId: {}", errorMessage, requestId);
-//      return dataTable;
-//    }
+    // Query scheduler wait time already exceeds query timeout, directly return
+    if (querySchedulingTimeMs >= queryTimeoutMs) {
+      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.SCHEDULING_TIMEOUT_EXCEPTIONS, 1);
+      String errorMessage = String
+          .format("Query scheduling took %dms (longer than query timeout of %dms)", querySchedulingTimeMs,
+              queryTimeoutMs);
+      DataTable dataTable = new DataTableImplV2();
+      dataTable.addException(QueryException.getException(QueryException.QUERY_SCHEDULING_TIMEOUT_ERROR, errorMessage));
+      LOGGER.error("{} while processing requestId: {}", errorMessage, requestId);
+      return dataTable;
+    }
 
     TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableNameWithType);
     if (tableDataManager == null) {
