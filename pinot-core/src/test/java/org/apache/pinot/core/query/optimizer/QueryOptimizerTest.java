@@ -29,6 +29,7 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.utils.CommonConstants.Query.Range;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
@@ -150,7 +151,7 @@ public class QueryOptimizerTest {
       assertEquals(thirdChild.getOperator(), FilterOperator.OR);
       List<FilterQueryTree> orFilterChildren = thirdChild.getChildren();
       assertEquals(orFilterChildren.size(), 3);
-      assertEquals(orFilterChildren.get(0).toString(), "float RANGE [(5.5\t\t*)]");
+      assertEquals(orFilterChildren.get(0).toString(), "float RANGE [(5.5\000*)]");
 
       // Order of second and third child is not deterministic
       FilterQueryTree secondOrFilterChild = orFilterChildren.get(1);
@@ -228,22 +229,22 @@ public class QueryOptimizerTest {
       assertEquals(filterQueryTree.getOperator(), FilterOperator.OR);
       List<FilterQueryTree> children = filterQueryTree.getChildren();
       assertEquals(children.size(), 4);
-      assertEquals(children.get(0).toString(), "int RANGE [(10\t\t20]]");
+      assertEquals(children.get(0).toString(), "int RANGE [(10\00020]]");
       // Alphabetical order for STRING column ('23' > '123')
-      assertEquals(children.get(2).toString(), "string RANGE [(23\t\t*)]");
+      assertEquals(children.get(2).toString(), "string RANGE [(23\000*)]");
 
       FilterQueryTree secondChild = children.get(1);
       assertEquals(secondChild.getOperator(), FilterOperator.AND);
       assertEquals(secondChild.getChildren().size(), 2);
       assertEquals(secondChild.getChildren().get(0).toString(), "float EQUALITY [6]");
-      assertEquals(secondChild.getChildren().get(1).toString(), "float RANGE [[6.0\t\t6.5)]");
+      assertEquals(secondChild.getChildren().get(1).toString(), "float RANGE [[6.0\0006.5)]");
 
       // Range filter on multi-value column should not be merged ([-5, 10] can match this filter)
       FilterQueryTree fourthChild = children.get(3);
       assertEquals(fourthChild.getOperator(), FilterOperator.AND);
       assertEquals(fourthChild.getChildren().size(), 2);
-      assertEquals(fourthChild.getChildren().get(0).toString(), "mvInt RANGE [(5\t\t*)]");
-      assertEquals(fourthChild.getChildren().get(1).toString(), "mvInt RANGE [(*\t\t0)]");
+      assertEquals(fourthChild.getChildren().get(0).toString(), "mvInt RANGE [(5\000*)]");
+      assertEquals(fourthChild.getChildren().get(1).toString(), "mvInt RANGE [(*\0000)]");
     }
 
     OPTIMIZER.optimize(pinotQuery, SCHEMA);
@@ -251,16 +252,16 @@ public class QueryOptimizerTest {
     assertEquals(filterFunction.getOperator(), FilterKind.OR.name());
     List<Expression> operands = filterFunction.getOperands();
     assertEquals(operands.size(), 4);
-    assertEquals(operands.get(0), getRangeFilterExpression("int", "(10\t\t20]"));
+    assertEquals(operands.get(0), getRangeFilterExpression("int", "(10\00020]"));
     // Alphabetical order for STRING column ('23' > '123')
-    assertEquals(operands.get(2), getRangeFilterExpression("string", "(23\t\t*)"));
+    assertEquals(operands.get(2), getRangeFilterExpression("string", "(23\000*)"));
 
     Function secondChildFunction = operands.get(1).getFunctionCall();
     assertEquals(secondChildFunction.getOperator(), FilterKind.AND.name());
     List<Expression> secondChildChildren = secondChildFunction.getOperands();
     assertEquals(secondChildChildren.size(), 2);
     assertEquals(secondChildChildren.get(0), getEqFilterExpression("float", 6));
-    assertEquals(secondChildChildren.get(1), getRangeFilterExpression("float", "[6.0\t\t6.5)"));
+    assertEquals(secondChildChildren.get(1), getRangeFilterExpression("float", "[6.0\0006.5)"));
 
     // Range filter on multi-value column should not be merged ([-5, 10] can match this filter)
     Function fourthChildFunction = operands.get(3).getFunctionCall();
@@ -473,19 +474,18 @@ public class QueryOptimizerTest {
   }
 
   private static String getRangeString(FilterKind filterKind, List<Expression> operands) {
-    // TODO: Use the new delimiter after releasing 0.6.0
     switch (filterKind) {
       case GREATER_THAN:
-        return "(" + operands.get(1).getLiteral().getFieldValue().toString() + "\t\t*)";
+        return Range.LOWER_EXCLUSIVE + operands.get(1).getLiteral().getFieldValue().toString() + Range.UPPER_UNBOUNDED;
       case GREATER_THAN_OR_EQUAL:
-        return "[" + operands.get(1).getLiteral().getFieldValue().toString() + "\t\t*)";
+        return Range.LOWER_INCLUSIVE + operands.get(1).getLiteral().getFieldValue().toString() + Range.UPPER_UNBOUNDED;
       case LESS_THAN:
-        return "(*\t\t" + operands.get(1).getLiteral().getFieldValue().toString() + ")";
+        return Range.LOWER_UNBOUNDED + operands.get(1).getLiteral().getFieldValue().toString() + Range.UPPER_EXCLUSIVE;
       case LESS_THAN_OR_EQUAL:
-        return "(*\t\t" + operands.get(1).getLiteral().getFieldValue().toString() + "]";
+        return Range.LOWER_UNBOUNDED + operands.get(1).getLiteral().getFieldValue().toString() + Range.UPPER_INCLUSIVE;
       case BETWEEN:
-        return "[" + operands.get(1).getLiteral().getFieldValue().toString() + "\t\t" + operands.get(2).getLiteral()
-            .getFieldValue().toString() + "]";
+        return Range.LOWER_INCLUSIVE + operands.get(1).getLiteral().getFieldValue().toString() + Range.DELIMITER
+            + operands.get(2).getLiteral().getFieldValue().toString() + Range.UPPER_INCLUSIVE;
       case RANGE:
         return operands.get(1).getLiteral().getStringValue();
       default:

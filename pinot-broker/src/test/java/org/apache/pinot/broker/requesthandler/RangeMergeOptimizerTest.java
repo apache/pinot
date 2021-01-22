@@ -52,32 +52,32 @@ public class RangeMergeOptimizerTest {
   @Test
   public void testRangeIntersection() {
     // One range within another
-    testRangeOptimizer("(1\t\t100)", "(10\t\t20]", "(10\t\t20]");
+    testRangeOptimizer("(1\000100)", "(10\00020]", "(10\00020]");
 
     // One range within another, and one range is unbounded
-    testRangeOptimizer("(*\t\t*)", "[1\t\t2)", "[1\t\t2)");
+    testRangeOptimizer("(*\000*)", "[1\0002)", "[1\0002)");
 
     // One range with unbounded lower
-    testRangeOptimizer("(*\t\t5]", "[1\t\t20)", "[1\t\t5]");
+    testRangeOptimizer("(*\0005]", "[1\00020)", "[1\0005]");
 
     // One range with unbounded upper
-    testRangeOptimizer("(5\t\t*)", "[1\t\t20)", "(5\t\t20)");
+    testRangeOptimizer("(5\000*)", "[1\00020)", "(5\00020)");
 
     // Partial overlap
-    testRangeOptimizer("(1\t\t10]", "[5\t\t20)", "[5\t\t10]");
+    testRangeOptimizer("(1\00010]", "[5\00020)", "[5\00010]");
 
     // No overlap
-    testRangeOptimizer("(1\t\t10]", "[20\t\t30)", "[20\t\t10]");
+    testRangeOptimizer("(1\00010]", "[20\00030)", "[20\00010]");
 
     // Single point overlap
-    testRangeOptimizer("(1\t\t10]", "[10\t\t30)", "[10\t\t10]");
+    testRangeOptimizer("(1\00010]", "[10\00030)", "[10\00010]");
 
     // Redundant case
-    testRangeOptimizer("(*\t\t10]", "(*\t\t30)", "(*\t\t10]");
+    testRangeOptimizer("(*\00010]", "(*\00030)", "(*\00010]");
 
     // Extreme values
-    testRangeOptimizer(String.format("(*\t\t%d)", Long.MAX_VALUE), String.format("(%d\t\t*)", Long.MIN_VALUE),
-        String.format("(%d\t\t%d)", Long.MIN_VALUE, Long.MAX_VALUE));
+    testRangeOptimizer(String.format("(*\000%d)", Long.MAX_VALUE), String.format("(%d\000*)", Long.MIN_VALUE),
+        String.format("(%d\000%d)", Long.MIN_VALUE, Long.MAX_VALUE));
   }
 
   @Test

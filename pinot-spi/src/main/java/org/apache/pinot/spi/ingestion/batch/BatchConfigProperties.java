@@ -22,8 +22,6 @@ package org.apache.pinot.spi.ingestion.batch;
  * Defines all the keys used in the batch configs map
  */
 public class BatchConfigProperties {
-
-  public static final String TABLE_CONFIGS = "tableConfigs";
   public static final String TABLE_NAME = "tableName";
 
   public static final String INPUT_DIR_URI = "inputDirURI";
@@ -38,6 +36,8 @@ public class BatchConfigProperties {
   public static final String RECORD_READER_CLASS = "recordReader.className";
   public static final String RECORD_READER_CONFIG_CLASS = "recordReader.configClassName";
   public static final String RECORD_READER_PROP_PREFIX = "recordReader.prop";
+  public static final String TABLE_CONFIGS = "tableConfigs";
+  public static final String TABLE_CONFIGS_URI = "tableConfigsURI";
   public static final String SCHEMA = "schema";
   public static final String SCHEMA_URI = "schemaURI";
   public static final String SEQUENCE_ID = "sequenceId";

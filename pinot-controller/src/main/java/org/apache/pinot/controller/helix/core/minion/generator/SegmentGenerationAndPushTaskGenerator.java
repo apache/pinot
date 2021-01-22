@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core.minion.generator;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
@@ -51,7 +50,7 @@ import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
-import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -226,7 +225,7 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
 
   private Map<String, String> getSingleFileGenerationTaskConfig(String offlineTableName, int sequenceID,
       Map<String, String> batchConfigMap, URI inputFileURI)
-      throws JsonProcessingException, URISyntaxException {
+      throws URISyntaxException {
 
     URI inputDirURI = getDirectoryUri(batchConfigMap.get(BatchConfigProperties.INPUT_DIR_URI));
     URI outputDirURI = null;
@@ -236,15 +235,13 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
     String pushMode = IngestionConfigUtils.getPushMode(batchConfigMap);
 
     Map<String, String> singleFileGenerationTaskConfig = new HashMap<>(batchConfigMap);
+    singleFileGenerationTaskConfig
+        .put(BatchConfigProperties.TABLE_NAME, TableNameBuilder.OFFLINE.tableNameWithType(offlineTableName));
     singleFileGenerationTaskConfig.put(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, inputFileURI.toString());
     if (outputDirURI != null) {
       URI outputSegmentDirURI = getRelativeOutputPath(inputDirURI, inputFileURI, outputDirURI);
       singleFileGenerationTaskConfig.put(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI, outputSegmentDirURI.toString());
     }
-    singleFileGenerationTaskConfig.put(BatchConfigProperties.SCHEMA,
-        JsonUtils.objectToString(_clusterInfoAccessor.getTableSchema(offlineTableName)));
-    singleFileGenerationTaskConfig.put(BatchConfigProperties.TABLE_CONFIGS,
-        JsonUtils.objectToString(_clusterInfoAccessor.getTableConfig(offlineTableName)));
     singleFileGenerationTaskConfig.put(BatchConfigProperties.SEQUENCE_ID, String.valueOf(sequenceID));
     singleFileGenerationTaskConfig
         .put(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE, BatchConfigProperties.SegmentNameGeneratorType.SIMPLE);
