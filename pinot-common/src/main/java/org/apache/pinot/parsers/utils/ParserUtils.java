@@ -27,6 +27,7 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Literal;
+import org.apache.pinot.common.utils.CommonConstants.Query.Range;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 
 
@@ -145,26 +146,21 @@ public class ParserUtils {
     boolean treatLiteralAsIdentifier = true;
 
     if (FilterKind.LESS_THAN == filterKind) {
-
       String value = standardizeExpression(operands.get(1), treatLiteralAsIdentifier);
-      rangeExpression = "(*\t\t" + value + ")";
+      rangeExpression = Range.LOWER_UNBOUNDED + value + Range.UPPER_EXCLUSIVE;
     } else if (FilterKind.LESS_THAN_OR_EQUAL == filterKind) {
-
       String value = standardizeExpression(operands.get(1), treatLiteralAsIdentifier);
-      rangeExpression = "(*\t\t" + value + "]";
+      rangeExpression = Range.LOWER_UNBOUNDED + value + Range.UPPER_INCLUSIVE;
     } else if (FilterKind.GREATER_THAN == filterKind) {
-
       String value = standardizeExpression(operands.get(1), treatLiteralAsIdentifier);
-      rangeExpression = "(" + value + "\t\t*)";
+      rangeExpression = Range.LOWER_EXCLUSIVE + value + Range.UPPER_UNBOUNDED;
     } else if (FilterKind.GREATER_THAN_OR_EQUAL == filterKind) {
-
       String value = standardizeExpression(operands.get(1), treatLiteralAsIdentifier);
-      rangeExpression = "[" + value + "\t\t*)";
+      rangeExpression = Range.LOWER_INCLUSIVE + value + Range.UPPER_UNBOUNDED;
     } else if (FilterKind.BETWEEN == filterKind) {
-
       String left = standardizeExpression(operands.get(1), treatLiteralAsIdentifier);
       String right = standardizeExpression(operands.get(2), treatLiteralAsIdentifier);
-      rangeExpression = "[" + left + "\t\t" + right + "]";
+      rangeExpression = Range.LOWER_INCLUSIVE + left + Range.DELIMITER + right + Range.UPPER_INCLUSIVE;
     } else {
       throw new UnsupportedOperationException("Unknown Filter Kind:" + filterKind);
     }

@@ -19,48 +19,44 @@
 package org.apache.pinot.tools.scan.query;
 
 import java.util.List;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.utils.CommonConstants.Query.Range;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 
 public class RangePredicateFilter implements PredicateFilter {
-  private static final String SEPARATOR = "\t\t";
   private int _startIndex;
   private int _endIndex;
-  private final Dictionary _dictionary;
-  private final boolean _includeStart;
-  private final boolean _includeEnd;
 
-  public RangePredicateFilter(Dictionary dictionaryReader, List<String> predicateValue) {
-    _dictionary = dictionaryReader;
-    String[] values = predicateValue.get(0).split(SEPARATOR);
-    final String rangeString = predicateValue.get(0).trim();
+  public RangePredicateFilter(Dictionary dictionary, List<String> predicateValue) {
+    String rangeString = predicateValue.get(0);
+    boolean includeStart = rangeString.charAt(0) == Range.LOWER_INCLUSIVE;
+    boolean includeEnd = rangeString.charAt(rangeString.length() - 1) == Range.UPPER_INCLUSIVE;
 
     // Trim the enclosing '[' and ']' as well.
-    String start = values[0].substring(1, values[0].length());
-    String end = values[1].substring(0, values[1].length() - 1);
+    String[] split = StringUtils.split(rangeString, Range.DELIMITER);
+    String start = split[0].substring(1);
+    String end = split[1].substring(0, split[1].length() - 1);
 
-    _includeStart = !rangeString.trim().startsWith("(") || start.equals("*");
-    _includeEnd = !rangeString.trim().endsWith(")") || end.equals("*");
-
-    if (start.equals("*")) {
+    if (start.equals(Range.UNBOUNDED)) {
       _startIndex = 0;
     } else {
-      _startIndex = _dictionary.indexOf(start);
+      _startIndex = dictionary.indexOf(start);
     }
     if (_startIndex < 0) {
       _startIndex = -(_startIndex + 1);
-    } else if (!_includeStart) {
+    } else if (!includeStart) {
       _startIndex++;
     }
 
-    if (end.equals("*")) {
-      _endIndex = _dictionary.length() - 1;
+    if (end.equals(Range.UNBOUNDED)) {
+      _endIndex = dictionary.length() - 1;
     } else {
-      _endIndex = _dictionary.indexOf(end);
+      _endIndex = dictionary.indexOf(end);
     }
     if (_endIndex < 0) {
       _endIndex = -(_endIndex + 1) - 1;
-    } else if (!_includeEnd) {
+    } else if (!includeEnd) {
       --_endIndex;
     }
   }

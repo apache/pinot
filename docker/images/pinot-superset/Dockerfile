@@ -18,7 +18,7 @@
 #
 
 ARG SUPERSET_IMAGE_TAG=latest
-FROM apache/incubator-superset:${SUPERSET_IMAGE_TAG}
+FROM apache/superset:${SUPERSET_IMAGE_TAG}
 
 # Switching to root to install the required packages
 USER root
