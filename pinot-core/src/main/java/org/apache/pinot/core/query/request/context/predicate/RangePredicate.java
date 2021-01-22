@@ -27,7 +27,7 @@ import org.apache.pinot.core.query.request.context.ExpressionContext;
  * Predicate for RANGE.
  * <p>Pinot uses RANGE to represent '>', '>=', '<', '<=', BETWEEN so that intersection of multiple ranges can be merged.
  */
-public class RangePredicate implements Predicate {
+public class RangePredicate extends BasePredicate implements Predicate {
   public static final char DELIMITER = '\0';
   // TODO: Remove the legacy delimiter after releasing 0.6.0
   public static final String LEGACY_DELIMITER = "\t\t";

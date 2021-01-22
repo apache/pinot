@@ -120,6 +120,10 @@ public abstract class BaseDictionaryBasedPredicateEvaluator extends BasePredicat
   @SuppressWarnings("Duplicates")
   @Override
   public boolean applyMV(int[] dictIds, int length) {
+    if (_precomputed != null) {
+      return _precomputed;
+    }
+
     if (isExclusive()) {
       for (int i = 0; i < length; i++) {
         if (!applySV(dictIds[i])) {

@@ -26,7 +26,7 @@ import org.apache.pinot.core.query.request.context.ExpressionContext;
 /**
  * Predicate for IN.
  */
-public class InPredicate implements Predicate {
+public class InPredicate extends BasePredicate implements Predicate {
   private final ExpressionContext _lhs;
   private final List<String> _values;
 

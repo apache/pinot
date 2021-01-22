@@ -25,6 +25,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 public class IntDictionary extends BaseImmutableDictionary {
 
+  private static BigDecimal INT_MAX_VALUE = BigDecimal.valueOf(Integer.MAX_VALUE);
+  private static BigDecimal INT_MIN_VALUE = BigDecimal.valueOf(Integer.MIN_VALUE);
   public IntDictionary(PinotDataBuffer dataBuffer, int length) {
     super(dataBuffer, length, Integer.BYTES, (byte) 0);
   }
@@ -38,12 +40,12 @@ public class IntDictionary extends BaseImmutableDictionary {
     // A value greater than Integer.MAX_VALUE will downcast to Integer.MAX_VALUE and a value less than Integer.MIN_VALUE
     // will downcast to Integer.MIN_VALUE. This can cause binary search to return a match if the column actually contains
     // Integer.MIN_VALUE or Integer.MAX_VALUE. We avoid this error by explicitly checking for overflow and underflow.
-    if (bigDecimal.compareTo(BigDecimal.valueOf(Integer.MAX_VALUE)) > 0) {
+    if (bigDecimal.compareTo(INT_MAX_VALUE) > 0) {
       // Binary search insert position of value greater than Integer.MAX_VALUE
       return -(length()+1);
     }
 
-    if (bigDecimal.compareTo(BigDecimal.valueOf(Integer.MIN_VALUE)) < 0) {
+    if (bigDecimal.compareTo(INT_MIN_VALUE) < 0) {
       // Binary search insert position of value less than Integer.MIN_VALUE
       return -1;
     }

@@ -79,15 +79,24 @@ public class NotEqualsPredicateEvaluatorFactory {
     int[] _matchingDictIds;
 
     DictionaryBasedNeqPredicateEvaluator(NotEqPredicate nEqPredicate, Dictionary dictionary) {
-      _nonMatchingDictId = dictionary.indexOf(nEqPredicate.getValue());
-      if (_nonMatchingDictId >= 0) {
-        _nonMatchingDictIds = new int[]{_nonMatchingDictId};
-        if (dictionary.length() == 1) {
-          _alwaysFalse = true;
-        }
+      _precomputed = nEqPredicate.getPrecomputed();
+      if (_precomputed != null && _precomputed) {
+         _nonMatchingDictId = -1;
+         _nonMatchingDictIds = new int[0];
+         _alwaysTrue = true;
+        // TODO: we cannot use _precomputed if _precomputed is set to true, because _matchingDictIds
+        // need to be set as well.
       } else {
-        _nonMatchingDictIds = new int[0];
-        _alwaysTrue = true;
+        _nonMatchingDictId = dictionary.indexOf(nEqPredicate.getValue());
+        if (_nonMatchingDictId >= 0) {
+          _nonMatchingDictIds = new int[]{_nonMatchingDictId};
+          if (dictionary.length() == 1) {
+            _alwaysFalse = true;
+          }
+        } else {
+          _nonMatchingDictIds = new int[0];
+          _alwaysTrue = true;
+        }
       }
       _dictionary = dictionary;
     }
@@ -134,6 +143,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     final int _nonMatchingValue;
 
     IntRawValueBasedNeqPredicateEvaluator(NotEqPredicate nEqPredicate) {
+      _precomputed = nEqPredicate.getPrecomputed();
       _nonMatchingValue = Integer.parseInt(nEqPredicate.getValue());
     }
 
@@ -149,7 +159,7 @@ public class NotEqualsPredicateEvaluatorFactory {
 
     @Override
     public boolean applySV(int value) {
-      return _nonMatchingValue != value;
+      return _precomputed != null ? _precomputed : _nonMatchingValue != value;
     }
   }
 
@@ -157,6 +167,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     final long _nonMatchingValue;
 
     LongRawValueBasedNeqPredicateEvaluator(NotEqPredicate nEqPredicate) {
+      _precomputed = nEqPredicate.getPrecomputed();
       _nonMatchingValue = Long.parseLong(nEqPredicate.getValue());
     }
 
@@ -172,7 +183,7 @@ public class NotEqualsPredicateEvaluatorFactory {
 
     @Override
     public boolean applySV(long value) {
-      return _nonMatchingValue != value;
+      return _precomputed != null ? _precomputed : _nonMatchingValue != value;
     }
   }
 
@@ -180,6 +191,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     final float _nonMatchingValue;
 
     FloatRawValueBasedNeqPredicateEvaluator(NotEqPredicate nEqPredicate) {
+      _precomputed = nEqPredicate.getPrecomputed();
       _nonMatchingValue = Float.parseFloat(nEqPredicate.getValue());
     }
 
@@ -195,7 +207,7 @@ public class NotEqualsPredicateEvaluatorFactory {
 
     @Override
     public boolean applySV(float value) {
-      return _nonMatchingValue != value;
+      return _precomputed != null ? _precomputed : _nonMatchingValue != value;
     }
   }
 
@@ -203,6 +215,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     final double _nonMatchingValue;
 
     DoubleRawValueBasedNeqPredicateEvaluator(NotEqPredicate nEqPredicate) {
+      _precomputed = nEqPredicate.getPrecomputed();
       _nonMatchingValue = Double.parseDouble(nEqPredicate.getValue());
     }
 
@@ -218,7 +231,7 @@ public class NotEqualsPredicateEvaluatorFactory {
 
     @Override
     public boolean applySV(double value) {
-      return _nonMatchingValue != value;
+      return _precomputed != null ? _precomputed : _nonMatchingValue != value;
     }
   }
 
@@ -226,6 +239,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     final String _nonMatchingValue;
 
     StringRawValueBasedNeqPredicateEvaluator(NotEqPredicate nEqPredicate) {
+      _precomputed = nEqPredicate.getPrecomputed();
       _nonMatchingValue = nEqPredicate.getValue();
     }
 
@@ -241,7 +255,7 @@ public class NotEqualsPredicateEvaluatorFactory {
 
     @Override
     public boolean applySV(String value) {
-      return !_nonMatchingValue.equals(value);
+      return _precomputed != null ? _precomputed : _nonMatchingValue != value;
     }
   }
 
@@ -249,6 +263,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     final byte[] _nonMatchingValue;
 
     BytesRawValueBasedNeqPredicateEvaluator(NotEqPredicate nEqPredicate) {
+      _precomputed = nEqPredicate.getPrecomputed();
       _nonMatchingValue = BytesUtils.toBytes(nEqPredicate.getValue());
     }
 
@@ -264,7 +279,7 @@ public class NotEqualsPredicateEvaluatorFactory {
 
     @Override
     public boolean applySV(byte[] value) {
-      return ByteArray.compare(_nonMatchingValue, value) != 0;
+      return _precomputed != null ? _precomputed : ByteArray.compare(_nonMatchingValue, value) != 0;
     }
   }
 }

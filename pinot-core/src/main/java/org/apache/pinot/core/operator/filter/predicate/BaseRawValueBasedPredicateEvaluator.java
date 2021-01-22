@@ -66,6 +66,10 @@ public abstract class BaseRawValueBasedPredicateEvaluator extends BasePredicateE
   @SuppressWarnings("Duplicates")
   @Override
   public boolean applyMV(int[] values, int length) {
+    if (_precomputed != null) {
+      return _precomputed;
+    }
+
     if (isExclusive()) {
       for (int i = 0; i < length; i++) {
         if (!applySV(values[i])) {

@@ -25,7 +25,7 @@ import org.apache.pinot.core.query.request.context.ExpressionContext;
 /**
  * Predicate for TEXT_MATCH.
  */
-public class TextMatchPredicate implements Predicate {
+public class TextMatchPredicate extends BasePredicate implements Predicate {
   private final ExpressionContext _lhs;
   private final String _value;
 

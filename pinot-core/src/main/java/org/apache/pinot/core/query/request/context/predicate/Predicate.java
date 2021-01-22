@@ -44,4 +44,18 @@ public interface Predicate {
    * Returns the left-hand side expression of the predicate.
    */
   ExpressionContext getLhs();
+
+  /**
+   * If we already know the result of the predicate during compile time, there is no need to evaluate the predicate
+   * during runtime.
+   *
+   * @param precomputed true, if predicate will always evaluate to true; otherwise, false.
+   */
+  void setPrecomputed(boolean precomputed);
+
+  /**
+   * @return null if there are no precomputed results; otherwise, a Boolean value that was computed during compile
+   * time.
+   */
+  Boolean getPrecomputed();
 }

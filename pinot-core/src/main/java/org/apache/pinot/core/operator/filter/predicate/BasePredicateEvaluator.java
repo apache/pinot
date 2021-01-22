@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.filter.predicate;
 
 public abstract class BasePredicateEvaluator implements PredicateEvaluator {
+  protected Boolean _precomputed;
 
   @Override
   public final boolean isExclusive() {

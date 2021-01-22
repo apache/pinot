@@ -18,14 +18,13 @@
  */
 package org.apache.pinot.core.plan;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-
 import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
@@ -40,13 +39,17 @@ import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvide
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.predicate.EqPredicate;
+import org.apache.pinot.core.query.request.context.predicate.NotEqPredicate;
 import org.apache.pinot.core.query.request.context.predicate.Predicate;
+import org.apache.pinot.core.query.request.context.predicate.RangePredicate;
 import org.apache.pinot.core.query.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.core.query.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.core.segment.index.datasource.MutableDataSource;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
 import org.apache.pinot.core.segment.index.readers.ValidDocIndexReader;
 import org.apache.pinot.core.util.QueryOptions;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 public class FilterPlanNode implements PlanNode {
@@ -175,14 +178,158 @@ public class FilterPlanNode implements PlanNode {
                 return new MatchAllFilterOperator(_numDocs);
               }
             default:
+              FieldSpec.DataType columnType = dataSource.getDataSourceMetadata().getDataType();
+              Predicate castedPredicate = castPredicateToColumnType(predicate, columnType);
               PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider
-                  .getPredicateEvaluator(predicate, dataSource.getDictionary(),
-                      dataSource.getDataSourceMetadata().getDataType());
+                  .getPredicateEvaluator(castedPredicate, dataSource.getDictionary(),
+                      columnType);
               return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, _numDocs);
           }
         }
       default:
         throw new IllegalStateException();
     }
+  }
+
+  private Predicate castPredicateToColumnType(Predicate predicate, FieldSpec.DataType columnType) {
+    if (columnType != FieldSpec.DataType.DOUBLE && columnType != FieldSpec.DataType.FLOAT
+        && columnType != FieldSpec.DataType.LONG && columnType != FieldSpec.DataType.INT) {
+      // this is not a numerical predicate, hence don't worry about type conversions.
+      return predicate;
+    }
+
+    switch (predicate.getType())
+    {
+      case EQ: {
+        EqPredicate eqPredicate = (EqPredicate) predicate;
+        BigDecimal actualValue = new BigDecimal(eqPredicate.getValue());
+        BigDecimal convertedValue = actualValue;
+        switch (columnType) {
+          case INT:
+            convertedValue = new BigDecimal(actualValue.intValue());
+            break;
+          case LONG:
+            convertedValue = new BigDecimal(actualValue.longValue());
+            break;
+          case FLOAT:
+            convertedValue = new BigDecimal(String.valueOf(String.valueOf(actualValue.floatValue())));
+            break;
+          case DOUBLE:
+            convertedValue = new BigDecimal(String.valueOf(String.valueOf(actualValue.floatValue())));
+            break;
+        }
+
+        int compared = actualValue.compareTo(convertedValue);
+
+        // TODO: Need to adjust all eqPredicate.getLhs() function since we are re-writing the plan.
+        EqPredicate castedEqPredicate = new EqPredicate(eqPredicate.getLhs(), convertedValue.toString());
+        if (compared != 0) {
+          // We already know that this predicate will always evaluate to false; hence, there is no need
+          // to evaluate the predicate during runtime.
+          castedEqPredicate.setPrecomputed(false);
+        }
+
+        return castedEqPredicate;
+      }
+      case NOT_EQ: {
+        NotEqPredicate nEqPredicate = (NotEqPredicate) predicate;
+        BigDecimal actualValue = new BigDecimal(nEqPredicate.getValue());
+        BigDecimal convertedValue = actualValue;
+        switch (columnType) {
+          case INT:
+            convertedValue = new BigDecimal(actualValue.intValue());
+            break;
+          case LONG:
+            convertedValue = new BigDecimal(actualValue.longValue());
+            break;
+          case FLOAT:
+            convertedValue = new BigDecimal(String.valueOf(String.valueOf(actualValue.floatValue())));
+            break;
+          case DOUBLE:
+            convertedValue = new BigDecimal(String.valueOf(String.valueOf(actualValue.floatValue())));
+            break;
+        }
+
+        int compared = actualValue.compareTo(convertedValue);
+        NotEqPredicate castedEqPredicate = new NotEqPredicate(nEqPredicate.getLhs(), convertedValue.toString());
+        if (compared != 0) {
+          // We already know that this predicate will always evaluate to true; hence, there is no need
+          // to evaluate the predicate during runtime.
+          castedEqPredicate.setPrecomputed(true);
+        }
+
+        return castedEqPredicate;
+      }
+      case RANGE: {
+        RangePredicate rangePredicate = (RangePredicate) predicate;
+
+        boolean lowerInclusive = rangePredicate.isLowerInclusive(), upperInclusive = rangePredicate.isUpperInclusive();
+        if (!rangePredicate.getLowerBound().equals(RangePredicate.UNBOUNDED)) {
+          BigDecimal lowerBound = new BigDecimal(rangePredicate.getLowerBound());
+          BigDecimal lowerConvertedValue = lowerBound;
+          switch (columnType) {
+            case INT: {
+              lowerConvertedValue = new BigDecimal(lowerBound.intValue());
+              break;
+            }
+            case LONG: {
+              lowerConvertedValue = new BigDecimal(lowerBound.longValue());
+              break;
+            }
+            case FLOAT: {
+              lowerConvertedValue = new BigDecimal(String.valueOf(lowerBound.floatValue()));
+              break;
+            }
+            case DOUBLE: {
+              // check if conversion to LONG is lossless
+              lowerConvertedValue = new BigDecimal(String.valueOf(lowerBound.doubleValue()));
+              break;
+            }
+          }
+
+          int compared = lowerBound.compareTo(lowerConvertedValue);
+          if (compared != 0) {
+            //If value after conversion is less than original value, upper bound has to be exclusive; otherwise,
+            //upper bound has to be inclusive.
+            lowerInclusive = !(compared > 0);
+          }
+        }
+
+        if (!rangePredicate.getUpperBound().equals(RangePredicate.UNBOUNDED)) {
+          BigDecimal upperBound = new BigDecimal(rangePredicate.getUpperBound());
+          BigDecimal upperConvertedValue = upperBound;
+          switch (columnType) {
+            case INT: {
+              upperConvertedValue = new BigDecimal(upperBound.intValue());
+              break;
+            }
+            case LONG: {
+              upperConvertedValue = new BigDecimal(upperBound.longValue());
+              break;
+            }
+            case FLOAT: {
+              upperConvertedValue = new BigDecimal(String.valueOf(upperBound.floatValue()));
+              break;
+            }
+            case DOUBLE: {
+              upperConvertedValue = new BigDecimal(String.valueOf(upperBound.doubleValue()));
+              break;
+            }
+          }
+
+          int compared = upperBound.compareTo(upperConvertedValue);
+          if (compared != 0) {
+            //If value after conversion is less than original value, upper bound has to be inclusive; otherwise,
+            //upper bound has to be exclusive.
+            upperInclusive = compared > 0;
+          }
+        }
+
+        return new RangePredicate(rangePredicate.getLhs(), lowerInclusive, rangePredicate.getLowerBound(),
+            upperInclusive, rangePredicate.getUpperBound());
+      }
+    }
+
+    return predicate;
   }
 }

@@ -25,7 +25,7 @@ import org.apache.pinot.core.query.request.context.ExpressionContext;
 /**
  * Predicate for EQ.
  */
-public class EqPredicate implements Predicate {
+public class EqPredicate extends BasePredicate implements Predicate {
   private final ExpressionContext _lhs;
   private final String _value;
 

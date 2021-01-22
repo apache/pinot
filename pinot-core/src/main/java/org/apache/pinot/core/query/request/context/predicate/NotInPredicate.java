@@ -26,7 +26,7 @@ import org.apache.pinot.core.query.request.context.ExpressionContext;
 /**
  * Predicate for NOT_IN.
  */
-public class NotInPredicate implements Predicate {
+public class NotInPredicate extends BasePredicate implements Predicate {
   private final ExpressionContext _lhs;
   private final List<String> _values;
 

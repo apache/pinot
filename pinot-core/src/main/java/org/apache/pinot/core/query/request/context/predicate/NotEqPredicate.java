@@ -25,7 +25,7 @@ import org.apache.pinot.core.query.request.context.ExpressionContext;
 /**
  * Predicate for NOT_EQ.
  */
-public class NotEqPredicate implements Predicate {
+public class NotEqPredicate extends BasePredicate implements Predicate {
   private final ExpressionContext _lhs;
   private final String _value;
 

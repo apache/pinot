@@ -25,7 +25,7 @@ import org.apache.pinot.core.query.request.context.ExpressionContext;
 /**
  * Predicate for IS_NOT_NULL.
  */
-public class IsNotNullPredicate implements Predicate {
+public class IsNotNullPredicate extends BasePredicate implements Predicate {
   private final ExpressionContext _lhs;
 
   public IsNotNullPredicate(ExpressionContext lhs) {
