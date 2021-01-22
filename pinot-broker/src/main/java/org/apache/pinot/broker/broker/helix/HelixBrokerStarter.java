@@ -133,7 +133,9 @@ public class HelixBrokerStarter implements ServiceStartable {
 
   private int inferPort() {
     return Optional.ofNullable(_brokerConf.getProperty(Helix.KEY_OF_BROKER_QUERY_PORT)).map(Integer::parseInt)
-        .orElseGet(() -> _listenerConfigs.stream().findFirst().map(ListenerConfig::getPort).get());
+        .orElseGet(() -> _listenerConfigs.stream().findFirst().map(ListenerConfig::getPort).orElseThrow(() ->
+            new IllegalStateException(String.format("Requires at least one ingress config or '%s'",
+                Helix.KEY_OF_BROKER_QUERY_PORT))));
   }
 
   private void setupHelixSystemProperties() {
