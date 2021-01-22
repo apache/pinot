@@ -157,7 +157,7 @@ public class EqualsPredicateEvaluatorFactory {
 
     @Override
     public boolean applySV(long value) {
-      return _precomputed != null ? _matchingValue == value : _precomputed;
+      return _precomputed == null ? _matchingValue == value : _precomputed;
     }
   }
 
