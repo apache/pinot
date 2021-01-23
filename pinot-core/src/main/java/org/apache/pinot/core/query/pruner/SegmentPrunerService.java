@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.query.config.SegmentPrunerConfig;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,11 +39,21 @@ public class SegmentPrunerService {
 
   public SegmentPrunerService(SegmentPrunerConfig config) {
     int numPruners = config.numSegmentPruners();
-    _segmentPruners = new ArrayList<>(numPruners);
+    _segmentPruners = new ArrayList<>(numPruners + 1);
+    boolean hasValidSegmentPruner = false;
     for (int i = 0; i < numPruners; i++) {
       LOGGER.info("Adding segment pruner: " + config.getSegmentPrunerName(i));
+      SegmentPruner segmentPruner =
+          SegmentPrunerProvider.getSegmentPruner(config.getSegmentPrunerName(i), config.getSegmentPrunerConfig(i));
       _segmentPruners.add(
-          SegmentPrunerProvider.getSegmentPruner(config.getSegmentPrunerName(i), config.getSegmentPrunerConfig(i)));
+          segmentPruner);
+      if (segmentPruner instanceof ValidSegmentPruner) {
+        hasValidSegmentPruner = true;
+      }
+    }
+    if (!hasValidSegmentPruner) {
+      _segmentPruners.add(
+          SegmentPrunerProvider.getSegmentPruner(ValidSegmentPruner.class.getSimpleName(), new PinotConfiguration()));
     }
   }
 

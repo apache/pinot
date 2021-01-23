@@ -116,9 +116,9 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     Preconditions.checkNotNull(columnMetadata,
         "ColumnMetadata for " + column + " should not be null. " + "Potentially invalid column name specified.");
     if (_indexContainerMap.containsKey(column)) {
-      return new ImmutableDataSource(columnMetadata);
-    } else {
       return new ImmutableDataSource(columnMetadata, _indexContainerMap.get(column));
+    } else {
+      return new ImmutableDataSource(columnMetadata);
     }
   }
 

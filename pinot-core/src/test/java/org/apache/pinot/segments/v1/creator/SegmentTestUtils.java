@@ -94,6 +94,16 @@ public class SegmentTestUtils {
     return segmentGeneratorConfig;
   }
 
+  public static SegmentGeneratorConfig getSegmentGeneratorConfig(File inputFile, FileFormat inputFormat, File outputDir,
+      String tableName, TableConfig tableConfig, Schema schema) {
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    segmentGeneratorConfig.setInputFilePath(inputFile.getAbsolutePath());
+    segmentGeneratorConfig.setOutDir(outputDir.getAbsolutePath());
+    segmentGeneratorConfig.setFormat(inputFormat);
+    segmentGeneratorConfig.setTableName(tableName);
+    return segmentGeneratorConfig;
+  }
+
   public static Schema extractSchemaFromAvroWithoutTime(File avroFile)
       throws IOException {
     DataFileStream<GenericRecord> dataStream =

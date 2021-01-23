@@ -51,8 +51,13 @@ import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.segments.v1.creator.SegmentTestUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.IngestionSchemaValidator;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -63,10 +68,12 @@ import com.yammer.metrics.core.MetricsRegistry;
 
 public class QueryExecutorTest {
   private static final String AVRO_DATA_PATH = "data/simpleData200001.avro";
+  private static final String EMPTY_JSON_DATA_PATH = "data/test_empty_data.json";
   private static final String QUERY_EXECUTOR_CONFIG_PATH = "conf/query-executor.properties";
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "QueryExecutorTest");
   private static final String TABLE_NAME = "testTable";
   private static final int NUM_SEGMENTS_TO_GENERATE = 2;
+  private static final int NUM_EMPTY_SEGMENTS_TO_GENERATE = 2;
   private static final Pql2Compiler COMPILER = new Pql2Compiler();
   private static final ExecutorService QUERY_RUNNERS = Executors.newFixedThreadPool(20);
 
@@ -85,9 +92,12 @@ public class QueryExecutorTest {
     URL resourceUrl = getClass().getClassLoader().getResource(AVRO_DATA_PATH);
     Assert.assertNotNull(resourceUrl);
     File avroFile = new File(resourceUrl.getFile());
-    for (int i = 0; i < NUM_SEGMENTS_TO_GENERATE; i++) {
+    Schema schema = SegmentTestUtils.extractSchemaFromAvroWithoutTime(avroFile);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    int i = 0;
+    for (; i < NUM_SEGMENTS_TO_GENERATE; i++) {
       SegmentGeneratorConfig config =
-          SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(avroFile, INDEX_DIR, TABLE_NAME);
+          SegmentTestUtils.getSegmentGeneratorConfig(avroFile, FileFormat.AVRO, INDEX_DIR, TABLE_NAME, tableConfig, schema);
       config.setSegmentNamePostfix(Integer.toString(i));
       SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
       driver.init(config);
@@ -97,6 +107,19 @@ public class QueryExecutorTest {
       Assert.assertFalse(ingestionSchemaValidator.getSingleValueMultiValueFieldMismatchResult().isMismatchDetected());
       Assert.assertFalse(ingestionSchemaValidator.getMultiValueStructureMismatchResult().isMismatchDetected());
       Assert.assertFalse(ingestionSchemaValidator.getMissingPinotColumnResult().isMismatchDetected());
+      _indexSegments.add(ImmutableSegmentLoader.load(new File(INDEX_DIR, driver.getSegmentName()), ReadMode.mmap));
+      _segmentNames.add(driver.getSegmentName());
+    }
+    resourceUrl = getClass().getClassLoader().getResource(EMPTY_JSON_DATA_PATH);
+    Assert.assertNotNull(resourceUrl);
+    File jsonFile = new File(resourceUrl.getFile());
+    for (; i < NUM_SEGMENTS_TO_GENERATE + NUM_EMPTY_SEGMENTS_TO_GENERATE; i++) {
+      SegmentGeneratorConfig config =
+          SegmentTestUtils.getSegmentGeneratorConfig(jsonFile, FileFormat.JSON, INDEX_DIR, TABLE_NAME, tableConfig, schema);
+      config.setSegmentNamePostfix(Integer.toString(i));
+      SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
+      driver.init(config);
+      driver.build();
       _indexSegments.add(ImmutableSegmentLoader.load(new File(INDEX_DIR, driver.getSegmentName()), ReadMode.mmap));
       _segmentNames.add(driver.getSegmentName());
     }

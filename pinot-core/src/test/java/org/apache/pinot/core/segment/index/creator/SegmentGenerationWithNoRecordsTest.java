@@ -67,6 +67,7 @@ public class SegmentGenerationWithNoRecordsTest {
         .setRangeIndexColumns(Lists.newArrayList(STRING_COLUMN2))
         .setNoDictionaryColumns(Lists.newArrayList(LONG_COLUMN2)).setVarLengthDictionaryColumns(Lists.newArrayList(STRING_COLUMN3))
         .setOnHeapDictionaryColumns(Lists.newArrayList(LONG_COLUMN3)).build();
+    _tableConfig.getIndexingConfig().setEnableDefaultStarTree(true);
     _schema = new Schema.SchemaBuilder()
         .addSingleValueDimension(STRING_COLUMN1, FieldSpec.DataType.STRING)
         .addSingleValueDimension(STRING_COLUMN2, FieldSpec.DataType.STRING)
