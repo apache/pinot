@@ -37,6 +37,7 @@
     <pinot.root>${basedir}/../../..</pinot.root>
     <phase.prop>package</phase.prop>
     <aws.version>2.15.50</aws.version>
+    <powermock.version>2.0.9</powermock.version>
   </properties>
 
   <dependencies>
@@ -106,6 +107,26 @@
       <groupId>io.netty</groupId>
       <artifactId>netty-common</artifactId>
       <version>4.1.42.Final</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.easymock</groupId>
+      <artifactId>easymock</artifactId>
+      <version>4.2</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.powermock</groupId>
+      <artifactId>powermock-module-testng</artifactId>
+      <version>${powermock.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.powermock</groupId>
+      <artifactId>powermock-api-easymock</artifactId>
+      <version>${powermock.version}</version>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 

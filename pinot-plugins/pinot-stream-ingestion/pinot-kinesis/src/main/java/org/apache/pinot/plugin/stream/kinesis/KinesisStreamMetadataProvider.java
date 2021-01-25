@@ -59,6 +59,14 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
     _fetchTimeoutMs = streamConfig.getFetchTimeoutMillis();
   }
 
+  public KinesisStreamMetadataProvider(String clientId, StreamConfig streamConfig, KinesisConnectionHandler kinesisConnectionHandler, StreamConsumerFactory streamConsumerFactory) {
+    KinesisConfig kinesisConfig = new KinesisConfig(streamConfig);
+    _kinesisConnectionHandler = kinesisConnectionHandler;
+    _kinesisStreamConsumerFactory = streamConsumerFactory;
+    _clientId = clientId;
+    _fetchTimeoutMs = streamConfig.getFetchTimeoutMillis();
+  }
+
   @Override
   public int fetchPartitionCount(long timeoutMillis) {
     throw new UnsupportedOperationException();
@@ -83,7 +91,7 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
     List<PartitionGroupInfo> newPartitionGroupInfos = new ArrayList<>();
 
     Map<String, Shard> shardIdToShardMap =
-        _kinesisConnectionHandler.getShards().stream().collect(Collectors.toMap(Shard::shardId, s -> s));
+        _kinesisConnectionHandler.getShards().stream().collect(Collectors.toMap(Shard::shardId, s -> s, (s1, s2) -> s1));
     Set<String> shardsInCurrent = new HashSet<>();
     Set<String> shardsEnded = new HashSet<>();
 
