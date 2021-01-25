@@ -127,6 +127,9 @@ public class RealtimeSegmentConverterTest {
     converter.build(SegmentVersion.v3, null);
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(new File(outputDir, segmentName));
     Assert.assertEquals(metadata.getTotalDocs(), 0);
+    Assert.assertEquals(metadata.getTimeColumn(), DATE_TIME_COLUMN);
+    Assert.assertEquals(metadata.getTimeUnit(), TimeUnit.MILLISECONDS);
+    Assert.assertEquals(metadata.getStartTime(), metadata.getEndTime());
     Assert.assertTrue(metadata.getAllColumns().containsAll(schema.getColumnNames()));
     System.out.println(outputDir);
   }

@@ -48,6 +48,7 @@ public class SegmentPrunerFactory {
       ZkHelixPropertyStore<ZNRecord> propertyStore) {
     RoutingConfig routingConfig = tableConfig.getRoutingConfig();
     List<SegmentPruner> segmentPruners = new ArrayList<>();
+    // Always prune out empty segments first
     segmentPruners.add(new EmptySegmentPruner(tableConfig, propertyStore));
 
     if (routingConfig != null) {

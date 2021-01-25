@@ -21,6 +21,7 @@ package org.apache.pinot.core.segment.index.creator;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.util.Collections;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
@@ -93,6 +94,9 @@ public class SegmentGenerationWithNoRecordsTest {
     File segmentDir = buildSegment(_tableConfig, _schema);
     SegmentMetadataImpl metadata = SegmentDirectory.loadSegmentMetadata(segmentDir);
     Assert.assertEquals(metadata.getTotalDocs(), 0);
+    Assert.assertEquals(metadata.getTimeColumn(), DATE_TIME_COLUMN);
+    Assert.assertEquals(metadata.getTimeUnit(), TimeUnit.MILLISECONDS);
+    Assert.assertEquals(metadata.getStartTime(), metadata.getEndTime());
     Assert.assertTrue(metadata.getAllColumns().containsAll(_schema.getColumnNames()));
     PinotSegmentRecordReader segmentRecordReader = new PinotSegmentRecordReader(segmentDir);
     Assert.assertFalse(segmentRecordReader.hasNext());

@@ -534,7 +534,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     properties.setProperty(SEGMENT_TOTAL_DOCS, String.valueOf(totalDocs));
 
     // Write time related metadata (start time, end time, time unit)
-    if (timeColumnName != null && totalDocs > 0) {
+    if (timeColumnName != null) {
       ColumnIndexCreationInfo timeColumnIndexCreationInfo = indexCreationInfoMap.get(timeColumnName);
       if (timeColumnIndexCreationInfo != null) {
         long startTime;
@@ -547,20 +547,34 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           endTime = Long.parseLong(config.getEndTime());
           timeUnit = Preconditions.checkNotNull(config.getSegmentTimeUnit());
         } else {
-          String startTimeStr = timeColumnIndexCreationInfo.getMin().toString();
-          String endTimeStr = timeColumnIndexCreationInfo.getMax().toString();
+          if (totalDocs > 0) {
+            String startTimeStr = timeColumnIndexCreationInfo.getMin().toString();
+            String endTimeStr = timeColumnIndexCreationInfo.getMax().toString();
 
-          if (config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
-            // For TimeColumnType.SIMPLE_DATE_FORMAT, convert time value into millis since epoch
-            DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(config.getSimpleDateFormat());
-            startTime = dateTimeFormatter.parseMillis(startTimeStr);
-            endTime = dateTimeFormatter.parseMillis(endTimeStr);
-            timeUnit = TimeUnit.MILLISECONDS;
+            if (config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
+              // For TimeColumnType.SIMPLE_DATE_FORMAT, convert time value into millis since epoch
+              DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(config.getSimpleDateFormat());
+              startTime = dateTimeFormatter.parseMillis(startTimeStr);
+              endTime = dateTimeFormatter.parseMillis(endTimeStr);
+              timeUnit = TimeUnit.MILLISECONDS;
+            } else {
+              // by default, time column type is TimeColumnType.EPOCH
+              startTime = Long.parseLong(startTimeStr);
+              endTime = Long.parseLong(endTimeStr);
+              timeUnit = Preconditions.checkNotNull(config.getSegmentTimeUnit());
+            }
           } else {
-            // by default, time column type is TimeColumnType.EPOCH
-            startTime = Long.parseLong(startTimeStr);
-            endTime = Long.parseLong(endTimeStr);
-            timeUnit = Preconditions.checkNotNull(config.getSegmentTimeUnit());
+            // No records in segment. Use current time as start/end
+            long now = System.currentTimeMillis();
+            if (config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
+              startTime = now;
+              endTime = now;
+              timeUnit = TimeUnit.MILLISECONDS;
+            } else {
+              timeUnit = Preconditions.checkNotNull(config.getSegmentTimeUnit());
+              startTime = timeUnit.convert(now, TimeUnit.MILLISECONDS);
+              endTime = timeUnit.convert(now, TimeUnit.MILLISECONDS);
+            }
           }
         }
 

@@ -512,6 +512,11 @@ public class PinotLLCRealtimeSegmentManager {
           "start/end time information is not correctly written to the segment for table: " + realtimeTableName);
       committingSegmentZKMetadata.setStartTime(segmentMetadata.getTimeInterval().getStartMillis());
       committingSegmentZKMetadata.setEndTime(segmentMetadata.getTimeInterval().getEndMillis());
+    } else {
+      // Set current time as start/end time if total docs is 0
+      long now = System.currentTimeMillis();
+      committingSegmentZKMetadata.setStartTime(now);
+      committingSegmentZKMetadata.setEndTime(now);
     }
     committingSegmentZKMetadata.setTimeUnit(TimeUnit.MILLISECONDS);
     committingSegmentZKMetadata.setIndexVersion(segmentMetadata.getVersion());
