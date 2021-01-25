@@ -23,39 +23,27 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Stream;
 import org.apache.pinot.spi.stream.Checkpoint;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupInfo;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
-import org.apache.pinot.spi.stream.StreamConfig;
-import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.easymock.Capture;
 import org.easymock.CaptureType;
-import org.easymock.EasyMock;
 import org.powermock.api.easymock.PowerMock;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.testng.PowerMockTestCase;
 import org.testng.Assert;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
-import software.amazon.awssdk.services.kinesis.KinesisClient;
-import software.amazon.awssdk.services.kinesis.model.DescribeStreamRequest;
-import software.amazon.awssdk.services.kinesis.model.DescribeStreamResponse;
-import software.amazon.awssdk.services.kinesis.model.GetRecordsResponse;
-import software.amazon.awssdk.services.kinesis.model.GetShardIteratorResponse;
-import software.amazon.awssdk.services.kinesis.model.Record;
 import software.amazon.awssdk.services.kinesis.model.SequenceNumberRange;
 import software.amazon.awssdk.services.kinesis.model.Shard;
-import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
-import software.amazon.awssdk.services.kinesis.model.StreamDescription;
 
-//TODO: Remove static import
-import static org.easymock.EasyMock.*;
-
+import static org.easymock.EasyMock.capture;
+import static org.easymock.EasyMock.newCapture;
+import static org.easymock.EasyMock.captureInt;
+import static org.easymock.EasyMock.expect;
+import static org.easymock.EasyMock.replay;
 
 @PrepareForTest(Shard.class)
 public class KinesisStreamMetadataProviderTest extends PowerMockTestCase {
@@ -86,14 +74,14 @@ public class KinesisStreamMetadataProviderTest extends PowerMockTestCase {
   @Test
   public void getPartitionsGroupInfoListTest()
       throws Exception {
-    EasyMock.expect(kinesisConnectionHandler.getShards()).andReturn(ImmutableList.of(shard0, shard1)).anyTimes();
-    EasyMock.expect(shard0.shardId()).andReturn(SHARD_ID_0).anyTimes();
-    EasyMock.expect(shard1.shardId()).andReturn(SHARD_ID_1).anyTimes();
-    EasyMock.expect(shard0.parentShardId()).andReturn(null).anyTimes();
-    EasyMock.expect(shard1.parentShardId()).andReturn(null).anyTimes();
-    EasyMock.expect(shard0.sequenceNumberRange())
+    expect(kinesisConnectionHandler.getShards()).andReturn(ImmutableList.of(shard0, shard1)).anyTimes();
+    expect(shard0.shardId()).andReturn(SHARD_ID_0).anyTimes();
+    expect(shard1.shardId()).andReturn(SHARD_ID_1).anyTimes();
+    expect(shard0.parentShardId()).andReturn(null).anyTimes();
+    expect(shard1.parentShardId()).andReturn(null).anyTimes();
+    expect(shard0.sequenceNumberRange())
         .andReturn(SequenceNumberRange.builder().startingSequenceNumber("1").build()).anyTimes();
-    EasyMock.expect(shard1.sequenceNumberRange())
+    expect(shard1.sequenceNumberRange())
         .andReturn(SequenceNumberRange.builder().startingSequenceNumber("1").build()).anyTimes();
 
     replay(kinesisConnectionHandler, shard0, shard1);
@@ -122,20 +110,20 @@ public class KinesisStreamMetadataProviderTest extends PowerMockTestCase {
     Capture<Integer> intArguments = newCapture(CaptureType.ALL);
     Capture<String> stringCapture = newCapture(CaptureType.ALL);
 
-    EasyMock.expect(kinesisConnectionHandler.getShards()).andReturn(ImmutableList.of(shard0, shard1)).anyTimes();
-    EasyMock.expect(shard0.shardId()).andReturn(SHARD_ID_0).anyTimes();
-    EasyMock.expect(shard1.shardId()).andReturn(SHARD_ID_1).anyTimes();
-    EasyMock.expect(shard0.parentShardId()).andReturn(null).anyTimes();
-    EasyMock.expect(shard1.parentShardId()).andReturn(null).anyTimes();
-    EasyMock.expect(shard0.sequenceNumberRange())
+    expect(kinesisConnectionHandler.getShards()).andReturn(ImmutableList.of(shard0, shard1)).anyTimes();
+    expect(shard0.shardId()).andReturn(SHARD_ID_0).anyTimes();
+    expect(shard1.shardId()).andReturn(SHARD_ID_1).anyTimes();
+    expect(shard0.parentShardId()).andReturn(null).anyTimes();
+    expect(shard1.parentShardId()).andReturn(null).anyTimes();
+    expect(shard0.sequenceNumberRange())
         .andReturn(SequenceNumberRange.builder().startingSequenceNumber("1").endingSequenceNumber("1").build())
         .anyTimes();
-    EasyMock.expect(shard1.sequenceNumberRange())
+    expect(shard1.sequenceNumberRange())
         .andReturn(SequenceNumberRange.builder().startingSequenceNumber("1").build()).anyTimes();
-    EasyMock.expect(streamConsumerFactory
+    expect(streamConsumerFactory
         .createPartitionGroupConsumer(capture(stringCapture), capture(partitionGroupMetadataCapture)))
         .andReturn(partitionGroupConsumer).anyTimes();
-    EasyMock.expect(partitionGroupConsumer
+    expect(partitionGroupConsumer
         .fetchMessages(capture(checkpointArgs), capture(checkpointArgs), captureInt(intArguments)))
         .andReturn(new KinesisRecordsBatch(new ArrayList<>(), "0", true)).anyTimes();
 
@@ -164,20 +152,20 @@ public class KinesisStreamMetadataProviderTest extends PowerMockTestCase {
     Capture<Integer> intArguments = newCapture(CaptureType.ALL);
     Capture<String> stringCapture = newCapture(CaptureType.ALL);
 
-    EasyMock.expect(kinesisConnectionHandler.getShards()).andReturn(ImmutableList.of(shard0, shard1)).anyTimes();
-    EasyMock.expect(shard0.shardId()).andReturn(SHARD_ID_0).anyTimes();
-    EasyMock.expect(shard1.shardId()).andReturn(SHARD_ID_1).anyTimes();
-    EasyMock.expect(shard0.parentShardId()).andReturn(SHARD_ID_1).anyTimes();
-    EasyMock.expect(shard1.parentShardId()).andReturn(null).anyTimes();
-    EasyMock.expect(shard0.sequenceNumberRange())
+    expect(kinesisConnectionHandler.getShards()).andReturn(ImmutableList.of(shard0, shard1)).anyTimes();
+    expect(shard0.shardId()).andReturn(SHARD_ID_0).anyTimes();
+    expect(shard1.shardId()).andReturn(SHARD_ID_1).anyTimes();
+    expect(shard0.parentShardId()).andReturn(SHARD_ID_1).anyTimes();
+    expect(shard1.parentShardId()).andReturn(null).anyTimes();
+    expect(shard0.sequenceNumberRange())
         .andReturn(SequenceNumberRange.builder().startingSequenceNumber("1").build()).anyTimes();
-    EasyMock.expect(shard1.sequenceNumberRange())
+    expect(shard1.sequenceNumberRange())
         .andReturn(SequenceNumberRange.builder().startingSequenceNumber("1").endingSequenceNumber("1").build())
         .anyTimes();
-    EasyMock.expect(streamConsumerFactory
+    expect(streamConsumerFactory
         .createPartitionGroupConsumer(capture(stringCapture), capture(partitionGroupMetadataCapture)))
         .andReturn(partitionGroupConsumer).anyTimes();
-    EasyMock.expect(partitionGroupConsumer
+    expect(partitionGroupConsumer
         .fetchMessages(capture(checkpointArgs), capture(checkpointArgs), captureInt(intArguments)))
         .andReturn(new KinesisRecordsBatch(new ArrayList<>(), "0", true)).anyTimes();
 
