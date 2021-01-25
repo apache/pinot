@@ -398,7 +398,7 @@ public class SqlUtils {
     String quoteChar = "";
     if (!StringUtils.isNumeric(value)) {
       quoteChar = "\"";
-      if (value.contains(quoteChar) || StringUtils.isEmpty(value)) {
+      if (StringUtils.isEmpty(value) || value.contains(quoteChar)) {
         quoteChar = "\'";
       }
       if (value.contains(quoteChar)) {
