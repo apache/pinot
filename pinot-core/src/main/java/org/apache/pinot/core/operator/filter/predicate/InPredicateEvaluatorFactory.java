@@ -214,7 +214,7 @@ public class InPredicateEvaluatorFactory {
         // First convert string to BigDecimal and then downcast to float. This allows type conversion from any compatible
         // numerical value represented as string to an float value.
         BigDecimal actualValue = new BigDecimal(value);
-        BigDecimal convertedValue = new BigDecimal(actualValue.longValue());
+        BigDecimal convertedValue = new BigDecimal(String.valueOf(actualValue.floatValue()));
 
         if (actualValue.compareTo(convertedValue) == 0) {
           _matchingValues.add(convertedValue.floatValue());
@@ -247,7 +247,16 @@ public class InPredicateEvaluatorFactory {
       List<String> values = inPredicate.getValues();
       _matchingValues = new DoubleOpenHashSet(HashUtil.getMinHashSetSize(values.size()));
       for (String value : values) {
-        _matchingValues.add(Double.parseDouble(value));
+        // First convert string to BigDecimal and then downcast to double. This allows type conversion from any compatible
+        // numerical value represented as string to an double value.
+        BigDecimal actualValue = new BigDecimal(value);
+        BigDecimal convertedValue = new BigDecimal(String.valueOf(actualValue.doubleValue()));
+
+        if (actualValue.compareTo(convertedValue) == 0) {
+          _matchingValues.add(convertedValue.doubleValue());
+        } else {
+          throw new NumberFormatException("IN predicate value " + value + " is not a double value.");
+        }
       }
     }
 
