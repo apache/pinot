@@ -323,6 +323,26 @@ public class NumericalFloatPredicateTest extends BaseQueriesTest {
     Assert.assertEquals(result.get(0), 5l);
   }
 
+  /** Check if we can use values of different numerical types in IN predicate. */
+  @Test
+  public void testFloatColumnWithInPredicate() {
+    Operator operator = getOperatorForSqlQuery("select count(*) from scores where floatColumn IN (12.1, 25.1, 45.1, -45.1)");
+    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
+    List<Object> result = block.getAggregationResult();
+    Assert.assertEquals(result.size(), 1);
+    Assert.assertEquals(result.get(0), 4l);
+  }
+
+  /** Check if we can use values of different numerical types in NOT IN predicate. */
+  @Test
+  public void testFloatColumnWithNotInPredicate() {
+    Operator operator = getOperatorForSqlQuery("select count(*) from scores where floatColumn NOT IN (12.1, 12.101, 25.1, 45.1, -45.1)");
+    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
+    List<Object> result = block.getAggregationResult();
+    Assert.assertEquals(result.size(), 1);
+    Assert.assertEquals(result.get(0), 7l);
+  }
+
   @AfterClass
   public void tearDown()
       throws IOException {

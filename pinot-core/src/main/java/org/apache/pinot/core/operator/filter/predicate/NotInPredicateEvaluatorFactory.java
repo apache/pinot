@@ -26,6 +26,7 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
+import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -155,7 +156,16 @@ public class NotInPredicateEvaluatorFactory {
       List<String> values = notInPredicate.getValues();
       _nonMatchingValues = new IntOpenHashSet(HashUtil.getMinHashSetSize(values.size()));
       for (String value : values) {
-        _nonMatchingValues.add(Integer.parseInt(value));
+        // First convert string to BigDecimal and then downcast to int. This allows type conversion from any compatible
+        // numerical value represented as string to an int value.
+        BigDecimal actualValue = new BigDecimal(value);
+        BigDecimal convertedValue = new BigDecimal(actualValue.intValue());
+
+        if (actualValue.compareTo(convertedValue) == 0) {
+          _nonMatchingValues.add(convertedValue.intValue());
+        } else {
+          throw new NumberFormatException("IN predicate value " + value + " is not an int value.");
+        }
       }
     }
 
@@ -182,7 +192,16 @@ public class NotInPredicateEvaluatorFactory {
       List<String> values = notInPredicate.getValues();
       _nonMatchingValues = new LongOpenHashSet(values.size());
       for (String value : values) {
-        _nonMatchingValues.add(Long.parseLong(value));
+        // First convert string to BigDecimal and then downcast to float. This allows type conversion from any compatible
+        // numerical value represented as string to an long value.
+        BigDecimal actualValue = new BigDecimal(value);
+        BigDecimal convertedValue = new BigDecimal(actualValue.longValue());
+
+        if (actualValue.compareTo(convertedValue) == 0) {
+          _nonMatchingValues.add(convertedValue.longValue());
+        } else {
+          throw new NumberFormatException("IN predicate value " + value + " is not a long value.");
+        }
       }
     }
 
@@ -209,7 +228,16 @@ public class NotInPredicateEvaluatorFactory {
       List<String> values = notInPredicate.getValues();
       _nonMatchingValues = new FloatOpenHashSet(HashUtil.getMinHashSetSize(values.size()));
       for (String value : values) {
-        _nonMatchingValues.add(Float.parseFloat(value));
+        // First convert string to BigDecimal and then downcast to float. This allows type conversion from any compatible
+        // numerical value represented as string to an float value.
+        BigDecimal actualValue = new BigDecimal(value);
+        BigDecimal convertedValue = new BigDecimal(actualValue.longValue());
+
+        if (actualValue.compareTo(convertedValue) == 0) {
+          _nonMatchingValues.add(convertedValue.floatValue());
+        } else {
+          throw new NumberFormatException("IN predicate value " + value + " is not a float value.");
+        }
       }
     }
 

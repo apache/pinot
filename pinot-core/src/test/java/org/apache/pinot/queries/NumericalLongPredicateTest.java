@@ -353,6 +353,26 @@ public class NumericalLongPredicateTest extends BaseQueriesTest {
     Assert.assertEquals(result.get(0), 2l);
   }
 
+  /** Check if we can use values of different numerical types in IN predicate. */
+  @Test
+  public void testLongColumnWithInPredicate() {
+    Operator operator = getOperatorForSqlQuery("select count(*) from scores where longColumn IN (12, 1.0, 25.01, 40.0, -12.0)");
+    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
+    List<Object> result = block.getAggregationResult();
+    Assert.assertEquals(result.size(), 1);
+    Assert.assertEquals(result.get(0), 4l);
+  }
+
+  /** Check if we can use values of different numerical types in NOT IN predicate. */
+  @Test
+  public void testLongColumnWithNotInPredicate() {
+    Operator operator = getOperatorForSqlQuery("select count(*) from scores where longColumn NOT IN (12, 1.0, 25.01, 40.0, -12.0)");
+    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
+    List<Object> result = block.getAggregationResult();
+    Assert.assertEquals(result.size(), 1);
+    Assert.assertEquals(result.get(0), 8l);
+  }
+
   @AfterClass
   public void tearDown()
       throws IOException {

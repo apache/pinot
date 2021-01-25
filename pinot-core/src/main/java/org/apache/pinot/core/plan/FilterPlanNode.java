@@ -46,8 +46,10 @@ import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.FunctionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.predicate.EqPredicate;
+import org.apache.pinot.core.query.request.context.predicate.InPredicate;
 import org.apache.pinot.core.query.request.context.predicate.NotEqPredicate;
 import org.apache.pinot.core.query.request.context.predicate.JsonMatchPredicate;
+import org.apache.pinot.core.query.request.context.predicate.NotInPredicate;
 import org.apache.pinot.core.query.request.context.predicate.Predicate;
 import org.apache.pinot.core.query.request.context.predicate.RangePredicate;
 import org.apache.pinot.core.query.request.context.predicate.RegexpLikePredicate;
@@ -374,6 +376,88 @@ public class FilterPlanNode implements PlanNode {
 
         return new RangePredicate(rangePredicate.getLhs(), lowerInclusive, rangePredicate.getLowerBound(),
             upperInclusive, rangePredicate.getUpperBound());
+      }
+      case IN:
+      {
+        InPredicate inPredicate = (InPredicate) predicate;
+        List<String> values = inPredicate.getValues();
+        List<String> castedValues = new ArrayList<>();
+        for (String value : values) {
+          BigDecimal actualValue = new BigDecimal(value);
+          switch (columnType) {
+            case INT: {
+              BigDecimal convertedValue = new BigDecimal(actualValue.intValue());
+              if (actualValue.compareTo(convertedValue) == 0) {
+                castedValues.add(String.valueOf(convertedValue.intValue()));
+              }
+              break;
+            }
+            case LONG: {
+              BigDecimal convertedValue = new BigDecimal(actualValue.longValue());
+              if (actualValue.compareTo(convertedValue) == 0) {
+                castedValues.add(String.valueOf(convertedValue.longValue()));
+              }
+              break;
+            }
+            case FLOAT: {
+              BigDecimal convertedValue = new BigDecimal(String.valueOf(actualValue.floatValue()));
+              if (actualValue.compareTo(convertedValue) == 0) {
+                castedValues.add(String.valueOf(convertedValue.floatValue()));
+              }
+              break;
+            }
+            case DOUBLE: {
+              BigDecimal convertedValue = new BigDecimal(String.valueOf(actualValue.doubleValue()));
+              if (actualValue.compareTo(convertedValue) == 0) {
+                castedValues.add(String.valueOf(convertedValue.doubleValue()));
+              }
+              break;
+            }
+          }
+        }
+
+        return new InPredicate(inPredicate.getLhs(), castedValues);
+      }
+      case NOT_IN:
+      {
+        NotInPredicate notInPredicate = (NotInPredicate) predicate;
+        List<String> values = notInPredicate.getValues();
+        List<String> castedValues = new ArrayList<>();
+        for (String value : values) {
+          BigDecimal actualValue = new BigDecimal(value);
+          switch (columnType) {
+            case INT: {
+              BigDecimal convertedValue = new BigDecimal(actualValue.intValue());
+              if (actualValue.compareTo(convertedValue) == 0) {
+                castedValues.add(String.valueOf(convertedValue.intValue()));
+              }
+              break;
+            }
+            case LONG: {
+              BigDecimal convertedValue = new BigDecimal(actualValue.longValue());
+              if (actualValue.compareTo(convertedValue) == 0) {
+                castedValues.add(String.valueOf(convertedValue.longValue()));
+              }
+              break;
+            }
+            case FLOAT: {
+              BigDecimal convertedValue = new BigDecimal(String.valueOf(actualValue.floatValue()));
+              if (actualValue.compareTo(convertedValue) == 0) {
+                castedValues.add(String.valueOf(convertedValue.floatValue()));
+              }
+              break;
+            }
+            case DOUBLE: {
+              BigDecimal convertedValue = new BigDecimal(String.valueOf(actualValue.doubleValue()));
+              if (actualValue.compareTo(convertedValue) == 0) {
+                castedValues.add(String.valueOf(convertedValue.doubleValue()));
+              }
+              break;
+            }
+          }
+        }
+
+        return new NotInPredicate(notInPredicate.getLhs(), castedValues);
       }
     }
 

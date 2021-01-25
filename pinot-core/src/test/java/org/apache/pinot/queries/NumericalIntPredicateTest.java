@@ -346,6 +346,26 @@ public class NumericalIntPredicateTest extends BaseQueriesTest {
     Assert.assertEquals(result.get(0), 4l);
   }
 
+  /** Check if we can use values of different numerical types in IN predicate. */
+  @Test
+  public void testIntColumnWithInPredicate() {
+    Operator operator = getOperatorForSqlQuery("select count(*) from scores where intColumn IN (12, 1.0, 25.01, 40.0, -12.0)");
+    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
+    List<Object> result = block.getAggregationResult();
+    Assert.assertEquals(result.size(), 1);
+    Assert.assertEquals(result.get(0), 4l);
+  }
+
+  /** Check if we can use values of different numerical types in NOT IN predicate. */
+  @Test
+  public void testIntColumnWithNotInPredicate() {
+    Operator operator = getOperatorForSqlQuery("select count(*) from scores where intColumn NOT IN (12, 1.0, 25.01, 40.0, -12.0)");
+    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
+    List<Object> result = block.getAggregationResult();
+    Assert.assertEquals(result.size(), 1);
+    Assert.assertEquals(result.get(0), 8l);
+  }
+
   /** Check if we can compare two columns of different numerical types. */
   @Test
   public void testCompareIntColumnWithLongColumn() {
