@@ -40,13 +40,8 @@ import static org.easymock.EasyMock.*;
 
 @PrepareForTest(Shard.class)
 public class KinesisStreamMetadataProviderTest extends PowerMockTestCase {
-    private static final String STREAM_NAME = "kinesis-test";
-    private static final String AWS_REGION = "us-west-2";
-
     private static final String SHARD_ID_0 = "0";
     private static final String SHARD_ID_1 = "1";
-    private static final String SHARD_ITERATOR_0 = "0";
-    private static final String SHARD_ITERATOR_1 = "1";
     public static final String CLIENT_ID = "dummy";
     public static final int TIMEOUT = 1000;
 
@@ -89,7 +84,7 @@ public class KinesisStreamMetadataProviderTest extends PowerMockTestCase {
     }
 
     @Test
-    public void getPartitionsGroupInfoSinglePartitionTest() throws Exception {
+    public void getPartitionsGroupInfoEndOfShardTest() throws Exception {
         List<PartitionGroupMetadata> currentPartitionGroupMeta = new ArrayList<>();
 
         Map<String, String> shardToSequenceMap = new HashMap<>();
@@ -120,5 +115,39 @@ public class KinesisStreamMetadataProviderTest extends PowerMockTestCase {
 
         Assert.assertEquals(result.size(), 1);
         Assert.assertEquals(result.get(0).getPartitionGroupId(), 1);
+    }
+
+    @Test
+    public void getPartitionsGroupInfoChildShardsest() throws Exception {
+        List<PartitionGroupMetadata> currentPartitionGroupMeta = new ArrayList<>();
+
+        Map<String, String> shardToSequenceMap = new HashMap<>();
+        shardToSequenceMap.put("1", "1");
+        KinesisCheckpoint kinesisCheckpoint = new KinesisCheckpoint(shardToSequenceMap);
+
+        currentPartitionGroupMeta.add(new PartitionGroupMetadata(0, 1, kinesisCheckpoint, kinesisCheckpoint, "CONSUMING"));
+
+        Capture<Checkpoint> checkpointArgs = newCapture(CaptureType.ALL);
+        Capture<PartitionGroupMetadata> partitionGroupMetadataCapture = newCapture(CaptureType.ALL);
+        Capture<Integer> intArguments = newCapture(CaptureType.ALL);
+        Capture<String> stringCapture = newCapture(CaptureType.ALL);
+
+        EasyMock.expect(kinesisConnectionHandler.getShards()).andReturn(ImmutableList.of(shard0, shard1)).anyTimes();
+        EasyMock.expect(shard0.shardId()).andReturn(SHARD_ID_0).anyTimes();
+        EasyMock.expect(shard1.shardId()).andReturn(SHARD_ID_1).anyTimes();
+        EasyMock.expect(shard0.parentShardId()).andReturn(SHARD_ID_1).anyTimes();
+        EasyMock.expect(shard1.parentShardId()).andReturn(null).anyTimes();
+        EasyMock.expect(shard0.sequenceNumberRange()).andReturn(SequenceNumberRange.builder().startingSequenceNumber("1").build()).anyTimes();
+        EasyMock.expect(shard1.sequenceNumberRange()).andReturn(SequenceNumberRange.builder().startingSequenceNumber("1").endingSequenceNumber("1").build()).anyTimes();
+        EasyMock.expect(streamConsumerFactory.createPartitionGroupConsumer(capture(stringCapture), capture(partitionGroupMetadataCapture))).andReturn(partitionGroupConsumer).anyTimes();
+        EasyMock.expect(partitionGroupConsumer.fetchMessages(capture(checkpointArgs), capture(checkpointArgs), captureInt(intArguments))).andReturn(new KinesisRecordsBatch(new ArrayList<>(), "0", true)).anyTimes();
+
+        replay(kinesisConnectionHandler, shard0, shard1, streamConsumerFactory, partitionGroupConsumer);
+
+        List<PartitionGroupInfo> result = kinesisStreamMetadataProvider.getPartitionGroupInfoList(CLIENT_ID, TestUtils.getStreamConfig(), currentPartitionGroupMeta,
+            TIMEOUT);
+
+        Assert.assertEquals(result.size(), 1);
+        Assert.assertEquals(result.get(0).getPartitionGroupId(), 0);
     }
 }
