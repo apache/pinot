@@ -800,18 +800,16 @@ public class PinotLLCRealtimeSegmentManager {
     // These conditions can happen again due to manual operations considered as fixes in Issues #5559 and #5263
     // The following check prevents the table from going into such a state (but does not prevent the root cause
     // of attempting such a zk update).
-    if (instanceStatesMap != null) {
-      LLCSegmentName newLLCSegmentName = new LLCSegmentName(newSegmentName);
-      int partitionId = newLLCSegmentName.getPartitionId();
-      int seqNum = newLLCSegmentName.getSequenceNumber();
-      for (String segmentNameStr : instanceStatesMap.keySet()) {
-        LLCSegmentName llcSegmentName = new LLCSegmentName(segmentNameStr);
-        if (llcSegmentName.getPartitionId() == partitionId && llcSegmentName.getSequenceNumber() == seqNum) {
-          String errorMsg =
-              String.format("Segment %s is a duplicate of existing segment %s", newSegmentName, segmentNameStr);
-          LOGGER.error(errorMsg);
-          throw new HelixHelper.PermanentUpdaterException(errorMsg);
-        }
+    LLCSegmentName newLLCSegmentName = new LLCSegmentName(newSegmentName);
+    int partitionId = newLLCSegmentName.getPartitionId();
+    int seqNum = newLLCSegmentName.getSequenceNumber();
+    for (String segmentNameStr : instanceStatesMap.keySet()) {
+      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentNameStr);
+      if (llcSegmentName.getPartitionId() == partitionId && llcSegmentName.getSequenceNumber() == seqNum) {
+        String errorMsg =
+            String.format("Segment %s is a duplicate of existing segment %s", newSegmentName, segmentNameStr);
+        LOGGER.error(errorMsg);
+        throw new HelixHelper.PermanentUpdaterException(errorMsg);
       }
     }
     // Assign instances to the new segment and add instances as state CONSUMING
