@@ -41,6 +41,12 @@ public class KinesisConnectionHandler {
     createConnection();
   }
 
+  public KinesisConnectionHandler(String stream, String awsRegion, KinesisClient kinesisClient) {
+    _stream = stream;
+    _awsRegion = awsRegion;
+    _kinesisClient = kinesisClient;
+  }
+
   /**
    * Lists all shards of the stream
    */

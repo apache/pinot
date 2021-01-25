@@ -31,6 +31,7 @@ import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.services.kinesis.KinesisClient;
 import software.amazon.awssdk.services.kinesis.model.ExpiredIteratorException;
 import software.amazon.awssdk.services.kinesis.model.GetRecordsRequest;
 import software.amazon.awssdk.services.kinesis.model.GetRecordsResponse;
@@ -55,6 +56,15 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
 
   public KinesisConsumer(KinesisConfig kinesisConfig) {
     super(kinesisConfig.getStream(), kinesisConfig.getAwsRegion());
+    _stream = kinesisConfig.getStream();
+    _maxRecords = kinesisConfig.maxRecordsToFetch();
+    _shardIteratorType = kinesisConfig.getShardIteratorType();
+    _executorService = Executors.newSingleThreadExecutor();
+  }
+
+  public KinesisConsumer(KinesisConfig kinesisConfig, KinesisClient kinesisClient) {
+    super(kinesisConfig.getStream(), kinesisConfig.getAwsRegion(), kinesisClient);
+    _kinesisClient = kinesisClient;
     _stream = kinesisConfig.getStream();
     _maxRecords = kinesisConfig.maxRecordsToFetch();
     _shardIteratorType = kinesisConfig.getShardIteratorType();
@@ -149,9 +159,6 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     } catch (KinesisException e) {
       LOG.warn("Encountered unknown unrecoverable AWS exception", e);
       throw new RuntimeException(e);
-    } catch(IllegalStateException e){
-       LOG.warn("Illegal state exception, connection is broken", e);
-       return handleException(kinesisStartCheckpoint, recordList);
     } catch (Throwable e) {
       // non transient errors
       LOG.error("Unknown fetchRecords exception", e);
