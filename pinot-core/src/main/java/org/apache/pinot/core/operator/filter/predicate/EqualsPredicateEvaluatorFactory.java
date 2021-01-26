@@ -79,10 +79,9 @@ public class EqualsPredicateEvaluatorFactory {
     DictionaryBasedEqPredicateEvaluator(EqPredicate eqPredicate, Dictionary dictionary) {
       _precomputed = eqPredicate.getPrecomputed();
       if (_precomputed != null && !_precomputed) {
+        // This predicate will always evaluate to false, so there are no matching dictionary ids.
         _matchingDictId = -1;
         _matchingDictIds = new int[0];
-        // TODO: we cannot use _precomputed if _precomputed is set to true, because _matchingDictIds
-        // need to be set as well.
       } else {
         _matchingDictId = dictionary.indexOf(eqPredicate.getValue());
         if (_matchingDictId >= 0) {

@@ -228,7 +228,7 @@ public class FilterPlanNode implements PlanNode {
               }
             default:
               FieldSpec.DataType columnType = dataSource.getDataSourceMetadata().getDataType();
-              Predicate castedPredicate = castPredicateToColumnType(predicate, columnType);
+              Predicate castedPredicate = rewritePredicateForType(predicate, columnType);
               PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider
                   .getPredicateEvaluator(castedPredicate, dataSource.getDictionary(),
                       columnType);
@@ -240,7 +240,39 @@ public class FilterPlanNode implements PlanNode {
     }
   }
 
-  private Predicate castPredicateToColumnType(Predicate predicate, FieldSpec.DataType columnType) {
+  /**
+   * As part of plan generation, we rewrite certain predicates based on the data type of the column. This allows
+   * for generating correct results after literal value of one numerical type is converted to the column type. In
+   * certain cases, this also allows us to precompute the result of predicate evaluation to either TRUE or FALSE
+   * thereby making query execution more efficient by avoiding the need to evaluate the predicate during runtime.
+   *
+   * As examples, consider a predicate where an integer column is being compared to a float literal.
+   * RANGE PREDICATE
+   *     intColumn > 12.1    rewritten to 	intColumn > 12
+   *     intColumn >= 12.1	 rewritten to   intColumn > 12
+   *     intColumn > -12.1	 rewritten to   intColumn >= -12
+   *     intColumn >= -12.1	 rewritten to   intColumn >= -12
+   *
+   *     intColumn < 12.1	   rewritten to   intColumn <= 12
+   *     intColumn <= 12.1	 rewritten to   intColumn <= 12
+   *     intColumn < -12.1	 rewritten to   intColumn < -12
+   *     intColumn <= -12.1	 rewritten to   intColumn < -12
+   *
+   * EQ PREDICATE
+   *     intColumn = 12.1	  rewritten to    FALSE
+   *     intColumn = 12.0	  rewritten to    intColumn = 12
+   *
+   * NOT_EQ PREDICATE
+   *     intColumn != 12.1	rewritten to    TRUE
+   *     intColumn != 12.0  rewritten to    intColumn != 12
+   *
+   * IN PREDICATE
+   *     intColumn IN (12, 12.1, 13.0) rewritten to    intColumn IN (12, 13)
+   *
+   * NOT_IN PREDICATE
+   *     intColumn NOT IN (12, 12.1, 13.0) rewritten to    intColumn IN (12, 13)
+   */
+  private Predicate rewritePredicateForType(Predicate predicate, FieldSpec.DataType columnType) {
     if (columnType != FieldSpec.DataType.DOUBLE && columnType != FieldSpec.DataType.FLOAT
         && columnType != FieldSpec.DataType.LONG && columnType != FieldSpec.DataType.INT) {
       // this is not a numerical predicate, hence don't worry about type conversions.
@@ -270,7 +302,6 @@ public class FilterPlanNode implements PlanNode {
 
         int compared = actualValue.compareTo(convertedValue);
 
-        // TODO: Need to adjust all eqPredicate.getLhs() function since we are re-writing the plan.
         EqPredicate castedEqPredicate = new EqPredicate(eqPredicate.getLhs(), convertedValue.toString());
         if (compared != 0) {
           // We already know that this predicate will always evaluate to false; hence, there is no need

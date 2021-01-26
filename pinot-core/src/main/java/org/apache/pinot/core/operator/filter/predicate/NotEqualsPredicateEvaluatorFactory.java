@@ -84,8 +84,7 @@ public class NotEqualsPredicateEvaluatorFactory {
          _nonMatchingDictId = -1;
          _nonMatchingDictIds = new int[0];
          _alwaysTrue = true;
-        // TODO: we cannot use _precomputed if _precomputed is set to true, because _matchingDictIds
-        // need to be set as well.
+        // This predicate will always evaluate to true, so there are no non-matching dictionary ids.
       } else {
         _nonMatchingDictId = dictionary.indexOf(nEqPredicate.getValue());
         if (_nonMatchingDictId >= 0) {

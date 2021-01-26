@@ -21,7 +21,9 @@ package org.apache.pinot.core.query.request.context.predicate;
 
 public abstract class BasePredicate implements Predicate {
 
-  // null by default to indicate that predicate does not have precomputed results.
+  // Sometimes we can tell, during compile time, whether a predicate will always evaluate to true or false. In such
+  // cases there is no need to evaluate the predicate during runtime. This field is null by default to indicate
+  // that predicate does not have precomputed results.
   Boolean _precomputed = null;
 
   @Override
