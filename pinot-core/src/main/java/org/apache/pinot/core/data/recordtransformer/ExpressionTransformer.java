@@ -18,8 +18,13 @@
  */
 package org.apache.pinot.core.data.recordtransformer;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -36,24 +41,48 @@ import org.apache.pinot.core.data.function.FunctionEvaluatorFactory;
  */
 public class ExpressionTransformer implements RecordTransformer {
 
-  private final Map<String, FunctionEvaluator> _expressionEvaluators = new HashMap<>();
+  private final LinkedHashMap<String, FunctionEvaluator> _expressionEvaluators = new LinkedHashMap<>();
 
   public ExpressionTransformer(TableConfig tableConfig, Schema schema) {
+    Map<String, FunctionEvaluator> expressionEvaluators = new HashMap<>();
     if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getTransformConfigs() != null) {
       for (TransformConfig transformConfig : tableConfig.getIngestionConfig().getTransformConfigs()) {
-        _expressionEvaluators.put(transformConfig.getColumnName(),
+        expressionEvaluators.put(transformConfig.getColumnName(),
             FunctionEvaluatorFactory.getExpressionEvaluator(transformConfig.getTransformFunction()));
       }
     }
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       String fieldName = fieldSpec.getName();
-      if (!fieldSpec.isVirtualColumn() && !_expressionEvaluators.containsKey(fieldName)) {
+      if (!fieldSpec.isVirtualColumn() && !expressionEvaluators.containsKey(fieldName)) {
         FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
         if (functionEvaluator != null) {
-          _expressionEvaluators.put(fieldName, functionEvaluator);
+          expressionEvaluators.put(fieldName, functionEvaluator);
         }
       }
     }
+
+    // Sort the transform functions based on dependencies
+    Set<String> visited = new HashSet<>();
+    for (Map.Entry<String, FunctionEvaluator> entry : expressionEvaluators.entrySet()) {
+      topologicalSort(entry.getKey(), expressionEvaluators, visited);
+    }
+  }
+
+  private void topologicalSort(String column, Map<String, FunctionEvaluator> expressionEvaluators, Set<String> visited) {
+    if (visited.contains(column)) {
+      return;
+    }
+    FunctionEvaluator functionEvaluator = expressionEvaluators.get(column);
+    if (functionEvaluator == null) {
+      visited.add(column);
+      return;
+    }
+    List<String> arguments = functionEvaluator.getArguments();
+    for (String arg : arguments) {
+      topologicalSort(arg, expressionEvaluators, visited);
+    }
+    visited.add(column);
+    _expressionEvaluators.put(column, functionEvaluator);
   }
 
   @Override

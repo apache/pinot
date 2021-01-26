@@ -19,7 +19,6 @@
 package org.apache.pinot.core.util;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -251,7 +250,6 @@ public final class TableConfigUtils {
       List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
       if (transformConfigs != null) {
         Set<String> transformColumns = new HashSet<>();
-        Set<String> argumentColumns = new HashSet<>();
         for (TransformConfig transformConfig : transformConfigs) {
           String columnName = transformConfig.getColumnName();
           if (schema != null) {
@@ -280,12 +278,6 @@ public final class TableConfigUtils {
                 "Arguments of a transform function '" + arguments + "' cannot contain the destination column '"
                     + columnName + "'");
           }
-          argumentColumns.addAll(arguments);
-        }
-        // TODO: remove this once we add support for derived columns/chained transform functions
-        if (!Collections.disjoint(transformColumns, argumentColumns)) {
-          throw new IllegalStateException(
-              "Derived columns not supported yet. Cannot use a transform column as argument to another transform functions");
         }
       }
     }
