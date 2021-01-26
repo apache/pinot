@@ -30,6 +30,7 @@ import org.apache.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMax
 import org.apache.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.pinot.core.segment.index.loader.defaultcolumn.DefaultColumnHandler;
 import org.apache.pinot.core.segment.index.loader.defaultcolumn.DefaultColumnHandlerFactory;
+import org.apache.pinot.core.segment.index.loader.invertedindex.H3IndexHandler;
 import org.apache.pinot.core.segment.index.loader.invertedindex.InvertedIndexHandler;
 import org.apache.pinot.core.segment.index.loader.invertedindex.JsonIndexHandler;
 import org.apache.pinot.core.segment.index.loader.invertedindex.LuceneFSTIndexHandler;
@@ -134,6 +135,13 @@ public class SegmentPreProcessor implements AutoCloseable {
       JsonIndexHandler jsonIndexHandler =
           new JsonIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
       jsonIndexHandler.createJsonIndices();
+
+      // Create H3 indices according to the index config.
+      if (_indexLoadingConfig.getH3IndexConfigs() != null) {
+        H3IndexHandler h3IndexHandler =
+            new H3IndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
+        h3IndexHandler.createH3Indices();
+      }
 
       // Create bloom filter if required
       BloomFilterHandler bloomFilterHandler =

@@ -21,7 +21,9 @@ package org.apache.pinot.controller.api.resources;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -29,6 +31,7 @@ import javax.inject.Inject;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
+import javax.ws.rs.NotFoundException;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
@@ -42,6 +45,16 @@ import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.quartz.CronTrigger;
+import org.quartz.JobDataMap;
+import org.quartz.JobDetail;
+import org.quartz.JobKey;
+import org.quartz.Scheduler;
+import org.quartz.SchedulerException;
+import org.quartz.SchedulerMetaData;
+import org.quartz.SimpleTrigger;
+import org.quartz.Trigger;
+import org.quartz.impl.matchers.GroupMatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -175,6 +188,113 @@ public class PinotTaskRestletResource {
   public List<PinotTaskConfig> getTaskConfigsDeprecated(
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName) {
     return _pinotHelixTaskResourceManager.getTaskConfigs(taskName);
+  }
+
+  @GET
+  @Path("/tasks/scheduler/information")
+  @ApiOperation("Fetch cron scheduler information")
+  public Map<String, Object> getCronSchedulerInformation()
+      throws SchedulerException {
+    Scheduler scheduler = _pinotTaskManager.getScheduler();
+    if (scheduler == null) {
+      throw new NotFoundException("Task scheduler is disabled");
+    }
+    SchedulerMetaData metaData = scheduler.getMetaData();
+    Map<String, Object> schedulerMetaData = new HashMap<>();
+    schedulerMetaData.put("Version", metaData.getVersion());
+    schedulerMetaData.put("SchedulerName", metaData.getSchedulerName());
+    schedulerMetaData.put("SchedulerInstanceId", metaData.getSchedulerInstanceId());
+    schedulerMetaData.put("getThreadPoolClass", metaData.getThreadPoolClass());
+    schedulerMetaData.put("getThreadPoolSize", metaData.getThreadPoolSize());
+    schedulerMetaData.put("SchedulerClass", metaData.getSchedulerClass());
+    schedulerMetaData.put("Clustered", metaData.isJobStoreClustered());
+    schedulerMetaData.put("JobStoreClass", metaData.getJobStoreClass());
+    schedulerMetaData.put("NumberOfJobsExecuted", metaData.getNumberOfJobsExecuted());
+    schedulerMetaData.put("InStandbyMode", metaData.isInStandbyMode());
+    schedulerMetaData.put("RunningSince", metaData.getRunningSince());
+    List<Map> jobDetails = new ArrayList<>();
+    for (String groupName : scheduler.getJobGroupNames()) {
+      for (JobKey jobKey : scheduler.getJobKeys(GroupMatcher.jobGroupEquals(groupName))) {
+        Map<String, Object> jobMap = new HashMap<>();
+        List<Trigger> triggers = (List<Trigger>) scheduler.getTriggersOfJob(jobKey);
+        jobMap.put("JobKey", jobKey);
+        jobMap.put("NextFireTime", triggers.get(0).getNextFireTime());
+        jobMap.put("PreviousFireTime", triggers.get(0).getPreviousFireTime());
+        jobDetails.add(jobMap);
+      }
+    }
+    schedulerMetaData.put("JobDetails", jobDetails);
+    return schedulerMetaData;
+  }
+
+  @GET
+  @Path("/tasks/scheduler/jobKeys")
+  @ApiOperation("Fetch cron scheduler job keys")
+  public List<JobKey> getCronSchedulerJobKeys()
+      throws SchedulerException {
+    Scheduler scheduler = _pinotTaskManager.getScheduler();
+    if (scheduler == null) {
+      throw new NotFoundException("Task scheduler is disabled");
+    }
+    List<JobKey> jobKeys = new ArrayList<>();
+    for (String group : scheduler.getTriggerGroupNames()) {
+      jobKeys.addAll(scheduler.getJobKeys(GroupMatcher.groupEquals(group)));
+    }
+    return jobKeys;
+  }
+
+  @GET
+  @Path("/tasks/scheduler/jobDetails")
+  @ApiOperation("Fetch cron scheduler job keys")
+  public Map<String, Object> getCronSchedulerJobDetails(
+      @ApiParam(value = "Table name (with type suffix)") @QueryParam("tableName") String tableName,
+      @ApiParam(value = "Task type") @QueryParam("taskType") String taskType)
+      throws SchedulerException {
+    Scheduler scheduler = _pinotTaskManager.getScheduler();
+    if (scheduler == null) {
+      throw new NotFoundException("Task scheduler is disabled");
+    }
+    JobKey jobKey = JobKey.jobKey(tableName, taskType);
+    if (!scheduler.checkExists(jobKey)) {
+      throw new NotFoundException(
+          "Unable to find job detail for table name - " + tableName + ", task type - " + taskType);
+    }
+    JobDetail schedulerJobDetail = scheduler.getJobDetail(jobKey);
+    Map<String, Object> jobDetail = new HashMap<>();
+    jobDetail.put("JobKey", schedulerJobDetail.getKey());
+    jobDetail.put("Description", schedulerJobDetail.getDescription());
+    jobDetail.put("JobClass", schedulerJobDetail.getJobClass());
+    JobDataMap jobData = schedulerJobDetail.getJobDataMap();
+    Map<String, String> jobDataMap = new HashMap<>();
+    for (String key : jobData.getKeys()) {
+      jobDataMap.put(key, jobData.get(key).toString());
+    }
+    jobDetail.put("JobDataMap", jobDataMap);
+    List<? extends Trigger> triggers = scheduler.getTriggersOfJob(jobKey);
+    List<Map> triggerMaps = new ArrayList<>();
+    if (!triggers.isEmpty()) {
+      for (Trigger trigger : triggers) {
+        Map<String, Object> triggerMap = new HashMap<>();
+        if (trigger instanceof SimpleTrigger) {
+          SimpleTrigger simpleTrigger = (SimpleTrigger) trigger;
+          triggerMap.put("TriggerType", SimpleTrigger.class.getSimpleName());
+          triggerMap.put("RepeatInterval", simpleTrigger.getRepeatInterval());
+          triggerMap.put("RepeatCount", simpleTrigger.getRepeatCount());
+          triggerMap.put("TimesTriggered", simpleTrigger.getTimesTriggered());
+        } else if (trigger instanceof CronTrigger) {
+          CronTrigger cronTrigger = (CronTrigger) trigger;
+          triggerMap.put("TriggerType", CronTrigger.class.getSimpleName());
+          triggerMap.put("TimeZone", cronTrigger.getTimeZone());
+          triggerMap.put("CronExpression", cronTrigger.getCronExpression());
+          triggerMap.put("ExpressionSummary", cronTrigger.getExpressionSummary());
+          triggerMap.put("NextFireTime", cronTrigger.getNextFireTime());
+          triggerMap.put("PreviousFireTime", cronTrigger.getPreviousFireTime());
+        }
+        triggerMaps.add(triggerMap);
+      }
+    }
+    jobDetail.put("Triggers", triggerMaps);
+    return jobDetail;
   }
 
   @POST

@@ -18,84 +18,71 @@
  */
 package org.apache.pinot.core.segment.index.readers;
 
-import com.google.common.base.Preconditions;
 import java.lang.ref.SoftReference;
+import java.nio.ByteOrder;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * Reader for bitmap based inverted index. Please reference
+ * {@link org.apache.pinot.core.segment.creator.impl.inv.BitmapInvertedIndexWriter} for the index file layout.
+ */
 public class BitmapInvertedIndexReader implements InvertedIndexReader<ImmutableRoaringBitmap> {
   public static final Logger LOGGER = LoggerFactory.getLogger(BitmapInvertedIndexReader.class);
 
-  private final PinotDataBuffer _dataBuffer;
   private final int _numBitmaps;
+  private final PinotDataBuffer _offsetBuffer;
+  private final PinotDataBuffer _bitmapBuffer;
+
+  // Use the offset of the first bitmap to support 2 different format of the inverted index:
+  //   1. Offset buffer stores the offsets within the whole data buffer (including offset buffer)
+  //   2. Offset buffer stores the offsets within the bitmap buffer
+  private final int _firstOffset;
 
   private volatile SoftReference<SoftReference<ImmutableRoaringBitmap>[]> _bitmaps;
 
-  /**
-   * Constructs an inverted index with the specified size.
-   * @param dataBuffer data buffer for the inverted index.
-   * @param cardinality the number of bitmaps in the inverted index, which should be the same as the
-   *          number of values in
-   *          the dictionary.
-   */
-  public BitmapInvertedIndexReader(PinotDataBuffer dataBuffer, int cardinality) {
-    _dataBuffer = dataBuffer;
-    _numBitmaps = cardinality;
+  public BitmapInvertedIndexReader(PinotDataBuffer dataBuffer, int numBitmaps) {
+    _numBitmaps = numBitmaps;
 
-    int lastOffset = _dataBuffer.getInt(_numBitmaps * Integer.BYTES);
-    Preconditions.checkState(lastOffset == _dataBuffer.size(),
-        "The last offset should be equal to buffer size! Current lastOffset: " + lastOffset + ", buffer size: "
-            + _dataBuffer.size());
+    long offsetBufferEndOffset = (long) (numBitmaps + 1) * Integer.BYTES;
+    _offsetBuffer = dataBuffer.view(0, offsetBufferEndOffset, ByteOrder.BIG_ENDIAN);
+    _bitmapBuffer = dataBuffer.view(offsetBufferEndOffset, dataBuffer.size());
+
+    _firstOffset = _offsetBuffer.getInt(0);
   }
 
-  /**
-   * {@inheritDoc}
-   */
+  @SuppressWarnings("unchecked")
   @Override
   public ImmutableRoaringBitmap getDocIds(int dictId) {
-    SoftReference<ImmutableRoaringBitmap>[] bitmapArrayReference = null;
-    // Return the bitmap if it's still on heap
-    if (_bitmaps != null) {
-      bitmapArrayReference = _bitmaps.get();
-      if (bitmapArrayReference != null) {
-        SoftReference<ImmutableRoaringBitmap> bitmapReference = bitmapArrayReference[dictId];
-        if (bitmapReference != null) {
-          ImmutableRoaringBitmap value = bitmapReference.get();
-          if (value != null) {
-            return value;
-          }
-        }
-      } else {
-        bitmapArrayReference = new SoftReference[_numBitmaps];
-        _bitmaps = new SoftReference<SoftReference<ImmutableRoaringBitmap>[]>(bitmapArrayReference);
+    SoftReference<ImmutableRoaringBitmap>[] bitmapArrayReference;
+    if (_bitmaps != null && (bitmapArrayReference = _bitmaps.get()) != null) {
+      SoftReference<ImmutableRoaringBitmap> bitmapReference = bitmapArrayReference[dictId];
+      ImmutableRoaringBitmap bitmap;
+      if (bitmapReference != null && (bitmap = bitmapReference.get()) != null) {
+        return bitmap;
       }
     } else {
       bitmapArrayReference = new SoftReference[_numBitmaps];
-      _bitmaps = new SoftReference<SoftReference<ImmutableRoaringBitmap>[]>(bitmapArrayReference);
+      _bitmaps = new SoftReference<>(bitmapArrayReference);
     }
     synchronized (this) {
-      ImmutableRoaringBitmap value;
-      if (bitmapArrayReference[dictId] == null || bitmapArrayReference[dictId].get() == null) {
-        value = buildRoaringBitmapForIndex(dictId);
-        bitmapArrayReference[dictId] = new SoftReference<ImmutableRoaringBitmap>(value);
-      } else {
-        value = bitmapArrayReference[dictId].get();
+      SoftReference<ImmutableRoaringBitmap> bitmapReference = bitmapArrayReference[dictId];
+      ImmutableRoaringBitmap bitmap;
+      if (bitmapReference == null || (bitmap = bitmapReference.get()) == null) {
+        bitmap = buildRoaringBitmap(dictId);
+        bitmapArrayReference[dictId] = new SoftReference<>(bitmap);
       }
-      return value;
+      return bitmap;
     }
   }
 
-  private synchronized ImmutableRoaringBitmap buildRoaringBitmapForIndex(final int index) {
-    int currentOffset = getOffset(index);
-    int bufferLength = getOffset(index + 1) - currentOffset;
-    return new ImmutableRoaringBitmap(_dataBuffer.toDirectByteBuffer(currentOffset, bufferLength));
-  }
-
-  private int getOffset(final int index) {
-    return _dataBuffer.getInt(index * Integer.BYTES);
+  private ImmutableRoaringBitmap buildRoaringBitmap(int dictId) {
+    int offset = _offsetBuffer.getInt(dictId * Integer.BYTES);
+    int length = _offsetBuffer.getInt((dictId + 1) * Integer.BYTES) - offset;
+    return new ImmutableRoaringBitmap(_bitmapBuffer.toDirectByteBuffer(offset - _firstOffset, length));
   }
 
   @Override

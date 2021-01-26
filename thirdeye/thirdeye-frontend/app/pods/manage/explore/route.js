@@ -12,9 +12,14 @@ import { formatYamlFilter, redundantParse } from 'thirdeye-frontend/utils/yaml-t
 import moment from 'moment';
 import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
 
+const ANALYSIS_RANGE = [
+  moment().add(1, 'day').subtract(30, 'day').startOf('day').valueOf(),
+  moment().add(1, 'day').startOf('day').valueOf()
+];
+
 export default Route.extend(AuthenticatedRouteMixin, {
   notifications: service('toast'),
-  analysisRange: [moment().add(1, 'day').subtract(30, 'day').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()],
+  analysisRange: ANALYSIS_RANGE,
 
   async model(params) {
     const alertId = params.alert_id;
@@ -29,7 +34,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
     const detectionUrl = `/detection/${alertId}`;
     try {
       const detection_result = await fetch(detectionUrl, getProps);
-      const detection_status  = get(detection_result, 'status');
+      const detection_status = get(detection_result, 'status');
       const detection_json = await detection_result.json();
       if (detection_status !== 200) {
         if (detection_status !== 401) {
@@ -52,7 +57,13 @@ export default Route.extend(AuthenticatedRouteMixin, {
             dataset: detection_json.datasetNames,
             filters: formatYamlFilter(detectionInfo.filters),
             dimensionExploration: formatYamlFilter(detectionInfo.dimensionExploration),
-            lastDetectionTime: lastDetection.toDateString() + ", " +  lastDetection.toLocaleTimeString() + " (" + moment().tz(moment.tz.guess()).format('z') + ")",
+            lastDetectionTime:
+              lastDetection.toDateString() +
+              ', ' +
+              lastDetection.toLocaleTimeString() +
+              ' (' +
+              moment().tz(moment.tz.guess()).format('z') +
+              ')',
             rawYaml: detection_json.yaml
           });
 
@@ -65,7 +76,6 @@ export default Route.extend(AuthenticatedRouteMixin, {
             timeWindowSize: detection_json.alertDetailsDefaultWindowSize,
             granularity: detection_json.monitoringGranularity.toString()
           });
-
         }
       }
     } catch (error) {
@@ -76,7 +86,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
     const healthUrl = `/detection/health/${alertId}?start=${analysisRange[0]}&end=${analysisRange[1]}`;
     try {
       const health_result = await fetch(healthUrl, getProps);
-      const health_status  = get(health_result, 'status');
+      const health_status = get(health_result, 'status');
       const health_json = await health_result.json();
       if (health_status !== 200) {
         if (health_status !== 401) {
@@ -90,10 +100,10 @@ export default Route.extend(AuthenticatedRouteMixin, {
     }
 
     //subscription group fetch
-    const subUrl = `/detection/subscription-groups/${alertId}`;//dropdown of subscription groups
+    const subUrl = `/detection/subscription-groups/${alertId}`; //dropdown of subscription groups
     try {
       const settings_result = await fetch(subUrl, getProps);
-      const settings_status  = get(settings_result, 'status');
+      const settings_status = get(settings_result, 'status');
       const settings_json = await settings_result.json();
       if (settings_status !== 200) {
         if (settings_status !== 401) {
@@ -106,16 +116,16 @@ export default Route.extend(AuthenticatedRouteMixin, {
       notifications.error('Retrieving subscription groups failed.', error, toastOptions);
     }
 
-    let subscribedGroups = "";
+    let subscribedGroups = '';
     if (typeof get(this, 'subscriptionGroups') === 'object' && get(this, 'subscriptionGroups').length > 0) {
       const groups = get(this, 'subscriptionGroups');
       for (let key in groups) {
-        if (groups.hasOwnProperty(key)) {
+        if ({}.propertyIsEnumerable.call(groups, key)) {
           let group = groups[key];
-          if (subscribedGroups === "") {
+          if (subscribedGroups === '') {
             subscribedGroups = group.name;
           } else {
-            subscribedGroups = subscribedGroups + ", " + group.name;
+            subscribedGroups = subscribedGroups + ', ' + group.name;
           }
         }
       }
@@ -139,14 +149,12 @@ export default Route.extend(AuthenticatedRouteMixin, {
    *
    * @override
    */
-  redirect() {
-    /**
-     * We will be temporarily redirecting to single-metric-anomalies route for all alerts.
-     * Once the new route is ready for composite anomalies, extract model.alertData.type and
-     * subsequenty navigate to composite-anomalies route if type is 'COMPOSITE_ALERT', else
-     * navigate to single-metric-anomalies route.
-     */
-    this.transitionTo('manage.explore.single-metric-anomalies');
+  redirect({ alertData: { type } = {} } = {}) {
+    if (type === 'COMPOSITE_ALERT') {
+      this.transitionTo('manage.explore.composite-anomalies');
+    } else {
+      this.transitionTo('manage.explore.single-metric-anomalies');
+    }
   },
 
   actions: {
@@ -157,7 +165,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
     willTransition(transition) {
       //saving session url - TODO: add a util or service - lohuynh
       if (transition.intent.name && transition.intent.name !== 'logout') {
-        this.set('session.store.fromUrl', {lastIntentTransition: transition});
+        this.set('session.store.fromUrl', { lastIntentTransition: transition });
       }
     },
 
@@ -166,10 +174,10 @@ export default Route.extend(AuthenticatedRouteMixin, {
     },
 
     /**
-    * Refresh route's model.
-    * @method refreshModel
-    * @return {undefined}
-    */
+     * Refresh route's model.
+     * @method refreshModel
+     * @return {undefined}
+     */
     refreshModel() {
       this.refresh();
     }

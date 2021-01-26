@@ -439,6 +439,40 @@ public class InbuiltFunctionsTest {
     inputs.add(
         new Object[]{"array_contains_string(stringArray, '2')", Collections.singletonList("stringArray"), row, true});
 
+    inputs
+        .add(new Object[]{"array_slice_int(intArray, 1, 2)", Collections.singletonList("intArray"), row, new int[]{2}});
+    inputs.add(new Object[]{"array_slice_int(integerArray, 1, 2)", Collections.singletonList(
+        "integerArray"), row, new int[]{2}});
+    inputs.add(new Object[]{"array_slice_string(stringArray, 1, 2)", Collections.singletonList(
+        "stringArray"), row, new String[]{"2"}});
+
+    inputs.add(new Object[]{"array_distinct_int(intArray)", Collections.singletonList(
+        "intArray"), row, new int[]{3, 2, 10, 6, 1, 12}});
+    inputs.add(new Object[]{"array_distinct_int(integerArray)", Collections.singletonList(
+        "integerArray"), row, new int[]{3, 2, 10, 6, 1, 12}});
+    inputs.add(new Object[]{"array_distinct_string(stringArray)", Collections.singletonList(
+        "stringArray"), row, new String[]{"3", "2", "10", "6", "1", "12"}});
+
+    inputs.add(new Object[]{"array_remove_int(intArray, 2)", Collections.singletonList(
+        "intArray"), row, new int[]{3, 10, 6, 1, 12}});
+    inputs.add(new Object[]{"array_remove_int(integerArray, 2)", Collections.singletonList(
+        "integerArray"), row, new int[]{3, 10, 6, 1, 12}});
+    inputs.add(new Object[]{"array_remove_string(stringArray, 2)", Collections.singletonList(
+        "stringArray"), row, new String[]{"3", "10", "6", "1", "12"}});
+
+    inputs.add(new Object[]{"array_union_int(intArray, intArray)", Lists.newArrayList("intArray",
+        "intArray"), row, new int[]{3, 2, 10, 6, 1, 12}});
+    inputs.add(new Object[]{"array_union_int(integerArray, integerArray)", Lists.newArrayList("integerArray",
+        "integerArray"), row, new int[]{3, 2, 10, 6, 1, 12}});
+    inputs.add(new Object[]{"array_union_string(stringArray, stringArray)", Lists.newArrayList("stringArray",
+        "stringArray"), row, new String[]{"3", "2", "10", "6", "1", "12"}});
+
+    inputs.add(new Object[]{"array_concat_int(intArray, intArray)", Lists.newArrayList("intArray",
+        "intArray"), row, new int[]{3, 2, 10, 6, 1, 12, 3, 2, 10, 6, 1, 12}});
+    inputs.add(new Object[]{"array_concat_int(integerArray, integerArray)", Lists.newArrayList("integerArray",
+        "integerArray"), row, new int[]{3, 2, 10, 6, 1, 12, 3, 2, 10, 6, 1, 12}});
+    inputs.add(new Object[]{"array_concat_string(stringArray, stringArray)", Lists.newArrayList("stringArray",
+        "stringArray"), row, new String[]{"3", "2", "10", "6", "1", "12", "3", "2", "10", "6", "1", "12"}});
     return inputs.toArray(new Object[0][]);
   }
 }

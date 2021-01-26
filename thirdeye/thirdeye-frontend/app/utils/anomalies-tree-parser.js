@@ -155,13 +155,14 @@ const setMetricsBucket = (buckets, anomaly, metric) => {
     METRICS: { KEY: metricKey, DEFAULT_TITLE, COMPONENT_PATH }
   } = CLASSIFICATIONS;
   const { [metricKey]: { data } = {} } = buckets;
-  const { id, startTime, endTime, feedback, avgCurrentVal: current, avgBaselineVal: predicted } = anomaly;
+  const { id, startTime, endTime, feedback, dimensions, avgCurrentVal: current, avgBaselineVal: predicted } = anomaly;
 
   const metricTableRow = {
     id,
     startTime,
     endTime,
     metric,
+    dimensions,
     feedback,
     currentPredicted: {
       current: humanizeFloat(current),
@@ -465,6 +466,32 @@ const parseCompositeAnomaly = (input) => {
 };
 
 /**
+ * Update the feedback on current node and then use DFS to recursively update the feedback
+ * for the entire subree if the cascading option is selected
+ *
+ * @param {Object} anomaly
+ *   The starting node(root of a subtree) to update the feedback
+ * @param {String} feedbackType
+ *   The feedback to update to
+ * @param {Boolean} cascade
+ *   Whether or not the feedback should be cascaded downstream
+ */
+const setTreeFeedback = (anomaly, feedbackType, cascade) => {
+  anomaly.feedback = {
+    ...anomaly.feedback,
+    feedbackType: feedbackType
+  };
+
+  if (cascade) {
+    const { children = [] } = anomaly;
+
+    for (const child of children) {
+      setTreeFeedback(child, feedbackType, cascade);
+    }
+  }
+};
+
+/**
  * Perform depth-first-search to retrieve anomaly in the tree
  *
  * @param {Number} id
@@ -545,6 +572,9 @@ export const parseSubtree = (id, input) => {
   if (Array.isArray(input)) {
     for (const entry of input) {
       anomaly = findAnomaly(id, entry);
+      if (!isEmpty(anomaly)) {
+        break;
+      }
     }
   } else {
     anomaly = findAnomaly(id, input);
@@ -557,4 +587,33 @@ export const parseSubtree = (id, input) => {
   } else if (isEmpty(metric)) {
     return parseCompositeAnomaly(anomaly);
   }
+};
+
+/**
+ * Update anomaly feedback for the current node and subtree nodes, provided the subtree nodes are not already
+ * explicitly tagged with feedback
+ *
+ * @param {Number} id
+ *   The anomaly id
+ * @param {String} feedback
+ *   The feedback submitted by the user
+ * @param {Boolean} cascade
+ *   Whether or not the feedback should be cascaded downstream
+ * @param {Array<Object> or Object} input
+ *   The tree structure hosting the anomaly referenced by the id.
+ *      -If the entire tree is being passed, it would be in an array form
+ *      -If a subtree is being passed, it would be in an object form
+ *
+ */
+export const updateAnomalyFeedback = (id, feedback, cascade, input) => {
+  let anomaly;
+  if (Array.isArray(input)) {
+    for (const entry of input) {
+      anomaly = findAnomaly(id, entry);
+    }
+  } else {
+    anomaly = findAnomaly(id, input);
+  }
+
+  setTreeFeedback(anomaly, feedback, cascade);
 };

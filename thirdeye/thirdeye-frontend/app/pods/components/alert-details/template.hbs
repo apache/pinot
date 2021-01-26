@@ -1,35 +1,24 @@
 <div class="alert-details">
-
   <div class="pull-right">
     {{#if isPreviewMode}}
-      {{#if showDetails}}
         {{bs-button
           defaultText=(if showDetails "Rerun Preview" "Preview Alert")
-          disabled=disableRerunButton
+          disabled=(if showDetails disableRerunButton disablePreviewButton)
           type="outline-primary"
           buttonType="refresh"
           onClick=(action "getPreview")
           class="te-button te-button--cancel"
         }}
-      {{else}}
-        {{bs-button
-          defaultText="Preview Alert"
-          disabled=disablePreviewButton
-          type="outline-primary"
-          buttonType="refresh"
-          onClick=(action "getPreview")
-          class="te-button te-button--cancel"
-        }}
-      {{/if}}
     {{/if}}
   </div>
+  {{!-- HEADER --}}
   {{#unless errorAnomalies}}
-    {{#if showDetails}}
-      {{#if isPreviewLoading}}
-        {{ember-spinner scale=0.5 rotate=10 speed='1.1' color='#3498DB'}}
-        <p>Running detection between <strong>{{pill.activeRangeStart}}</strong> and <strong>{{pill.activeRangeEnd}}</strong>.</p>
-      {{else}}
-        {{#if isPreviewMode}}
+    {{#if isPreviewMode}}
+      {{#if showDetails}}
+        {{#if isPreviewLoading}}
+          {{ember-spinner scale=0.5 rotate=10 speed='1.1' color='#3498DB'}}
+          <p>Running detection between <strong>{{pill.activeRangeStart}}</strong> and <strong>{{pill.activeRangeEnd}}</strong>.</p>
+        {{else}}
           <div class="diffcurrent-alert alert alert-warning fade in">
             <h4><i class="glyphicon glyphicon-exclamation-sign"></i> Use with caution!</h4>
             <p>Preview can take a long time to run. We recommend previewing for less than a week on
@@ -40,42 +29,56 @@
               <p>Click "Rerun Preview" to get the preview for your updated configuration</p>
             {{/if}}
           </div>
+          {{#if showDetails}}
+            {{#unless dataIsCurrent}}
+            <div class="detection-yaml-msg">Alert configuration has changed.</div>
+            {{/unless}}  
+          {{/if}}
+
         {{/if}}
-        {{#if dataIsCurrent}}
-          <div class="col-xs-12 preview">
-            <div class="col-xs-2 no-padding">
-              <label class="te-label te-label--display">Display Window
-                <span>
-                  <i class="glyphicon glyphicon-question-sign"></i>
-                  {{#tooltip-on-element class="te-tooltip"}}
-                    This is the maximum display period in days. You can zoom into the chart further using the mouse wheel.
-                  {{/tooltip-on-element}}
-                </span>
-              </label>
-            </div>
-            <div class="col-xs-4 no-padding">
-              {{date-range-picker
-                class="te-range-picker"
-                alwaysShowCalendars=true
-                timePicker=true
-                timePicker24Hour=true
-                timePickerIncrement=pill.timePickerIncrement
-                start=pill.activeRangeStart
-                end=pill.activeRangeEnd
-                ranges=pill.predefinedRanges
-                showCustomRangeLabel=false
-                format=pill.uiDateFormat
-                serverFormat="YYYY-MM-DD HH:mm"
-                applyAction=(action "onRangeSelection")
-              }}
-            </div>
-          </div>
-
-          {{#if alertId}}
-
-          <div class="te-content-block__performance-health-wrapper">
+      {{/if}}
+    {{/if}}
+    {{!-- display window + Dropdown --}}
+    {{#unless isPreviewLoading}}
+      {{#unless disablePreviewButton}}
+      <div class="col-xs-12 preview">
+        <div class="col-xs-2 no-padding">
+          <label class="te-label te-label--display">Display Window
+            <span>
+              <i class="glyphicon glyphicon-question-sign"></i>
+              {{#tooltip-on-element class="te-tooltip"}}
+                This is the maximum display period in days. You can zoom into the chart further using the mouse wheel.
+              {{/tooltip-on-element}}
+            </span>
+          </label>
+        </div>
+        <div class="col-xs-4 no-padding">
+          {{date-range-picker
+            class="te-range-picker"
+            alwaysShowCalendars=true
+            timePicker=true
+            timePicker24Hour=true
+            timePickerIncrement=pill.timePickerIncrement
+            start=pill.activeRangeStart
+            end=pill.activeRangeEnd
+            ranges=pill.predefinedRanges
+            showCustomRangeLabel=false
+            format=pill.uiDateFormat
+            serverFormat="YYYY-MM-DD HH:mm"
+            applyAction=(action "onRangeSelection")
+          }}
+        </div>
+      </div>
+      {{/unless}}
+    {{/unless}}
+    {{!-- draw chart & table--}}
+    {{#if showDetails}}
+      {{#if dataIsCurrent}}
+        {{#unless isPreviewLoading}}
+          {{!-- Stats Cards --}}
+          <div class="te-content-block__performance-health-wrapper">    
             <!-- Anomalies, Response Rate, Precision, Recall -->
-            <div class="te-horizontal-cards te-content-block__alert-performance">
+            <div class="te-horizontal-cards te-content-block{{if alertId '__alert-performance'}}" >
               <h4 class="te-self-serve__block-title">
                 <label for="select-dimension" class="control-label te-label">
                   Alert Performance
@@ -100,41 +103,13 @@
                 }}
               {{/if}}
             </div>
-
-            {{detection-health
+            {{#if alertId}}
+              {{detection-health
               health=detectionHealth
               selectedRule=selectedRule
-            }}
+              }}
+            {{/if}}
           </div>
-          {{else}}
-            <!-- Anomalies, Response Rate, Precision, Recall -->
-            <div class="te-horizontal-cards te-content-block">
-              <h4 class="te-self-serve__block-title">
-                <label for="select-dimension" class="control-label te-label">
-                  Alert Performance
-                  <span>
-                    <i class="glyphicon glyphicon-question-sign"></i>
-                    {{#tooltip-on-element class="te-tooltip"}}
-                      All estimated performance numbers are based on reviewed anomalies.
-                    {{/tooltip-on-element}}
-                  </span>
-                </label>
-              </h4>
-              {{!-- Alert anomaly stats cards --}}
-              {{#if performanceStatsTaskInstance.isRunning }}
-                <div class="spinner-wrapper spinner-wrapper--card">
-                  {{ember-spinner lines=30 radius=20 length=0 width=10 opacity=0 trail=75 color='blue'}}
-                </div>
-              {{else}}  
-                {{stats-cards
-                  stats=computedStats
-                  areTwoSetsOfAnomalies=areTwoSetsOfAnomalies
-                  isEditMode=isEditMode
-                }}
-              {{/if}}
-            </div>
-
-          {{/if}}
 
           {{#if isReportSuccess}}
             {{#bs-alert type="success" class="te-form__banner te-form__banner--success"}}
@@ -147,21 +122,22 @@
               <strong>Error:</strong> Failed to save reported anomaly.
             {{/bs-alert}}
           {{/if}}
-
+          {{!-- Sub Headers --}}
+        
           <div class="te-content-block">
-            {{#if showRules}}
-              <h4 class="te-self-serve__block-title">{{selectedRule.name}} {{#if alertHasDimensions}}/ {{selectedDimension}}{{/if}} anomalies over time ({{numFilteredAnomalies}})</h4>
+          {{#if showRules}}
+            <h4 class="te-self-serve__block-title">{{selectedRule.name}} {{#if alertHasDimensions}}/ {{selectedDimension}}{{/if}} anomalies over time ({{numFilteredAnomalies}})</h4>
+          {{else}}
+            {{#if isComposite}}
+              <h4 class="te-self-serve__block-title">Composite Anomalies</h4>
             {{else}}
-              {{#if isComposite}}
-                <h4 class="te-self-serve__block-title">Composite Anomalies</h4>
-              {{else}}
-                <h4 class="te-self-serve__block-title">{{#if alertHasDimensions}}{{selectedDimension}} a{{else}}A{{/if}}nomalies over time ({{numFilteredAnomalies}})</h4>
-              {{/if}}
+              <h4 class="te-self-serve__block-title">{{#if alertHasDimensions}}{{selectedDimension}} a{{else}}A{{/if}}nomalies over time ({{numFilteredAnomalies}})</h4>
             {{/if}}
+          {{/if}}
 
-            {{#unless isPreviewMode}}
-              <a class="te-self-serve__side-link te-self-serve__side-link--high" {{action "onClickReportAnomaly" this}}>Report missing anomaly</a>
-            {{/unless}}
+          {{#unless isPreviewMode}}
+            <a class="te-self-serve__side-link te-self-serve__side-link--high" {{action "onClickReportAnomaly" this}}>Report missing anomaly</a>
+          {{/unless}}
 
             <div class="te-form__select te-form__select--same-line col-md-3">
               {{!-- Rule selector --}}
@@ -225,47 +201,46 @@
             </div>
 
             {{#if isTrainingDisplayed}}
-              <div class="col-xs-12 no-padding">
-                  <div class="alert-details-msg-forecast">
-                    <p>{{material-design-icon
-                      name='error-outline'
-                    }} {{trainingMessage}}
-                      <span>
-                        <i class="glyphicon glyphicon-question-sign"></i>
-                        {{#tooltip-on-element side='right' class="te-tooltip te-tooltip--large te-tooltip--cover" as |popover|}}
-                          <div class="te-tooltip__header">
-                            <span class="te-tooltip__title">Train Period</span>
-                          </div>
+            <div class="col-xs-12 no-padding">
+              <div class="alert-details-msg-forecast">
+                <p>{{material-design-icon
+                  name='error-outline'
+                }} {{trainingMessage}}
+                  <span>
+                    <i class="glyphicon glyphicon-question-sign"></i>
+                    {{#tooltip-on-element side='right' class="te-tooltip te-tooltip--large te-tooltip--cover" as |popover|}}
+                      <div class="te-tooltip__header">
+                        <span class="te-tooltip__title">Train Period</span>
+                      </div>
 
-                          <div class="te-horizontal-forecast__fit-container">
-                            <ul class="te-horizontal-forecast__label-column">
-                              <li class="te-horizontal-forecast__title">Fit Start</li>
-                              <li class="te-horizontal-forecast__title">Fit End</li>
-                            </ul>
+                      <div class="te-horizontal-forecast__fit-container">
+                        <ul class="te-horizontal-forecast__label-column">
+                          <li class="te-horizontal-forecast__title">Fit Start</li>
+                          <li class="te-horizontal-forecast__title">Fit End</li>
+                        </ul>
 
-                            <ul class="te-horizontal-forecast__fit-value">
-                              <li class="te-horizontal-forecast__date">{{trainingTooltipDateTimes.fitStart}}</li>
-                              <li class="te-horizontal-forecast__date">{{trainingTooltipDateTimes.fitEnd}}</li>
-                            </ul>
-                          </div>
+                        <ul class="te-horizontal-forecast__fit-value">
+                          <li class="te-horizontal-forecast__date">{{trainingTooltipDateTimes.fitStart}}</li>
+                          <li class="te-horizontal-forecast__date">{{trainingTooltipDateTimes.fitEnd}}</li>
+                        </ul>
+                      </div>
 
-                          <div class="te-horizontal-forecast__container">
-                            <ul class="te-horizontal-forecast__label-column">
-                              <li class="te-horizontal-forecast__title">Forecast Start</li>
-                              <li class="te-horizontal-forecast__title">Forecast End</li>
-                            </ul>
+                      <div class="te-horizontal-forecast__container">
+                        <ul class="te-horizontal-forecast__label-column">
+                          <li class="te-horizontal-forecast__title">Forecast Start</li>
+                          <li class="te-horizontal-forecast__title">Forecast End</li>
+                        </ul>
 
-                            <ul class="te-horizontal-forecast__forecast-value">
-                              <li class="te-horizontal-forecast__date">{{trainingTooltipDateTimes.forecastStart}}</li>
-                              <li class="te-horizontal-forecast__date">{{trainingTooltipDateTimes.forecastEnd}}</li>
-                            </ul>
-                          </div>
-
-                        {{/tooltip-on-element}}
-                      </span>
-                    </p>
-                  </div>
+                        <ul class="te-horizontal-forecast__forecast-value">
+                          <li class="te-horizontal-forecast__date">{{trainingTooltipDateTimes.forecastStart}}</li>
+                          <li class="te-horizontal-forecast__date">{{trainingTooltipDateTimes.forecastEnd}}</li>
+                        </ul>
+                      </div>
+                    {{/tooltip-on-element}}
+                  </span>
+                </p>
               </div>
+            </div>
             {{/if}}
 
             {{!-- Missing anomaly modal --}}
@@ -302,53 +277,54 @@
             {{/te-modal}}
 
             <div class="col-xs-12 te-graph-container">
-              {{#if isDataLoading}}
+            {{#if isDataLoading}}
+              {{rootcause-placeholder
+                message=blobMessage
+                iconClass="glyphicon glyphicon-equalizer"}}
+              {{#unless getAnomaliesError}}
+                <div class="spinner-wrapper spinner-wrapper--card">
+                  {{ember-spinner lines=30 radius=20 length=0 width=10 opacity=0 trail=75 color='blue'}}
+                </div>
+              {{/unless}}
+            {{else}}
+              {{#if getAnomaliesError}}
                 {{rootcause-placeholder
                   message=blobMessage
                   iconClass="glyphicon glyphicon-equalizer"}}
-                {{#unless getAnomaliesError}}
-                  <div class="spinner-wrapper spinner-wrapper--card">
-                    {{ember-spinner lines=30 radius=20 length=0 width=10 opacity=0 trail=75 color='blue'}}
-                  </div>
-                {{/unless}}
               {{else}}
-                {{#if getAnomaliesError}}
-                  {{rootcause-placeholder
-                    message=blobMessage
-                    iconClass="glyphicon glyphicon-equalizer"}}
-                {{else}}
-                  {{#unless isComposite}}
-                    {{timeseries-chart
-                      series=series
-                      colorMapping=colorMapping
-                      axis=axis
-                      zoom=zoom
-                      legend=legend
-                      point=point
-                      order=order
-                    }}
-                  {{/unless}}
-                {{/if}}
-              {{/if}}
-              {{#unless isPreviewMode}}
                 {{#unless isComposite}}
-                  <div class="te-form__note">
-                    NOTE: If you find the metric shown above is inconsistent, please email <a class="thirdeye-link-secondary" target="_blank" href="{{graphMailtoLink}}">ask_thirdeye</a>.
-                  </div>
-                  <div class="te-form__note">
-                    {{partial 'partials/si-note'}}
-                  </div>
+                  {{timeseries-chart
+                    series=series
+                    colorMapping=colorMapping
+                    axis=axis
+                    zoom=zoom
+                    legend=legend
+                    point=point
+                    order=order
+                  }}
                 {{/unless}}
+              {{/if}}
+            {{/if}}
+            {{#unless isPreviewMode}}
+              {{#unless isComposite}}
+                <div class="te-form__note">
+                  NOTE: If you find the metric shown above is inconsistent, please email <a class="thirdeye-link-secondary" target="_blank" href="{{graphMailtoLink}}">ask_thirdeye</a>.
+                </div>
+                <div class="te-form__note">
+                  {{partial 'partials/si-note'}}
+                </div>
               {{/unless}}
-          </div>
-          {{#unless isComposite}}
-            {{!-- Baseline type selector --}}
-            {{range-pill-selectors
-              title="Baseline"
-              timeRangeOptions=baselineOptions
-              selectAction=(action "onBaselineOptionClick")
-            }}
-          {{/unless}}
+            {{/unless}}
+            </div>
+            
+            {{#unless isComposite}}
+              {{!-- Baseline type selector --}}
+              {{range-pill-selectors
+                title="Baseline"
+                timeRangeOptions=baselineOptions
+                selectAction=(action "onBaselineOptionClick")
+              }}
+            {{/unless}}
             {{#if anomaliesAny}}
               {{models-table
                 data=tableAnomalies
@@ -358,74 +334,15 @@
                 customClasses=customClasses
               }}
             {{/if}}
-        </div>
-        {{else}}
-        <div class="detection-yaml-msg">Alert configuration has changed.</div>
-          <div class="col-xs-12 preview">
-            <div class="col-xs-2 no-padding">
-              <label class="te-label te-label--display">Display Window
-                <span>
-                  <i class="glyphicon glyphicon-question-sign"></i>
-                  {{#tooltip-on-element class="te-tooltip"}}
-                    This is the maximum display period in days. You can zoom into the chart further using the mouse wheel.
-                  {{/tooltip-on-element}}
-                </span>
-              </label>
-            </div>
-            <div class="col-xs-4 no-padding">
-              {{date-range-picker
-                class="te-range-picker"
-                alwaysShowCalendars=true
-                timePicker=true
-                timePicker24Hour=true
-                timePickerIncrement=pill.timePickerIncrement
-                start=pill.activeRangeStart
-                end=pill.activeRangeEnd
-                ranges=pill.predefinedRanges
-                showCustomRangeLabel=false
-                format=pill.uiDateFormat
-                serverFormat="YYYY-MM-DD HH:mm"
-                applyAction=(action "onRangeSelection")
-              }}
-            </div>
-          </div>
-        {{/if}}
-      {{/if}}
+          </div>   
+        {{/unless}}
+      {{/if}}  
     {{else}}
       {{#if disablePreviewButton}}
         <p>Enter YAML configuration to enable preview.</p>
-      {{else}}
-        <div class="col-xs-12 preview">
-          <div class="col-xs-2 no-padding">
-            <label class="te-label te-label--display">Display Window
-              <span>
-                <i class="glyphicon glyphicon-question-sign"></i>
-                {{#tooltip-on-element class="te-tooltip"}}
-                  This is the maximum display period in days. You can zoom into the chart further using the mouse wheel.
-                {{/tooltip-on-element}}
-              </span>
-            </label>
-          </div>
-          <div class="col-xs-4 no-padding">
-            {{date-range-picker
-              class="te-range-picker"
-              alwaysShowCalendars=true
-              timePicker=true
-              timePicker24Hour=true
-              timePickerIncrement=pill.timePickerIncrement
-              start=pill.activeRangeStart
-              end=pill.activeRangeEnd
-              ranges=pill.predefinedRanges
-              showCustomRangeLabel=false
-              format=pill.uiDateFormat
-              serverFormat="YYYY-MM-DD HH:mm"
-              applyAction=(action "onRangeSelection")
-            }}
-          </div>
-        </div>
       {{/if}}
     {{/if}}
   {{/unless}}
-  <p>{{errorAnomalies}}</p>
+        <p>{{errorAnomalies}}</p>
   {{yield}}
 </div>

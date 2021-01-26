@@ -49,6 +49,7 @@ import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -70,6 +71,7 @@ public class SegmentPrunerTest {
   private static final String REALTIME_TABLE_NAME = "testTable_REALTIME";
   private static final String PARTITION_COLUMN = "memberId";
   private static final String TIME_COLUMN = "timeColumn";
+  private static final String SDF_PATTERN = "yyyyMMdd";
 
   private static final String QUERY_1 = "SELECT * FROM testTable";
   private static final String QUERY_2 = "SELECT * FROM testTable where memberId = 0";
@@ -81,6 +83,12 @@ public class SegmentPrunerTest {
   private static final String QUERY_8 = "SELECT * FROM testTable where timeColumn < 15 OR timeColumn > 45";
   private static final String QUERY_9 = "SELECT * FROM testTable where timeColumn < 15 OR (60 < timeColumn AND timeColumn < 70)";
   private static final String QUERY_10 = "SELECT * FROM testTable where timeColumn < 0 AND timeColumn > 0";
+
+  private static final String SDF_QUERY_1 = "SELECT * FROM testTable where timeColumn = 20200131";
+  private static final String SDF_QUERY_2 = "SELECT * FROM testTable where timeColumn BETWEEN 20200101 AND 20200331";
+  private static final String SDF_QUERY_3 = "SELECT * FROM testTable where 20200430 < timeColumn AND timeColumn < 20200630";
+  private static final String SDF_QUERY_4 = "SELECT * FROM testTable where timeColumn <= 20200101 OR timeColumn in (20200201, 20200401)";
+  private static final String SDF_QUERY_5 = "SELECT * FROM testTable where timeColumn in (20200101, 20200102) AND timeColumn >= 20200530";
 
   private ZkStarter.ZookeeperInstance _zkInstance;
   private ZkClient _zkClient;
@@ -294,10 +302,12 @@ public class SegmentPrunerTest {
     assertEquals(segmentPruner.prune(brokerRequest6, Collections.emptySet()), Collections.emptySet());
     assertEquals(segmentPruner.prune(brokerRequest7, Collections.emptySet()), Collections.emptySet());
 
+    // Initialize with non-empty onlineSegments
     // Segments without metadata (not updated yet) should not be pruned
+    segmentPruner = new TimeSegmentPruner(tableConfig, _propertyStore);
     String newSegment = "newSegment";
     onlineSegments.add(newSegment);
-    segmentPruner.onExternalViewChange(externalView, idealState, onlineSegments);
+    segmentPruner.init(externalView, idealState, onlineSegments);
     assertEquals(segmentPruner.prune(brokerRequest1, new HashSet<>(Collections.singletonList(newSegment))),
         Collections.singletonList(newSegment));
     assertEquals(segmentPruner.prune(brokerRequest2, new HashSet<>(Collections.singletonList(newSegment))),
@@ -312,7 +322,6 @@ public class SegmentPrunerTest {
         Collections.singletonList(newSegment));
     assertEquals(segmentPruner.prune(brokerRequest7, new HashSet<>(Collections.singletonList(newSegment))),
         Collections.emptySet()); // query with invalid range will always have empty filtered result
-
 
     // Segments without time range metadata should not be pruned
     String segmentWithoutTimeRangeMetadata = "segmentWithoutTimeRangeMetadata";
@@ -367,7 +376,6 @@ public class SegmentPrunerTest {
     assertEquals(new HashSet(segmentPruner.prune(brokerRequest7, new HashSet<>(Arrays.asList(segment0, segment1, segment2)))),
         Collections.emptySet());
 
-
     // Update metadata without external view change or refreshing should have no effect
     setSegmentZKTimeRangeMetadata(segment2, 20, 30, TimeUnit.DAYS);
     assertEquals(segmentPruner.prune(brokerRequest1,  new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
@@ -403,6 +411,55 @@ public class SegmentPrunerTest {
         Collections.emptySet());
   }
 
+  @Test
+  public void testTimeSegmentPrunerSimpleDateFormat() {
+    CalciteSqlCompiler sqlCompiler = new CalciteSqlCompiler();
+    BrokerRequest brokerRequest1 = sqlCompiler.compileToBrokerRequest(SDF_QUERY_1);
+    BrokerRequest brokerRequest2 = sqlCompiler.compileToBrokerRequest(SDF_QUERY_2);
+    BrokerRequest brokerRequest3 = sqlCompiler.compileToBrokerRequest(SDF_QUERY_3);
+    BrokerRequest brokerRequest4 = sqlCompiler.compileToBrokerRequest(SDF_QUERY_4);
+    BrokerRequest brokerRequest5 = sqlCompiler.compileToBrokerRequest(SDF_QUERY_5);
+
+    ExternalView externalView = Mockito.mock(ExternalView.class);
+    IdealState idealState = Mockito.mock(IdealState.class);
+
+    TableConfig tableConfig = getTableConfig(RAW_TABLE_NAME, TableType.REALTIME);
+    setSchemaDateTimeFieldSpecSDF(RAW_TABLE_NAME, SDF_PATTERN);
+
+    TimeSegmentPruner segmentPruner = new TimeSegmentPruner(tableConfig, _propertyStore);
+    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, RAW_TABLE_NAME);
+    DateTimeFormatSpec dateTimeFormatSpec = new DateTimeFormatSpec(schema.getSpecForTimeColumn(TIME_COLUMN).getFormat());
+
+    Set<String> onlineSegments = new HashSet<>();
+    String segment0 = "segment0";
+    onlineSegments.add(segment0);
+    setSegmentZKTimeRangeMetadata(segment0,
+        dateTimeFormatSpec.fromFormatToMillis("20200101"),
+        dateTimeFormatSpec.fromFormatToMillis("20200228"),
+        TimeUnit.MILLISECONDS);
+
+    String segment1 = "segment1";
+    onlineSegments.add(segment1);
+    setSegmentZKTimeRangeMetadata(segment1,
+        dateTimeFormatSpec.fromFormatToMillis("20200201"),
+        dateTimeFormatSpec.fromFormatToMillis("20200530"),
+        TimeUnit.MILLISECONDS);
+
+    String segment2 = "segment2";
+    onlineSegments.add(segment2);
+    setSegmentZKTimeRangeMetadata(segment2,
+        dateTimeFormatSpec.fromFormatToMillis("20200401"),
+        dateTimeFormatSpec.fromFormatToMillis("20200430"),
+        TimeUnit.MILLISECONDS);
+
+    segmentPruner.init(externalView, idealState, onlineSegments);
+    assertEquals(segmentPruner.prune(brokerRequest1, onlineSegments), new HashSet<>(Collections.singletonList(segment0)));
+    assertEquals(segmentPruner.prune(brokerRequest2, onlineSegments), new HashSet<>(Arrays.asList(segment0, segment1)));
+    assertEquals(segmentPruner.prune(brokerRequest3, onlineSegments), new HashSet<>(Collections.singletonList(segment1)));
+    assertEquals(segmentPruner.prune(brokerRequest4, onlineSegments), new HashSet<>(Arrays.asList(segment0, segment1, segment2)));
+    assertEquals(segmentPruner.prune(brokerRequest5, onlineSegments), Collections.emptySet());
+  }
+
   private TableConfig getTableConfig(String rawTableName, TableType type) {
     return new TableConfigBuilder(type).setTableName(rawTableName).setTimeColumnName(TIME_COLUMN).build();
   }
@@ -410,6 +467,11 @@ public class SegmentPrunerTest {
   private void setSchemaDateTimeFieldSpec(String rawTableName, TimeUnit timeUnit) {
     ZKMetadataProvider.setSchema(_propertyStore, new Schema.SchemaBuilder().setSchemaName(rawTableName)
         .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:" + timeUnit + ":EPOCH", "1:" + timeUnit).build());
+  }
+
+  private void setSchemaDateTimeFieldSpecSDF(String rawTableName, String format) {
+    ZKMetadataProvider.setSchema(_propertyStore, new Schema.SchemaBuilder().setSchemaName(rawTableName)
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:" + format, "1:DAYS").build());
   }
 
   private void setSegmentZKPartitionMetadata(String segment, String partitionFunction, int numPartitions, int partitionId) {

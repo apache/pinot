@@ -145,8 +145,7 @@ public class RangeMergeOptimizer extends FilterQueryTreeOptimizer {
       }
     }
 
-    // TODO: Switch to RangePredicate.DELIMITER after releasing 0.5.0
-    stringBuilder.append(RangePredicate.LEGACY_DELIMITER);
+    stringBuilder.append(RangePredicate.DELIMITER);
 
     String upperBound1 = predicate1.getUpperBound();
     String upperBound2 = predicate2.getUpperBound();

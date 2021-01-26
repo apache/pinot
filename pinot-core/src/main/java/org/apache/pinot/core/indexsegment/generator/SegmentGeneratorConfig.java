@@ -35,6 +35,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
+import org.apache.pinot.core.segment.creator.impl.inv.geospatial.H3IndexConfig;
 import org.apache.pinot.core.segment.name.FixedSegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SimpleSegmentNameGenerator;
@@ -50,6 +51,7 @@ import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.joda.time.format.DateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,13 +75,14 @@ public class SegmentGeneratorConfig implements Serializable {
   private final List<String> _textIndexCreationColumns = new ArrayList<>();
   private final List<String> _fstIndexCreationColumns = new ArrayList<>();
   private final List<String> _jsonIndexCreationColumns = new ArrayList<>();
+  private final Map<String, H3IndexConfig> _h3IndexConfigs = new HashMap<>();
   private final List<String> _columnSortOrder = new ArrayList<>();
   private List<String> _varLengthDictionaryColumns = new ArrayList<>();
   private String _inputFilePath = null;
   private FileFormat _format = FileFormat.AVRO;
   private String _recordReaderPath = null; //TODO: this should be renamed to recordReaderClass or even better removed
   private String _outDir = null;
-  private String _tableName = null;
+  private String _rawTableName = null;
   private String _segmentName = null;
   private String _segmentNamePostfix = null;
   private String _segmentTimeColumnName = null;
@@ -125,6 +128,7 @@ public class SegmentGeneratorConfig implements Serializable {
     setSchema(schema);
 
     _tableConfig = tableConfig;
+    setTableName(tableConfig.getTableName());
 
     // NOTE: SegmentGeneratorConfig#setSchema doesn't set the time column anymore. timeColumnName is expected to be read from table config.
     String timeColumnName = null;
@@ -148,9 +152,8 @@ public class SegmentGeneratorConfig implements Serializable {
 
         if (noDictionaryColumnMap != null) {
           Map<String, ChunkCompressorFactory.CompressionType> serializedNoDictionaryColumnMap =
-              noDictionaryColumnMap.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
-                  e -> ChunkCompressorFactory.CompressionType
-                      .valueOf(e.getValue())));
+              noDictionaryColumnMap.entrySet().stream().collect(Collectors
+                  .toMap(Map.Entry::getKey, e -> ChunkCompressorFactory.CompressionType.valueOf(e.getValue())));
           this.setRawIndexCompressionType(serializedNoDictionaryColumnMap);
         }
       }
@@ -188,6 +191,7 @@ public class SegmentGeneratorConfig implements Serializable {
 
       extractTextIndexColumnsFromTableConfig(tableConfig);
       extractFSTIndexColumnsFromTableConfig(tableConfig);
+      extractH3IndexConfigsFromTableConfig(tableConfig);
 
       _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
     }
@@ -240,6 +244,18 @@ public class SegmentGeneratorConfig implements Serializable {
       for (FieldConfig fieldConfig : fieldConfigList) {
         if (fieldConfig.getIndexType() == FieldConfig.IndexType.FST) {
           _fstIndexCreationColumns.add(fieldConfig.getName());
+        }
+      }
+    }
+  }
+
+  private void extractH3IndexConfigsFromTableConfig(TableConfig tableConfig) {
+    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+    if (fieldConfigList != null) {
+      for (FieldConfig fieldConfig : fieldConfigList) {
+        if (fieldConfig.getIndexType() == FieldConfig.IndexType.H3) {
+          //noinspection ConstantConditions
+          _h3IndexConfigs.put(fieldConfig.getName(), new H3IndexConfig(fieldConfig.getProperties()));
         }
       }
     }
@@ -300,6 +316,10 @@ public class SegmentGeneratorConfig implements Serializable {
 
   public List<String> getJsonIndexCreationColumns() {
     return _jsonIndexCreationColumns;
+  }
+
+  public Map<String, H3IndexConfig> getH3IndexConfigs() {
+    return _h3IndexConfigs;
   }
 
   public List<String> getColumnSortOrder() {
@@ -418,11 +438,11 @@ public class SegmentGeneratorConfig implements Serializable {
   }
 
   public String getTableName() {
-    return _tableName;
+    return _rawTableName;
   }
 
   public void setTableName(String tableName) {
-    _tableName = tableName;
+    _rawTableName = tableName != null ? TableNameBuilder.extractRawTableName(tableName) : null;
   }
 
   public String getSegmentName() {
@@ -569,7 +589,7 @@ public class SegmentGeneratorConfig implements Serializable {
     if (_segmentName != null) {
       return new FixedSegmentNameGenerator(_segmentName);
     }
-    return new SimpleSegmentNameGenerator(_tableName, _segmentNamePostfix);
+    return new SimpleSegmentNameGenerator(_rawTableName, _segmentNamePostfix);
   }
 
   public void setSegmentNameGenerator(SegmentNameGenerator segmentNameGenerator) {

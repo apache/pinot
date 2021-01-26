@@ -117,6 +117,7 @@ public abstract class ControllerTestUtils {
   protected static HelixManager _helixManager;
   protected static HelixAdmin _helixAdmin;
   protected static HelixDataAccessor _helixDataAccessor;
+  protected static ControllerConf _controllerConfig;
 
   protected static ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
@@ -153,14 +154,14 @@ public abstract class ControllerTestUtils {
   public static void startController(Map<String, Object> properties) {
     Preconditions.checkState(_controllerStarter == null);
 
-    ControllerConf config = new ControllerConf(properties);
+    _controllerConfig = new ControllerConf(properties);
 
-    _controllerPort = Integer.valueOf(config.getControllerPort());
+    _controllerPort = Integer.valueOf(_controllerConfig.getControllerPort());
     _controllerBaseApiUrl = "http://localhost:" + _controllerPort;
     _controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl);
-    _controllerDataDir = config.getDataDir();
+    _controllerDataDir = _controllerConfig.getDataDir();
 
-    _controllerStarter = getControllerStarter(config);
+    _controllerStarter = getControllerStarter(_controllerConfig);
     _controllerStarter.start();
     _helixResourceManager = _controllerStarter.getHelixResourceManager();
     _helixManager = _controllerStarter.getHelixControllerManager();
@@ -193,6 +194,10 @@ public abstract class ControllerTestUtils {
 
   protected static ControllerStarter getControllerStarter(ControllerConf config) {
     return new ControllerStarter(config);
+  }
+
+  public static ControllerConf getControllerConfig() {
+    return _controllerConfig;
   }
 
   public static void stopController() {
@@ -449,7 +454,7 @@ public abstract class ControllerTestUtils {
   /**
    * Add a schema to the controller.
    */
-  protected static void addSchema(Schema schema) throws IOException {
+  public static void addSchema(Schema schema) throws IOException {
     String url = _controllerRequestURLBuilder.forSchemaCreate();
     PostMethod postMethod = sendMultipartPostRequest(url, schema.toSingleLineJsonString());
     assertEquals(postMethod.getStatusCode(), 200);

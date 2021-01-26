@@ -52,6 +52,10 @@ public class MergeEqInFilterOptimizer implements FilterOptimizer {
 
   @Override
   public FilterQueryTree optimize(FilterQueryTree filterQueryTree, @Nullable Schema schema) {
+    return optimize(filterQueryTree);
+  }
+
+  private FilterQueryTree optimize(FilterQueryTree filterQueryTree) {
     FilterOperator operator = filterQueryTree.getOperator();
     if (operator == FilterOperator.OR) {
       List<FilterQueryTree> children = filterQueryTree.getChildren();
@@ -64,7 +68,7 @@ public class MergeEqInFilterOptimizer implements FilterOptimizer {
         FilterOperator childOperator = child.getOperator();
         assert childOperator != FilterOperator.OR;
         if (childOperator == FilterOperator.AND) {
-          child.getChildren().replaceAll(c -> optimize(c, schema));
+          child.getChildren().replaceAll(this::optimize);
           newChildren.add(child);
         } else if (childOperator == FilterOperator.EQUALITY) {
           String column = child.getColumn();
@@ -117,7 +121,7 @@ public class MergeEqInFilterOptimizer implements FilterOptimizer {
         return filterQueryTree;
       }
     } else if (operator == FilterOperator.AND) {
-      filterQueryTree.getChildren().replaceAll(c -> optimize(c, schema));
+      filterQueryTree.getChildren().replaceAll(this::optimize);
       return filterQueryTree;
     } else if (operator == FilterOperator.IN) {
       String column = filterQueryTree.getColumn();
@@ -146,6 +150,10 @@ public class MergeEqInFilterOptimizer implements FilterOptimizer {
 
   @Override
   public Expression optimize(Expression filterExpression, @Nullable Schema schema) {
+    return optimize(filterExpression);
+  }
+
+  private Expression optimize(Expression filterExpression) {
     Function function = filterExpression.getFunctionCall();
     String operator = function.getOperator();
     if (operator.equals(FilterKind.OR.name())) {
@@ -160,7 +168,7 @@ public class MergeEqInFilterOptimizer implements FilterOptimizer {
         String childOperator = childFunction.getOperator();
         assert !childOperator.equals(FilterKind.OR.name());
         if (childOperator.equals(FilterKind.AND.name())) {
-          childFunction.getOperands().replaceAll(o -> optimize(o, schema));
+          childFunction.getOperands().replaceAll(this::optimize);
           newChildren.add(child);
         } else if (childOperator.equals(FilterKind.EQUALS.name())) {
           List<Expression> operands = childFunction.getOperands();
@@ -219,7 +227,7 @@ public class MergeEqInFilterOptimizer implements FilterOptimizer {
         return filterExpression;
       }
     } else if (operator.equals(FilterKind.AND.name())) {
-      function.getOperands().replaceAll(c -> optimize(c, schema));
+      function.getOperands().replaceAll(this::optimize);
       return filterExpression;
     } else if (operator.equals(FilterKind.IN.name())) {
       List<Expression> operands = function.getOperands();

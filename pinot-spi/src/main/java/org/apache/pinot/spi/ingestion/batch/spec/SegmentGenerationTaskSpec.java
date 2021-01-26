@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -36,7 +37,7 @@ public class SegmentGenerationTaskSpec implements Serializable {
   /**
    * Table config to create segment
    */
-  private JsonNode _tableConfig;
+  private TableConfig _tableConfig;
 
   /**
    * Table schema
@@ -73,11 +74,11 @@ public class SegmentGenerationTaskSpec implements Serializable {
    */
   private Map<String, String> _customProperties = new HashMap<>();
 
-  public JsonNode getTableConfig() {
+  public TableConfig getTableConfig() {
     return _tableConfig;
   }
 
-  public void setTableConfig(JsonNode tableConfig) {
+  public void setTableConfig(TableConfig tableConfig) {
     _tableConfig = tableConfig;
   }
 

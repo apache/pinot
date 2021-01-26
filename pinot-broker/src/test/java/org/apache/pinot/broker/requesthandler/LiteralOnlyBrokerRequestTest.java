@@ -92,7 +92,7 @@ public class LiteralOnlyBrokerRequestTest {
       throws Exception {
     SingleConnectionBrokerRequestHandler requestHandler =
         new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), null, null, null, null,
-            new BrokerMetrics("", new MetricsRegistry(), true, Collections.emptySet()));
+            new BrokerMetrics("", new MetricsRegistry(), true, Collections.emptySet()), null);
     long randNum = RANDOM.nextLong();
     byte[] randBytes = new byte[12];
     RANDOM.nextBytes(randBytes);
@@ -119,7 +119,7 @@ public class LiteralOnlyBrokerRequestTest {
       throws Exception {
     SingleConnectionBrokerRequestHandler requestHandler =
         new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), null, null, null, null,
-            new BrokerMetrics("", new MetricsRegistry(), true, Collections.emptySet()));
+            new BrokerMetrics("", new MetricsRegistry(), true, Collections.emptySet()), null);
     long currentTsMin = System.currentTimeMillis();
     JsonNode request = new ObjectMapper().readTree(
         "{\"sql\":\"SELECT now() as currentTs, fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z') as firstDayOf2020\"}");

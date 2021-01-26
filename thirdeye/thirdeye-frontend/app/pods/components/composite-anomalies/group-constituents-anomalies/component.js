@@ -69,7 +69,8 @@ export default Component.extend({
           groupName: d.groupName,
           criticalityScore: d.criticality,
           currentPredicted: d.currentPredicted,
-          feedback: getFeedback(d.feedback)
+          feedback: getFeedback(d.feedback),
+          isLeaf: false
         };
         computedTableData.push(row);
       });

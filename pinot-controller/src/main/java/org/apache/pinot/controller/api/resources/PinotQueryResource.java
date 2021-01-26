@@ -44,8 +44,8 @@ import javax.ws.rs.core.HttpHeaders;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -63,11 +63,15 @@ public class PinotQueryResource {
   private static final Pql2Compiler PQL_QUERY_COMPILER = new Pql2Compiler();
   private static final CalciteSqlCompiler SQL_QUERY_COMPILER = new CalciteSqlCompiler();
   private static final Random RANDOM = new Random();
+
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
 
   @Inject
   AccessControlFactory _accessControlFactory;
+
+  @Inject
+  ControllerConf _controllerConf;
 
   @Deprecated
   @POST
@@ -151,34 +155,35 @@ public class PinotQueryResource {
   public String getQueryResponse(String query, String traceEnabled, String queryOptions, HttpHeaders httpHeaders,
       String querySyntax) {
     // Get resource table name.
-    BrokerRequest brokerRequest;
+    String tableName;
     try {
+      String inputTableName;
       switch (querySyntax) {
         case CommonConstants.Broker.Request.SQL:
-          brokerRequest = SQL_QUERY_COMPILER.compileToBrokerRequest(query);
+          inputTableName =
+              SQL_QUERY_COMPILER.compileToBrokerRequest(query).getPinotQuery().getDataSource().getTableName();
           break;
         case CommonConstants.Broker.Request.PQL:
-          brokerRequest = PQL_QUERY_COMPILER.compileToBrokerRequest(query);
+          inputTableName = PQL_QUERY_COMPILER.compileToBrokerRequest(query).getQuerySource().getTableName();
           break;
         default:
           throw new UnsupportedOperationException("Unsupported query syntax - " + querySyntax);
       }
-      String inputTableName = brokerRequest.getQuerySource().getTableName();
-      brokerRequest.getQuerySource().setTableName(_pinotHelixResourceManager.getActualTableName(inputTableName));
+      tableName = _pinotHelixResourceManager.getActualTableName(inputTableName);
     } catch (Exception e) {
       LOGGER.error("Caught exception while compiling {} query: {}", querySyntax.toUpperCase(), query, e);
       return QueryException.getException(QueryException.PQL_PARSING_ERROR, e).toString();
     }
-    String tableName = TableNameBuilder.extractRawTableName(brokerRequest.getQuerySource().getTableName());
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
 
     // Validate data access
     AccessControl accessControl = _accessControlFactory.create();
-    if (!accessControl.hasDataAccess(httpHeaders, tableName)) {
+    if (!accessControl.hasDataAccess(httpHeaders, rawTableName)) {
       return QueryException.ACCESS_DENIED_ERROR.toString();
     }
 
     // Get brokers for the resource table.
-    List<String> instanceIds = _pinotHelixResourceManager.getBrokerInstancesFor(tableName);
+    List<String> instanceIds = _pinotHelixResourceManager.getBrokerInstancesFor(rawTableName);
     if (instanceIds.isEmpty()) {
       return QueryException.BROKER_RESOURCE_MISSING_ERROR.toString();
     }
@@ -196,10 +201,14 @@ public class PinotQueryResource {
       LOGGER.error("Instance {} not found", instanceId);
       return QueryException.INTERNAL_ERROR.toString();
     }
+
     String hostNameWithPrefix = instanceConfig.getHostName();
-    String url =
-        getQueryURL(hostNameWithPrefix.substring(hostNameWithPrefix.indexOf("_") + 1), instanceConfig.getPort(),
-            querySyntax);
+
+    String protocol = _controllerConf.getControllerBrokerProtocol();
+    int port = _controllerConf.getControllerBrokerPortOverride() > 0 ? _controllerConf.getControllerBrokerPortOverride()
+        : Integer.parseInt(instanceConfig.getPort());
+    String url = getQueryURL(protocol, hostNameWithPrefix.substring(hostNameWithPrefix.indexOf("_") + 1),
+        String.valueOf(port), querySyntax);
     ObjectNode requestJson = getRequestJson(query, traceEnabled, queryOptions, querySyntax);
     return sendRequestRaw(url, query, requestJson);
   }
@@ -226,12 +235,12 @@ public class PinotQueryResource {
     return requestJson;
   }
 
-  private String getQueryURL(String hostName, String port, String querySyntax) {
+  private String getQueryURL(String protocol, String hostName, String port, String querySyntax) {
     switch (querySyntax) {
       case CommonConstants.Broker.Request.SQL:
-        return String.format("http://%s:%s/query/sql", hostName, port);
+        return String.format("%s://%s:%s/query/sql", protocol, hostName, port);
       case CommonConstants.Broker.Request.PQL:
-        return String.format("http://%s:%s/query", hostName, port);
+        return String.format("%s://%s:%s/query", protocol, hostName, port);
       default:
         throw new UnsupportedOperationException("Unsupported query syntax - " + querySyntax);
     }

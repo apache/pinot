@@ -74,7 +74,8 @@ export default Component.extend({
           metric: d.metric,
           dimensions: d.dimensions,
           currentPredicted: d.currentPredicted,
-          feedback: getFeedback(d.feedback)
+          feedback: getFeedback(d.feedback),
+          isLeaf: true
         };
         computedTableData.push(row);
       });

@@ -211,6 +211,9 @@ public class ControllerRequestURLBuilder {
     }
     return url;
   }
+  public String forTableSchemaGet(String tableName) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "schema");
+  }
 
   public String forTableExternalView(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "externalview");
@@ -328,5 +331,9 @@ public class ControllerRequestURLBuilder {
         batchConfigMap.entrySet().stream().map(e -> String.format("\"%s\":\"%s\"", e.getKey(), e.getValue()))
             .collect(Collectors.joining(",", "{", "}"));
     return forIngestFromURI(tableNameWithType, batchConfigMapStr, sourceURIStr);
+  }
+
+  public String forClusterConfigs() {
+    return StringUtil.join("/", _baseUrl, "cluster/configs");
   }
 }

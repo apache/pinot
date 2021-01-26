@@ -206,3 +206,10 @@ rules:
   name: "pinot_server_netty_tcp_$2_$3"
   labels:
     id: "$1"
+# Pinot Minions
+- pattern: "\"org.apache.pinot.minion.metrics\"<type=\"MinionMetrics\", name=\"pinot.minion.(\\w+)\"><>(\\w+)"
+  name: "pinot_minion_$1_$2"
+- pattern: "\"org.apache.pinot.minion.metrics\"<type=\"MinionMetrics\", name=\"pinot.minion.(\\w+).(\\w+)\"><>(\\w+)"
+  name: "pinot_minion_$2_$3"
+  labels:
+    id: "$1"

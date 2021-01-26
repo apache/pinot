@@ -136,7 +136,7 @@ public class HadoopPinotFS extends PinotFS {
   @Override
   public long length(URI fileUri)
       throws IOException {
-    return _hadoopFS.getLength(new Path(fileUri));
+    return _hadoopFS.getFileStatus(new Path(fileUri)).getLen();
   }
 
   @Override
@@ -202,9 +202,12 @@ public class HadoopPinotFS extends PinotFS {
 
   @Override
   public boolean isDirectory(URI uri) {
-    FileStatus fileStatus = new FileStatus();
-    fileStatus.setPath(new Path(uri));
-    return fileStatus.isDirectory();
+    try {
+      return _hadoopFS.getFileStatus(new Path(uri)).isDirectory();
+    } catch (IOException e) {
+      LOGGER.error("Could not get file status for {}", uri, e);
+      throw new RuntimeException(e);
+    }
   }
 
   @Override
@@ -212,7 +215,7 @@ public class HadoopPinotFS extends PinotFS {
     try {
       return _hadoopFS.getFileStatus(new Path(uri)).getModificationTime();
     } catch (IOException e) {
-      LOGGER.error("Could not get file status for {}", uri);
+      LOGGER.error("Could not get file status for {}", uri, e);
       throw new RuntimeException(e);
     }
   }

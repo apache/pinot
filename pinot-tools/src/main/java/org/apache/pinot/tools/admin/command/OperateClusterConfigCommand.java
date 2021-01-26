@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.Command;
@@ -41,6 +42,9 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
 
   @Option(name = "-controllerPort", required = false, metaVar = "<int>", usage = "http port for controller.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
+
+  @Option(name = "-controllerProtocol", required = false, metaVar = "<String>", usage = "protocol for controller.")
+  private String _controllerProtocol = CommonConstants.HTTP_PROTOCOL;
 
   @Option(name = "-config", metaVar = "<string>", usage = "Cluster config to operate.")
   private String _config;
@@ -63,8 +67,8 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
 
   @Override
   public String toString() {
-    String toString = "Operate ClusterConfig -controllerHost " + _controllerHost + " -controllerPort " + _controllerPort
-        + " -operation " + _operation;
+    String toString = "Operate ClusterConfig -controllerProtocol " + _controllerProtocol + " -controllerHost "
+        + _controllerHost + " -controllerPort " + _controllerPort + " -operation " + _operation;
     if (_config != null) {
       toString += " -config " + _config;
     }
@@ -91,6 +95,11 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
     return this;
   }
 
+  public OperateClusterConfigCommand setControllerProtocol(String controllerProtocol) {
+    _controllerProtocol = controllerProtocol;
+    return this;
+  }
+
   public OperateClusterConfigCommand setConfig(String config) {
     _config = config;
     return this;
@@ -110,7 +119,7 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
     if (StringUtils.isEmpty(_config) && !_operation.equalsIgnoreCase("GET")) {
       throw new UnsupportedOperationException("Empty config: " + _config);
     }
-    String clusterConfigUrl = "http://" + _controllerHost + ":" + _controllerPort + "/cluster/configs";
+    String clusterConfigUrl = _controllerProtocol + "://" + _controllerHost + ":" + _controllerPort + "/cluster/configs";
     switch (_operation.toUpperCase()) {
       case "ADD":
       case "UPDATE":

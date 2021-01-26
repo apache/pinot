@@ -74,6 +74,11 @@ import org.slf4j.LoggerFactory;
 public class FileUploadDownloadClient implements Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(FileUploadDownloadClient.class);
 
+  /**
+   * optional default SSL context for FileUploadDownloadClient operations
+   */
+  public static SSLContext _defaultSSLContext;
+
   public static class CustomHeaders {
     public static final String UPLOAD_TYPE = "UPLOAD_TYPE";
     public static final String DOWNLOAD_URI = "DOWNLOAD_URI";
@@ -106,13 +111,15 @@ public class FileUploadDownloadClient implements Closeable {
   private static final String TABLES_PATH = "/tables";
   private static final String TYPE_DELIMITER = "?type=";
 
+  private static final List<String> SUPPORTED_PROTOCOLS = Arrays.asList(HTTP, HTTPS);
+
   private final CloseableHttpClient _httpClient;
 
   /**
    * Construct the client with default settings.
    */
   public FileUploadDownloadClient() {
-    this(null);
+    this(_defaultSSLContext);
   }
 
   /**
@@ -124,9 +131,12 @@ public class FileUploadDownloadClient implements Closeable {
     _httpClient = HttpClients.custom().setSSLContext(sslContext).build();
   }
 
-  private static URI getURI(String scheme, String host, int port, String path)
+  private static URI getURI(String protocol, String host, int port, String path)
       throws URISyntaxException {
-    return new URI(scheme, null, host, port, path, null, null);
+    if (!SUPPORTED_PROTOCOLS.contains(protocol)) {
+      throw new IllegalArgumentException(String.format("Unsupported protocol '%s'", protocol));
+    }
+    return new URI(protocol, null, host, port, path, null, null);
   }
 
   public static URI getRetrieveTableConfigHttpURI(String host, int port, String rawTableName)
@@ -153,6 +163,11 @@ public class FileUploadDownloadClient implements Closeable {
     return getURI(HTTP, host, port, SCHEMA_PATH + "/" + schemaName);
   }
 
+  public static URI getRetrieveSchemaURI(String protocol, String host, int port, String schemaName)
+      throws URISyntaxException {
+    return getURI(protocol, host, port, SCHEMA_PATH + "/" + schemaName);
+  }
+
   public static URI getUploadSchemaHttpURI(String host, int port)
       throws URISyntaxException {
     return getURI(HTTP, host, port, SCHEMA_PATH);
@@ -161,6 +176,11 @@ public class FileUploadDownloadClient implements Closeable {
   public static URI getUploadSchemaHttpsURI(String host, int port)
       throws URISyntaxException {
     return getURI(HTTPS, host, port, SCHEMA_PATH);
+  }
+
+  public static URI getUploadSchemaURI(String protocol, String host, int port)
+      throws URISyntaxException {
+    return getURI(protocol, host, port, SCHEMA_PATH);
   }
 
   public static URI getUploadSchemaURI(URI controllerURI)
@@ -196,6 +216,11 @@ public class FileUploadDownloadClient implements Closeable {
   public static URI getUploadSegmentHttpsURI(String host, int port)
       throws URISyntaxException {
     return getURI(HTTPS, host, port, SEGMENT_PATH);
+  }
+
+  public static URI getUploadSegmentURI(String protocol, String host, int port)
+      throws URISyntaxException {
+    return getURI(protocol, host, port, SEGMENT_PATH);
   }
 
   public static URI getUploadSegmentURI(URI controllerURI)
@@ -707,5 +732,14 @@ public class FileUploadDownloadClient implements Closeable {
   public void close()
       throws IOException {
     _httpClient.close();
+  }
+
+  /**
+   * Install a default SSLContext for all FileUploadDownloadClients instantiated.
+   *
+   * @param sslContext default ssl context
+   */
+  public static void installDefaultSSLContext(SSLContext sslContext) {
+    _defaultSSLContext = sslContext;
   }
 }

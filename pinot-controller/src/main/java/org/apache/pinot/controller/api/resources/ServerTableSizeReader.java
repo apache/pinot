@@ -58,7 +58,7 @@ public class ServerTableSizeReader {
     List<String> serverUrls = new ArrayList<>(numServers);
     BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
     for (String endpoint : endpointsToServers.keySet()) {
-      String tableSizeUri = "http://" + endpoint + "/table/" + tableNameWithType + "/size";
+      String tableSizeUri = endpoint + "/table/" + tableNameWithType + "/size";
       serverUrls.add(tableSizeUri);
     }
 

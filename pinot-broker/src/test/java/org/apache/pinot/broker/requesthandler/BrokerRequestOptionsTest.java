@@ -23,8 +23,8 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.CommonConstants.Broker.Request;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -54,6 +54,7 @@ public class BrokerRequestOptionsTest {
     // TRACE
     // has trace false
     jsonRequest.put(Request.TRACE, false);
+    brokerRequest = compiler.compileToBrokerRequest(query);
     BaseBrokerRequestHandler.setOptions(requestId, query, jsonRequest, brokerRequest);
     Assert.assertFalse(brokerRequest.isEnableTrace());
     Assert.assertNull(brokerRequest.getDebugOptions());
@@ -61,80 +62,97 @@ public class BrokerRequestOptionsTest {
 
     // has trace true
     jsonRequest.put(Request.TRACE, true);
+    brokerRequest = compiler.compileToBrokerRequest(query);
     BaseBrokerRequestHandler.setOptions(requestId, query, jsonRequest, brokerRequest);
     Assert.assertTrue(brokerRequest.isEnableTrace());
+    Assert.assertNull(brokerRequest.getDebugOptions());
+    Assert.assertEquals(brokerRequest.getQueryOptionsSize(), 1);
+    Assert.assertEquals(brokerRequest.getQueryOptions().get(Request.TRACE), "true");
 
     // DEBUG_OPTIONS
     // has debugOptions
+    jsonRequest = JsonUtils.newObjectNode();
     jsonRequest.put(Request.DEBUG_OPTIONS, "debugOption1=foo");
+    brokerRequest = compiler.compileToBrokerRequest(query);
     BaseBrokerRequestHandler.setOptions(requestId, query, jsonRequest, brokerRequest);
+    Assert.assertFalse(brokerRequest.isEnableTrace());
     Assert.assertEquals(brokerRequest.getDebugOptionsSize(), 1);
     Assert.assertEquals(brokerRequest.getDebugOptions().get("debugOption1"), "foo");
+    Assert.assertEquals(brokerRequest.getQueryOptionsSize(), 0);
 
     // has multiple debugOptions
     jsonRequest.put(Request.DEBUG_OPTIONS, "debugOption1=foo;debugOption2=bar");
+    brokerRequest = compiler.compileToBrokerRequest(query);
     BaseBrokerRequestHandler.setOptions(requestId, query, jsonRequest, brokerRequest);
+    Assert.assertFalse(brokerRequest.isEnableTrace());
     Assert.assertEquals(brokerRequest.getDebugOptionsSize(), 2);
     Assert.assertEquals(brokerRequest.getDebugOptions().get("debugOption1"), "foo");
     Assert.assertEquals(brokerRequest.getDebugOptions().get("debugOption2"), "bar");
+    Assert.assertEquals(brokerRequest.getQueryOptionsSize(), 0);
 
     // incorrect debug options
-    boolean exception = false;
     jsonRequest.put(Request.DEBUG_OPTIONS, "debugOption1");
+    brokerRequest = compiler.compileToBrokerRequest(query);
     try {
       BaseBrokerRequestHandler.setOptions(requestId, query, jsonRequest, brokerRequest);
+      Assert.fail();
     } catch (Exception e) {
-      exception = true;
+      // Expected
     }
-    Assert.assertTrue(exception);
 
     // QUERY_OPTIONS
     jsonRequest = JsonUtils.newObjectNode();
     // has queryOptions in brokerRequest already
+    brokerRequest = compiler.compileToBrokerRequest(query);
     Map<String, String> queryOptions = new HashMap<>();
     queryOptions.put("queryOption1", "foo");
     brokerRequest.setQueryOptions(queryOptions);
     BaseBrokerRequestHandler.setOptions(requestId, query, jsonRequest, brokerRequest);
+    Assert.assertFalse(brokerRequest.isEnableTrace());
+    Assert.assertNull(brokerRequest.getDebugOptions());
     Assert.assertEquals(brokerRequest.getQueryOptionsSize(), 1);
     Assert.assertEquals(brokerRequest.getQueryOptions().get("queryOption1"), "foo");
 
     // has queryOptions in query
-    query = "select * from table option(queryOption1=foo)";
-    brokerRequest = compiler.compileToBrokerRequest(query);
+    brokerRequest = compiler.compileToBrokerRequest("select * from table option(queryOption1=foo)");
     BaseBrokerRequestHandler.setOptions(requestId, query, jsonRequest, brokerRequest);
+    Assert.assertFalse(brokerRequest.isEnableTrace());
+    Assert.assertNull(brokerRequest.getDebugOptions());
     Assert.assertEquals(brokerRequest.getQueryOptionsSize(), 1);
     Assert.assertEquals(brokerRequest.getQueryOptions().get("queryOption1"), "foo");
 
     // has query options in json payload
-    query = "select * from table";
-    brokerRequest = compiler.compileToBrokerRequest(query);
     jsonRequest.put(Request.QUERY_OPTIONS, "queryOption1=foo");
+    brokerRequest = compiler.compileToBrokerRequest(query);
     BaseBrokerRequestHandler.setOptions(requestId, query, jsonRequest, brokerRequest);
+    Assert.assertFalse(brokerRequest.isEnableTrace());
+    Assert.assertNull(brokerRequest.getDebugOptions());
     Assert.assertEquals(brokerRequest.getQueryOptionsSize(), 1);
     Assert.assertEquals(brokerRequest.getQueryOptions().get("queryOption1"), "foo");
 
     // has query options in both, union. broker request takes priority
-    query = "select * from table option(queryOption1=foo)";
-    brokerRequest = compiler.compileToBrokerRequest(query);
     jsonRequest.put(Request.QUERY_OPTIONS, "queryOption1=bar;queryOption2=moo");
+    brokerRequest = compiler.compileToBrokerRequest("select * from table option(queryOption1=foo)");
     BaseBrokerRequestHandler.setOptions(requestId, query, jsonRequest, brokerRequest);
+    Assert.assertFalse(brokerRequest.isEnableTrace());
+    Assert.assertNull(brokerRequest.getDebugOptions());
     Assert.assertEquals(brokerRequest.getQueryOptionsSize(), 2);
     Assert.assertEquals(brokerRequest.getQueryOptions().get("queryOption1"), "foo");
     Assert.assertEquals(brokerRequest.getQueryOptions().get("queryOption2"), "moo");
 
     // has all 3
-    query = "select * from table";
     jsonRequest = JsonUtils.newObjectNode();
-    brokerRequest = compiler.compileToBrokerRequest(query);
     jsonRequest.put(Request.TRACE, true);
     jsonRequest.put(Request.DEBUG_OPTIONS, "debugOption1=foo");
     jsonRequest.put(Request.QUERY_OPTIONS, "queryOption1=bar;queryOption2=moo");
+    brokerRequest = compiler.compileToBrokerRequest(query);
     BaseBrokerRequestHandler.setOptions(requestId, query, jsonRequest, brokerRequest);
     Assert.assertTrue(brokerRequest.isEnableTrace());
     Assert.assertEquals(brokerRequest.getDebugOptionsSize(), 1);
     Assert.assertEquals(brokerRequest.getDebugOptions().get("debugOption1"), "foo");
-    Assert.assertEquals(brokerRequest.getQueryOptionsSize(), 2);
+    Assert.assertEquals(brokerRequest.getQueryOptionsSize(), 3);
     Assert.assertEquals(brokerRequest.getQueryOptions().get("queryOption1"), "bar");
     Assert.assertEquals(brokerRequest.getQueryOptions().get("queryOption2"), "moo");
+    Assert.assertEquals(brokerRequest.getQueryOptions().get(Request.TRACE), "true");
   }
 }

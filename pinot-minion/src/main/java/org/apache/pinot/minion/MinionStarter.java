@@ -74,9 +74,12 @@ public class MinionStarter implements ServiceStartable {
   public MinionStarter(String helixClusterName, String zkAddress, PinotConfiguration config)
       throws Exception {
     _config = config;
-    _instanceId = config.getProperty(CommonConstants.Helix.Instance.INSTANCE_ID_KEY,
-        CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE + NetUtil.getHostAddress() + "_" + _config
-            .getProperty(CommonConstants.Helix.KEY_OF_MINION_PORT, CommonConstants.Minion.DEFAULT_HELIX_PORT));
+    String host = _config.getProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST,
+        _config.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtil
+            .getHostnameOrAddress() : NetUtil.getHostAddress());
+    int port = _config
+        .getProperty(CommonConstants.Helix.KEY_OF_MINION_PORT, CommonConstants.Minion.DEFAULT_HELIX_PORT);
+    _instanceId = _config.getProperty(CommonConstants.Helix.Instance.INSTANCE_ID_KEY, CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE + host + "_" + port);
     setupHelixSystemProperties();
     _helixManager = new ZKHelixManager(helixClusterName, _instanceId, InstanceType.PARTICIPANT, zkAddress);
     MinionTaskZkMetadataManager minionTaskZkMetadataManager = new MinionTaskZkMetadataManager(_helixManager);
@@ -140,9 +143,10 @@ public class MinionStarter implements ServiceStartable {
     File dataDir = new File(_config
         .getProperty(CommonConstants.Helix.Instance.DATA_DIR_KEY, CommonConstants.Minion.DEFAULT_INSTANCE_DATA_DIR));
     if (dataDir.exists()) {
-      FileUtils.forceDelete(dataDir);
+      FileUtils.cleanDirectory(dataDir);
+    } else {
+      FileUtils.forceMkdir(dataDir);
     }
-    FileUtils.forceMkdir(dataDir);
     minionContext.setDataDir(dataDir);
 
     // Initialize metrics

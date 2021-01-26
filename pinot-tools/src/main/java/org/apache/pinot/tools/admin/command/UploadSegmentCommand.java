@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.net.URI;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -46,6 +47,9 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
   @Option(name = "-controllerPort", required = false, metaVar = "<int>", usage = "Port number for controller.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
+  @Option(name = "-controllerProtocol", required = false, metaVar = "<String>", usage = "protocol for controller.")
+  private String _controllerProtocol = CommonConstants.HTTP_PROTOCOL;
+
   @Option(name = "-segmentDir", required = true, metaVar = "<string>", usage = "Path to segment directory.")
   private String _segmentDir = null;
 
@@ -68,8 +72,8 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
 
   @Override
   public String toString() {
-    return ("UploadSegment -controllerHost " + _controllerHost + " -controllerPort " + _controllerPort + " -segmentDir "
-        + _segmentDir);
+    return ("UploadSegment -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost
+        + " -controllerPort " + _controllerPort + " -segmentDir " + _segmentDir);
   }
 
   @Override
@@ -89,6 +93,11 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
 
   public UploadSegmentCommand setControllerPort(String controllerPort) {
     _controllerPort = controllerPort;
+    return this;
+  }
+
+  public UploadSegmentCommand setControllerProtocol(String controllerProtocol) {
+    _controllerProtocol = controllerProtocol;
     return this;
   }
 
@@ -116,7 +125,7 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
 
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       URI uploadSegmentHttpURI =
-          FileUploadDownloadClient.getUploadSegmentHttpURI(_controllerHost, Integer.parseInt(_controllerPort));
+          FileUploadDownloadClient.getUploadSegmentURI(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort));
       for (File segmentFile : segmentFiles) {
         File segmentTarFile;
         if (segmentFile.isDirectory()) {

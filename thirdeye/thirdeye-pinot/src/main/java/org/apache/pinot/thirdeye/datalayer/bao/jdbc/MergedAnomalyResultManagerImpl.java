@@ -392,7 +392,22 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
     return null;
   }
 
+  /**
+   * Update anomaly feedback without propagation
+   * @param entity Anomaly entity
+   */
+  @Override
   public void updateAnomalyFeedback(MergedAnomalyResultDTO entity) {
+    updateAnomalyFeedback(entity, false);
+  }
+
+  /**
+   * Update anomaly feedback
+   * @param entity Anomaly entity
+   * @param propagate Propagate the feedback to its children all the way to the leaves
+   */
+  @Override
+  public void updateAnomalyFeedback(MergedAnomalyResultDTO entity, boolean propagate) {
     MergedAnomalyResultBean bean = convertDTO2Bean(entity, MergedAnomalyResultBean.class);
     AnomalyFeedbackDTO feedbackDTO = (AnomalyFeedbackDTO) entity.getFeedback();
     if (feedbackDTO != null) {
@@ -408,10 +423,14 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
       }
       bean.setAnomalyFeedbackId(feedbackDTO.getId());
     }
-    for(MergedAnomalyResultDTO child: entity.getChildren()){
-      child.setFeedback(feedbackDTO);
-      this.updateAnomalyFeedback(child);
+
+    if (propagate) {
+      for(MergedAnomalyResultDTO child: entity.getChildren()){
+        child.setFeedback(feedbackDTO);
+        this.updateAnomalyFeedback(child, true);
+      }
     }
+
     genericPojoDao.update(bean);
   }
 

@@ -128,6 +128,7 @@
     <scala.version>2.11.11</scala.version>
     <antlr.version>4.6</antlr.version>
     <jsonpath.version>2.4.0</jsonpath.version>
+    <quartz.version>2.3.2</quartz.version>
     <calcite.version>1.19.0</calcite.version>
     <lucene.version>8.2.0</lucene.version>
     <reflections.version>0.9.11</reflections.version>
@@ -143,6 +144,7 @@
     <log4j.version>2.11.2</log4j.version>
     <netty.version>4.1.42.Final</netty.version>
     <jts.version>1.16.1</jts.version>
+    <h3.version>3.0.3</h3.version>
     <jmh.version>1.26</jmh.version>
 
     <!-- Sets the VM argument line used when unit tests are run. -->
@@ -508,6 +510,11 @@
         <groupId>javax.ws.rs</groupId>
         <artifactId>javax.ws.rs-api</artifactId>
         <version>2.0.1</version>
+      </dependency>
+      <dependency>
+        <groupId>org.quartz-scheduler</groupId>
+        <artifactId>quartz</artifactId>
+        <version>${quartz.version}</version>
       </dependency>
       <dependency>
         <groupId>javax.validation</groupId>
@@ -1192,6 +1199,11 @@
         <groupId>org.locationtech.jts</groupId>
         <artifactId>jts-core</artifactId>
         <version>${jts.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.uber</groupId>
+        <artifactId>h3</artifactId>
+        <version>${h3.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

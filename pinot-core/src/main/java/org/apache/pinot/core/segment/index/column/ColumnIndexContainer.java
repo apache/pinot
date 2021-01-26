@@ -22,6 +22,7 @@ import java.io.Closeable;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.H3IndexReader;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.JsonIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReaderImpl;
@@ -62,6 +63,11 @@ public interface ColumnIndexContainer extends Closeable {
    * Returns the json index for the column, or {@code null} if it does not exist.
    */
   JsonIndexReader getJsonIndex();
+
+  /**
+   * Returns the H3 index for the column, or {@code null} if it does not exist.
+   */
+  H3IndexReader getH3Index();
 
   /**
    * Returns the dictionary for the column, or {@code null} if it does not exist.

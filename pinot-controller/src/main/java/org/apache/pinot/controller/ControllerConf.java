@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller;
 
+import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -37,9 +38,17 @@ import static org.apache.pinot.common.utils.CommonConstants.Controller.DEFAULT_M
 
 
 public class ControllerConf extends PinotConfiguration {
+  public static final List<String> SUPPORTED_PROTOCOLS = Arrays.asList(
+      CommonConstants.HTTP_PROTOCOL,
+      CommonConstants.HTTPS_PROTOCOL);
+
   public static final String CONTROLLER_VIP_HOST = "controller.vip.host";
   public static final String CONTROLLER_VIP_PORT = "controller.vip.port";
   public static final String CONTROLLER_VIP_PROTOCOL = "controller.vip.protocol";
+  public static final String CONTROLLER_BROKER_PROTOCOL = "controller.broker.protocol";
+  public static final String CONTROLLER_BROKER_PORT_OVERRIDE = "controller.broker.port.override";
+  public static final String CONTROLLER_BROKER_TLS_PREFIX = "controller.broker.tls";
+  public static final String CONTROLLER_TLS_PREFIX = "controller.tls";
   public static final String CONTROLLER_HOST = "controller.host";
   public static final String CONTROLLER_PORT = "controller.port";
   public static final String CONTROLLER_ACCESS_PROTOCOLS = "controller.access.protocols";
@@ -79,6 +88,7 @@ public class ControllerConf extends PinotConfiguration {
     public static final String STATUS_CHECKER_WAIT_FOR_PUSH_TIME_IN_SECONDS =
         "controller.statuschecker.waitForPushTimeInSeconds";
     public static final String TASK_MANAGER_FREQUENCY_IN_SECONDS = "controller.task.frequencyInSeconds";
+    public static final String PINOT_TASK_MANAGER_SCHEDULER_ENABLED = "controller.task.scheduler.enabled";
     @Deprecated
     // RealtimeSegmentRelocator has been rebranded as SegmentRelocator
     public static final String DEPRECATED_REALTIME_SEGMENT_RELOCATOR_FREQUENCY =
@@ -144,6 +154,7 @@ public class ControllerConf extends PinotConfiguration {
   // If it's set to false, existing HLC realtime tables will stop consumption, and creation of new HLC tables will be disallowed.
   // Please make sure there is no HLC table running in the cluster before disallowing it.
   public static final String ALLOW_HLC_TABLES = "controller.allow.hlc.tables";
+  public static final String DIM_TABLE_MAX_SIZE = "controller.dimTable.maxSize";
 
   // Defines the kind of storage and the underlying PinotFS implementation
   private static final String PINOT_FS_FACTORY_CLASS_LOCAL = "controller.storage.factory.class.file";
@@ -164,6 +175,7 @@ public class ControllerConf extends PinotConfiguration {
   private static final String DEFAULT_CONTROLLER_MODE = ControllerMode.DUAL.name();
   private static final String DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY =
       AutoRebalanceStrategy.class.getName();
+  private static final String DEFAULT_DIM_TABLE_MAX_SIZE = "200M";
 
   private static final String DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL = LocalPinotFS.class.getName();
 
@@ -234,6 +246,10 @@ public class ControllerConf extends PinotConfiguration {
     setProperty(CONTROLLER_VIP_PROTOCOL, vipProtocol);
   }
 
+  public void setControllerBrokerProtocol(String protocol) {
+    setProperty(CONTROLLER_BROKER_PROTOCOL, protocol);
+  }
+
   public void setControllerPort(String port) {
     setProperty(CONTROLLER_PORT, port);
   }
@@ -252,6 +268,14 @@ public class ControllerConf extends PinotConfiguration {
 
   public void setZkStr(String zkStr) {
     setProperty(ZK_STR, zkStr);
+  }
+
+  public void setDimTableMaxSize(String size) {
+    setProperty(DIM_TABLE_MAX_SIZE, size);
+  }
+
+  public String getDimTableMaxSize() {
+    return getProperty(DIM_TABLE_MAX_SIZE, DEFAULT_DIM_TABLE_MAX_SIZE);
   }
 
   // A boolean to decide whether Jersey API should be the primary one. For now, we set this to be false,
@@ -349,11 +373,11 @@ public class ControllerConf extends PinotConfiguration {
   }  
 
   public String getControllerVipProtocol() {
-    return Optional.ofNullable(getProperty(CONTROLLER_VIP_PROTOCOL))
+    return getSupportedProtocol(CONTROLLER_VIP_PROTOCOL);
+  }
 
-        .filter(protocol -> CommonConstants.HTTPS_PROTOCOL.equals(protocol))
-
-        .orElse(CommonConstants.HTTP_PROTOCOL);
+  public String getControllerBrokerProtocol() {
+    return getSupportedProtocol(CONTROLLER_BROKER_PROTOCOL);
   }
 
   public int getRetentionControllerFrequencyInSeconds() {
@@ -587,6 +611,10 @@ public class ControllerConf extends PinotConfiguration {
     return getPeriodicTaskInitialDelayInSeconds();
   }
 
+  public boolean isPinotTaskManagerSchedulerEnabled() {
+    return getProperty(ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, false);
+  }
+
   /**
    * RealtimeSegmentRelocator has been rebranded to SegmentRelocator.
    * Check for SEGMENT_RELOCATOR_INITIAL_DELAY_IN_SECONDS property, if not found, return REALTIME_SEGMENT_RELOCATION_INITIAL_DELAY_IN_SECONDS
@@ -634,6 +662,10 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(CONFIG_OF_CONTROLLER_METRICS_PREFIX, DEFAULT_METRICS_PREFIX);
   }
 
+  public int getControllerBrokerPortOverride() {
+    return getProperty(CONTROLLER_BROKER_PORT_OVERRIDE, -1);
+  }
+
   private long convertPeriodToSeconds(String timeStr) {
     long seconds;
     try {
@@ -643,5 +675,12 @@ public class ControllerConf extends PinotConfiguration {
       throw new RuntimeException("Invalid time spec '" + timeStr + "' (Valid examples: '3h', '4h30m', '30m')", e);
     }
     return seconds;
+  }
+
+  private String getSupportedProtocol(String property) {
+    String value = getProperty(property, CommonConstants.HTTP_PROTOCOL);
+    Preconditions.checkArgument(SUPPORTED_PROTOCOLS.contains(value),
+        "Unsupported %s protocol '%s'", property, value);
+    return value;
   }
 }

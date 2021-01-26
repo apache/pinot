@@ -19,25 +19,22 @@
 
 package org.apache.pinot.core.segment.index.loader.invertedindex;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.HashSet;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneFSTIndexCreator;
 import org.apache.pinot.core.segment.index.loader.LoaderUtils;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.core.segment.index.readers.BaseImmutableDictionary;
-import org.apache.pinot.core.segment.index.readers.StringDictionary;
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.HashSet;
-import java.util.Set;
 
 import static org.apache.pinot.core.segment.creator.impl.V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
 
@@ -108,14 +105,6 @@ public class LuceneFSTIndexHandler {
     }
   }
 
-  private BaseImmutableDictionary getDictionaryReader(ColumnMetadata columnMetadata)
-      throws IOException {
-    PinotDataBuffer dictionaryBuffer =
-        _segmentWriter.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.DICTIONARY);
-    return new StringDictionary(dictionaryBuffer, columnMetadata.getCardinality(), columnMetadata.getColumnMaxLength(),
-        (byte) columnMetadata.getPaddingCharacter());
-  }
-
   private void createFSTIndexForColumn(ColumnMetadata columnMetadata)
       throws IOException {
     String column = columnMetadata.getColumnName();
@@ -138,7 +127,7 @@ public class LuceneFSTIndexHandler {
     LOGGER.info("Creating new FST index for column: {} in segment: {}, cardinality: {}", column, _segmentName,
         columnMetadata.getCardinality());
     LuceneFSTIndexCreator luceneFSTIndexCreator = new LuceneFSTIndexCreator(_indexDir, column, null);
-    try (BaseImmutableDictionary dictionary = getDictionaryReader(columnMetadata);) {
+    try (Dictionary dictionary = LoaderUtils.getDictionary(_segmentWriter, columnMetadata)) {
       for (int dictId = 0; dictId < dictionary.length(); dictId++) {
         luceneFSTIndexCreator.add(dictionary.getStringValue(dictId));
       }

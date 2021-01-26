@@ -39,6 +39,7 @@ import org.apache.pinot.broker.routing.segmentpruner.interval.IntervalTree;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants.Query.Range;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -58,11 +59,6 @@ public class TimeSegmentPruner implements SegmentPruner {
   private static final long MIN_START_TIME = 0;
   private static final long MAX_END_TIME = Long.MAX_VALUE;
   private static final Interval DEFAULT_INTERVAL = new Interval(MIN_START_TIME, MAX_END_TIME);
-  private static final char DELIMITER = '\0';
-  private static final String LEGACY_DELIMITER = "\t\t";
-  private static final char START_INCLUSIVE = '(';
-  private static final char END_INCLUSIVE = ')';
-  private static final String UNBOUNDED = "*";
 
   private final String _tableNameWithType;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
@@ -95,7 +91,7 @@ public class TimeSegmentPruner implements SegmentPruner {
     int numSegments = onlineSegments.size();
     List<String> segments = new ArrayList<>(numSegments);
     List<String> segmentZKMetadataPaths = new ArrayList<>(numSegments);
-    for (String segment : segments) {
+    for (String segment : onlineSegments) {
       segments.add(segment);
       segmentZKMetadataPaths.add(_segmentZKMetadataPathPrefix + segment);
     }
@@ -127,7 +123,8 @@ public class TimeSegmentPruner implements SegmentPruner {
   }
 
   @Override
-  public synchronized void onExternalViewChange(ExternalView externalView, IdealState idealState, Set<String> onlineSegments) {
+  public synchronized void onExternalViewChange(ExternalView externalView, IdealState idealState,
+      Set<String> onlineSegments) {
     // NOTE: We don't update all the segment ZK metadata for every external view change, but only the new added/removed
     //       ones. The refreshed segment ZK metadata change won't be picked up.
     for (String segment : onlineSegments) {
@@ -138,10 +135,10 @@ public class TimeSegmentPruner implements SegmentPruner {
     _intervalTree = new IntervalTree<>(_intervalMap);
   }
 
-
   @Override
   public synchronized void refreshSegment(String segment) {
-    Interval interval = extractIntervalFromSegmentZKMetaZNRecord(segment, _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT));
+    Interval interval = extractIntervalFromSegmentZKMetaZNRecord(segment,
+        _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT));
     _intervalMap.put(segment, interval);
     _intervalTree = new IntervalTree<>(_intervalMap);
   }
@@ -214,6 +211,16 @@ public class TimeSegmentPruner implements SegmentPruner {
         if (filterQueryTree.getColumn().equals(_timeColumn)) {
           long timeStamp = _timeFormatSpec.fromFormatToMillis(filterQueryTree.getValue().get(0));
           return Collections.singletonList(new Interval(timeStamp, timeStamp));
+        }
+        return null;
+      case IN:
+        if (filterQueryTree.getColumn().equals(_timeColumn)) {
+          List<Interval> intervals = new ArrayList<>(filterQueryTree.getValue().size());
+          for (String value : filterQueryTree.getValue()) {
+            long timeStamp = _timeFormatSpec.fromFormatToMillis(value);
+            intervals.add(new Interval(timeStamp, timeStamp));
+          }
+          return intervals;
         }
         return null;
       case RANGE:
@@ -323,19 +330,22 @@ public class TimeSegmentPruner implements SegmentPruner {
     long startTime = MIN_START_TIME;
     long endTime = MAX_END_TIME;
     String intervalExpression = intervalExpressions.get(0);
-    boolean startInclusive = intervalExpression.charAt(0) == START_INCLUSIVE;
-    boolean endInclusive = intervalExpression.charAt(intervalExpression.length() - 1) == END_INCLUSIVE;
-    String interval = intervalExpression.substring(1, intervalExpression.length() - 1);
-    String[] split = StringUtils.split(interval, DELIMITER);
-    if (split.length != 2) {
-      split = StringUtils.split(interval, LEGACY_DELIMITER);
+    int length = intervalExpression.length();
+    boolean startExclusive = intervalExpression.charAt(0) == Range.LOWER_EXCLUSIVE;
+    boolean endExclusive = intervalExpression.charAt(length - 1) == Range.UPPER_EXCLUSIVE;
+    String interval = intervalExpression.substring(1, length - 1);
+    String[] split = StringUtils.split(interval, Range.DELIMITER);
+    if (!split[0].equals(Range.UNBOUNDED)) {
+      startTime = _timeFormatSpec.fromFormatToMillis(split[0]);
+      if (startExclusive) {
+        startTime++;
+      }
     }
-
-    if (!split[0].equals(UNBOUNDED)) {
-      startTime = startInclusive? _timeFormatSpec.fromFormatToMillis(split[0]) + 1 : _timeFormatSpec.fromFormatToMillis(split[0]);
-    }
-    if (!split[1].equals(UNBOUNDED)) {
-      endTime = endInclusive ? _timeFormatSpec.fromFormatToMillis(split[1]) - 1 : _timeFormatSpec.fromFormatToMillis(split[1]);
+    if (!split[1].equals(Range.UNBOUNDED)) {
+      endTime = _timeFormatSpec.fromFormatToMillis(split[1]);
+      if (endExclusive) {
+        endTime--;
+      }
     }
 
     if (startTime > endTime) {

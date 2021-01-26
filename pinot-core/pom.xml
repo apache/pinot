@@ -54,6 +54,10 @@
   </build>
   <dependencies>
     <dependency>
+      <groupId>com.uber</groupId>
+      <artifactId>h3</artifactId>
+    </dependency>
+    <dependency>
       <groupId>me.lemire.integercompression</groupId>
       <artifactId>JavaFastPFOR</artifactId>
     </dependency>
@@ -122,10 +126,6 @@
       <artifactId>netty-all</artifactId>
     </dependency>
     <dependency>
-      <groupId>it.unimi.dsi</groupId>
-      <artifactId>fastutil</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
     </dependency>
@@ -167,6 +167,15 @@
       <groupId>org.locationtech.jts</groupId>
       <artifactId>jts-core</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.glassfish.jersey.containers</groupId>
+      <artifactId>jersey-container-grizzly2-http</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.glassfish.grizzly</groupId>
+      <artifactId>grizzly-http-server</artifactId>
+    </dependency>
+
     <!-- test -->
     <dependency>
       <groupId>org.apache.pinot</groupId>

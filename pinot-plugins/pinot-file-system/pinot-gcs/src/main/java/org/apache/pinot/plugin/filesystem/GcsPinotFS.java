@@ -58,6 +58,7 @@ public class GcsPinotFS  extends PinotFS {
   public static final String GCP_KEY = "gcpKey";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(GcsPinotFS.class);
+  private static final String SCHEME = "gs";
   private static final String DELIMITER = "/";
   private static final int BUFFER_SIZE = 128 * 1024;
   private Storage storage;
@@ -130,7 +131,7 @@ public class GcsPinotFS  extends PinotFS {
 
   private URI getBase(URI uri) throws IOException {
     try {
-      return new URI(uri.getScheme(), uri.getHost(), null, null);
+      return new URI(SCHEME, uri.getHost(), DELIMITER, null);
     } catch (URISyntaxException e) {
       throw new IOException(e);
     }
@@ -204,11 +205,11 @@ public class GcsPinotFS  extends PinotFS {
     LOGGER.info("Deleting uri {} force {}", segmentUri, forceDelete);
     try {
       if (!exists(segmentUri)) {
-        return false;
+        return forceDelete;
       }
       if (isDirectory(segmentUri)) {
-        if (!forceDelete) {
-          checkState(isEmptyDirectory(segmentUri), "ForceDelete flag is not set and directory '%s' is not empty", segmentUri);
+        if (!forceDelete && !isEmptyDirectory(segmentUri)) {
+          return false;
         }
         String prefix = normalizeToDirectoryPrefix(segmentUri);
         Page<Blob> page;
@@ -292,7 +293,7 @@ public class GcsPinotFS  extends PinotFS {
   public long length(URI fileUri) throws IOException {
     try {
       checkState(!isPathTerminatedByDelimiter(fileUri), "URI is a directory");
-      Blob blob = getBucket(fileUri).get(fileUri.getPath());
+      Blob blob = getBlob(fileUri);
       checkState(existsBlob(blob), "File '%s' does not exist", fileUri);
       return blob.getSize();
     } catch (Throwable t) {
@@ -313,11 +314,17 @@ public class GcsPinotFS  extends PinotFS {
       }
       page.iterateAll()
           .forEach(blob -> {
-            if (!blob.getName().equals(fileUri.getPath())) {
-              builder.add(blob.getName());
+            if (!blob.getName().equals(prefix)) {
+              try {
+                builder.add(new URI(SCHEME, fileUri.getHost(), DELIMITER + blob.getName(), null).toString());
+              } catch (URISyntaxException e) {
+                throw new RuntimeException(e);
+              }
             }
           });
-      return builder.build().toArray(new String[0]);
+      String[] listedFiles = builder.build().toArray(new String[0]);
+      LOGGER.info("Listed {} files from URI: {}, is recursive: {}", listedFiles.length, fileUri, recursive);
+      return listedFiles;
     } catch (Throwable t) {
       throw new IOException(t);
     }

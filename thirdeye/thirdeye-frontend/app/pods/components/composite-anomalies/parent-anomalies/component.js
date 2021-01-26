@@ -57,7 +57,8 @@ export default Component.extend({
           anomalyId: d.id,
           startDuration: getAnomaliesStartDuration(d.startTime, d.endTime, true),
           anomaliesDetails: this.getAnomaliesDetails(d.details),
-          feedback: getFeedback(d.feedback)
+          feedback: getFeedback(d.feedback),
+          isLeaf: false
         };
         computedTableData.push(row);
       });

@@ -16,44 +16,44 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.api.listeners;
+package org.apache.pinot.core.transport;
 
 /**
  * Provides configuration settings expected by an Http Server to 
  * setup listeners for http and https protocols.
  */
 public class ListenerConfig {
-  private final String name;
-  private final String host;
-  private final int port;
-  private final String protocol;
-  private final TlsConfiguration tlsConfiguration;
+  private final String _name;
+  private final String _host;
+  private final int _port;
+  private final String _protocol;
+  private final TlsConfig _tlsConfig;
 
-  public ListenerConfig(String name, String host, int port, String protocol, TlsConfiguration tlsConfiguration) {
-    this.name = name;
-    this.host = host;
-    this.port = port;
-    this.protocol = protocol;
-    this.tlsConfiguration = tlsConfiguration;
+  public ListenerConfig(String name, String host, int port, String protocol, TlsConfig tlsConfig) {
+    this._name = name;
+    this._host = host;
+    this._port = port;
+    this._protocol = protocol;
+    this._tlsConfig = tlsConfig;
   }
 
   public String getName() {
-    return name;
+    return _name;
   }
 
   public String getHost() {
-    return host;
+    return _host;
   }
 
   public int getPort() {
-    return port;
+    return _port;
   }
 
   public String getProtocol() {
-    return protocol;
+    return _protocol;
   }
 
-  public TlsConfiguration getTlsConfiguration() {
-    return tlsConfiguration;
+  public TlsConfig getTlsConfig() {
+    return _tlsConfig;
   }
 }

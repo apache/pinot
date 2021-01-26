@@ -21,6 +21,7 @@ package org.apache.pinot.core.transport;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -46,12 +47,35 @@ public class QueryRouter {
   private final String _brokerId;
   private final BrokerMetrics _brokerMetrics;
   private final ServerChannels _serverChannels;
+  private final ServerChannels _serverChannelsTls;
   private final ConcurrentHashMap<Long, AsyncQueryResponse> _asyncQueryResponseMap = new ConcurrentHashMap<>();
 
+  /**
+   * Create an unsecured query router
+   *
+   * @param brokerId broker id
+   * @param brokerMetrics broker metrics
+   */
   public QueryRouter(String brokerId, BrokerMetrics brokerMetrics) {
     _brokerId = brokerId;
     _brokerMetrics = brokerMetrics;
     _serverChannels = new ServerChannels(this, brokerMetrics);
+    _serverChannelsTls = null;
+  }
+
+  /**
+   * Create a query router with TLS config
+   *
+   * @param brokerId broker id
+   * @param brokerMetrics broker metrics
+   * @param tlsConfig TLS config
+   */
+  public QueryRouter(String brokerId, BrokerMetrics brokerMetrics, TlsConfig tlsConfig) {
+    _brokerId = brokerId;
+    _brokerMetrics = brokerMetrics;
+    _serverChannels = new ServerChannels(this, brokerMetrics);
+    _serverChannelsTls = Optional.ofNullable(tlsConfig)
+        .map(conf -> new ServerChannels(this, brokerMetrics, conf)).orElse(null);
   }
 
   public AsyncQueryResponse submitQuery(long requestId, String rawTableName,
@@ -60,12 +84,15 @@ public class QueryRouter {
       long timeoutMs) {
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
 
+    // can prefer but not require TLS until all servers guaranteed to be on TLS
+    boolean preferTls = _serverChannelsTls != null;
+
     // Build map from server to request based on the routing table
     Map<ServerRoutingInstance, InstanceRequest> requestMap = new HashMap<>();
     if (offlineBrokerRequest != null) {
       assert offlineRoutingTable != null;
       for (Map.Entry<ServerInstance, List<String>> entry : offlineRoutingTable.entrySet()) {
-        ServerRoutingInstance serverRoutingInstance = entry.getKey().toServerRoutingInstance(TableType.OFFLINE);
+        ServerRoutingInstance serverRoutingInstance = entry.getKey().toServerRoutingInstance(TableType.OFFLINE, preferTls);
         InstanceRequest instanceRequest = getInstanceRequest(requestId, offlineBrokerRequest, entry.getValue());
         requestMap.put(serverRoutingInstance, instanceRequest);
       }
@@ -73,7 +100,7 @@ public class QueryRouter {
     if (realtimeBrokerRequest != null) {
       assert realtimeRoutingTable != null;
       for (Map.Entry<ServerInstance, List<String>> entry : realtimeRoutingTable.entrySet()) {
-        ServerRoutingInstance serverRoutingInstance = entry.getKey().toServerRoutingInstance(TableType.REALTIME);
+        ServerRoutingInstance serverRoutingInstance = entry.getKey().toServerRoutingInstance(TableType.REALTIME, preferTls);
         InstanceRequest instanceRequest = getInstanceRequest(requestId, realtimeBrokerRequest, entry.getValue());
         requestMap.put(serverRoutingInstance, instanceRequest);
       }
@@ -85,8 +112,9 @@ public class QueryRouter {
     _asyncQueryResponseMap.put(requestId, asyncQueryResponse);
     for (Map.Entry<ServerRoutingInstance, InstanceRequest> entry : requestMap.entrySet()) {
       ServerRoutingInstance serverRoutingInstance = entry.getKey();
+      ServerChannels serverChannels = serverRoutingInstance.isTlsEnabled() ? _serverChannelsTls : _serverChannels;
       try {
-        _serverChannels.sendRequest(serverRoutingInstance, entry.getValue());
+        serverChannels.sendRequest(serverRoutingInstance, entry.getValue());
         asyncQueryResponse.markRequestSubmitted(serverRoutingInstance);
       } catch (Exception e) {
         LOGGER.error("Caught exception while sending request {} to server: {}, marking query failed", requestId,
