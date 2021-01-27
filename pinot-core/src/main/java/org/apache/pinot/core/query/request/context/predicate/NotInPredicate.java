@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.core.query.request.context.predicate;
 
+import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
@@ -28,7 +31,7 @@ import org.apache.pinot.core.query.request.context.ExpressionContext;
  */
 public class NotInPredicate extends BasePredicate implements Predicate {
   private final ExpressionContext _lhs;
-  private final List<String> _values;
+  private List<String> _values;
 
   public NotInPredicate(ExpressionContext lhs, List<String> values) {
     _lhs = lhs;
@@ -47,6 +50,47 @@ public class NotInPredicate extends BasePredicate implements Predicate {
 
   public List<String> getValues() {
     return _values;
+  }
+
+  @Override
+  public void rewrite(DataType dataType) {
+    List<String> castedValues = new ArrayList<>();
+    for (String value : _values) {
+      BigDecimal actualValue = new BigDecimal(value);
+      switch (dataType) {
+        case INT: {
+          BigDecimal convertedValue = new BigDecimal(actualValue.intValue());
+          if (actualValue.compareTo(convertedValue) == 0) {
+            castedValues.add(String.valueOf(convertedValue.intValue()));
+          }
+          break;
+        }
+        case LONG: {
+          BigDecimal convertedValue = new BigDecimal(actualValue.longValue());
+          if (actualValue.compareTo(convertedValue) == 0) {
+            castedValues.add(String.valueOf(convertedValue.longValue()));
+          }
+          break;
+        }
+        case FLOAT: {
+          BigDecimal convertedValue = new BigDecimal(String.valueOf(actualValue.floatValue()));
+          if (actualValue.compareTo(convertedValue) == 0) {
+            castedValues.add(String.valueOf(convertedValue.floatValue()));
+          }
+          break;
+        }
+        case DOUBLE: {
+          BigDecimal convertedValue = new BigDecimal(String.valueOf(actualValue.doubleValue()));
+          if (actualValue.compareTo(convertedValue) == 0) {
+            castedValues.add(String.valueOf(convertedValue.doubleValue()));
+          }
+          break;
+        }
+      }
+    }
+
+    _values = castedValues;
+
   }
 
   @Override

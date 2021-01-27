@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.plan;
 
-import java.math.BigDecimal;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -45,13 +44,8 @@ import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.FunctionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.request.context.predicate.EqPredicate;
-import org.apache.pinot.core.query.request.context.predicate.InPredicate;
-import org.apache.pinot.core.query.request.context.predicate.NotEqPredicate;
 import org.apache.pinot.core.query.request.context.predicate.JsonMatchPredicate;
-import org.apache.pinot.core.query.request.context.predicate.NotInPredicate;
 import org.apache.pinot.core.query.request.context.predicate.Predicate;
-import org.apache.pinot.core.query.request.context.predicate.RangePredicate;
 import org.apache.pinot.core.query.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.core.query.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.core.segment.index.datasource.MutableDataSource;
@@ -228,9 +222,45 @@ public class FilterPlanNode implements PlanNode {
               }
             default:
               FieldSpec.DataType columnType = dataSource.getDataSourceMetadata().getDataType();
-              Predicate castedPredicate = rewritePredicateForType(predicate, columnType);
+              //
+              // As part of plan generation, we rewrite certain predicates based on the data type of the column. This allows
+              // for generating correct results after literal value of one numerical type is converted to the column type. In
+              // certain cases, this also allows us to precompute the result of predicate evaluation to either TRUE or FALSE
+              // thereby making query execution more efficient by avoiding the need to evaluate the predicate during runtime.
+              //
+              // As examples, consider a predicate where an integer column is being compared to a float literal.
+              // RANGE PREDICATE
+              //     intColumn > 12.1    rewritten to 	intColumn > 12
+              //     intColumn >= 12.1	 rewritten to   intColumn > 12
+              //     intColumn > -12.1	 rewritten to   intColumn >= -12
+              //     intColumn >= -12.1	 rewritten to   intColumn >= -12
+              //
+              //     intColumn < 12.1	   rewritten to   intColumn <= 12
+              //     intColumn <= 12.1	 rewritten to   intColumn <= 12
+              //     intColumn < -12.1	 rewritten to   intColumn < -12
+              //     intColumn <= -12.1	 rewritten to   intColumn < -12
+              //
+              // EQ PREDICATE
+              //     intColumn = 12.1	  rewritten to    FALSE
+              //     intColumn = 12.0	  rewritten to    intColumn = 12
+              //
+              // NOT_EQ PREDICATE
+              //     intColumn != 12.1	rewritten to    TRUE
+              //     intColumn != 12.0  rewritten to    intColumn != 12
+              //
+              // IN PREDICATE
+              //     intColumn IN (12, 12.1, 13.0) rewritten to    intColumn IN (12, 13)
+              //
+              // NOT_IN PREDICATE
+              //     intColumn NOT IN (12, 12.1, 13.0) rewritten to    intColumn IN (12, 13)
+              //
+              if (columnType == FieldSpec.DataType.INT || columnType == FieldSpec.DataType.LONG
+                  || columnType == FieldSpec.DataType.FLOAT || columnType == FieldSpec.DataType.DOUBLE) {
+                predicate.rewrite(columnType);
+              }
+
               PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider
-                  .getPredicateEvaluator(castedPredicate, dataSource.getDictionary(),
+                  .getPredicateEvaluator(predicate, dataSource.getDictionary(),
                       columnType);
               return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, _numDocs);
           }
@@ -238,260 +268,5 @@ public class FilterPlanNode implements PlanNode {
       default:
         throw new IllegalStateException();
     }
-  }
-
-  /**
-   * As part of plan generation, we rewrite certain predicates based on the data type of the column. This allows
-   * for generating correct results after literal value of one numerical type is converted to the column type. In
-   * certain cases, this also allows us to precompute the result of predicate evaluation to either TRUE or FALSE
-   * thereby making query execution more efficient by avoiding the need to evaluate the predicate during runtime.
-   *
-   * As examples, consider a predicate where an integer column is being compared to a float literal.
-   * RANGE PREDICATE
-   *     intColumn > 12.1    rewritten to 	intColumn > 12
-   *     intColumn >= 12.1	 rewritten to   intColumn > 12
-   *     intColumn > -12.1	 rewritten to   intColumn >= -12
-   *     intColumn >= -12.1	 rewritten to   intColumn >= -12
-   *
-   *     intColumn < 12.1	   rewritten to   intColumn <= 12
-   *     intColumn <= 12.1	 rewritten to   intColumn <= 12
-   *     intColumn < -12.1	 rewritten to   intColumn < -12
-   *     intColumn <= -12.1	 rewritten to   intColumn < -12
-   *
-   * EQ PREDICATE
-   *     intColumn = 12.1	  rewritten to    FALSE
-   *     intColumn = 12.0	  rewritten to    intColumn = 12
-   *
-   * NOT_EQ PREDICATE
-   *     intColumn != 12.1	rewritten to    TRUE
-   *     intColumn != 12.0  rewritten to    intColumn != 12
-   *
-   * IN PREDICATE
-   *     intColumn IN (12, 12.1, 13.0) rewritten to    intColumn IN (12, 13)
-   *
-   * NOT_IN PREDICATE
-   *     intColumn NOT IN (12, 12.1, 13.0) rewritten to    intColumn IN (12, 13)
-   */
-  private Predicate rewritePredicateForType(Predicate predicate, FieldSpec.DataType columnType) {
-    if (columnType != FieldSpec.DataType.DOUBLE && columnType != FieldSpec.DataType.FLOAT
-        && columnType != FieldSpec.DataType.LONG && columnType != FieldSpec.DataType.INT) {
-      // this is not a numerical predicate, hence don't worry about type conversions.
-      return predicate;
-    }
-
-    switch (predicate.getType())
-    {
-      case EQ: {
-        EqPredicate eqPredicate = (EqPredicate) predicate;
-        BigDecimal actualValue = new BigDecimal(eqPredicate.getValue());
-        BigDecimal convertedValue = actualValue;
-        switch (columnType) {
-          case INT:
-            convertedValue = new BigDecimal(actualValue.intValue());
-            break;
-          case LONG:
-            convertedValue = new BigDecimal(actualValue.longValue());
-            break;
-          case FLOAT:
-            convertedValue = new BigDecimal(String.valueOf(String.valueOf(actualValue.floatValue())));
-            break;
-          case DOUBLE:
-            convertedValue = new BigDecimal(String.valueOf(String.valueOf(actualValue.floatValue())));
-            break;
-        }
-
-        int compared = actualValue.compareTo(convertedValue);
-
-        EqPredicate castedEqPredicate = new EqPredicate(eqPredicate.getLhs(), convertedValue.toString());
-        if (compared != 0) {
-          // We already know that this predicate will always evaluate to false; hence, there is no need
-          // to evaluate the predicate during runtime.
-          castedEqPredicate.setPrecomputed(false);
-        }
-
-        return castedEqPredicate;
-      }
-      case NOT_EQ: {
-        NotEqPredicate nEqPredicate = (NotEqPredicate) predicate;
-        BigDecimal actualValue = new BigDecimal(nEqPredicate.getValue());
-        BigDecimal convertedValue = actualValue;
-        switch (columnType) {
-          case INT:
-            convertedValue = new BigDecimal(actualValue.intValue());
-            break;
-          case LONG:
-            convertedValue = new BigDecimal(actualValue.longValue());
-            break;
-          case FLOAT:
-            convertedValue = new BigDecimal(String.valueOf(String.valueOf(actualValue.floatValue())));
-            break;
-          case DOUBLE:
-            convertedValue = new BigDecimal(String.valueOf(String.valueOf(actualValue.floatValue())));
-            break;
-        }
-
-        int compared = actualValue.compareTo(convertedValue);
-        NotEqPredicate castedEqPredicate = new NotEqPredicate(nEqPredicate.getLhs(), convertedValue.toString());
-        if (compared != 0) {
-          // We already know that this predicate will always evaluate to true; hence, there is no need
-          // to evaluate the predicate during runtime.
-          castedEqPredicate.setPrecomputed(true);
-        }
-
-        return castedEqPredicate;
-      }
-      case RANGE: {
-        RangePredicate rangePredicate = (RangePredicate) predicate;
-
-        boolean lowerInclusive = rangePredicate.isLowerInclusive(), upperInclusive = rangePredicate.isUpperInclusive();
-        if (!rangePredicate.getLowerBound().equals(RangePredicate.UNBOUNDED)) {
-          BigDecimal lowerBound = new BigDecimal(rangePredicate.getLowerBound());
-          BigDecimal lowerConvertedValue = lowerBound;
-          switch (columnType) {
-            case INT: {
-              lowerConvertedValue = new BigDecimal(lowerBound.intValue());
-              break;
-            }
-            case LONG: {
-              lowerConvertedValue = new BigDecimal(lowerBound.longValue());
-              break;
-            }
-            case FLOAT: {
-              lowerConvertedValue = new BigDecimal(String.valueOf(lowerBound.floatValue()));
-              break;
-            }
-            case DOUBLE: {
-              // check if conversion to LONG is lossless
-              lowerConvertedValue = new BigDecimal(String.valueOf(lowerBound.doubleValue()));
-              break;
-            }
-          }
-
-          int compared = lowerBound.compareTo(lowerConvertedValue);
-          if (compared != 0) {
-            //If value after conversion is less than original value, upper bound has to be exclusive; otherwise,
-            //upper bound has to be inclusive.
-            lowerInclusive = !(compared > 0);
-          }
-        }
-
-        if (!rangePredicate.getUpperBound().equals(RangePredicate.UNBOUNDED)) {
-          BigDecimal upperBound = new BigDecimal(rangePredicate.getUpperBound());
-          BigDecimal upperConvertedValue = upperBound;
-          switch (columnType) {
-            case INT: {
-              upperConvertedValue = new BigDecimal(upperBound.intValue());
-              break;
-            }
-            case LONG: {
-              upperConvertedValue = new BigDecimal(upperBound.longValue());
-              break;
-            }
-            case FLOAT: {
-              upperConvertedValue = new BigDecimal(String.valueOf(upperBound.floatValue()));
-              break;
-            }
-            case DOUBLE: {
-              upperConvertedValue = new BigDecimal(String.valueOf(upperBound.doubleValue()));
-              break;
-            }
-          }
-
-          int compared = upperBound.compareTo(upperConvertedValue);
-          if (compared != 0) {
-            //If value after conversion is less than original value, upper bound has to be inclusive; otherwise,
-            //upper bound has to be exclusive.
-            upperInclusive = compared > 0;
-          }
-        }
-
-        return new RangePredicate(rangePredicate.getLhs(), lowerInclusive, rangePredicate.getLowerBound(),
-            upperInclusive, rangePredicate.getUpperBound());
-      }
-      case IN:
-      {
-        InPredicate inPredicate = (InPredicate) predicate;
-        List<String> values = inPredicate.getValues();
-        List<String> castedValues = new ArrayList<>();
-        for (String value : values) {
-          BigDecimal actualValue = new BigDecimal(value);
-          switch (columnType) {
-            case INT: {
-              BigDecimal convertedValue = new BigDecimal(actualValue.intValue());
-              if (actualValue.compareTo(convertedValue) == 0) {
-                castedValues.add(String.valueOf(convertedValue.intValue()));
-              }
-              break;
-            }
-            case LONG: {
-              BigDecimal convertedValue = new BigDecimal(actualValue.longValue());
-              if (actualValue.compareTo(convertedValue) == 0) {
-                castedValues.add(String.valueOf(convertedValue.longValue()));
-              }
-              break;
-            }
-            case FLOAT: {
-              BigDecimal convertedValue = new BigDecimal(String.valueOf(actualValue.floatValue()));
-              if (actualValue.compareTo(convertedValue) == 0) {
-                castedValues.add(String.valueOf(convertedValue.floatValue()));
-              }
-              break;
-            }
-            case DOUBLE: {
-              BigDecimal convertedValue = new BigDecimal(String.valueOf(actualValue.doubleValue()));
-              if (actualValue.compareTo(convertedValue) == 0) {
-                castedValues.add(String.valueOf(convertedValue.doubleValue()));
-              }
-              break;
-            }
-          }
-        }
-
-        return new InPredicate(inPredicate.getLhs(), castedValues);
-      }
-      case NOT_IN:
-      {
-        NotInPredicate notInPredicate = (NotInPredicate) predicate;
-        List<String> values = notInPredicate.getValues();
-        List<String> castedValues = new ArrayList<>();
-        for (String value : values) {
-          BigDecimal actualValue = new BigDecimal(value);
-          switch (columnType) {
-            case INT: {
-              BigDecimal convertedValue = new BigDecimal(actualValue.intValue());
-              if (actualValue.compareTo(convertedValue) == 0) {
-                castedValues.add(String.valueOf(convertedValue.intValue()));
-              }
-              break;
-            }
-            case LONG: {
-              BigDecimal convertedValue = new BigDecimal(actualValue.longValue());
-              if (actualValue.compareTo(convertedValue) == 0) {
-                castedValues.add(String.valueOf(convertedValue.longValue()));
-              }
-              break;
-            }
-            case FLOAT: {
-              BigDecimal convertedValue = new BigDecimal(String.valueOf(actualValue.floatValue()));
-              if (actualValue.compareTo(convertedValue) == 0) {
-                castedValues.add(String.valueOf(convertedValue.floatValue()));
-              }
-              break;
-            }
-            case DOUBLE: {
-              BigDecimal convertedValue = new BigDecimal(String.valueOf(actualValue.doubleValue()));
-              if (actualValue.compareTo(convertedValue) == 0) {
-                castedValues.add(String.valueOf(convertedValue.doubleValue()));
-              }
-              break;
-            }
-          }
-        }
-
-        return new NotInPredicate(notInPredicate.getLhs(), castedValues);
-      }
-    }
-
-    return predicate;
   }
 }

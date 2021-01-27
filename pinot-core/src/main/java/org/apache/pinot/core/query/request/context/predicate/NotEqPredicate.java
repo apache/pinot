@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.core.query.request.context.predicate;
 
+import java.math.BigDecimal;
 import java.util.Objects;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
@@ -27,7 +29,7 @@ import org.apache.pinot.core.query.request.context.ExpressionContext;
  */
 public class NotEqPredicate extends BasePredicate implements Predicate {
   private final ExpressionContext _lhs;
-  private final String _value;
+  private String _value;
 
   public NotEqPredicate(ExpressionContext lhs, String value) {
     _lhs = lhs;
@@ -46,6 +48,33 @@ public class NotEqPredicate extends BasePredicate implements Predicate {
 
   public String getValue() {
     return _value;
+  }
+
+  @Override
+  public void rewrite(DataType dataType) {
+    BigDecimal actualValue = new BigDecimal(_value);
+    BigDecimal convertedValue = actualValue;
+    switch (dataType) {
+      case INT:
+        _value = String.valueOf(actualValue.intValue());
+        break;
+      case LONG:
+        _value = String.valueOf(actualValue.longValue());
+        break;
+      case FLOAT:
+        _value = String.valueOf(actualValue.floatValue());
+        break;
+      case DOUBLE:
+        _value = String.valueOf(actualValue.doubleValue());
+        break;
+    }
+
+    int compared = actualValue.compareTo(new BigDecimal(_value));
+    if (compared != 0) {
+      // We already know that this predicate will always evaluate to true; hence, there is no need
+      // to evaluate the predicate during runtime.
+      _precomputed = true;
+    }
   }
 
   @Override

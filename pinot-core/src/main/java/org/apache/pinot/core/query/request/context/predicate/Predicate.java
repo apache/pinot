@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.request.context.predicate;
 
 import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
@@ -46,16 +47,18 @@ public interface Predicate {
   ExpressionContext getLhs();
 
   /**
-   * If we already know the result of the predicate during compile time, there is no need to evaluate the predicate
-   * during runtime.
-   *
-   * @param precomputed true, if predicate will always evaluate to true; otherwise, false.
-   */
-  void setPrecomputed(boolean precomputed);
-
-  /**
-   * @return null if there are no precomputed results; otherwise, a Boolean value that was computed during compile
+   * @return result if it was precomputed during compile time; otherwise, return null.
    * time.
    */
   Boolean getPrecomputed();
+
+  /**
+   * A predicate, by default, doesn't know the data type of its column. After column data type
+   * has been resolved, this function is called to rewrite the predicate to work against the
+   * column data type. This allows us to evaluate predicates with mixed data types such as
+   * "intColumn > 3.43" or "longColumn IN (12, 23.2)".
+   *
+   * @param dataType data type against which this predicate will be evaluated.
+   */
+  void rewrite(DataType dataType);
 }

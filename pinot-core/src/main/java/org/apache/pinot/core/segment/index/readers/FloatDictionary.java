@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.segment.index.readers;
 
-import java.math.BigDecimal;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -31,24 +30,7 @@ public class FloatDictionary extends BaseImmutableDictionary {
 
   @Override
   public int insertionIndexOf(String stringValue) {
-    // First convert string to BigDecimal and then downcast to int. This allows type conversion from any compatible
-    // numerical value represented as string to an int value.
-    BigDecimal bigDecimal = new BigDecimal(stringValue);
-
-    // A value greater than Float.MAX_VALUE will downcast to Float.MAX_VALUE and a value less than -Float.MAX_VALUE
-    // will downcast to -Float.MAX_VALUE. This can cause binary search to return a match if the column actually contains
-    // -Float.MAX_VALUE or Float.MAX_VALUE. We avoid this error by explicitly checking for overflow and underflow.
-    if (bigDecimal.compareTo(BigDecimal.valueOf(Float.MAX_VALUE)) > 0) {
-      // Binary search insert position of value greater than Float.MAX_VALUE
-      return -(length()+1);
-    }
-
-    if (bigDecimal.compareTo(BigDecimal.valueOf(-Float.MAX_VALUE)) < 0) {
-      // Binary search Insert position of value less than -Float.MIN_VALUE
-      return -1;
-    }
-
-    return binarySearch(bigDecimal.floatValue());
+    return binarySearch(Float.parseFloat(stringValue));
   }
 
   @Override

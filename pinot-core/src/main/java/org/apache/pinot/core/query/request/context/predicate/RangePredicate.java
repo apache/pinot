@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.core.query.request.context.predicate;
 
+import java.math.BigDecimal;
 import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.CommonConstants.Query.Range;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
@@ -29,6 +31,18 @@ import org.apache.pinot.core.query.request.context.ExpressionContext;
  * <p>Pinot uses RANGE to represent '>', '>=', '<', '<=', BETWEEN so that intersection of multiple ranges can be merged.
  */
 public class RangePredicate extends BasePredicate implements Predicate {
+  private static BigDecimal INT_MIN_VALUE = BigDecimal.valueOf(Integer.MIN_VALUE);
+  private static BigDecimal INT_MAX_VALUE = BigDecimal.valueOf(Integer.MAX_VALUE);
+
+  private static BigDecimal LONG_MIN_VALUE = BigDecimal.valueOf(Long.MIN_VALUE);
+  private static BigDecimal LONG_MAX_VALUE = BigDecimal.valueOf(Long.MAX_VALUE);
+
+  private static BigDecimal FLOAT_MIN_VALUE = BigDecimal.valueOf(-Float.MAX_VALUE);
+  private static BigDecimal FLOAT_MAX_VALUE = BigDecimal.valueOf(Float.MAX_VALUE);
+
+  private static BigDecimal DOUBLE_MIN_VALUE = BigDecimal.valueOf(-Double.MAX_VALUE);
+  private static BigDecimal DOUBLE_MAX_VALUE = BigDecimal.valueOf(Double.MAX_VALUE);
+
   public static final char DELIMITER = Range.DELIMITER;
   public static final char LOWER_EXCLUSIVE = Range.LOWER_EXCLUSIVE;
   public static final char LOWER_INCLUSIVE = Range.LOWER_INCLUSIVE;
@@ -40,10 +54,10 @@ public class RangePredicate extends BasePredicate implements Predicate {
   private static final String LEGACY_DELIMITER = "\t\t";
 
   private final ExpressionContext _lhs;
-  private final boolean _lowerInclusive;
-  private final String _lowerBound;
-  private final boolean _upperInclusive;
-  private final String _upperBound;
+  private boolean _lowerInclusive;
+  private String _lowerBound;
+  private boolean _upperInclusive;
+  private String _upperBound;
 
   /**
    * The range is formatted as 5 parts:
@@ -103,6 +117,93 @@ public class RangePredicate extends BasePredicate implements Predicate {
 
   public String getUpperBound() {
     return _upperBound;
+  }
+
+
+  private static BigDecimal toInt(BigDecimal value) {
+    if (value.compareTo(INT_MAX_VALUE) > 0) {
+      return INT_MAX_VALUE;
+    } else if (value.compareTo(INT_MIN_VALUE) < 0) {
+      return INT_MIN_VALUE;
+    } else {
+      return new BigDecimal(value.intValue());
+    }
+  }
+
+  private static BigDecimal toLong(BigDecimal value) {
+    if (value.compareTo(LONG_MAX_VALUE) > 0) {
+      return LONG_MAX_VALUE;
+    } else if (value.compareTo(LONG_MIN_VALUE) < 0) {
+      return LONG_MIN_VALUE;
+    } else {
+      return new BigDecimal(value.longValue());
+    }
+  }
+
+  private static BigDecimal toFloat(BigDecimal value) {
+    if (value.compareTo(FLOAT_MAX_VALUE) > 0) {
+      return FLOAT_MAX_VALUE;
+    } else if (value.compareTo(FLOAT_MIN_VALUE) < 0) {
+      return FLOAT_MIN_VALUE;
+    } else {
+      return new BigDecimal(String.valueOf(value.floatValue()));
+    }
+  }
+
+  private static BigDecimal toDouble(BigDecimal value) {
+    if (value.compareTo(DOUBLE_MAX_VALUE) > 0) {
+      return DOUBLE_MAX_VALUE;
+    } else if (value.compareTo(DOUBLE_MIN_VALUE) < 0) {
+      return DOUBLE_MIN_VALUE;
+    } else {
+      return new BigDecimal(String.valueOf(value.doubleValue()));
+    }
+  }
+
+  private static BigDecimal convertValue(BigDecimal original, DataType dataType) {
+    switch (dataType) {
+      case INT:
+        return toInt(original);
+      case LONG:
+        return toLong(original);
+      case FLOAT:
+        return toFloat(original);
+      case DOUBLE:
+        return toDouble(original);
+      default:
+        return original;
+    }
+  }
+
+  @Override
+  public void rewrite(DataType dataType) {
+    if (!_lowerBound.equals(RangePredicate.UNBOUNDED)) {
+      BigDecimal lowerBound = new BigDecimal(_lowerBound);
+      BigDecimal lowerConvertedValue = convertValue(lowerBound, dataType);
+
+      int compared = lowerBound.compareTo(lowerConvertedValue);
+      if (compared != 0) {
+        //If value after conversion is less than original value, upper bound has to be exclusive; otherwise,
+        //upper bound has to be inclusive.
+        _lowerInclusive = !(compared > 0);
+      }
+
+      _lowerBound = String.valueOf(lowerConvertedValue);
+    }
+
+    if (!_upperBound.equals(RangePredicate.UNBOUNDED)) {
+      BigDecimal upperBound = new BigDecimal(_upperBound);
+      BigDecimal upperConvertedValue = convertValue(upperBound, dataType);
+
+      int compared = upperBound.compareTo(upperConvertedValue);
+      if (compared != 0) {
+        //If value after conversion is less than original value, upper bound has to be inclusive; otherwise,
+        //upper bound has to be exclusive.
+        _upperInclusive = compared > 0;
+      }
+
+      _upperBound = String.valueOf(upperConvertedValue);
+    }
   }
 
   @Override

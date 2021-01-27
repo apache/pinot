@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.query.request.context.predicate;
 
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+
 
 public abstract class BasePredicate implements Predicate {
 
@@ -27,12 +29,12 @@ public abstract class BasePredicate implements Predicate {
   Boolean _precomputed = null;
 
   @Override
-  public void setPrecomputed(boolean precomputed) {
-    _precomputed = precomputed;
+  public Boolean getPrecomputed() {
+    return _precomputed;
   }
 
   @Override
-  public Boolean getPrecomputed() {
-    return _precomputed;
+  public void rewrite(DataType dataType) {
+    // by default we assume that predicate will work with the specified data type.
   }
 }
