@@ -81,5 +81,21 @@
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-annotations</artifactId>
     </dependency>
+    
+    <!-- For testing import of csv files -->
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-csv</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
+    
+    <!-- So we have a jar to stick in the dependency jars directory -->
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-json</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 </project>

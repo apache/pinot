@@ -20,7 +20,9 @@ package org.apache.pinot.plugin.ingestion.batch.hadoop;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Files;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -61,7 +63,7 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
   private File _localTempDir;
 
   @Override
-  public void setup(Context context) {
+  public void setup(Context context) throws IOException {
     _jobConf = context.getConfiguration();
     Yaml yaml = new Yaml();
     String segmentGenerationJobSpecStr = _jobConf.get(SEGMENT_GENERATION_JOB_SPEC);
@@ -69,10 +71,9 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
     LOGGER.info("Segment generation job spec : {}", segmentGenerationJobSpecStr);
     _localTempDir = new File(FileUtils.getTempDirectory(), "pinot-" + UUID.randomUUID());
 
-    // Load Pinot Plugins copied from Distributed cache.
     File localPluginsTarFile = new File(PINOT_PLUGINS_TAR_GZ);
     if (localPluginsTarFile.exists()) {
-      File pluginsDirFile = new File(PINOT_PLUGINS_DIR);
+      File pluginsDirFile = Files.createTempDirectory(PINOT_PLUGINS_DIR).toFile();
       try {
         TarGzCompressionUtils.untar(localPluginsTarFile, pluginsDirFile);
       } catch (Exception e) {
