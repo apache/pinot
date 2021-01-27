@@ -375,16 +375,11 @@ public class TableConfigUtilsTest {
       // expected
     }
 
-    // chained transform functions
+    // derived columns - should pass
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
-        new IngestionConfig(null, null, null,
-            Lists.newArrayList(new TransformConfig("a", "reverse(x)"), new TransformConfig("b", "lower(a)")))).build();
-    try {
-      TableConfigUtils.validate(tableConfig, schema);
-      Assert.fail("Should fail due to using transformed column 'a' as argument for transform function of column 'b'");
-    } catch (IllegalStateException e) {
-      // expected
-    }
+        new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("transformedCol", "reverse(x)"),
+            new TransformConfig("myCol", "lower(transformedCol)")))).build();
+    TableConfigUtils.validate(tableConfig, schema);
   }
 
   @Test
