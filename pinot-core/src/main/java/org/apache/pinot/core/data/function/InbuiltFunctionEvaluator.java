@@ -75,7 +75,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
           break;
         case IDENTIFIER:
           String columnName = argument.getIdentifier();
-          childNode = new ColumnExecutionNode(columnName);
+          childNode = new ColumnExecutionNode(columnName, _arguments.size());
           _arguments.add(columnName);
           break;
         case LITERAL:
@@ -104,9 +104,16 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     return _rootNode.execute(row);
   }
 
+  @Override
+  public Object evaluate(Object[] values) {
+    return _rootNode.execute(values);
+  }
+
   private interface ExecutableNode {
 
     Object execute(GenericRow row);
+
+    Object execute(Object[] values);
   }
 
   private static class FunctionExecutionNode implements ExecutableNode {
@@ -129,6 +136,16 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
       _functionInvoker.convertTypes(_arguments);
       return _functionInvoker.invoke(_arguments);
     }
+
+    @Override
+    public Object execute(Object[] values) {
+      int numArguments = _argumentNodes.length;
+      for (int i = 0; i < numArguments; i++) {
+        _arguments[i] = _argumentNodes[i].execute(values);
+      }
+      _functionInvoker.convertTypes(_arguments);
+      return _functionInvoker.invoke(_arguments);
+    }
   }
 
   private static class ConstantExecutionNode implements ExecutableNode {
@@ -142,18 +159,30 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     public String execute(GenericRow row) {
       return _value;
     }
+
+    @Override
+    public Object execute(Object[] values) {
+      return _value;
+    }
   }
 
   private static class ColumnExecutionNode implements ExecutableNode {
     final String _column;
+    final int _id;
 
-    ColumnExecutionNode(String column) {
+    ColumnExecutionNode(String column, int id) {
       _column = column;
+      _id = id;
     }
 
     @Override
     public Object execute(GenericRow row) {
       return row.getValue(_column);
+    }
+
+    @Override
+    public Object execute(Object[] values) {
+      return values[_id];
     }
   }
 }

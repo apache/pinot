@@ -20,7 +20,6 @@ package org.apache.pinot.core.segment.index.loader.defaultcolumn;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
-import java.util.Set;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.loader.LoaderUtils;
@@ -38,13 +37,13 @@ import org.slf4j.LoggerFactory;
 public class V3DefaultColumnHandler extends BaseDefaultColumnHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(V3DefaultColumnHandler.class);
 
-  public V3DefaultColumnHandler(File indexDir, Schema schema, SegmentMetadataImpl segmentMetadata,
-      SegmentDirectory.Writer segmentWriter) {
-    super(indexDir, schema, segmentMetadata, segmentWriter);
+  public V3DefaultColumnHandler(File indexDir, SegmentMetadataImpl segmentMetadata,
+      IndexLoadingConfig indexLoadingConfig, Schema schema, SegmentDirectory.Writer segmentWriter) {
+    super(indexDir, segmentMetadata, indexLoadingConfig, schema, segmentWriter);
   }
 
   @Override
-  protected void updateDefaultColumn(String column, DefaultColumnAction action, IndexLoadingConfig indexLoadingConfig)
+  protected void updateDefaultColumn(String column, DefaultColumnAction action)
       throws Exception {
     LOGGER.info("Starting default column action: {} on column: {}", action, column);
 
@@ -70,6 +69,9 @@ public class V3DefaultColumnHandler extends BaseDefaultColumnHandler {
     File forwardIndexFile;
     if (isSingleValue) {
       forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
+      if (!forwardIndexFile.exists()) {
+        forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
+      }
     } else {
       forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
     }

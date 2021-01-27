@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.core.segment.index.loader.defaultcolumn;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -30,18 +33,34 @@ import java.util.Set;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.core.data.function.FunctionEvaluator;
+import org.apache.pinot.core.data.function.FunctionEvaluatorFactory;
+import org.apache.pinot.core.data.readers.PinotSegmentColumnReader;
 import org.apache.pinot.core.segment.creator.ColumnIndexCreationInfo;
+import org.apache.pinot.core.segment.creator.ForwardIndexCreator;
+import org.apache.pinot.core.segment.creator.StatsCollectorConfig;
 import org.apache.pinot.core.segment.creator.TextIndexType;
 import org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.SegmentDictionaryCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.stats.BytesColumnPredIndexStatsCollector;
+import org.apache.pinot.core.segment.creator.impl.stats.DoubleColumnPreIndexStatsCollector;
+import org.apache.pinot.core.segment.creator.impl.stats.FloatColumnPreIndexStatsCollector;
+import org.apache.pinot.core.segment.creator.impl.stats.IntColumnPreIndexStatsCollector;
+import org.apache.pinot.core.segment.creator.impl.stats.LongColumnPreIndexStatsCollector;
+import org.apache.pinot.core.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.loader.LoaderUtils;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
@@ -87,17 +106,19 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   }
 
   protected final File _indexDir;
-  protected final Schema _schema;
   protected final SegmentMetadataImpl _segmentMetadata;
+  protected final IndexLoadingConfig _indexLoadingConfig;
+  protected final Schema _schema;
   protected final SegmentDirectory.Writer _segmentWriter;
 
   private final PropertiesConfiguration _segmentProperties;
 
-  protected BaseDefaultColumnHandler(File indexDir, Schema schema, SegmentMetadataImpl segmentMetadata,
-      SegmentDirectory.Writer segmentWriter) {
+  protected BaseDefaultColumnHandler(File indexDir, SegmentMetadataImpl segmentMetadata,
+      IndexLoadingConfig indexLoadingConfig, Schema schema, SegmentDirectory.Writer segmentWriter) {
     _indexDir = indexDir;
-    _schema = schema;
     _segmentMetadata = segmentMetadata;
+    _indexLoadingConfig = indexLoadingConfig;
+    _schema = schema;
     _segmentWriter = segmentWriter;
     _segmentProperties = SegmentMetadataImpl.getPropertiesConfiguration(indexDir);
   }
@@ -106,7 +127,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    * {@inheritDoc}
    */
   @Override
-  public void updateDefaultColumns(IndexLoadingConfig indexLoadingConfig)
+  public void updateDefaultColumns()
       throws Exception {
     // Compute the action needed for each column.
     Map<String, DefaultColumnAction> defaultColumnActionMap = computeDefaultColumnActionMap();
@@ -117,7 +138,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     // Update each default column based on the default column action.
     for (Map.Entry<String, DefaultColumnAction> entry : defaultColumnActionMap.entrySet()) {
       // This method updates the metadata properties, need to save it later.
-      updateDefaultColumn(entry.getKey(), entry.getValue(), indexLoadingConfig);
+      updateDefaultColumn(entry.getKey(), entry.getValue());
     }
 
     // Update the segment metadata.
@@ -178,6 +199,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    *
    * @return Action Map for each column.
    */
+  @VisibleForTesting
   Map<String, DefaultColumnAction> computeDefaultColumnActionMap() {
     Map<String, DefaultColumnAction> defaultColumnActionMap = new HashMap<>();
 
@@ -293,8 +315,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    * @param action default column action.
    * @throws Exception
    */
-  protected abstract void updateDefaultColumn(String column, DefaultColumnAction action,
-      IndexLoadingConfig indexLoadingConfig)
+  protected abstract void updateDefaultColumn(String column, DefaultColumnAction action)
       throws Exception;
 
   /**
@@ -324,8 +345,69 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    */
   protected void createColumnV1Indices(String column)
       throws Exception {
+    TableConfig tableConfig = _indexLoadingConfig.getTableConfig();
+    if (tableConfig != null && tableConfig.getIngestionConfig() != null
+        && tableConfig.getIngestionConfig().getTransformConfigs() != null) {
+      List<TransformConfig> transformConfigs = tableConfig.getIngestionConfig().getTransformConfigs();
+      for (TransformConfig transformConfig : transformConfigs) {
+        if (transformConfig.getColumnName().equals(column)) {
+          String transformFunction = transformConfig.getTransformFunction();
+          FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
+
+          // Check if all arguments exist in the segment
+          // TODO: Support chained derived column
+          boolean skipCreatingDerivedColumn = false;
+          List<String> arguments = functionEvaluator.getArguments();
+          List<ColumnMetadata> argumentsMetadata = new ArrayList<>(arguments.size());
+          for (String argument : arguments) {
+            ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(argument);
+            if (columnMetadata == null) {
+              LOGGER.warn(
+                  "Skip creating derived column: {} because argument: {} does not exist in the segment, creating default value column instead",
+                  column, argument);
+              skipCreatingDerivedColumn = true;
+              break;
+            }
+            argumentsMetadata.add(columnMetadata);
+          }
+          if (skipCreatingDerivedColumn) {
+            break;
+          }
+
+          // TODO: Support raw derived column
+          if (_indexLoadingConfig.getNoDictionaryColumns().contains(column)) {
+            LOGGER.warn("Skip creating raw derived column: {}, creating default value column instead", column);
+            break;
+          }
+
+          // TODO: Support multi-value derived column
+          if (!_schema.getFieldSpecFor(column).isSingleValueField()) {
+            LOGGER.warn("Skip creating MV derived column: {}, creating default value column instead", column);
+            break;
+          }
+
+          try {
+            createDerivedColumnV1Indices(column, functionEvaluator, argumentsMetadata);
+            return;
+          } catch (Exception e) {
+            LOGGER.error(
+                "Caught exception while creating derived column: {} with transform function: {}, creating default value column instead",
+                column, transformFunction, e);
+            break;
+          }
+        }
+      }
+    }
+
+    createDefaultValueColumnV1Indices(column);
+  }
+
+  /**
+   * Helper method to create the V1 indices (dictionary and forward index) for a column with default values.
+   */
+  private void createDefaultValueColumnV1Indices(String column)
+      throws Exception {
     FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
-    Preconditions.checkNotNull(fieldSpec);
 
     // Generate column index creation information.
     int totalDocs = _segmentMetadata.getTotalDocs();
@@ -413,5 +495,187 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         .addColumnMetadataInfo(_segmentProperties, column, columnIndexCreationInfo, totalDocs, fieldSpec,
             true/*hasDictionary*/, dictionaryElementSize, true/*hasInvertedIndex*/, TextIndexType.NONE,
             false/*hasFSTIndex*/, false/*hasJsonIndex*/);
+  }
+
+  /**
+   * Helper method to create the V1 indices (dictionary and forward index) for a column with derived values.
+   * TODO:
+   *   - Support chained derived column
+   *   - Support raw derived column
+   *   - Support multi-value derived column
+   */
+  private void createDerivedColumnV1Indices(String column, FunctionEvaluator functionEvaluator,
+      List<ColumnMetadata> argumentsMetadata)
+      throws Exception {
+    // Initialize value readers for all arguments
+    int numArguments = argumentsMetadata.size();
+    List<ValueReader> valueReaders = new ArrayList<>(numArguments);
+    for (ColumnMetadata argumentMetadata : argumentsMetadata) {
+      valueReaders.add(new ValueReader(argumentMetadata));
+    }
+
+    try {
+      // Calculate the values for the derived column
+      Object[] inputValues = new Object[numArguments];
+      int numDocs = _segmentMetadata.getTotalDocs();
+      Object[] outputValues = new Object[numDocs];
+      for (int i = 0; i < numDocs; i++) {
+        for (int j = 0; j < numArguments; j++) {
+          inputValues[j] = valueReaders.get(j).getValue(i);
+        }
+        outputValues[i] = functionEvaluator.evaluate(inputValues);
+      }
+
+      FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
+      StatsCollectorConfig statsCollectorConfig =
+          new StatsCollectorConfig(_indexLoadingConfig.getTableConfig(), _schema, null);
+      ColumnIndexCreationInfo indexCreationInfo;
+      switch (fieldSpec.getDataType()) {
+        case INT: {
+          for (int i = 0; i < numDocs; i++) {
+            outputValues[i] = ((Number) outputValues[i]).intValue();
+          }
+          IntColumnPreIndexStatsCollector statsCollector =
+              new IntColumnPreIndexStatsCollector(column, statsCollectorConfig);
+          for (Object value : outputValues) {
+            statsCollector.collect(value);
+          }
+          statsCollector.seal();
+          indexCreationInfo =
+              new ColumnIndexCreationInfo(statsCollector, true, false, true, fieldSpec.getDefaultNullValue());
+          break;
+        }
+        case LONG: {
+          for (int i = 0; i < numDocs; i++) {
+            outputValues[i] = ((Number) outputValues[i]).longValue();
+          }
+          LongColumnPreIndexStatsCollector statsCollector =
+              new LongColumnPreIndexStatsCollector(column, statsCollectorConfig);
+          for (Object value : outputValues) {
+            statsCollector.collect(value);
+          }
+          statsCollector.seal();
+          indexCreationInfo =
+              new ColumnIndexCreationInfo(statsCollector, true, false, true, fieldSpec.getDefaultNullValue());
+          break;
+        }
+        case FLOAT: {
+          for (int i = 0; i < numDocs; i++) {
+            outputValues[i] = ((Number) outputValues[i]).floatValue();
+          }
+          FloatColumnPreIndexStatsCollector statsCollector =
+              new FloatColumnPreIndexStatsCollector(column, statsCollectorConfig);
+          for (Object value : outputValues) {
+            statsCollector.collect(value);
+          }
+          statsCollector.seal();
+          indexCreationInfo =
+              new ColumnIndexCreationInfo(statsCollector, true, false, true, fieldSpec.getDefaultNullValue());
+          break;
+        }
+        case DOUBLE: {
+          for (int i = 0; i < numDocs; i++) {
+            outputValues[i] = ((Number) outputValues[i]).doubleValue();
+          }
+          DoubleColumnPreIndexStatsCollector statsCollector =
+              new DoubleColumnPreIndexStatsCollector(column, statsCollectorConfig);
+          for (Object value : outputValues) {
+            statsCollector.collect(value);
+          }
+          statsCollector.seal();
+          indexCreationInfo =
+              new ColumnIndexCreationInfo(statsCollector, true, false, true, fieldSpec.getDefaultNullValue());
+          break;
+        }
+        case STRING: {
+          for (int i = 0; i < numDocs; i++) {
+            outputValues[i] = outputValues[i].toString();
+          }
+          StringColumnPreIndexStatsCollector statsCollector =
+              new StringColumnPreIndexStatsCollector(column, statsCollectorConfig);
+          for (Object value : outputValues) {
+            statsCollector.collect(value);
+          }
+          statsCollector.seal();
+          indexCreationInfo = new ColumnIndexCreationInfo(statsCollector, true,
+              _indexLoadingConfig.getVarLengthDictionaryColumns().contains(column), true,
+              fieldSpec.getDefaultNullValue());
+          break;
+        }
+        case BYTES: {
+          BytesColumnPredIndexStatsCollector statsCollector =
+              new BytesColumnPredIndexStatsCollector(column, statsCollectorConfig);
+          for (Object value : outputValues) {
+            statsCollector.collect(value);
+          }
+          statsCollector.seal();
+          indexCreationInfo = new ColumnIndexCreationInfo(statsCollector, true,
+              _indexLoadingConfig.getVarLengthDictionaryColumns().contains(column), true,
+              new ByteArray((byte[]) fieldSpec.getDefaultNullValue()));
+          break;
+        }
+        default:
+          throw new IllegalStateException();
+      }
+
+      // Create dictionary
+      try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(
+          indexCreationInfo.getSortedUniqueElementsArray(), fieldSpec, _indexDir,
+          indexCreationInfo.isUseVarLengthDictionary())) {
+        dictionaryCreator.build();
+
+        // Create forward index
+        int cardinality = indexCreationInfo.getDistinctValueCount();
+        try (ForwardIndexCreator forwardIndexCreator = indexCreationInfo.isSorted()
+            ? new SingleValueSortedForwardIndexCreator(_indexDir, column, cardinality)
+            : new SingleValueUnsortedForwardIndexCreator(_indexDir, column, cardinality, numDocs)) {
+          for (int i = 0; i < numDocs; i++) {
+            forwardIndexCreator.putDictId(dictionaryCreator.indexOfSV(outputValues[i]));
+          }
+        }
+
+        // Add the column metadata
+        SegmentColumnarIndexCreator
+            .addColumnMetadataInfo(_segmentProperties, column, indexCreationInfo, numDocs, fieldSpec, true,
+                dictionaryCreator.getNumBytesPerEntry(), true, TextIndexType.NONE, false, false);
+      }
+    } finally {
+      for (ValueReader valueReader : valueReaders) {
+        valueReader.close();
+      }
+    }
+  }
+
+  @SuppressWarnings("rawtypes")
+  private class ValueReader implements Closeable {
+    final ForwardIndexReader _forwardIndexReader;
+    final Dictionary _dictionary;
+    final PinotSegmentColumnReader _columnReader;
+
+    ValueReader(ColumnMetadata columnMetadata)
+        throws IOException {
+      _forwardIndexReader = LoaderUtils.getForwardIndexReader(_segmentWriter, columnMetadata);
+      if (columnMetadata.hasDictionary()) {
+        _dictionary = LoaderUtils.getDictionary(_segmentWriter, columnMetadata);
+      } else {
+        _dictionary = null;
+      }
+      _columnReader =
+          new PinotSegmentColumnReader(_forwardIndexReader, _dictionary, columnMetadata.getMaxNumberOfMultiValues());
+    }
+
+    Object getValue(int docId) {
+      return _columnReader.getValue(docId);
+    }
+
+    @Override
+    public void close()
+        throws IOException {
+      _columnReader.close();
+      if (_dictionary != null) {
+        _dictionary.close();
+      }
+      _forwardIndexReader.close();
+    }
   }
 }

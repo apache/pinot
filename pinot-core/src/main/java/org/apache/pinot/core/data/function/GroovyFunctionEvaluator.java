@@ -95,10 +95,7 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     return _script.run();
   }
 
-  /**
-   * Evaluate the Groovy function with bindings provided as an array of Object
-   * The number of elements in the values must match the numArguments
-   */
+  @Override
   public Object evaluate(Object[] values) {
     for (int i = 0; i < _numArguments; i++) {
       _binding.setVariable(_arguments.get(i), values[i]);
