@@ -30,9 +30,6 @@ import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.easymock.Capture;
 import org.easymock.CaptureType;
-import org.powermock.api.easymock.PowerMock;
-import org.powermock.core.classloader.annotations.PrepareForTest;
-import org.powermock.modules.testng.PowerMockTestCase;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -40,20 +37,19 @@ import software.amazon.awssdk.services.kinesis.model.SequenceNumberRange;
 import software.amazon.awssdk.services.kinesis.model.Shard;
 
 import static org.easymock.EasyMock.capture;
+import static org.easymock.EasyMock.createMock;
+import static org.easymock.EasyMock.createNiceMock;
 import static org.easymock.EasyMock.newCapture;
 import static org.easymock.EasyMock.captureInt;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.replay;
 
-@PrepareForTest(Shard.class)
-public class KinesisStreamMetadataProviderTest extends PowerMockTestCase {
+public class KinesisStreamMetadataProviderTest {
   private static final String SHARD_ID_0 = "0";
   private static final String SHARD_ID_1 = "1";
   public static final String CLIENT_ID = "dummy";
   public static final int TIMEOUT = 1000;
 
-  private static Shard shard0;
-  private static Shard shard1;
   private static KinesisConnectionHandler kinesisConnectionHandler;
   private KinesisStreamMetadataProvider kinesisStreamMetadataProvider;
   private static StreamConsumerFactory streamConsumerFactory;
@@ -61,11 +57,9 @@ public class KinesisStreamMetadataProviderTest extends PowerMockTestCase {
 
   @BeforeMethod
   public void setupTest() {
-    kinesisConnectionHandler = PowerMock.createMock(KinesisConnectionHandler.class);
-    shard0 = PowerMock.createMock(Shard.class);
-    shard1 = PowerMock.createMock(Shard.class);
-    streamConsumerFactory = PowerMock.createMock(StreamConsumerFactory.class);
-    partitionGroupConsumer = PowerMock.createNiceMock(PartitionGroupConsumer.class);
+    kinesisConnectionHandler = createMock(KinesisConnectionHandler.class);
+    streamConsumerFactory = createMock(StreamConsumerFactory.class);
+    partitionGroupConsumer = createNiceMock(PartitionGroupConsumer.class);
     kinesisStreamMetadataProvider =
         new KinesisStreamMetadataProvider(CLIENT_ID, TestUtils.getStreamConfig(), kinesisConnectionHandler,
             streamConsumerFactory);
@@ -74,20 +68,15 @@ public class KinesisStreamMetadataProviderTest extends PowerMockTestCase {
   @Test
   public void getPartitionsGroupInfoListTest()
       throws Exception {
-    expect(kinesisConnectionHandler.getShards()).andReturn(ImmutableList.of(shard0, shard1)).anyTimes();
-    expect(shard0.shardId()).andReturn(SHARD_ID_0).anyTimes();
-    expect(shard1.shardId()).andReturn(SHARD_ID_1).anyTimes();
-    expect(shard0.parentShardId()).andReturn(null).anyTimes();
-    expect(shard1.parentShardId()).andReturn(null).anyTimes();
-    expect(shard0.sequenceNumberRange())
-        .andReturn(SequenceNumberRange.builder().startingSequenceNumber("1").build()).anyTimes();
-    expect(shard1.sequenceNumberRange())
-        .andReturn(SequenceNumberRange.builder().startingSequenceNumber("1").build()).anyTimes();
+    Shard shard0 = Shard.builder().shardId(SHARD_ID_0).sequenceNumberRange(SequenceNumberRange.builder().startingSequenceNumber("1").build()).build();
+    Shard shard1 = Shard.builder().shardId(SHARD_ID_1).sequenceNumberRange(SequenceNumberRange.builder().startingSequenceNumber("1").build()).build();
 
-    replay(kinesisConnectionHandler, shard0, shard1);
+    expect(kinesisConnectionHandler.getShards()).andReturn(ImmutableList.of(shard0, shard1)).anyTimes();
+    replay(kinesisConnectionHandler);
 
     List<PartitionGroupInfo> result = kinesisStreamMetadataProvider
         .getPartitionGroupInfoList(CLIENT_ID, TestUtils.getStreamConfig(), new ArrayList<>(), TIMEOUT);
+
 
     Assert.assertEquals(result.size(), 2);
     Assert.assertEquals(result.get(0).getPartitionGroupId(), 0);
@@ -110,16 +99,9 @@ public class KinesisStreamMetadataProviderTest extends PowerMockTestCase {
     Capture<Integer> intArguments = newCapture(CaptureType.ALL);
     Capture<String> stringCapture = newCapture(CaptureType.ALL);
 
+    Shard shard0 = Shard.builder().shardId(SHARD_ID_0).sequenceNumberRange(SequenceNumberRange.builder().startingSequenceNumber("1").endingSequenceNumber("1").build()).build();
+    Shard shard1 = Shard.builder().shardId(SHARD_ID_1).sequenceNumberRange(SequenceNumberRange.builder().startingSequenceNumber("1").build()).build();
     expect(kinesisConnectionHandler.getShards()).andReturn(ImmutableList.of(shard0, shard1)).anyTimes();
-    expect(shard0.shardId()).andReturn(SHARD_ID_0).anyTimes();
-    expect(shard1.shardId()).andReturn(SHARD_ID_1).anyTimes();
-    expect(shard0.parentShardId()).andReturn(null).anyTimes();
-    expect(shard1.parentShardId()).andReturn(null).anyTimes();
-    expect(shard0.sequenceNumberRange())
-        .andReturn(SequenceNumberRange.builder().startingSequenceNumber("1").endingSequenceNumber("1").build())
-        .anyTimes();
-    expect(shard1.sequenceNumberRange())
-        .andReturn(SequenceNumberRange.builder().startingSequenceNumber("1").build()).anyTimes();
     expect(streamConsumerFactory
         .createPartitionGroupConsumer(capture(stringCapture), capture(partitionGroupMetadataCapture)))
         .andReturn(partitionGroupConsumer).anyTimes();
@@ -127,7 +109,7 @@ public class KinesisStreamMetadataProviderTest extends PowerMockTestCase {
         .fetchMessages(capture(checkpointArgs), capture(checkpointArgs), captureInt(intArguments)))
         .andReturn(new KinesisRecordsBatch(new ArrayList<>(), "0", true)).anyTimes();
 
-    replay(kinesisConnectionHandler, shard0, shard1, streamConsumerFactory, partitionGroupConsumer);
+    replay(kinesisConnectionHandler, streamConsumerFactory, partitionGroupConsumer);
 
     List<PartitionGroupInfo> result = kinesisStreamMetadataProvider
         .getPartitionGroupInfoList(CLIENT_ID, TestUtils.getStreamConfig(), currentPartitionGroupMeta, TIMEOUT);
@@ -152,16 +134,10 @@ public class KinesisStreamMetadataProviderTest extends PowerMockTestCase {
     Capture<Integer> intArguments = newCapture(CaptureType.ALL);
     Capture<String> stringCapture = newCapture(CaptureType.ALL);
 
+    Shard shard0 = Shard.builder().shardId(SHARD_ID_0).parentShardId(SHARD_ID_1).sequenceNumberRange(SequenceNumberRange.builder().startingSequenceNumber("1").build()).build();
+    Shard shard1 = Shard.builder().shardId(SHARD_ID_1).sequenceNumberRange(SequenceNumberRange.builder().startingSequenceNumber("1").endingSequenceNumber("1").build()).build();
+
     expect(kinesisConnectionHandler.getShards()).andReturn(ImmutableList.of(shard0, shard1)).anyTimes();
-    expect(shard0.shardId()).andReturn(SHARD_ID_0).anyTimes();
-    expect(shard1.shardId()).andReturn(SHARD_ID_1).anyTimes();
-    expect(shard0.parentShardId()).andReturn(SHARD_ID_1).anyTimes();
-    expect(shard1.parentShardId()).andReturn(null).anyTimes();
-    expect(shard0.sequenceNumberRange())
-        .andReturn(SequenceNumberRange.builder().startingSequenceNumber("1").build()).anyTimes();
-    expect(shard1.sequenceNumberRange())
-        .andReturn(SequenceNumberRange.builder().startingSequenceNumber("1").endingSequenceNumber("1").build())
-        .anyTimes();
     expect(streamConsumerFactory
         .createPartitionGroupConsumer(capture(stringCapture), capture(partitionGroupMetadataCapture)))
         .andReturn(partitionGroupConsumer).anyTimes();
@@ -169,7 +145,7 @@ public class KinesisStreamMetadataProviderTest extends PowerMockTestCase {
         .fetchMessages(capture(checkpointArgs), capture(checkpointArgs), captureInt(intArguments)))
         .andReturn(new KinesisRecordsBatch(new ArrayList<>(), "0", true)).anyTimes();
 
-    replay(kinesisConnectionHandler, shard0, shard1, streamConsumerFactory, partitionGroupConsumer);
+    replay(kinesisConnectionHandler, streamConsumerFactory, partitionGroupConsumer);
 
     List<PartitionGroupInfo> result = kinesisStreamMetadataProvider
         .getPartitionGroupInfoList(CLIENT_ID, TestUtils.getStreamConfig(), currentPartitionGroupMeta, TIMEOUT);

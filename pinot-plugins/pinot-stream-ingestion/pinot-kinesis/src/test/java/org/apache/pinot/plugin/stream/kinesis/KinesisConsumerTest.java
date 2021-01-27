@@ -24,8 +24,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.easymock.Capture;
-import org.powermock.api.easymock.PowerMock;
-import org.powermock.modules.testng.PowerMockTestCase;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -39,11 +37,12 @@ import software.amazon.awssdk.services.kinesis.model.GetShardIteratorResponse;
 import software.amazon.awssdk.services.kinesis.model.Record;
 
 import static org.easymock.EasyMock.capture;
+import static org.easymock.EasyMock.createMock;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.replay;
 
 
-public class KinesisConsumerTest extends PowerMockTestCase {
+public class KinesisConsumerTest {
   public static final int TIMEOUT = 1000;
   public static final int NUM_RECORDS = 10;
   public static final String DUMMY_RECORD_PREFIX = "DUMMY_RECORD-";
@@ -57,9 +56,9 @@ public class KinesisConsumerTest extends PowerMockTestCase {
 
   @BeforeMethod
   public void setupTest() {
-    kinesisConnectionHandler = PowerMock.createMock(KinesisConnectionHandler.class);
-    kinesisClient = PowerMock.createMock(KinesisClient.class);
-    streamConsumerFactory = PowerMock.createMock(StreamConsumerFactory.class);
+    kinesisConnectionHandler = createMock(KinesisConnectionHandler.class);
+    kinesisClient = createMock(KinesisClient.class);
+    streamConsumerFactory = createMock(StreamConsumerFactory.class);
 
     recordList = new ArrayList<>();
 
