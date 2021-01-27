@@ -33,6 +33,7 @@ import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.predicate.Predicate;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -138,28 +139,90 @@ public class NumericalPrecomputedPredicateTest extends BaseQueriesTest {
   /** Predicate precomputed as false during compile time */
   @Test
   public void testIntColumnEqualToDecimalValue() {
-    Operator operator = getOperatorForSqlQuery("SELECT count(*) FROM testTable WHERE intColumn = 25.1");
+    // An Integer column will never have a decimal value; hence, a predicate, that compares an Integer column with a
+    // decimal value will always evaluate to false. Check if we are able to precompute the result during compile time.
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL("SELECT count(*) FROM testTable WHERE intColumn = 12.1");
+    Operator operator =  PLAN_MAKER.makeSegmentPlanNode(getIndexSegment(), queryContext).run();
+
+    Predicate predicate = queryContext.getFilter().getPredicate();
+    Assert.assertNotNull(predicate.getPrecomputedResult());
+    Assert.assertFalse(predicate.getPrecomputedResult());
+    Assert.assertEquals(predicate.toString(), "intColumn = '12.1'");
+
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     List<Object> result = block.getAggregationResult();
     Assert.assertEquals(result.size(), 1);
     Assert.assertEquals(result.get(0), 0l);
+  }
+
+  /** Predicate precomputed as false during compile time */
+  @Test
+  public void testIntColumnNotEqualToDecimalValue() {
+    // An Integer column will never have a decimal value; hence, a predicate, that compares an Integer column with a
+    // decimal value will always evaluate to false. Check if we are able to precompute the result during compile time.
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL("SELECT count(*) FROM testTable WHERE intColumn != 12.1");
+    Operator operator =  PLAN_MAKER.makeSegmentPlanNode(getIndexSegment(), queryContext).run();
+
+    Predicate predicate = queryContext.getFilter().getPredicate();
+    Assert.assertNotNull(predicate.getPrecomputedResult());
+    Assert.assertTrue(predicate.getPrecomputedResult());
+    Assert.assertEquals(predicate.toString(), "intColumn != '12.1'");
+
+    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
+    List<Object> result = block.getAggregationResult();
+    Assert.assertEquals(result.size(), 1);
+    Assert.assertEquals(result.get(0), 12l);
   }
 
   @Test
   public void testLongColumnEqualToDecimalValue() {
-    Operator operator = getOperatorForSqlQuery("SELECT count(*) FROM testTable WHERE longColumn = 25.1");
+    // A Long column will never have a decimal value; hence, a predicate, that compares a Long column with a decimal
+    // value will always evaluate to false. Check if we are able to precompute the result during compile time.
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL("SELECT count(*) FROM testTable WHERE longColumn = 1609046359848.1");
+    Operator operator =  PLAN_MAKER.makeSegmentPlanNode(getIndexSegment(), queryContext).run();
+
+    Predicate predicate = queryContext.getFilter().getPredicate();
+    Assert.assertNotNull(predicate.getPrecomputedResult());
+    Assert.assertFalse(predicate.getPrecomputedResult());
+    Assert.assertEquals(predicate.toString(), "longColumn = '1.6090463598481E12'");
+
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     List<Object> result = block.getAggregationResult();
     Assert.assertEquals(result.size(), 1);
     Assert.assertEquals(result.get(0), 0l);
+  }
+
+  @Test
+  public void testLongColumnNotEqualToDecimalValue() {
+    // A Long column will never have a decimal value; hence, a predicate, that compares a Long column with a decimal
+    // value will always evaluate to false. Check if we are able to precompute the result during compile time.
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL("SELECT count(*) FROM testTable WHERE longColumn != 1609046359848.1");
+    Operator operator =  PLAN_MAKER.makeSegmentPlanNode(getIndexSegment(), queryContext).run();
+
+    Predicate predicate = queryContext.getFilter().getPredicate();
+    Assert.assertNotNull(predicate.getPrecomputedResult());
+    Assert.assertTrue(predicate.getPrecomputedResult());
+    Assert.assertEquals(predicate.toString(), "longColumn != '1.6090463598481E12'");
+
+    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
+    List<Object> result = block.getAggregationResult();
+    Assert.assertEquals(result.size(), 1);
+    Assert.assertEquals(result.get(0), 12l);
   }
 
   @Test
   public void testFloatColumnEqualToDecimalValue() {
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL("SELECT count(*) FROM testTable WHERE floatColumn = 25.12345678");
-    Assert.assertNull(queryContext.getFilter().getPredicate().getPrecomputed());
-
+    // A Float column will never have a value with more than 6 decimal places; hence, a predicate, that compares a
+    // Float column with a value that has more than 6 decimal places, will always evaluate to false. Check if we
+    // are able to precompute the result during compile time.
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL("SELECT count(*) FROM testTable WHERE floatColumn = -45.12345678");
     Operator operator =  PLAN_MAKER.makeSegmentPlanNode(getIndexSegment(), queryContext).run();
+
+    Predicate predicate = queryContext.getFilter().getPredicate();
+    Assert.assertNotNull(predicate.getPrecomputedResult());
+    Assert.assertFalse(predicate.getPrecomputedResult());
+    Assert.assertEquals(predicate.toString(), "floatColumn = '-45.12345678'");
+
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     List<Object> result = block.getAggregationResult();
     Assert.assertEquals(result.size(), 1);
@@ -167,15 +230,62 @@ public class NumericalPrecomputedPredicateTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testDoubleColumnEqualToDecimalValue() {
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL("SELECT count(*) FROM testTable WHERE doubleColumn = 25.123456781234567812345678");
-    Assert.assertNull(queryContext.getFilter().getPredicate().getPrecomputed());
-
+  public void testFloatColumnNotEqualToDecimalValue() {
+    // A Float column will never have a value with more than 6 decimal places; hence, a predicate, that compares a
+    // Float column with a value that has more than 6 decimal places, will always evaluate to false. Check if we
+    // are able to precompute the result during compile time.
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL("SELECT count(*) FROM testTable WHERE floatColumn != -45.12345678");
     Operator operator =  PLAN_MAKER.makeSegmentPlanNode(getIndexSegment(), queryContext).run();
+
+    Predicate predicate = queryContext.getFilter().getPredicate();
+    Assert.assertNotNull(predicate.getPrecomputedResult());
+    Assert.assertTrue(predicate.getPrecomputedResult());
+    Assert.assertEquals(predicate.toString(), "floatColumn != '-45.12345678'");
+
+    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
+    List<Object> result = block.getAggregationResult();
+    Assert.assertEquals(result.size(), 1);
+    Assert.assertEquals(result.get(0), 12l);
+  }
+
+  @Test
+  public void testDoubleColumnEqualToDecimalValue() {
+    // A double column will never have a value with more than 16 decimal places; hence, a predicate, that compares a
+    // Double column with a value that has more than 16 decimal places, will always evaluate to false. Check if we
+    // are able to precompute the result during compile time.
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL("SELECT count(*) FROM testTable WHERE doubleColumn = 25.123456781234567812345678");
+    Operator operator =  PLAN_MAKER.makeSegmentPlanNode(getIndexSegment(), queryContext).run();
+
+    Predicate predicate = queryContext.getFilter().getPredicate();
+    //Assert.assertNotNull(predicate.getPrecomputedResult());
+    //Assert.assertFalse(predicate.getPrecomputedResult());
+    //Assert.assertEquals(predicate.toString(), "doubleColumn == '25.123456781234567812345678'");
+    Assert.assertEquals(predicate.toString(), "doubleColumn = '25.12345678123457'");
+
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     List<Object> result = block.getAggregationResult();
     Assert.assertEquals(result.size(), 1);
     Assert.assertEquals(result.get(0), 0l);
+  }
+
+  @Test
+  public void testDoubleColumnNotEqualToDecimalValue() {
+    // A double column will never have a value with more than 16 decimal places; hence, a predicate, that compares a
+    // Double column with a value that has more than 16 decimal places, will always evaluate to false. Check if we
+    // are able to precompute the result during compile time.
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL("SELECT count(*) FROM testTable WHERE doubleColumn != 25.123456781234567812345678");
+    Operator operator =  PLAN_MAKER.makeSegmentPlanNode(getIndexSegment(), queryContext).run();
+
+    Predicate predicate = queryContext.getFilter().getPredicate();
+    //Assert.assertNotNull(predicate.getPrecomputedResult());
+    //Assert.assertFalse(predicate.getPrecomputedResult());
+    //Assert.assertEquals(predicate.toString(), "doubleColumn == '25.123456781234567812345678'");
+    Assert.assertEquals(predicate.toString(), "doubleColumn != '25.12345678123457'");
+
+    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
+    List<Object> result = block.getAggregationResult();
+    Assert.assertEquals(result.size(), 1);
+    Assert.assertEquals(result.get(0), 12l);
   }
 
   @AfterClass

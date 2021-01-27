@@ -119,7 +119,10 @@ public class RangePredicate extends BasePredicate implements Predicate {
     return _upperBound;
   }
 
-
+  /**
+   * If the input value is greater than Integer.MAX_VALUE, return Integer.MAX_VALUE. If the input value is less than
+   * Integer.MIN_VALUE return Integer.MIN_VALUE. Otherwise, convert the input value to an Integer value.
+   */
   private static BigDecimal toInt(BigDecimal value) {
     if (value.compareTo(INT_MAX_VALUE) > 0) {
       return INT_MAX_VALUE;
@@ -130,6 +133,10 @@ public class RangePredicate extends BasePredicate implements Predicate {
     }
   }
 
+  /**
+   * If the input value is greater than Long.MAX_VALUE, return Long.MAX_VALUE. If the input value is less than
+   * Long.MIN_VALUE return Long.MIN_VALUE. Otherwise, convert the input value to an Integer value.
+   */
   private static BigDecimal toLong(BigDecimal value) {
     if (value.compareTo(LONG_MAX_VALUE) > 0) {
       return LONG_MAX_VALUE;
@@ -140,6 +147,10 @@ public class RangePredicate extends BasePredicate implements Predicate {
     }
   }
 
+  /**
+   * If the input value is greater than Float.MAX_VALUE, return Float.MAX_VALUE. If the input value is less than
+   * -Float.MAX_VALUE return -Float.MAX_VALUE. Otherwise, convert the input value to an Integer value.
+   */
   private static BigDecimal toFloat(BigDecimal value) {
     if (value.compareTo(FLOAT_MAX_VALUE) > 0) {
       return FLOAT_MAX_VALUE;
@@ -150,6 +161,10 @@ public class RangePredicate extends BasePredicate implements Predicate {
     }
   }
 
+  /**
+   * If the input value is greater than Double.MAX_VALUE, return Double.MAX_VALUE. If the input value is less than
+   * -Double.MAX_VALUE return -Double.MAX_VALUE. Otherwise, convert the input value to an Integer value.
+   */
   private static BigDecimal toDouble(BigDecimal value) {
     if (value.compareTo(DOUBLE_MAX_VALUE) > 0) {
       return DOUBLE_MAX_VALUE;
@@ -160,6 +175,11 @@ public class RangePredicate extends BasePredicate implements Predicate {
     }
   }
 
+  /**
+   * Convert the input value to the specified datatype. If the input value is greater than the maximum value of the
+   * data type, return the maximum value. If the input value is less than the minimum value of the data type, return
+   * the minimum value. Otherwise, convert input value to the given data type.
+   */
   private static BigDecimal convertValue(BigDecimal original, DataType dataType) {
     switch (dataType) {
       case INT:
@@ -177,6 +197,21 @@ public class RangePredicate extends BasePredicate implements Predicate {
 
   @Override
   public void rewrite(DataType dataType) {
+    // Consider a predicate where an integer column is being compared to a double literal. This predicate will be
+    // rewritten as specified below.
+    // RANGE PREDICATE
+    //     intColumn > 12.1    rewritten to 	intColumn > 12
+    //     intColumn >= 12.1   rewritten to   intColumn > 12
+    //     intColumn > -12.1   rewritten to   intColumn >= -12
+    //     intColumn >= -12.1  rewritten to   intColumn >= -12
+    //
+    //     intColumn < 12.1    rewritten to   intColumn <= 12
+    //     intColumn <= 12.1   rewritten to   intColumn <= 12
+    //     intColumn < -12.1   rewritten to   intColumn < -12
+    //     intColumn <= -12.1  rewritten to   intColumn < -12
+    //
+    // The same logic applies to value of any numerical type.
+    //
     if (!_lowerBound.equals(RangePredicate.UNBOUNDED)) {
       BigDecimal lowerBound = new BigDecimal(_lowerBound);
       BigDecimal lowerConvertedValue = convertValue(lowerBound, dataType);

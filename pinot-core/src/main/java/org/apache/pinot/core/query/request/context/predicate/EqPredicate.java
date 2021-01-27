@@ -52,27 +52,38 @@ public class EqPredicate extends BasePredicate implements Predicate {
 
   @Override
   public void rewrite(DataType dataType) {
+    // Consider a predicate where an integer column is being compared to a double literal. This predicate will be
+    // rewritten as specified below.
+    // EQ PREDICATE
+    //     intColumn = 12.1	  rewritten to    ALWAYS FALSE
+    //     intColumn = 12.0	  rewritten to    intColumn = 12
+    //
+    // The same logic applies to value of any numerical type.
+    //
     BigDecimal actualValue = new BigDecimal(_value);
+    String convertedValue = _value;
     switch (dataType) {
       case INT:
-        _value = String.valueOf(actualValue.intValue());
+        convertedValue = String.valueOf(actualValue.intValue());
         break;
       case LONG:
-        _value = String.valueOf(actualValue.longValue());
+        convertedValue = String.valueOf(actualValue.longValue());
         break;
       case FLOAT:
-        _value = String.valueOf(actualValue.floatValue());
+        convertedValue = String.valueOf(actualValue.floatValue());
         break;
       case DOUBLE:
-        _value = String.valueOf(actualValue.doubleValue());
+        convertedValue = String.valueOf(actualValue.doubleValue());
         break;
     }
 
-    int compared = actualValue.compareTo(new BigDecimal(_value));
+    int compared = actualValue.compareTo(new BigDecimal(convertedValue));
     if (compared != 0) {
-      // We already know that this predicate will always evaluate to false; hence, there is no need
-      // to evaluate the predicate during runtime.
+      // This predicate will always evaluate to false; hence, there is no need to evaluate the predicate during runtime.
       _precomputed = false;
+    } else {
+      // We need to evaluate this predicate after converting data type.
+      _value = convertedValue;
     }
   }
 

@@ -50,7 +50,7 @@ public interface Predicate {
    * @return result if it was precomputed during compile time; otherwise, return null.
    * time.
    */
-  Boolean getPrecomputed();
+  Boolean getPrecomputedResult();
 
   /**
    * A predicate, by default, doesn't know the data type of its column. After column data type

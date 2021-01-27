@@ -29,7 +29,7 @@ public abstract class BasePredicate implements Predicate {
   Boolean _precomputed = null;
 
   @Override
-  public Boolean getPrecomputed() {
+  public Boolean getPrecomputedResult() {
     return _precomputed;
   }
 

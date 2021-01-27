@@ -77,7 +77,7 @@ public class EqualsPredicateEvaluatorFactory {
     final int[] _matchingDictIds;
 
     DictionaryBasedEqPredicateEvaluator(EqPredicate eqPredicate, Dictionary dictionary) {
-      _precomputed = eqPredicate.getPrecomputed();
+      _precomputed = eqPredicate.getPrecomputedResult();
       if (_precomputed != null && !_precomputed) {
         // This predicate will always evaluate to false, so there are no matching dictionary ids.
         _matchingDictId = -1;
@@ -116,7 +116,7 @@ public class EqualsPredicateEvaluatorFactory {
     final int _matchingValue;
 
     IntRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate) {
-      _precomputed = eqPredicate.getPrecomputed();
+      _precomputed = eqPredicate.getPrecomputedResult();
       _matchingValue = Integer.parseInt(eqPredicate.getValue());
     }
 
@@ -140,7 +140,7 @@ public class EqualsPredicateEvaluatorFactory {
     final long _matchingValue;
 
     LongRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate) {
-      _precomputed = eqPredicate.getPrecomputed();
+      _precomputed = eqPredicate.getPrecomputedResult();
       _matchingValue = Long.parseLong(eqPredicate.getValue());
     }
 
@@ -164,7 +164,7 @@ public class EqualsPredicateEvaluatorFactory {
     final float _matchingValue;
 
     FloatRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate) {
-      _precomputed = eqPredicate.getPrecomputed();
+      _precomputed = eqPredicate.getPrecomputedResult();
       _matchingValue = Float.parseFloat(eqPredicate.getValue());
     }
 
@@ -188,7 +188,7 @@ public class EqualsPredicateEvaluatorFactory {
     final double _matchingValue;
 
     DoubleRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate) {
-      _precomputed = eqPredicate.getPrecomputed();
+      _precomputed = eqPredicate.getPrecomputedResult();
       _matchingValue = Double.parseDouble(eqPredicate.getValue());
     }
 
@@ -212,7 +212,7 @@ public class EqualsPredicateEvaluatorFactory {
     final String _matchingValue;
 
     StringRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate) {
-      _precomputed = eqPredicate.getPrecomputed();
+      _precomputed = eqPredicate.getPrecomputedResult();
       _matchingValue = eqPredicate.getValue();
     }
 
@@ -236,7 +236,7 @@ public class EqualsPredicateEvaluatorFactory {
     final byte[] _matchingValue;
 
     BytesRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate) {
-      _precomputed = eqPredicate.getPrecomputed();
+      _precomputed = eqPredicate.getPrecomputedResult();
       _matchingValue = BytesUtils.toBytes(eqPredicate.getValue());
     }
 

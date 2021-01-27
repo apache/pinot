@@ -222,40 +222,12 @@ public class FilterPlanNode implements PlanNode {
               }
             default:
               FieldSpec.DataType columnType = dataSource.getDataSourceMetadata().getDataType();
-              //
-              // As part of plan generation, we rewrite certain predicates based on the data type of the column. This allows
-              // for generating correct results after literal value of one numerical type is converted to the column type. In
-              // certain cases, this also allows us to precompute the result of predicate evaluation to either TRUE or FALSE
-              // thereby making query execution more efficient by avoiding the need to evaluate the predicate during runtime.
-              //
-              // As examples, consider a predicate where an integer column is being compared to a float literal.
-              // RANGE PREDICATE
-              //     intColumn > 12.1    rewritten to 	intColumn > 12
-              //     intColumn >= 12.1	 rewritten to   intColumn > 12
-              //     intColumn > -12.1	 rewritten to   intColumn >= -12
-              //     intColumn >= -12.1	 rewritten to   intColumn >= -12
-              //
-              //     intColumn < 12.1	   rewritten to   intColumn <= 12
-              //     intColumn <= 12.1	 rewritten to   intColumn <= 12
-              //     intColumn < -12.1	 rewritten to   intColumn < -12
-              //     intColumn <= -12.1	 rewritten to   intColumn < -12
-              //
-              // EQ PREDICATE
-              //     intColumn = 12.1	  rewritten to    FALSE
-              //     intColumn = 12.0	  rewritten to    intColumn = 12
-              //
-              // NOT_EQ PREDICATE
-              //     intColumn != 12.1	rewritten to    TRUE
-              //     intColumn != 12.0  rewritten to    intColumn != 12
-              //
-              // IN PREDICATE
-              //     intColumn IN (12, 12.1, 13.0) rewritten to    intColumn IN (12, 13)
-              //
-              // NOT_IN PREDICATE
-              //     intColumn NOT IN (12, 12.1, 13.0) rewritten to    intColumn IN (12, 13)
-              //
               if (columnType == FieldSpec.DataType.INT || columnType == FieldSpec.DataType.LONG
                   || columnType == FieldSpec.DataType.FLOAT || columnType == FieldSpec.DataType.DOUBLE) {
+                // As part of plan generation, we rewrite certain predicates based on the data type of the column. This allows
+                // for generating correct results after literal value of one numerical type is converted to the column type. In
+                // certain cases, this also allows us to precompute the result of predicate evaluation to either TRUE or FALSE
+                // thereby making query execution more efficient by avoiding the need to evaluate the predicate during runtime.
                 predicate.rewrite(columnType);
               }
 

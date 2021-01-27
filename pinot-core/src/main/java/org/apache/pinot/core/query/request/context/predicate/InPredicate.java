@@ -55,6 +55,18 @@ public class InPredicate extends BasePredicate implements Predicate {
   @Override
   public void rewrite(DataType dataType) {
     List<String> castedValues = new ArrayList<>();
+
+    // If the value specified in IN predicate is not the same after conversion to column data type, we
+    // can safely remove it from the IN predicate. Such a value will never match against any value in
+    // the column of specified dataType.
+    //
+    // Consider a predicate where an integer column is being compared to a double literal. This predicate will be
+    // rewritten as specified below.
+    // IN PREDICATE
+    //     intColumn IN (12, 12.1, 13.0) rewritten to    intColumn IN (12, 13)
+    //
+    // The same logic applies to value of any numerical type.
+    //
     for (String value : _values) {
       BigDecimal actualValue = new BigDecimal(value);
       switch (dataType) {
