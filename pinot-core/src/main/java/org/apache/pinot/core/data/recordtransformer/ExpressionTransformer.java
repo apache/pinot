@@ -18,20 +18,19 @@
  */
 package org.apache.pinot.core.data.recordtransformer;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.core.data.function.FunctionEvaluator;
+import org.apache.pinot.core.data.function.FunctionEvaluatorFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.core.data.function.FunctionEvaluator;
-import org.apache.pinot.core.data.function.FunctionEvaluatorFactory;
 
 
 /**
