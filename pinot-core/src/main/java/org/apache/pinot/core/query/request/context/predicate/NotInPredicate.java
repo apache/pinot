@@ -63,12 +63,10 @@ public class NotInPredicate extends BasePredicate implements Predicate {
     // Consider a predicate where an integer column is being compared to a double literal. This predicate will be
     // rewritten as specified below.
     // NOT_IN PREDICATE
-    //     intColumn NOT IN (12, 12.1, 13.0) rewritten to    intColumn IN (12, 13)
+    //     "intColumn NOT IN (12, 12.1, 13.0)" rewritten to "intColumn IN (12, 13)"
     //
     // The same logic applies to value of any numerical type.
     //
-
-    // TODO: add test case for situation when all values in IN predicate are removed.
     for (String value : _values) {
       BigDecimal actualValue = new BigDecimal(value);
       switch (dataType) {

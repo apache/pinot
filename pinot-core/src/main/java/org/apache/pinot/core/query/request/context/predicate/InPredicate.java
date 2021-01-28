@@ -63,7 +63,7 @@ public class InPredicate extends BasePredicate implements Predicate {
     // Consider a predicate where an integer column is being compared to a double literal. This predicate will be
     // rewritten as specified below.
     // IN PREDICATE
-    //     intColumn IN (12, 12.1, 13.0) rewritten to    intColumn IN (12, 13)
+    //     "intColumn IN (12, 12.1, 13.0)" rewritten to "intColumn IN (12, 13)"
     //
     // The same logic applies to value of any numerical type.
     //

@@ -200,15 +200,15 @@ public class RangePredicate extends BasePredicate implements Predicate {
     // Consider a predicate where an integer column is being compared to a double literal. This predicate will be
     // rewritten as specified below.
     // RANGE PREDICATE
-    //     intColumn > 12.1    rewritten to 	intColumn > 12
-    //     intColumn >= 12.1   rewritten to   intColumn > 12
-    //     intColumn > -12.1   rewritten to   intColumn >= -12
-    //     intColumn >= -12.1  rewritten to   intColumn >= -12
+    //     "intColumn > 12.1" rewritten to "intColumn > 12"
+    //     "intColumn >= 12.1" rewritten to "intColumn > 12"
+    //     "intColumn > -12.1" rewritten to "intColumn >= -12"
+    //     "intColumn >= -12.1" rewritten to "intColumn >= -12"
     //
-    //     intColumn < 12.1    rewritten to   intColumn <= 12
-    //     intColumn <= 12.1   rewritten to   intColumn <= 12
-    //     intColumn < -12.1   rewritten to   intColumn < -12
-    //     intColumn <= -12.1  rewritten to   intColumn < -12
+    //     "intColumn < 12.1"  rewritten to "intColumn <= 12"
+    //     "intColumn <= 12.1" rewritten to "intColumn <= 12"
+    //     "intColumn < -12.1" rewritten to "intColumn < -12"
+    //     "intColumn <= -12.1" rewritten to "intColumn < -12"
     //
     // The same logic applies to value of any numerical type.
     //

@@ -358,12 +358,32 @@ public class NumericalIntPredicateTest extends BaseQueriesTest {
 
   /** Check if we can use values of different numerical types in NOT IN predicate. */
   @Test
+  public void testIntColumnWithInFloatValuesPredicate() {
+    Operator operator = getOperatorForSqlQuery("select count(*) from scores where intColumn IN (12.1, 1.01, 25.01, 40.01, -12.01)");
+    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
+    List<Object> result = block.getAggregationResult();
+    Assert.assertEquals(result.size(), 1);
+    Assert.assertEquals(result.get(0), 0l);
+  }
+
+  /** Check if we can use values of different numerical types in NOT IN predicate. */
+  @Test
   public void testIntColumnWithNotInPredicate() {
     Operator operator = getOperatorForSqlQuery("select count(*) from scores where intColumn NOT IN (12, 1.0, 25.01, 40.0, -12.0)");
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     List<Object> result = block.getAggregationResult();
     Assert.assertEquals(result.size(), 1);
     Assert.assertEquals(result.get(0), 8l);
+  }
+
+  /** Check if we can use values of different numerical types in NOT IN predicate. */
+  @Test
+  public void testIntColumnWithNotInFloatValuesPredicate() {
+    Operator operator = getOperatorForSqlQuery("select count(*) from scores where intColumn NOT IN (12.1, 1.01, 25.01, 40.01, -12.01)");
+    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
+    List<Object> result = block.getAggregationResult();
+    Assert.assertEquals(result.size(), 1);
+    Assert.assertEquals(result.get(0), 12l);
   }
 
   /** Check if we can compare two columns of different numerical types. */
