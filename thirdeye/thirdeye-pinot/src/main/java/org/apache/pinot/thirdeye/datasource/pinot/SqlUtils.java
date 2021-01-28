@@ -102,7 +102,7 @@ public class SqlUtils {
     String dataset = metricFunction.getDataset();
 
     StringBuilder sb = new StringBuilder();
-    String selectionClause = getSelectionClause(metricConfig, metricFunction, groupBy);
+    String selectionClause = getSelectionClause(metricConfig, metricFunction, groupBy, timeGranularity, dataTimeSpec);
 
     sb.append("SELECT ").append(selectionClause).append(" FROM ").append(dataset);
     String betweenClause = getBetweenClause(startTime, endTimeExclusive, dataTimeSpec, dataset);
@@ -126,13 +126,15 @@ public class SqlUtils {
     return sb.toString();
   }
 
-  private static String getSelectionClause(MetricConfigDTO metricConfig, MetricFunction metricFunction, List<String> groupBy) {
+  private static String getSelectionClause(MetricConfigDTO metricConfig, MetricFunction metricFunction,
+      List<String> groupBy, TimeGranularity aggregationGranularity, TimeSpec timeSpec) {
     StringBuilder builder = new StringBuilder();
     if (!groupBy.isEmpty()) {
       for (String groupByDimension : groupBy) {
         builder.append(groupByDimension).append(", ");
       }
     }
+    builder.append(getTimeColumnQueryName(aggregationGranularity, timeSpec)).append(", ");
     String metricName = null;
     if (metricFunction.getMetricName().equals("*")) {
       metricName = "*";
@@ -360,19 +362,8 @@ public class SqlUtils {
 
   private static String getDimensionGroupByClause(List<String> groupBy,
       TimeGranularity aggregationGranularity, TimeSpec timeSpec) {
-    String timeColumnName = timeSpec.getColumnName();
     List<String> groups = new LinkedList<>();
-    if (aggregationGranularity != null && !groups.contains(timeColumnName)) {
-      // Convert the time column to 1 minute granularity if it is epoch.
-      // E.g., dateTimeConvert(timestampInEpoch,'1:MILLISECONDS:EPOCH','1:MILLISECONDS:EPOCH','1:MINUTES')
-      if (timeSpec.getFormat().equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString())
-          && !timeSpec.getDataGranularity().equals(aggregationGranularity)) {
-        String groupByTimeColumnName = convertEpochToMinuteAggGranularity(timeColumnName, timeSpec);
-        groups.add(groupByTimeColumnName);
-      } else {
-        groups.add(timeColumnName);
-      }
-    }
+    groups.add(getTimeColumnQueryName(aggregationGranularity, timeSpec));
     if (groupBy != null) {
       groups.addAll(groupBy);
     }
@@ -380,6 +371,19 @@ public class SqlUtils {
       return "";
     }
     return String.format("GROUP BY %s", COMMA.join(groups));
+  }
+
+  private static String getTimeColumnQueryName(TimeGranularity aggregationGranularity, TimeSpec timeSpec) {
+    String timeColumnName = timeSpec.getColumnName();
+    if (aggregationGranularity != null) {
+      // Convert the time column to 1 minute granularity if it is epoch.
+      // E.g., dateTimeConvert(timestampInEpoch,'1:MILLISECONDS:EPOCH','1:MILLISECONDS:EPOCH','1:MINUTES')
+      if (timeSpec.getFormat().equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString())
+          && !timeSpec.getDataGranularity().equals(aggregationGranularity)) {
+        return convertEpochToMinuteAggGranularity(timeColumnName, timeSpec);
+      }
+    }
+    return timeColumnName;
   }
 
   public static String getDataTimeRangeSql(String dataset, String timeColumnName) {
@@ -392,7 +396,7 @@ public class SqlUtils {
    *
    * @param value value to be quoted
    * @return quoted value
-   * @throws IllegalArgumentException if no unused quote char can be found
+   * @throws IllegalArgumentException if no unused quote char can be foundl
    */
   static String quote(String value) {
     String quoteChar = "";
