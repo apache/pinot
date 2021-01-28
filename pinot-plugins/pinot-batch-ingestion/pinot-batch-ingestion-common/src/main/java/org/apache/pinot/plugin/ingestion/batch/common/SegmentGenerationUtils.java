@@ -142,7 +142,7 @@ public class SegmentGenerationUtils {
   public static URI getRelativeOutputPath(URI baseInputDir, URI inputFile, URI outputDir) {
     URI relativePath = baseInputDir.relativize(inputFile);
     Preconditions.checkState(relativePath.getPath().length() > 0 && !relativePath.equals(inputFile),
-        "Unable to extract out the relative path based on base input path: " + baseInputDir);
+        "Unable to extract out the relative path for input file '" + inputFile + "', based on base input path: " + baseInputDir);
     String outputDirStr = outputDir.toString();
     outputDir = !outputDirStr.endsWith("/") ? URI.create(outputDirStr.concat("/")) : outputDir;
     URI relativeOutputURI = outputDir.resolve(relativePath).resolve(".");

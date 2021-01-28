@@ -26,6 +26,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.FileSystems;
 import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
@@ -40,6 +41,7 @@ import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
@@ -212,11 +214,12 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
     } else {
       LOGGER.info("Creating segments with data files: {}", filteredFiles);
       for (int i = 0; i < numDataFiles; i++) {
-        String dataFilePath = filteredFiles.get(i);
-
+        // Typically PinotFS implementations list files without a protocol, so we lose (for example) the
+        // hdfs:// portion of the path. Call getFileURI() to fix this up.
+        URI inputFileURI = getFileURI(filteredFiles.get(i), inputDirURI);
         File localFile = File.createTempFile("pinot-filepath-", ".txt");
         try (DataOutputStream dataOutputStream = new DataOutputStream(new FileOutputStream(localFile))) {
-          dataOutputStream.write(StringUtil.encodeUtf8(dataFilePath + " " + i));
+          dataOutputStream.write(StringUtil.encodeUtf8(inputFileURI + " " + i));
           dataOutputStream.flush();
           outputDirFS.copyFromLocalFile(localFile, new Path(stagingInputDir, Integer.toString(i)).toUri());
         }
@@ -226,11 +229,14 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
     try {
       // Set up the job
       Job job = Job.getInstance(getConf());
-      job.setJobName(getClass().getName());
+      job.setJobName(getClass().getSimpleName());
 
       // Our class is in the batch-ingestion-hadoop plugin, so we want to pick a class
       // that's in the main jar (the pinot-all-${PINOT_VERSION}-jar-with-dependencies.jar)
       job.setJarByClass(SegmentGenerationJobSpec.class);
+
+      // Disable speculative execution, as otherwise two map tasks can wind up writing to the same staging file.
+      job.getConfiguration().setBoolean(MRJobConfig.MAP_SPECULATIVE, false);
 
       // But we have to copy ourselves to HDFS, and add us to the distributed cache, so
       // that the mapper code is available.
@@ -289,6 +295,16 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
       LOGGER.info("Trying to clean up staging directory: [{}]", stagingDirURI);
       outputDirFS.delete(stagingDirURI, true);
     }
+  }
+
+  protected static URI getFileURI(String uriStr, URI fullUriForPathOnlyUriStr)
+      throws URISyntaxException {
+    URI fileURI = URI.create(uriStr);
+    if (fileURI.getScheme() == null) {
+      return new URI(fullUriForPathOnlyUriStr.getScheme(), fullUriForPathOnlyUriStr.getAuthority(),
+              fileURI.getPath(), fileURI.getQuery(), fileURI.getFragment());
+    }
+    return fileURI;
   }
 
   /**
