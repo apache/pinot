@@ -72,6 +72,10 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
     }
   }
 
+  public final ControllerMetrics getControllerMetrics() {
+    return _controllerMetrics;
+  }
+
   /**
    * Processes the given list of tables, and returns the number of tables processed.
    * <p>
