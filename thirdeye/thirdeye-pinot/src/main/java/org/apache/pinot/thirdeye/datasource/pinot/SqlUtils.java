@@ -134,7 +134,9 @@ public class SqlUtils {
         builder.append(groupByDimension).append(", ");
       }
     }
-    builder.append(getTimeColumnQueryName(aggregationGranularity, timeSpec)).append(", ");
+    if (aggregationGranularity != null) {
+      builder.append(getTimeColumnQueryName(aggregationGranularity, timeSpec)).append(", ");
+    }
     String metricName = null;
     if (metricFunction.getMetricName().equals("*")) {
       metricName = "*";
@@ -363,7 +365,9 @@ public class SqlUtils {
   private static String getDimensionGroupByClause(List<String> groupBy,
       TimeGranularity aggregationGranularity, TimeSpec timeSpec) {
     List<String> groups = new LinkedList<>();
-    groups.add(getTimeColumnQueryName(aggregationGranularity, timeSpec));
+    if (aggregationGranularity != null) {
+      groups.add(getTimeColumnQueryName(aggregationGranularity, timeSpec));
+    }
     if (groupBy != null) {
       groups.addAll(groupBy);
     }

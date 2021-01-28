@@ -173,7 +173,7 @@ public class PqlUtilsTest {
   public void testLimit() throws Exception {
     MetricFunction metricFunction = new MetricFunction(MetricAggFunction.AVG, METRIC.getMetricName(), this.metricId, COLLECTION, null, null);
 
-    TimeSpec timeSpec = new TimeSpec(METRIC.getMetricName(), TimeGranularity.fromString("1_SECONDS"), TimeSpec.SINCE_EPOCH_FORMAT);
+    TimeSpec timeSpec = new TimeSpec("Date", TimeGranularity.fromString("1_SECONDS"), TimeSpec.SINCE_EPOCH_FORMAT);
 
     ThirdEyeRequest request = ThirdEyeRequest.newBuilder()
         .setMetricFunctions(Collections.singletonList(metricFunction))
@@ -185,14 +185,14 @@ public class PqlUtilsTest {
 
     String pql = SqlUtils.getSql(request, metricFunction, ArrayListMultimap.<String, String>create(), timeSpec);
 
-    Assert.assertEquals(pql, "SELECT dimension, AVG(metric) FROM collection WHERE  metric >= 1 AND metric < 2 GROUP BY dimension LIMIT 12345");
+    Assert.assertEquals(pql, "SELECT dimension, AVG(metric) FROM collection WHERE  Date >= 1 AND Date < 2 GROUP BY dimension LIMIT 12345");
   }
 
   @Test
   public void testLimitDefault() throws Exception {
     MetricFunction metricFunction = new MetricFunction(MetricAggFunction.AVG, METRIC.getMetricName(), this.metricId, COLLECTION, null, null);
 
-    TimeSpec timeSpec = new TimeSpec(METRIC.getMetricName(), TimeGranularity.fromString("1_SECONDS"), TimeSpec.SINCE_EPOCH_FORMAT);
+    TimeSpec timeSpec = new TimeSpec("Date", TimeGranularity.fromString("1_SECONDS"), TimeSpec.SINCE_EPOCH_FORMAT);
 
     ThirdEyeRequest request = ThirdEyeRequest.newBuilder()
         .setMetricFunctions(Collections.singletonList(metricFunction))
@@ -203,6 +203,6 @@ public class PqlUtilsTest {
 
     String pql = SqlUtils.getSql(request, metricFunction, ArrayListMultimap.<String, String>create(), timeSpec);
 
-    Assert.assertEquals(pql, "SELECT dimension, AVG(metric) FROM collection WHERE  metric >= 1 AND metric < 2 GROUP BY dimension LIMIT 100000");
+    Assert.assertEquals(pql, "SELECT dimension, AVG(metric) FROM collection WHERE  Date >= 1 AND Date < 2 GROUP BY dimension LIMIT 100000");
   }
 }
