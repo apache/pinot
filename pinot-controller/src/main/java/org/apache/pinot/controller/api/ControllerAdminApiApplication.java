@@ -18,41 +18,25 @@
  */
 package org.apache.pinot.controller.api;
 
+import io.swagger.jaxrs.config.BeanConfig;
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.net.UnknownHostException;
-import java.util.Collection;
 import java.util.List;
-import java.util.stream.Collectors;
-
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
-
-import org.apache.pinot.controller.api.listeners.ListenerConfig;
-import org.apache.pinot.controller.api.listeners.TlsConfiguration;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.core.transport.ListenerConfig;
+import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
-import org.glassfish.grizzly.http.server.NetworkListener;
-import org.glassfish.grizzly.ssl.SSLContextConfigurator;
-import org.glassfish.grizzly.ssl.SSLEngineConfigurator;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
-import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
-import org.glassfish.jersey.internal.guava.ThreadFactoryBuilder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.media.multipart.MultiPartFeature;
-import org.glassfish.jersey.process.JerseyProcessingUncaughtExceptionHandler;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.base.Preconditions;
-
-import io.swagger.jaxrs.config.BeanConfig;
 
 
 public class ControllerAdminApiApplication extends ResourceConfig {
@@ -76,53 +60,17 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     // property("jersey.config.server.tracing.threshold", "VERBOSE");
   }
 
-  private SSLEngineConfigurator buildSSLEngineConfigurator(TlsConfiguration tlsConfiguration) {
-    SSLContextConfigurator sslContextConfigurator = new SSLContextConfigurator();
-
-    sslContextConfigurator.setKeyStoreFile(tlsConfiguration.getKeyStorePath());
-    sslContextConfigurator.setKeyStorePass(tlsConfiguration.getKeyStorePassword());
-    sslContextConfigurator.setTrustStoreFile(tlsConfiguration.getTrustStorePath());
-    sslContextConfigurator.setTrustStorePass(tlsConfiguration.getTrustStorePassword());
-
-    return new SSLEngineConfigurator(sslContextConfigurator).setClientMode(false)
-        .setWantClientAuth(tlsConfiguration.isRequiresClientAuth()).setEnabledProtocols(new String[] { "TLSv1.2 " });
-  }
-
   public void registerBinder(AbstractBinder binder) {
     register(binder);
   }
 
-  private void configureListener(ListenerConfig listenerConfig, HttpServer httpServer) {
-    final NetworkListener listener = new NetworkListener(listenerConfig.getName() + "-" + listenerConfig.getPort(),
-        listenerConfig.getHost(), listenerConfig.getPort());
-
-    listener.getTransport().getWorkerThreadPoolConfig()
-        .setThreadFactory(new ThreadFactoryBuilder().setNameFormat("grizzly-http-server-%d")
-            .setUncaughtExceptionHandler(new JerseyProcessingUncaughtExceptionHandler()).build());
-
-    listener.setSecure(listenerConfig.getTlsConfiguration() != null);
-    if (listener.isSecure()) {
-      listener.setSSLEngineConfig(buildSSLEngineConfigurator(listenerConfig.getTlsConfiguration()));
-    }
-    httpServer.addListener(listener);
-  }
-
   public void start(List<ListenerConfig> listenerConfigs) {
-    // ideally greater than reserved port but then port 80 is also valid
-    Preconditions.checkNotNull(listenerConfigs);
-
-    // The URI is irrelevant since the default listener will be manually rewritten.
-    _httpServer = GrizzlyHttpServerFactory.createHttpServer(URI.create("http://0.0.0.0/"), this, false);
-
-    // Listeners cannot be configured with the factory. Manual overrides is required as instructed by Javadoc.
-    _httpServer.removeListener("grizzly");
-
-    listenerConfigs.forEach(listenerConfig->configureListener(listenerConfig, _httpServer));
+    _httpServer = ListenerConfigUtil.buildHttpServer(this, listenerConfigs);
 
     try {
       _httpServer.start();
     } catch (IOException e) {
-      throw new RuntimeException("Failed to start Http Server", e);
+      throw new RuntimeException("Failed to start http server", e);
     }
 
     setupSwagger(_httpServer);
@@ -137,9 +85,6 @@ public class ControllerAdminApiApplication extends ResourceConfig {
 
     _httpServer.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(classLoader, "/webapp/"), "/index.html");
     _httpServer.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(classLoader, "/webapp/js/"), "/js/");
-
-    LOGGER.info("Admin API started on ports: {}", listenerConfigs.stream().map(ListenerConfig::getPort)
-        .map(port -> port.toString()).collect(Collectors.joining(",")));
   }
 
   private void setupSwagger(HttpServer httpServer) {

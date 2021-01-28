@@ -572,6 +572,9 @@ export const parseSubtree = (id, input) => {
   if (Array.isArray(input)) {
     for (const entry of input) {
       anomaly = findAnomaly(id, entry);
+      if (!isEmpty(anomaly)) {
+        break;
+      }
     }
   } else {
     anomaly = findAnomaly(id, input);

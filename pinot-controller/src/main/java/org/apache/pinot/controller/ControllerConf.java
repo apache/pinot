@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller;
 
+import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -37,9 +38,17 @@ import static org.apache.pinot.common.utils.CommonConstants.Controller.DEFAULT_M
 
 
 public class ControllerConf extends PinotConfiguration {
+  public static final List<String> SUPPORTED_PROTOCOLS = Arrays.asList(
+      CommonConstants.HTTP_PROTOCOL,
+      CommonConstants.HTTPS_PROTOCOL);
+
   public static final String CONTROLLER_VIP_HOST = "controller.vip.host";
   public static final String CONTROLLER_VIP_PORT = "controller.vip.port";
   public static final String CONTROLLER_VIP_PROTOCOL = "controller.vip.protocol";
+  public static final String CONTROLLER_BROKER_PROTOCOL = "controller.broker.protocol";
+  public static final String CONTROLLER_BROKER_PORT_OVERRIDE = "controller.broker.port.override";
+  public static final String CONTROLLER_BROKER_TLS_PREFIX = "controller.broker.tls";
+  public static final String CONTROLLER_TLS_PREFIX = "controller.tls";
   public static final String CONTROLLER_HOST = "controller.host";
   public static final String CONTROLLER_PORT = "controller.port";
   public static final String CONTROLLER_ACCESS_PROTOCOLS = "controller.access.protocols";
@@ -237,6 +246,10 @@ public class ControllerConf extends PinotConfiguration {
     setProperty(CONTROLLER_VIP_PROTOCOL, vipProtocol);
   }
 
+  public void setControllerBrokerProtocol(String protocol) {
+    setProperty(CONTROLLER_BROKER_PROTOCOL, protocol);
+  }
+
   public void setControllerPort(String port) {
     setProperty(CONTROLLER_PORT, port);
   }
@@ -360,11 +373,11 @@ public class ControllerConf extends PinotConfiguration {
   }  
 
   public String getControllerVipProtocol() {
-    return Optional.ofNullable(getProperty(CONTROLLER_VIP_PROTOCOL))
+    return getSupportedProtocol(CONTROLLER_VIP_PROTOCOL);
+  }
 
-        .filter(protocol -> CommonConstants.HTTPS_PROTOCOL.equals(protocol))
-
-        .orElse(CommonConstants.HTTP_PROTOCOL);
+  public String getControllerBrokerProtocol() {
+    return getSupportedProtocol(CONTROLLER_BROKER_PROTOCOL);
   }
 
   public int getRetentionControllerFrequencyInSeconds() {
@@ -649,6 +662,10 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(CONFIG_OF_CONTROLLER_METRICS_PREFIX, DEFAULT_METRICS_PREFIX);
   }
 
+  public int getControllerBrokerPortOverride() {
+    return getProperty(CONTROLLER_BROKER_PORT_OVERRIDE, -1);
+  }
+
   private long convertPeriodToSeconds(String timeStr) {
     long seconds;
     try {
@@ -658,5 +675,12 @@ public class ControllerConf extends PinotConfiguration {
       throw new RuntimeException("Invalid time spec '" + timeStr + "' (Valid examples: '3h', '4h30m', '30m')", e);
     }
     return seconds;
+  }
+
+  private String getSupportedProtocol(String property) {
+    String value = getProperty(property, CommonConstants.HTTP_PROTOCOL);
+    Preconditions.checkArgument(SUPPORTED_PROTOCOLS.contains(value),
+        "Unsupported %s protocol '%s'", property, value);
+    return value;
   }
 }

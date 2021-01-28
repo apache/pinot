@@ -203,7 +203,7 @@ public class TableSizeReaderTest {
           httpServer.start();
         }
       }).start();
-      endpoint = "localhost:" + httpServer.getAddress().getPort();
+      endpoint = "http://localhost:" + httpServer.getAddress().getPort();
     }
   }
 

@@ -108,13 +108,17 @@ public class CommonConstants {
       public static final String INSTANCE_ID_KEY = "instanceId";
       public static final String DATA_DIR_KEY = "dataDir";
       public static final String ADMIN_PORT_KEY = "adminPort";
+      public static final String ADMIN_HTTPS_PORT_KEY = "adminHttpsPort";
       public static final String GRPC_PORT_KEY = "grpcPort";
+      public static final String NETTYTLS_PORT_KEY = "nettyTlsPort";
     }
 
     public static final String SET_INSTANCE_ID_TO_HOSTNAME_KEY = "pinot.set.instance.id.to.hostname";
 
     public static final String KEY_OF_SERVER_NETTY_PORT = "pinot.server.netty.port";
     public static final int DEFAULT_SERVER_NETTY_PORT = 8098;
+    public static final String KEY_OF_SERVER_NETTYTLS_PORT = Server.SERVER_NETTYTLS_PREFIX + ".port";
+    public static final int DEFAULT_SERVER_NETTYTLS_PORT = 8091;
     public static final String KEY_OF_BROKER_QUERY_PORT = "pinot.broker.client.queryPort";
     public static final int DEFAULT_BROKER_QUERY_PORT = 8099;
     public static final String KEY_OF_SERVER_NETTY_HOST = "pinot.server.netty.host";
@@ -177,6 +181,9 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_GROUPBY_TRIM_THRESHOLD = "pinot.broker.groupby.trim.threshold";
     public static final int DEFAULT_BROKER_GROUPBY_TRIM_THRESHOLD = 1_000_000;
 
+    public static final String BROKER_TLS_PREFIX = "pinot.broker.tls";
+    public static final String BROKER_NETTYTLS_ENABLED = "pinot.broker.nettytls.enabled";
+
     public static class Request {
       public static final String PQL = "pql";
       public static final String SQL = "sql";
@@ -207,11 +214,15 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_EXECUTOR_TIMEOUT = "pinot.server.query.executor.timeout";
     public static final String CONFIG_OF_QUERY_EXECUTOR_CLASS = "pinot.server.query.executor.class";
     public static final String CONFIG_OF_REQUEST_HANDLER_FACTORY_CLASS = "pinot.server.requestHandlerFactory.class";
+    public static final String CONFIG_OF_NETTY_SERVER_ENABLED = "pinot.server.netty.enabled";
+    public static final boolean DEFAULT_NETTY_SERVER_ENABLED = true;
     public static final String CONFIG_OF_NETTY_PORT = "pinot.server.netty.port";
     public static final String CONFIG_OF_ENABLE_GRPC_SERVER = "pinot.server.grpc.enable";
     public static final boolean DEFAULT_ENABLE_GRPC_SERVER = false;
     public static final String CONFIG_OF_GRPC_PORT = "pinot.server.grpc.port";
     public static final int DEFAULT_GRPC_PORT = 8090;
+    public static final String CONFIG_OF_NETTYTLS_SERVER_ENABLED = "pinot.server.nettytls.enabled";
+    public static final boolean DEFAULT_NETTYTLS_SERVER_ENABLED = false;
     public static final String CONFIG_OF_ADMIN_API_PORT = "pinot.server.adminapi.port";
     public static final int DEFAULT_ADMIN_API_PORT = 8097;
 
@@ -284,6 +295,9 @@ public class CommonConstants {
 
     public static final String PINOT_SERVER_METRICS_PREFIX = "pinot.server.metrics.prefix";
 
+    public static final String SERVER_TLS_PREFIX = "pinot.server.tls";
+    public static final String SERVER_NETTYTLS_PREFIX = "pinot.server.nettytls";
+
     public static class SegmentCompletionProtocol {
       public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.server.segment.uploader";
 
@@ -319,7 +333,7 @@ public class CommonConstants {
     // FYI this is incorrect as it generate metrics named without a dot after pinot.controller part,
     // but we keep this default for backward compatibility in case someone relies on this format
     // see Server or Broker class for correct prefix format you should use
-    public static final String DEFAULT_METRICS_PREFIX = "pinot.controller";
+    public static final String DEFAULT_METRICS_PREFIX = "pinot.controller.";
   }
 
   public static class Minion {

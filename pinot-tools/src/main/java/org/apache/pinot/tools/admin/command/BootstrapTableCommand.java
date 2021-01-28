@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.tools.admin.command;
 
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.tools.Command;
@@ -69,6 +70,9 @@ public class BootstrapTableCommand extends AbstractBaseAdminCommand implements C
   @Option(name = "-controllerPort", required = false, metaVar = "<int>", usage = "http port for broker.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
+  @Option(name = "-controllerProtocol", required = false, metaVar = "<String>", usage = "protocol for controller.")
+  private String _controllerProtocol = CommonConstants.HTTP_PROTOCOL;
+
   @Option(name = "-dir", required = false, aliases = {"-d", "-directory"}, metaVar = "<String>", usage = "The directory contains all the configs and data to bootstrap a table")
   private String _dir;
 
@@ -112,6 +116,6 @@ public class BootstrapTableCommand extends AbstractBaseAdminCommand implements C
     if (_controllerHost == null) {
       _controllerHost = NetUtil.getHostAddress();
     }
-    return new BootstrapTableTool(_controllerHost, Integer.parseInt(_controllerPort), _dir).execute();
+    return new BootstrapTableTool(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort), _dir).execute();
   }
 }

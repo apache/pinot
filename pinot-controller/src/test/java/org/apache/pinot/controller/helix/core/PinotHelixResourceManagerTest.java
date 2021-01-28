@@ -111,8 +111,8 @@ public class PinotHelixResourceManagerTest {
 
     // check actual endpoint names
     for (String key : endpoints.keySet()) {
-      int port = DEFAULT_ADMIN_API_PORT + Integer.valueOf(key.substring("Server_localhost_".length()));
-      Assert.assertEquals(endpoints.get(key), "localhost:" + port);
+      int port = DEFAULT_ADMIN_API_PORT + Integer.parseInt(key.substring("Server_localhost_".length()));
+      Assert.assertEquals(endpoints.get(key), "http://localhost:" + port);
     }
   }
 

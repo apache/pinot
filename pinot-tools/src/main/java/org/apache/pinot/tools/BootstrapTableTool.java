@@ -31,12 +31,15 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.minion.MinionClient;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.core.util.TlsUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
+import org.apache.pinot.spi.ingestion.batch.spec.TlsSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.tools.admin.command.AddTableCommand;
@@ -49,6 +52,7 @@ import org.yaml.snakeyaml.Yaml;
 public class BootstrapTableTool {
   private static final Logger LOGGER = LoggerFactory.getLogger(BootstrapTableTool.class);
   private static final String COMPLETED = "COMPLETED";
+  private final String _controllerProtocol;
   private final String _controllerHost;
   private final int _controllerPort;
   private final String _tableDir;
@@ -57,6 +61,18 @@ public class BootstrapTableTool {
   public BootstrapTableTool(String controllerHost, int controllerPort, String tableDir) {
     Preconditions.checkNotNull(controllerHost);
     Preconditions.checkNotNull(tableDir);
+    _controllerProtocol = CommonConstants.HTTP_PROTOCOL;
+    _controllerHost = controllerHost;
+    _controllerPort = controllerPort;
+    _tableDir = tableDir;
+    _minionClient = new MinionClient(controllerHost, String.valueOf(controllerPort));
+  }
+
+  public BootstrapTableTool(String controllerProtocol, String controllerHost, int controllerPort, String tableDir) {
+    Preconditions.checkNotNull(controllerProtocol);
+    Preconditions.checkNotNull(controllerHost);
+    Preconditions.checkNotNull(tableDir);
+    _controllerProtocol = controllerProtocol;
     _controllerHost = controllerHost;
     _controllerPort = controllerPort;
     _tableDir = tableDir;
@@ -108,8 +124,9 @@ public class BootstrapTableTool {
   private boolean createTable(File schemaFile, File tableConfigFile)
       throws Exception {
     return new AddTableCommand().setSchemaFile(schemaFile.getAbsolutePath())
-        .setTableConfigFile(tableConfigFile.getAbsolutePath()).setControllerHost(_controllerHost)
-        .setControllerPort(String.valueOf(_controllerPort)).setExecute(true).execute();
+        .setTableConfigFile(tableConfigFile.getAbsolutePath()).setControllerProtocol(_controllerProtocol)
+        .setControllerHost(_controllerHost).setControllerPort(String.valueOf(_controllerPort)).setExecute(true)
+        .execute();
   }
 
   private boolean bootstrapOfflineTable(File setupTableTmpDir, String tableName, File schemaFile,
@@ -146,8 +163,8 @@ public class BootstrapTableTool {
     }
     if (ingestionJobSpecFile != null) {
       if (ingestionJobSpecFile.exists()) {
-        LOGGER.info("Launch data ingestion job to build index segment for table {} and push to controller [{}:{}]",
-            tableName, _controllerHost, _controllerPort);
+        LOGGER.info("Launch data ingestion job to build index segment for table {} and push to controller [{}://{}:{}]",
+            tableName, _controllerProtocol, _controllerHost, _controllerPort);
         try (Reader reader = new BufferedReader(new FileReader(ingestionJobSpecFile.getAbsolutePath()))) {
           SegmentGenerationJobSpec spec = new Yaml().loadAs(reader, SegmentGenerationJobSpec.class);
           String inputDirURI = spec.getInputDirURI();
@@ -162,6 +179,13 @@ public class BootstrapTableTool {
               spec.setInputDirURI(resolvedInputDirURI.toString());
             }
           }
+
+          TlsSpec tlsSpec = spec.getTlsSpec();
+          if (tlsSpec != null) {
+            TlsUtils.installDefaultSSLSocketFactory(tlsSpec.getKeyStorePath(), tlsSpec.getKeyStorePassword(),
+                tlsSpec.getTrustStorePath(), tlsSpec.getTrustStorePassword());
+          }
+
           IngestionJobLauncher.runIngestionJob(spec);
         }
       } else {

@@ -87,6 +87,6 @@ public class ServerSegmentMetadataReader {
   }
 
   private String generateSegmentMetadataServerURL(String tableNameWithType, String segmentName, String endpoint) {
-    return String.format("http://%s/tables/%s/segments/%s/metadata", endpoint, tableNameWithType, segmentName);
+    return String.format("%s/tables/%s/segments/%s/metadata", endpoint, tableNameWithType, segmentName);
   }
 }

@@ -18,9 +18,13 @@
  */
 package org.apache.pinot.tools.admin.command;
 
+import java.net.URI;
+import java.net.URL;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.HttpURL;
 import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
@@ -36,6 +40,9 @@ public class ChangeTableState extends AbstractBaseAdminCommand implements Comman
 
   @Option(name = "-controllerPort", required = false, metaVar = "<int>", usage = "Port number for controller.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
+
+  @Option(name = "-controllerProtocol", required = false, metaVar = "<String>", usage = "protocol for controller.")
+  private String _controllerProtocol = CommonConstants.HTTP_PROTOCOL;
 
   @Option(name = "-tableName", required = true, metaVar = "<String>", usage = "Table name to disable")
   private String _tableName;
@@ -59,9 +66,10 @@ public class ChangeTableState extends AbstractBaseAdminCommand implements Comman
           "Invalid value for state: " + _state + "\n Value must be one of enable|disable|drop");
     }
     HttpClient httpClient = new HttpClient();
-    HttpURL url = new HttpURL(_controllerHost, Integer.parseInt(_controllerPort), URI_TABLES_PATH + _tableName);
-    url.setQuery("state", stateValue);
-    GetMethod httpGet = new GetMethod(url.getEscapedURI());
+    URI uri = new URI(_controllerProtocol, null, _controllerHost, Integer.parseInt(_controllerPort),
+        URI_TABLES_PATH + _tableName, "state=" + stateValue, null);
+
+    GetMethod httpGet = new GetMethod(uri.toString());
     int status = httpClient.executeMethod(httpGet);
     if (status != 200) {
       throw new RuntimeException("Failed to change table state, error: " + httpGet.getResponseBodyAsString());
@@ -85,8 +93,8 @@ public class ChangeTableState extends AbstractBaseAdminCommand implements Comman
 
   @Override
   public String toString() {
-    return ("ChangeTableState -controllerHost " + _controllerHost + " -controllerPort " + _controllerPort
-        + " -tableName" + _tableName + " -state" + _state);
+    return ("ChangeTableState -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost
+        + " -controllerPort " + _controllerPort + " -tableName" + _tableName + " -state" + _state);
   }
 
   @Override

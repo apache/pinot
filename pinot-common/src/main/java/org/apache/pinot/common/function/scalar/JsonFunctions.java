@@ -19,8 +19,17 @@
 package org.apache.pinot.common.function.scalar;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.JsonPath;
+import com.jayway.jsonpath.Option;
+import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
+import com.jayway.jsonpath.spi.json.JsonProvider;
+import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
+import com.jayway.jsonpath.spi.mapper.MappingProvider;
+import java.util.EnumSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -37,6 +46,28 @@ import org.apache.pinot.spi.utils.JsonUtils;
  *   </code>
  */
 public class JsonFunctions {
+  static {
+    Configuration.setDefaults(new Configuration.Defaults() {
+      private final JsonProvider jsonProvider = new JacksonJsonProvider();
+      private final MappingProvider mappingProvider = new JacksonMappingProvider();
+
+      @Override
+      public JsonProvider jsonProvider() {
+        return jsonProvider;
+      }
+
+      @Override
+      public MappingProvider mappingProvider() {
+        return mappingProvider;
+      }
+
+      @Override
+      public Set<Option> options() {
+        return EnumSet.noneOf(Option.class);
+      }
+    });
+  }
+
   private JsonFunctions() {
   }
 
@@ -67,6 +98,30 @@ public class JsonFunctions {
       return JsonPath.read((String) object, jsonPath);
     }
     return JsonPath.read(object, jsonPath);
+  }
+
+  /**
+   * Extract object array based on Json path
+   */
+  @ScalarFunction
+  public static Object[] jsonPathArray(Object object, String jsonPath)
+      throws JsonProcessingException {
+    if (object instanceof String) {
+      return convertObjectToArray(JsonPath.read((String) object, jsonPath));
+    }
+    if (object instanceof Object[]) {
+      return convertObjectToArray(JsonPath.read(JsonUtils.objectToString(object), jsonPath));
+    }
+    return convertObjectToArray(JsonPath.read(object, jsonPath));
+  }
+
+  private static Object[] convertObjectToArray(Object arrayObject) {
+    if (arrayObject instanceof List) {
+      return ((List) arrayObject).toArray();
+    } else if (arrayObject instanceof Object[]) {
+      return (Object[]) arrayObject;
+    }
+    return new Object[]{arrayObject};
   }
 
   /**

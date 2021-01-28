@@ -19,7 +19,13 @@
 package org.apache.pinot.common.function;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.collect.ImmutableMap;
 import com.jayway.jsonpath.JsonPath;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.function.scalar.JsonFunctions;
 import org.testng.annotations.Test;
 
@@ -65,4 +71,84 @@ public class JsonFunctionsTest {
     assertEquals(JsonFunctions.jsonPathDouble(jsonString, "$.actor.aaa", 53.2), 53.2);
   }
 
+  @Test
+  public void testJsonFunctionExtractingArray()
+      throws JsonProcessingException {
+    String jsonString = "{\n" +
+        "    \"name\": \"Pete\",\n" +
+        "    \"age\": 24,\n" +
+        "    \"subjects\": [\n" +
+        "        {\n" +
+        "            \"name\": \"maths\",\n" +
+        "            \"homework_grades\": [80, 85, 90, 95, 100],\n" +
+        "            \"grade\": \"A\"\n" +
+        "        },\n" +
+        "        {\n" +
+        "            \"name\": \"english\",\n" +
+        "            \"homework_grades\": [60, 65, 70, 85, 90],\n" +
+        "            \"grade\": \"B\"\n" +
+        "        }\n" +
+        "    ]\n" +
+        "}";
+    assertEquals(JsonFunctions.jsonPathArray(jsonString, "$.subjects[*].name"), new String[]{"maths", "english"});
+    assertEquals(JsonFunctions.jsonPathArray(jsonString, "$.subjects[*].grade"), new String[]{"A", "B"});
+    assertEquals(JsonFunctions.jsonPathArray(jsonString, "$.subjects[*].homework_grades"),
+        new Object[]{Arrays.asList(80, 85, 90, 95, 100), Arrays.asList(60, 65, 70, 85, 90)});
+  }
+
+  @Test
+  public void testJsonFunctionOnJsonArray()
+      throws JsonProcessingException {
+    String jsonArrayString =
+        "[\n" +
+        "        {\n" +
+        "            \"name\": \"maths\",\n" +
+        "            \"grade\": \"A\",\n" +
+        "            \"homework_grades\": [80, 85, 90, 95, 100],\n" +
+        "            \"score\": 90\n" +
+        "        },\n" +
+        "        {\n" +
+        "            \"name\": \"english\",\n" +
+        "            \"grade\": \"B\",\n" +
+        "            \"homework_grades\": [60, 65, 70, 85, 90],\n" +
+        "            \"score\": 50\n" +
+        "        }\n" +
+        "]";
+    assertEquals(JsonFunctions.jsonPathArray(jsonArrayString, "$.[*].name"), new String[]{"maths", "english"});
+    assertEquals(JsonFunctions.jsonPathArray(jsonArrayString, "$.[*].grade"), new String[]{"A", "B"});
+    assertEquals(JsonFunctions.jsonPathArray(jsonArrayString, "$.[*].homework_grades"),
+        new Object[]{Arrays.asList(80, 85, 90, 95, 100), Arrays.asList(60, 65, 70, 85, 90)});
+    assertEquals(JsonFunctions.jsonPathArray(jsonArrayString, "$.[*].score"), new Integer[]{90, 50});
+  }
+
+  @Test
+  public void testJsonFunctionOnList()
+      throws JsonProcessingException {
+    List<Map<String, Object>> rawData = new ArrayList<Map<String, Object>>();
+    rawData.add(ImmutableMap.of("name", "maths", "grade", "A", "score", 90,
+        "homework_grades", Arrays.asList(80, 85, 90, 95, 100)));
+    rawData.add(ImmutableMap.of("name", "english", "grade", "B", "score", 50,
+        "homework_grades", Arrays.asList(60, 65, 70, 85, 90)));
+    assertEquals(JsonFunctions.jsonPathArray(rawData, "$.[*].name"), new String[]{"maths", "english"});
+    assertEquals(JsonFunctions.jsonPathArray(rawData, "$.[*].grade"), new String[]{"A", "B"});
+    assertEquals(JsonFunctions.jsonPathArray(rawData, "$.[*].homework_grades"),
+        new Object[]{Arrays.asList(80, 85, 90, 95, 100), Arrays.asList(60, 65, 70, 85, 90)});
+    assertEquals(JsonFunctions.jsonPathArray(rawData, "$.[*].score"), new Integer[]{90, 50});
+  }
+
+  @Test
+  public void testJsonFunctionOnObjectArray()
+      throws JsonProcessingException {
+    Object[] rawData = new Object[] {
+        ImmutableMap.of("name", "maths", "grade", "A", "score", 90,
+            "homework_grades", Arrays.asList(80, 85, 90, 95, 100)),
+        ImmutableMap.of("name", "english", "grade", "B", "score", 50,
+            "homework_grades", Arrays.asList(60, 65, 70, 85, 90))
+    };
+    assertEquals(JsonFunctions.jsonPathArray(rawData, "$.[*].name"), new String[]{"maths", "english"});
+    assertEquals(JsonFunctions.jsonPathArray(rawData, "$.[*].grade"), new String[]{"A", "B"});
+    assertEquals(JsonFunctions.jsonPathArray(rawData, "$.[*].homework_grades"),
+        new Object[]{Arrays.asList(80, 85, 90, 95, 100), Arrays.asList(60, 65, 70, 85, 90)});
+    assertEquals(JsonFunctions.jsonPathArray(rawData, "$.[*].score"), new Integer[]{90, 50});
+  }
 }

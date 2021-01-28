@@ -28,9 +28,12 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
+import io.netty.handler.ssl.ClientAuth;
+import io.netty.handler.ssl.SslContextBuilder;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
+import org.apache.pinot.core.util.TlsUtils;
 
 
 /**
@@ -41,15 +44,36 @@ public class QueryServer {
   private final int _port;
   private final QueryScheduler _queryScheduler;
   private final ServerMetrics _serverMetrics;
+  private final TlsConfig _tlsConfig;
 
   private EventLoopGroup _bossGroup;
   private EventLoopGroup _workerGroup;
   private Channel _channel;
 
+  /**
+   * Create an unsecured server instance
+   *
+   * @param port bind port
+   * @param queryScheduler query scheduler
+   * @param serverMetrics server metrics
+   */
   public QueryServer(int port, QueryScheduler queryScheduler, ServerMetrics serverMetrics) {
+    this(port, queryScheduler, serverMetrics, null);
+  }
+
+  /**
+   * Create a server instance with TLS config
+   *
+   * @param port bind port
+   * @param queryScheduler query scheduler
+   * @param serverMetrics server metrics
+   * @param tlsConfig TLS/SSL config
+   */
+  public QueryServer(int port, QueryScheduler queryScheduler, ServerMetrics serverMetrics, TlsConfig tlsConfig) {
     _port = port;
     _queryScheduler = queryScheduler;
     _serverMetrics = serverMetrics;
+    _tlsConfig = tlsConfig;
   }
 
   public void start() {
@@ -62,6 +86,10 @@ public class QueryServer {
           .childHandler(new ChannelInitializer<SocketChannel>() {
             @Override
             protected void initChannel(SocketChannel ch) {
+              if (_tlsConfig != null) {
+                attachSSLHandler(ch);
+              }
+
               ch.pipeline()
                   .addLast(new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, Integer.BYTES, 0, Integer.BYTES),
                       new LengthFieldPrepender(Integer.BYTES),
@@ -72,6 +100,29 @@ public class QueryServer {
       // Shut down immediately
       _workerGroup.shutdownGracefully(0, 0, TimeUnit.SECONDS);
       _bossGroup.shutdownGracefully(0, 0, TimeUnit.SECONDS);
+      throw new RuntimeException(e);
+    }
+  }
+
+  private void attachSSLHandler(SocketChannel ch) {
+    try {
+      if (_tlsConfig.getKeyStorePath() == null) {
+        throw new IllegalArgumentException("Must provide key store path for secured server");
+      }
+
+      SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(TlsUtils.createKeyManagerFactory(_tlsConfig));
+
+      if (_tlsConfig.getTrustStorePath() != null) {
+        sslContextBuilder.trustManager(TlsUtils.createTrustManagerFactory(_tlsConfig));
+      }
+
+      if (_tlsConfig.isClientAuthEnabled()) {
+        sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
+      }
+
+      ch.pipeline().addLast("ssl", sslContextBuilder.build().newHandler(ch.alloc()));
+
+    } catch (Exception e) {
       throw new RuntimeException(e);
     }
   }

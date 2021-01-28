@@ -159,7 +159,7 @@ public class ConsumingSegmentInfoReaderTest {
       httpServer = HttpServer.create(socket, 0);
       httpServer.createContext(path, handler);
       new Thread(() -> httpServer.start()).start();
-      endpoint = "localhost:" + httpServer.getAddress().getPort();
+      endpoint = "http://localhost:" + httpServer.getAddress().getPort();
     }
   }
 

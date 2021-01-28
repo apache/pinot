@@ -180,7 +180,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     }
   }
 
-  private void validateMagicMarker(PinotDataBuffer buffer, int startOffset) {
+  private void validateMagicMarker(PinotDataBuffer buffer, long startOffset) {
     long actualMarkerValue = buffer.getLong(startOffset);
     if (actualMarkerValue != MAGIC_MARKER) {
       LOGGER.error("Missing magic marker in index file: {} at position: {}", indexFile, startOffset);
@@ -292,10 +292,10 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     }
     allocBuffers.add(buffer);
 
-    int prevSlicePoint = 0;
+    long prevSlicePoint = 0;
     for (Long fileOffset : offsetAccum) {
       IndexEntry entry = startOffsets.get(fileOffset);
-      int endSlicePoint = prevSlicePoint + (int) entry.size;
+      long endSlicePoint = prevSlicePoint + entry.size;
       validateMagicMarker(buffer, prevSlicePoint);
       PinotDataBuffer viewBuffer = buffer.view(prevSlicePoint + MAGIC_MARKER_SIZE_BYTES, endSlicePoint);
       entry.buffer = viewBuffer;

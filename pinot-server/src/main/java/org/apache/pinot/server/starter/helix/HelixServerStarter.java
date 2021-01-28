@@ -28,6 +28,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
@@ -48,6 +49,7 @@ import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Helix.Instance;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel;
@@ -60,6 +62,8 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.core.transport.ListenerConfig;
+import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.server.api.access.AccessControlFactory;
 import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.server.realtime.ControllerLeaderLocator;
@@ -100,6 +104,7 @@ public class HelixServerStarter implements ServiceStartable {
   private final String _helixClusterName;
   private final String _zkAddress;
   private final PinotConfiguration _serverConf;
+  private final List<ListenerConfig> _listenerConfigs;
   private final String _host;
   private final int _port;
   private final String _instanceId;
@@ -116,6 +121,7 @@ public class HelixServerStarter implements ServiceStartable {
     _zkAddress = zkAddress;
     // Make a clone so that changes to the config won't propagate to the caller
     _serverConf = serverConf.clone();
+    _listenerConfigs = ListenerConfigUtil.buildServerAdminConfigs(_serverConf);
 
     _host = _serverConf.getProperty(Helix.KEY_OF_SERVER_NETTY_HOST,
         _serverConf.getProperty(Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtil.getHostnameOrAddress()
@@ -342,11 +348,37 @@ public class HelixServerStarter implements ServiceStartable {
     }
 
     // Update admin API port
-    int adminApiPort = _serverConf.getProperty(Server.CONFIG_OF_ADMIN_API_PORT, Server.DEFAULT_ADMIN_API_PORT);
+    LOGGER.info("Starting server admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _adminApiApplication = new AdminApiApplication(_serverInstance, accessControlFactory);
-    _adminApiApplication.start(adminApiPort);
-    _helixAdmin.setConfig(_instanceConfigScope,
-        Collections.singletonMap(Instance.ADMIN_PORT_KEY, String.valueOf(adminApiPort)));
+    _adminApiApplication.start(_listenerConfigs);
+
+    // Update http admin port
+    Optional<ListenerConfig> adminApiHttp = _listenerConfigs.stream()
+        .filter(listener -> CommonConstants.HTTP_PROTOCOL.equals(listener.getProtocol())).findFirst();
+    if (adminApiHttp.isPresent()) {
+      _helixAdmin.setConfig(_instanceConfigScope,
+          Collections.singletonMap(Instance.ADMIN_PORT_KEY, String.valueOf(adminApiHttp.get().getPort())));
+    } else {
+      _helixAdmin.removeConfig(_instanceConfigScope, Collections.singletonList(Instance.ADMIN_PORT_KEY));
+    }
+
+    // Update https admin port
+    Optional<ListenerConfig> adminApiHttps = _listenerConfigs.stream()
+        .filter(listener -> CommonConstants.HTTPS_PROTOCOL.equals(listener.getProtocol())).findFirst();
+    if (adminApiHttps.isPresent()) {
+      _helixAdmin.setConfig(_instanceConfigScope,
+          Collections.singletonMap(Instance.ADMIN_HTTPS_PORT_KEY, String.valueOf(adminApiHttps.get().getPort())));
+    } else {
+      _helixAdmin.removeConfig(_instanceConfigScope, Collections.singletonList(Instance.ADMIN_HTTPS_PORT_KEY));
+    }
+
+    // Update nettytls port
+    if (serverInstanceConfig.isNettyTlsServerEnabled()) {
+      _helixAdmin.setConfig(_instanceConfigScope,
+          Collections.singletonMap(Instance.NETTYTLS_PORT_KEY, String.valueOf(serverInstanceConfig.getNettyTlsPort())));
+    } else {
+      _helixAdmin.removeConfig(_instanceConfigScope, Collections.singletonList(Instance.NETTYTLS_PORT_KEY));
+    }
 
     // Update gRPC port
     if (serverInstanceConfig.isEnableGrpcServer()) {

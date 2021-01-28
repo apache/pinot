@@ -48,6 +48,7 @@ private[pinot] class PinotServerDataFetcher(
   private val metricsRegistry = new MetricsRegistry()
   private val brokerMetrics = new BrokerMetrics(metricsRegistry)
   private val queryRouter = new QueryRouter(brokerId, brokerMetrics)
+  // TODO add support for TLS-secured server
 
   def fetchData(): List[DataTable] = {
     val routingTableForRequest = createRoutingTableForRequest()
@@ -95,6 +96,7 @@ private[pinot] class PinotServerDataFetcher(
     val instanceConfig = new InstanceConfig(nullZkId)
     instanceConfig.setHostName(pinotSplit.serverAndSegments.serverHost)
     instanceConfig.setPort(pinotSplit.serverAndSegments.serverPort)
+    // TODO: support grpc and netty-sec
     val serverInstance = new ServerInstance(instanceConfig)
     Map(
       serverInstance -> pinotSplit.serverAndSegments.segments.asJava
