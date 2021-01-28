@@ -65,7 +65,7 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
   @Option(name = "-format", required = true, metaVar = "<AVRO/CSV/JSON/THRIFT/PARQUET/ORC>", usage = "Input data format.")
   private FileFormat _format;
 
-  @Option(name = "-segmentNameGeneratorType", metaVar = "<AVRO/CSV/JSON/THRIFT/PARQUET/ORC>", usage = "Segment name generator type, default to FIXED type.")
+  @Option(name = "-segmentNameGeneratorType", metaVar = "<FIXED/SIMPLE/NORMALIZED_DATE>", usage = "Segment name generator type, default to FIXED type.")
   private String _segmentNameGeneratorType = BatchConfigProperties.SegmentNameGeneratorType.FIXED;
 
   @Option(name = "-table", required = true, metaVar = "<string>", usage = "Table name.")
