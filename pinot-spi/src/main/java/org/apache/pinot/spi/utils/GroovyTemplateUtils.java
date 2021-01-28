@@ -19,7 +19,6 @@
 package org.apache.pinot.spi.utils;
 
 import groovy.text.SimpleTemplateEngine;
-import groovy.text.TemplateEngine;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
@@ -33,7 +32,7 @@ import java.util.TimeZone;
 
 
 public class GroovyTemplateUtils {
-  private static final TemplateEngine GROOVY_TEMPLATE_ENGINE = new SimpleTemplateEngine();
+  private static final SimpleTemplateEngine GROOVY_TEMPLATE_ENGINE = new SimpleTemplateEngine();
   private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
 
   public static String renderTemplate(String template, Map<String, Object> newContext)
@@ -77,5 +76,6 @@ public class GroovyTemplateUtils {
 
   static {
     DATE_FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
+    GROOVY_TEMPLATE_ENGINE.setEscapeBackslash(true);
   }
 }
