@@ -168,6 +168,11 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
           .format("The scheme of staging directory URI [%s] and output directory URI [%s] has to be same.",
               stagingDirURI, outputDirURI));
     }
+    if (outputDirFS.exists(stagingDirURI)) {
+      LOGGER.info("Clearing out existing staging directory: [{}]", stagingDirURI);
+      outputDirFS.delete(stagingDirURI, true);
+    }
+    
     outputDirFS.mkdir(stagingDirURI);
     Path stagingInputDir = new Path(stagingDirURI.toString(), "input");
     outputDirFS.mkdir(stagingInputDir.toUri());
@@ -216,7 +221,7 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
       for (int i = 0; i < numDataFiles; i++) {
         // Typically PinotFS implementations list files without a protocol, so we lose (for example) the
         // hdfs:// portion of the path. Call getFileURI() to fix this up.
-        URI inputFileURI = getFileURI(filteredFiles.get(i), inputDirURI);
+        URI inputFileURI = SegmentGenerationUtils.getFileURI(filteredFiles.get(i), inputDirURI);
         File localFile = File.createTempFile("pinot-filepath-", ".txt");
         try (DataOutputStream dataOutputStream = new DataOutputStream(new FileOutputStream(localFile))) {
           dataOutputStream.write(StringUtil.encodeUtf8(inputFileURI + " " + i));
@@ -288,23 +293,40 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
         throw new RuntimeException("Job failed: " + job);
       }
 
-      LOGGER.info("Trying to copy segment tars from staging directory: [{}] to output directory [{}]", stagingDirURI,
+      LOGGER.info("Moving segment tars from staging directory [{}] to output directory [{}]", stagingDirURI,
           outputDirURI);
-      outputDirFS.copy(new Path(stagingDir, SEGMENT_TAR_SUBDIR_NAME).toUri(), outputDirURI);
+      moveFiles(outputDirFS, new Path(stagingDir, SEGMENT_TAR_SUBDIR_NAME).toUri(), outputDirURI, _spec.isOverwriteOutput());
     } finally {
       LOGGER.info("Trying to clean up staging directory: [{}]", stagingDirURI);
       outputDirFS.delete(stagingDirURI, true);
     }
   }
 
-  protected static URI getFileURI(String uriStr, URI fullUriForPathOnlyUriStr)
-      throws URISyntaxException {
-    URI fileURI = URI.create(uriStr);
-    if (fileURI.getScheme() == null) {
-      return new URI(fullUriForPathOnlyUriStr.getScheme(), fullUriForPathOnlyUriStr.getAuthority(),
-              fileURI.getPath(), fileURI.getQuery(), fileURI.getFragment());
+  /**
+   * Move all files from the <sourceDir> to the <destDir>, but don't delete existing contents of destDir.
+   * If <overwrite> is true, and the source file exists in the destination directory, then replace it, otherwise
+   * log a warning and continue. We assume that source and destination directories are on the same filesystem,
+   * so that move() can be used.
+   * 
+   * @param fs 
+   * @param sourceDir
+   * @param destDir
+   * @param overwrite
+   * @throws IOException 
+   * @throws URISyntaxException 
+   */
+  private void moveFiles(PinotFS fs, URI sourceDir, URI destDir, boolean overwrite) throws IOException, URISyntaxException {
+    for (String sourcePath : fs.listFiles(sourceDir, true)) {
+      URI sourceFileUri = SegmentGenerationUtils.getFileURI(sourcePath, sourceDir);
+      String sourceFilename = FilenameUtils.getName(sourceFileUri.getPath());
+      URI destFileUri = SegmentGenerationUtils.getRelativeOutputPath(sourceDir, sourceFileUri, destDir).resolve(sourceFilename);
+      
+      if (!overwrite && fs.exists(destFileUri)) {
+        LOGGER.warn("Can't overwrite existing output segment tar file: {}", destFileUri);
+      } else {
+        fs.move(sourceFileUri, destFileUri, true);
+      }
     }
-    return fileURI;
   }
 
   /**

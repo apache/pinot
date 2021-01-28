@@ -53,4 +53,31 @@ public class SegmentGenerationUtilsTest {
         "hdfs://namenode2/output/dir/subdir/file.tar.gz");
   }
   
+  // Don't lose authority portion of inputDirURI when creating output files
+  // https://github.com/apache/incubator-pinot/issues/6355
+
+  @Test
+  public void testGetFileURI() throws Exception {
+    // Typical file URI
+    validateFileURI(new URI("file:/path/to/"));
+
+    // Namenode as authority, plus non-standard port
+    validateFileURI(new URI("hdfs://namenode:9999/path/to/"));
+
+    // S3 bucket + path
+    validateFileURI(new URI("s3://bucket/path/to/"));
+
+    // S3 URI with userInfo (username/password)
+    validateFileURI(new URI("s3://username:password@bucket/path/to/"));
+  }
+
+  private void validateFileURI(URI directoryURI) throws URISyntaxException {
+    URI fileURI = new URI(directoryURI.toString() + "file");
+    String rawPath = fileURI.getRawPath();
+
+    Assert.assertEquals(SegmentGenerationUtils.getFileURI(rawPath, fileURI).toString(),
+        fileURI.toString());
+
+  }
+
 }

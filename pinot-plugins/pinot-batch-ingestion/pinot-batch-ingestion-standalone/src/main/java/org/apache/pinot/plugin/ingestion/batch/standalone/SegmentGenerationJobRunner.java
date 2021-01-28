@@ -174,7 +174,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
       CountDownLatch segmentCreationTaskCountDownLatch = new CountDownLatch(numInputFiles);
       //iterate on the file list, for each
       for (int i = 0; i < numInputFiles; i++) {
-        final URI inputFileURI = getFileURI(filteredFiles.get(i), inputDirURI);
+        final URI inputFileURI = SegmentGenerationUtils.getFileURI(filteredFiles.get(i), inputDirURI);
 
         //copy input path to local
         File localInputDataFile = new File(localInputTempDir, new File(inputFileURI.getPath()).getName());
@@ -244,16 +244,5 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
       uri = new File(uriStr).toURI();
     }
     return uri;
-  }
-
-  @VisibleForTesting
-  protected static URI getFileURI(String uriStr, URI fullUriForPathOnlyUriStr)
-      throws URISyntaxException {
-    URI fileURI = URI.create(uriStr);
-    if (fileURI.getScheme() == null) {
-      return new URI(fullUriForPathOnlyUriStr.getScheme(), fullUriForPathOnlyUriStr.getAuthority(),
-              fileURI.getPath(), fileURI.getQuery(), fileURI.getFragment());
-    }
-    return fileURI;
   }
 }

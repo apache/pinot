@@ -163,4 +163,15 @@ public class SegmentGenerationUtils {
     String[] pathSplits = inputFileURI.getPath().split("/");
     return pathSplits[pathSplits.length - 1];
   }
+  
+  public static URI getFileURI(String uriStr, URI fullUriForPathOnlyUriStr)
+      throws URISyntaxException {
+    URI fileURI = URI.create(uriStr);
+    if (fileURI.getScheme() == null) {
+      return new URI(fullUriForPathOnlyUriStr.getScheme(), fullUriForPathOnlyUriStr.getAuthority(),
+              fileURI.getPath(), fileURI.getQuery(), fileURI.getFragment());
+    }
+    return fileURI;
+  }
+
 }

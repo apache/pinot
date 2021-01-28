@@ -183,12 +183,9 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
       //move segment to output PinotFS
       URI outputSegmentTarURI = SegmentGenerationUtils.getRelativeOutputPath(inputDirURI, inputFileURI, outputDirURI)
           .resolve(segmentTarFileName);
-      LOGGER.info("Trying to move segment tar file from: [{}] to [{}]", localSegmentTarFile, outputSegmentTarURI);
-      if (!_spec.isOverwriteOutput() && outputDirFS.exists(outputSegmentTarURI)) {
-        LOGGER.warn("Not overwrite existing output segment tar file: {}", outputDirFS.exists(outputSegmentTarURI));
-      } else {
-        outputDirFS.copyFromLocalFile(localSegmentTarFile, outputSegmentTarURI);
-      }
+      LOGGER.info("Copying segment tar file from [{}] to [{}]", localSegmentTarFile, outputSegmentTarURI);
+      outputDirFS.copyFromLocalFile(localSegmentTarFile, outputSegmentTarURI);
+      
       FileUtils.deleteQuietly(localSegmentDir);
       FileUtils.deleteQuietly(localSegmentTarFile);
       FileUtils.deleteQuietly(localInputDataFile);
