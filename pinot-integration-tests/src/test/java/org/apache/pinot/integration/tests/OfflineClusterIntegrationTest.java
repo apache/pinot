@@ -53,6 +53,8 @@ import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -566,19 +568,22 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   /**
-   * We will add extra new columns to the schema to test adding new columns with default value to the offline segments.
+   * We will add extra new columns to the schema to test adding new columns with default value/transform function to the
+   * offline segments.
    * <p>New columns are: (name, field type, data type, single/multi value, default null value)
    * <ul>
-   *   <li>"newAddedIntMetric", METRIC, INT, single-value, 1</li>
-   *   <li>"newAddedLongMetric", METRIC, LONG, single-value, 1</li>
-   *   <li>"newAddedFloatMetric", METRIC, FLOAT, single-value, default (0.0)</li>
-   *   <li>"newAddedDoubleMetric", METRIC, DOUBLE, single-value, default (0.0)</li>
-   *   <li>"newAddedIntDimension", DIMENSION, INT, single-value, default (Integer.MIN_VALUE)</li>
-   *   <li>"newAddedLongDimension", DIMENSION, LONG, single-value, default (Long.MIN_VALUE)</li>
-   *   <li>"newAddedFloatDimension", DIMENSION, FLOAT, single-value, default (Float.NEGATIVE_INFINITY)</li>
-   *   <li>"newAddedDoubleDimension", DIMENSION, DOUBLE, single-value, default (Double.NEGATIVE_INFINITY)</li>
-   *   <li>"newAddedSVStringDimension", DIMENSION, STRING, single-value, default ("null")</li>
-   *   <li>"newAddedMVStringDimension", DIMENSION, STRING, multi-value, ""</li>
+   *   <li>"NewAddedIntMetric", METRIC, INT, single-value, 1</li>
+   *   <li>"NewAddedLongMetric", METRIC, LONG, single-value, 1</li>
+   *   <li>"NewAddedFloatMetric", METRIC, FLOAT, single-value, default (0.0)</li>
+   *   <li>"NewAddedDoubleMetric", METRIC, DOUBLE, single-value, default (0.0)</li>
+   *   <li>"NewAddedIntDimension", DIMENSION, INT, single-value, default (Integer.MIN_VALUE)</li>
+   *   <li>"NewAddedLongDimension", DIMENSION, LONG, single-value, default (Long.MIN_VALUE)</li>
+   *   <li>"NewAddedFloatDimension", DIMENSION, FLOAT, single-value, default (Float.NEGATIVE_INFINITY)</li>
+   *   <li>"NewAddedDoubleDimension", DIMENSION, DOUBLE, single-value, default (Double.NEGATIVE_INFINITY)</li>
+   *   <li>"NewAddedSVStringDimension", DIMENSION, STRING, single-value, default ("null")</li>
+   *   <li>"NewAddedMVStringDimension", DIMENSION, STRING, multi-value, ""</li>
+   *   <li>"NewAddedDerivedHoursSinceEpoch", DIMENSION, INT, single-value, default (Integer.MIN_VALUE)</li>
+   *   <li>"NewAddedDerivedSecondsSinceEpoch", DIMENSION, LONG, single-value, default (LONG.MIN_VALUE)</li>
    * </ul>
    */
   @Test
@@ -589,7 +594,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     reloadDefaultColumns(true);
     JsonNode queryResponse = postQuery(SELECT_STAR_QUERY);
     assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-    assertEquals(queryResponse.get("selectionResults").get("columns").size(), 89);
+    assertEquals(queryResponse.get("selectionResults").get("columns").size(), 91);
 
     testNewAddedColumns();
 
@@ -604,11 +609,22 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     long numTotalDocs = getCountStarResult();
 
     if (withExtraColumns) {
+      // Add columns to the schema first to pass the validation of the table config
       _schemaFileName = SCHEMA_FILE_NAME_WITH_EXTRA_COLUMNS;
+      addSchema(createSchema());
+      TableConfig tableConfig = getOfflineTableConfig();
+      tableConfig.setIngestionConfig(new IngestionConfig(null, null, null, Arrays
+          .asList(new TransformConfig("NewAddedDerivedHoursSinceEpoch", "times(DaysSinceEpoch, 24)"),
+              new TransformConfig("NewAddedDerivedSecondsSinceEpoch", "times(times(DaysSinceEpoch, 24), 3600)"))));
+      updateTableConfig(tableConfig);
     } else {
+      // Remove columns from the table config first to pass the validation of the table config
+      TableConfig tableConfig = getOfflineTableConfig();
+      tableConfig.setIngestionConfig(null);
+      updateTableConfig(tableConfig);
       _schemaFileName = SCHEMA_FILE_NAME_WITH_MISSING_COLUMNS;
+      addSchema(createSchema());
     }
-    addSchema(createSchema());
 
     // Trigger reload
     reloadOfflineTable(getTableName());
@@ -675,6 +691,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testQuery(pqlQuery, Collections.singletonList(sqlQuery));
     pqlQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedMVStringDimension = ''";
     sqlQuery = "SELECT COUNT(*) FROM mytable";
+    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
+    pqlQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedHoursSinceEpoch = 392232";
+    sqlQuery = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch = 16343";
+    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
+    pqlQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedSecondsSinceEpoch = 1411862400";
+    sqlQuery = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch = 16341";
     testQuery(pqlQuery, Collections.singletonList(sqlQuery));
 
     // Test queries with new added metric column in aggregation function
@@ -994,11 +1016,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testCaseStatementWithLogicalTransformFunction()
       throws Exception {
-    String sqlQuery =
-        "SELECT ArrDelay"
-            + ", CASE WHEN ArrDelay > 50 OR ArrDelay < 10 THEN 10 ELSE 0 END"
-            + ", CASE WHEN ArrDelay < 50 AND ArrDelay >= 10 THEN 10 ELSE 0 END"
-            + " FROM mytable LIMIT 1000";
+    String sqlQuery = "SELECT ArrDelay" + ", CASE WHEN ArrDelay > 50 OR ArrDelay < 10 THEN 10 ELSE 0 END"
+        + ", CASE WHEN ArrDelay < 50 AND ArrDelay >= 10 THEN 10 ELSE 0 END" + " FROM mytable LIMIT 1000";
     JsonNode response = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
     JsonNode rows = response.get("resultTable").get("rows");
     assertEquals(response.get("exceptions").size(), 0);

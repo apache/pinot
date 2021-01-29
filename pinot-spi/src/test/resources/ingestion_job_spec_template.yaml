@@ -23,9 +23,14 @@ executionFrameworkSpec:
   segmentTarPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.standalone.SegmentTarPushJobRunner'
   segmentUriPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.standalone.SegmentUriPushJobRunner'
 jobType: SegmentCreationAndTarPush
+
 inputDirURI: 'file:///path/to/input/${ year }/${ month }/${ day }'
+# includeFileNamePattern: include file name pattern, supported glob pattern.
+# Sample usage:
+#   'glob:*.avro' will include all avro files just under the inputDirURI, not sub directories;
+#   'glob:**\/*.avro' will include all the avro files under inputDirURI recursively.
 includeFileNamePattern: 'glob:**/*.parquet'
-excludeFileNamePattern: 'glob:**/*.avro'
+excludeFileNamePattern: 'glob:**/*.avro' # 'glob:**\/*.avro' will exclude all the avro files.
 outputDirURI: 'file:///path/to/output/${year}/${month}/${day}'
 overwriteOutput: true
 segmentCreationJobParallelism: 100

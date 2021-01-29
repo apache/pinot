@@ -19,7 +19,6 @@
 package org.apache.pinot.core.segment.index.loader.defaultcolumn;
 
 import java.io.File;
-import java.util.Set;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
@@ -31,16 +30,13 @@ import org.slf4j.LoggerFactory;
 public class V1DefaultColumnHandler extends BaseDefaultColumnHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(V1DefaultColumnHandler.class);
 
-  public V1DefaultColumnHandler(File indexDir, Schema schema, SegmentMetadataImpl segmentMetadata,
-      SegmentDirectory.Writer segmentWriter) {
-    super(indexDir, schema, segmentMetadata, segmentWriter);
+  public V1DefaultColumnHandler(File indexDir, SegmentMetadataImpl segmentMetadata,
+      IndexLoadingConfig indexLoadingConfig, Schema schema, SegmentDirectory.Writer segmentWriter) {
+    super(indexDir, segmentMetadata, indexLoadingConfig, schema, segmentWriter);
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
-  protected void updateDefaultColumn(String column, DefaultColumnAction action, IndexLoadingConfig indexLoadingConfig)
+  protected boolean updateDefaultColumn(String column, DefaultColumnAction action)
       throws Exception {
     LOGGER.info("Starting default column action: {} on column: {}", action, column);
 
@@ -51,7 +47,9 @@ public class V1DefaultColumnHandler extends BaseDefaultColumnHandler {
 
     // For ADD and UPDATE action, create new dictionary and forward index, and update column metadata
     if (action.isAddAction() || action.isUpdateAction()) {
-      createColumnV1Indices(column);
+      return createColumnV1Indices(column);
+    } else {
+      return true;
     }
   }
 }
