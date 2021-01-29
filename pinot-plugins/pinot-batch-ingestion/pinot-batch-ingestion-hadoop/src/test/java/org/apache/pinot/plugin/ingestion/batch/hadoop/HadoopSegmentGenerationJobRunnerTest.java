@@ -127,7 +127,7 @@ public class HadoopSegmentGenerationJobRunnerTest {
     efSpec.setSegmentGenerationJobRunnerClassName(HadoopSegmentGenerationJobRunner.class.getName());
     Map<String, String> extraConfigs = new HashMap<>();
     extraConfigs.put("stagingDir", stagingDir.toURI().toString());
-    extraConfigs.put("dependencyJarDir", dependencyJarsDir.toURI().toString());
+    extraConfigs.put("dependencyJarDir", dependencyJarsDir.getAbsolutePath());
     efSpec.setExtraConfigs(extraConfigs);
     jobSpec.setExecutionFrameworkSpec(efSpec);
     
