@@ -19,6 +19,7 @@
 package org.apache.pinot.core.util;
 
 import com.google.common.base.Preconditions;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -213,7 +214,7 @@ public final class TableConfigUtils {
               "Dimension tables must have segment ingestion type REFRESH");
         }
       }
-      if (tableConfig.isDimTable()){
+      if (tableConfig.isDimTable()) {
         Preconditions.checkState(ingestionConfig.getBatchIngestionConfig() != null,
             "Dimension tables must have batch ingestion configuration");
       }
@@ -248,16 +249,16 @@ public final class TableConfigUtils {
 
       // Transform configs
       List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
+      Set<String> schemaColumnNames = schema == null ? Collections.emptySet() : schema.getColumnNames();
+      Set<String> derivedColumns = new HashSet<>();
+      Map<String, FunctionEvaluator> columnToFunctionEvaluator = new HashMap<>();
       if (transformConfigs != null) {
-        Map<String, String> columnToTransformExpression = new HashMap<>();
-        Map<String, FunctionEvaluator> columnToFunctionEvaluator = new HashMap<>();
         Set<String> transformColumns = new HashSet<>();
         for (TransformConfig transformConfig : transformConfigs) {
           String columnName = transformConfig.getColumnName();
           if (schema != null) {
             Preconditions.checkState(schema.getFieldSpecFor(columnName) != null,
-                "The destination column '" + columnName
-                    + "' of the transform function must be present in the schema");
+                "The destination column '" + columnName + "' of the transform function must be present in the schema");
           }
           String transformFunction = transformConfig.getTransformFunction();
           if (columnName == null || transformFunction == null) {
@@ -281,45 +282,20 @@ public final class TableConfigUtils {
                     + columnName + "'");
           }
           columnToFunctionEvaluator.put(columnName, expressionEvaluator);
-          columnToTransformExpression.put(columnName, transformFunction);
-        }
-        Map<String, Integer> transformFunctionChainDepth = new HashMap<>();
-        for (String column : columnToFunctionEvaluator.keySet()) {
-          if (transformFunctionChainDepth(column, columnToFunctionEvaluator, transformFunctionChainDepth) > 2) {
-            Set<String> derivedArguments = columnToFunctionEvaluator.get(column).getArguments().stream()
-                .filter(a -> transformFunctionChainDepth.get(a) == 2).collect(Collectors.toSet());
-            throw new IllegalStateException(String.format(
-                "Derived columns: [%s] cannot be used as arguments to the transform function: %s of derived column: %s.",
-                derivedArguments, columnToTransformExpression.get(column), column));
+          if (schemaColumnNames.containsAll(arguments)) {
+            derivedColumns.add(columnName);
           }
+        }
+        for (Map.Entry<String, FunctionEvaluator> entry : columnToFunctionEvaluator.entrySet()) {
+          String column = entry.getKey();
+          List<String> arguments = entry.getValue().getArguments();
+          Preconditions.checkState(Collections.disjoint(derivedColumns, arguments),
+              "Column: %s with arguments: [%s] is a derived column. "
+                  + "A derived column cannot use other derived columns as arguments. Full list of derived columns: [%s]",
+              column, arguments, derivedColumns);
         }
       }
     }
-  }
-
-  /**
-   * Returns the depth of chaining in transform functions. Eg:
-   * Column A, with no transform function returns 0 (regular column)
-   * Column B, where B = f(A) returns 1 (column with ingestion transform function)
-   * Column C, where C = f(B) returns 2 (derived column)
-   * Column D, where D = f(C) returns 3 (derived column on a derived column)
-   */
-  private static int transformFunctionChainDepth(String column, Map<String, FunctionEvaluator> columnToFunctionMap,
-      Map<String, Integer> depth) {
-    if (depth.containsKey(column)) {
-      return depth.get(column);
-    }
-    FunctionEvaluator functionEvaluator = columnToFunctionMap.get(column);
-    if (functionEvaluator == null) {
-      depth.put(column, 0);
-      return 0;
-    }
-    int maxDepth = Integer.MIN_VALUE;
-    for (String arg : functionEvaluator.getArguments()) {
-      maxDepth = Math.max(maxDepth, transformFunctionChainDepth(arg, columnToFunctionMap, depth));
-    }
-    depth.put(column, maxDepth + 1);
-    return maxDepth + 1;
   }
 
   /**
@@ -522,8 +498,8 @@ public final class TableConfigUtils {
       Preconditions.checkState(schema.getFieldSpecFor(columnName) != null,
           "Column Name " + columnName + " defined in field config list must be a valid column defined in the schema");
 
-      if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY &&
-          indexingConfigs.getNoDictionaryColumns() != null) {
+      if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY
+          && indexingConfigs.getNoDictionaryColumns() != null) {
         Preconditions.checkArgument(!indexingConfigs.getNoDictionaryColumns().contains(columnName),
             "FieldConfig encoding type is different from indexingConfig for column: " + columnName);
       }

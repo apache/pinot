@@ -428,6 +428,28 @@ public class TableConfigUtilsTest {
     } catch (IllegalStateException e) {
       // expected
     }
+
+    // derived column on derived column - should fail (transformedCol is a derived col in this case)
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("sourceCol", FieldSpec.DataType.STRING)
+        .addMetric("transformedCol", FieldSpec.DataType.LONG)
+        .addSingleValueDimension("derivedCol", FieldSpec.DataType.STRING).build();
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
+        new IngestionConfig(null, null, null, Lists
+            .newArrayList(new TransformConfig("transformedCol", "reverse(sourceCol)"),
+                new TransformConfig("derivedCol", "lower(transformedCol)")))).build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail due to derived column on derived column");
+    } catch (IllegalStateException e) {
+      // expected
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
+        new IngestionConfig(null, null, null, Lists
+            .newArrayList(new TransformConfig("transformedCol", "Groovy({sourceCol + y}, sourceCol, y)"),
+                new TransformConfig("derivedCol", "lower(transformedCol)")))).build();
+    TableConfigUtils.validate(tableConfig, schema);
   }
 
   @Test
