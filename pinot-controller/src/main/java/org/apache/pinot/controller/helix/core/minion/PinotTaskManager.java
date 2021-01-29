@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
@@ -124,14 +125,6 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     return TABLE_CONFIG_PATH_PREFIX + tableWithType;
   }
 
-  protected synchronized void cleanupCronTaskScheduler() {
-    try {
-      _scheduledExecutorService.clear();
-    } catch (SchedulerException e) {
-      LOGGER.error("Failed to clear all tasks in scheduler", e);
-    }
-  }
-
   public synchronized void cleanUpCronTaskSchedulerForTable(String tableWithType) {
     LOGGER.info("Cleaning up task in scheduler for table {}", tableWithType);
     TableTaskSchedulerUpdater tableTaskSchedulerUpdater = _tableTaskSchedulerUpdaterMap.get(tableWithType);
@@ -158,12 +151,18 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       if (jobKey.getName().equals(tableWithType)) {
         try {
           _scheduledExecutorService.deleteJob(jobKey);
+          _controllerMetrics.addValueToTableGauge(getCronJobName(tableWithType, jobKey.getGroup()),
+              ControllerGauge.CRON_SCHEDULER_JOB_SCHEDULED, -1L);
         } catch (SchedulerException e) {
           LOGGER.error("Got exception when deleting the scheduled job - {}", jobKey, e);
         }
       }
     }
     _tableTaskTypeToCronExpressionMap.remove(tableWithType);
+  }
+
+  public static String getCronJobName(String tableWithType, String taskType) {
+    return String.format("%s.%s", tableWithType, taskType);
   }
 
   public synchronized void subscribeTableConfigChanges(String tableWithType) {
@@ -220,6 +219,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
         if (!taskToCronExpressionMap.containsKey(existingTaskType)) {
           try {
             _scheduledExecutorService.deleteJob(JobKey.jobKey(tableWithType, existingTaskType));
+            _controllerMetrics.addValueToTableGauge(getCronJobName(tableWithType, existingTaskType),
+                ControllerGauge.CRON_SCHEDULER_JOB_SCHEDULED, -1L);
           } catch (SchedulerException e) {
             LOGGER.error("Failed to delete scheduled job for table {}, task type {}", tableWithType,
                 existingScheduledTasks, e);
@@ -279,7 +280,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     }
     if (!exists) {
       LOGGER
-          .info("Trying to put cron expression: {} for table {}, task type: {}", cronExprStr, tableWithType, taskType);
+          .info("Trying to schedule a job with cron expression: {} for table {}, task type: {}", cronExprStr, tableWithType, taskType);
       Trigger trigger = TriggerBuilder.newTrigger().withIdentity(TriggerKey.triggerKey(tableWithType, taskType))
           .withSchedule(CronScheduleBuilder.cronSchedule(cronExprStr)).build();
       JobDataMap jobDataMap = new JobDataMap();
@@ -290,6 +291,9 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
               .build();
       try {
         _scheduledExecutorService.scheduleJob(jobDetail, trigger);
+        _controllerMetrics
+            .addValueToTableGauge(getCronJobName(tableWithType, taskType), ControllerGauge.CRON_SCHEDULER_JOB_SCHEDULED,
+                1L);
       } catch (Exception e) {
         LOGGER.error("Failed to parse Cron expression - " + cronExprStr, e);
         throw e;
