@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
@@ -244,7 +245,7 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
       job.getConfiguration().setBoolean(MRJobConfig.MAP_SPECULATIVE, false);
 
       // But we have to copy ourselves to HDFS, and add us to the distributed cache, so
-      // that the mapper code is available.
+      // that the mapper code is available. 
       addMapperJarToDistributedCache(job, outputDirFS, stagingDirURI);
 
       org.apache.hadoop.conf.Configuration jobConf = job.getConfiguration();
@@ -262,13 +263,19 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
       // In order to ensure pinot plugins would be loaded to each worker, this method
       // tars entire plugins directory and set this file into Distributed cache.
       // Then each mapper job will untar the plugin tarball, and set system properties accordingly.
+      // Note that normally we'd just use Hadoop's support for putting jars on the 
+      // classpath via the distributed cache, but some of the plugins (e.g. the pinot-parquet
+      // input format) include Hadoop classes, which can be incompatibile with the Hadoop
+      // installation/jars being used to run the mapper, leading to errors such as:
+      // java.lang.NoSuchMethodError: org.apache.hadoop.ipc.RPC.getServer(...
+      //
       packPluginsToDistributedCache(job, outputDirFS, stagingDirURI);
 
       // Add dependency jars, if we're provided with a directory containing these.
-      String dependencyJarsDir = _spec.getExecutionFrameworkSpec().getExtraConfigs().get(DEPS_JAR_DIR_FIELD);
-      if (dependencyJarsDir != null) {
-        Path dependencyJarsPath = new Path(stagingDirURI.toString(), DEPS_JAR_SUBDIR_NAME);
-        addDepsJarToDistributedCache(job, dependencyJarsDir, outputDirFS, dependencyJarsPath.toUri());
+      String dependencyJarsSrcDir = _spec.getExecutionFrameworkSpec().getExtraConfigs().get(DEPS_JAR_DIR_FIELD);
+      if (dependencyJarsSrcDir != null) {
+        Path dependencyJarsDestPath = new Path(stagingDirURI.toString(), DEPS_JAR_SUBDIR_NAME);
+        addJarsToDistributedCache(job, new File(dependencyJarsSrcDir), outputDirFS, dependencyJarsDestPath.toUri(), false);
       }
 
       _spec.setOutputDirURI(stagingSegmentTarUri.toUri().toString());
@@ -377,31 +384,25 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
     }
   }
 
-  protected void addDepsJarToDistributedCache(Job job, String srcDirName, PinotFS dstFS, URI dstDirUri)
-      throws IOException {
-    if (srcDirName != null) {
-      URI srcDirUri = URI.create(srcDirName);
-      if (srcDirUri.getScheme() == null) {
-        srcDirUri = new File(srcDirName).toURI();
-      }
-      
-      Path dstDirPath = new Path(dstDirUri);
-      PinotFS srcFS = PinotFSFactory.create(srcDirUri.getScheme());
-      String[] files = srcFS.listFiles(srcDirUri, true);
-      for (String srcFilename : files) {
-        URI srcFileUri = URI.create(srcFilename);
-        if (!srcFS.isDirectory(srcFileUri) && srcFilename.endsWith(".jar")) {
-          LOGGER.info("Adding deps jar: {} to distributed cache", srcFilename);
-          
-          // Copy the local file to our destination directory, and then add it.
-          String jarName = FilenameUtils.getName(srcFileUri.getPath());
-          Path dstFilePath = new Path(dstDirPath, jarName);
-          URI dstFileUri = dstFilePath.toUri();
-          dstFS.copy(srcFileUri, dstFileUri);
-          
-          job.addFileToClassPath(dstFilePath);
-        }
-      }
+  protected void addJarsToDistributedCache(Job job, File srcDir, PinotFS dstFS, URI dstDirUri, boolean recursive)
+      throws Exception {
+    if (!srcDir.exists()) {
+      LOGGER.warn("No jars directory at [{}]", srcDir);
+      return;
+    }
+
+    Path dstDirPath = new Path(dstDirUri);
+    for (File jarFile : FileUtils.listFiles(srcDir, new String[] {"jar"}, recursive)) {
+      LOGGER.info("Adding jar {} to distributed cache", jarFile);
+
+      String jarName = jarFile.getName();
+      Path dstFilePath = new Path(dstDirPath, jarName);
+      URI dstFileUri = dstFilePath.toUri();
+
+      dstFS.copyFromLocalFile(jarFile, dstFileUri);
+
+      job.addFileToClassPath(dstFilePath);
     }
   }
+
 }

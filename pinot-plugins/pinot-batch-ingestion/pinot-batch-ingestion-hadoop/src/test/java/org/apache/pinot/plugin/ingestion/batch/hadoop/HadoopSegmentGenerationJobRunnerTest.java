@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.plugin.inputformat.csv.CSVRecordReader;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
 import org.apache.pinot.plugin.inputformat.json.JSONRecordReader;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -33,6 +34,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.Schema.SchemaBuilder;
+import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.ingestion.batch.spec.ExecutionFrameworkSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.RecordReaderSpec;
@@ -48,8 +50,8 @@ import com.google.common.collect.Lists;
 public class HadoopSegmentGenerationJobRunnerTest {
 
   @Test
-  public void testDistributedCache() throws Exception {
-    File testDir = Files.createTempDirectory("testDistributedCache-").toFile();
+  public void testSegmentGeneration() throws Exception {
+    File testDir = Files.createTempDirectory("testSegmentGeneration-").toFile();
     testDir.delete();
     testDir.mkdirs();
     
@@ -103,14 +105,15 @@ public class HadoopSegmentGenerationJobRunnerTest {
     FileUtils.copyFile(extraJar, new File(dependencyJarsDir, extraJar.getName()));
 
     SegmentGenerationJobSpec jobSpec = new SegmentGenerationJobSpec();
+    jobSpec.setJobType("SegmentCreation");
     jobSpec.setInputDirURI(inputDir.toURI().toString());
     jobSpec.setOutputDirURI(outputDir.toURI().toString());
     jobSpec.setOverwriteOutput(false);
     
     RecordReaderSpec recordReaderSpec = new RecordReaderSpec();
     recordReaderSpec.setDataFormat("csv");
-    recordReaderSpec.setClassName("org.apache.pinot.plugin.inputformat.csv.CSVRecordReader");
-    recordReaderSpec.setConfigClassName("org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig");
+    recordReaderSpec.setClassName(CSVRecordReader.class.getName());
+    recordReaderSpec.setConfigClassName(CSVRecordReaderConfig.class.getName());
     jobSpec.setRecordReaderSpec(recordReaderSpec);
     
     TableSpec tableSpec = new TableSpec();
@@ -120,6 +123,8 @@ public class HadoopSegmentGenerationJobRunnerTest {
     jobSpec.setTableSpec(tableSpec);
     
     ExecutionFrameworkSpec efSpec = new ExecutionFrameworkSpec();
+    efSpec.setName("hadoop");
+    efSpec.setSegmentGenerationJobRunnerClassName(HadoopSegmentGenerationJobRunner.class.getName());
     Map<String, String> extraConfigs = new HashMap<>();
     extraConfigs.put("stagingDir", stagingDir.toURI().toString());
     extraConfigs.put("dependencyJarDir", dependencyJarsDir.toURI().toString());
@@ -128,7 +133,7 @@ public class HadoopSegmentGenerationJobRunnerTest {
     
     PinotFSSpec pfsSpec = new PinotFSSpec();
     pfsSpec.setScheme("file");
-    pfsSpec.setClassName("org.apache.pinot.spi.filesystem.LocalPinotFS");
+    pfsSpec.setClassName(LocalPinotFS.class.getName());
     jobSpec.setPinotFSSpecs(Collections.singletonList(pfsSpec));
     
     System.setProperty(PluginManager.PLUGINS_DIR_PROPERTY_NAME, pluginsDir.getAbsolutePath());    

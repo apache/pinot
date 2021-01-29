@@ -36,6 +36,7 @@ import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 
 
+@SuppressWarnings("serial")
 public class HadoopSegmentMetadataPushJobRunner implements IngestionJobRunner, Serializable {
   private SegmentGenerationJobSpec _spec;
 
