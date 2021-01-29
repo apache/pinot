@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -136,9 +137,13 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     }
 
     // Update each default column based on the default column action.
-    for (Map.Entry<String, DefaultColumnAction> entry : defaultColumnActionMap.entrySet()) {
-      // This method updates the metadata properties, need to save it later.
-      updateDefaultColumn(entry.getKey(), entry.getValue());
+    Iterator<Map.Entry<String, DefaultColumnAction>> entryIterator = defaultColumnActionMap.entrySet().iterator();
+    while (entryIterator.hasNext()) {
+      Map.Entry<String, DefaultColumnAction> entry = entryIterator.next();
+      // This method updates the metadata properties, need to save it later. Remove the entry if the update failed.
+      if (!updateDefaultColumn(entry.getKey(), entry.getValue())) {
+        entryIterator.remove();
+      }
     }
 
     // Update the segment metadata.
@@ -308,14 +313,10 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   }
 
   /**
-   * Helper method to update default column indices.
-   * TODO: ADD SUPPORT TO STAR TREE INDEX.
-   *
-   * @param column column name.
-   * @param action default column action.
-   * @throws Exception
+   * Helper method to update default column indices, returns {@code true} if the update succeeds, {@code false}
+   * otherwise.
    */
-  protected abstract void updateDefaultColumn(String column, DefaultColumnAction action)
+  protected abstract boolean updateDefaultColumn(String column, DefaultColumnAction action)
       throws Exception;
 
   /**
@@ -339,11 +340,10 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   }
 
   /**
-   * Helper method to create the V1 indices (dictionary and forward index) for a column.
-   *
-   * @param column column name.
+   * Helper method to create the V1 indices (dictionary and forward index) for a column, returns {@code true} if the
+   * creation succeeds, {@code false} otherwise.
    */
-  protected void createColumnV1Indices(String column)
+  protected boolean createColumnV1Indices(String column)
       throws Exception {
     TableConfig tableConfig = _indexLoadingConfig.getTableConfig();
     if (tableConfig != null && tableConfig.getIngestionConfig() != null
@@ -356,50 +356,44 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
           // Check if all arguments exist in the segment
           // TODO: Support chained derived column
-          boolean skipCreatingDerivedColumn = false;
           List<String> arguments = functionEvaluator.getArguments();
           List<ColumnMetadata> argumentsMetadata = new ArrayList<>(arguments.size());
           for (String argument : arguments) {
             ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(argument);
             if (columnMetadata == null) {
-              LOGGER.warn(
-                  "Skip creating derived column: {} because argument: {} does not exist in the segment, creating default value column instead",
-                  column, argument);
-              skipCreatingDerivedColumn = true;
-              break;
+              LOGGER.warn("Skip creating derived column: {} because argument: {} does not exist in the segment", column,
+                  argument);
+              return false;
             }
             argumentsMetadata.add(columnMetadata);
-          }
-          if (skipCreatingDerivedColumn) {
-            break;
           }
 
           // TODO: Support raw derived column
           if (_indexLoadingConfig.getNoDictionaryColumns().contains(column)) {
-            LOGGER.warn("Skip creating raw derived column: {}, creating default value column instead", column);
-            break;
+            LOGGER.warn("Skip creating raw derived column: {}", column);
+            return false;
           }
 
           // TODO: Support multi-value derived column
           if (!_schema.getFieldSpecFor(column).isSingleValueField()) {
             LOGGER.warn("Skip creating MV derived column: {}, creating default value column instead", column);
-            break;
+            return false;
           }
 
           try {
             createDerivedColumnV1Indices(column, functionEvaluator, argumentsMetadata);
-            return;
+            return true;
           } catch (Exception e) {
-            LOGGER.error(
-                "Caught exception while creating derived column: {} with transform function: {}, creating default value column instead",
-                column, transformFunction, e);
-            break;
+            LOGGER.error("Caught exception while creating derived column: {} with transform function: {}", column,
+                transformFunction, e);
+            return false;
           }
         }
       }
     }
 
     createDefaultValueColumnV1Indices(column);
+    return true;
   }
 
   /**

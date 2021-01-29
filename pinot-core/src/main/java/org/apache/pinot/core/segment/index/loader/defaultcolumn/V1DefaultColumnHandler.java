@@ -35,11 +35,8 @@ public class V1DefaultColumnHandler extends BaseDefaultColumnHandler {
     super(indexDir, segmentMetadata, indexLoadingConfig, schema, segmentWriter);
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
-  protected void updateDefaultColumn(String column, DefaultColumnAction action)
+  protected boolean updateDefaultColumn(String column, DefaultColumnAction action)
       throws Exception {
     LOGGER.info("Starting default column action: {} on column: {}", action, column);
 
@@ -50,7 +47,9 @@ public class V1DefaultColumnHandler extends BaseDefaultColumnHandler {
 
     // For ADD and UPDATE action, create new dictionary and forward index, and update column metadata
     if (action.isAddAction() || action.isUpdateAction()) {
-      createColumnV1Indices(column);
+      return createColumnV1Indices(column);
+    } else {
+      return true;
     }
   }
 }
