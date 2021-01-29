@@ -376,10 +376,58 @@ public class TableConfigUtilsTest {
     }
 
     // derived columns - should pass
+    schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("derivedCol", FieldSpec.DataType.STRING)
+            .addMetric("transformedCol", FieldSpec.DataType.LONG).build();
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
         new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("transformedCol", "reverse(x)"),
-            new TransformConfig("myCol", "lower(transformedCol)")))).build();
+            new TransformConfig("derivedCol", "lower(transformedCol)")))).build();
     TableConfigUtils.validate(tableConfig, schema);
+
+    // derived columns - should pass
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
+        new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("transformedCol", "reverse(x)"),
+            new TransformConfig("derivedCol", "Groovy({transformedCol + x}, transformedCol, x)")))).build();
+    TableConfigUtils.validate(tableConfig, schema);
+
+    // derived columns - should pass
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("derivedCol", FieldSpec.DataType.STRING)
+        .addMetric("transformedCol1", FieldSpec.DataType.LONG).addMetric("transformedCol2", FieldSpec.DataType.LONG)
+        .build();
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
+        new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("transformedCol1", "reverse(x)"),
+            new TransformConfig("transformedCol2", "reverse(y)"), new TransformConfig("derivedCol",
+                "Groovy({transformedCol1 + transformedCol2}, transformedCol1, transformedCol2)")))).build();
+    TableConfigUtils.validate(tableConfig, schema);
+
+    // derived column on derived column - should fail
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("derivedCol", FieldSpec.DataType.STRING)
+        .addMetric("derivedColOnDerivedCol", FieldSpec.DataType.LONG).addMetric("transformedCol", FieldSpec.DataType.LONG)
+        .build();
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
+        new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("transformedCol", "reverse(x)"),
+            new TransformConfig("derivedCol", "lower(transformedCol)"),
+            new TransformConfig("derivedColOnDerivedCol", "lower(derivedCol)")))).build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail due to derived column on derived column");
+    } catch (IllegalStateException e) {
+      // expected
+    }
+
+    // derived column on derived column - should fail
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
+        new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("transformedCol", "reverse(x)"),
+            new TransformConfig("derivedCol", "lower(transformedCol)"),
+            new TransformConfig("derivedColOnDerivedCol", "Groovy({derivedCol + transformedCol}, derivedCol, transformedCol)")))).build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail due to derived column on derived column");
+    } catch (IllegalStateException e) {
+      // expected
+    }
   }
 
   @Test

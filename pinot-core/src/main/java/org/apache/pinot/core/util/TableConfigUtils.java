@@ -249,6 +249,7 @@ public final class TableConfigUtils {
       // Transform configs
       List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
       if (transformConfigs != null) {
+        Map<String, FunctionEvaluator> columnToFunction = new HashMap<>();
         Set<String> transformColumns = new HashSet<>();
         for (TransformConfig transformConfig : transformConfigs) {
           String columnName = transformConfig.getColumnName();
@@ -278,9 +279,40 @@ public final class TableConfigUtils {
                 "Arguments of a transform function '" + arguments + "' cannot contain the destination column '"
                     + columnName + "'");
           }
+          columnToFunction.put(columnName, expressionEvaluator);
+        }
+        Map<String, Integer> chainDepth = new HashMap<>();
+        for (String column : columnToFunction.keySet()) {
+          Preconditions.checkState(transformFunctionChainDepth(column, columnToFunction, chainDepth) <= 2,
+              "Cannot create derived column on another derived column");
         }
       }
     }
+  }
+
+  /**
+   * Returns the depth of chaining in transform functions. Eg:
+   * Column A, with no transform function returns 0 (regular column)
+   * Column B, where B = f(A) returns 1 (column with ingestion transform function)
+   * Column C, where C = f(B) returns 2 (derived column)
+   * Column D, where D = f(C) returns 3 (derived column on a derived column)
+   */
+  private static int transformFunctionChainDepth(String column, Map<String, FunctionEvaluator> columnToFunctionMap,
+      Map<String, Integer> depth) {
+    if (depth.containsKey(column)) {
+      return depth.get(column);
+    }
+    FunctionEvaluator functionEvaluator = columnToFunctionMap.get(column);
+    if (functionEvaluator == null) {
+      depth.put(column, 0);
+      return 0;
+    }
+    int maxDepth = Integer.MIN_VALUE;
+    for (String arg : functionEvaluator.getArguments()) {
+      maxDepth = Math.max(maxDepth, transformFunctionChainDepth(arg, columnToFunctionMap, depth));
+    }
+    depth.put(column, maxDepth + 1);
+    return maxDepth + 1;
   }
 
   /**
