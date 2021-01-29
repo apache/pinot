@@ -70,7 +70,7 @@ public class PinotDataSourceResource {
     String resultString;
     PinotQuery pinotQuery = new PinotQuery(pql, tableName);
     try {
-      ThirdEyeResultSetGroup thirdEyeResultSetGroup = pinotDataSource.executePQL(pinotQuery);
+      ThirdEyeResultSetGroup thirdEyeResultSetGroup = pinotDataSource.executeSQL(pinotQuery);
       resultString = OBJECT_MAPPER.writeValueAsString(thirdEyeResultSetGroup);
     } catch (ExecutionException | JsonProcessingException e) {
       LOG.error("Failed to execute PQL ({}) due to the exception:", pinotQuery);
