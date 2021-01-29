@@ -20,6 +20,7 @@ package org.apache.pinot.core.data.readers;
 
 import java.io.Closeable;
 import java.io.IOException;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
@@ -43,6 +44,18 @@ public class PinotSegmentColumnReader implements Closeable {
       _dictIdBuffer = null;
     } else {
       _dictIdBuffer = new int[dataSource.getDataSourceMetadata().getMaxNumValuesPerMVEntry()];
+    }
+  }
+
+  public PinotSegmentColumnReader(ForwardIndexReader reader, @Nullable Dictionary dictionary,
+      int maxNumValuesPerMVEntry) {
+    _reader = reader;
+    _readerContext = _reader.createContext();
+    _dictionary = dictionary;
+    if (_reader.isSingleValue()) {
+      _dictIdBuffer = null;
+    } else {
+      _dictIdBuffer = new int[maxNumValuesPerMVEntry];
     }
   }
 

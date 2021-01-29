@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.core.segment.index.loader.defaultcolumn;
 
-import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
-
-
 public interface DefaultColumnHandler {
 
   /**
@@ -29,6 +26,6 @@ public interface DefaultColumnHandler {
    *
    * @throws Exception
    */
-  void updateDefaultColumns(IndexLoadingConfig indexLoadingConfig)
+  void updateDefaultColumns()
       throws Exception;
 }
