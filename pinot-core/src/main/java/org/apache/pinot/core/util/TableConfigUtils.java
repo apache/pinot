@@ -249,7 +249,8 @@ public final class TableConfigUtils {
       // Transform configs
       List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
       if (transformConfigs != null) {
-        Map<String, FunctionEvaluator> columnToFunction = new HashMap<>();
+        Map<String, String> columnToTransformExpression = new HashMap<>();
+        Map<String, FunctionEvaluator> columnToFunctionEvaluator = new HashMap<>();
         Set<String> transformColumns = new HashSet<>();
         for (TransformConfig transformConfig : transformConfigs) {
           String columnName = transformConfig.getColumnName();
@@ -279,12 +280,18 @@ public final class TableConfigUtils {
                 "Arguments of a transform function '" + arguments + "' cannot contain the destination column '"
                     + columnName + "'");
           }
-          columnToFunction.put(columnName, expressionEvaluator);
+          columnToFunctionEvaluator.put(columnName, expressionEvaluator);
+          columnToTransformExpression.put(columnName, transformFunction);
         }
-        Map<String, Integer> chainDepth = new HashMap<>();
-        for (String column : columnToFunction.keySet()) {
-          Preconditions.checkState(transformFunctionChainDepth(column, columnToFunction, chainDepth) <= 2,
-              "Cannot create derived column on another derived column");
+        Map<String, Integer> transformFunctionChainDepth = new HashMap<>();
+        for (String column : columnToFunctionEvaluator.keySet()) {
+          if (transformFunctionChainDepth(column, columnToFunctionEvaluator, transformFunctionChainDepth) > 2) {
+            Set<String> derivedArguments = columnToFunctionEvaluator.get(column).getArguments().stream()
+                .filter(a -> transformFunctionChainDepth.get(a) == 2).collect(Collectors.toSet());
+            throw new IllegalStateException(String.format(
+                "Derived columns: [%s] cannot be used as arguments to the transform function: %s of derived column: %s.",
+                derivedArguments, columnToTransformExpression.get(column), column));
+          }
         }
       }
     }
