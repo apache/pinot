@@ -428,4 +428,9 @@ public class IndexLoadingConfig {
   public TableConfig getTableConfig() {
     return _tableConfig;
   }
+
+  @VisibleForTesting
+  public void setTableConfig(TableConfig tableConfig) {
+    _tableConfig = tableConfig;
+  }
 }
