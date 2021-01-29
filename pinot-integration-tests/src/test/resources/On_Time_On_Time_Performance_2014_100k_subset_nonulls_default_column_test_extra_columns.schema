@@ -283,6 +283,14 @@
       "dataType": "STRING",
       "singleValueField": false,
       "defaultNullValue": ""
+    },
+    {
+      "name": "NewAddedDerivedHoursSinceEpoch",
+      "dataType": "INT"
+    },
+    {
+      "name": "NewAddedDerivedSecondsSinceEpoch",
+      "dataType": "LONG"
     }
   ],
   "metricFieldSpecs": [

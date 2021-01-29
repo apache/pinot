@@ -57,7 +57,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Util class for generated PQL queries (pinot).
  */
-public class PqlUtils {
+public class SqlUtils {
   private static final Joiner AND = Joiner.on(" AND ");
   private static final Joiner COMMA = Joiner.on(", ");
 
@@ -74,7 +74,7 @@ public class PqlUtils {
   private static final String OPERATOR_GREATER_THAN = ">";
   private static final String OPERATOR_GREATER_THAN_EQUALS = ">=";
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(PqlUtils.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(SqlUtils.class);
   private static final int DEFAULT_TOP = 100000;
   private static final String PERCENTILE_TDIGEST_PREFIX = "percentileTDigest";
 
@@ -85,16 +85,16 @@ public class PqlUtils {
    * Due to the summation, all metric column values can be assumed to be doubles.
    * @throws ExecutionException
    */
-  public static String getPql(ThirdEyeRequest request, MetricFunction metricFunction,
+  public static String getSql(ThirdEyeRequest request, MetricFunction metricFunction,
       Multimap<String, String> filterSet, TimeSpec dataTimeSpec) throws ExecutionException {
     // TODO handle request.getFilterClause()
 
-    return getPql(metricFunction, request.getStartTimeInclusive(), request.getEndTimeExclusive(), filterSet,
+    return getSql(metricFunction, request.getStartTimeInclusive(), request.getEndTimeExclusive(), filterSet,
         request.getGroupBy(), request.getGroupByTimeGranularity(), dataTimeSpec, request.getLimit());
   }
 
 
-  private static String getPql(MetricFunction metricFunction, DateTime startTime,
+  private static String getSql(MetricFunction metricFunction, DateTime startTime,
       DateTime endTimeExclusive, Multimap<String, String> filterSet, List<String> groupBy,
       TimeGranularity timeGranularity, TimeSpec dataTimeSpec, int limit) throws ExecutionException {
 
@@ -102,7 +102,7 @@ public class PqlUtils {
     String dataset = metricFunction.getDataset();
 
     StringBuilder sb = new StringBuilder();
-    String selectionClause = getSelectionClause(metricConfig, metricFunction);
+    String selectionClause = getSelectionClause(metricConfig, metricFunction, groupBy, timeGranularity, dataTimeSpec);
 
     sb.append("SELECT ").append(selectionClause).append(" FROM ").append(dataset);
     String betweenClause = getBetweenClause(startTime, endTimeExclusive, dataTimeSpec, dataset);
@@ -120,14 +120,23 @@ public class PqlUtils {
     String groupByClause = getDimensionGroupByClause(groupBy, timeGranularity, dataTimeSpec);
     if (StringUtils.isNotBlank(groupByClause)) {
       sb.append(" ").append(groupByClause);
-      sb.append(" TOP ").append(limit);
+      sb.append(" LIMIT ").append(limit);
     }
 
     return sb.toString();
   }
 
-  private static String getSelectionClause(MetricConfigDTO metricConfig, MetricFunction metricFunction) {
+  private static String getSelectionClause(MetricConfigDTO metricConfig, MetricFunction metricFunction,
+      List<String> groupBy, TimeGranularity aggregationGranularity, TimeSpec timeSpec) {
     StringBuilder builder = new StringBuilder();
+    if (!groupBy.isEmpty()) {
+      for (String groupByDimension : groupBy) {
+        builder.append(groupByDimension).append(", ");
+      }
+    }
+    if (aggregationGranularity != null) {
+      builder.append(getTimeColumnQueryName(aggregationGranularity, timeSpec)).append(", ");
+    }
     String metricName = null;
     if (metricFunction.getMetricName().equals("*")) {
       metricName = "*";
@@ -147,7 +156,7 @@ public class PqlUtils {
    * @return
    * @throws Exception
    */
-  public static String getDimensionAsMetricPql(ThirdEyeRequest request, MetricFunction metricFunction,
+  public static String getDimensionAsMetricSql(ThirdEyeRequest request, MetricFunction metricFunction,
       Multimap<String, String> filterSet, TimeSpec dataTimeSpec, DatasetConfigDTO datasetConfig) throws Exception {
 
     // select sum(metric_values_column) from collection
@@ -175,7 +184,7 @@ public class PqlUtils {
           + " as metricNamesColumns in " + metricNamesColumns);
     }
 
-    String dimensionAsMetricPql = getDimensionAsMetricPql(metricFunction,
+    String dimensionAsMetricPql = getDimensionAsMetricSql(metricFunction,
         request.getStartTimeInclusive(), request.getEndTimeExclusive(), filterSet,
         request.getGroupBy(), request.getGroupByTimeGranularity(), dataTimeSpec,
         metricNamesList, metricNamesColumnsList, metricValuesColumn, request.getLimit());
@@ -184,7 +193,7 @@ public class PqlUtils {
   }
 
 
-  private static String getDimensionAsMetricPql(MetricFunction metricFunction, DateTime startTime,
+  private static String getDimensionAsMetricSql(MetricFunction metricFunction, DateTime startTime,
       DateTime endTimeExclusive, Multimap<String, String> filterSet, List<String> groupBy,
       TimeGranularity timeGranularity, TimeSpec dataTimeSpec, List<String> metricNames, List<String> metricNamesColumns,
       String metricValuesColumn, int limit)
@@ -214,7 +223,7 @@ public class PqlUtils {
     String groupByClause = getDimensionGroupByClause(groupBy, timeGranularity, dataTimeSpec);
     if (StringUtils.isNotBlank(groupByClause)) {
       sb.append(" ").append(groupByClause);
-      sb.append(" TOP ").append(limit);
+      sb.append(" LIMIT ").append(limit);
     }
 
     return sb.toString();
@@ -355,18 +364,9 @@ public class PqlUtils {
 
   private static String getDimensionGroupByClause(List<String> groupBy,
       TimeGranularity aggregationGranularity, TimeSpec timeSpec) {
-    String timeColumnName = timeSpec.getColumnName();
     List<String> groups = new LinkedList<>();
-    if (aggregationGranularity != null && !groups.contains(timeColumnName)) {
-      // Convert the time column to 1 minute granularity if it is epoch.
-      // E.g., dateTimeConvert(timestampInEpoch,'1:MILLISECONDS:EPOCH','1:MILLISECONDS:EPOCH','1:MINUTES')
-      if (timeSpec.getFormat().equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString())
-          && !timeSpec.getDataGranularity().equals(aggregationGranularity)) {
-        String groupByTimeColumnName = convertEpochToMinuteAggGranularity(timeColumnName, timeSpec);
-        groups.add(groupByTimeColumnName);
-      } else {
-        groups.add(timeColumnName);
-      }
+    if (aggregationGranularity != null) {
+      groups.add(getTimeColumnQueryName(aggregationGranularity, timeSpec));
     }
     if (groupBy != null) {
       groups.addAll(groupBy);
@@ -375,6 +375,19 @@ public class PqlUtils {
       return "";
     }
     return String.format("GROUP BY %s", COMMA.join(groups));
+  }
+
+  private static String getTimeColumnQueryName(TimeGranularity aggregationGranularity, TimeSpec timeSpec) {
+    String timeColumnName = timeSpec.getColumnName();
+    if (aggregationGranularity != null) {
+      // Convert the time column to 1 minute granularity if it is epoch.
+      // E.g., dateTimeConvert(timestampInEpoch,'1:MILLISECONDS:EPOCH','1:MILLISECONDS:EPOCH','1:MINUTES')
+      if (timeSpec.getFormat().equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString())
+          && !timeSpec.getDataGranularity().equals(aggregationGranularity)) {
+        return convertEpochToMinuteAggGranularity(timeColumnName, timeSpec);
+      }
+    }
+    return timeColumnName;
   }
 
   public static String getDataTimeRangeSql(String dataset, String timeColumnName) {
@@ -387,13 +400,13 @@ public class PqlUtils {
    *
    * @param value value to be quoted
    * @return quoted value
-   * @throws IllegalArgumentException if no unused quote char can be found
+   * @throws IllegalArgumentException if no unused quote char can be foundl
    */
   static String quote(String value) {
     String quoteChar = "";
     if (!StringUtils.isNumeric(value)) {
       quoteChar = "\"";
-      if (value.contains(quoteChar)) {
+      if (StringUtils.isEmpty(value) || value.contains(quoteChar)) {
         quoteChar = "\'";
       }
       if (value.contains(quoteChar)) {

@@ -74,9 +74,12 @@ public class IndexLoadingConfig {
   // constructed from FieldConfig
   private Map<String, Map<String, String>> _columnProperties = new HashMap<>();
 
+  private TableConfig _tableConfig;
+
   public IndexLoadingConfig(InstanceDataManagerConfig instanceDataManagerConfig, TableConfig tableConfig) {
     extractFromInstanceConfig(instanceDataManagerConfig);
     extractFromTableConfig(tableConfig);
+    _tableConfig = tableConfig;
   }
 
   private void extractFromTableConfig(TableConfig tableConfig) {
@@ -420,5 +423,14 @@ public class IndexLoadingConfig {
 
   public int getRealtimeAvgMultiValueCount() {
     return _realtimeAvgMultiValueCount;
+  }
+
+  public TableConfig getTableConfig() {
+    return _tableConfig;
+  }
+
+  @VisibleForTesting
+  public void setTableConfig(TableConfig tableConfig) {
+    _tableConfig = tableConfig;
   }
 }

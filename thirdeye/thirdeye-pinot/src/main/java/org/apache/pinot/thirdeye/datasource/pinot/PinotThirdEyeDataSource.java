@@ -168,19 +168,19 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
                   datasetConfig.getPreAggregatedKeyword());
         }
 
-        String pql;
+        String sql;
         MetricConfigDTO metricConfig = metricFunction.getMetricConfig();
         if (metricConfig != null && metricConfig.isDimensionAsMetric()) {
-          pql = PqlUtils.getDimensionAsMetricPql(request, metricFunction, decoratedFilterSet, dataTimeSpec,
+          sql = SqlUtils.getDimensionAsMetricSql(request, metricFunction, decoratedFilterSet, dataTimeSpec,
               datasetConfig);
         } else {
-          pql = PqlUtils.getPql(request, metricFunction, decoratedFilterSet, dataTimeSpec);
+          sql = SqlUtils.getSql(request, metricFunction, decoratedFilterSet, dataTimeSpec);
         }
 
         ThirdEyeResultSetGroup resultSetGroup;
         final long tStartFunction = System.nanoTime();
         try {
-          resultSetGroup = this.executePQL(new PinotQuery(pql, dataset));
+          resultSetGroup = this.executeSQL(new PinotQuery(sql, dataset));
           if (metricConfig != null) {
             ThirdeyeMetricsUtil.getRequestLog()
                 .success(this.getName(), metricConfig.getDataset(), metricConfig.getName(), tStartFunction, System.nanoTime());
@@ -275,7 +275,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
    *
    * @throws ExecutionException is thrown if failed to connect to Pinot or gets results from Pinot.
    */
-  public ThirdEyeResultSetGroup executePQL(PinotQuery pinotQuery) throws ExecutionException {
+  public ThirdEyeResultSetGroup executeSQL(PinotQuery pinotQuery) throws ExecutionException {
     Preconditions
         .checkNotNull(this.pinotResponseCache, "{} doesn't connect to Pinot or cache is not initialized.", getName());
 
@@ -295,7 +295,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
    *
    * @throws ExecutionException is thrown if failed to connect to Pinot or gets results from Pinot.
    */
-  public ThirdEyeResultSetGroup refreshPQL(PinotQuery pinotQuery) throws ExecutionException {
+  public ThirdEyeResultSetGroup refreshSQL(PinotQuery pinotQuery) throws ExecutionException {
     Preconditions
         .checkNotNull(this.pinotResponseCache, "{} doesn't connect to Pinot or cache is not initialized.", getName());
 

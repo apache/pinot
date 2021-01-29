@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -228,5 +229,33 @@ public class ExpressionTransformerTest {
     // no transformation
     expressionTransformer.transform(genericRow);
     Assert.assertEquals(genericRow.getValue("outgoing"), "123");
+  }
+
+  @Test
+  public void testTransformFunctionSortOrder() {
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("a", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("b", FieldSpec.DataType.STRING).addSingleValueDimension("c", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("d", FieldSpec.DataType.STRING).addSingleValueDimension("e", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("f", FieldSpec.DataType.STRING).build();
+    List<TransformConfig> transformConfigs = new ArrayList<>();
+    transformConfigs.add(new TransformConfig("d", "plus(x, 10)"));
+    transformConfigs.add(new TransformConfig("b", "plus(d, 10)"));
+    transformConfigs.add(new TransformConfig("a", "plus(b, 10)"));
+    transformConfigs.add(new TransformConfig("c", "plus(a, d)"));
+    transformConfigs.add(new TransformConfig("f", "plus(e, 10)"));
+    IngestionConfig ingestionConfig = new IngestionConfig(null, null, null, transformConfigs);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testDerivedFunctions")
+        .setIngestionConfig(ingestionConfig).build();
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
+    GenericRow genericRow = new GenericRow();
+    genericRow.putValue("x", 100);
+    genericRow.putValue("e", 200);
+    GenericRow transform = expressionTransformer.transform(genericRow);
+    Assert.assertEquals(transform.getValue("a"), 130.0);
+    Assert.assertEquals(transform.getValue("b"), 120.0);
+    Assert.assertEquals(transform.getValue("c"), 240.0);
+    Assert.assertEquals(transform.getValue("d"), 110.0);
+    Assert.assertEquals(transform.getValue("e"), 200);
+    Assert.assertEquals(transform.getValue("f"), 210.0);
   }
 }
