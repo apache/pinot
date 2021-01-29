@@ -40,6 +40,8 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.utils.config.InstanceUtils;
+import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.spi.config.instance.Instance;
@@ -117,6 +119,7 @@ public class PinotInstanceRestletResource {
 
   @POST
   @Path("/instances")
+  @Authenticate(AccessType.CREATE)
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Create a new instance", consumes = MediaType.APPLICATION_JSON, notes = "Creates a new instance with given instance config")
@@ -131,6 +134,7 @@ public class PinotInstanceRestletResource {
 
   @POST
   @Path("/instances/{instanceName}/state")
+  @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.TEXT_PLAIN)
   @ApiOperation(value = "Enable/disable/drop an instance", notes = "Enable/disable/drop an instance")
@@ -172,6 +176,7 @@ public class PinotInstanceRestletResource {
 
   @DELETE
   @Path("/instances/{instanceName}")
+  @Authenticate(AccessType.DELETE)
   @Consumes(MediaType.TEXT_PLAIN)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Drop an instance", notes = "Drop an instance")
@@ -193,6 +198,7 @@ public class PinotInstanceRestletResource {
 
   @PUT
   @Path("/instances/{instanceName}")
+  @Authenticate(AccessType.UPDATE)
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update the specified instance", consumes = MediaType.APPLICATION_JSON, notes = "Update specified instance with given instance config")
@@ -211,6 +217,7 @@ public class PinotInstanceRestletResource {
 
   @PUT
   @Path("/instances/{instanceName}/updateTags")
+  @Authenticate(AccessType.UPDATE)
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update the tags of the specified instance", consumes = MediaType.APPLICATION_JSON, notes = "Update the tags of the specified instance")

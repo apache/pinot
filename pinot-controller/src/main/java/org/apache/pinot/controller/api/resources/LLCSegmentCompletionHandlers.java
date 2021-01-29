@@ -42,6 +42,8 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
+import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import org.apache.pinot.controller.util.SegmentCompletionUtils;
@@ -257,6 +259,7 @@ public class LLCSegmentCompletionHandlers {
 
   @POST
   @Path(SegmentCompletionProtocol.MSG_TYPE_COMMIT)
+  @Authenticate(AccessType.CREATE)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Produces(MediaType.APPLICATION_JSON)
   public String segmentCommit(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
@@ -340,6 +343,7 @@ public class LLCSegmentCompletionHandlers {
   // TODO: remove this API. Should not upload segment via controller
   @POST
   @Path(SegmentCompletionProtocol.MSG_TYPE_SEGMENT_UPLOAD)
+  @Authenticate(AccessType.CREATE)
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   public String segmentUpload(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
@@ -380,6 +384,7 @@ public class LLCSegmentCompletionHandlers {
 
   @POST
   @Path(SegmentCompletionProtocol.MSG_TYPE_COMMIT_END_METADATA)
+  @Authenticate(AccessType.CREATE)
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   public String segmentCommitEndWithMetadata(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,

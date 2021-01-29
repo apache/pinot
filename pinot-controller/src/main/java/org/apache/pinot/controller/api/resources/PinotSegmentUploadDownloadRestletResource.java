@@ -71,6 +71,8 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
+import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.upload.SegmentValidator;
 import org.apache.pinot.controller.api.upload.ZKOperator;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -394,6 +396,7 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
   @Path("/segments")
+  @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as json")
   // We use this endpoint with URI upload because a request sent with the multipart content type will reject the POST
   // request if a multipart object is not sent. This endpoint does not move the segment to its final location;
@@ -414,6 +417,7 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Path("/segments")
+  @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as binary")
   // For the multipart endpoint, we will always move segment to final location regardless of the segment endpoint.
   public void uploadSegmentAsMultiPart(FormDataMultiPart multiPart,
@@ -432,6 +436,7 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
   @Path("/v2/segments")
+  @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as json")
   // We use this endpoint with URI upload because a request sent with the multipart content type will reject the POST
   // request if a multipart object is not sent. This endpoint is recommended for use. It differs from the first
@@ -452,6 +457,7 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Path("/v2/segments")
+  @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as binary")
   // This behavior does not differ from v1 of the same endpoint.
   public void uploadSegmentAsMultiPartV2(FormDataMultiPart multiPart,
@@ -467,6 +473,7 @@ public class PinotSegmentUploadDownloadRestletResource {
 
   @POST
   @Path("segments/{tableName}/startReplaceSegments")
+  @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Start to replace segments", notes = "Start to replace segments")
   public Response startReplaceSegments(
@@ -487,6 +494,7 @@ public class PinotSegmentUploadDownloadRestletResource {
 
   @POST
   @Path("segments/{tableName}/endReplaceSegments")
+  @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "End to replace segments", notes = "End to replace segments")
   public Response endReplaceSegments(

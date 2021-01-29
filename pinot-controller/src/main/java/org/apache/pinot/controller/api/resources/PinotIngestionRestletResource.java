@@ -37,6 +37,8 @@ import javax.ws.rs.container.Suspended;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.FileIngestionHelper;
 import org.apache.pinot.controller.util.FileIngestionHelper.DataPayload;
@@ -108,6 +110,7 @@ public class PinotIngestionRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Path("/ingestFromFile")
+  @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Ingest a file", notes = "Creates a segment using given file and pushes it to Pinot. "
       + "\n All steps happen on the controller. This API is NOT meant for production environments/large input files. "
       + "\n Example usage (query params need encoding):" + "\n```"
@@ -147,6 +150,7 @@ public class PinotIngestionRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Path("/ingestFromURI")
+  @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Ingest from the given URI", notes =
       "Creates a segment using file at the given URI and pushes it to Pinot. "
           + "\n All steps happen on the controller. This API is NOT meant for production environments/large input files. "

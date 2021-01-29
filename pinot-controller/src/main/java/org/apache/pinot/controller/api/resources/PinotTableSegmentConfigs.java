@@ -31,6 +31,8 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.util.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -53,6 +55,7 @@ public class PinotTableSegmentConfigs {
   @Deprecated
   @PUT
   @Path("/tables/{tableName}/segmentConfigs")
+  @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update segments configuration", notes = "Updates segmentsConfig section (validation and retention) of a table")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Table not found"), @ApiResponse(code = 500, message = "Internal server error")})

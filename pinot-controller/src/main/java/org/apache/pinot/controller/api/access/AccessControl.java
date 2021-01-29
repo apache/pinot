@@ -30,9 +30,38 @@ public interface AccessControl {
   /**
    * Return whether the client has data access to the given table.
    *
-   * @param httpHeaders Http headers
+   * Note: This method is only used fore read access. It's being deprecated and its usage will be replaced by
+   * `hasAccess` method with AccessType.READ.
+   *
+   * @param httpHeaders HTTP headers containing requester identity
    * @param tableName Name of the table to be accessed
    * @return Whether the client has data access to the table
    */
+  @Deprecated
   boolean hasDataAccess(HttpHeaders httpHeaders, String tableName);
+
+  /**
+   * Return whether the client has permission to the given table
+   *
+   * @param tableName name of the table to be accessed
+   * @param accessType type of the access
+   * @param httpHeaders HTTP headers containing requester identity
+   * @param endpointUrl the request url for which this access control is called
+   * @return whether the client has permission
+   */
+  default boolean hasAccess(String tableName, AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
+    return true;
+  }
+
+  /**
+   * Return whether the client has permission to access the epdpoints with are not table level
+   *
+   * @param accessType type of the access
+   * @param httpHeaders HTTP headers
+   * @param endpointUrl the request url for which this access control is called
+   * @return whether the client has permission
+   */
+  default boolean hasAccess(AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
+    return true;
+  }
 }
