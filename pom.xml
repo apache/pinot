@@ -117,7 +117,7 @@
     <parquet.version>1.8.0</parquet.version>
     <helix.version>0.9.8</helix.version>
     <zkclient.version>0.7</zkclient.version>
-    <jackson.version>2.12.0</jackson.version>
+    <jackson.version>2.9.8</jackson.version>
     <async-http-client.version>1.9.21</async-http-client.version>
     <jersey.version>2.28</jersey.version>
     <grizzly.version>2.4.4</grizzly.version>
