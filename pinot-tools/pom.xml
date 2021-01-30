@@ -103,6 +103,12 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-batch-ingestion-standalone</artifactId>
+      <version>${project.version}</version>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-s3</artifactId>
       <version>${project.version}</version>
       <scope>runtime</scope>
