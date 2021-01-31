@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.WordUtils;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReader;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
 import org.apache.pinot.plugin.inputformat.json.JSONRecordReader;
@@ -91,11 +92,15 @@ public class HadoopSegmentGenerationJobRunnerTest {
     // the staging dir if it exists.
     FileUtils.touch(new File(stagingDir, "output"));
     
-    // Set up plugins dir
+    // Set up a plugins dir, with a sub-directory. We'll use an external jar,
+    // since using a class inside of Pinot to find the enclosing jar is somehow
+    // finding the directory of classes vs. the actual jar, on the build server 
+    // (though it works fine in other configurations).
     File pluginsDir = new File(testDir, "plugins");
-    pluginsDir.mkdir();
-    File pluginJar = new File(CSVRecordReaderConfig.class.getProtectionDomain().getCodeSource().getLocation().toURI());
-    FileUtils.copyFile(pluginJar, new File(pluginsDir, pluginJar.getName()));
+    File myPluginDir = new File(pluginsDir, "my-plugin");
+    myPluginDir.mkdirs();
+    File pluginJar = new File(WordUtils.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+    FileUtils.copyFile(pluginJar, new File(myPluginDir, pluginJar.getName()));
     
     // Set up dependency jars dir.
     // FUTURE set up jar with class that we need for reading file, so we know it's working
