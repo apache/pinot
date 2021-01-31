@@ -47,6 +47,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import com.google.common.collect.Lists;
+import com.google.gson.Gson;
 
 public class HadoopSegmentGenerationJobRunnerTest {
 
@@ -106,7 +107,7 @@ public class HadoopSegmentGenerationJobRunnerTest {
     // FUTURE set up jar with class that we need for reading file, so we know it's working
     File dependencyJarsDir = new File(testDir, "jars");
     dependencyJarsDir.mkdir();
-    File extraJar = new File(JSONRecordReader.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+    File extraJar = new File(Gson.class.getProtectionDomain().getCodeSource().getLocation().toURI());
     FileUtils.copyFile(extraJar, new File(dependencyJarsDir, extraJar.getName()));
 
     SegmentGenerationJobSpec jobSpec = new SegmentGenerationJobSpec();
