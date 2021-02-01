@@ -112,6 +112,12 @@ public final class ListenerConfigUtil {
 
     listeners.addAll(buildListenerConfigs(brokerConf, "pinot.broker.client", tlsDefaults));
 
+    // support legacy behavior < 0.7.0
+    if (listeners.isEmpty()) {
+      listeners.add(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST,
+          CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT, CommonConstants.HTTP_PROTOCOL, new TlsConfig()));
+    }
+
     return listeners;
   }
 
@@ -127,6 +133,12 @@ public final class ListenerConfigUtil {
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(serverConf, CommonConstants.Server.SERVER_TLS_PREFIX);
 
     listeners.addAll(buildListenerConfigs(serverConf, "pinot.server.adminapi", tlsDefaults));
+
+    // support legacy behavior < 0.7.0
+    if (listeners.isEmpty()) {
+      listeners.add(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST,
+          CommonConstants.Server.DEFAULT_ADMIN_API_PORT, CommonConstants.HTTP_PROTOCOL, new TlsConfig()));
+    }
 
     return listeners;
   }

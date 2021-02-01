@@ -195,8 +195,9 @@ public class ControllerStarter implements ServiceStartable {
 
   private int inferPort() {
     return Optional.ofNullable(_config.getControllerPort()).map(Integer::parseInt)
-        .orElseGet(() -> _listenerConfigs.stream().findFirst().map(ListenerConfig::getPort)
-            .orElse(ControllerConf.DEFAULT_CONTROLLER_PORT));
+        .orElseGet(() -> _listenerConfigs.stream().findFirst().map(ListenerConfig::getPort).orElseThrow(() ->
+            new IllegalStateException(String.format("Requires at least one ingress config or '%s'",
+                CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT))));
   }
 
   private void setupHelixSystemProperties() {
