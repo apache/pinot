@@ -37,7 +37,6 @@
     <pinot.root>${basedir}/../../..</pinot.root>
     <phase.prop>package</phase.prop>
     <aws.version>2.14.28</aws.version>
-    <powermock.version>2.0.9</powermock.version>
     <jackson.version>2.10.4</jackson.version>
     <netty.version>4.1.42.Final</netty.version>
     <easymock.version>4.2</easymock.version>
