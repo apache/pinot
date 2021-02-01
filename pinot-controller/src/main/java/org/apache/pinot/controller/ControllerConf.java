@@ -65,6 +65,8 @@ public class ControllerConf extends PinotConfiguration {
   public static final String CONTROLLER_MODE = "controller.mode";
   public static final String LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY = "controller.resource.rebalance.strategy";
 
+  public static final int DEFAULT_CONTROLLER_PORT = 9000;
+
   public enum ControllerMode {
     DUAL, PINOT_ONLY, HELIX_ONLY
   }
