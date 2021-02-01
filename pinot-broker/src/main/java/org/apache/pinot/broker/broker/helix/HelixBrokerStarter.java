@@ -26,7 +26,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixConstants.ChangeType;
@@ -125,17 +124,21 @@ public class HelixBrokerStarter implements ServiceStartable {
           .getHostnameOrAddress() : NetUtil.getHostAddress();
     }
 
-    _brokerId = _brokerConf.getProperty(Helix.Instance.INSTANCE_ID_KEY,
-        Helix.PREFIX_OF_BROKER_INSTANCE + brokerHost + "_" + inferPort());
+    _brokerId = _brokerConf
+        .getProperty(Helix.Instance.INSTANCE_ID_KEY, Helix.PREFIX_OF_BROKER_INSTANCE + brokerHost + "_" + inferPort());
 
     _brokerConf.addProperty(Broker.CONFIG_OF_BROKER_ID, _brokerId);
   }
 
   private int inferPort() {
-    return Optional.ofNullable(_brokerConf.getProperty(Helix.KEY_OF_BROKER_QUERY_PORT)).map(Integer::parseInt)
-        .orElseGet(() -> _listenerConfigs.stream().findFirst().map(ListenerConfig::getPort).orElseThrow(() ->
-            new IllegalStateException(String.format("Requires at least one ingress config or '%s'",
-                Helix.KEY_OF_BROKER_QUERY_PORT))));
+    String port = _brokerConf.getProperty(Helix.KEY_OF_BROKER_QUERY_PORT);
+    if (port != null) {
+      return Integer.parseInt(port);
+    }
+    if (!_listenerConfigs.isEmpty()) {
+      return _listenerConfigs.get(0).getPort();
+    }
+    return Helix.DEFAULT_BROKER_QUERY_PORT;
   }
 
   private void setupHelixSystemProperties() {
@@ -256,11 +259,13 @@ public class HelixBrokerStarter implements ServiceStartable {
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_brokerConf, Broker.BROKER_TLS_PREFIX);
 
     if (_brokerConf.getProperty(Broker.BROKER_NETTYTLS_ENABLED, false)) {
-      _brokerRequestHandler = new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager,
-          _accessControlFactory, queryQuotaManager, tableCache, _brokerMetrics, tlsDefaults);
+      _brokerRequestHandler =
+          new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
+              queryQuotaManager, tableCache, _brokerMetrics, tlsDefaults);
     } else {
-      _brokerRequestHandler = new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager,
-          _accessControlFactory, queryQuotaManager, tableCache, _brokerMetrics, null);
+      _brokerRequestHandler =
+          new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
+              queryQuotaManager, tableCache, _brokerMetrics, null);
     }
 
     LOGGER.info("Starting broker admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
