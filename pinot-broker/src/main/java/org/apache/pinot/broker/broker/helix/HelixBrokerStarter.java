@@ -126,14 +126,9 @@ public class HelixBrokerStarter implements ServiceStartable {
     }
 
     _brokerId = _brokerConf.getProperty(Helix.Instance.INSTANCE_ID_KEY,
-        Helix.PREFIX_OF_BROKER_INSTANCE + brokerHost + "_" + inferPort());
+        Helix.PREFIX_OF_BROKER_INSTANCE + brokerHost + "_" + _listenerConfigs.get(0).getPort());
 
     _brokerConf.addProperty(Broker.CONFIG_OF_BROKER_ID, _brokerId);
-  }
-
-  private int inferPort() {
-    return Optional.ofNullable(_brokerConf.getProperty(Helix.KEY_OF_BROKER_QUERY_PORT)).map(Integer::parseInt)
-        .orElseGet(() -> _listenerConfigs.stream().findFirst().map(ListenerConfig::getPort).get());
   }
 
   private void setupHelixSystemProperties() {
