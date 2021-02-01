@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.stream.kinesis;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.Map;
 import org.apache.pinot.spi.stream.Checkpoint;
@@ -33,6 +34,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
  */
 public class KinesisCheckpoint implements StreamPartitionMsgOffset {
   private final Map<String, String> _shardToStartSequenceMap;
+  public static final ObjectMapper objectMapper = new ObjectMapper();
 
   public KinesisCheckpoint(Map<String, String> shardToStartSequenceMap) {
     _shardToStartSequenceMap = shardToStartSequenceMap;
@@ -40,8 +42,7 @@ public class KinesisCheckpoint implements StreamPartitionMsgOffset {
 
   public KinesisCheckpoint(String checkpointStr)
       throws IOException {
-    _shardToStartSequenceMap = JsonUtils.stringToObject(checkpointStr, new TypeReference<Map<String, String>>() {
-    });
+    _shardToStartSequenceMap = objectMapper.readValue(checkpointStr, new TypeReference<Map<String, String>>(){});
   }
 
   public Map<String, String> getShardToStartSequenceMap() {
@@ -51,7 +52,7 @@ public class KinesisCheckpoint implements StreamPartitionMsgOffset {
   @Override
   public String serialize() {
     try {
-      return JsonUtils.objectToString(_shardToStartSequenceMap);
+      return objectMapper.writeValueAsString(_shardToStartSequenceMap);
     } catch (JsonProcessingException e) {
       throw new IllegalStateException();
     }

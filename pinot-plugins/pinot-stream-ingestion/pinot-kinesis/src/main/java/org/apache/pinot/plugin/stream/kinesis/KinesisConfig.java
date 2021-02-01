@@ -59,4 +59,8 @@ public class KinesisConfig {
   public ShardIteratorType getShardIteratorType() {
     return ShardIteratorType.fromValue(_props.getOrDefault(SHARD_ITERATOR_TYPE, DEFAULT_SHARD_ITERATOR_TYPE));
   }
+
+  public void setMaxRecordsToFetch(int maxRecordsToFetch){
+    _props.put(MAX_RECORDS_TO_FETCH, String.valueOf(maxRecordsToFetch));
+  }
 }

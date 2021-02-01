@@ -18,51 +18,162 @@
  */
 package org.apache.pinot.plugin.stream.kinesis;
 
-import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.spi.stream.PartitionGroupMetadata;
-import software.amazon.awssdk.services.kinesis.model.Shard;
-import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
+import org.apache.pinot.spi.stream.StreamConsumerFactory;
+import org.easymock.Capture;
+import org.testng.Assert;
+import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.Test;
+import software.amazon.awssdk.core.SdkBytes;
+import software.amazon.awssdk.services.kinesis.KinesisClient;
+import software.amazon.awssdk.services.kinesis.model.ChildShard;
+import software.amazon.awssdk.services.kinesis.model.GetRecordsRequest;
+import software.amazon.awssdk.services.kinesis.model.GetRecordsResponse;
+import software.amazon.awssdk.services.kinesis.model.GetShardIteratorRequest;
+import software.amazon.awssdk.services.kinesis.model.GetShardIteratorResponse;
+import software.amazon.awssdk.services.kinesis.model.Record;
+
+import static org.easymock.EasyMock.capture;
+import static org.easymock.EasyMock.createMock;
+import static org.easymock.EasyMock.expect;
+import static org.easymock.EasyMock.replay;
 
 
 public class KinesisConsumerTest {
+  public static final int TIMEOUT = 1000;
+  public static final int NUM_RECORDS = 10;
+  public static final String DUMMY_RECORD_PREFIX = "DUMMY_RECORD-";
+  public static final String PARTITION_KEY_PREFIX = "PARTITION_KEY-";
+  public static final String PLACEHOLDER = "DUMMY";
 
-  private static final String STREAM_NAME = "kinesis-test";
-  private static final String AWS_REGION = "us-west-2";
+  private static KinesisConnectionHandler kinesisConnectionHandler;
+  private static StreamConsumerFactory streamConsumerFactory;
+  private static KinesisClient kinesisClient;
+  private List<Record> recordList;
 
-  public static void main(String[] args)
-      throws IOException {
-    Map<String, String> props = new HashMap<>();
-    props.put(KinesisConfig.STREAM, STREAM_NAME);
-    props.put(KinesisConfig.AWS_REGION, AWS_REGION);
-    props.put(KinesisConfig.MAX_RECORDS_TO_FETCH, "10");
-    props.put(KinesisConfig.SHARD_ITERATOR_TYPE, ShardIteratorType.AT_SEQUENCE_NUMBER.toString());
-    KinesisConfig kinesisConfig = new KinesisConfig(props);
-    KinesisConnectionHandler kinesisConnectionHandler = new KinesisConnectionHandler(STREAM_NAME, AWS_REGION);
-    List<Shard> shardList = kinesisConnectionHandler.getShards();
-    for (Shard shard : shardList) {
-      System.out.println("SHARD: " + shard.shardId());
+  @BeforeMethod
+  public void setupTest() {
+    kinesisConnectionHandler = createMock(KinesisConnectionHandler.class);
+    kinesisClient = createMock(KinesisClient.class);
+    streamConsumerFactory = createMock(StreamConsumerFactory.class);
 
-      KinesisConsumer kinesisConsumer = new KinesisConsumer(kinesisConfig);
-      System.out.println(
-          "Kinesis Checkpoint Range: < " + shard.sequenceNumberRange().startingSequenceNumber() + ", " + shard
-              .sequenceNumberRange().endingSequenceNumber() + " >");
-      Map<String, String> shardIdToSeqNumMap = new HashMap<>();
-      shardIdToSeqNumMap.put(shard.shardId(), shard.sequenceNumberRange().startingSequenceNumber());
-      KinesisCheckpoint kinesisCheckpoint = new KinesisCheckpoint(shardIdToSeqNumMap);
-      KinesisRecordsBatch kinesisRecordsBatch = kinesisConsumer.fetchMessages(kinesisCheckpoint, null, 60 * 1000);
-      int n = kinesisRecordsBatch.getMessageCount();
+    recordList = new ArrayList<>();
 
-      System.out.println("Found " + n + " messages ");
-      for (int i = 0; i < n; i++) {
-        System.out.println(
-            "SEQ-NO: " + kinesisRecordsBatch.getMessageOffsetAtIndex(i) + ", DATA: " + kinesisRecordsBatch
-                .getMessageAtIndex(i));
-      }
-      kinesisConsumer.close();
+    for (int i = 0; i < NUM_RECORDS; i++) {
+      Record record =
+          Record.builder().data(SdkBytes.fromUtf8String(DUMMY_RECORD_PREFIX + i)).partitionKey(PARTITION_KEY_PREFIX + i)
+              .sequenceNumber(String.valueOf(i + 1)).build();
+      recordList.add(record);
     }
-    kinesisConnectionHandler.close();
+  }
+
+  @Test
+  public void testBasicConsumer() {
+    Capture<GetRecordsRequest> getRecordsRequestCapture = Capture.newInstance();
+    Capture<GetShardIteratorRequest> getShardIteratorRequestCapture = Capture.newInstance();
+
+    GetRecordsResponse getRecordsResponse =
+        GetRecordsResponse.builder().nextShardIterator(null).records(recordList).build();
+    GetShardIteratorResponse getShardIteratorResponse =
+        GetShardIteratorResponse.builder().shardIterator(PLACEHOLDER).build();
+
+    expect(kinesisClient.getRecords(capture(getRecordsRequestCapture))).andReturn(getRecordsResponse).anyTimes();
+    expect(kinesisClient.getShardIterator(capture(getShardIteratorRequestCapture))).andReturn(getShardIteratorResponse)
+        .anyTimes();
+
+    replay(kinesisClient);
+
+    KinesisConsumer kinesisConsumer = new KinesisConsumer(TestUtils.getKinesisConfig(), kinesisClient);
+
+    Map<String, String> shardToSequenceMap = new HashMap<>();
+    shardToSequenceMap.put("0", "1");
+    KinesisCheckpoint kinesisCheckpoint = new KinesisCheckpoint(shardToSequenceMap);
+    KinesisRecordsBatch kinesisRecordsBatch = kinesisConsumer.fetchMessages(kinesisCheckpoint, null, TIMEOUT);
+
+    Assert.assertEquals(kinesisRecordsBatch.getMessageCount(), NUM_RECORDS);
+
+    for (int i = 0; i < NUM_RECORDS; i++) {
+      Assert.assertEquals(baToString(kinesisRecordsBatch.getMessageAtIndex(i)), DUMMY_RECORD_PREFIX + i);
+    }
+
+    Assert.assertFalse(kinesisRecordsBatch.isEndOfPartitionGroup());
+  }
+
+  @Test
+  public void testBasicConsumerWithMaxRecordsLimit() {
+    int maxRecordsLimit = 20;
+    Capture<GetRecordsRequest> getRecordsRequestCapture = Capture.newInstance();
+    Capture<GetShardIteratorRequest> getShardIteratorRequestCapture = Capture.newInstance();
+
+    GetRecordsResponse getRecordsResponse =
+        GetRecordsResponse.builder().nextShardIterator(PLACEHOLDER).records(recordList).build();
+    GetShardIteratorResponse getShardIteratorResponse =
+        GetShardIteratorResponse.builder().shardIterator(PLACEHOLDER).build();
+
+    expect(kinesisClient.getRecords(capture(getRecordsRequestCapture))).andReturn(getRecordsResponse).anyTimes();
+    expect(kinesisClient.getShardIterator(capture(getShardIteratorRequestCapture))).andReturn(getShardIteratorResponse)
+        .anyTimes();
+
+    replay(kinesisClient);
+
+    KinesisConfig kinesisConfig = TestUtils.getKinesisConfig();
+    kinesisConfig.setMaxRecordsToFetch(maxRecordsLimit);
+    KinesisConsumer kinesisConsumer = new KinesisConsumer(kinesisConfig, kinesisClient);
+
+    Map<String, String> shardToSequenceMap = new HashMap<>();
+    shardToSequenceMap.put("0", "1");
+    KinesisCheckpoint kinesisCheckpoint = new KinesisCheckpoint(shardToSequenceMap);
+    KinesisRecordsBatch kinesisRecordsBatch = kinesisConsumer.fetchMessages(kinesisCheckpoint, null, TIMEOUT);
+
+    Assert.assertEquals(kinesisRecordsBatch.getMessageCount(), maxRecordsLimit);
+
+    for (int i = 0; i < NUM_RECORDS; i++) {
+      Assert.assertEquals(baToString(kinesisRecordsBatch.getMessageAtIndex(i)), DUMMY_RECORD_PREFIX + i);
+    }
+  }
+
+  @Test
+  public void testBasicConsumerWithChildShard() {
+    int maxRecordsLimit = 20;
+
+    List<ChildShard> shardList = new ArrayList<>();
+    shardList.add(ChildShard.builder().shardId(PLACEHOLDER).parentShards("0").build());
+
+    Capture<GetRecordsRequest> getRecordsRequestCapture = Capture.newInstance();
+    Capture<GetShardIteratorRequest> getShardIteratorRequestCapture = Capture.newInstance();
+
+    GetRecordsResponse getRecordsResponse =
+        GetRecordsResponse.builder().nextShardIterator(null).records(recordList).childShards(shardList).build();
+    GetShardIteratorResponse getShardIteratorResponse =
+        GetShardIteratorResponse.builder().shardIterator(PLACEHOLDER).build();
+
+    expect(kinesisClient.getRecords(capture(getRecordsRequestCapture))).andReturn(getRecordsResponse).anyTimes();
+    expect(kinesisClient.getShardIterator(capture(getShardIteratorRequestCapture))).andReturn(getShardIteratorResponse)
+        .anyTimes();
+
+    replay(kinesisClient);
+
+    KinesisConfig kinesisConfig = TestUtils.getKinesisConfig();
+    kinesisConfig.setMaxRecordsToFetch(maxRecordsLimit);
+    KinesisConsumer kinesisConsumer = new KinesisConsumer(kinesisConfig, kinesisClient);
+
+    Map<String, String> shardToSequenceMap = new HashMap<>();
+    shardToSequenceMap.put("0", "1");
+    KinesisCheckpoint kinesisCheckpoint = new KinesisCheckpoint(shardToSequenceMap);
+    KinesisRecordsBatch kinesisRecordsBatch = kinesisConsumer.fetchMessages(kinesisCheckpoint, null, TIMEOUT);
+
+    Assert.assertTrue(kinesisRecordsBatch.isEndOfPartitionGroup());
+    Assert.assertEquals(kinesisRecordsBatch.getMessageCount(), NUM_RECORDS);
+
+    for (int i = 0; i < NUM_RECORDS; i++) {
+      Assert.assertEquals(baToString(kinesisRecordsBatch.getMessageAtIndex(i)), DUMMY_RECORD_PREFIX + i);
+    }
+  }
+
+  public String baToString(byte[] bytes) {
+    return SdkBytes.fromByteArray(bytes).asUtf8String();
   }
 }

@@ -31,6 +31,7 @@ import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.services.kinesis.KinesisClient;
 import software.amazon.awssdk.services.kinesis.model.ExpiredIteratorException;
 import software.amazon.awssdk.services.kinesis.model.GetRecordsRequest;
 import software.amazon.awssdk.services.kinesis.model.GetRecordsResponse;
@@ -55,6 +56,15 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
 
   public KinesisConsumer(KinesisConfig kinesisConfig) {
     super(kinesisConfig.getStream(), kinesisConfig.getAwsRegion());
+    _stream = kinesisConfig.getStream();
+    _maxRecords = kinesisConfig.maxRecordsToFetch();
+    _shardIteratorType = kinesisConfig.getShardIteratorType();
+    _executorService = Executors.newSingleThreadExecutor();
+  }
+
+  public KinesisConsumer(KinesisConfig kinesisConfig, KinesisClient kinesisClient) {
+    super(kinesisConfig.getStream(), kinesisConfig.getAwsRegion(), kinesisClient);
+    _kinesisClient = kinesisClient;
     _stream = kinesisConfig.getStream();
     _maxRecords = kinesisConfig.maxRecordsToFetch();
     _shardIteratorType = kinesisConfig.getShardIteratorType();
@@ -175,6 +185,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     if (sequenceNumber != null && _shardIteratorType.toString().contains("SEQUENCE")) {
       requestBuilder = requestBuilder.startingSequenceNumber(sequenceNumber);
     }
+
     return _kinesisClient.getShardIterator(requestBuilder.build()).shardIterator();
   }
 
