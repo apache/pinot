@@ -870,11 +870,11 @@ public class PinotLLCRealtimeSegmentManager {
     // The following check prevents the table from going into such a state (but does not prevent the root cause
     // of attempting such a zk update).
     LLCSegmentName newLLCSegmentName = new LLCSegmentName(newSegmentName);
-    int partitionId = newLLCSegmentName.getPartitionId();
+    int partitionId = newLLCSegmentName.getPartitionGroupId();
     int seqNum = newLLCSegmentName.getSequenceNumber();
     for (String segmentNameStr : instanceStatesMap.keySet()) {
       LLCSegmentName llcSegmentName = new LLCSegmentName(segmentNameStr);
-      if (llcSegmentName.getPartitionId() == partitionId && llcSegmentName.getSequenceNumber() == seqNum) {
+      if (llcSegmentName.getPartitionGroupId() == partitionId && llcSegmentName.getSequenceNumber() == seqNum) {
         String errorMsg =
             String.format("Segment %s is a duplicate of existing segment %s", newSegmentName, segmentNameStr);
         LOGGER.error(errorMsg);
