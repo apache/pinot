@@ -16,42 +16,11 @@ import Component from '@ember/component';
 import { computed } from '@ember/object';
 import { A as EmberArray } from '@ember/array';
 
-import moment from 'moment';
-import config from 'thirdeye-frontend/config/environment';
-import { getAnomaliesStartDuration, getFeedback } from 'thirdeye-frontend/utils/composite-anomalies';
-
-const TABLE_COLUMNS = [
-  {
-    component: 'custom/composite-anomalies-table/start-duration',
-    propertyName: 'startDuration',
-    title: `Start / Duration (${moment.tz([2012, 5], config.timeZone).format('z')})`
-  },
-  {
-    component: 'custom/composite-anomalies-table/metric',
-    propertyName: 'metric',
-    title: 'Metric'
-  },
-  {
-    component: 'custom/composite-anomalies-table/dimensions',
-    propertyName: 'dimensions',
-    title: 'Dimension'
-  },
-  {
-    component: 'custom/composite-anomalies-table/current-predicted',
-    propertyName: 'currentPredicted',
-    title: 'Current / Predicted'
-  },
-  {
-    component: 'custom/composite-anomalies-table/resolution',
-    propertyName: 'feedback',
-    title: 'Feedback'
-  },
-  {
-    component: 'custom/anomalies-table/investigation-link',
-    propertyName: 'id',
-    title: 'Investigate'
-  }
-];
+import {
+  getAnomaliesStartDuration,
+  getFeedback,
+  ENTITY_METRICS_COLUMNS
+} from 'thirdeye-frontend/utils/composite-anomalies';
 
 const CUSTOM_TABLE_CLASSES = {
   table: 'composite-anomalies-table'
@@ -67,14 +36,14 @@ export default Component.extend({
     const computedTableData = [];
 
     if (this.data && this.data.length > 0) {
-      this.data.map((d) => {
+      this.data.map(({ id, startTime, endTime, metric, dimensions, currentPredicted, feedback }) => {
         const row = {
-          id: d.id,
-          startDuration: getAnomaliesStartDuration(d.startTime, d.endTime, false),
-          metric: d.metric,
-          dimensions: d.dimensions,
-          currentPredicted: d.currentPredicted,
-          feedback: getFeedback(d.feedback),
+          id: id,
+          startDuration: getAnomaliesStartDuration(startTime, endTime, false),
+          metric: metric,
+          dimensions: dimensions,
+          currentPredicted: currentPredicted,
+          feedback: getFeedback(feedback),
           isLeaf: true
         };
         computedTableData.push(row);
@@ -83,5 +52,5 @@ export default Component.extend({
 
     return computedTableData;
   }),
-  tableColumns: TABLE_COLUMNS
+  tableColumns: ENTITY_METRICS_COLUMNS
 });

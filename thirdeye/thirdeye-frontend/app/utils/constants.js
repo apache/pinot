@@ -10,9 +10,11 @@ export const toastOptions = {
 };
 
 export const BREADCRUMB_TIME_DISPLAY_FORMAT = 'MMM D HH:mm';
+export const ANOMALIES_START_DISPLAY_FORMAT = 'MMM Do, h:mm';
 
 export default {
   deleteProps,
   toastOptions,
-  BREADCRUMB_TIME_DISPLAY_FORMAT
+  BREADCRUMB_TIME_DISPLAY_FORMAT,
+  ANOMALIES_START_DISPLAY_FORMAT
 };
