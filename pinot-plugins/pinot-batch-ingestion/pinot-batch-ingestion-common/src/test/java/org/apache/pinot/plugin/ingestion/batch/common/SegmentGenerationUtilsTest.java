@@ -60,6 +60,11 @@ public class SegmentGenerationUtilsTest {
   public void testGetFileURI() throws Exception {
     // Typical file URI
     validateFileURI(new URI("file:/path/to/"));
+    validateFileURI(new URI("file://hostname/path/to/"));
+    validateFileURI(new URI("file:///path/to/"));
+
+    // Regular HDFS path
+    validateFileURI(new URI("hdfs:///path/to/"));
 
     // Namenode as authority, plus non-standard port
     validateFileURI(new URI("hdfs://namenode:9999/path/to/"));
