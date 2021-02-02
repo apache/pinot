@@ -35,7 +35,6 @@ import java.util.HashMap;
 import java.util.List;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.FilenameUtils;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.LongWritable;
@@ -325,7 +324,7 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
   private void moveFiles(PinotFS fs, URI sourceDir, URI destDir, boolean overwrite) throws IOException, URISyntaxException {
     for (String sourcePath : fs.listFiles(sourceDir, true)) {
       URI sourceFileUri = SegmentGenerationUtils.getFileURI(sourcePath, sourceDir);
-      String sourceFilename = FilenameUtils.getName(sourceFileUri.getPath());
+      String sourceFilename = SegmentGenerationUtils.getFileName(sourceFileUri);
       URI destFileUri = SegmentGenerationUtils.getRelativeOutputPath(sourceDir, sourceFileUri, destDir).resolve(sourceFilename);
       
       if (!overwrite && fs.exists(destFileUri)) {
