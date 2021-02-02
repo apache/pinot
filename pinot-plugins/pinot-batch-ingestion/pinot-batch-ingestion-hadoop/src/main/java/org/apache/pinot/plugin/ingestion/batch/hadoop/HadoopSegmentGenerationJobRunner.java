@@ -370,7 +370,7 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
         outputDirFS.copyFromLocalFile(pluginsTarGzFile, cachedPluginsTarball.toUri());
         job.addCacheFile(cachedPluginsTarball.toUri());
       } catch (Exception e) {
-        LOGGER.error("Failed to tar plugins directory", e);
+        LOGGER.error("Failed to tar plugins directory and upload to staging dir", e);
         throw new RuntimeException(e);
       }
 
