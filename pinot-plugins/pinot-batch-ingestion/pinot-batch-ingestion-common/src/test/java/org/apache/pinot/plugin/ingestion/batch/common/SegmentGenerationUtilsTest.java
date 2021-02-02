@@ -58,13 +58,23 @@ public class SegmentGenerationUtilsTest {
 
   @Test
   public void testGetFileURI() throws Exception {
-    // Typical file URI
+    // Raw path without scheme
+    Assert.assertEquals(SegmentGenerationUtils.getFileURI("/path/to/file", new URI("file:/path/to")).toString(),
+        "file:/path/to/file");
+    Assert.assertEquals(SegmentGenerationUtils.getFileURI("/path/to/file", new URI("hdfs://namenode/path/to")).toString(),
+        "hdfs://namenode/path/to/file");
+    Assert.assertEquals(SegmentGenerationUtils.getFileURI("/path/to/file", new URI("hdfs:///path/to")).toString(),
+        "hdfs:/path/to/file");
+
+    // Typical local file URI
     validateFileURI(new URI("file:/path/to/"));
+    // Remote hostname.
     validateFileURI(new URI("file://hostname/path/to/"));
-    validateFileURI(new URI("file:///path/to/"));
+    // Local hostname
+    validateFileURI(new URI("file:///path/to/"), "file:/path/to/");
 
     // Regular HDFS path
-    validateFileURI(new URI("hdfs:///path/to/"));
+    validateFileURI(new URI("hdfs:///path/to/"), "hdfs:/path/to/");
 
     // Namenode as authority, plus non-standard port
     validateFileURI(new URI("hdfs://namenode:9999/path/to/"));
@@ -74,15 +84,19 @@ public class SegmentGenerationUtilsTest {
 
     // S3 URI with userInfo (username/password)
     validateFileURI(new URI("s3://username:password@bucket/path/to/"));
+    
   }
 
-  private void validateFileURI(URI directoryURI) throws URISyntaxException {
+  private void validateFileURI(URI directoryURI, String expectedPrefix) throws URISyntaxException {
     URI fileURI = new URI(directoryURI.toString() + "file");
     String rawPath = fileURI.getRawPath();
 
     Assert.assertEquals(SegmentGenerationUtils.getFileURI(rawPath, fileURI).toString(),
-        fileURI.toString());
+        expectedPrefix + "file");
+  }
 
+  private void validateFileURI(URI directoryURI) throws URISyntaxException {
+    validateFileURI(directoryURI, directoryURI.toString());
   }
 
 }
