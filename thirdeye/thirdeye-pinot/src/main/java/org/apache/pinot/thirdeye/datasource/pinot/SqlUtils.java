@@ -24,6 +24,7 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
+import java.util.regex.Pattern;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
@@ -78,6 +79,11 @@ public class SqlUtils {
   private static final int DEFAULT_TOP = 100000;
   private static final String PERCENTILE_TDIGEST_PREFIX = "percentileTDigest";
 
+  // for escaping queries that have reserved keywords
+  private static final String RESERVED_KEYWORDS = "(DATE|TIME|TIMESTAMP|GROUPS|TABLE)";
+  private static final Pattern RESERVED_KEYWORD_PATTERN = Pattern.compile(
+      "([^a-zA-Z0-9_$\"]|^)" + RESERVED_KEYWORDS + "([^a-zA-Z0-9_$\"]|$)", Pattern.CASE_INSENSITIVE);
+  private static final String RESERVED_KEYWORD_REPLACEMENT = "$1\"$2\"$3";
 
   /**
    * Returns sql to calculate the sum of all raw metrics required for <tt>request</tt>, grouped by
@@ -123,7 +129,7 @@ public class SqlUtils {
       sb.append(" LIMIT ").append(limit);
     }
 
-    return sb.toString();
+    return escapeSqlReservedKeywords(sb.toString());
   }
 
   private static String getSelectionClause(MetricConfigDTO metricConfig, MetricFunction metricFunction,
@@ -189,9 +195,13 @@ public class SqlUtils {
         request.getGroupBy(), request.getGroupByTimeGranularity(), dataTimeSpec,
         metricNamesList, metricNamesColumnsList, metricValuesColumn, request.getLimit());
 
-    return dimensionAsMetricPql;
+    return escapeSqlReservedKeywords(dimensionAsMetricPql);
   }
 
+  private static String escapeSqlReservedKeywords(String query) {
+    // escape all reserve keywords with double quotes
+    return RESERVED_KEYWORD_PATTERN.matcher(query).replaceAll(RESERVED_KEYWORD_REPLACEMENT);
+  }
 
   private static String getDimensionAsMetricSql(MetricFunction metricFunction, DateTime startTime,
       DateTime endTimeExclusive, Multimap<String, String> filterSet, List<String> groupBy,
