@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.stream.kinesis;
 
 import java.util.Map;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
 import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 
 
@@ -27,7 +28,7 @@ import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
  * Kinesis stream specific config
  */
 public class KinesisConfig {
-  public static final String STREAM = "stream";
+  public static final String STREAM_TYPE = "kinesis";
   public static final String SHARD_ITERATOR_TYPE = "shard-iterator-type";
   public static final String AWS_REGION = "aws-region";
   public static final String MAX_RECORDS_TO_FETCH = "max-records-to-fetch";
@@ -45,7 +46,8 @@ public class KinesisConfig {
   }
 
   public String getStream() {
-    return _props.get(STREAM);
+    return _props
+        .get(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_TOPIC_NAME));
   }
 
   public String getAwsRegion() {

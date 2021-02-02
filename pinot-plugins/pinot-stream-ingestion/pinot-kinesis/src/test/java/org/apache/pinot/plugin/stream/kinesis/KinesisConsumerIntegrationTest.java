@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
 import software.amazon.awssdk.services.kinesis.model.Shard;
 import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 
@@ -34,7 +35,8 @@ public class KinesisConsumerIntegrationTest {
   public static void main(String[] args)
       throws IOException {
     Map<String, String> props = new HashMap<>();
-    props.put(KinesisConfig.STREAM, STREAM_NAME);
+    props.put(StreamConfigProperties
+        .constructStreamProperty(KinesisConfig.STREAM_TYPE, StreamConfigProperties.STREAM_TOPIC_NAME), STREAM_NAME);
     props.put(KinesisConfig.AWS_REGION, AWS_REGION);
     props.put(KinesisConfig.MAX_RECORDS_TO_FETCH, "10");
     props.put(KinesisConfig.SHARD_ITERATOR_TYPE, ShardIteratorType.AT_SEQUENCE_NUMBER.toString());

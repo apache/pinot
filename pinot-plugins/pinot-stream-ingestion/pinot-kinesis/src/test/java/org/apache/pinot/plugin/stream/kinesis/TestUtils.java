@@ -31,7 +31,6 @@ public class TestUtils {
 
   public static StreamConfig getStreamConfig() {
     Map<String, String> props = new HashMap<>();
-    props.put(KinesisConfig.STREAM, STREAM_NAME);
     props.put(KinesisConfig.AWS_REGION, AWS_REGION);
     props.put(KinesisConfig.MAX_RECORDS_TO_FETCH, "10");
     props.put(KinesisConfig.SHARD_ITERATOR_TYPE, ShardIteratorType.AT_SEQUENCE_NUMBER.toString());
@@ -46,7 +45,7 @@ public class TestUtils {
 
   public static KinesisConfig getKinesisConfig() {
     Map<String, String> props = new HashMap<>();
-    props.put(KinesisConfig.STREAM, STREAM_NAME);
+    props.put("stream.kinesis.topic.name", STREAM_NAME);
     props.put(KinesisConfig.AWS_REGION, AWS_REGION);
     props.put(KinesisConfig.MAX_RECORDS_TO_FETCH, "10");
     props.put(KinesisConfig.SHARD_ITERATOR_TYPE, ShardIteratorType.AT_SEQUENCE_NUMBER.toString());
