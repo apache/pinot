@@ -173,7 +173,7 @@ public class PinotLLCRealtimeSegmentManager {
 
     // From all segment names in the ideal state, find unique partition group ids and their latest segment
     Map<Integer, LLCSegmentName> partitionGroupIdToLatestSegment = new HashMap<>();
-    for (String segment : idealState.getPartitionSet()) {
+    for (String segment : idealState.getRecord().getMapFields().keySet()) {
       LLCSegmentName llcSegmentName = new LLCSegmentName(segment);
       int partitionGroupId = llcSegmentName.getPartitionGroupId();
       partitionGroupIdToLatestSegment.compute(partitionGroupId, (k, latestSegment) -> {
@@ -192,11 +192,8 @@ public class PinotLLCRealtimeSegmentManager {
     for (Map.Entry<Integer, LLCSegmentName> entry : partitionGroupIdToLatestSegment.entrySet()) {
       int partitionGroupId = entry.getKey();
       LLCSegmentName llcSegmentName = entry.getValue();
-      RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = ZKMetadataProvider
-          .getRealtimeSegmentZKMetadata(_propertyStore, llcSegmentName.getTableName(), llcSegmentName.getSegmentName());
-      Preconditions.checkNotNull(realtimeSegmentZKMetadata);
       LLCRealtimeSegmentZKMetadata llRealtimeSegmentZKMetadata =
-          (LLCRealtimeSegmentZKMetadata) realtimeSegmentZKMetadata;
+          getSegmentZKMetadata(streamConfig.getTableNameWithType(), llcSegmentName.getSegmentName());
       PartitionGroupMetadata partitionGroupMetadata =
           new PartitionGroupMetadata(partitionGroupId, llcSegmentName.getSequenceNumber(),
               checkpointFactory.create(llRealtimeSegmentZKMetadata.getStartOffset()),
@@ -531,7 +528,7 @@ public class PinotLLCRealtimeSegmentManager {
       newConsumingSegmentName = newLLCSegment.getSegmentName();
     }
 
-    // TODO: create new partition groups also here
+    // TODO: Also, create new partition groups here (instead of waiting for the Validation Manager)
     //  Cannot do it at the moment, because of the timestamp suffix on the segment name.
     //  Different committing segments could create a CONSUMING segment for same new partitionGroup, with different name
 
@@ -869,20 +866,19 @@ public class PinotLLCRealtimeSegmentManager {
     // These conditions can happen again due to manual operations considered as fixes in Issues #5559 and #5263
     // The following check prevents the table from going into such a state (but does not prevent the root cause
     // of attempting such a zk update).
-    LLCSegmentName newLLCSegmentName = new LLCSegmentName(newSegmentName);
-    int partitionId = newLLCSegmentName.getPartitionGroupId();
-    int seqNum = newLLCSegmentName.getSequenceNumber();
-    for (String segmentNameStr : instanceStatesMap.keySet()) {
-      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentNameStr);
-      if (llcSegmentName.getPartitionGroupId() == partitionId && llcSegmentName.getSequenceNumber() == seqNum) {
-        String errorMsg =
-            String.format("Segment %s is a duplicate of existing segment %s", newSegmentName, segmentNameStr);
-        LOGGER.error(errorMsg);
-        throw new HelixHelper.PermanentUpdaterException(errorMsg);
-      }
-    }
-    // Assign instances to the new segment and add instances as state CONSUMING
     if (newSegmentName != null) {
+      LLCSegmentName newLLCSegmentName = new LLCSegmentName(newSegmentName);
+      int partitionId = newLLCSegmentName.getPartitionGroupId();
+      int seqNum = newLLCSegmentName.getSequenceNumber();
+      for (String segmentNameStr : instanceStatesMap.keySet()) {
+        LLCSegmentName llcSegmentName = new LLCSegmentName(segmentNameStr);
+        if (llcSegmentName.getPartitionGroupId() == partitionId && llcSegmentName.getSequenceNumber() == seqNum) {
+          String errorMsg = String.format("Segment %s is a duplicate of existing segment %s", newSegmentName, segmentNameStr);
+          LOGGER.error(errorMsg);
+          throw new HelixHelper.PermanentUpdaterException(errorMsg);
+        }
+      }
+      // Assign instances to the new segment and add instances as state CONSUMING
       List<String> instancesAssigned = segmentAssignment.assignSegment(newSegmentName, instanceStatesMap, instancePartitionsMap);
       instanceStatesMap.put(newSegmentName, SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.CONSUMING));
       LOGGER.info("Adding new CONSUMING segment: {} to instances: {}", newSegmentName, instancesAssigned);
