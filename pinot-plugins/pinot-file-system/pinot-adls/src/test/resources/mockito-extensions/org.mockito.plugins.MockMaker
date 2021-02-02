@@ -1,0 +1,4 @@
+# This class defines Mockito plugins to be used during testing
+
+# mock-maker inline enables mocking of 'final' classes in Mockito v2
+mock-maker-inline

@@ -18,6 +18,27 @@
  */
 package org.apache.pinot.plugin.filesystem;
 
+import com.azure.core.http.rest.PagedIterable;
+import com.azure.core.util.Context;
+import com.azure.identity.ClientSecretCredential;
+import com.azure.identity.ClientSecretCredentialBuilder;
+import com.azure.storage.blob.BlobClient;
+import com.azure.storage.blob.BlobServiceClient;
+import com.azure.storage.blob.BlobServiceClientBuilder;
+import com.azure.storage.common.StorageSharedKeyCredential;
+import com.azure.storage.common.Utility;
+import com.azure.storage.file.datalake.DataLakeDirectoryClient;
+import com.azure.storage.file.datalake.DataLakeFileClient;
+import com.azure.storage.file.datalake.DataLakeFileSystemClient;
+import com.azure.storage.file.datalake.DataLakeServiceClient;
+import com.azure.storage.file.datalake.DataLakeServiceClientBuilder;
+import com.azure.storage.file.datalake.models.DataLakeRequestConditions;
+import com.azure.storage.file.datalake.models.DataLakeStorageException;
+import com.azure.storage.file.datalake.models.ListPathsOptions;
+import com.azure.storage.file.datalake.models.PathHttpHeaders;
+import com.azure.storage.file.datalake.models.PathItem;
+import com.azure.storage.file.datalake.models.PathProperties;
+import com.google.common.annotations.VisibleForTesting;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -36,37 +57,15 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.Map;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.azure.core.http.rest.PagedIterable;
-import com.azure.core.util.Context;
-import com.azure.storage.blob.BlobClient;
-import com.azure.storage.blob.BlobServiceClient;
-import com.azure.storage.blob.BlobServiceClientBuilder;
-import com.azure.storage.common.StorageSharedKeyCredential;
-import com.azure.storage.common.Utility;
-import com.azure.storage.file.datalake.DataLakeDirectoryClient;
-import com.azure.storage.file.datalake.DataLakeFileClient;
-import com.azure.storage.file.datalake.DataLakeFileSystemClient;
-import com.azure.storage.file.datalake.DataLakeServiceClient;
-import com.azure.storage.file.datalake.DataLakeServiceClientBuilder;
-import com.azure.storage.file.datalake.models.DataLakeRequestConditions;
-import com.azure.storage.file.datalake.models.DataLakeStorageException;
-import com.azure.storage.file.datalake.models.ListPathsOptions;
-import com.azure.storage.file.datalake.models.PathHttpHeaders;
-import com.azure.storage.file.datalake.models.PathItem;
-import com.azure.storage.file.datalake.models.PathProperties;
-
 
 /**
  * Azure Data Lake Storage Gen2 implementation for the PinotFS interface.
- *
- * TODO: add the unit test
  */
 public class ADLSGen2PinotFS extends PinotFS {
   private static final Logger LOGGER = LoggerFactory.getLogger(ADLSGen2PinotFS.class);
@@ -75,12 +74,16 @@ public class ADLSGen2PinotFS extends PinotFS {
   private static final String ACCESS_KEY = "accessKey";
   private static final String FILE_SYSTEM_NAME = "fileSystemName";
   private static final String ENABLE_CHECKSUM = "enableChecksum";
+  private static final String CLIENT_ID = "clientId";
+  private static final String CLIENT_SECRET = "clientSecret";
+  private static final String TENANT_ID = "tenantId";
 
   private static final String HTTPS_URL_PREFIX = "https://";
 
   private static final String AZURE_STORAGE_DNS_SUFFIX = ".dfs.core.windows.net";
   private static final String AZURE_BLOB_DNS_SUFFIX = ".blob.core.windows.net";
   private static final String PATH_ALREADY_EXISTS_ERROR_CODE = "PathAlreadyExists";
+  private static final String FILE_SYSTEM_NOT_FOUND_ERROR_CODE = "FilesystemNotFound";
   private static final String IS_DIRECTORY_KEY = "hdi_isfolder";
 
   private static final int NOT_FOUND_STATUS_CODE = 404;
@@ -96,6 +99,12 @@ public class ADLSGen2PinotFS extends PinotFS {
   // However, there's some overhead in computing hash. (Adds roughly 3 seconds for 1GB file)
   private boolean _enableChecksum;
 
+  public ADLSGen2PinotFS(DataLakeFileSystemClient fileSystemClient,
+      BlobServiceClient blobServiceClient) {
+    _fileSystemClient = fileSystemClient;
+    _blobServiceClient = blobServiceClient;
+  }
+
   @Override
   public void init(PinotConfiguration config) {
     _enableChecksum = config.getProperty(ENABLE_CHECKSUM, false);
@@ -106,22 +115,61 @@ public class ADLSGen2PinotFS extends PinotFS {
     // TODO: consider to add the encryption of the following config
     String accessKey = config.getProperty(ACCESS_KEY);
     String fileSystemName = config.getProperty(FILE_SYSTEM_NAME);
+    String clientId = config.getProperty(CLIENT_ID);
+    String clientSecret = config.getProperty(CLIENT_SECRET);
+    String tenantId = config.getProperty(TENANT_ID);
 
     String dfsServiceEndpointUrl = HTTPS_URL_PREFIX + accountName + AZURE_STORAGE_DNS_SUFFIX;
     String blobServiceEndpointUrl = HTTPS_URL_PREFIX + accountName + AZURE_BLOB_DNS_SUFFIX;
 
-    StorageSharedKeyCredential sharedKeyCredential = new StorageSharedKeyCredential(accountName, accessKey);
+    DataLakeServiceClientBuilder dataLakeServiceClientBuilder = new DataLakeServiceClientBuilder().endpoint(dfsServiceEndpointUrl);
+    BlobServiceClientBuilder blobServiceClientBuilder = new BlobServiceClientBuilder().endpoint(blobServiceEndpointUrl);
 
-    DataLakeServiceClient serviceClient = new DataLakeServiceClientBuilder().credential(sharedKeyCredential)
-        .endpoint(dfsServiceEndpointUrl)
-        .buildClient();
+    if (accountName!= null && accessKey != null) {
+      // Authenticate using accessKey
+      StorageSharedKeyCredential sharedKeyCredential = new StorageSharedKeyCredential(accountName, accessKey);
+      dataLakeServiceClientBuilder.credential(sharedKeyCredential);
+      blobServiceClientBuilder.credential(sharedKeyCredential);
+    } else if (clientId != null && clientSecret != null && tenantId != null) {
+      // Authenticate using AAD
+      ClientSecretCredential clientSecretCredential = new ClientSecretCredentialBuilder()
+          .clientId(clientId)
+          .clientSecret(clientSecret)
+          .tenantId(tenantId)
+          .build();
+      dataLakeServiceClientBuilder.credential(clientSecretCredential);
+      blobServiceClientBuilder.credential(clientSecretCredential);
+    } else {
+      // Error out as at least one mode of auth info needed
+      throw new IllegalArgumentException("Expecting either (accountName, accessKey) or (clientId, clientSecret, tenantId)");
+    }
 
-    _blobServiceClient =
-        new BlobServiceClientBuilder().credential(sharedKeyCredential).endpoint(blobServiceEndpointUrl).buildClient();
-    _fileSystemClient = serviceClient.getFileSystemClient(fileSystemName);
+    _blobServiceClient = blobServiceClientBuilder.buildClient();
+    DataLakeServiceClient serviceClient = dataLakeServiceClientBuilder.buildClient();
+    _fileSystemClient = getOrCreateClientWithFileSystem(serviceClient, fileSystemName);
+
     LOGGER.info("ADLSGen2PinotFS is initialized (accountName={}, fileSystemName={}, dfsServiceEndpointUrl={}, "
             + "blobServiceEndpointUrl={}, enableChecksum={})", accountName, fileSystemName, dfsServiceEndpointUrl,
         blobServiceEndpointUrl, _enableChecksum);
+  }
+
+  @VisibleForTesting
+  public DataLakeFileSystemClient getOrCreateClientWithFileSystem(DataLakeServiceClient serviceClient,
+      String fileSystemName) {
+    DataLakeFileSystemClient fileSystemClient;
+    try {
+      fileSystemClient = serviceClient.getFileSystemClient(fileSystemName);
+      // The return value is irrelevant. This is to test if the filesystem exists.
+      fileSystemClient.getProperties();
+      return fileSystemClient;
+    } catch (DataLakeStorageException e) {
+      if (e.getStatusCode() == NOT_FOUND_STATUS_CODE && e.getErrorCode().equals(FILE_SYSTEM_NOT_FOUND_ERROR_CODE)) {
+        LOGGER.info("FileSystem with name {} does not exist. Creating one with the same name.", fileSystemName);
+        return serviceClient.createFileSystem(fileSystemName);
+      } else {
+        throw e;
+      }
+    }
   }
 
   @Override
