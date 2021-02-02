@@ -481,7 +481,7 @@ public class HelixHelper {
         .addAll(HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.getRealtimeTagForTenant(tenant)));
     return serverInstances;
   }
-  
+
   /**
    * Returns the broker instances in the cluster for the given tenant.
    *

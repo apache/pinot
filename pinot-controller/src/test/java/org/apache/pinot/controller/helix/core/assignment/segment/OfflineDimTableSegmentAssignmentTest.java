@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import com.google.common.collect.ImmutableList;
-import org.apache.calcite.runtime.Resources;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixProperty;
