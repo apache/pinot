@@ -463,6 +463,13 @@ public class HelixHelper {
 
   /**
    * Returns the server instances in the cluster for the given tenant.
+   */
+  public static Set<String> getServerInstancesForTenant(HelixManager helixManager, String tenant) {
+    return getServerInstancesForTenant(getInstanceConfigs(helixManager), tenant);
+  }
+
+  /**
+   * Returns the server instances in the cluster for the given tenant.
    *
    * TODO: refactor code to use this method if applicable to reuse instance configs in order to reduce ZK accesses
    */
@@ -474,6 +481,7 @@ public class HelixHelper {
         .addAll(HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.getRealtimeTagForTenant(tenant)));
     return serverInstances;
   }
+
 
   /**
    * Returns the broker instances in the cluster for the given tenant.

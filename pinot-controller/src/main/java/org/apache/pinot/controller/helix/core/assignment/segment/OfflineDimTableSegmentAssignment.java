@@ -19,6 +19,8 @@
 package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
+import java.util.Set;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.assignment.InstancePartitions;
@@ -68,21 +70,24 @@ public class OfflineDimTableSegmentAssignment implements SegmentAssignment {
   @Override
   public List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap) {
-    String serverTag = TagNameUtils.extractOfflineServerTag(_tenantConfig);
+    String serverTag = _tenantConfig.getServer();
+    Set<String> instances = HelixHelper.getServerInstancesForTenant(_helixManager, serverTag);
 
-    List<String> instances = HelixHelper.getInstancesWithTag(_helixManager, serverTag);
     int numInstances = instances.size();
-    Preconditions.checkState(numInstances > 0, "No instance found with tag: %s", serverTag);
+    Preconditions.checkState(numInstances > 0, "No instance found with tag: %s or %s",
+        TagNameUtils.getOfflineTagForTenant(serverTag),
+        TagNameUtils.getRealtimeTagForTenant(serverTag));
 
-    return instances;
+    return new ArrayList<>(instances);
   }
 
   @Override
   public Map<String, Map<String, String>> rebalanceTable(Map<String, Map<String, String>> currentAssignment,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, @Nullable List<Tier> sortedTiers,
       @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap, Configuration config) {
-    String serverTag = TagNameUtils.extractOfflineServerTag(_tenantConfig);
-    List<String> instances = HelixHelper.getInstancesWithTag(_helixManager, serverTag);
+
+    String serverTag = _tenantConfig.getServer();
+    Set<String> instances = HelixHelper.getServerInstancesForTenant(_helixManager, serverTag);
     Map<String, Map<String, String>> newAssignment = new TreeMap<>();
     for (String segment : currentAssignment.keySet()) {
       newAssignment.put(segment, SegmentAssignmentUtils
