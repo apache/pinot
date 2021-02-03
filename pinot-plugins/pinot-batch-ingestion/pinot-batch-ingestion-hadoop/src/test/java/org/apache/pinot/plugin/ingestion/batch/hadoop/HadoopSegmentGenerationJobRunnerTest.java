@@ -16,16 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.ingestion.batch.standalone;
+package org.apache.pinot.plugin.ingestion.batch.hadoop;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.WordUtils;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReader;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
+import org.apache.pinot.plugin.inputformat.json.JSONRecordReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -37,19 +41,18 @@ import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.RecordReaderSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import com.google.common.collect.Lists;
+import com.google.gson.Gson;
 
-public class SegmentGenerationJobRunnerTest {
-  
+public class HadoopSegmentGenerationJobRunnerTest {
+
   @Test
   public void testSegmentGeneration() throws Exception {
-    // TODO use common resource definitions & code shared with Hadoop unit test.
-    // So probably need a pinot-batch-ingestion-common tests jar that we depend on.
-
     File testDir = Files.createTempDirectory("testSegmentGeneration-").toFile();
     testDir.delete();
     testDir.mkdirs();
@@ -59,13 +62,11 @@ public class SegmentGenerationJobRunnerTest {
     File inputFile = new File(inputDir, "input.csv");
     FileUtils.writeLines(inputFile, Lists.newArrayList("col1,col2", "value1,1", "value2,2"));
     
-    // Create an output directory, with two empty files in it. One we'll overwrite,
-    // and one we'll leave alone.
     final String outputFilename = "myTable_OFFLINE_0.tar.gz";
-    final String existingFilename = "myTable_OFFLINE_100.tar.gz";
+    final String otherFilename = "myTable_OFFLINE_100.tar.gz";
     File outputDir = new File(testDir, "output");
     FileUtils.touch(new File(outputDir, outputFilename));
-    FileUtils.touch(new File(outputDir, existingFilename));
+    FileUtils.touch(new File(outputDir, otherFilename));
     
     // Set up schema file.
     final String schemaName = "mySchema";
@@ -86,6 +87,29 @@ public class SegmentGenerationJobRunnerTest {
       .build();
     FileUtils.write(tableConfigFile, tableConfig.toJsonString(), StandardCharsets.UTF_8);
     
+    File stagingDir = new File(testDir, "staging");
+    stagingDir.mkdir();
+    // Add the staging output dir, which should cause code to fail unless we've added code to remove
+    // the staging dir if it exists.
+    FileUtils.touch(new File(stagingDir, "output"));
+    
+    // Set up a plugins dir, with a sub-directory. We'll use an external jar,
+    // since using a class inside of Pinot to find the enclosing jar is somehow
+    // finding the directory of classes vs. the actual jar, on the build server 
+    // (though it works fine in other configurations).
+    File pluginsDir = new File(testDir, "plugins");
+    File myPluginDir = new File(pluginsDir, "my-plugin");
+    myPluginDir.mkdirs();
+    File pluginJar = new File(WordUtils.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+    FileUtils.copyFile(pluginJar, new File(myPluginDir, pluginJar.getName()));
+    
+    // Set up dependency jars dir.
+    // FUTURE set up jar with class that we need for reading file, so we know it's working
+    File dependencyJarsDir = new File(testDir, "jars");
+    dependencyJarsDir.mkdir();
+    File extraJar = new File(Gson.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+    FileUtils.copyFile(extraJar, new File(dependencyJarsDir, extraJar.getName()));
+
     SegmentGenerationJobSpec jobSpec = new SegmentGenerationJobSpec();
     jobSpec.setJobType("SegmentCreation");
     jobSpec.setInputDirURI(inputDir.toURI().toString());
@@ -105,8 +129,12 @@ public class SegmentGenerationJobRunnerTest {
     jobSpec.setTableSpec(tableSpec);
     
     ExecutionFrameworkSpec efSpec = new ExecutionFrameworkSpec();
-    efSpec.setName("standalone");
-    efSpec.setSegmentGenerationJobRunnerClassName(SegmentGenerationJobRunner.class.getName());
+    efSpec.setName("hadoop");
+    efSpec.setSegmentGenerationJobRunnerClassName(HadoopSegmentGenerationJobRunner.class.getName());
+    Map<String, String> extraConfigs = new HashMap<>();
+    extraConfigs.put("stagingDir", stagingDir.toURI().toString());
+    extraConfigs.put("dependencyJarDir", dependencyJarsDir.getAbsolutePath());
+    efSpec.setExtraConfigs(extraConfigs);
     jobSpec.setExecutionFrameworkSpec(efSpec);
     
     PinotFSSpec pfsSpec = new PinotFSSpec();
@@ -114,11 +142,13 @@ public class SegmentGenerationJobRunnerTest {
     pfsSpec.setClassName(LocalPinotFS.class.getName());
     jobSpec.setPinotFSSpecs(Collections.singletonList(pfsSpec));
     
-    SegmentGenerationJobRunner jobRunner = new SegmentGenerationJobRunner(jobSpec);
+    System.setProperty(PluginManager.PLUGINS_DIR_PROPERTY_NAME, pluginsDir.getAbsolutePath());    
+    HadoopSegmentGenerationJobRunner jobRunner = new HadoopSegmentGenerationJobRunner(jobSpec);
     jobRunner.run();
+    Assert.assertFalse(stagingDir.exists());
     
     // The output directory should still have the original file in it.
-    File oldSegmentFile = new File(outputDir, existingFilename);
+    File oldSegmentFile = new File(outputDir, otherFilename);
     Assert.assertTrue(oldSegmentFile.exists());
 
     // The output directory should have the original file in it (since we aren't overwriting)
@@ -129,8 +159,9 @@ public class SegmentGenerationJobRunnerTest {
     
     // Now run again, but this time with overwriting of output files, and confirm we got a valid segment file.
     jobSpec.setOverwriteOutput(true);
-    jobRunner = new SegmentGenerationJobRunner(jobSpec);
+    jobRunner = new HadoopSegmentGenerationJobRunner(jobSpec);
     jobRunner.run();
+    Assert.assertFalse(stagingDir.exists());
 
     // The original file should still be there.
     Assert.assertTrue(oldSegmentFile.exists());
@@ -140,5 +171,5 @@ public class SegmentGenerationJobRunnerTest {
     Assert.assertTrue(newSegmentFile.length() > 0);
 
     // FUTURE - validate contents of file?
-    }
+  }
 }

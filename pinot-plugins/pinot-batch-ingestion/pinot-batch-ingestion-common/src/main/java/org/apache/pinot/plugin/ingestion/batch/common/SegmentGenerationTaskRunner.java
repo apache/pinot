@@ -20,7 +20,6 @@ package org.apache.pinot.plugin.ingestion.batch.common;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.IOException;
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
@@ -43,6 +42,7 @@ import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
+@SuppressWarnings("serial")
 public class SegmentGenerationTaskRunner implements Serializable {
 
   public static final String FIXED_SEGMENT_NAME_GENERATOR = "fixed";
@@ -134,7 +134,7 @@ public class SegmentGenerationTaskRunner implements Serializable {
       case NORMALIZED_DATE_SEGMENT_NAME_GENERATOR:
         SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
         DateTimeFormatSpec dateTimeFormatSpec = null;
-        String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+        String timeColumnName = validationConfig.getTimeColumnName();
 
         if (timeColumnName != null) {
           DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
