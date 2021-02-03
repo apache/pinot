@@ -62,6 +62,7 @@ public class TarGzCompressionUtils {
         BufferedOutputStream bufferedOut = new BufferedOutputStream(fileOut);
         OutputStream gzipOut = new GzipCompressorOutputStream(bufferedOut);
         TarArchiveOutputStream tarGzOut = new TarArchiveOutputStream(gzipOut)) {
+      tarGzOut.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_STAR);
       tarGzOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
       addFileToTarGz(tarGzOut, inputFile, "");
     }
