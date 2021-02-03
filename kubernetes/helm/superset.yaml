@@ -2274,10 +2274,10 @@ spec:
         runAsGroup: 1000
         fsGroup: 1000
       containers:
-        - image: apachepinot/pinot-superset:0.36.0rc3
+        - image: apachepinot/pinot-superset:latest
           imagePullPolicy: Always
           name: superset
-          args: [ "flask", "run", "-p", "8088", "--with-threads", "--reload", "--debugger", "--host=0.0.0.0" ]
+          args: [ "superset", "run", "-p", "8088", "--with-threads", "--reload", "--debugger", "--host=0.0.0.0" ]
           env:
             - name: PYTHONPATH
               value: "/etc/superset"
