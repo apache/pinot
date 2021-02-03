@@ -26,6 +26,11 @@ module.exports = {
     semi: ['warn', 'always'],
     'comma-style': ['warn', 'last'],
     'no-unused-vars': ['warn', { vars: 'all', args: 'after-used', ignoreRestSiblings: false }],
+    "space-before-function-paren": ["error", {
+      "anonymous": "always",
+      "named": "never",
+      "asyncArrow": "always"
+    }],
     // TODO: fix all warnings and change rules back to "error"
     'ember/avoid-leaking-state-in-ember-objects': ['warn'],
     'ember/no-attrs-in-components': ['warn'],
