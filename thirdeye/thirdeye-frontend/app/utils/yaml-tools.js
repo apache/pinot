@@ -76,7 +76,7 @@ function mergeContents(fieldObject, yamlObject) {
     const fieldKeys = Object.keys(fieldObject);
     const yamlKeys = yamlObject ? Object.keys(yamlObject) : [];
     if (yamlKeys.length > 0) {
-      fieldKeys.forEach(key => {
+      fieldKeys.forEach((key) => {
         if (yamlKeys.includes(key)) {
           // merge yaml contents and passed in contents
           output[key] = mergeContents(fieldObject[key], yamlObject[key]);
@@ -96,12 +96,12 @@ export function redundantParse(yamlString) {
   let yamlAsObject = {};
   try {
     yamlAsObject = yamljs.parse(yamlString);
-  } catch(error) {
+  } catch (error) {
     try {
       // use jsyaml package to try parsing again, since yamljs doesn't parse some edge cases
       yamlAsObject = jsyaml.safeLoad(yamlString);
     } catch (error) {
-      throw new Error("yaml parsing error");
+      throw new Error('yaml parsing error');
     }
   }
   return yamlAsObject;
@@ -119,14 +119,13 @@ export function fieldsToYaml(fields, yamlString) {
   let yamlAsObject = {};
   try {
     yamlAsObject = redundantParse(yamlString);
-  }
-  catch(err) {
+  } catch (err) {
     return null;
   }
   const fieldKeys = Object.keys(fields);
   const yamlKeys = yamlAsObject ? Object.keys(yamlAsObject) : [];
   if (yamlKeys.length > 0) {
-    yamlKeys.forEach(key => {
+    yamlKeys.forEach((key) => {
       if (fieldKeys.includes(key) && fields[key]) {
         // merge yaml contents and passed in contents, then map stringified version
         yamlAsObject[key] = mergeContents(fields[key], yamlAsObject[key]);
@@ -150,7 +149,7 @@ function traverseYaml(field, yamlObject, type) {
   let value = null;
   for (let i = 0; i < keys.length; i++) {
     if (keys[i] === field) {
-      value = (typeof yamlObject[keys[i]] === type) ? yamlObject[keys[i]] : null;
+      value = typeof yamlObject[keys[i]] === type ? yamlObject[keys[i]] : null;
     } else if (yamlObject[keys[i]] && typeof yamlObject[keys[i]] === 'object') {
       value = traverseYaml(field, yamlObject[keys[i]]);
     }
@@ -160,8 +159,6 @@ function traverseYaml(field, yamlObject, type) {
   }
   return value;
 }
-
-
 
 /**
  * This function will return the value of a given field in a yaml string if it exists
@@ -175,8 +172,7 @@ export function getValueFromYaml(field, yamlString, type) {
   let yamlAsObject = {};
   try {
     yamlAsObject = redundantParse(yamlString);
-  }
-  catch(err){
+  } catch (err) {
     return null;
   }
   return yamlAsObject ? traverseYaml(field, yamlAsObject, type) : null;
@@ -195,8 +191,7 @@ export function addBackComments(yamlAsObject, yamlString) {
   let yamlKeys = Object.keys(yamlAsObject); // this should not change since we only update fields
   try {
     newYaml = yamljs.stringify(yamlAsObject, 20, 1);
-  }
-  catch(err) {
+  } catch (err) {
     return null;
   }
   // split yamls into array of strings, line by line
@@ -209,7 +204,7 @@ export function addBackComments(yamlAsObject, yamlString) {
   let keyIndex = 0; // this is for iterating through the keys
   // iterate through split new yaml
   while (newYamlIndex < newLines.length && oldYamlIndex < oldLines.length && keyIndex < yamlKeys.length) {
-    let nextKey = ((keyIndex + 1) < yamlKeys.length) ? keyIndex + 1 : keyIndex;
+    let nextKey = keyIndex + 1 < yamlKeys.length ? keyIndex + 1 : keyIndex;
     if (newLines[newYamlIndex].includes(`${yamlKeys[keyIndex]}:`)) {
       let foundStart = false;
       // loop through old yaml string and add comments and/or blank lines as needed
@@ -238,7 +233,11 @@ export function addBackComments(yamlAsObject, yamlString) {
               mergedLines.push(oldLines[oldYamlIndex]);
               oldYamlIndex++;
             }
-            if (oldYamlIndex < oldLines.length && oldLines[oldYamlIndex].includes(`${yamlKeys[nextKey]}:`) && oldLines[oldYamlIndex].charAt(0) !== '#') {
+            if (
+              oldYamlIndex < oldLines.length &&
+              oldLines[oldYamlIndex].includes(`${yamlKeys[nextKey]}:`) &&
+              oldLines[oldYamlIndex].charAt(0) !== '#'
+            ) {
               foundEndOld = true;
             }
             if (newYamlIndex < newLines.length && newLines[newYamlIndex].includes(`${yamlKeys[nextKey]}:`)) {
@@ -259,7 +258,11 @@ export function addBackComments(yamlAsObject, yamlString) {
                 }
                 oldYamlIndex++;
               }
-              if (oldYamlIndex < oldLines.length && oldLines[oldYamlIndex].includes(`${yamlKeys[nextKey]}:`) && oldLines[oldYamlIndex].charAt(0) !== '#') {
+              if (
+                oldYamlIndex < oldLines.length &&
+                oldLines[oldYamlIndex].includes(`${yamlKeys[nextKey]}:`) &&
+                oldLines[oldYamlIndex].charAt(0) !== '#'
+              ) {
                 foundEndOld = true;
               }
             }
@@ -304,22 +307,18 @@ export function addBackComments(yamlAsObject, yamlString) {
  * @return {String} - formatted filters string
  */
 export function formatYamlFilter(filters) {
-  if (filters){
+  if (filters) {
     const filterStrings = [];
-    Object.keys(filters).forEach(
-      function(filterKey) {
-        const filter = filters[filterKey];
-        if (filter && Array.isArray(filter)) {
-          filter.forEach(
-            function (filterValue) {
-              filterStrings.push(filterKey + '=' + filterValue);
-            }
-          );
-        } else {
-          filterStrings.push(filterKey + '=' + filter);
-        }
+    Object.keys(filters).forEach(function (filterKey) {
+      const filter = filters[filterKey];
+      if (filter && Array.isArray(filter)) {
+        filter.forEach(function (filterValue) {
+          filterStrings.push(filterKey + '=' + filterValue);
+        });
+      } else {
+        filterStrings.push(filterKey + '=' + filter);
       }
-    );
+    });
     return filterStrings.join(';');
   }
   return '';
@@ -343,10 +342,10 @@ export function enrichAlertResponseObject(alerts) {
     let dimensions = '';
     let dimensionsArray = yamlAlert.dimensionExploration ? yamlAlert.dimensionExploration.dimensions : null;
     if (Array.isArray(dimensionsArray)) {
-      dimensionsArray.forEach(dim => {
+      dimensionsArray.forEach((dim) => {
         dimensions = dimensions + `${dim}, `;
       });
-      dimensions = dimensions.substring(0, dimensions.length-2);
+      dimensions = dimensions.substring(0, dimensions.length - 2);
     }
     Object.assign(yamlAlert, {
       functionName: yamlAlert.name,
@@ -356,7 +355,7 @@ export function enrichAlertResponseObject(alerts) {
       exploreDimensions: dimensions,
       filters: formatYamlFilter(yamlAlert.filters),
       isNewPipeline: true,
-      group: Array.isArray(yamlAlert.subscriptionGroup) ? yamlAlert.subscriptionGroup.join(", ") : null
+      group: Array.isArray(yamlAlert.subscriptionGroup) ? yamlAlert.subscriptionGroup.join(', ') : null
     });
   }
 
@@ -368,7 +367,11 @@ export function enrichAlertResponseObject(alerts) {
  */
 function _detectionType(yamlAlert) {
   if (yamlAlert.rules && Array.isArray(yamlAlert.rules) && yamlAlert.rules.length > 0) {
-    if (yamlAlert.rules[0].detection && Array.isArray(yamlAlert.rules[0].detection) && yamlAlert.rules[0].detection.length > 0) {
+    if (
+      yamlAlert.rules[0].detection &&
+      Array.isArray(yamlAlert.rules[0].detection) &&
+      yamlAlert.rules[0].detection.length > 0
+    ) {
       return yamlAlert.rules[0].detection[0].type;
     }
   }

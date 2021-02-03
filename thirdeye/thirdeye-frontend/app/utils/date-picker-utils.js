@@ -1,35 +1,20 @@
-import moment from "moment";
+import moment from 'moment';
 
-const DISPLAY_DATE_FORMAT = "YYYY-MM-DD HH:mm";
+const DISPLAY_DATE_FORMAT = 'YYYY-MM-DD HH:mm';
 
 const BASE_SPEC = {
   TIME_PICKER: true,
   TIME_PICKER_24_HOUR: true,
   TIME_PICKER_INCREMENT: 5,
   SHOW_CUSTOM_RANGE_LABEL: false,
-  UI_DATE_FORMAT: "MMM D, YYYY hh:mm a",
-  SERVER_FORMAT: "YYYY-MM-DD HH:mm"
+  UI_DATE_FORMAT: 'MMM D, YYYY hh:mm a',
+  SERVER_FORMAT: 'YYYY-MM-DD HH:mm'
 };
 
 const PREDEFINED_RANGES = {
-  "Last 48 Hours": [
-    moment()
-      .subtract(48, "hour")
-      .startOf("hour"),
-    moment().startOf("hour")
-  ],
-  "Last Week": [
-    moment()
-      .subtract(1, "week")
-      .startOf("day"),
-    moment().startOf("day")
-  ],
-  "Last 30 Days": [
-    moment()
-      .subtract(1, "month")
-      .startOf("day"),
-    moment().startOf("day")
-  ]
+  'Last 48 Hours': [moment().subtract(48, 'hour').startOf('hour'), moment().startOf('hour')],
+  'Last Week': [moment().subtract(1, 'week').startOf('day'), moment().startOf('day')],
+  'Last 30 Days': [moment().subtract(1, 'month').startOf('day'), moment().startOf('day')]
 };
 
 /**
@@ -41,7 +26,7 @@ const PREDEFINED_RANGES = {
  * @return {String}
  *   The date in "YYYY-MM-DD HH:mm" format
  */
-const getInitialDate = date => {
+const getInitialDate = (date) => {
   return moment(date).format(DISPLAY_DATE_FORMAT);
 };
 

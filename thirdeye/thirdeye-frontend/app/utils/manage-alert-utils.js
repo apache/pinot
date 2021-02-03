@@ -1,5 +1,5 @@
 import moment from 'moment';
-import { isPresent, isBlank } from "@ember/utils";
+import { isPresent, isBlank } from '@ember/utils';
 import { getWithDefault } from '@ember/object';
 import { buildDateEod } from 'thirdeye-frontend/utils/utils';
 import { getFormattedDuration } from 'thirdeye-frontend/utils/anomaly';
@@ -13,13 +13,13 @@ import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
  */
 export function formatEvalMetric(metric, isPercentage = false) {
   const isWhole = Number.isInteger(Number(metric));
-  let shown = (metric === 'Infinity') ? metric : 'N/A';
+  let shown = metric === 'Infinity' ? metric : 'N/A';
   const multiplier = isPercentage ? 100 : 1;
   const convertedNum = metric * multiplier;
   const formattedNum = isWhole ? convertedNum : convertedNum.toFixed(1);
   let displayNum = isFinite(metric) ? formattedNum : shown;
   // Prevent meaninglessly large numbers
-  return (Number(displayNum) > 10000) ? 'N/A' : displayNum;
+  return Number(displayNum) > 10000 ? 'N/A' : displayNum;
 }
 
 /**
@@ -52,7 +52,10 @@ export function powerSort(targetArray, targetProperty) {
       a = a[targetProperty];
       b = b[targetProperty];
     }
-    return (a || '').toLowerCase().trim().localeCompare((b || '').toLowerCase().trim());
+    return (a || '')
+      .toLowerCase()
+      .trim()
+      .localeCompare((b || '').toLowerCase().trim());
   });
   return sortedArray;
 }
@@ -64,9 +67,11 @@ export function powerSort(targetArray, targetProperty) {
  * @returns {Array}
  */
 export function toIdGroups(anomalyIds, bucketSize = 10) {
-  const idGroups = anomalyIds.map((item, index) => {
-    return (index % bucketSize === 0) ? anomalyIds.slice(index, index + bucketSize) : null;
-  }).filter(item => item);
+  const idGroups = anomalyIds
+    .map((item, index) => {
+      return index % bucketSize === 0 ? anomalyIds.slice(index, index + bucketSize) : null;
+    })
+    .filter((item) => item);
   return idGroups;
 }
 
@@ -79,20 +84,23 @@ export function enhanceAnomalies(rawAnomalies, severityScores) {
   const newAnomalies = [];
   const anomaliesPresent = rawAnomalies && rawAnomalies.length;
   // De-dupe raw anomalies, extract only the good stuff (anomalyDetailsList)
-  const anomalies = anomaliesPresent ? [].concat(...rawAnomalies.map(data => data.anomalyDetailsList)) : [];
+  const anomalies = anomaliesPresent ? [].concat(...rawAnomalies.map((data) => data.anomalyDetailsList)) : [];
   // Extract all resolved scores from the RSVP promise response
-  const resolvedScores = severityScores ? severityScores.map((score) => {
-    return (score.state === 'fulfilled') ? score.value : '';
-  }) : [];
+  const resolvedScores = severityScores
+    ? severityScores.map((score) => {
+        return score.state === 'fulfilled' ? score.value : '';
+      })
+    : [];
 
   // Loop over all anomalies to configure display settings
   anomalies.forEach((anomaly) => {
     let dimensionList = [];
-    let targetAnomaly = resolvedScores.find(score => Number(score.id) === Number(anomaly.anomalyId));
+    let targetAnomaly = resolvedScores.find((score) => Number(score.id) === Number(anomaly.anomalyId));
     // Extract current anomaly's score from array of all scores
     const score = resolvedScores.length && targetAnomaly ? targetAnomaly.score : null;
     // Set up anomaly change rate display
-    const changeRate = (anomaly.current && anomaly.baseline) ? floatToPercent((anomaly.current - anomaly.baseline) / anomaly.baseline) : 0;
+    const changeRate =
+      anomaly.current && anomaly.baseline ? floatToPercent((anomaly.current - anomaly.baseline) / anomaly.baseline) : 0;
     const isNullChangeRate = Number.isNaN(Number(changeRate));
     // Set 'not reviewed' label
     if (!anomaly.anomalyFeedback) {
@@ -141,7 +149,7 @@ export function enhanceAnomalies(rawAnomalies, severityScores) {
  * @param {String} duration - the selected time span that is default
  * @return {Array}
  */
-export function setUpTimeRangeOptions(datesKeys, duration, forecast=false) {
+export function setUpTimeRangeOptions(datesKeys, duration, forecast = false) {
   let newRangeArr = [];
 
   const defaultCustomRange = {
@@ -160,17 +168,16 @@ export function setUpTimeRangeOptions(datesKeys, duration, forecast=false) {
  * @returns {Array}
  */
 function pastOnly(datesKeys, duration, newRangeArr) {
-  const dateKeyMap = new Map(
-    [
-      [ '1m', ['Last 30 Days', 1, 'month'] ],
-      [ '3m', ['Last 3 Months', 3, 'month'] ],
-      [ '2w', ['Last 2 Weeks', 2, 'week'] ],
-      [ '1w', ['Last Week', 1, 'week'] ],
-      [ '2d', ['Yesterday', 2, 'day'] ],
-      [ '1d', ['Last 24 Hours', 24, 'hour'] ],
-      [ '48h', ['Last 48 Hours', 48, 'hour'] ],
-      [ 'today', ['Today'] ]
-    ]);
+  const dateKeyMap = new Map([
+    ['1m', ['Last 30 Days', 1, 'month']],
+    ['3m', ['Last 3 Months', 3, 'month']],
+    ['2w', ['Last 2 Weeks', 2, 'week']],
+    ['1w', ['Last Week', 1, 'week']],
+    ['2d', ['Yesterday', 2, 'day']],
+    ['1d', ['Last 24 Hours', 24, 'hour']],
+    ['48h', ['Last 48 Hours', 48, 'hour']],
+    ['today', ['Today']]
+  ]);
 
   datesKeys.forEach((value) => {
     const currVal = dateKeyMap.get(value);
@@ -178,7 +185,7 @@ function pastOnly(datesKeys, duration, newRangeArr) {
     let start;
     let end;
     // overrides map above
-    switch(label) {
+    switch (label) {
       case 'Today':
         start = moment().startOf('day');
         end = start.add(1, 'days');
@@ -210,17 +217,16 @@ function pastOnly(datesKeys, duration, newRangeArr) {
  * @returns {Array}
  */
 function futureAndPast(datesKeys, duration, newRangeArr) {
-  const dateKeyMap = new Map(
-    [
-      [ '1m', ['Next 30 Days', 1, 'month'] ],
-      [ '3m', ['Next 3 Months', 3, 'month'] ],
-      [ '2w', ['Next 2 Weeks', 2, 'week'] ],
-      [ '1w', ['Next Week', 1, 'week'] ],
-      [ '2d', ['Tomorrow', 2, 'day'] ],
-      [ '1d', ['Next 24 Hours', 24, 'hour'] ],
-      [ '48h', ['Next 48 Hours', 48, 'hour'] ],
-      [ 'today', ['Today'] ]
-    ]);
+  const dateKeyMap = new Map([
+    ['1m', ['Next 30 Days', 1, 'month']],
+    ['3m', ['Next 3 Months', 3, 'month']],
+    ['2w', ['Next 2 Weeks', 2, 'week']],
+    ['1w', ['Next Week', 1, 'week']],
+    ['2d', ['Tomorrow', 2, 'day']],
+    ['1d', ['Next 24 Hours', 24, 'hour']],
+    ['48h', ['Next 48 Hours', 48, 'hour']],
+    ['today', ['Today']]
+  ]);
 
   newRangeArr = pastOnly(datesKeys, duration, newRangeArr);
 
@@ -230,7 +236,7 @@ function futureAndPast(datesKeys, duration, newRangeArr) {
     let start;
     let end;
     // overrides map above
-    switch(label) {
+    switch (label) {
       case 'Today':
         start = moment().startOf('day');
         end = start.add(1, 'days');
@@ -296,10 +302,15 @@ export function buildMetricDataUrl(graphConfig) {
   // For end date, use end stamp if defined and valid, otherwise use maxData
   const currentEnd = endStamp && moment(endStamp).isValid() ? moment(endStamp).valueOf() : moment(maxData).valueOf();
   // For graph start date, use start stamp if defined and valid, otherwise pick it usimng startTimeBucket depending on granularity
-  const currentStart = startStamp && moment(startStamp).isValid() ? moment(startStamp).valueOf() : moment(currentEnd).subtract(1, startTimeBucket).valueOf();
+  const currentStart =
+    startStamp && moment(startStamp).isValid()
+      ? moment(startStamp).valueOf()
+      : moment(currentEnd).subtract(1, startTimeBucket).valueOf();
   // Now build the metric data url -> currentEnd and currentStart reused in the call since baseline no longer displayed on graph
-  return `/timeseries/compare/${id}/${currentStart}/${currentEnd}/${currentStart}/${currentEnd}?dimension=` +
-         `${selectedDimension}&granularity=${granularity}${filterQs}`;
+  return (
+    `/timeseries/compare/${id}/${currentStart}/${currentEnd}/${currentStart}/${currentEnd}?dimension=` +
+    `${selectedDimension}&granularity=${granularity}${filterQs}`
+  );
 }
 
 /**
@@ -322,8 +333,10 @@ export function getTopDimensions(metricData, dimCount) {
   // Build the array of subdimension objects for the selected dimension
   dimensionKeys.forEach((subDimension) => {
     let subdObj = dimensionObj[subDimension];
-    let changeArr = subdObj.cumulativePercentageChange.map(item => Math.abs(item));
-    let average = changeArr.length ? changeArr.reduce((previous, current) => current += previous) / changeArr.length : 0;
+    let changeArr = subdObj.cumulativePercentageChange.map((item) => Math.abs(item));
+    let average = changeArr.length
+      ? changeArr.reduce((previous, current) => (current += previous)) / changeArr.length
+      : 0;
     if (subDimension.toLowerCase() !== 'all') {
       dimensionList.push({
         average,

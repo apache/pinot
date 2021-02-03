@@ -13,5 +13,5 @@
  * translate(mapping, value) ---> '1 hour'
  */
 export default (mapping, value) => {
-  return Object.keys(mapping).find(key => value === mapping[key]);
+  return Object.keys(mapping).find((key) => value === mapping[key]);
 };
