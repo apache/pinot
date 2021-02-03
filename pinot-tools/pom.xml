@@ -148,6 +148,11 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-minion</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-batch-ingestion-standalone</artifactId>
+      <version>${project.version}</version>
+    </dependency>
   </dependencies>
   <build>
     <plugins>

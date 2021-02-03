@@ -72,7 +72,7 @@ public class JsonIndexQuickStart {
         e.printStackTrace();
       }
     }));
-    printStatus(Color.CYAN, "***** Bootstrap baseballStats table *****");
+    printStatus(Color.CYAN, "***** Bootstrap githubEvents table *****");
     runner.bootstrapTable();
 
     printStatus(Color.CYAN, "***** Waiting for 5 seconds for the server to fetch the assigned segment *****");
