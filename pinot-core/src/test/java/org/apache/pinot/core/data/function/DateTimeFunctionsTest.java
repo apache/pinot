@@ -25,7 +25,10 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.joda.time.format.DateTimeFormatter;
+import org.joda.time.format.ISODateTimeFormat;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -36,7 +39,9 @@ import org.testng.annotations.Test;
  */
 public class DateTimeFunctionsTest {
   private static final ZoneOffset WEIRD_ZONE = ZoneOffset.ofHoursMinutes(7, 9);
-  private static final DateTimeZone TEST_DATE_TIME_ZONE = DateTimeZone.forID(WEIRD_ZONE.getId());
+  private static final DateTimeZone WEIRD_DATE_TIME_ZONE = DateTimeZone.forID(WEIRD_ZONE.getId());
+  private static final DateTime WEIRD_TIMESTAMP = new DateTime(2021, 2, 1, 20, 12, 12, 123, WEIRD_DATE_TIME_ZONE);
+  private static final String WEIRD_TIMESTAMP_ISO8601_STRING = "2021-02-01T20:12:12.123+07:09";
 
   private void testFunction(String functionExpression, List<String> expectedArguments, GenericRow row,
       Object expectedResult) {
@@ -305,9 +310,9 @@ public class DateTimeFunctionsTest {
 
     // name variations
     testFunction("datetrunc('millisecond', epochMillis, 'MILLISECONDS')", arguments, row, 1612296732123L);
-    testFunction("date_trunc('millisecond', epochMillis, 'MILLISECONDS')", arguments, row, 1612296732123L);
+    testFunction("date_trunc('MILLISECOND', epochMillis, 'MILLISECONDS')", arguments, row, 1612296732123L);
     testFunction("dateTrunc('millisecond', epochMillis, 'MILLISECONDS')", arguments, row, 1612296732123L);
-    testFunction("DATE_TRUNC('millisecond', epochMillis, 'MILLISECONDS')", arguments, row, 1612296732123L);
+    testFunction("DATE_TRUNC('SECOND', epochMillis, 'MILLISECONDS')", arguments, row, 1612296732000L);
 
     // MILLISECONDS to various
     testFunction("datetrunc('millisecond', epochMillis, 'MILLISECONDS')", arguments, row, 1612296732123L);
@@ -350,18 +355,28 @@ public class DateTimeFunctionsTest {
 
     // MILLISECONDS to various with timezone
     row.clear();
-    row.putValue("epochMillis", 1612296732123L);
+    row.putValue("epochMillis", iso8601ToUtcEpochMillis(WEIRD_TIMESTAMP_ISO8601_STRING));
     arguments = Lists.newArrayList("epochMillis");
-    String weirdDateTimeZoneid = TEST_DATE_TIME_ZONE.getID();
+    String weirdDateTimeZoneid = WEIRD_DATE_TIME_ZONE.getID();
+    DateTime result = WEIRD_TIMESTAMP;
     testFunction("datetrunc('millisecond', epochMillis, 'MILLISECONDS', '" + weirdDateTimeZoneid + "')", arguments, row,
-        1612296732123L);
-    testFunction("datetrunc('minute', epochMillis, 'MILLISECONDS', '" + weirdDateTimeZoneid + "')", arguments, row,
-        1612296720000L);
+        result.getMillis());
+    result = result.withMillisOfSecond(0);
     testFunction("datetrunc('second', epochMillis, 'MILLISECONDS', '" + weirdDateTimeZoneid + "')", arguments, row,
-        1612296732000L);
+        result.getMillis());
+    result = result.withSecondOfMinute(0);
+    testFunction("datetrunc('minute', epochMillis, 'MILLISECONDS', '" + weirdDateTimeZoneid + "')", arguments, row,
+        result.getMillis());
+    result = result.withMinuteOfHour(0);
     testFunction("datetrunc('hour', epochMillis, 'MILLISECONDS', '" + weirdDateTimeZoneid + "')", arguments, row,
-        1612295460000L);
+        result.getMillis());
+    result = result.withHourOfDay(0);
     testFunction("datetrunc('day', epochMillis, 'MILLISECONDS', '" + weirdDateTimeZoneid + "')", arguments, row,
-        1612296732000L);
+        result.getMillis());
+  }
+
+  private static long iso8601ToUtcEpochMillis(String iso8601) {
+    DateTimeFormatter formatter = ISODateTimeFormat.dateTimeParser().withOffsetParsed();
+    return formatter.parseDateTime(iso8601).getMillis();
   }
 }

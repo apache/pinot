@@ -41,7 +41,7 @@ public class DateTimeUtils {
   private static final DateTimeFieldType QUARTER_OF_YEAR = new QuarterOfYearDateTimeField();
 
   public static DateTimeField getTimestampField(ISOChronology chronology, String unitString) {
-    switch (unitString) {
+    switch (unitString.toLowerCase()) {
       case "millisecond":
         return chronology.millisOfSecond();
       case "second":
