@@ -72,12 +72,10 @@ public class OfflineDimTableSegmentAssignment implements SegmentAssignment {
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap) {
     String serverTag = _tenantConfig.getServer();
     Set<String> instances = HelixHelper.getServerInstancesForTenant(_helixManager, serverTag);
-
     int numInstances = instances.size();
     Preconditions.checkState(numInstances > 0, "No instance found with tag: %s or %s",
         TagNameUtils.getOfflineTagForTenant(serverTag),
         TagNameUtils.getRealtimeTagForTenant(serverTag));
-
     return new ArrayList<>(instances);
   }
 
@@ -85,7 +83,6 @@ public class OfflineDimTableSegmentAssignment implements SegmentAssignment {
   public Map<String, Map<String, String>> rebalanceTable(Map<String, Map<String, String>> currentAssignment,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, @Nullable List<Tier> sortedTiers,
       @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap, Configuration config) {
-
     String serverTag = _tenantConfig.getServer();
     Set<String> instances = HelixHelper.getServerInstancesForTenant(_helixManager, serverTag);
     Map<String, Map<String, String>> newAssignment = new TreeMap<>();
