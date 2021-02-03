@@ -105,4 +105,23 @@ public class OfflineDimTableSegmentAssignmentTest {
         _segmentAssignment.rebalanceTable(currentAssignment, new TreeMap<>(), null, null, null);
     assertEquals(newAssignment.get(SEGMENT_NAME).size(), NUM_INSTANCES - 1);
   }
+
+  @Test
+  public void testSegmentAssignmentToRealtimeHosts() {
+    List<HelixProperty> instanceConfigList = new ArrayList<>();
+    for (String instance: INSTANCES) {
+      ZNRecord znRecord = new ZNRecord(instance);
+      znRecord.setListField(TAG_LIST.name(), ImmutableList.of(REALTIME_SERVER_TAG));
+      instanceConfigList.add(new InstanceConfig(znRecord));
+    }
+    HelixDataAccessor dataAccessor = mock(HelixDataAccessor.class);
+    PropertyKey.Builder builder = new PropertyKey.Builder("cluster");
+    when(dataAccessor.keyBuilder()).thenReturn(builder);
+    when(dataAccessor.getChildValues(builder.instanceConfigs(), true)).thenReturn(instanceConfigList);
+    when(_helixManager.getHelixDataAccessor()).thenReturn(dataAccessor);
+
+    List<String> instances = _segmentAssignment.assignSegment(SEGMENT_NAME, new TreeMap(), new TreeMap());
+    assertEquals(instances.size(), NUM_INSTANCES);
+    assertEqualsNoOrder(instances.toArray(), INSTANCES.toArray());
+  }
 }
