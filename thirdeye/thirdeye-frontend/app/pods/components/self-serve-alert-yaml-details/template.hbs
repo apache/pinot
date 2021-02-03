@@ -1,80 +1,97 @@
 <div class="te-search-results__header row">
   <div class="te-search-results__title-group col-md-10 col-xs-9">
     <div class="te-search-results__title">
-      <h3 class="te-search-results__title-name" title={{alertData.detectionName}}>{{alertData.detectionName}}</h3>
-      {{#if (eq displayMode "list")}}
-      {{#link-to "manage.explore" alertData.id}}
-      <div class="te-search-results__title-name" title={{alertData.detectionName}}>{{alertData.detectionName}}</div>
-      {{/link-to}}
-      {{/if}}
+      <h3 class="te-search-results__title-name" title={{alertData.detectionName}}>
+        {{alertData.detectionName}}
+      </h3>
       {{#if isLoadError}}
-      <div
-        class="te-search-results__tag {{if (eq displayMode "list") "te-search-results__tag--list"}} {{if alertData.isActive "te-search-results__tag--active"}}">
-        Error
-      </div>
+        <div class="te-search-results__tag
+             {{if (eq displayMode " list") "te-search-results__tag--list"}}
+             {{if alertData.isActive "te-search-results__tag--active"}}">
+          Error
+        </div>
       {{else}}
-      <div
-        class="te-search-results__tag {{if (eq displayMode "list") "te-search-results__tag--list"}} {{if alertData.isActive "te-search-results__tag--active"}}">
-        {{if alertData.isActive "Active" "Inactive"}}
-      </div>
-      {{#x-toggle
+        <div class="te-search-results__tag
+             {{if (eq displayMode " list") "te-search-results__tag--list"}}
+             {{if alertData.isActive "te-search-results__tag--active"}}">
+          {{if alertData.isActive "Active" "Inactive"}}
+        </div>
+        {{#x-toggle
           value=alertData.isActive
           classNames="te-toggle te-toggle--form te-toggle--left report-toggle activation-toggle"
           theme="ios"
           id="active-toggle"
           showLabels=false
           name="activeToggle"
-      onToggle=(action "toggleAlertActivation")
-      as |toggle|}}
-      {{toggle.switch theme='ios' onLabel='diff on' offLabel='diff off'}}
-      {{/x-toggle}}
+          onToggle=(action "toggleAlertActivation") as |toggle|
+        }}
+          {{toggle.switch theme="ios" onLabel="diff on" offLabel="diff off"}}
+        {{/x-toggle}}
       {{/if}}
     </div>
   </div>
   <div class="col-md-2 col-xs-3">
-    <div class="pull-right">{{yield}}</div>
+    <div class="pull-right">
+      {{yield}}
+    </div>
   </div>
 </div>
-<h4 class="te-alert-page__subtitle">{{alertData.description}}</h4>
+<h4 class="te-alert-page__subtitle">
+  {{alertData.description}}
+</h4>
 {{#if (not isLoadError)}}
-<div class="te-alert-detail-breakdown row">
-  <dl class="col-xs-12 col-sm-5 row">
-    <dt class="col-md-4">Metric</dt>
-    <dd class="col-md-8 te-search-results__value{{valueClassSuffix}}" title={{alertData.metric}}>
-      {{if alertData.metric alertData.metric 'N/A'}}
-    </dd>
-
-    <dt class="col-md-4">Dataset</dt>
-    <dd class="col-md-8 te-search-results__value{{valueClassSuffix}}" title={{alertData.dataset}}>
-      {{if alertData.dataset alertData.dataset 'N/A'}}
-    </dd>
-
-    <dt class="col-md-4">Filtered By</dt>
-    <dd class="col-md-8 te-search-results__value{{valueClassSuffix}}" title={{alertData.filters}}>
-      {{if alertData.filters alertData.filters 'N/A'}}</dd>
-
-    <dt class="col-md-4">Breakdown By</dt>
-    <dd class="col-md-8 te-search-results__value{{valueClassSuffix}}" title={{alertData.dimensionExploration}}>
-      {{if alertData.dimensionExploration alertData.dimensionExploration 'N/A'}}</dd>
-  </dl>
-
-  <dl class="col-xs-12 col-sm-5 row">
-    <dt class="col-md-4">Created By</dt>
-    <dd class="col-md-8 te-search-results__value{{valueClassSuffix}}" title={{alertData.createdBy}}>
-      {{if alertData.createdBy alertData.createdBy 'N/A'}}</dd>
-
-    <dt class="col-md-4">Updated By</dt>
-    <dd class="col-md-8 te-search-results__value{{valueClassSuffix}}" title={{alertData.updatedBy}}>
-      {{if alertData.updatedBy alertData.updatedBy 'N/A'}}</dd>
-
-    <dt class="col-md-4">Last detection</dt>
-    <dd class="col-md-8 te-search-results__value{{valueClassSuffix}}" title={{alertData.lastDetectionTime}}>
-      {{if alertData.lastDetectionTime alertData.lastDetectionTime 'N/A'}}</dd>
-
-    <dt class="col-md-4">Subscribed Groups</dt>
-    <dd class="col-md-8 te-search-results__value{{valueClassSuffix}}" title={{subscribedGroups}}>
-      {{if subscribedGroups subscribedGroups 'N/A'}}
-    </dd>
-  </dl>
-</div>
+  <div class="te-alert-detail-breakdown row">
+    <dl class="col-xs-12 col-sm-5 row">
+      <dt class="col-md-4">
+        Metric
+      </dt>
+      <dd class="col-md-8 te-search-results__value{{valueClassSuffix}}" title={{alertData.metric}}>
+        {{if alertData.metric alertData.metric "N/A"}}
+      </dd>
+      <dt class="col-md-4">
+        Dataset
+      </dt>
+      <dd class="col-md-8 te-search-results__value{{valueClassSuffix}}" title={{alertData.dataset}}>
+        {{if alertData.dataset alertData.dataset "N/A"}}
+      </dd>
+      <dt class="col-md-4">
+        Filtered By
+      </dt>
+      <dd class="col-md-8 te-search-results__value{{valueClassSuffix}}" title={{alertData.filters}}>
+        {{if alertData.filters alertData.filters "N/A"}}
+      </dd>
+      <dt class="col-md-4">
+        Breakdown By
+      </dt>
+      <dd class="col-md-8 te-search-results__value{{valueClassSuffix}}" title={{alertData.dimensionExploration}}>
+        {{if alertData.dimensionExploration alertData.dimensionExploration "N/A"}}
+      </dd>
+    </dl>
+    <dl class="col-xs-12 col-sm-5 row">
+      <dt class="col-md-4">
+        Created By
+      </dt>
+      <dd class="col-md-8 te-search-results__value{{valueClassSuffix}}" title={{alertData.createdBy}}>
+        {{if alertData.createdBy alertData.createdBy "N/A"}}
+      </dd>
+      <dt class="col-md-4">
+        Updated By
+      </dt>
+      <dd class="col-md-8 te-search-results__value{{valueClassSuffix}}" title={{alertData.updatedBy}}>
+        {{if alertData.updatedBy alertData.updatedBy "N/A"}}
+      </dd>
+      <dt class="col-md-4">
+        Last detection
+      </dt>
+      <dd class="col-md-8 te-search-results__value{{valueClassSuffix}}" title={{alertData.lastDetectionTime}}>
+        {{if alertData.lastDetectionTime alertData.lastDetectionTime "N/A"}}
+      </dd>
+      <dt class="col-md-4">
+        Subscribed Groups
+      </dt>
+      <dd class="col-md-8 te-search-results__value{{valueClassSuffix}}" title={{subscribedGroups}}>
+        {{if subscribedGroups subscribedGroups "N/A"}}
+      </dd>
+    </dl>
+  </div>
 {{/if}}
