@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.operator.transform.function;
+package org.apache.pinot.common.function;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -46,7 +46,7 @@ public final class TimeZoneKey {
   private static final TimeZoneKey[] OFFSET_TIME_ZONE_KEYS = new TimeZoneKey[OFFSET_TIME_ZONE_MAX - OFFSET_TIME_ZONE_MIN + 1];
 
   static {
-    try (InputStream in = TimeZoneKey.class.getResourceAsStream("zone-index.properties")) {
+    try (InputStream in = TimeZoneKey.class.getClassLoader().getResourceAsStream("zone-index.properties")) {
       // load zone file
       // todo parse file by hand since Properties ignores duplicate entries
       Properties data = new Properties() {

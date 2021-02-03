@@ -19,14 +19,13 @@
 package org.apache.pinot.core.data.function;
 
 import com.google.common.collect.Lists;
-import java.io.IOException;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.utils.JsonUtils;
+import org.joda.time.DateTimeZone;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -35,7 +34,9 @@ import org.testng.annotations.Test;
 /**
  * Tests the Pinot inbuilt transform functions
  */
-public class InbuiltFunctionsTest {
+public class DateTimeFunctionsTest {
+  private static final ZoneOffset WEIRD_ZONE = ZoneOffset.ofHoursMinutes(7, 9);
+  private static final DateTimeZone TEST_DATE_TIME_ZONE = DateTimeZone.forID(WEIRD_ZONE.getId());
 
   private void testFunction(String functionExpression, List<String> expectedArguments, GenericRow row,
       Object expectedResult) {
@@ -296,220 +297,71 @@ public class InbuiltFunctionsTest {
     return inputs.toArray(new Object[0][]);
   }
 
-  @Test(dataProvider = "jsonFunctionsDataProvider")
-  public void testJsonFunctions(String functionExpression, List<String> expectedArguments, GenericRow row,
-      Object expectedResult) {
-    testFunction(functionExpression, expectedArguments, row, expectedResult);
-  }
-
-  @DataProvider(name = "jsonFunctionsDataProvider")
-  public Object[][] jsonFunctionsDataProvider()
-      throws IOException {
-    List<Object[]> inputs = new ArrayList<>();
-
-    // toJsonMapStr
-    GenericRow row0 = new GenericRow();
-    String jsonStr = "{\"k1\":\"foo\",\"k2\":\"bar\"}";
-    row0.putValue("jsonMap", JsonUtils.stringToObject(jsonStr, Map.class));
-    inputs.add(new Object[]{"toJsonMapStr(jsonMap)", Lists.newArrayList("jsonMap"), row0, jsonStr});
-
-    GenericRow row1 = new GenericRow();
-    jsonStr = "{\"k3\":{\"sub1\":10,\"sub2\":1.0},\"k4\":\"baz\",\"k5\":[1,2,3]}";
-    row1.putValue("jsonMap", JsonUtils.stringToObject(jsonStr, Map.class));
-    inputs.add(new Object[]{"toJsonMapStr(jsonMap)", Lists.newArrayList("jsonMap"), row1, jsonStr});
-
-    GenericRow row2 = new GenericRow();
-    jsonStr = "{\"k1\":\"foo\",\"k2\":\"bar\"}";
-    row2.putValue("jsonMap", JsonUtils.stringToObject(jsonStr, Map.class));
-    inputs.add(new Object[]{"json_format(jsonMap)", Lists.newArrayList("jsonMap"), row2, jsonStr});
-
-    GenericRow row3 = new GenericRow();
-    jsonStr = "{\"k3\":{\"sub1\":10,\"sub2\":1.0},\"k4\":\"baz\",\"k5\":[1,2,3]}";
-    row3.putValue("jsonMap", JsonUtils.stringToObject(jsonStr, Map.class));
-    inputs.add(new Object[]{"json_format(jsonMap)", Lists.newArrayList("jsonMap"), row3, jsonStr});
-
-    GenericRow row4 = new GenericRow();
-    jsonStr = "[{\"one\":1,\"two\":\"too\"},{\"one\":11,\"two\":\"roo\"}]";
-    row4.putValue("jsonMap", JsonUtils.stringToObject(jsonStr, List.class));
-    inputs.add(new Object[]{"json_format(jsonMap)", Lists.newArrayList("jsonMap"), row4, jsonStr});
-
-    GenericRow row5 = new GenericRow();
-    jsonStr =
-        "[{\"one\":1,\"two\":{\"sub1\":1.1,\"sub2\":1.2},\"three\":[\"a\",\"b\"]},{\"one\":11,\"two\":{\"sub1\":11.1,\"sub2\":11.2},\"three\":[\"aa\",\"bb\"]}]";
-    row5.putValue("jsonMap", JsonUtils.stringToObject(jsonStr, List.class));
-    inputs.add(new Object[]{"json_format(jsonMap)", Lists.newArrayList("jsonMap"), row5, jsonStr});
-
-    GenericRow row6 = new GenericRow();
-    jsonStr =
-        "[{\"one\":1,\"two\":{\"sub1\":1.1,\"sub2\":1.2},\"three\":[\"a\",\"b\"]},{\"one\":11,\"two\":{\"sub1\":11.1,\"sub2\":11.2},\"three\":[\"aa\",\"bb\"]}]";
-    row6.putValue("jsonPathArray", JsonUtils.stringToObject(jsonStr, List.class));
-    inputs.add(new Object[]{"json_path_array(jsonPathArray, '$.[*].one')", Lists.newArrayList(
-        "jsonPathArray"), row6, new Object[]{1, 11}});
-
-    GenericRow row7 = new GenericRow();
-    jsonStr =
-        "[{\"one\":1,\"two\":{\"sub1\":1.1,\"sub2\":1.2},\"three\":[\"a\",\"b\"]},{\"one\":11,\"two\":{\"sub1\":11.1,\"sub2\":11.2},\"three\":[\"aa\",\"bb\"]}]";
-    row7.putValue("jsonPathArray", JsonUtils.stringToObject(jsonStr, List.class));
-    inputs.add(new Object[]{"json_path_array(jsonPathArray, '$.[*].three')", Lists.newArrayList(
-        "jsonPathArray"), row7, new Object[]{Arrays.asList("a", "b"), Arrays.asList("aa", "bb")}});
-
-    GenericRow row8 = new GenericRow();
-    jsonStr = "{\"k3\":{\"sub1\":10,\"sub2\":1.0},\"k4\":\"baz\",\"k5\":[1,2,3]}";
-    row8.putValue("jsonPathString", JsonUtils.stringToObject(jsonStr, Map.class));
-    inputs.add(new Object[]{"json_path_string(jsonPathString, '$.k3')", Lists.newArrayList(
-        "jsonPathString"), row8, "{\"sub1\":10,\"sub2\":1.0}"});
-
-    GenericRow row9 = new GenericRow();
-    jsonStr = "{\"k3\":{\"sub1\":10,\"sub2\":1.0},\"k4\":\"baz\",\"k5\":[1,2,3]}";
-    row9.putValue("jsonPathString", JsonUtils.stringToObject(jsonStr, Map.class));
-    inputs.add(new Object[]{"json_path_string(jsonPathString, '$.k4')", Lists.newArrayList(
-        "jsonPathString"), row9, "baz"});
-
-    GenericRow row10 = new GenericRow();
-    jsonStr = "{\"k3\":{\"sub1\":10,\"sub2\":1.0},\"k4\":\"baz\",\"k5\":[1,2,3]}";
-    row10.putValue("jsonPathString", JsonUtils.stringToObject(jsonStr, Map.class));
-    inputs.add(new Object[]{"json_path_long(jsonPathString, '$.k3.sub1')", Lists.newArrayList(
-        "jsonPathString"), row10, 10L});
-
-    GenericRow row11 = new GenericRow();
-    jsonStr = "{\"k3\":{\"sub1\":10,\"sub2\":1.0},\"k4\":\"baz\",\"k5\":[1,2,3]}";
-    row11.putValue("jsonPathString", JsonUtils.stringToObject(jsonStr, Map.class));
-    inputs.add(new Object[]{"json_path_double(jsonPathString, '$.k3.sub2')", Lists.newArrayList(
-        "jsonPathString"), row11, 1.0});
-    return inputs.toArray(new Object[0][]);
-  }
-
-  @Test(dataProvider = "arithmeticFunctionsDataProvider")
-  public void testArithmeticFunctions(String functionExpression, List<String> expectedArguments, GenericRow row,
-      Object expectedResult) {
-    testFunction(functionExpression, expectedArguments, row, expectedResult);
-  }
-
-  @DataProvider(name = "arithmeticFunctionsDataProvider")
-  public Object[][] arithmeticFunctionsDataProvider() {
-    List<Object[]> inputs = new ArrayList<>();
-
-    GenericRow row0 = new GenericRow();
-    row0.putValue("a", (byte) 1);
-    row0.putValue("b", (char) 2);
-    inputs.add(new Object[]{"plus(a, b)", Lists.newArrayList("a", "b"), row0, 3.0});
-
-    GenericRow row1 = new GenericRow();
-    row1.putValue("a", (short) 3);
-    row1.putValue("b", 4);
-    inputs.add(new Object[]{"minus(a, b)", Lists.newArrayList("a", "b"), row1, -1.0});
-
-    GenericRow row2 = new GenericRow();
-    row2.putValue("a", 5L);
-    row2.putValue("b", 6f);
-    inputs.add(new Object[]{"times(a, b)", Lists.newArrayList("a", "b"), row2, 30.0});
-
-    GenericRow row3 = new GenericRow();
-    row3.putValue("a", 7.0);
-    row3.putValue("b", "8");
-    inputs.add(new Object[]{"divide(a, b)", Lists.newArrayList("a", "b"), row3, 0.875});
-
-    return inputs.toArray(new Object[0][]);
-  }
-
-  @Test(dataProvider = "arrayFunctionsDataProvider")
-  public void testArrayFunctions(String functionExpression, List<String> expectedArguments, GenericRow row,
-      Object expectedResult) {
-    testFunction(functionExpression, expectedArguments, row, expectedResult);
-  }
-
-  @DataProvider(name = "arrayFunctionsDataProvider")
-  public Object[][] arrayFunctionsDataProvider() {
-    List<Object[]> inputs = new ArrayList<>();
-
+  @Test
+  public void testDateTrunc() {
     GenericRow row = new GenericRow();
-    row.putValue("intArray", new int[]{3, 2, 10, 6, 1, 12});
-    row.putValue("integerArray", new Integer[]{3, 2, 10, 6, 1, 12});
-    row.putValue("stringArray", new String[]{"3", "2", "10", "6", "1", "12"});
+    row.putValue("epochMillis", 1612296732123L);
+    List<String> arguments = Lists.newArrayList("epochMillis");
 
-    inputs.add(new Object[]{"array_reverse_int(intArray)", Collections.singletonList(
-        "intArray"), row, new int[]{12, 1, 6, 10, 2, 3}});
-    inputs.add(new Object[]{"array_reverse_int(integerArray)", Collections.singletonList(
-        "integerArray"), row, new int[]{12, 1, 6, 10, 2, 3}});
-    inputs.add(new Object[]{"array_reverse_int(stringArray)", Collections.singletonList(
-        "stringArray"), row, new int[]{12, 1, 6, 10, 2, 3}});
+    // name variations
+    testFunction("datetrunc('millisecond', epochMillis, 'MILLISECONDS')", arguments, row, 1612296732123L);
+    testFunction("date_trunc('millisecond', epochMillis, 'MILLISECONDS')", arguments, row, 1612296732123L);
+    testFunction("dateTrunc('millisecond', epochMillis, 'MILLISECONDS')", arguments, row, 1612296732123L);
+    testFunction("DATE_TRUNC('millisecond', epochMillis, 'MILLISECONDS')", arguments, row, 1612296732123L);
 
-    inputs.add(new Object[]{"array_reverse_string(intArray)", Collections.singletonList(
-        "intArray"), row, new String[]{"12", "1", "6", "10", "2", "3"}});
-    inputs.add(new Object[]{"array_reverse_string(integerArray)", Collections.singletonList(
-        "integerArray"), row, new String[]{"12", "1", "6", "10", "2", "3"}});
-    inputs.add(new Object[]{"array_reverse_string(stringArray)", Collections.singletonList(
-        "stringArray"), row, new String[]{"12", "1", "6", "10", "2", "3"}});
+    // MILLISECONDS to various
+    testFunction("datetrunc('millisecond', epochMillis, 'MILLISECONDS')", arguments, row, 1612296732123L);
+    testFunction("datetrunc('second', epochMillis, 'MILLISECONDS')", arguments, row, 1612296732000L);
+    testFunction("datetrunc('minute', epochMillis, 'MILLISECONDS')", arguments, row, 1612296720000L);
+    testFunction("datetrunc('hour', epochMillis, 'MILLISECONDS')", arguments, row, 1612296000000L);
+    testFunction("datetrunc('day', epochMillis, 'MILLISECONDS')", arguments, row, 1612224000000L);
+    testFunction("datetrunc('week', epochMillis, 'MILLISECONDS')", arguments, row, 1612137600000L);
+    testFunction("datetrunc('month', epochMillis, 'MILLISECONDS')", arguments, row, 1612137600000L);
+    testFunction("datetrunc('quarter', epochMillis, 'MILLISECONDS')", arguments, row, 1609459200000L);
+    testFunction("datetrunc('year', epochMillis, 'MILLISECONDS')", arguments, row, 1609459200000L);
 
-    inputs.add(new Object[]{"array_sort_int(intArray)", Collections.singletonList(
-        "intArray"), row, new int[]{1, 2, 3, 6, 10, 12}});
-    inputs.add(new Object[]{"array_sort_int(integerArray)", Collections.singletonList(
-        "integerArray"), row, new int[]{1, 2, 3, 6, 10, 12}});
-    inputs.add(new Object[]{"array_sort_int(stringArray)", Collections.singletonList(
-        "stringArray"), row, new int[]{1, 2, 3, 6, 10, 12}});
+    // SECONDS to various
+    row.clear();
+    row.putValue("epochSeconds", 1612296732);
+    arguments = Lists.newArrayList("epochSeconds");
+    testFunction("datetrunc('millisecond', epochSeconds, 'SECONDS')", arguments, row, 1612296732L);
+    testFunction("datetrunc('second', epochSeconds, 'SECONDS')", arguments, row, 1612296732L);
+    testFunction("datetrunc('minute', epochSeconds, 'SECONDS')", arguments, row, 1612296720L);
+    testFunction("datetrunc('hour', epochSeconds, 'SECONDS')", arguments, row, 1612296000L);
+    testFunction("datetrunc('day', epochSeconds, 'SECONDS')", arguments, row, 1612224000L);
+    testFunction("datetrunc('week', epochSeconds, 'SECONDS')", arguments, row, 1612137600L);
+    testFunction("datetrunc('month', epochSeconds, 'SECONDS')", arguments, row, 1612137600L);
+    testFunction("datetrunc('quarter', epochSeconds, 'SECONDS')", arguments, row, 1609459200L);
+    testFunction("datetrunc('year', epochSeconds, 'SECONDS')", arguments, row, 1609459200L);
 
-    inputs.add(new Object[]{"array_sort_string(intArray)", Collections.singletonList(
-        "intArray"), row, new String[]{"1", "10", "12", "2", "3", "6"}});
-    inputs.add(new Object[]{"array_sort_string(integerArray)", Collections.singletonList(
-        "integerArray"), row, new String[]{"1", "10", "12", "2", "3", "6"}});
-    inputs.add(new Object[]{"array_sort_string(stringArray)", Collections.singletonList(
-        "stringArray"), row, new String[]{"1", "10", "12", "2", "3", "6"}});
+    // MINUTES to various
+    row.clear();
+    row.putValue("epochMinutes", 26871612);
+    arguments = Lists.newArrayList("epochMinutes");
+    testFunction("datetrunc('millisecond', epochMinutes, 'MINUTES')", arguments, row, 26871612L);
+    testFunction("datetrunc('second', epochMinutes, 'MINUTES')", arguments, row, 26871612L);
+    testFunction("datetrunc('minute', epochMinutes, 'MINUTES')", arguments, row, 26871612L);
+    testFunction("datetrunc('hour', epochMinutes, 'MINUTES')", arguments, row, 26871600L);
+    testFunction("datetrunc('day', epochMinutes, 'MINUTES')", arguments, row, 26870400L);
+    testFunction("datetrunc('week', epochMinutes, 'MINUTES')", arguments, row, 26868960L);
+    testFunction("datetrunc('month', epochMinutes, 'MINUTES')", arguments, row, 26868960L);
+    testFunction("datetrunc('quarter', epochMinutes, 'MINUTES')", arguments, row, 26824320L);
+    testFunction("datetrunc('year', epochMinutes, 'MINUTES')", arguments, row, 26824320L);
 
-    inputs.add(new Object[]{"array_index_of_int(intArray, 2)", Collections.singletonList("intArray"), row, 1});
-    inputs.add(new Object[]{"array_index_of_int(integerArray, 2)", Collections.singletonList("integerArray"), row, 1});
-    inputs.add(new Object[]{"array_index_of_int(stringArray, 2)", Collections.singletonList("stringArray"), row, 1});
-
-    inputs.add(new Object[]{"array_index_of_string(intArray, '2')", Collections.singletonList("intArray"), row, 1});
-    inputs.add(
-        new Object[]{"array_index_of_string(integerArray, '2')", Collections.singletonList("integerArray"), row, 1});
-    inputs
-        .add(new Object[]{"array_index_of_string(stringArray, '2')", Collections.singletonList("stringArray"), row, 1});
-
-    inputs.add(new Object[]{"array_contains_int(intArray, 2)", Collections.singletonList("intArray"), row, true});
-    inputs
-        .add(new Object[]{"array_contains_int(integerArray, 2)", Collections.singletonList("integerArray"), row, true});
-    inputs.add(new Object[]{"array_contains_int(stringArray, 2)", Collections.singletonList("stringArray"), row, true});
-
-    inputs.add(new Object[]{"array_contains_string(intArray, '2')", Collections.singletonList("intArray"), row, true});
-    inputs.add(
-        new Object[]{"array_contains_string(integerArray, '2')", Collections.singletonList("integerArray"), row, true});
-    inputs.add(
-        new Object[]{"array_contains_string(stringArray, '2')", Collections.singletonList("stringArray"), row, true});
-
-    inputs
-        .add(new Object[]{"array_slice_int(intArray, 1, 2)", Collections.singletonList("intArray"), row, new int[]{2}});
-    inputs.add(new Object[]{"array_slice_int(integerArray, 1, 2)", Collections.singletonList(
-        "integerArray"), row, new int[]{2}});
-    inputs.add(new Object[]{"array_slice_string(stringArray, 1, 2)", Collections.singletonList(
-        "stringArray"), row, new String[]{"2"}});
-
-    inputs.add(new Object[]{"array_distinct_int(intArray)", Collections.singletonList(
-        "intArray"), row, new int[]{3, 2, 10, 6, 1, 12}});
-    inputs.add(new Object[]{"array_distinct_int(integerArray)", Collections.singletonList(
-        "integerArray"), row, new int[]{3, 2, 10, 6, 1, 12}});
-    inputs.add(new Object[]{"array_distinct_string(stringArray)", Collections.singletonList(
-        "stringArray"), row, new String[]{"3", "2", "10", "6", "1", "12"}});
-
-    inputs.add(new Object[]{"array_remove_int(intArray, 2)", Collections.singletonList(
-        "intArray"), row, new int[]{3, 10, 6, 1, 12}});
-    inputs.add(new Object[]{"array_remove_int(integerArray, 2)", Collections.singletonList(
-        "integerArray"), row, new int[]{3, 10, 6, 1, 12}});
-    inputs.add(new Object[]{"array_remove_string(stringArray, 2)", Collections.singletonList(
-        "stringArray"), row, new String[]{"3", "10", "6", "1", "12"}});
-
-    inputs.add(new Object[]{"array_union_int(intArray, intArray)", Lists.newArrayList("intArray",
-        "intArray"), row, new int[]{3, 2, 10, 6, 1, 12}});
-    inputs.add(new Object[]{"array_union_int(integerArray, integerArray)", Lists.newArrayList("integerArray",
-        "integerArray"), row, new int[]{3, 2, 10, 6, 1, 12}});
-    inputs.add(new Object[]{"array_union_string(stringArray, stringArray)", Lists.newArrayList("stringArray",
-        "stringArray"), row, new String[]{"3", "2", "10", "6", "1", "12"}});
-
-    inputs.add(new Object[]{"array_concat_int(intArray, intArray)", Lists.newArrayList("intArray",
-        "intArray"), row, new int[]{3, 2, 10, 6, 1, 12, 3, 2, 10, 6, 1, 12}});
-    inputs.add(new Object[]{"array_concat_int(integerArray, integerArray)", Lists.newArrayList("integerArray",
-        "integerArray"), row, new int[]{3, 2, 10, 6, 1, 12, 3, 2, 10, 6, 1, 12}});
-    inputs.add(new Object[]{"array_concat_string(stringArray, stringArray)", Lists.newArrayList("stringArray",
-        "stringArray"), row, new String[]{"3", "2", "10", "6", "1", "12", "3", "2", "10", "6", "1", "12"}});
-    return inputs.toArray(new Object[0][]);
+    // MILLISECONDS to various with timezone
+    row.clear();
+    row.putValue("epochMillis", 1612296732123L);
+    arguments = Lists.newArrayList("epochMillis");
+    String weirdDateTimeZoneid = TEST_DATE_TIME_ZONE.getID();
+    testFunction("datetrunc('millisecond', epochMillis, 'MILLISECONDS', '" + weirdDateTimeZoneid + "')", arguments, row,
+        1612296732123L);
+    testFunction("datetrunc('minute', epochMillis, 'MILLISECONDS', '" + weirdDateTimeZoneid + "')", arguments, row,
+        1612296720000L);
+    testFunction("datetrunc('second', epochMillis, 'MILLISECONDS', '" + weirdDateTimeZoneid + "')", arguments, row,
+        1612296732000L);
+    testFunction("datetrunc('hour', epochMillis, 'MILLISECONDS', '" + weirdDateTimeZoneid + "')", arguments, row,
+        1612295460000L);
+    testFunction("datetrunc('day', epochMillis, 'MILLISECONDS', '" + weirdDateTimeZoneid + "')", arguments, row,
+        1612296732000L);
   }
 }
