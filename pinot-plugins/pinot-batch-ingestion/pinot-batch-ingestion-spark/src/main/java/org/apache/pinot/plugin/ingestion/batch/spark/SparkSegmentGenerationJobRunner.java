@@ -186,7 +186,9 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
         }
       }
       if (!inputDirFS.isDirectory(new URI(file))) {
-        filteredFiles.add(file);
+        // In case PinotFS implementations list files without a scheme (e.g. hdfs://), then we may lose it in the
+        // input file path. Call SegmentGenerationUtils.getFileURI() to fix this up.
+        filteredFiles.add(SegmentGenerationUtils.getFileURI(file, inputDirURI).toString());
       }
     }
 
