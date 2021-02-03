@@ -18,7 +18,6 @@ module.exports = {
     'no-console': 'error',
     'no-debugger': 'error',
     'eol-last': ['warn', 'always'],
-    indent: ['warn', 2, { SwitchCase: 1 }],
     'space-in-parens': ['warn', 'never'],
     'no-trailing-spaces': ['warn'],
     'comma-dangle': ['warn', 'never'],
@@ -26,7 +25,7 @@ module.exports = {
     semi: ['warn', 'always'],
     'comma-style': ['warn', 'last'],
     'no-unused-vars': ['warn', { vars: 'all', args: 'after-used', ignoreRestSiblings: false }],
-    "space-before-function-paren": ["error", {
+    "space-before-function-paren": ["warn", {
       "anonymous": "always",
       "named": "never",
       "asyncArrow": "always"

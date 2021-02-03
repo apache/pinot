@@ -792,13 +792,10 @@ export function trimTimeRanges(anomalyRange, analysisRange) {
   const newAnalysisRangeStart = Math.max(analysisRange[0], anomalyRange[1] - newAnalysisDuration);
   const newAnalysisRange = [newAnalysisRangeStart, anomalyRange[1]];
 
-  return Object.assign(
-    {},
-    {
-      anomalyRange: newAnomalyRange,
-      analysisRange: newAnalysisRange
-    }
-  );
+  return {
+    anomalyRange: newAnomalyRange,
+    analysisRange: newAnalysisRange
+  };
 }
 
 export default {
