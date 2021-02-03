@@ -44,7 +44,7 @@ import org.glassfish.jersey.server.ResourceConfig;
 
 
 /**
- * Utility class that generates Http {@link ListenerConfig} instances 
+ * Utility class that generates Http {@link ListenerConfig} instances
  * based on the properties provided by a property namespace in {@link PinotConfiguration}.
  */
 public final class ListenerConfigUtil {
@@ -61,11 +61,11 @@ public final class ListenerConfigUtil {
   /**
    * Generates {@link ListenerConfig} instances based on the combination
    * of properties such as *.port and *.access.protocols.
-   * 
+   *
    * @param config property holders for controller configuration
    * @param namespace property namespace to extract from
    *
-   * @return List of {@link ListenerConfig} for which http listeners 
+   * @return List of {@link ListenerConfig} for which http listeners
    * should be created.
    */
   public static List<ListenerConfig> buildListenerConfigs(PinotConfiguration config, String namespace,
@@ -124,11 +124,10 @@ public final class ListenerConfigUtil {
   public static List<ListenerConfig> buildServerAdminConfigs(PinotConfiguration serverConf) {
     List<ListenerConfig> listeners = new ArrayList<>();
 
-    String adminApiPortString = serverConf.getProperty(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT);
-    if (adminApiPortString != null) {
-      listeners.add(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, Integer.parseInt(adminApiPortString),
-          CommonConstants.HTTP_PROTOCOL, new TlsConfig()));
-    }
+    int adminApiPort = serverConf.getProperty(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT,
+        CommonConstants.Server.DEFAULT_ADMIN_API_PORT);
+    listeners.add(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, adminApiPort,
+        CommonConstants.HTTP_PROTOCOL, new TlsConfig()));
 
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(serverConf, CommonConstants.Server.SERVER_TLS_PREFIX);
 
