@@ -69,13 +69,13 @@ public class AggregationResultSetTest {
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
-  public void testGetString_rowNotZero() {
+  public void testGetStringForNonZeroRow() {
     // Run the test
     aggregationResultSetUnderTest.getString(1, 0);
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
-  public void testGetString_columnNotZero() {
+  public void testGetStringForNonZeroColumn() {
     // Run the test
     aggregationResultSetUnderTest.getString(0, 1);
   }

@@ -95,7 +95,7 @@ public class DynamicBrokerSelectorTest {
   }
 
   @Test(priority = 1)
-  public void testSelectBroker_nullTable() throws Exception {
+  public void testSelectBrokerForNullTable() throws Exception {
     // Setup
     dynamicBrokerSelectorUnderTest.handleDataChange("dataPath", "data");
 
