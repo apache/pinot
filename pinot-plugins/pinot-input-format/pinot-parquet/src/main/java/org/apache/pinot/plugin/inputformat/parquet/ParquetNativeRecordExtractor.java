@@ -131,7 +131,7 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
             return binaryToDecimal(from.getBinary(fieldIndex, index), decimalMetadata.getPrecision(),
                 decimalMetadata.getScale());
           }
-          return from.getBinary(fieldIndex, index);
+          return from.getBinary(fieldIndex, index).getBytes();
         case INT96:
           Binary int96 = from.getInt96(fieldIndex, index);
           ByteBuffer buf = ByteBuffer.wrap(int96.getBytes()).order(ByteOrder.LITTLE_ENDIAN);
@@ -237,6 +237,9 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
   public boolean isMultiValue(Object value) {
     if (super.isMultiValue(value)) {
       return true;
+    }
+    if (value instanceof byte[]) {
+      return false;
     }
     return value.getClass().isArray();
   }

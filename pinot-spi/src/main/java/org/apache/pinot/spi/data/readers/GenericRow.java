@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -188,6 +189,9 @@ public class GenericRow implements Serializable {
         } else if (!fieldValue.equals(thatFieldValue)) {
           if (fieldValue instanceof Map && thatFieldValue instanceof Map) {
             return compareMap((Map<String, Object>) fieldValue, (Map<String, Object>) thatFieldValue);
+          }
+          if ((fieldValue instanceof byte[]) && (thatFieldValue instanceof byte[])) {
+            return Arrays.equals((byte[]) fieldValue, (byte[]) thatFieldValue);
           }
           if (fieldValue.getClass().isArray() && thatFieldValue.getClass().isArray()) {
             return compareArray((Object[]) fieldValue, (Object[]) thatFieldValue);
