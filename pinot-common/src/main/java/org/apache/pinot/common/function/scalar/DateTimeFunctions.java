@@ -20,8 +20,11 @@ package org.apache.pinot.common.function.scalar;
 
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.function.DateTimePatternHandler;
+import org.apache.pinot.common.function.DateTimeUtils;
+import org.apache.pinot.common.function.TimeZoneKey;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeField;
 import org.joda.time.DateTimeZone;
 
 
@@ -551,5 +554,54 @@ public class DateTimeFunctions {
   @ScalarFunction
   public static int millisecond(long millis, String timezoneId) {
     return new DateTime(millis, DateTimeZone.forID(timezoneId)).getMillisOfSecond();
+  }
+
+  /**
+   * The sql compatible date_trunc function for epoch time.
+   * @param unit truncate to unit (millisecond, second, minute, hour, day, week, month, quarter, year)
+   * @param timeValue value to truncate
+   * @param inputTimeUnitStr TimeUnit of value, expressed in Java's joda TimeUnit
+   * @return truncated timeValue in same TimeUnit as the input
+   */
+  @ScalarFunction
+  public static long dateTrunc(String unit, long timeValue, String inputTimeUnitStr) {
+    return dateTrunc(unit, timeValue, inputTimeUnitStr, TimeZoneKey.UTC_KEY.getId(), inputTimeUnitStr);
+  }
+
+  /**
+   *
+   * The sql compatible date_trunc function for epoch time.
+   * @param unit truncate to unit (millisecond, second, minute, hour, day, week, month, quarter, year)
+   * @param timeValue value to truncate
+   * @param inputTimeUnitStr TimeUnit of value, expressed in Java's joda TimeUnit
+   * @param timeZone timezone of the input
+   * @return truncated timeValue in same TimeUnit as the input
+   */
+  @ScalarFunction
+  public static long dateTrunc(String unit, long timeValue, String inputTimeUnitStr, String timeZone) {
+    return dateTrunc(unit, timeValue, inputTimeUnitStr, timeZone, inputTimeUnitStr);
+  }
+
+  /**
+   *
+   * The sql compatible date_trunc function for epoch time.
+   * @param unit truncate to unit (millisecond, second, minute, hour, day, week, month, quarter, year)
+   * @param timeValue value to truncate
+   * @param inputTimeUnitStr TimeUnit of value, expressed in Java's joda TimeUnit
+   * @param timeZone timezone of the input
+   * @param outputTimeUnitStr TimeUnit to convert the output to
+   * @return truncated timeValue
+   *
+   */
+  @ScalarFunction
+  public static long dateTrunc(String unit, long timeValue, String inputTimeUnitStr, String timeZone,
+      String outputTimeUnitStr) {
+    TimeUnit inputTimeUnit = TimeUnit.valueOf(inputTimeUnitStr);
+    TimeUnit outputTimeUnit = TimeUnit.valueOf(outputTimeUnitStr);
+    TimeZoneKey timeZoneKey = TimeZoneKey.getTimeZoneKey(timeZone);
+
+    DateTimeField dateTimeField = DateTimeUtils.getTimestampField(DateTimeUtils.getChronology(timeZoneKey), unit);
+    return outputTimeUnit.convert(dateTimeField.roundFloor(TimeUnit.MILLISECONDS.convert(timeValue, inputTimeUnit)),
+        TimeUnit.MILLISECONDS);
   }
 }
