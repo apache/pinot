@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.tools.admin.command;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -71,8 +72,14 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
   @Option(name = "-numHours", metaVar = "<String>", usage = "number of hours to consume as comma separated values (default 2,3,4,5,6,7,8,9,10,11,12)")
   private String _numHours = "2,3,4,5,6,7,8,9,10,11,12";
 
-  @Option(name = "-sampleCompletedSegmentDir", required = true, metaVar = "<String>", usage = "Consume from the topic for n hours and provide the path of the segment dir after it completes")
+  @Option(name = "-sampleCompletedSegmentDir", required = false, metaVar = "<String>", usage = "Consume from the topic for n hours and provide the path of the segment dir after it completes")
   private String _sampleCompletedSegmentDir;
+
+  @Option(name = "-dataCharacteristicsFile", required = false, metaVar = "<String>", usage = "File containing characteristics by which a segment will be generated")
+  private String _dataCharacteristicsFile;
+
+  @Option(name = "-schemaFile", required = false, metaVar = "<String>")
+  private String _schemaFile;
 
   @Option(name = "-ingestionRate", required = true, metaVar = "<String>", usage = "Avg number of messages per second ingested on any one stream partition (assumed all partitions are uniform)")
   private int _ingestionRate;
@@ -130,10 +137,13 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
 
   @Override
   public String toString() {
-    return ("RealtimeProvisioningHelper -tableConfigFile " + _tableConfigFile + " -numPartitions "
-        + _numPartitions + " -pushFrequency " + _pushFrequency + " -numHosts " + _numHosts + " -numHours " + _numHours
-        + " -sampleCompletedSegmentDir " + _sampleCompletedSegmentDir + " -ingestionRate "
-        + _ingestionRate + " -maxUsableHostMemory " + _maxUsableHostMemory + " -retentionHours " + _retentionHours);
+    String segmentStr = _sampleCompletedSegmentDir != null
+        ? " -sampleCompletedSegmentDir " + _sampleCompletedSegmentDir
+        : " -schemaFile " + _schemaFile + " -dataCharacteristicsFile " + _dataCharacteristicsFile;
+    return "RealtimeProvisioningHelper -tableConfigFile " + _tableConfigFile + " -numPartitions " + _numPartitions
+        + " -pushFrequency " + _pushFrequency + " -numHosts " + _numHosts + " -numHours " + _numHours + segmentStr
+        + " -ingestionRate " + _ingestionRate + " -maxUsableHostMemory " + _maxUsableHostMemory + " -retentionHours "
+        + _retentionHours;
   }
 
   @Override
@@ -145,7 +155,8 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
   public String description() {
     return
         "Given the table config, partitions, retention and a sample completed segment for a realtime table to be setup, "
-            + "this tool will provide memory used by each host and an optimal segment size for various combinations of hours to consume and hosts";
+            + "this tool will provide memory used by each host and an optimal segment size for various combinations of hours to consume and hosts. "
+            + "Instead of a completed segment, if characteristics of data is provided, a segment will be generated and used for memory estimation.";
   }
 
   @Override
@@ -171,6 +182,11 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
   @Override
   public boolean execute()
       throws IOException {
+
+    boolean segmentProvided = _sampleCompletedSegmentDir != null;
+    boolean characteristicsProvided = _schemaFile != null && _dataCharacteristicsFile != null;
+    Preconditions.checkState(segmentProvided ^ characteristicsProvided, "Either completed segment should be provided or both characteristic & schema files!");
+
     LOGGER.info("Executing command: {}", toString());
 
     TableConfig tableConfig;
@@ -217,12 +233,12 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     // TODO: allow multiple segments.
     // Consuming: Build statsHistory using multiple segments. Use multiple data points of (totalDocs,numHoursConsumed) to calculate totalDocs for our numHours
     // Completed: Use multiple (completedSize,numHours) data points to calculate completed size for our numHours
-    File sampleCompletedSegmentFile = new File(_sampleCompletedSegmentDir);
 
     long maxUsableHostMemBytes = DataSizeUtils.toBytes(_maxUsableHostMemory);
 
-    MemoryEstimator memoryEstimator =
-        new MemoryEstimator(tableConfig, sampleCompletedSegmentFile, _ingestionRate, maxUsableHostMemBytes, tableRetentionHours);
+    MemoryEstimator memoryEstimator = segmentProvided
+        ? new MemoryEstimator(tableConfig, new File(_sampleCompletedSegmentDir), _ingestionRate, maxUsableHostMemBytes, tableRetentionHours)
+        : new MemoryEstimator(tableConfig, new File(_dataCharacteristicsFile), new File(_schemaFile), _ingestionRate, maxUsableHostMemBytes, tableRetentionHours);
     File sampleStatsHistory = memoryEstimator.initializeStatsHistory();
     memoryEstimator
         .estimateMemoryUsed(sampleStatsHistory, numHosts, numHours, totalConsumingPartitions, _retentionHours);

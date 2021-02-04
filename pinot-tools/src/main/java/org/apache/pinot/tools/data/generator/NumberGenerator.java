@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.tools.data.generator;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -32,10 +33,11 @@ import org.slf4j.LoggerFactory;
 
 public class NumberGenerator implements Generator {
   private static final Logger LOGGER = LoggerFactory.getLogger(NumberGenerator.class);
+  private static final double DEFAULT_NUMBER_OF_VALUES_PER_ENTRY = 1;
 
   private final int cardinality;
   private final DataType columnType;
-  private final boolean sorted;
+  private final double numberOfValuesPerEntry;
 
   private List<Integer> intValues;
   private List<Double> doubleValues;
@@ -44,10 +46,13 @@ public class NumberGenerator implements Generator {
 
   private final Random random;
 
-  public NumberGenerator(Integer cardinality, DataType type, boolean sorted) {
-    this.cardinality = cardinality.intValue();
+  public NumberGenerator(Integer cardinality, DataType type, Double numberOfValuesPerEntry) {
+    this.cardinality = cardinality;
+    this.numberOfValuesPerEntry =
+        numberOfValuesPerEntry != null ? numberOfValuesPerEntry : DEFAULT_NUMBER_OF_VALUES_PER_ENTRY;
+    Preconditions.checkState(this.numberOfValuesPerEntry >= 1,
+        "Number of values per entry (should be >= 1): " + this.numberOfValuesPerEntry);
     columnType = type;
-    this.sorted = sorted;
     random = new Random(System.currentTimeMillis());
   }
 
@@ -61,7 +66,7 @@ public class NumberGenerator implements Generator {
         final int start = rand.nextInt(cardinality);
         final int end = start + cardinality;
         for (int i = start; i < end; i++) {
-          intValues.add(new Integer(i));
+          intValues.add(i);
         }
         break;
       case LONG:
@@ -69,15 +74,15 @@ public class NumberGenerator implements Generator {
         final long longStart = rand.nextInt(cardinality);
         final long longEnd = longStart + cardinality;
         for (long i = longStart; i < longEnd; i++) {
-          longValues.add(new Long(i));
+          longValues.add(i);
         }
         break;
       case FLOAT:
         floatValues = new ArrayList<Float>();
-        final float floatStart = rand.nextFloat() * rand.nextInt(1000);
+        final float floatStart = Math.round(rand.nextFloat()* 100.0f) / 100.0f;
         int floatCounter = 1;
         while (true) {
-          floatValues.add(new Float(floatStart + 0.1f));
+          floatValues.add(floatStart + floatCounter);
           if (floatCounter == cardinality) {
             break;
           }
@@ -86,10 +91,10 @@ public class NumberGenerator implements Generator {
         break;
       case DOUBLE:
         doubleValues = new ArrayList<Double>();
-        final double doubleStart = rand.nextDouble() * rand.nextInt(10000);
+        final double doubleStart = Math.round(rand.nextDouble() * 100.0) / 100.0;
         int doubleCounter = 1;
         while (true) {
-          doubleValues.add(new Double(doubleStart + 0.1d));
+          doubleValues.add(doubleStart + doubleCounter);
           if (doubleCounter == cardinality) {
             break;
           }
@@ -104,6 +109,13 @@ public class NumberGenerator implements Generator {
 
   @Override
   public Object next() {
+    if (numberOfValuesPerEntry == 1) {
+      return getNextNumber();
+    }
+    return MultiValueGeneratorHelper.generateMultiValueEntries(numberOfValuesPerEntry, random, this::getNextNumber);
+  }
+
+  private Number getNextNumber() {
     switch (columnType) {
       case INT:
         return intValues.get(random.nextInt(cardinality));
@@ -120,7 +132,7 @@ public class NumberGenerator implements Generator {
   }
 
   public static void main(String[] args) {
-    final NumberGenerator gen = new NumberGenerator(10000000, DataType.LONG, false);
+    final NumberGenerator gen = new NumberGenerator(10000000, DataType.LONG, null);
     gen.init();
     for (int i = 0; i < 1000; i++) {
       System.out.println(gen.next());
