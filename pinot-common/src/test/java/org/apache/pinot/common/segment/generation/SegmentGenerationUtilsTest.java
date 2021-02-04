@@ -17,12 +17,13 @@
  * under the License.
  */
 
-package org.apache.pinot.plugin.ingestion.batch.common;
+package org.apache.pinot.common.segment.generation;
 
-import org.testng.Assert;
-import org.testng.annotations.Test;
 import java.net.URI;
 import java.net.URISyntaxException;
+import org.testng.Assert;
+import org.testng.annotations.Test;
+
 
 public class SegmentGenerationUtilsTest {
 

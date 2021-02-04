@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.helix.core.minion.generator;
 
 import com.google.common.base.Preconditions;
-import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -36,6 +35,7 @@ import java.util.Set;
 import org.apache.helix.task.JobConfig;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
@@ -161,7 +161,7 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
       List<Map<String, String>> batchConfigMaps = batchIngestionConfig.getBatchConfigMaps();
       for (Map<String, String> batchConfigMap : batchConfigMaps) {
         try {
-          URI inputDirURI = getDirectoryUri(batchConfigMap.get(BatchConfigProperties.INPUT_DIR_URI));
+          URI inputDirURI = SegmentGenerationUtils.getDirectoryURI(batchConfigMap.get(BatchConfigProperties.INPUT_DIR_URI));
           updateRecordReaderConfigs(batchConfigMap);
           List<OfflineSegmentZKMetadata> offlineSegmentsMetadata = Collections.emptyList();
           // For append mode, we don't create segments for input file URIs already created.
@@ -227,10 +227,10 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
       Map<String, String> batchConfigMap, URI inputFileURI)
       throws URISyntaxException {
 
-    URI inputDirURI = getDirectoryUri(batchConfigMap.get(BatchConfigProperties.INPUT_DIR_URI));
+    URI inputDirURI = SegmentGenerationUtils.getDirectoryURI(batchConfigMap.get(BatchConfigProperties.INPUT_DIR_URI));
     URI outputDirURI = null;
     if (batchConfigMap.containsKey(BatchConfigProperties.OUTPUT_DIR_URI)) {
-      outputDirURI = getDirectoryUri(batchConfigMap.get(BatchConfigProperties.OUTPUT_DIR_URI));
+      outputDirURI = SegmentGenerationUtils.getDirectoryURI(batchConfigMap.get(BatchConfigProperties.OUTPUT_DIR_URI));
     }
     String pushMode = IngestionConfigUtils.getPushMode(batchConfigMap);
 
@@ -239,7 +239,7 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
         .put(BatchConfigProperties.TABLE_NAME, TableNameBuilder.OFFLINE.tableNameWithType(offlineTableName));
     singleFileGenerationTaskConfig.put(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, inputFileURI.toString());
     if (outputDirURI != null) {
-      URI outputSegmentDirURI = getRelativeOutputPath(inputDirURI, inputFileURI, outputDirURI);
+      URI outputSegmentDirURI = SegmentGenerationUtils.getRelativeOutputPath(inputDirURI, inputFileURI, outputDirURI);
       singleFileGenerationTaskConfig.put(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI, outputSegmentDirURI.toString());
     }
     singleFileGenerationTaskConfig.put(BatchConfigProperties.SEQUENCE_ID, String.valueOf(sequenceID));
@@ -311,7 +311,7 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
         }
       }
       try {
-        URI inputFileURI = getFileURI(file, inputDirURI);
+        URI inputFileURI = SegmentGenerationUtils.getFileURI(file, inputDirURI);
         if (existingSegmentInputFileURIs.contains(inputFileURI.toString())) {
           LOGGER.debug("Skipping already processed inputFileURI: {}", inputFileURI);
           continue;
@@ -329,16 +329,6 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
     return inputFileURIs;
   }
 
-  private URI getFileURI(String uriStr, URI fullUriForPathOnlyUriStr)
-      throws URISyntaxException {
-    URI fileURI = URI.create(uriStr);
-    if (fileURI.getScheme() == null) {
-      return new URI(fullUriForPathOnlyUriStr.getScheme(), fullUriForPathOnlyUriStr.getAuthority(), fileURI.getPath(),
-          fileURI.getQuery(), fileURI.getFragment());
-    }
-    return fileURI;
-  }
-
   private Set<String> getExistingSegmentInputFiles(List<OfflineSegmentZKMetadata> offlineSegmentsMetadata) {
     Set<String> existingSegmentInputFiles = new HashSet<>();
     for (OfflineSegmentZKMetadata metadata : offlineSegmentsMetadata) {
@@ -348,24 +338,5 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
       }
     }
     return existingSegmentInputFiles;
-  }
-
-  private URI getDirectoryUri(String uriStr)
-      throws URISyntaxException {
-    URI uri = new URI(uriStr);
-    if (uri.getScheme() == null) {
-      uri = new File(uriStr).toURI();
-    }
-    return uri;
-  }
-
-  private static URI getRelativeOutputPath(URI baseInputDir, URI inputFile, URI outputDir) {
-    URI relativePath = baseInputDir.relativize(inputFile);
-    Preconditions.checkState(relativePath.getPath().length() > 0 && !relativePath.equals(inputFile),
-        "Unable to extract out the relative path based on base input path: " + baseInputDir);
-    String outputDirStr = outputDir.toString();
-    outputDir = !outputDirStr.endsWith("/") ? URI.create(outputDirStr.concat("/")) : outputDir;
-    URI relativeOutputURI = outputDir.resolve(relativePath).resolve(".");
-    return relativeOutputURI;
   }
 }
