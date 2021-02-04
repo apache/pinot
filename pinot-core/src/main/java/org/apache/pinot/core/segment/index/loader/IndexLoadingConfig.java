@@ -326,13 +326,13 @@ public class IndexLoadingConfig {
   }
 
   @VisibleForTesting
-  public void setJsonIndexColumns(Set<String> jsonIndexColumns) {
-    _jsonIndexColumns = jsonIndexColumns;
+  public void setFSTIndexColumns(Set<String> fstIndexColumns) {
+    _fstIndexColumns = fstIndexColumns;
   }
 
   @VisibleForTesting
-  public void setFSTIndexColumns(Set<String> fstIndexColumns) {
-    _fstIndexColumns = fstIndexColumns;
+  public void setJsonIndexColumns(Set<String> jsonIndexColumns) {
+    _jsonIndexColumns = jsonIndexColumns;
   }
 
   @VisibleForTesting
