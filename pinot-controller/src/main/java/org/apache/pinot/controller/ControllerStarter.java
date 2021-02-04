@@ -63,6 +63,7 @@ import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.api.ControllerAdminApiApplication;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
+import org.apache.pinot.controller.helix.core.minion.MinionInstancesCleanupTask;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.controller.api.resources.ControllerFilePathProvider;
 import org.apache.pinot.controller.api.resources.InvalidControllerConfigException;
@@ -140,6 +141,7 @@ public class ControllerStarter implements ServiceStartable {
   private SegmentCompletionManager _segmentCompletionManager;
   private LeadControllerManager _leadControllerManager;
   private List<ServiceStatus.ServiceStatusCallback> _serviceStatusCallbackList;
+  private MinionInstancesCleanupTask _minionInstancesCleanupTask;
 
   public ControllerStarter(ControllerConf conf) {
     _config = conf;
@@ -250,6 +252,10 @@ public class ControllerStarter implements ServiceStartable {
 
   public PinotTaskManager getTaskManager() {
     return _taskManager;
+  }
+
+  public MinionInstancesCleanupTask getMinionInstancesCleanupTask() {
+    return _minionInstancesCleanupTask;
   }
 
   @Override
@@ -580,6 +586,8 @@ public class ControllerStarter implements ServiceStartable {
     _segmentRelocator = new SegmentRelocator(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
         _executorService);
     periodicTasks.add(_segmentRelocator);
+    _minionInstancesCleanupTask = new MinionInstancesCleanupTask(_helixResourceManager, _config, _controllerMetrics);
+    periodicTasks.add(_minionInstancesCleanupTask);
 
     return periodicTasks;
   }
