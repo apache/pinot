@@ -53,9 +53,9 @@ public class DetectionConfigValidator extends ThirdEyeUserConfigValidator<Detect
   public static final String PROP_METRIC = "metric";
   public static final String PROP_DATASET = "dataset";
   public static final String PROP_RULES = "rules";
-  private static final String PROP_ALERTS = "alerts";
+  public static final String PROP_ALERTS = "alerts";
+  public static final String PROP_TYPE = "type";
   private static final String PROP_GROUPER = "grouper";
-  private static final String PROP_TYPE = "type";
   private static final String PROP_NAME = "name";
   private static final String PROP_DETECTION_NAME = "detectionName";
 
