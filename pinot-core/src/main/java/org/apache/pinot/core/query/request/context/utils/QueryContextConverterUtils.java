@@ -231,6 +231,9 @@ public class QueryContextConverterUtils {
       case TEXT_MATCH:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new TextMatchPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
+      case JSON_MATCH:
+          return new FilterContext(FilterContext.Type.PREDICATE, null,
+              new JsonMatchPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
       case IS_NULL:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new IsNullPredicate(getExpression(operands.get(0))));
