@@ -18,6 +18,7 @@ module.exports = {
     'no-console': 'error',
     'no-debugger': 'error',
     'eol-last': ['warn', 'always'],
+    'indent': ['warn', 2, { 'SwitchCase': 1 }],
     'space-in-parens': ['warn', 'never'],
     'no-trailing-spaces': ['warn'],
     'comma-dangle': ['warn', 'never'],

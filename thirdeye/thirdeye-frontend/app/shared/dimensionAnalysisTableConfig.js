@@ -6,10 +6,10 @@ const COLUMN_CLASS = 'rootcause-dimensions-table__column';
  */
 export const groupedHeaders = (advDimensionCount, overallChange) => [
   [
-    {title: 'Top Anomalous Dimensions', className: 'rootcause-dimensions-table__header', colspan: advDimensionCount},
-    {title: '', className: 'rootcause-dimensions-table__header', colspan: 2},
-    {title: `Overall Change ${overallChange}`, className: 'rootcause-dimensions-table__header', colspan: 1},
-    {title: '', className: 'rootcause-dimensions-table__header', colspan: 2}
+    { title: 'Top Anomalous Dimensions', className: 'rootcause-dimensions-table__header', colspan: advDimensionCount },
+    { title: '', className: 'rootcause-dimensions-table__header', colspan: 2 },
+    { title: `Overall Change ${overallChange}`, className: 'rootcause-dimensions-table__header', colspan: 1 },
+    { title: '', className: 'rootcause-dimensions-table__header', colspan: 2 }
   ]
 ];
 

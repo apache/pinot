@@ -80,6 +80,7 @@ export function toIdGroups(anomalyIds, bucketSize = 10) {
  * @param {Array} anomalies - array of raw anomalies
  * @returns {Array}
  */
+// TODO: Will remove if it's deprecated
 export function enhanceAnomalies(rawAnomalies, severityScores) {
   const newAnomalies = [];
   const anomaliesPresent = rawAnomalies && rawAnomalies.length;
@@ -87,9 +88,7 @@ export function enhanceAnomalies(rawAnomalies, severityScores) {
   const anomalies = anomaliesPresent ? [].concat(...rawAnomalies.map((data) => data.anomalyDetailsList)) : [];
   // Extract all resolved scores from the RSVP promise response
   const resolvedScores = severityScores
-    ? severityScores.map((score) => {
-        return score.state === 'fulfilled' ? score.value : '';
-      })
+    ? severityScores.map((score) => (score.state === 'fulfilled' ? score.value : ''))
     : [];
 
   // Loop over all anomalies to configure display settings

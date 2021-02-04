@@ -12,171 +12,171 @@
  */
 export default [
   {
-    header: "Holidays",
-    eventType: "holiday",
-    framework: "eventHoliday",
-    color: "green",
+    header: 'Holidays',
+    eventType: 'holiday',
+    framework: 'eventHoliday',
+    color: 'green',
     inputs: [
       {
-        label: "Country",
-        labelMapping: "countryCode",
-        type: "dropdown"
+        label: 'Country',
+        labelMapping: 'countryCode',
+        type: 'dropdown'
       }
     ]
   },
   {
-    header: "GCN",
-    eventType: "gcn",
-    framework: "eventIssue",
-    color: "orange",
+    header: 'GCN',
+    eventType: 'gcn',
+    framework: 'eventIssue',
+    color: 'orange',
     inputs: [
       {
-        label: "Fabric",
-        labelMapping: "fabrics",
-        type: "dropdown"
+        label: 'Fabric',
+        labelMapping: 'fabrics',
+        type: 'dropdown'
       },
       {
-        label: "Status",
-        labelMapping: "status",
-        type: "dropdown"
+        label: 'Status',
+        labelMapping: 'status',
+        type: 'dropdown'
       },
       {
-        label: "Priority",
-        labelMapping: "priority",
-        type: "dropdown"
+        label: 'Priority',
+        labelMapping: 'priority',
+        type: 'dropdown'
       }
     ]
   },
   {
-    header: "LiX",
-    eventType: "lix",
-    framework: "eventExperiment",
-    color: "purple",
+    header: 'LiX',
+    eventType: 'lix',
+    framework: 'eventExperiment',
+    color: 'purple',
     inputs: [
       {
-        label: "metrics",
-        labelMapping: "metrics",
-        type: "dropdown"
+        label: 'metrics',
+        labelMapping: 'metrics',
+        type: 'dropdown'
       },
       {
-        label: "services",
-        labelMapping: "services",
-        type: "dropdown"
+        label: 'services',
+        labelMapping: 'services',
+        type: 'dropdown'
       },
       {
-        label: "tags",
-        labelMapping: "tags",
-        type: "dropdown"
+        label: 'tags',
+        labelMapping: 'tags',
+        type: 'dropdown'
       }
     ]
   },
   {
-    header: "Deployments",
-    eventType: "informed",
-    framework: "eventDeployment",
-    color: "red",
+    header: 'Deployments',
+    eventType: 'informed',
+    framework: 'eventDeployment',
+    color: 'red',
     inputs: [
       {
-        label: "services",
-        labelMapping: "services",
-        type: "dropdown"
+        label: 'services',
+        labelMapping: 'services',
+        type: 'dropdown'
       },
       {
-        label: "actions",
-        labelMapping: "actions",
-        type: "dropdown"
+        label: 'actions',
+        labelMapping: 'actions',
+        type: 'dropdown'
       },
       {
-        label: "fabrics",
-        labelMapping: "fabrics",
-        type: "dropdown"
+        label: 'fabrics',
+        labelMapping: 'fabrics',
+        type: 'dropdown'
       }
     ]
   },
   {
-    header: "Alert Correlation",
-    eventType: "alertcorrelation",
-    framework: "eventAC",
-    color: "blue",
+    header: 'Alert Correlation',
+    eventType: 'alertcorrelation',
+    framework: 'eventAC',
+    color: 'blue',
     inputs: [
       {
-        label: "fabrics",
-        labelMapping: "fabric",
-        type: "dropdown"
+        label: 'fabrics',
+        labelMapping: 'fabric',
+        type: 'dropdown'
       },
       {
-        label: "services",
-        labelMapping: "services",
-        type: "dropdown"
+        label: 'services',
+        labelMapping: 'services',
+        type: 'dropdown'
       },
       {
-        label: "downstream services",
-        labelMapping: "downstreamservice",
-        type: "dropdown"
+        label: 'downstream services',
+        labelMapping: 'downstreamservice',
+        type: 'dropdown'
       },
       {
-        label: "downstream endpoints",
-        labelMapping: "downstreamendpoint",
-        type: "dropdown"
+        label: 'downstream endpoints',
+        labelMapping: 'downstreamendpoint',
+        type: 'dropdown'
       }
     ]
   },
   {
-    header: "Anomalies",
-    eventType: "anomaly",
-    framework: "eventAnomaly",
-    color: "teal",
+    header: 'Anomalies',
+    eventType: 'anomaly',
+    framework: 'eventAnomaly',
+    color: 'teal',
     inputs: [
       {
-        label: "dataset",
-        labelMapping: "dataset",
-        type: "dropdown"
+        label: 'dataset',
+        labelMapping: 'dataset',
+        type: 'dropdown'
       },
       {
-        label: "metric",
-        labelMapping: "metric",
-        type: "dropdown"
+        label: 'metric',
+        labelMapping: 'metric',
+        type: 'dropdown'
       }
     ]
   },
   {
-    header: "CM",
-    eventType: "cm",
-    framework: "eventChange",
-    color: "grey",
+    header: 'CM',
+    eventType: 'cm',
+    framework: 'eventChange',
+    color: 'grey',
     inputs: [
       {
-        label: "Change Type",
-        labelMapping: "type",
-        type: "dropdown"
+        label: 'Change Type',
+        labelMapping: 'type',
+        type: 'dropdown'
       },
       {
-        label: "Change Board",
-        labelMapping: "board",
-        type: "dropdown"
+        label: 'Change Board',
+        labelMapping: 'board',
+        type: 'dropdown'
       },
       {
-        label: "Services",
-        labelMapping: "services",
-        type: "dropdown"
+        label: 'Services',
+        labelMapping: 'services',
+        type: 'dropdown'
       },
       {
-        label: "Category",
-        labelMapping: "category",
-        type: "dropdown"
+        label: 'Category',
+        labelMapping: 'category',
+        type: 'dropdown'
       }
     ]
   },
   {
-    header: "Custom",
-    eventType: "custom",
-    framework: "eventCustom",
-    color: "pink",
+    header: 'Custom',
+    eventType: 'custom',
+    framework: 'eventCustom',
+    color: 'pink',
     inputs: [
       {
-        label: "Country",
-        labelMapping: "countryCode",
-        type: "dropdown"
+        label: 'Country',
+        labelMapping: 'countryCode',
+        type: 'dropdown'
       }
     ]
   }
