@@ -3,7 +3,7 @@ import DS from 'ember-data';
 /*
  * @description This model is unique as it does not match the query url.
  * @example /detection-job/eval/application/{appName}?
-*/
+ */
 export default DS.Model.extend({
   falseAlarm: DS.attr(),
   newTrend: DS.attr(),
