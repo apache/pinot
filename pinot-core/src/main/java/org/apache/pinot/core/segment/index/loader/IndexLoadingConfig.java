@@ -326,7 +326,9 @@ public class IndexLoadingConfig {
   }
 
   @VisibleForTesting
-  public void setJsonIndexColumns(Set<String> jsonIndexColumns) { _jsonIndexColumns = jsonIndexColumns; }
+  public void setJsonIndexColumns(Set<String> jsonIndexColumns) {
+    _jsonIndexColumns = jsonIndexColumns;
+  }
 
   @VisibleForTesting
   public void setFSTIndexColumns(Set<String> fstIndexColumns) {

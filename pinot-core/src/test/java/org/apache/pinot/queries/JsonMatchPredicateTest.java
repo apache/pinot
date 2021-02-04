@@ -137,7 +137,8 @@ public class JsonMatchPredicateTest extends BaseQueriesTest {
     indexLoadingConfig.setJsonIndexColumns(new HashSet<String>(jsonIndexColumns));
     indexLoadingConfig.setReadMode(ReadMode.mmap);
 
-    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
+    ImmutableSegment immutableSegment =
+        ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
     _indexSegment = immutableSegment;
     _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
   }
@@ -210,7 +211,6 @@ public class JsonMatchPredicateTest extends BaseQueriesTest {
     Assert.assertTrue(iterator.hasNext());
     Assert.assertEquals(iterator.next()[0], "[\"a\",\"b\",\"c\",\"d\"]");
   }
-
 
   /** Test filtering on string value within a JSON array*/
   @Test
