@@ -17,24 +17,19 @@ module.exports = {
   rules: {
     'no-console': 'error',
     'no-debugger': 'error',
-    'eol-last': ['error', 'always'],
-    'indent': ['error', 2, { 'SwitchCase': 1 }],
-    'space-in-parens': ['error', 'never'],
-    'no-trailing-spaces': ['error'],
-    'comma-dangle': ['error', 'never'],
-    'comma-spacing': ['error', { before: false, after: true }],
-    semi: ['error', 'always'],
-    'comma-style': ['error', 'last'],
-    'no-unused-vars': ['error', { vars: 'all', args: 'after-used', ignoreRestSiblings: false }],
-    "space-before-function-paren": ["error", {
-      "anonymous": "always",
-      "named": "never",
-      "asyncArrow": "always"
-    }],
-    // TODO: fix all errorings and change rules back to "error"
-    'ember/avoid-leaking-state-in-ember-objects': ['error'],
-    'ember/no-attrs-in-components': ['error'],
-    'prettier/prettier': ['error']
+    'eol-last': ['warn', 'always'],
+    indent: ['warn', 2, { SwitchCase: 1 }],
+    'space-in-parens': ['warn', 'never'],
+    'no-trailing-spaces': ['warn'],
+    'comma-dangle': ['warn', 'never'],
+    'comma-spacing': ['warn', { before: false, after: true }],
+    semi: ['warn', 'always'],
+    'comma-style': ['warn', 'last'],
+    'no-unused-vars': ['warn', { vars: 'all', args: 'after-used', ignoreRestSiblings: false }],
+    // TODO: fix all warnings and change rules back to "error"
+    'ember/avoid-leaking-state-in-ember-objects': ['warn'],
+    'ember/no-attrs-in-components': ['warn'],
+    'prettier/prettier': ['warn']
   },
   overrides: [
     // node files
