@@ -1,0 +1,74 @@
+detectionName: sample_composite_detection
+description: Simple composite aert
+type: COMPOSITE_ALERT
+cron: "0 0 5 1/1 * ? *"
+alerts:
+  - type: METRIC_ALERT
+    name: metric1
+    metric: metric1
+    dataset: dataset1
+    rules:
+      - detection:
+          - name: detection_rule_1
+            type: THRESHOLD
+            params:
+              max: 900
+              min: 100
+              monitoringGranularity: 1_HOURS
+
+  - type: METRIC_ALERT
+    name: metric2
+    metric: metric2
+    dataset: dataset2
+    rules:
+      - detection:
+          - name: detection_rule_2
+            type: THRESHOLD
+            params:
+              max: 900
+              min: 100
+              monitoringGranularity: 1_HOURS
+  - type: COMPOSITE_ALERT
+    alerts:
+      - type: METRIC_ALERT
+        name: metric3
+        metric: metric3
+        dataset: dataset3
+        rules:
+          - detection:
+              - name: detection_rule_3
+                type: THRESHOLD
+                params:
+                  max: 900
+                  min: 100
+                  monitoringGranularity: 1_HOURS
+      - type: METRIC_ALERT
+        name: metric4
+        metric: metric4
+        dataset: dataset4
+        rules:
+          - detection:
+              - name: detection_rule_4
+                type: THRESHOLD
+                params:
+                  max: 900
+                  min: 100
+                  monitoringGranularity: 1_HOURS
+    grouper:
+      - type: GROUPER
+        name: grouper1
+        params:
+          operator: OR
+          leftOp:
+            value: metric3
+          rightOp:
+            value: metric4
+grouper:
+  - type : GROUPER
+    name: grouper2
+    params:
+      operator: OR
+      leftOp:
+        value: metric1
+      rightOp:
+        value: metric2

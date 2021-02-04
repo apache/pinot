@@ -86,6 +86,8 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
   private static final long DEFAULT_PRESENTING_WINDOW_SIZE_DAILY = TimeUnit.DAYS.toMillis(30);
   private static final TimeGranularity DEFAULT_SHOW_GRANULARITY = new TimeGranularity(1, TimeUnit.DAYS);
 
+  private static final String METRIC_ALERT_TYPE = "METRIC_ALERT";
+  private static final String COMPOSITE_ALERT_TYPE = "COMPOSITE_ALERT";
   private static final String ALGORITHM_TYPE = "ALGORITHM";
   private static final String CONFIGURATION = "configuration";
 
@@ -119,6 +121,7 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
     output.put(ATTR_HEALTH, getDetectionHealth(config));
 
     Set<String> metricUrns = extractMetricUrnsFromProperties(config.getProperties());
+    Set<String> metrics = new HashSet<>();
 
     Map<String, MetricConfigDTO> metricUrnToMetricDTOs = new HashMap<>();
     for (String metricUrn : metricUrns) {
@@ -140,12 +143,27 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
     output.put(ATTR_GRANULARITY, granularities.stream().map(TimeGranularity::toAggregationGranularityString).distinct().collect(Collectors.toList()));
     // the default window size of the alert details page
     output.put(ATTR_ALERT_DETAILS_WINDOW_SIZE, getAlertDetailsDefaultWindowSize(granularities));
-    output.put(ATTR_METRIC, yamlObject.get(PROP_METRIC));
+    output.put(ATTR_METRIC, extractMetric(yamlObject, metrics));
     output.put(ATTR_FILTERS, yamlObject.get(PROP_FILTERS));
     output.put(ATTR_DIMENSION_EXPLORE, yamlObject.get(PROP_DIMENSION_EXPLORATION));
     output.put(ATTR_DATASET_NAME, getDatasetDisplayNames(metricUrnToDatasets, yamlObject));
     output.put(ATTR_RULES, yamlObject.get(PROP_RULES));
     return output;
+  }
+
+  private Set<String> extractMetric(Map<String, Object> yamlObject, Set<String> metrics) {
+    if (yamlObject.get(PROP_TYPE) != null && COMPOSITE_ALERT_TYPE.equals(yamlObject.get(PROP_TYPE).toString())) {
+      if (yamlObject.get(PROP_ALERTS) != null) {
+        List<Map<String,Object>> nestedAlerts = (List<Map<String, Object>>) yamlObject.get(PROP_ALERTS);
+        nestedAlerts.forEach(alert -> extractMetric(alert, metrics));
+        return metrics;
+      } else {
+        throw new RuntimeException("Invalid alert config: composite alert without the alerts clause.");
+      }
+    } else {
+      metrics.add(yamlObject.get(PROP_METRIC).toString());
+      return metrics;
+    }
   }
 
   /**

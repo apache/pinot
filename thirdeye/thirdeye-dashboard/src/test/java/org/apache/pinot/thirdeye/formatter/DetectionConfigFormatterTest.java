@@ -75,8 +75,28 @@ public class DetectionConfigFormatterTest {
     Assert.assertEquals(result.get(ATTR_UPDATED_BY), configDTO.getUpdatedBy());
     Assert.assertTrue(ConfigUtils.getList(result.get(ATTR_METRIC_URNS))
         .containsAll(Arrays.asList("thirdeye:metric:1", "thirdeye:metric:2")));
+    Assert.assertTrue(ConfigUtils.getList(result.get(ATTR_METRIC))
+        .containsAll(Arrays.asList("cost")));
     Assert.assertEquals(result.get(ATTR_ALERT_DETAILS_WINDOW_SIZE), TimeUnit.DAYS.toMillis(30));
     Assert.assertEquals(ConfigUtils.getList(result.get(ATTR_RULES)).size(), 1);
+  }
+
+  @Test
+  public void testFormatCompositeConfig() throws IOException {
+    DetectionConfigDTO configDTO = new DetectionConfigDTO();
+    configDTO.setName("test");
+    configDTO.setActive(true);
+    configDTO.setYaml(IOUtils.toString(Thread.currentThread().getContextClassLoader().getResourceAsStream("sample-detection-composite-config.yml")));
+    configDTO.setDescription("description");
+    configDTO.setCreatedBy("test");
+    configDTO.setUpdatedBy("test");
+    configDTO.setId(1L);
+    configDTO.setProperties(ImmutableMap.of("nestedMetricUrns", Collections.singleton("thirdeye:metric:1"), "nested",
+        Collections.singletonList(ImmutableMap.of("nestedMetricUrns", Collections.singleton("thirdeye:metric:2")))));
+    DetectionConfigFormatter formatter =
+        new DetectionConfigFormatter(this.daoRegistry.getMetricConfigDAO(), this.daoRegistry.getDatasetConfigDAO());
+    Map<String, Object> result = formatter.format(configDTO);
+    Assert.assertTrue(ConfigUtils.getList(result.get(ATTR_METRIC)).containsAll(Arrays.asList("metric1", "metric2", "metric3", "metric4")));
   }
 
   @AfterMethod(alwaysRun = true)
