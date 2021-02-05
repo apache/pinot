@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
+import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -72,12 +73,15 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
 
   private static final String TABLE_CONFIG_PARENT_PATH = "/CONFIGS/TABLE";
   private static final String TABLE_CONFIG_PATH_PREFIX = "/CONFIGS/TABLE/";
+  private static final String TASK_QUEUE_PATH_PATTERN = "/TaskRebalancer/TaskQueue_%s/Context";
 
   private final PinotHelixTaskResourceManager _helixTaskResourceManager;
   private final ClusterInfoAccessor _clusterInfoAccessor;
   private final TaskGeneratorRegistry _taskGeneratorRegistry;
   private final Map<String, Map<String, String>> _tableTaskTypeToCronExpressionMap = new ConcurrentHashMap<>();
   private final Map<String, TableTaskSchedulerUpdater> _tableTaskSchedulerUpdaterMap = new ConcurrentHashMap<>();
+  private final Map<String, TaskTypeMetricsUpdater> _taskTypeMetricsUpdaterMap = new ConcurrentHashMap<>();
+  private final Map<TaskState, Integer> _taskStateToCountMap = new ConcurrentHashMap<>();
 
   private Scheduler _scheduledExecutorService = null;
 
@@ -123,6 +127,10 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
 
   private String getPropertyStorePathForTable(String tableWithType) {
     return TABLE_CONFIG_PATH_PREFIX + tableWithType;
+  }
+
+  private String getPropertyStorePathForTaskQueue(String taskType) {
+    return String.format(TASK_QUEUE_PATH_PATTERN, taskType);
   }
 
   public synchronized void cleanUpCronTaskSchedulerForTable(String tableWithType) {
@@ -369,6 +377,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       String taskType = entry.getKey();
       List<TableConfig> enabledTableConfigs = entry.getValue();
       PinotTaskGenerator taskGenerator = _taskGeneratorRegistry.getTaskGenerator(taskType);
+      scheduleTaskTypeMetricsUpdaterIfNeeded(taskType);
       if (taskGenerator != null) {
         _helixTaskResourceManager.ensureTaskQueueExists(taskType);
         tasksScheduled.put(taskType, scheduleTask(taskGenerator, enabledTableConfigs, isLeader));
@@ -438,6 +447,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       }
     }
 
+    scheduleTaskTypeMetricsUpdaterIfNeeded(taskType);
     _helixTaskResourceManager.ensureTaskQueueExists(taskType);
     return scheduleTask(taskGenerator, enabledTableConfigs, false);
   }
@@ -458,6 +468,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
         .checkState(tableConfig.getTaskConfig() != null && tableConfig.getTaskConfig().isTaskTypeEnabled(taskType),
             "Table: %s does not have task type: %s enabled", tableNameWithType, taskType);
 
+    scheduleTaskTypeMetricsUpdaterIfNeeded(taskType);
     _helixTaskResourceManager.ensureTaskQueueExists(taskType);
     return scheduleTask(taskGenerator, Collections.singletonList(tableConfig), false);
   }
@@ -477,5 +488,35 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
 
   public Scheduler getScheduler() {
     return _scheduledExecutorService;
+  }
+
+  public synchronized void reportMetrics(String taskType) {
+    Map<String, TaskState> taskStates = _helixTaskResourceManager.getTaskStates(taskType);
+    Map<TaskState, Integer> taskStateToCountMap = new HashMap<>();
+    for (String taskName : taskStates.keySet()) {
+      TaskState taskState = taskStates.get(taskName);
+      if (!taskStateToCountMap.containsKey(taskState)) {
+        taskStateToCountMap.put(taskState, 0);
+      }
+      taskStateToCountMap.put(taskState, taskStateToCountMap.get(taskState) + 1);
+    }
+    // Reset all the status to 0
+    for (TaskState taskState : _taskStateToCountMap.keySet()) {
+      _taskStateToCountMap.put(taskState, 0);
+    }
+    _taskStateToCountMap.putAll(taskStateToCountMap);
+    for (TaskState taskState : _taskStateToCountMap.keySet()) {
+      _controllerMetrics.setValueOfTableGauge(String.format("%s.%s", taskType, taskState), ControllerGauge.TASK_STATUS,
+          _taskStateToCountMap.get(taskState));
+    }
+  }
+
+  private synchronized void scheduleTaskTypeMetricsUpdaterIfNeeded(String taskType) {
+    if (!_taskTypeMetricsUpdaterMap.containsKey(taskType)) {
+      TaskTypeMetricsUpdater taskTypeMetricsUpdater = new TaskTypeMetricsUpdater(taskType, this);
+      _pinotHelixResourceManager.getPropertyStore()
+          .subscribeDataChanges(getPropertyStorePathForTaskQueue(taskType), taskTypeMetricsUpdater);
+      _taskTypeMetricsUpdaterMap.put(taskType, taskTypeMetricsUpdater);
+    }
   }
 }
