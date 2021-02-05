@@ -11,9 +11,8 @@ export function computeColor([value = 0]) {
 
   if (value > 0) {
     return `rgba(0,0,234,${opacity})`;
-  } else{
-    return `rgba(234,0,0,${opacity})`;
   }
+  return `rgba(234,0,0,${opacity})`;
 }
 
 export default helper(computeColor);
