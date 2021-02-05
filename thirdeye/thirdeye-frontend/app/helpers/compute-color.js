@@ -9,10 +9,7 @@ import { helper } from '@ember/component/helper';
 export function computeColor([value = 0]) {
   const opacity = Math.abs(value / 25);
 
-  if (value > 0) {
-    return `rgba(0,0,234,${opacity})`;
-  }
-  return `rgba(234,0,0,${opacity})`;
+  return value > 0 ? `rgba(0,0,234,${opacity})` : `rgba(234,0,0,${opacity})`;
 }
 
 export default helper(computeColor);

@@ -9,10 +9,7 @@ import { helper } from '@ember/component/helper';
 export function computeTextColor([value = 0]) {
   const opacity = Math.abs(value / 25);
 
-  if (opacity < 0.5) {
-    return '#000000';
-  }
-  return '#ffffff';
+  return opacity < 0.5 ? '#000000' : '#ffffff';
 }
 
 export default helper(computeTextColor);
