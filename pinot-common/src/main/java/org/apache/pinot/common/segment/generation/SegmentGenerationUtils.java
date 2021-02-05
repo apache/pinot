@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.ingestion.batch.common;
+package org.apache.pinot.common.segment.generation;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -163,7 +163,15 @@ public class SegmentGenerationUtils {
     String[] pathSplits = inputFileURI.getPath().split("/");
     return pathSplits[pathSplits.length - 1];
   }
-  
+
+  /**
+   * Convert a File URI String to URI Object, use parent URI scheme/userInfo/host/port if sheme is not specified.
+   *
+   * @param uriStr
+   * @param fullUriForPathOnlyUriStr
+   * @return
+   * @throws URISyntaxException
+   */
   public static URI getFileURI(String uriStr, URI fullUriForPathOnlyUriStr)
       throws URISyntaxException {
     URI fileURI = URI.create(uriStr);
@@ -175,4 +183,19 @@ public class SegmentGenerationUtils {
     return fileURI;
   }
 
+  /**
+   * Convert Directory URI String to URI Object, default to local file system scheme.
+   *
+   * @param uriStr
+   * @return
+   * @throws URISyntaxException
+   */
+  public static URI getDirectoryURI(String uriStr)
+      throws URISyntaxException {
+    URI uri = new URI(uriStr);
+    if (uri.getScheme() == null) {
+      uri = new File(uriStr).toURI();
+    }
+    return uri;
+  }
 }

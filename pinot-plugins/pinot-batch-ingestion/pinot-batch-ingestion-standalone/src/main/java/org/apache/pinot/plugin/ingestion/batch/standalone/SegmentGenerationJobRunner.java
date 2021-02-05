@@ -20,7 +20,6 @@ package org.apache.pinot.plugin.ingestion.batch.standalone;
 
 import java.io.File;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.file.FileSystems;
 import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
@@ -34,7 +33,7 @@ import java.util.concurrent.Executors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
-import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUtils;
+import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -50,8 +49,6 @@ import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationTaskSpec;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.annotations.VisibleForTesting;
 
 
 public class SegmentGenerationJobRunner implements IngestionJobRunner {
@@ -121,11 +118,11 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
     }
 
     //Get pinotFS for input
-    final URI inputDirURI = getDirectoryUri(_spec.getInputDirURI());
+    final URI inputDirURI = SegmentGenerationUtils.getDirectoryURI(_spec.getInputDirURI());
     PinotFS inputDirFS = PinotFSFactory.create(inputDirURI.getScheme());
 
     //Get outputFS for writing output pinot segments
-    final URI outputDirURI = getDirectoryUri(_spec.getOutputDirURI());
+    final URI outputDirURI = SegmentGenerationUtils.getDirectoryURI(_spec.getOutputDirURI());
     PinotFS outputDirFS = PinotFSFactory.create(outputDirURI.getScheme());
     outputDirFS.mkdir(outputDirURI);
 
@@ -235,14 +232,5 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
       FileUtils.deleteQuietly(localTempDir);
       _executorService.shutdown();
     }
-  }
-
-  private URI getDirectoryUri(String uriStr)
-      throws URISyntaxException {
-    URI uri = new URI(uriStr);
-    if (uri.getScheme() == null) {
-      uri = new File(uriStr).toURI();
-    }
-    return uri;
   }
 }
