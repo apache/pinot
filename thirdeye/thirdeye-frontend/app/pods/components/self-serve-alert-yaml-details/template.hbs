@@ -5,15 +5,21 @@
         {{alertData.detectionName}}
       </h3>
       {{#if isLoadError}}
-        <div class="te-search-results__tag
-             {{if (eq displayMode " list") "te-search-results__tag--list"}}
-             {{if alertData.isActive "te-search-results__tag--active"}}">
+        <div
+          class="te-search-results__tag
+            {{if (eq displayMode " list") "te-search-results__tag--list"}}
+
+            {{if alertData.isActive "te-search-results__tag--active"}}"
+        >
           Error
         </div>
       {{else}}
-        <div class="te-search-results__tag
-             {{if (eq displayMode " list") "te-search-results__tag--list"}}
-             {{if alertData.isActive "te-search-results__tag--active"}}">
+        <div
+          class="te-search-results__tag
+            {{if (eq displayMode " list") "te-search-results__tag--list"}}
+
+            {{if alertData.isActive "te-search-results__tag--active"}}"
+        >
           {{if alertData.isActive "Active" "Inactive"}}
         </div>
         {{#x-toggle
@@ -46,7 +52,15 @@
         Metric
       </dt>
       <dd class="col-md-8 te-search-results__value{{valueClassSuffix}}" title={{alertData.metric}}>
-        {{if alertData.metric alertData.metric "N/A"}}
+        <span>
+          {{if firstMetric firstMetric "N/A"}}
+        </span>
+        {{#if (gt remainingMetricCount 0)}}
+          <span class="te-search-results__value te-search-results__value--remaining-metric-count">
+            +
+            {{remainingMetricCount}}
+          </span>
+        {{/if}}
       </dd>
       <dt class="col-md-4">
         Dataset

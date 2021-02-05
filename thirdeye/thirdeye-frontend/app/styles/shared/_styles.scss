@@ -853,6 +853,16 @@ body {
     flex-shrink: 9015;
     overflow: hidden;
     text-overflow: ellipsis;
+
+    &--remaining-metric-count {
+      font-family: Lato;
+      font-style: normal;
+      font-weight: normal;
+      font-size: 14px;
+      line-height: 20px;
+
+      color: #0073b1;
+    }
   }
 
   &__value-solo {

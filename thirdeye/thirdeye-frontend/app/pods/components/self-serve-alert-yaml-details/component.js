@@ -30,12 +30,22 @@ export default Component.extend({
   init() {
     this._super(...arguments);
     const mode = get(this, 'displayMode');
+
     if (mode === 'single') {
       setProperties(this, {
         valueClassSuffix: '-solo',
         modeSubClass: 'solo'
       });
     }
+  },
+
+  didReceiveAttrs() {
+    this._super(...arguments);
+
+    const { alertData: { metric: metrics = [] } = {} } = this;
+
+    this.set('firstMetric', metrics[0]);
+    this.set('remainingMetricCount', metrics.length - 1);
   },
 
   actions: {
