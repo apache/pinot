@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.pinot.controller.api;
+package org.apache.pinot.controller.api.access;
 
 import java.util.Optional;
 import javax.ws.rs.core.MultivaluedHashMap;
@@ -27,9 +27,8 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 
-public class ControllerAdminApiApplicationTest {
-
-  private final ControllerAdminApiApplication.AuthFilter _authFilter = new ControllerAdminApiApplication.AuthFilter();
+public class AuthenticationFilterTest {
+  private final AuthenticationFilter _authFilter = new AuthenticationFilter();
 
   @Test
   public void testAuthFilter_extractTableName_withTableNameInPathParams() {

@@ -18,35 +18,20 @@
  */
 package org.apache.pinot.controller.api;
 
-import com.google.common.annotations.VisibleForTesting;
 import io.swagger.jaxrs.config.BeanConfig;
 import java.io.IOException;
-import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.List;
-import java.util.Optional;
-import javax.inject.Inject;
-import javax.inject.Provider;
 import javax.ws.rs.container.ContainerRequestContext;
-import javax.ws.rs.container.ContainerRequestFilter;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
-import javax.ws.rs.container.ResourceInfo;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MultivaluedMap;
-import javax.ws.rs.core.UriInfo;
 import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.controller.api.access.AccessControlFactory;
-import org.apache.pinot.controller.api.access.AccessControlUtils;
-import org.apache.pinot.controller.api.access.AccessType;
-import org.apache.pinot.controller.api.access.Authenticate;
+import org.apache.pinot.controller.api.access.AuthenticationFilter;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
-import org.glassfish.grizzly.http.server.Request;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.media.multipart.MultiPartFeature;
@@ -72,7 +57,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     registerClasses(io.swagger.jaxrs.listing.ApiListingResource.class);
     registerClasses(io.swagger.jaxrs.listing.SwaggerSerializers.class);
     register(new CorsFilter());
-    register(AuthFilter.class);
+    register(AuthenticationFilter.class);
     // property("jersey.config.server.tracing.type", "ALL");
     // property("jersey.config.server.tracing.threshold", "VERBOSE");
   }
@@ -139,66 +124,6 @@ public class ControllerAdminApiApplication extends ResourceConfig {
         ContainerResponseContext containerResponseContext)
         throws IOException {
       containerResponseContext.getHeaders().add("Access-Control-Allow-Origin", "*");
-    }
-  }
-
-  @javax.ws.rs.ext.Provider
-  public static class AuthFilter implements ContainerRequestFilter {
-
-    @Inject
-    Provider<Request> _requestProvider;
-
-    @Inject
-    AccessControlFactory _accessControlFactory;
-
-    @Context
-    ResourceInfo _resourceInfo;
-
-    @Context
-    HttpHeaders _httpHeaders;
-
-    @Override
-    public void filter(ContainerRequestContext requestContext)
-        throws IOException {
-      // check if authentication is required
-      Method endpointMethod = _resourceInfo.getResourceMethod();
-      if (endpointMethod.isAnnotationPresent(Authenticate.class)) {
-        // Perform authentication:
-        // Note that table name is extracted from "path parameters" or "query parameters" if it's defined as one of the
-        // followings:
-        //     - "tableName",
-        //     - "tableNameWithType", or
-        //     - "schemaName"
-        // If table name is not available, it means the endpoint is not a table-level endpoint.
-        AccessControlUtils accessControlUtils = new AccessControlUtils();
-        AccessType accessType = endpointMethod.getAnnotation(Authenticate.class).value();
-        String endpointUrl = _requestProvider.get().getRequestURL().toString();
-        UriInfo uriInfo = requestContext.getUriInfo();
-        Optional<String> tableName = extractTableName(uriInfo.getPathParameters(), uriInfo.getQueryParameters());
-        accessControlUtils
-            .validatePermission(tableName, accessType, _httpHeaders, endpointUrl, _accessControlFactory.create());
-      }
-    }
-
-    @VisibleForTesting
-    Optional<String> extractTableName(MultivaluedMap<String, String> pathParameters,
-        MultivaluedMap<String, String> queryParameters) {
-      Optional<String> tableName = extractTableName(pathParameters);
-      if (tableName.isPresent()) {
-        return tableName;
-      }
-      return extractTableName(queryParameters);
-    }
-
-    private Optional<String> extractTableName(MultivaluedMap<String, String> mmap) {
-      String tableName = mmap.getFirst("tableName");
-      if (tableName == null) {
-        tableName = mmap.getFirst("tableNameWithType");
-        if (tableName == null) {
-          tableName = mmap.getFirst("schemaName");
-        }
-      }
-      return Optional.ofNullable(tableName);
     }
   }
 }

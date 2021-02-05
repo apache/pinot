@@ -28,8 +28,7 @@ import org.apache.pinot.controller.api.ControllerAdminApiApplication;
 
 /**
  * Annotation to be used on top of REST endpoints. Methods annotated with this annotation automatically get
- * authenticated in {@link ControllerAdminApiApplication.AuthFilter} and if validation passes, then the methods get
- * executed.
+ * authenticated in {@link AuthenticationFilter} and if validation passes, then the methods get executed.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
