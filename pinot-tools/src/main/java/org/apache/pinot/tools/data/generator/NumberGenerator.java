@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.tools.data.generator;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+
+import com.google.common.primitives.Longs;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,6 +67,8 @@ public class NumberGenerator implements Generator {
           intValues.add(new Integer(i));
         }
         break;
+      case BYTES:
+        // use long case
       case LONG:
         longValues = new ArrayList<Long>();
         final long longStart = rand.nextInt(cardinality);
@@ -113,6 +118,8 @@ public class NumberGenerator implements Generator {
         return floatValues.get(random.nextInt(cardinality));
       case DOUBLE:
         return doubleValues.get(random.nextInt(cardinality));
+      case BYTES:
+        return ByteBuffer.wrap(Longs.toByteArray(longValues.get(random.nextInt(cardinality))));
       default:
         throw new RuntimeException("number generator can only accept a column of type number and this : " + columnType
             + " is not a supported number type");

@@ -156,7 +156,7 @@ public class DataGenerator {
 
     spec.setName(column);
     spec.setDataType(dataType);
-    spec.setSingleValueField(true);
+    spec.setSingleValueField(genSpec.getSingleValueFlagsMap().getOrDefault(column, true));
 
     return spec;
   }
@@ -178,8 +178,8 @@ public class DataGenerator {
       cardinality.put(col, 1000);
     }
     final DataGeneratorSpec spec =
-        new DataGeneratorSpec(Arrays.asList(columns), cardinality, range, template, dataTypes, fieldTypes, timeUnits,
-            FileFormat.AVRO, "/tmp/out", true);
+        new DataGeneratorSpec(Arrays.asList(columns), cardinality, range, template, dataTypes, fieldTypes,
+            new HashMap<>(), timeUnits, FileFormat.AVRO, "/tmp/out", true);
 
     final DataGenerator gen = new DataGenerator();
     gen.init(spec);

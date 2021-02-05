@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -37,6 +38,7 @@ import org.apache.avro.file.DataFileReader;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -133,7 +135,7 @@ public class QueryGenerator {
               _multiValueColumnMaxNumElements.put(fieldName, 0);
             } else {
               _singleValueColumnNames.add(fieldName);
-              if (type != Schema.Type.STRING && type != Schema.Type.BOOLEAN) {
+              if (type != Schema.Type.STRING && type != Schema.Type.BOOLEAN && type != Schema.Type.BYTES) {
                 _singleValueNumericalColumnNames.add(fieldName);
               }
             }
@@ -182,7 +184,12 @@ public class QueryGenerator {
    * @param avroValue Avro value.
    */
   private static void storeAvroValueIntoValueSet(Set<String> valueSet, Object avroValue) {
-    if (avroValue instanceof Number) {
+    if (avroValue instanceof ByteBuffer) {
+      // for raw bytes
+      String hexRaw = StringUtils.stripStart(Hex.encodeHexString(((ByteBuffer) avroValue).array()), "0");
+      String hexAligned = (hexRaw.length() & 0x1) == 0 ? hexRaw : "0" + hexRaw;
+      valueSet.add("'" + hexAligned + "'");
+    } else if (avroValue instanceof Number) {
       // For Number object, store raw value.
       valueSet.add(avroValue.toString());
     } else {
@@ -1012,8 +1019,8 @@ public class QueryGenerator {
           }
         }
 
-        String pql = String.format(" REGEXP_LIKE(%s, '%s')", columnName, pqlRegexBuilder.toString());
-        String sql = String.format(" REGEXP_LIKE(%s, '%s', 'i')", columnName, sqlRegexBuilder.toString());
+        String pql = String.format("REGEXP_LIKE(%s, '%s')", columnName, pqlRegexBuilder.toString());
+        String sql = String.format("REGEXP_LIKE(%s, '%s', 'i')", columnName, sqlRegexBuilder.toString());
         return new StringQueryFragment(pql, sql);
       } else {
         String equalsPredicate = String.format("%s = %s", columnName, value);

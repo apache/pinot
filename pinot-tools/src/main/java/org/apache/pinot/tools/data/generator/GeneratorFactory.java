@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.tools.data.generator;
 
+import org.apache.commons.lang.RandomStringUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 import java.util.Map;
@@ -46,6 +47,8 @@ public class GeneratorFactory {
         return new RangeFloatGenerator(start, end);
       case DOUBLE:
         return new RangeDoubleGenerator(start, end);
+      case BYTES:
+        return new RangeBytesGenerator(start, end);
       default:
         throw new RuntimeException(String.format("Invalid datatype '%s'", dataType));
     }
