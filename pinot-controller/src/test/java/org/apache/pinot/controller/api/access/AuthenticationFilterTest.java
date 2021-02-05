@@ -31,7 +31,7 @@ public class AuthenticationFilterTest {
   private final AuthenticationFilter _authFilter = new AuthenticationFilter();
 
   @Test
-  public void testAuthFilter_extractTableName_withTableNameInPathParams() {
+  public void testExtractTableName_withTableNameInPathParams() {
     MultivaluedMap<String, String> pathParams = new MultivaluedHashMap<>();
     MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
     pathParams.putSingle("tableName", "A");
@@ -45,7 +45,7 @@ public class AuthenticationFilterTest {
   }
 
   @Test
-  public void testAuthFilter_extractTableName_withTableNameWithTypeInPathParams() {
+  public void testExtractTableName_withTableNameWithTypeInPathParams() {
     MultivaluedMap<String, String> pathParams = new MultivaluedHashMap<>();
     MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
     pathParams.putSingle("tableNameWithType", "B");
@@ -58,7 +58,7 @@ public class AuthenticationFilterTest {
   }
 
   @Test
-  public void testAuthFilter_extractTableName_withSchemaNameInPathParams() {
+  public void testExtractTableName_withSchemaNameInPathParams() {
     MultivaluedMap<String, String> pathParams = new MultivaluedHashMap<>();
     MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
     pathParams.putSingle("schemaName", "C");
@@ -70,7 +70,7 @@ public class AuthenticationFilterTest {
   }
 
   @Test
-  public void testAuthFilter_extractTableName_withTableNameInQueryParams() {
+  public void testExtractTableName_withTableNameInQueryParams() {
     MultivaluedMap<String, String> pathParams = new MultivaluedHashMap<>();
     MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
     queryParams.putSingle("tableName", "D");
@@ -81,7 +81,7 @@ public class AuthenticationFilterTest {
   }
 
   @Test
-  public void testAuthFilter_extractTableName_withTableNameWithTypeInQueryParams() {
+  public void testExtractTableName_withTableNameWithTypeInQueryParams() {
     MultivaluedMap<String, String> pathParams = new MultivaluedHashMap<>();
     MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
     queryParams.putSingle("tableNameWithType", "E");
@@ -91,7 +91,7 @@ public class AuthenticationFilterTest {
   }
 
   @Test
-  public void testAuthFilter_extractTableName_withSchemaNameInQueryParams() {
+  public void testExtractTableName_withSchemaNameInQueryParams() {
     MultivaluedMap<String, String> pathParams = new MultivaluedHashMap<>();
     MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
     queryParams.putSingle("schemaName", "F");
@@ -100,7 +100,7 @@ public class AuthenticationFilterTest {
   }
 
   @Test
-  public void testAuthFilter_extractTableName_withEmptyParams() {
+  public void testExtractTableName_withEmptyParams() {
     MultivaluedMap<String, String> pathParams = new MultivaluedHashMap<>();
     MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
     Optional<String> actual = _authFilter.extractTableName(pathParams, queryParams);
