@@ -43,6 +43,8 @@ import javax.ws.rs.core.Response;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
@@ -88,6 +90,7 @@ public class PinotClusterConfigs {
 
   @POST
   @Path("/cluster/configs")
+  @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Update cluster configuration")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Server error updating configuration")})
@@ -115,6 +118,7 @@ public class PinotClusterConfigs {
 
   @DELETE
   @Path("/cluster/configs/{configName}")
+  @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Delete cluster configuration")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Server error deleting configuration")})

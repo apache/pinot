@@ -27,6 +27,7 @@ import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.controller.api.access.AuthenticationFilter;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
@@ -56,6 +57,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     registerClasses(io.swagger.jaxrs.listing.ApiListingResource.class);
     registerClasses(io.swagger.jaxrs.listing.SwaggerSerializers.class);
     register(new CorsFilter());
+    register(AuthenticationFilter.class);
     // property("jersey.config.server.tracing.type", "ALL");
     // property("jersey.config.server.tracing.threshold", "VERBOSE");
   }

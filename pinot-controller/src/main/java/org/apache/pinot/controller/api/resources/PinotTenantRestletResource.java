@@ -46,6 +46,8 @@ import javax.ws.rs.core.Response;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -92,6 +94,7 @@ public class PinotTenantRestletResource {
 
   @POST
   @Path("/tenants")
+  @Authenticate(AccessType.CREATE)
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = " Create a tenant")
@@ -121,6 +124,7 @@ public class PinotTenantRestletResource {
   // TODO: should be /tenant/{tenantName}
   @PUT
   @Path("/tenants")
+  @Authenticate(AccessType.UPDATE)
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update a tenant")
@@ -339,6 +343,7 @@ public class PinotTenantRestletResource {
   //   2. with GET, we need to write our own routing logic to avoid conflict since this is same as the API above
   @POST
   @Path("/tenants/{tenantName}/metadata")
+  @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Change tenant state")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = String.class), @ApiResponse(code = 404, message = "Tenant not found"), @ApiResponse(code = 500, message = "Server error reading tenant information")})
@@ -394,6 +399,7 @@ public class PinotTenantRestletResource {
 
   @DELETE
   @Path("/tenants/{tenantName}")
+  @Authenticate(AccessType.DELETE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Delete a tenant")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 400, message = "Tenant can not be deleted"), @ApiResponse(code = 404, message = "Tenant not found"), @ApiResponse(code = 500, message = "Error deleting tenant")})
