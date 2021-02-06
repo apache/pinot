@@ -4,12 +4,8 @@ module.exports = {
   disable_watching: true,
   browser_disconnect_timeout: 500,
   browser_start_timeout: 90,
-  launch_in_ci: [
-    'Chrome'
-  ],
-  launch_in_dev: [
-    'Chrome', 'Firefox'
-  ],
+  launch_in_ci: ['Chrome'],
+  launch_in_dev: ['Chrome', 'Firefox'],
   browser_args: {
     Chrome: {
       mode: 'ci',
@@ -24,10 +20,7 @@ module.exports = {
     },
     Firefox: {
       mode: 'ci',
-      args: [
-        '-headless',
-        '--window-size=1440,900'
-      ]
+      args: ['-headless', '--window-size=1440,900']
     }
   }
 };
