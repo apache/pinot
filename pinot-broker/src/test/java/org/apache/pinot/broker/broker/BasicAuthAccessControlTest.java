@@ -121,6 +121,19 @@ public class BasicAuthAccessControlTest {
     }
 
     @Test
+    public void testAllowNonTable() {
+        Multimap<String, String> headers = ArrayListMultimap.create();
+        headers.put(HEADER_AUTHORIZATION, TOKEN_USER);
+
+        HttpRequesterIdentity identity = new HttpRequesterIdentity();
+        identity.setHttpHeaders(headers);
+
+        BrokerRequest request = new BrokerRequest();
+
+        Assert.assertTrue(_accessControl.hasAccess(identity, request));
+    }
+
+    @Test
     public void testNormalizeToken() {
         Multimap<String, String> headers = ArrayListMultimap.create();
         headers.put(HEADER_AUTHORIZATION, "  " + TOKEN_USER + "== ");

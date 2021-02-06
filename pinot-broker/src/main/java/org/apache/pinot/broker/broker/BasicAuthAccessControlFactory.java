@@ -107,7 +107,9 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       }
 
       BasicAuthPrincipal principal = principalOpt.get();
-      if (principal.getTables().isEmpty()) {
+      if (principal.getTables().isEmpty()
+              || !brokerRequest.isSetQuerySource()
+              || !brokerRequest.getQuerySource().isSetTableName()) {
         // no table restrictions? accept
         return true;
       }
