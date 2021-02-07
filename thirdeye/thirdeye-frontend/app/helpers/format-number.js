@@ -12,12 +12,12 @@ import d3 from 'd3';
  * // returns 123M
  * {{formatNumber 123456789 formatter="d3" format=".3s"}}
  */
-export function formatNumber([num = 0], {formatter = null, format = null} = {formatter, format}) {
+export function formatNumber([num = 0], { formatter = null, format = null } = { formatter, format }) {
   if (formatter && format) {
     return d3.format(format)(num);
   }
 
-  return num.toString().replace(/(\d)(?=(\d\d\d)+(?!\d))/g, "$1,");
+  return num.toString().replace(/(\d)(?=(\d\d\d)+(?!\d))/g, '$1,');
 }
 
 export default helper(formatNumber);
