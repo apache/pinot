@@ -117,7 +117,7 @@
     <parquet.version>1.8.0</parquet.version>
     <helix.version>0.9.8</helix.version>
     <zkclient.version>0.7</zkclient.version>
-    <jackson.version>2.9.8</jackson.version>
+    <jackson.version>2.10.0</jackson.version>
     <async-http-client.version>1.9.21</async-http-client.version>
     <jersey.version>2.28</jersey.version>
     <grizzly.version>2.4.4</grizzly.version>
@@ -142,7 +142,7 @@
     <dropwizard-metrics.version>4.1.2</dropwizard-metrics.version>
     <snappy-java.version>1.1.1.7</snappy-java.version>
     <log4j.version>2.11.2</log4j.version>
-    <netty.version>4.1.42.Final</netty.version>
+    <netty.version>4.1.54.Final</netty.version>
     <jts.version>1.16.1</jts.version>
     <h3.version>3.0.3</h3.version>
     <jmh.version>1.26</jmh.version>

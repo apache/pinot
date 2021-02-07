@@ -36,7 +36,7 @@
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
     <aws.sdk.version>2.13.46</aws.sdk.version>
-    <netty.version>4.1.42.Final</netty.version>
+    <netty.version>4.1.54.Final</netty.version>
     <http.client.version>4.5.9</http.client.version>
     <http.core.version>4.4.9</http.core.version>
     <reactivestream.version>1.0.3</reactivestream.version>
