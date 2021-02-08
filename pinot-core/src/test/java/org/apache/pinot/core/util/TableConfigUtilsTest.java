@@ -941,9 +941,18 @@ public class TableConfigUtilsTest {
         build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
-      Assert.fail("Should fail for range index defined on non numeric column");
     } catch (Exception e) {
-      // expected
+      Assert.fail("Should work for range index defined on dictionary encoded string column");
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setRangeIndexColumns(columnList)
+        .setNoDictionaryColumns(columnList).
+            build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail for range index defined on non numeric/no-dictionary column");
+    } catch (Exception e) {
+      // Expected
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setVarLengthDictionaryColumns(Arrays.asList("intCol")).

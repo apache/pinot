@@ -480,10 +480,13 @@ public final class TableConfigUtils {
     }
 
     // Range index semantic validation
+    // Range index can be defined on numeric columns and any column with a dictionary
     if (indexingConfig.getRangeIndexColumns() != null) {
       for (String rangeIndexCol : indexingConfig.getRangeIndexColumns()) {
-        Preconditions.checkState(schema.getFieldSpecFor(rangeIndexCol).getDataType().isNumeric(),
-            "Cannot create a range index on non-numeric column " + rangeIndexCol);
+        Preconditions.checkState(
+            schema.getFieldSpecFor(rangeIndexCol).getDataType().isNumeric() || !noDictionaryColumnsSet
+                .contains(rangeIndexCol),
+            "Cannot create a range index on non-numeric/no-dictionary column " + rangeIndexCol);
       }
     }
 
