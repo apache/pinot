@@ -18,15 +18,15 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby;
 
-import it.unimi.dsi.fastutil.ints.Int2IntMap;
-import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import com.google.common.annotations.VisibleForTesting;
+import it.unimi.dsi.fastutil.HashCommon;
 import it.unimi.dsi.fastutil.longs.Long2IntMap;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
+import java.util.Arrays;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.NoSuchElementException;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
@@ -61,8 +61,16 @@ import org.apache.pinot.core.segment.index.readers.Dictionary;
  * bounded by the number of groups limit (globalGroupIdUpperBound is always smaller or equal to numGroupsLimit).
  */
 public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
-  private final static int INITIAL_MAP_SIZE = 256;
-  private final static int MAX_CACHING_MAP_SIZE = 1048576;
+  // NOTE: map size = map capacity (power of 2) * load factor
+  private static final int INITIAL_MAP_SIZE = (int) ((1 << 10) * 0.75f);
+  private static final int MAX_CACHING_MAP_SIZE = (int) ((1 << 20) * 0.75f);
+
+  private static final ThreadLocal<IntGroupIdMap> THREAD_LOCAL_INT_MAP = ThreadLocal.withInitial(IntGroupIdMap::new);
+  private static final ThreadLocal<Long2IntOpenHashMap> THREAD_LOCAL_LONG_MAP =
+      ThreadLocal.withInitial(() -> new Long2IntOpenHashMap(INITIAL_MAP_SIZE));
+  private static final ThreadLocal<Object2IntOpenHashMap<IntArray>> THREAD_LOCAL_INT_ARRAY_MAP =
+      ThreadLocal.withInitial(() -> new Object2IntOpenHashMap<>(INITIAL_MAP_SIZE));
+
   private final ExpressionContext[] _groupByExpressions;
   private final int _numGroupByExpressions;
   private final int[] _cardinalities;
@@ -79,7 +87,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   private final RawKeyHolder _rawKeyHolder;
 
   public DictionaryBasedGroupKeyGenerator(TransformOperator transformOperator, ExpressionContext[] groupByExpressions,
-      int numGroupsLimit, int arrayBasedThreshold, Map mapBasedRawKeyHolders) {
+      int numGroupsLimit, int arrayBasedThreshold) {
     assert numGroupsLimit >= arrayBasedThreshold;
 
     _groupByExpressions = groupByExpressions;
@@ -108,35 +116,35 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
 
       _isSingleValueColumn[i] = transformOperator.getResultMetadata(groupByExpression).isSingleValue();
     }
+    // TODO: Clear the holder after processing the query instead of before
     if (longOverflow) {
+      // ArrayMapBasedHolder
       _globalGroupIdUpperBound = numGroupsLimit;
-      Object mapInternal = mapBasedRawKeyHolders.computeIfAbsent(ArrayMapBasedHolder.class.getName(),
-          o -> new ArrayMapBasedHolder(INITIAL_MAP_SIZE).getInternal());
-      _rawKeyHolder = new ArrayMapBasedHolder(mapInternal);
-      if (((Object2IntOpenHashMap) mapInternal).size() > MAX_CACHING_MAP_SIZE) {
-        mapBasedRawKeyHolders
-            .put(ArrayMapBasedHolder.class.getName(), new ArrayMapBasedHolder(INITIAL_MAP_SIZE).getInternal());
+      Object2IntOpenHashMap<IntArray> groupIdMap = THREAD_LOCAL_INT_ARRAY_MAP.get();
+      int size = groupIdMap.size();
+      groupIdMap.clear();
+      if (size > MAX_CACHING_MAP_SIZE) {
+        groupIdMap.trim();
       }
+      _rawKeyHolder = new ArrayMapBasedHolder(groupIdMap);
     } else {
       if (cardinalityProduct > Integer.MAX_VALUE) {
+        // LongMapBasedHolder
         _globalGroupIdUpperBound = numGroupsLimit;
-        Object mapInternal = mapBasedRawKeyHolders.computeIfAbsent(LongMapBasedHolder.class.getName(),
-            o -> new LongMapBasedHolder(INITIAL_MAP_SIZE).getInternal());
-        _rawKeyHolder = new LongMapBasedHolder(mapInternal);
-        if (((Long2IntOpenHashMap) mapInternal).size() > MAX_CACHING_MAP_SIZE) {
-          mapBasedRawKeyHolders
-              .put(ArrayMapBasedHolder.class.getName(), new ArrayMapBasedHolder(INITIAL_MAP_SIZE).getInternal());
+        Long2IntOpenHashMap groupIdMap = THREAD_LOCAL_LONG_MAP.get();
+        int size = groupIdMap.size();
+        groupIdMap.clear();
+        if (size > MAX_CACHING_MAP_SIZE) {
+          groupIdMap.trim();
         }
+        _rawKeyHolder = new LongMapBasedHolder(groupIdMap);
       } else {
         _globalGroupIdUpperBound = Math.min((int) cardinalityProduct, numGroupsLimit);
         if (cardinalityProduct > arrayBasedThreshold) {
-          Object mapInternal = mapBasedRawKeyHolders.computeIfAbsent(IntMapBasedHolder.class.getName(),
-              o -> new IntMapBasedHolder(INITIAL_MAP_SIZE).getInternal());
-          _rawKeyHolder = new IntMapBasedHolder(mapInternal);
-          if (((Int2IntOpenHashMap) mapInternal).size() > MAX_CACHING_MAP_SIZE) {
-            mapBasedRawKeyHolders
-                .put(ArrayMapBasedHolder.class.getName(), new ArrayMapBasedHolder(INITIAL_MAP_SIZE).getInternal());
-          }
+          // IntMapBasedHolder
+          IntGroupIdMap groupIdMap = THREAD_LOCAL_INT_MAP.get();
+          groupIdMap.clear();
+          _rawKeyHolder = new IntMapBasedHolder(groupIdMap);
         } else {
           _rawKeyHolder = new ArrayBasedHolder();
         }
@@ -209,8 +217,6 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
      * @return Upper bound of group id inside the holder
      */
     int getGroupIdUpperBound();
-
-    Object getInternal();
   }
 
   private class ArrayBasedHolder implements RawKeyHolder {
@@ -243,11 +249,6 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     @Override
     public int getGroupIdUpperBound() {
       return _globalGroupIdUpperBound;
-    }
-
-    @Override
-    public Object getInternal() {
-      return _flags;
     }
 
     @Override
@@ -284,18 +285,10 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   }
 
   private class IntMapBasedHolder implements RawKeyHolder {
-    private final Int2IntOpenHashMap _rawKeyToGroupIdMap;
+    private final IntGroupIdMap _groupIdMap;
 
-    private int _numGroups = 0;
-
-    public IntMapBasedHolder(int initialSize) {
-      _rawKeyToGroupIdMap = new Int2IntOpenHashMap(initialSize);
-      _rawKeyToGroupIdMap.defaultReturnValue(INVALID_ID);
-    }
-
-    public IntMapBasedHolder(Object hashMap) {
-      _rawKeyToGroupIdMap = (Int2IntOpenHashMap) hashMap;
-      _rawKeyToGroupIdMap.clear();
+    public IntMapBasedHolder(IntGroupIdMap groupIdMap) {
+      _groupIdMap = groupIdMap;
     }
 
     @Override
@@ -305,7 +298,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         for (int j = _numGroupByExpressions - 1; j >= 0; j--) {
           rawKey = rawKey * _cardinalities[j] + _singleValueDictIds[j][i];
         }
-        outGroupIds[i] = getGroupId(rawKey);
+        outGroupIds[i] = _groupIdMap.getGroupId(rawKey, _globalGroupIdUpperBound);
       }
     }
 
@@ -315,38 +308,22 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         int[] groupIds = getIntRawKeys(i);
         int length = groupIds.length;
         for (int j = 0; j < length; j++) {
-          groupIds[j] = getGroupId(groupIds[j]);
+          groupIds[j] = _groupIdMap.getGroupId(groupIds[j], _globalGroupIdUpperBound);
         }
         outGroupIds[i] = groupIds;
       }
     }
 
-    private int getGroupId(int rawKey) {
-      int groupId = _rawKeyToGroupIdMap.get(rawKey);
-      if (groupId == INVALID_ID) {
-        if (_numGroups < _globalGroupIdUpperBound) {
-          groupId = _numGroups;
-          _rawKeyToGroupIdMap.put(rawKey, _numGroups++);
-        }
-      }
-      return groupId;
-    }
-
     @Override
     public int getGroupIdUpperBound() {
-      return _numGroups;
-    }
-
-    @Override
-    public Object getInternal() {
-      return _rawKeyToGroupIdMap;
+      return _groupIdMap.size();
     }
 
     @Override
     public Iterator<GroupKey> iterator() {
       return new Iterator<GroupKey>() {
-        private final ObjectIterator<Int2IntMap.Entry> _iterator = _rawKeyToGroupIdMap.int2IntEntrySet().fastIterator();
         private final GroupKey _groupKey = new GroupKey();
+        private final Iterator<IntGroupIdMap.Entry> _iterator = _groupIdMap.iterator();
 
         @Override
         public boolean hasNext() {
@@ -355,9 +332,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
 
         @Override
         public GroupKey next() {
-          Int2IntMap.Entry entry = _iterator.next();
-          _groupKey._groupId = entry.getIntValue();
-          _groupKey._stringKey = getGroupKey(entry.getIntKey());
+          IntGroupIdMap.Entry entry = _iterator.next();
+          _groupKey._groupId = entry._groupId;
+          _groupKey._stringKey = getGroupKey(entry._rawKey);
           return _groupKey;
         }
 
@@ -472,18 +449,10 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   }
 
   private class LongMapBasedHolder implements RawKeyHolder {
-    private final Long2IntOpenHashMap _rawKeyToGroupIdMap;
+    private final Long2IntOpenHashMap _groupIdMap;
 
-    private int _numGroups = 0;
-
-    public LongMapBasedHolder(int initialSize) {
-      _rawKeyToGroupIdMap = new Long2IntOpenHashMap(initialSize);
-      _rawKeyToGroupIdMap.defaultReturnValue(INVALID_ID);
-    }
-
-    public LongMapBasedHolder(Object rawKeyToGroupIdMap) {
-      _rawKeyToGroupIdMap = (Long2IntOpenHashMap) rawKeyToGroupIdMap;
-      _rawKeyToGroupIdMap.clear();
+    public LongMapBasedHolder(Long2IntOpenHashMap groupIdMap) {
+      _groupIdMap = groupIdMap;
     }
 
     @Override
@@ -511,31 +480,23 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
 
     private int getGroupId(long rawKey) {
-      int groupId = _rawKeyToGroupIdMap.get(rawKey);
-      if (groupId == INVALID_ID) {
-        if (_numGroups < _globalGroupIdUpperBound) {
-          groupId = _numGroups;
-          _rawKeyToGroupIdMap.put(rawKey, _numGroups++);
-        }
+      int numGroups = _groupIdMap.size();
+      if (numGroups < _globalGroupIdUpperBound) {
+        return _groupIdMap.computeIfAbsent(rawKey, k -> numGroups);
+      } else {
+        return _groupIdMap.get(rawKey);
       }
-      return groupId;
     }
 
     @Override
     public int getGroupIdUpperBound() {
-      return _numGroups;
-    }
-
-    @Override
-    public Object getInternal() {
-      return _rawKeyToGroupIdMap;
+      return _groupIdMap.size();
     }
 
     @Override
     public Iterator<GroupKey> iterator() {
       return new Iterator<GroupKey>() {
-        private final ObjectIterator<Long2IntMap.Entry> _iterator =
-            _rawKeyToGroupIdMap.long2IntEntrySet().fastIterator();
+        private final ObjectIterator<Long2IntMap.Entry> _iterator = _groupIdMap.long2IntEntrySet().fastIterator();
         private final GroupKey _groupKey = new GroupKey();
 
         @Override
@@ -652,18 +613,10 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   }
 
   private class ArrayMapBasedHolder implements RawKeyHolder {
-    private final Object2IntOpenHashMap<IntArray> _rawKeyToGroupIdMap;
+    private final Object2IntOpenHashMap<IntArray> _groupIdMap;
 
-    private int _numGroups = 0;
-
-    public ArrayMapBasedHolder(int initialSize) {
-      _rawKeyToGroupIdMap = new Object2IntOpenHashMap<>(initialSize);
-      _rawKeyToGroupIdMap.defaultReturnValue(INVALID_ID);
-    }
-
-    public ArrayMapBasedHolder(Object rawKeyToGroupIdMap) {
-      _rawKeyToGroupIdMap = (Object2IntOpenHashMap<IntArray>) rawKeyToGroupIdMap;
-      _rawKeyToGroupIdMap.clear();
+    public ArrayMapBasedHolder(Object2IntOpenHashMap<IntArray> groupIdMap) {
+      _groupIdMap = groupIdMap;
     }
 
     @Override
@@ -691,31 +644,24 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
 
     private int getGroupId(IntArray rawKey) {
-      int groupId = _rawKeyToGroupIdMap.getInt(rawKey);
-      if (groupId == INVALID_ID) {
-        if (_numGroups < _globalGroupIdUpperBound) {
-          groupId = _numGroups;
-          _rawKeyToGroupIdMap.put(rawKey, _numGroups++);
-        }
+      int numGroups = _groupIdMap.size();
+      if (numGroups < _globalGroupIdUpperBound) {
+        return _groupIdMap.computeIntIfAbsent(rawKey, k -> numGroups);
+      } else {
+        return _groupIdMap.getInt(rawKey);
       }
-      return groupId;
     }
 
     @Override
     public int getGroupIdUpperBound() {
-      return _numGroups;
-    }
-
-    @Override
-    public Object getInternal() {
-      return _rawKeyToGroupIdMap;
+      return _groupIdMap.size();
     }
 
     @Override
     public Iterator<GroupKey> iterator() {
       return new Iterator<GroupKey>() {
         private final ObjectIterator<Object2IntMap.Entry<IntArray>> _iterator =
-            _rawKeyToGroupIdMap.object2IntEntrySet().fastIterator();
+            _groupIdMap.object2IntEntrySet().fastIterator();
         private final GroupKey _groupKey = new GroupKey();
 
         @Override
@@ -829,6 +775,156 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
       groupKeyBuilder.append(_dictionaries[i].getStringValue(rawKey._elements[i]));
     }
     return groupKeyBuilder.toString();
+  }
+
+  /**
+   * Fast int-to-int hashmap with {@link #INVALID_ID} as the default return value.
+   * <p>Different from {@link it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap}, this map uses one single array to store
+   * keys and values to reduce the cache miss.
+   */
+  @VisibleForTesting
+  public static class IntGroupIdMap {
+    private static final float LOAD_FACTOR = 0.75f;
+
+    private int[] _keyValueHolder;
+    private int _capacity;
+    private int _mask;
+    private int _maxNumEntries;
+    private int _size;
+
+    public IntGroupIdMap() {
+      _capacity = 1 << 10;
+      int holderSize = _capacity << 1;
+      _keyValueHolder = new int[holderSize];
+      _mask = holderSize - 1;
+      _maxNumEntries = (int) (_capacity * LOAD_FACTOR);
+    }
+
+    public int size() {
+      return _size;
+    }
+
+    /**
+     * Returns the group id for the given raw key. Create a new group id if the raw key does not exist and the group id
+     * upper bound is not reached.
+     */
+    public int getGroupId(int rawKey, int groupIdUpperBound) {
+      // NOTE: Key 0 is reserved as the null key. Use (rawKey + 1) as the internal key because rawKey can never be -1.
+      int internalKey = rawKey + 1;
+      int index = (HashCommon.mix(internalKey) << 1) & _mask;
+      int key = _keyValueHolder[index];
+
+      // Handle hash hit separately for better performance
+      if (key == internalKey) {
+        return _keyValueHolder[index + 1];
+      }
+      if (key == 0) {
+        return _size < groupIdUpperBound ? addNewGroup(internalKey, index) : INVALID_ID;
+      }
+
+      // Hash collision
+      while (true) {
+        index = (index + 2) & _mask;
+        key = _keyValueHolder[index];
+        if (key == internalKey) {
+          return _keyValueHolder[index + 1];
+        }
+        if (key == 0) {
+          return _size < groupIdUpperBound ? addNewGroup(internalKey, index) : INVALID_ID;
+        }
+      }
+    }
+
+    private int addNewGroup(int internalKey, int index) {
+      int groupId = _size++;
+      _keyValueHolder[index] = internalKey;
+      _keyValueHolder[index + 1] = groupId;
+      if (_size > _maxNumEntries) {
+        expand();
+      }
+      return groupId;
+    }
+
+    private void expand() {
+      _capacity <<= 1;
+      int holderSize = _capacity << 1;
+      int[] oldKeyValueHolder = _keyValueHolder;
+      _keyValueHolder = new int[holderSize];
+      _mask = holderSize - 1;
+      _maxNumEntries <<= 1;
+      int oldIndex = 0;
+      for (int i = 0; i < _size; i++) {
+        while (oldKeyValueHolder[oldIndex] == 0) {
+          oldIndex += 2;
+        }
+        int key = oldKeyValueHolder[oldIndex];
+        int value = oldKeyValueHolder[oldIndex + 1];
+        int newIndex = (HashCommon.mix(key) << 1) & _mask;
+        if (_keyValueHolder[newIndex] != 0) {
+          do {
+            newIndex = (newIndex + 2) & _mask;
+          } while (_keyValueHolder[newIndex] != 0);
+        }
+        _keyValueHolder[newIndex] = key;
+        _keyValueHolder[newIndex + 1] = value;
+        oldIndex += 2;
+      }
+    }
+
+    public Iterator<Entry> iterator() {
+      return new Iterator<Entry>() {
+        private final Entry _entry = new Entry();
+        private int _index;
+        private int _numRemainingEntries = _size;
+
+        @Override
+        public boolean hasNext() {
+          return _numRemainingEntries > 0;
+        }
+
+        @Override
+        public Entry next() {
+          int key;
+          while ((key = _keyValueHolder[_index]) == 0) {
+            _index += 2;
+          }
+          _entry._rawKey = key - 1;
+          _entry._groupId = _keyValueHolder[_index + 1];
+          _index += 2;
+          _numRemainingEntries--;
+          return _entry;
+        }
+
+        @Override
+        public void remove() {
+          throw new UnsupportedOperationException();
+        }
+      };
+    }
+
+    /**
+     * Clears the map and trims the map if the size is larger than the {@link #MAX_CACHING_MAP_SIZE}.
+     */
+    public void clear() {
+      if (_size == 0) {
+        return;
+      }
+      if (_size <= MAX_CACHING_MAP_SIZE) {
+        Arrays.fill(_keyValueHolder, 0);
+      } else {
+        _capacity = 1 << 10;
+        int holderSize = _capacity << 1;
+        _keyValueHolder = new int[holderSize];
+        _mask = holderSize - 1;
+        _maxNumEntries = (int) (_capacity * LOAD_FACTOR);
+      }
+      _size = 0;
+    }
+
+    public static class Entry {
+      public int _rawKey;
+      public int _groupId;
+    }
   }
 
   /**
