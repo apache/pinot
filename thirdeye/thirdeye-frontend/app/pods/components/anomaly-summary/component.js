@@ -25,13 +25,33 @@ import config from 'thirdeye-frontend/config/environment';
 
 const TABLE_DATE_FORMAT = 'MMM DD, hh:mm A'; // format for anomaly table and legend
 
+const CLASSES = {
+  table: 'table table-striped table-bordered table-condensed'
+};
+
+const GRAPH_ZOOM_CONFIG = {
+  enabled: false,
+  rescale: true
+};
+
+const GRAPH_LEGEND_CONFIG = {
+  show: true,
+  position: 'right'
+};
+
+const GRAPH_POINT_CONFIG = {
+  show: false
+};
+
+const INITIAL_EMPTY_OBJECT = {};
+
+const FEEDBACK_OPTIONS = anomalyResponseObj.mapBy('name');
+
 export default Component.extend({
   /**
    * Overrides ember-models-table's css classes
    */
-  classes: {
-    table: 'table table-striped table-bordered table-condensed'
-  },
+  classes: CLASSES,
 
   columns: columns,
   /**
@@ -41,7 +61,7 @@ export default Component.extend({
   /**
    * Anomaly data, fetched using the anomalyId
    */
-  anomalyData: {},
+  anomalyData: INITIAL_EMPTY_OBJECT,
   /**
    * current time series
    */
@@ -60,23 +80,15 @@ export default Component.extend({
    * imported color mapping for graph
    */
   colorMapping: colorMapping,
-  zoom: {
-    enabled: false,
-    rescale: true
-  },
+  zoom: GRAPH_ZOOM_CONFIG,
 
   // legend and point are for the graph
-  legend: {
-    show: true,
-    position: 'right'
-  },
-  point: {
-    show: false
-  },
+  legend: GRAPH_LEGEND_CONFIG,
+  point: GRAPH_POINT_CONFIG,
   isLoading: false,
-  feedbackOptions: anomalyResponseObj.mapBy('name'),
+  feedbackOptions: FEEDBACK_OPTIONS,
   labelMap: anomalyResponseMapAll,
-  labelResponse: {},
+  labelResponse: INITIAL_EMPTY_OBJECT,
 
   init() {
     this._super(...arguments);
