@@ -165,6 +165,6 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
     if (token == null) {
       return null;
     }
-    return StringUtils.remove(token.trim(), "=");
+    return StringUtils.remove(token.trim(), '=');
   }
 }
