@@ -76,6 +76,12 @@ public class BootstrapTableCommand extends AbstractBaseAdminCommand implements C
   @Option(name = "-dir", required = false, aliases = {"-d", "-directory"}, metaVar = "<String>", usage = "The directory contains all the configs and data to bootstrap a table")
   private String _dir;
 
+  @Option(name = "-user", required = false, metaVar = "<String>", usage = "Username for basic auth.")
+  private String _user;
+
+  @Option(name = "-password", required = false, metaVar = "<String>", usage = "Password for basic auth.")
+  private String _password;
+
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
@@ -116,6 +122,7 @@ public class BootstrapTableCommand extends AbstractBaseAdminCommand implements C
     if (_controllerHost == null) {
       _controllerHost = NetUtil.getHostAddress();
     }
-    return new BootstrapTableTool(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort), _dir).execute();
+    String token = ""; // TODO
+    return new BootstrapTableTool(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort), _dir, token).execute();
   }
 }

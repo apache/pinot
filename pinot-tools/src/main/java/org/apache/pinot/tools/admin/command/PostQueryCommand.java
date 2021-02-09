@@ -47,6 +47,12 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
   @Option(name = "-query", required = true, metaVar = "<string>", usage = "Query string to perform.")
   private String _query;
 
+  @Option(name = "-user", required = false, metaVar = "<String>", usage = "Username for basic auth.")
+  private String _user;
+
+  @Option(name = "-password", required = false, metaVar = "<String>", usage = "Password for basic auth.")
+  private String _password;
+
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
@@ -91,6 +97,16 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
     return this;
   }
 
+  public PostQueryCommand setUser(String user) {
+    _user = user;
+    return this;
+  }
+
+  public PostQueryCommand setPassword(String password) {
+    _password = password;
+    return this;
+  }
+
   public PostQueryCommand setQueryType(String queryType) {
     _queryType = queryType;
     return this;
@@ -117,7 +133,7 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
       request = JsonUtils.objectToString(Collections.singletonMap(Request.PQL, _query));
     }
 
-    return sendPostRequest(urlString, request);
+    return sendRequest("POST", urlString, request, makeBasicAuth(_user, _password));
   }
 
   @Override

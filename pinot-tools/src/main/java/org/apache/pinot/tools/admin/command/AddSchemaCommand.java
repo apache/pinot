@@ -22,6 +22,9 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.Collections;
+
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.data.Schema;
@@ -51,6 +54,12 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
   @Option(name = "-exec", required = false, metaVar = "<boolean>", usage = "Execute the command.")
   private boolean _exec;
 
+  @Option(name = "-user", required = false, metaVar = "<String>", usage = "Username for basic auth.")
+  private String _user;
+
+  @Option(name = "-password", required = false, metaVar = "<String>", usage = "Password for basic auth.")
+  private String _password;
+
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
@@ -73,7 +82,8 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
   public String toString() {
     String retString =
         ("AddSchema -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost
-            + " -controllerPort " + _controllerPort + " -schemaFile " + _schemaFile);
+            + " -controllerPort " + _controllerPort + " -schemaFile " + _schemaFile + " -user " + _user + " -password "
+                + "[hidden]");
 
     return ((_exec) ? (retString + " -exec") : retString);
   }
@@ -101,6 +111,14 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
   public AddSchemaCommand setSchemaFilePath(String schemaFilePath) {
     _schemaFile = schemaFilePath;
     return this;
+  }
+
+  public void setUser(String user) {
+    this._user = user;
+  }
+
+  public void setPassword(String password) {
+    this._password = password;
   }
 
   public AddSchemaCommand setExecute(boolean exec) {
@@ -131,7 +149,7 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       fileUploadDownloadClient.addSchema(
           FileUploadDownloadClient.getUploadSchemaURI(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort)),
-          schema.getSchemaName(), schemaFile);
+          schema.getSchemaName(), schemaFile, makeBasicAuth(_user, _password), Collections.emptyList());
     } catch (Exception e) {
       LOGGER.error("Got Exception to upload Pinot Schema: " + schema.getSchemaName(), e);
       return false;

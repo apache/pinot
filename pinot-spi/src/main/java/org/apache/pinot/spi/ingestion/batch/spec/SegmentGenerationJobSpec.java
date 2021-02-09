@@ -126,6 +126,11 @@ public class SegmentGenerationJobSpec implements Serializable {
    */
   private boolean _failOnEmptySegment = false;
 
+  /**
+   * Controller auth token
+   */
+  private String _authToken;
+
   public ExecutionFrameworkSpec getExecutionFrameworkSpec() {
     return _executionFrameworkSpec;
   }
@@ -285,6 +290,14 @@ public class SegmentGenerationJobSpec implements Serializable {
 
   public void setFailOnEmptySegment(boolean failOnEmptySegment) {
     _failOnEmptySegment = failOnEmptySegment;
+  }
+
+  public String getAuthToken() {
+    return _authToken;
+  }
+
+  public void setAuthToken(String authToken) {
+    _authToken = authToken;
   }
 }
 

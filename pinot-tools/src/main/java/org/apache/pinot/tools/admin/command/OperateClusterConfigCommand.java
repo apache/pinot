@@ -46,6 +46,12 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
   @Option(name = "-controllerProtocol", required = false, metaVar = "<String>", usage = "protocol for controller.")
   private String _controllerProtocol = CommonConstants.HTTP_PROTOCOL;
 
+  @Option(name = "-user", required = false, metaVar = "<String>", usage = "Username for basic auth.")
+  private String _user;
+
+  @Option(name = "-password", required = false, metaVar = "<String>", usage = "Password for basic auth.")
+  private String _password;
+
   @Option(name = "-config", metaVar = "<string>", usage = "Cluster config to operate.")
   private String _config;
 
@@ -100,6 +106,16 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
     return this;
   }
 
+  public OperateClusterConfigCommand setUser(String user) {
+    _user = user;
+    return this;
+  }
+
+  public OperateClusterConfigCommand setPassword(String password) {
+    _password = password;
+    return this;
+  }
+
   public OperateClusterConfigCommand setConfig(String config) {
     _config = config;
     return this;
@@ -129,8 +145,9 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
               "Bad config: " + _config + ". Please follow the pattern of [Config Key]=[Config Value]");
         }
         String request = JsonUtils.objectToString(Collections.singletonMap(splits[0], splits[1]));
-        return sendPostRequest(clusterConfigUrl, request);
+        return sendRequest("POST", clusterConfigUrl, request, makeBasicAuth(_user, _password));
       case "GET":
+        // TODO
         String response = IOUtils.toString(new URI(clusterConfigUrl), StandardCharsets.UTF_8);
         JsonNode jsonNode = JsonUtils.stringToJsonNode(response);
         Iterator<String> fieldNamesIterator = jsonNode.fieldNames();
@@ -142,7 +159,8 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
         }
         return results;
       case "DELETE":
-        return sendDeleteRequest(String.format("%s/%s", clusterConfigUrl, _config), null);
+        return sendRequest("DELETE", String.format("%s/%s", clusterConfigUrl, _config), null,
+            makeBasicAuth(_user, _password));
       default:
         throw new UnsupportedOperationException("Unsupported operation: " + _operation);
     }

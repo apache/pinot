@@ -29,9 +29,12 @@ import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.Map;
+import java.util.*;
 
 import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.http.Header;
+import org.apache.http.message.BasicHeader;
 import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.utils.PinotConfigUtils;
 
@@ -72,11 +75,18 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
 
   public static String sendRequest(String requestMethod, String urlString, String payload)
       throws IOException {
+    return sendRequest(requestMethod, urlString, payload, Collections.emptyList());
+  }
+
+  public static String sendRequest(String requestMethod, String urlString, String payload, List<Header> headers)
+      throws IOException {
     final URL url = new URL(urlString);
     final HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 
     conn.setDoOutput(true);
     conn.setRequestMethod(requestMethod);
+    headers.stream().flatMap(header -> Arrays.stream(header.getElements()))
+            .forEach(elem -> conn.setRequestProperty(elem.getName(), elem.getValue()));
     if (payload != null) {
       final BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(),
           StandardCharsets.UTF_8));
@@ -111,5 +121,18 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
   Map<String, Object> readConfigFromFile(String configFileName)
       throws ConfigurationException {
     return PinotConfigUtils.readConfigFromFile(configFileName);
+  }
+
+  static List<Header> makeBasicAuth(String user, String password) {
+    if (StringUtils.isBlank(user)) {
+      return Collections.emptyList();
+    }
+
+    if (StringUtils.isBlank(password)) {
+      password = "";
+    }
+
+    String token = "Basic " + Base64.getEncoder().encodeToString((user + ":" + password).getBytes());
+    return Collections.singletonList(new BasicHeader("Authorization", token));
   }
 }

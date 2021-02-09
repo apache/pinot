@@ -28,6 +28,8 @@ import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collections;
+
 
 public class AddTenantCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(AddTenantCommand.class);
@@ -58,6 +60,12 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
 
   @Option(name = "-exec", required = false, metaVar = "<boolean>", usage = "Execute the command.")
   private boolean _exec;
+
+  @Option(name = "-user", required = false, metaVar = "<String>", usage = "Username for basic auth.")
+  private String _user;
+
+  @Option(name = "-password", required = false, metaVar = "<String>", usage = "Password for basic auth.")
+  private String _password;
 
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
@@ -94,6 +102,16 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
     return this;
   }
 
+  public AddTenantCommand setUser(String user) {
+    _user = user;
+    return this;
+  }
+
+  public AddTenantCommand setPassword(String password) {
+    _password = password;
+    return this;
+  }
+
   public AddTenantCommand setExecute(boolean exec) {
     _exec = exec;
     return this;
@@ -118,8 +136,8 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
     LOGGER.info("Executing command: " + toString());
     Tenant tenant = new Tenant(_role, _name, _instanceCount, _offlineInstanceCount, _realtimeInstanceCount);
     String res = AbstractBaseAdminCommand
-        .sendPostRequest(ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTenantCreate(),
-            tenant.toJsonString());
+        .sendRequest("POST", ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTenantCreate(),
+            tenant.toJsonString(), makeBasicAuth(_user, _password));
 
     LOGGER.info(res);
     System.out.print(res);

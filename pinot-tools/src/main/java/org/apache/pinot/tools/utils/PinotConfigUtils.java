@@ -70,6 +70,12 @@ public class PinotConfigUtils {
     properties.put(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS, 3600);
     properties.put(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS, 3600);
     properties.put(ControllerConf.CONTROLLER_MODE, controllerMode.toString());
+    properties.put("controller.admin.access.control.factory.class", "org.apache.pinot.controller.api.access.BasicAuthAccessControlFactory");
+    properties.put("controller.admin.access.control.principals", "admin, user");
+    properties.put("controller.admin.access.control.principals.admin.password", "verysecret");
+    properties.put("controller.admin.access.control.principals.user.password", "secret");
+    properties.put("controller.admin.access.control.principals.user.tables", "baseballStats");
+    properties.put("controller.admin.access.control.principals.user.permissions", "read");
 
     return properties;
   }

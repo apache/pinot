@@ -55,20 +55,11 @@ public class BootstrapTableTool {
   private final String _controllerProtocol;
   private final String _controllerHost;
   private final int _controllerPort;
+  private final String _token;
   private final String _tableDir;
   private final MinionClient _minionClient;
 
-  public BootstrapTableTool(String controllerHost, int controllerPort, String tableDir) {
-    Preconditions.checkNotNull(controllerHost);
-    Preconditions.checkNotNull(tableDir);
-    _controllerProtocol = CommonConstants.HTTP_PROTOCOL;
-    _controllerHost = controllerHost;
-    _controllerPort = controllerPort;
-    _tableDir = tableDir;
-    _minionClient = new MinionClient(controllerHost, String.valueOf(controllerPort));
-  }
-
-  public BootstrapTableTool(String controllerProtocol, String controllerHost, int controllerPort, String tableDir) {
+  public BootstrapTableTool(String controllerProtocol, String controllerHost, int controllerPort, String tableDir, String token) {
     Preconditions.checkNotNull(controllerProtocol);
     Preconditions.checkNotNull(controllerHost);
     Preconditions.checkNotNull(tableDir);
@@ -77,6 +68,7 @@ public class BootstrapTableTool {
     _controllerPort = controllerPort;
     _tableDir = tableDir;
     _minionClient = new MinionClient(controllerHost, String.valueOf(controllerPort));
+    _token = token;
   }
 
   public boolean execute()

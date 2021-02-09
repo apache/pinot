@@ -21,6 +21,8 @@ package org.apache.pinot.tools.admin.command;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
+
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.NetUtil;
@@ -58,6 +60,12 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
   @Option(name = "-exec", required = false, metaVar = "<boolean>", usage = "Execute the command.")
   private boolean _exec;
 
+  @Option(name = "-user", required = false, metaVar = "<String>", usage = "Username for basic auth.")
+  private String _user;
+
+  @Option(name = "-password", required = false, metaVar = "<String>", usage = "Password for basic auth.")
+  private String _password;
+
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
@@ -82,7 +90,8 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
   public String toString() {
     String retString =
         ("AddTable -tableConfigFile " + _tableConfigFile + " -schemaFile " + _schemaFile + " -controllerProtocol "
-            + _controllerProtocol + " -controllerHost " + _controllerHost + " -controllerPort " + _controllerPort);
+            + _controllerProtocol + " -controllerHost " + _controllerHost + " -controllerPort " + _controllerPort
+                + " -user " + _user + " -password " + "[hidden]");
     return ((_exec) ? (retString + " -exec") : retString);
   }
 
@@ -115,6 +124,16 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
     return this;
   }
 
+  public AddTableCommand setUser(String user) {
+    _user = user;
+    return this;
+  }
+
+  public AddTableCommand setPassword(String password) {
+    _password = password;
+    return this;
+  }
+
   public AddTableCommand setExecute(boolean exec) {
     _exec = exec;
     return this;
@@ -134,7 +153,7 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       fileUploadDownloadClient.addSchema(
           FileUploadDownloadClient.getUploadSchemaURI(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort)),
-          schema.getSchemaName(), schemaFile);
+          schema.getSchemaName(), schemaFile, makeBasicAuth(_user, _password), Collections.emptyList());
     } catch (Exception e) {
       LOGGER.error("Got Exception to upload Pinot Schema: " + schema.getSchemaName(), e);
       throw e;

@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -73,6 +74,12 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
 
   @Option(name = "-controllerURI", metaVar = "<string>", usage = "Pinot Controller URI.")
   private String _controllerURI = "http://localhost:9000";
+
+  @Option(name = "-user", required = false, metaVar = "<String>", usage = "Username for basic auth.")
+  private String _user;
+
+  @Option(name = "-password", required = false, metaVar = "<String>", usage = "Password for basic auth.")
+  private String _password;
 
   @Option(name = "-tempDir", metaVar = "<string>", usage = "Temporary directory used to hold data during segment creation.")
   private String _tempDir = new File(FileUtils.getTempDirectory(), getClass().getSimpleName()).getAbsolutePath();
@@ -121,6 +128,16 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
     return this;
   }
 
+  public ImportDataCommand setUser(String user) {
+    _user = user;
+    return this;
+  }
+
+  public ImportDataCommand setPassword(String password) {
+    _password = password;
+    return this;
+  }
+
   public List<String> getAdditionalConfigs() {
     return _additionalConfigs;
   }
@@ -153,8 +170,8 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
   @Override
   public String toString() {
     String results = String
-        .format("InsertData -dataFilePath %s -format %s -table %s -controllerURI %s -tempDir %s", _dataFilePath,
-            _format, _table, _controllerURI, _tempDir);
+        .format("InsertData -dataFilePath %s -format %s -table %s -controllerURI %s -user %s -password %s -tempDir %s",
+            _dataFilePath, _format, _table, _controllerURI, _user, "[hidden]", _tempDir);
     if (_additionalConfigs != null) {
       results += " -additionalConfigs " + Arrays.toString(_additionalConfigs.toArray());
     }
@@ -226,6 +243,11 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
     spec.setCleanUpOutputDir(true);
     spec.setOverwriteOutput(true);
     spec.setJobType("SegmentCreationAndTarPush");
+
+    if (!StringUtils.isBlank(_user)) {
+      String token = ""; // TODO
+      spec.setAuthToken(token);
+    }
 
     // set ExecutionFrameworkSpec
     ExecutionFrameworkSpec executionFrameworkSpec = new ExecutionFrameworkSpec();
