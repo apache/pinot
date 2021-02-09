@@ -246,22 +246,29 @@ public class PinotSegmentUploadDownloadRestletResource {
         rawTableName = segmentMetadata.getTableName();
         LOGGER.info("Uploading a segment {} to table: {}, push type {}, (Derived from segment metadata)", segmentName, tableName, uploadType);
       }
-
-      String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+      // TODO (tingchen) generalize the following for realtime tables too
+      String tableNameWithType;
+      if (_pinotHelixResourceManager.isRealtimeOnlyTable(rawTableName)) {
+        tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
+      } else {
+        tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+      }
       String clientAddress = InetAddress.getByName(request.getRemoteAddr()).getHostName();
       LOGGER.info("Processing upload request for segment: {} of table: {} from client: {}, ingestion descriptor: {}",
-          segmentName, offlineTableName, clientAddress, ingestionDescriptor);
+          segmentName, tableNameWithType, clientAddress, ingestionDescriptor);
 
-      // Skip segment validation if upload only segment metadata
-      if (uploadType != FileUploadDownloadClient.FileUploadType.METADATA) {
+      // Skip segment validation if upload only segment metadata or it is a realtime table segment.
+      // TODO Perform a validation check for realtime segments too.
+      if (uploadType != FileUploadDownloadClient.FileUploadType.METADATA && TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
         // Validate segment
         new SegmentValidator(_pinotHelixResourceManager, _controllerConf, _executor, _connectionManager,
-            _controllerMetrics, _leadControllerManager.isLeaderForTable(offlineTableName)).validateOfflineSegment(offlineTableName, segmentMetadata, tempSegmentDir);
+            _controllerMetrics, _leadControllerManager.isLeaderForTable(tableNameWithType))
+            .validateOfflineSegment(tableNameWithType, segmentMetadata, tempSegmentDir);
       }
 
       // Encrypt segment
       String crypterClassNameInTableConfig =
-          _pinotHelixResourceManager.getCrypterClassNameFromTableConfig(offlineTableName);
+          _pinotHelixResourceManager.getCrypterClassNameFromTableConfig(tableNameWithType);
       Pair<String, File> encryptionInfo =
           encryptSegmentIfNeeded(tempDecryptedFile, tempEncryptedFile, uploadedSegmentIsEncrypted,
               crypterClassNameInHeader, crypterClassNameInTableConfig, segmentName, tableName);
@@ -276,7 +283,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       if (!moveSegmentToFinalLocation) {
         LOGGER
             .info("Setting zkDownloadUri: to {} for segment: {} of table: {}, skipping move", downloadUri, segmentName,
-                offlineTableName);
+                tableNameWithType);
         zkDownloadUri = downloadUri;
       } else {
         zkDownloadUri = getZkDownloadURIForSegmentUpload(rawTableName, segmentName);

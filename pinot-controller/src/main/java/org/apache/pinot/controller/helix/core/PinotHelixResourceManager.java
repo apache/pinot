@@ -85,6 +85,7 @@ import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
+import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
@@ -1649,8 +1650,8 @@ public class PinotHelixResourceManager {
   public void addNewSegment(String tableName, SegmentMetadata segmentMetadata, String downloadUrl,
       @Nullable String crypter) {
     String segmentName = segmentMetadata.getName();
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-
+    String tableNameWithType;
+    InstancePartitionsType instancePartitionsType;
     // NOTE: must first set the segment ZK metadata before assigning segment to instances because segment assignment
     // might need them to determine the partition of the segment, and server will need them to download the segment
     OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
@@ -1658,52 +1659,70 @@ public class PinotHelixResourceManager {
     offlineSegmentZKMetadata.setDownloadUrl(downloadUrl);
     offlineSegmentZKMetadata.setCrypterName(crypter);
     offlineSegmentZKMetadata.setPushTime(System.currentTimeMillis());
+
+    if (isRealtimeOnlyTable(tableName)) {
+      tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+      instancePartitionsType = InstancePartitionsType.CONSUMING;
+    } else {
+      tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+      instancePartitionsType = InstancePartitionsType.OFFLINE;
+    }
     String segmentZKMetadataPath =
-        ZKMetadataProvider.constructPropertyStorePathForSegment(offlineTableName, segmentName);
+        ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName);
     Preconditions.checkState(
         _propertyStore.set(segmentZKMetadataPath, offlineSegmentZKMetadata.toZNRecord(), AccessOption.PERSISTENT),
-        "Failed to set segment ZK metadata for table: " + offlineTableName + ", segment: " + segmentName);
-    LOGGER.info("Added segment: {} of table: {} to property store", segmentName, offlineTableName);
+        "Failed to set segment ZK metadata for table: " + tableNameWithType + ", segment: " + segmentName);
+    LOGGER.info("Added segment: {} of table: {} to property store", segmentName, tableNameWithType);
+    assignOfflineTableSegment(tableNameWithType, segmentName, segmentZKMetadataPath, instancePartitionsType);
+  }
 
+
+  private void assignOfflineTableSegment(String tableNameWithType, String segmentName, String segmentZKMetadataPath,
+      InstancePartitionsType instancePartitionsType) {
     // Assign instances for the segment and add it into IdealState
     try {
-      TableConfig offlineTableConfig = getTableConfig(offlineTableName);
+      TableConfig tableConfig = getTableConfig(tableNameWithType);
       Preconditions
-          .checkState(offlineTableConfig != null, "Failed to find table config for table: " + offlineTableName);
+          .checkState(tableConfig != null, "Failed to find table config for table: " + tableNameWithType);
       SegmentAssignment segmentAssignment =
-          SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, offlineTableConfig);
+          SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig);
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = Collections
-          .singletonMap(InstancePartitionsType.OFFLINE, InstancePartitionsUtils
-              .fetchOrComputeInstancePartitions(_helixZkManager, offlineTableConfig, InstancePartitionsType.OFFLINE));
-      synchronized (getTableUpdaterLock(offlineTableName)) {
-        HelixHelper.updateIdealState(_helixZkManager, offlineTableName, idealState -> {
+          .singletonMap(instancePartitionsType, InstancePartitionsUtils
+              .fetchOrComputeInstancePartitions(_helixZkManager, tableConfig, instancePartitionsType));
+      synchronized (getTableUpdaterLock(tableNameWithType)) {
+        HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, idealState -> {
           assert idealState != null;
           Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
           if (currentAssignment.containsKey(segmentName)) {
             LOGGER.warn("Segment: {} already exists in the IdealState for table: {}, do not update", segmentName,
-                offlineTableName);
+                tableNameWithType);
           } else {
             List<String> assignedInstances = segmentAssignment.assignSegment(segmentName, currentAssignment, instancePartitionsMap);
             LOGGER.info("Assigning segment: {} to instances: {} for table: {}", segmentName, assignedInstances,
-                offlineTableName);
-            currentAssignment.put(segmentName, SegmentAssignmentUtils.getInstanceStateMap(assignedInstances, SegmentStateModel.ONLINE));
+                tableNameWithType);
+            currentAssignment.put(segmentName, SegmentAssignmentUtils
+                .getInstanceStateMap(assignedInstances, SegmentStateModel.ONLINE));
           }
           return idealState;
         });
-        LOGGER.info("Added segment: {} to IdealState for table: {}", segmentName, offlineTableName);
+        LOGGER.info("Added segment: {} to IdealState for table: {}", segmentName, tableNameWithType);
       }
     } catch (Exception e) {
       LOGGER
           .error("Caught exception while adding segment: {} to IdealState for table: {}, deleting segment ZK metadata",
-              segmentName, offlineTableName, e);
+              segmentName, tableNameWithType, e);
       if (_propertyStore.remove(segmentZKMetadataPath, AccessOption.PERSISTENT)) {
-        LOGGER.info("Deleted segment ZK metadata for segment: {} of table: {}", segmentName, offlineTableName);
+        LOGGER.info("Deleted segment ZK metadata for segment: {} of table: {}", segmentName, tableNameWithType);
       } else {
         LOGGER
-            .error("Failed to deleted segment ZK metadata for segment: {} of table: {}", segmentName, offlineTableName);
+            .error("Failed to deleted segment ZK metadata for segment: {} of table: {}", segmentName, tableNameWithType);
       }
       throw e;
     }
+  }
+
+  public boolean isRealtimeOnlyTable(String tableName) {
+    return hasRealtimeTable(tableName) && !hasOfflineTable(tableName);
   }
 
   private Object getTableUpdaterLock(String offlineTableName) {
