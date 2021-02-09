@@ -85,7 +85,6 @@ import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
-import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
@@ -1673,11 +1672,11 @@ public class PinotHelixResourceManager {
         _propertyStore.set(segmentZKMetadataPath, offlineSegmentZKMetadata.toZNRecord(), AccessOption.PERSISTENT),
         "Failed to set segment ZK metadata for table: " + tableNameWithType + ", segment: " + segmentName);
     LOGGER.info("Added segment: {} of table: {} to property store", segmentName, tableNameWithType);
-    assignOfflineTableSegment(tableNameWithType, segmentName, segmentZKMetadataPath, instancePartitionsType);
+    assignTableSegment(tableNameWithType, segmentName, segmentZKMetadataPath, instancePartitionsType);
   }
 
 
-  private void assignOfflineTableSegment(String tableNameWithType, String segmentName, String segmentZKMetadataPath,
+  private void assignTableSegment(String tableNameWithType, String segmentName, String segmentZKMetadataPath,
       InstancePartitionsType instancePartitionsType) {
     // Assign instances for the segment and add it into IdealState
     try {

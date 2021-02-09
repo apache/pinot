@@ -55,7 +55,7 @@ public class PinotResourceManagerTest {
     TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(OFFLINE_TABLE_NAME).build();
     ControllerTestUtils.getHelixResourceManager().addTable(offlineTableConfig);
 
-    // Adding a realtime table
+    // Adding a realtime table which consumes from a stream with 2 partitions
     Schema dummySchema = ControllerTestUtils.createDummySchema(REALTIME_TABLE_NAME);
     ControllerTestUtils.addSchema(dummySchema);
     Map<String, String> streamConfigs = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
@@ -158,17 +158,27 @@ public class PinotResourceManagerTest {
 
   @Test
   public void testAddingRealtimeTableSegments() {
-    // Basic add/delete case
-    String segmentName =  "realtimeResourceManagerTestTable__1__0__onetimeunique";
+    // Add three segments: two from partition 0 and 1 from partition 1;
+    String partition0Segment0 =  "realtimeResourceManagerTestTable__0__0__aa";
+    String partition0Segment1 =  "realtimeResourceManagerTestTable__0__0__bb";
+    String partition1Segment1 =  "realtimeResourceManagerTestTable__1__0__cc";
     ControllerTestUtils.getHelixResourceManager().addNewSegment(
-          REALTIME_TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(REALTIME_TABLE_NAME, segmentName),
+        REALTIME_TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(REALTIME_TABLE_NAME, partition0Segment0),
+        "downloadUrl");
+    ControllerTestUtils.getHelixResourceManager().addNewSegment(
+        REALTIME_TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(REALTIME_TABLE_NAME, partition0Segment1),
+        "downloadUrl");
+    ControllerTestUtils.getHelixResourceManager().addNewSegment(
+          REALTIME_TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(REALTIME_TABLE_NAME, partition1Segment1),
           "downloadUrl");
 
     IdealState idealState = ControllerTestUtils
         .getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(), TableNameBuilder.REALTIME.tableNameWithType(REALTIME_TABLE_NAME));
     Set<String> segments = idealState.getPartitionSet();
-    Assert.assertEquals(segments.size(), 3);
-    Assert.assertTrue(segments.contains(segmentName));
+    Assert.assertEquals(segments.size(), 5);
+    Assert.assertTrue(segments.contains(partition0Segment0));
+    Assert.assertTrue(segments.contains(partition0Segment1));
+    Assert.assertTrue(segments.contains(partition1Segment1));
     // Check the segments of the same partition is assigned to the same set of servers.
     Map<Integer, Set<String>> segmentAssignment = new HashMap<>();
     for (String segment : segments) {

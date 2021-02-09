@@ -246,7 +246,7 @@ public class PinotSegmentUploadDownloadRestletResource {
         rawTableName = segmentMetadata.getTableName();
         LOGGER.info("Uploading a segment {} to table: {}, push type {}, (Derived from segment metadata)", segmentName, tableName, uploadType);
       }
-      // TODO (tingchen) generalize the following for realtime tables too
+
       String tableNameWithType;
       if (_pinotHelixResourceManager.isRealtimeOnlyTable(rawTableName)) {
         tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);

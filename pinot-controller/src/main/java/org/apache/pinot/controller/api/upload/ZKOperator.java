@@ -63,7 +63,7 @@ public class ZKOperator {
       throws Exception {
     String tableNameWithType;
     String segmentName = segmentMetadata.getName();
-    // The table is a realtime only table.
+
     if (_pinotHelixResourceManager.isRealtimeOnlyTable(rawTableName)) {
       tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
     } else {
