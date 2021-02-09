@@ -287,8 +287,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       LOGGER.error("Failed to check job existence for job key - table: {}, task: {} ", tableWithType, taskType, e);
     }
     if (!exists) {
-      LOGGER
-          .info("Trying to schedule a job with cron expression: {} for table {}, task type: {}", cronExprStr, tableWithType, taskType);
+      LOGGER.info("Trying to schedule a job with cron expression: {} for table {}, task type: {}", cronExprStr,
+          tableWithType, taskType);
       Trigger trigger = TriggerBuilder.newTrigger().withIdentity(TriggerKey.triggerKey(tableWithType, taskType))
           .withSchedule(CronScheduleBuilder.cronSchedule(cronExprStr)).build();
       JobDataMap jobDataMap = new JobDataMap();
@@ -377,9 +377,9 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       String taskType = entry.getKey();
       List<TableConfig> enabledTableConfigs = entry.getValue();
       PinotTaskGenerator taskGenerator = _taskGeneratorRegistry.getTaskGenerator(taskType);
-      scheduleTaskTypeMetricsUpdaterIfNeeded(taskType);
       if (taskGenerator != null) {
         _helixTaskResourceManager.ensureTaskQueueExists(taskType);
+        addTaskTypeMetricsUpdaterIfNeeded(taskType);
         tasksScheduled.put(taskType, scheduleTask(taskGenerator, enabledTableConfigs, isLeader));
       } else {
         List<String> enabledTables = new ArrayList<>(enabledTableConfigs.size());
@@ -447,8 +447,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       }
     }
 
-    scheduleTaskTypeMetricsUpdaterIfNeeded(taskType);
     _helixTaskResourceManager.ensureTaskQueueExists(taskType);
+    addTaskTypeMetricsUpdaterIfNeeded(taskType);
     return scheduleTask(taskGenerator, enabledTableConfigs, false);
   }
 
@@ -468,8 +468,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
         .checkState(tableConfig.getTaskConfig() != null && tableConfig.getTaskConfig().isTaskTypeEnabled(taskType),
             "Table: %s does not have task type: %s enabled", tableNameWithType, taskType);
 
-    scheduleTaskTypeMetricsUpdaterIfNeeded(taskType);
     _helixTaskResourceManager.ensureTaskQueueExists(taskType);
+    addTaskTypeMetricsUpdaterIfNeeded(taskType);
     return scheduleTask(taskGenerator, Collections.singletonList(tableConfig), false);
   }
 
@@ -493,25 +493,22 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   public synchronized void reportMetrics(String taskType) {
     Map<String, TaskState> taskStates = _helixTaskResourceManager.getTaskStates(taskType);
     Map<TaskState, Integer> taskStateToCountMap = new HashMap<>();
-    for (String taskName : taskStates.keySet()) {
-      TaskState taskState = taskStates.get(taskName);
-      if (!taskStateToCountMap.containsKey(taskState)) {
-        taskStateToCountMap.put(taskState, 0);
-      }
-      taskStateToCountMap.put(taskState, taskStateToCountMap.get(taskState) + 1);
+    for (TaskState taskState : taskStates.values()) {
+      taskStateToCountMap.merge(taskState, 1, Integer::sum);
     }
     // Reset all the status to 0
     for (TaskState taskState : _taskStateToCountMap.keySet()) {
       _taskStateToCountMap.put(taskState, 0);
     }
     _taskStateToCountMap.putAll(taskStateToCountMap);
-    for (TaskState taskState : _taskStateToCountMap.keySet()) {
-      _controllerMetrics.setValueOfTableGauge(String.format("%s.%s", taskType, taskState), ControllerGauge.TASK_STATUS,
-          _taskStateToCountMap.get(taskState));
+    for (Map.Entry<TaskState, Integer> taskStateEntry : _taskStateToCountMap.entrySet()) {
+      _controllerMetrics
+          .setValueOfTableGauge(String.format("%s.%s", taskType, taskStateEntry.getKey()), ControllerGauge.TASK_STATUS,
+              taskStateEntry.getValue());
     }
   }
 
-  private synchronized void scheduleTaskTypeMetricsUpdaterIfNeeded(String taskType) {
+  private synchronized void addTaskTypeMetricsUpdaterIfNeeded(String taskType) {
     if (!_taskTypeMetricsUpdaterMap.containsKey(taskType)) {
       TaskTypeMetricsUpdater taskTypeMetricsUpdater = new TaskTypeMetricsUpdater(taskType, this);
       _pinotHelixResourceManager.getPropertyStore()
