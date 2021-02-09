@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 import org.I0Itec.zkclient.ZkClient;
 import org.apache.zookeeper.server.ServerConfig;
 import org.apache.zookeeper.server.ZooKeeperServerMain;
+import org.apache.zookeeper.server.admin.AdminServer;
 import org.apache.zookeeper.server.quorum.QuorumPeerConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,6 +35,7 @@ public class ZkStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(ZkStarter.class);
   public static final int DEFAULT_ZK_TEST_PORT = 2191;
   public static final String DEFAULT_ZK_STR = "localhost:" + DEFAULT_ZK_TEST_PORT;
+  private static final int DEFAULT_ZK_CLIENT_RETRIES = 10;
 
   public static class ZookeeperInstance {
     private PublicZooKeeperServerMain _serverMain;
@@ -51,17 +53,18 @@ public class ZkStarter {
   static class PublicZooKeeperServerMain extends ZooKeeperServerMain {
     @Override
     public void initializeAndRun(String[] args)
-        throws QuorumPeerConfig.ConfigException, IOException {
+        throws QuorumPeerConfig.ConfigException, IOException, AdminServer.AdminServerException {
       // org.apache.log4j.jmx.* is not compatible under log4j-1.2-api, which provides the backward compatibility for
       // log4j 1.* api for log4j2. In order to avoid 'class not found error', the following line disables log4j jmx
       // bean registration for local zookeeper instance
       System.setProperty("zookeeper.jmx.log4j.disable", "true");
+      System.setProperty("zookeeper.admin.enableServer", "false");
       super.initializeAndRun(args);
     }
 
     @Override
     public void runFromConfig(final ServerConfig config)
-        throws IOException {
+        throws IOException, AdminServer.AdminServerException {
       ServerConfig newServerConfig = new ServerConfig() {
 
         public void parse(String[] args) {
@@ -81,11 +84,11 @@ public class ZkStarter {
           return config.getClientPortAddress();
         }
 
-        public String getDataDir() {
+        public File getDataDir() {
           return config.getDataDir();
         }
 
-        public String getDataLogDir() {
+        public File getDataLogDir() {
           return config.getDataLogDir();
         }
 
@@ -154,19 +157,29 @@ public class ZkStarter {
         public void run() {
           try {
             zookeeperServerMain.initializeAndRun(args);
-          } catch (QuorumPeerConfig.ConfigException e) {
-            LOGGER.warn("Caught exception while starting ZK", e);
-          } catch (IOException e) {
+          } catch (Exception e) {
             LOGGER.warn("Caught exception while starting ZK", e);
           }
         }
       }.start();
 
       // Wait until the ZK server is started
-      ZkClient client = new ZkClient("localhost:" + port, 10000);
-      client.waitUntilConnected(10L, TimeUnit.SECONDS);
-      client.close();
-
+      for (int retry = 0; retry < DEFAULT_ZK_CLIENT_RETRIES; retry++) {
+        try {
+          Thread.sleep(1000L);
+          ZkClient client = new ZkClient("localhost:" + port, 1000 * (DEFAULT_ZK_CLIENT_RETRIES - retry));
+          client.waitUntilConnected(DEFAULT_ZK_CLIENT_RETRIES - retry, TimeUnit.SECONDS);
+          client.close();
+          break;
+        } catch (Exception e) {
+          if (retry < DEFAULT_ZK_CLIENT_RETRIES - 1) {
+            LOGGER.warn("Failed to connect to zk server, retry: {}", retry, e);
+          } else {
+            LOGGER.warn("Failed to connect to zk server.", e);
+            throw e;
+          }
+        }
+      }
       return new ZookeeperInstance(zookeeperServerMain, dataDirPath);
     } catch (Exception e) {
       LOGGER.warn("Caught exception while starting ZK", e);
