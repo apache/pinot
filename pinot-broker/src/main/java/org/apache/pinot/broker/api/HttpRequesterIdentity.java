@@ -22,6 +22,9 @@ import com.google.common.collect.Multimap;
 import java.security.Principal;
 
 
+/**
+ * Identity container for HTTP requests with (optional) authorization headers
+ */
 public class HttpRequesterIdentity extends RequesterIdentity {
   private Multimap<String, String> _httpHeaders;
   private String _endpointUrl;

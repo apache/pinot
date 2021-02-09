@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.broker;
 
 import com.google.common.base.Preconditions;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
@@ -99,8 +100,9 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       HttpRequesterIdentity identity = (HttpRequesterIdentity) requesterIdentity;
 
       Collection<String> tokens = identity.getHttpHeaders().get(HEADER_AUTHORIZATION);
-      Optional<BasicAuthPrincipal> principalOpt = tokens.stream().map(BasicAuthAccessControlFactory::normalizeToken)
-              .map(_principals::get).filter(Objects::nonNull).findFirst();
+      Optional<BasicAuthPrincipal> principalOpt =
+          tokens.stream().map(BasicAuthAccessControlFactory::normalizeToken).map(_principals::get)
+              .filter(Objects::nonNull).findFirst();
 
       if (!principalOpt.isPresent()) {
         // no matching token? reject
@@ -108,9 +110,8 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       }
 
       BasicAuthPrincipal principal = principalOpt.get();
-      if (principal.getTables().isEmpty()
-              || !brokerRequest.isSetQuerySource()
-              || !brokerRequest.getQuerySource().isSetTableName()) {
+      if (principal.getTables().isEmpty() || !brokerRequest.isSetQuerySource() || !brokerRequest.getQuerySource()
+          .isSetTableName()) {
         // no table restrictions? accept
         return true;
       }
@@ -148,8 +149,8 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
 
   private static String toToken(String name, String password) {
     String identifier = String.format("%s:%s", name, password);
-    return normalizeToken(String.format("Basic %s", Base64.getEncoder()
-            .encodeToString(identifier.getBytes(StandardCharsets.UTF_8))));
+    return normalizeToken(
+        String.format("Basic %s", Base64.getEncoder().encodeToString(identifier.getBytes(StandardCharsets.UTF_8))));
   }
 
   /**
@@ -159,6 +160,7 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
    * @param token raw token
    * @return normalized token
    */
+  @Nullable
   private static String normalizeToken(String token) {
     if (token == null) {
       return null;
