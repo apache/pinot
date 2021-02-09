@@ -26,6 +26,7 @@ import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -89,7 +90,7 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
     private final Map<String, BasicAuthPrincipal> _principals;
 
     public BasicAuthAccessControl(Collection<BasicAuthPrincipal> principals) {
-      this._principals = principals.stream().collect(Collectors.toMap(BasicAuthPrincipal::getToken, p -> p));
+      _principals = principals.stream().collect(Collectors.toMap(BasicAuthPrincipal::getToken, p -> p));
     }
 
     @Override
@@ -127,9 +128,9 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
     private final Set<String> _tables;
 
     public BasicAuthPrincipal(String name, String token, Set<String> tables) {
-      this._name = name;
-      this._token = token;
-      this._tables = tables;
+      _name = name;
+      _token = token;
+      _tables = tables;
     }
 
     public String getName() {
@@ -147,13 +148,21 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
 
   private static String toToken(String name, String password) {
     String identifier = String.format("%s:%s", name, password);
-    return normalizeToken(String.format("Basic %s", Base64.getEncoder().encodeToString(identifier.getBytes())));
+    return normalizeToken(String.format("Basic %s", Base64.getEncoder()
+            .encodeToString(identifier.getBytes(StandardCharsets.UTF_8))));
   }
 
+  /**
+   * Implementations of base64 encoding vary and may generate different numbers of padding characters "=". We normalize
+   * these by removing any padding.
+   *
+   * @param token raw token
+   * @return normalized token
+   */
   private static String normalizeToken(String token) {
     if (token == null) {
       return null;
     }
-    return token.trim().replace("=", "");
+    return StringUtils.remove(token.trim(), "=");
   }
 }

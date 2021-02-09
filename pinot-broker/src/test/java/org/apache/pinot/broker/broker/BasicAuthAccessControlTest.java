@@ -32,121 +32,122 @@ import org.testng.annotations.Test;
 import java.util.HashMap;
 import java.util.Map;
 
+
 public class BasicAuthAccessControlTest {
-    private static final String TOKEN_USER = "Basic dXNlcjpzZWNyZXQ"; // user:secret
-    private static final String TOKEN_ADMIN = "Basic YWRtaW46dmVyeXNlY3JldA"; // admin:verysecret
+  private static final String TOKEN_USER = "Basic dXNlcjpzZWNyZXQ"; // user:secret
+  private static final String TOKEN_ADMIN = "Basic YWRtaW46dmVyeXNlY3JldA"; // admin:verysecret
 
-    private static final String HEADER_AUTHORIZATION = "authorization";
+  private static final String HEADER_AUTHORIZATION = "authorization";
 
-    private AccessControl _accessControl;
+  private AccessControl _accessControl;
 
-    @BeforeClass
-    public void setup() {
-        Map<String, Object> config = new HashMap<>();
-        config.put("principals", "admin,user");
-        config.put("principals.admin.password", "verysecret");
-        config.put("principals.user.password", "secret");
-        config.put("principals.user.tables", "lessImportantStuff");
+  @BeforeClass
+  public void setup() {
+    Map<String, Object> config = new HashMap<>();
+    config.put("principals", "admin,user");
+    config.put("principals.admin.password", "verysecret");
+    config.put("principals.user.password", "secret");
+    config.put("principals.user.tables", "lessImportantStuff");
 
-        AccessControlFactory factory = new BasicAuthAccessControlFactory();
-        factory.init(new PinotConfiguration(config));
+    AccessControlFactory factory = new BasicAuthAccessControlFactory();
+    factory.init(new PinotConfiguration(config));
 
-        _accessControl = factory.create();
-    }
+    _accessControl = factory.create();
+  }
 
-    @Test(expectedExceptions = IllegalArgumentException.class)
-    public void testNullEntity() {
-        _accessControl.hasAccess(null, null);
-    }
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testNullEntity() {
+    _accessControl.hasAccess(null, null);
+  }
 
-    @Test
-    public void testNullToken() {
-        Multimap<String, String> headers = ArrayListMultimap.create();
+  @Test
+  public void testNullToken() {
+    Multimap<String, String> headers = ArrayListMultimap.create();
 
-        HttpRequesterIdentity identity = new HttpRequesterIdentity();
-        identity.setHttpHeaders(headers);
+    HttpRequesterIdentity identity = new HttpRequesterIdentity();
+    identity.setHttpHeaders(headers);
 
-        Assert.assertFalse(_accessControl.hasAccess(identity, null));
-    }
+    Assert.assertFalse(_accessControl.hasAccess(identity, null));
+  }
 
-    @Test
-    public void testAllow() {
-        Multimap<String, String> headers = ArrayListMultimap.create();
-        headers.put(HEADER_AUTHORIZATION, TOKEN_USER);
+  @Test
+  public void testAllow() {
+    Multimap<String, String> headers = ArrayListMultimap.create();
+    headers.put(HEADER_AUTHORIZATION, TOKEN_USER);
 
-        HttpRequesterIdentity identity = new HttpRequesterIdentity();
-        identity.setHttpHeaders(headers);
+    HttpRequesterIdentity identity = new HttpRequesterIdentity();
+    identity.setHttpHeaders(headers);
 
-        QuerySource source = new QuerySource();
-        source.setTableName("lessImportantStuff");
+    QuerySource source = new QuerySource();
+    source.setTableName("lessImportantStuff");
 
-        BrokerRequest request = new BrokerRequest();
-        request.setQuerySource(source);
+    BrokerRequest request = new BrokerRequest();
+    request.setQuerySource(source);
 
-        Assert.assertTrue(_accessControl.hasAccess(identity, request));
-    }
+    Assert.assertTrue(_accessControl.hasAccess(identity, request));
+  }
 
-    @Test
-    public void testDeny() {
-        Multimap<String, String> headers = ArrayListMultimap.create();
-        headers.put(HEADER_AUTHORIZATION, TOKEN_USER);
+  @Test
+  public void testDeny() {
+    Multimap<String, String> headers = ArrayListMultimap.create();
+    headers.put(HEADER_AUTHORIZATION, TOKEN_USER);
 
-        HttpRequesterIdentity identity = new HttpRequesterIdentity();
-        identity.setHttpHeaders(headers);
+    HttpRequesterIdentity identity = new HttpRequesterIdentity();
+    identity.setHttpHeaders(headers);
 
-        QuerySource source = new QuerySource();
-        source.setTableName("veryImportantStuff");
+    QuerySource source = new QuerySource();
+    source.setTableName("veryImportantStuff");
 
-        BrokerRequest request = new BrokerRequest();
-        request.setQuerySource(source);
+    BrokerRequest request = new BrokerRequest();
+    request.setQuerySource(source);
 
-        Assert.assertFalse(_accessControl.hasAccess(identity, request));
-    }
+    Assert.assertFalse(_accessControl.hasAccess(identity, request));
+  }
 
-    @Test
-    public void testAllowAll() {
-        Multimap<String, String> headers = ArrayListMultimap.create();
-        headers.put(HEADER_AUTHORIZATION, TOKEN_ADMIN);
+  @Test
+  public void testAllowAll() {
+    Multimap<String, String> headers = ArrayListMultimap.create();
+    headers.put(HEADER_AUTHORIZATION, TOKEN_ADMIN);
 
-        HttpRequesterIdentity identity = new HttpRequesterIdentity();
-        identity.setHttpHeaders(headers);
+    HttpRequesterIdentity identity = new HttpRequesterIdentity();
+    identity.setHttpHeaders(headers);
 
-        QuerySource source = new QuerySource();
-        source.setTableName("veryImportantStuff");
+    QuerySource source = new QuerySource();
+    source.setTableName("veryImportantStuff");
 
-        BrokerRequest request = new BrokerRequest();
-        request.setQuerySource(source);
+    BrokerRequest request = new BrokerRequest();
+    request.setQuerySource(source);
 
-        Assert.assertTrue(_accessControl.hasAccess(identity, request));
-    }
+    Assert.assertTrue(_accessControl.hasAccess(identity, request));
+  }
 
-    @Test
-    public void testAllowNonTable() {
-        Multimap<String, String> headers = ArrayListMultimap.create();
-        headers.put(HEADER_AUTHORIZATION, TOKEN_USER);
+  @Test
+  public void testAllowNonTable() {
+    Multimap<String, String> headers = ArrayListMultimap.create();
+    headers.put(HEADER_AUTHORIZATION, TOKEN_USER);
 
-        HttpRequesterIdentity identity = new HttpRequesterIdentity();
-        identity.setHttpHeaders(headers);
+    HttpRequesterIdentity identity = new HttpRequesterIdentity();
+    identity.setHttpHeaders(headers);
 
-        BrokerRequest request = new BrokerRequest();
+    BrokerRequest request = new BrokerRequest();
 
-        Assert.assertTrue(_accessControl.hasAccess(identity, request));
-    }
+    Assert.assertTrue(_accessControl.hasAccess(identity, request));
+  }
 
-    @Test
-    public void testNormalizeToken() {
-        Multimap<String, String> headers = ArrayListMultimap.create();
-        headers.put(HEADER_AUTHORIZATION, "  " + TOKEN_USER + "== ");
+  @Test
+  public void testNormalizeToken() {
+    Multimap<String, String> headers = ArrayListMultimap.create();
+    headers.put(HEADER_AUTHORIZATION, "  " + TOKEN_USER + "== ");
 
-        HttpRequesterIdentity identity = new HttpRequesterIdentity();
-        identity.setHttpHeaders(headers);
+    HttpRequesterIdentity identity = new HttpRequesterIdentity();
+    identity.setHttpHeaders(headers);
 
-        QuerySource source = new QuerySource();
-        source.setTableName("lessImportantStuff");
+    QuerySource source = new QuerySource();
+    source.setTableName("lessImportantStuff");
 
-        BrokerRequest request = new BrokerRequest();
-        request.setQuerySource(source);
+    BrokerRequest request = new BrokerRequest();
+    request.setQuerySource(source);
 
-        Assert.assertTrue(_accessControl.hasAccess(identity, request));
-    }
+    Assert.assertTrue(_accessControl.hasAccess(identity, request));
+  }
 }
