@@ -47,6 +47,9 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
+import org.joda.time.DateTime;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -230,6 +233,11 @@ public class ThirdEyeJiraClient {
 
     if (jiraEntity.getCustomFieldsMap() != null) {
       for (Map.Entry<String, Object> customFieldEntry : jiraEntity.getCustomFieldsMap().entrySet()) {
+        if (customFieldEntry.getKey().toLowerCase().contains("date")) {
+          DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern("dd/MM/yyyy");
+          issueBuilder.setFieldValue(customFieldEntry.getKey(),
+              dateTimeFormatter.parseDateTime(customFieldEntry.getValue().toString()));
+        }
         issueBuilder.setFieldValue(
             customFieldEntry.getKey(),
             ComplexIssueInputFieldValue.with("name", customFieldEntry.getValue().toString()));
@@ -258,7 +266,6 @@ public class ThirdEyeJiraClient {
     issueBuilder.setSummary(jiraEntity.getSummary());
     issueBuilder.setIssueTypeId(jiraEntity.getJiraIssueTypeId());
     issueBuilder.setDescription(jiraEntity.getDescription());
-
     setJiraAlertUpdatableFields(issueBuilder, jiraEntity);
 
     return issueBuilder.build();
