@@ -508,8 +508,10 @@ public final class TableConfigUtils {
 
     if (indexingConfig.getJsonIndexColumns() != null) {
       for (String jsonIndexCol : indexingConfig.getJsonIndexColumns()) {
-        Preconditions.checkState(schema.getFieldSpecFor(jsonIndexCol).isSingleValueField(),
-            "Cannot create json index on multi-value column: " + jsonIndexCol);
+        Preconditions.checkState(
+            schema.getFieldSpecFor(jsonIndexCol).isSingleValueField() && schema.getFieldSpecFor(jsonIndexCol)
+                .getDataType().equals(FieldSpec.DataType.STRING),
+            "Json index can only be created for single value String column. Invalid for column: " + jsonIndexCol);
       }
     }
   }
@@ -553,8 +555,6 @@ public final class TableConfigUtils {
               "FST Index is only supported for single value string columns");
           break;
         case TEXT:
-          Preconditions.checkArgument(fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW,
-              "TEXT Index is only enabled on non dictionary encoded columns");
           Preconditions.checkState(
               fieldConfigColSpec.isSingleValueField() && fieldConfigColSpec.getDataType() == FieldSpec.DataType.STRING,
               "TEXT Index is only supported for single value string columns");

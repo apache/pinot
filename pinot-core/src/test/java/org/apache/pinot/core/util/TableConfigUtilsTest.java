@@ -695,17 +695,6 @@ public class TableConfigUtilsTest {
       Assert.assertEquals(e.getMessage(), "FST Index is only supported for single value string columns");
     }
 
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    try {
-      FieldConfig fieldConfig =
-          new FieldConfig("myCol1", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null);
-      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
-      TableConfigUtils.validate(tableConfig, schema);
-      Assert.fail("Should fail since TEXT index is enabled on dictionary encoded column");
-    } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "TEXT Index is only enabled on non dictionary encoded columns");
-    }
-
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(Arrays.asList("myCol2", "intCol")).build();
     try {
@@ -933,6 +922,24 @@ public class TableConfigUtilsTest {
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for non existent column in Json index config");
+    } catch (Exception e) {
+      // expected
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setJsonIndexColumns(Arrays.asList("intCol")).build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail for Json index defined on non string column");
+    } catch (Exception e) {
+      // expected
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setJsonIndexColumns(Arrays.asList("multiValCol")).build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail for Json index defined on multi-value column");
     } catch (Exception e) {
       // expected
     }
