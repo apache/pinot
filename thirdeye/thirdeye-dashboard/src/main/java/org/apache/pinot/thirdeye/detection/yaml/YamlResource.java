@@ -860,6 +860,41 @@ public class YamlResource {
     return runPreview(start, end, tuningStart, tuningEnd, payload, existingConfig);
   }
 
+
+  /***
+   * Auto-tune a alert given an alert id
+   * @param user user who requested the auto-tune operation
+   * @param id the alert config id
+   * @param tuningStartTime tuning start time
+   * @param tuningEndTime tuning end time
+   * @return The tuned detection config
+   */
+  @PUT
+  @Path("/autotune/{id}")
+  @Produces(MediaType.APPLICATION_JSON)
+  @PermitAll
+  @ApiOperation("Auto-tune and update the detection")
+  public Response autoTuneDetectionConfigApi(
+      @Auth ThirdEyePrincipal user,
+      @ApiParam("the detection config id to tune") @PathParam("id") long id,
+      @ApiParam("tuning window start time for tunable components") @QueryParam("tuningStartTime") long tuningStartTime,
+      @ApiParam("tuning window end time for tunable components") @QueryParam("tuningEndTime") long tuningEndTime) {
+    DetectionConfigDTO detectionConfig = this.detectionConfigDAO.findById(id);
+
+    // Tune the detection config - Passes the raw yaml params & injects tuned params
+    DetectionConfigTuner detectionTuner = new DetectionConfigTuner(detectionConfig, provider);
+    detectionConfig = detectionTuner.tune(tuningStartTime, tuningEndTime);
+    try {
+      this.detectionValidator.semanticValidation(detectionConfig);
+    } catch (ConfigValidationException e) {
+      return processValidationErrorResponse(PROP_DETECTION, YamlOperations.UPDATING.name(), detectionConfig.getYaml(), e);
+    }
+
+    this.detectionConfigDAO.update(detectionConfig);
+
+    return Response.ok(detectionConfig).build();
+  }
+
   private Response runPreview(long start, long end,
       long tuningStart, long tuningEnd, @NotNull String payload, DetectionConfigDTO existingConfig) {
     long ts = System.currentTimeMillis();
