@@ -226,6 +226,12 @@ public class MinionStarter implements ServiceStartable {
     _helixManager.disconnect();
     LOGGER.info("Deregistering service status handler");
     ServiceStatus.removeServiceStatusCallback(_instanceId);
+    LOGGER.info("Clean up Minion data directory");
+    try {
+      FileUtils.cleanDirectory(MinionContext.getInstance().getDataDir());
+    } catch (IOException e) {
+      LOGGER.warn("Failed to clean up Minion data directory: {}", MinionContext.getInstance().getDataDir(), e);
+    }
     LOGGER.info("Pinot minion stopped");
   }
 
