@@ -67,6 +67,11 @@ rules:
   labels:
     table: "$1"
     taskType: "$2"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.taskStatus.(\\w+)\\.(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_taskStatus_$3"
+  labels:
+    taskType: "$1"
+    status: "$2"
 # Pinot Broker
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+).authorization\"><>(\\w+)"
   name: "pinot_broker_authorization_$2"
