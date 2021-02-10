@@ -123,7 +123,8 @@ public class EmptySegmentPruner implements SegmentPruner {
    */
   @Override
   public Set<String> prune(BrokerRequest brokerRequest, Set<String> segments) {
-    segments.removeAll(_emptySegments);
-    return segments;
+    Set<String> selectedSegments = new HashSet<>(segments);
+    selectedSegments.removeAll(_emptySegments);
+    return selectedSegments;
   }
 }
