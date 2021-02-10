@@ -155,6 +155,37 @@ public class PinotPreparedStatement extends AbstractBasePreparedStatement {
   }
 
   @Override
+  public boolean execute()
+      throws SQLException {
+    _resultSet = executeQuery();
+    if (_resultSet.next()) {
+      _resultSet.beforeFirst();
+      return true;
+    } else {
+      _resultSet = null;
+      return false;
+    }
+  }
+
+  @Override
+  public ResultSet executeQuery(String sql)
+      throws SQLException {
+    validateState();
+    try {
+      Request request = new Request(QUERY_FORMAT, sql);
+      _resultSetGroup = _session.execute(request);
+      if (_resultSetGroup.getResultSetCount() == 0) {
+        _resultSet = PinotResultSet.empty();
+        return _resultSet;
+      }
+      _resultSet = new PinotResultSet(_resultSetGroup.getResultSet(0));
+      return _resultSet;
+    } catch (PinotClientException e) {
+      throw new SQLException(String.format("Failed to execute query : %s", sql), e);
+    }
+  }
+
+  @Override
   public ResultSet executeQuery()
       throws SQLException {
     validateState();
