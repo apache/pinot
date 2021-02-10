@@ -14,8 +14,8 @@
 
 import Component from '@ember/component';
 
+/* eslint-disable ember/avoid-leaking-state-in-ember-objects */
 export default Component.extend({
-
   title: '',
   data: {},
 
@@ -23,6 +23,7 @@ export default Component.extend({
    * Array to define alerts table columns for selected config group
    * @type {Array}
    */
+  // TODO: Move all value in to the util folder
   alertsTableColumns: [
     {
       propertyName: 'id',
@@ -49,5 +50,4 @@ export default Component.extend({
       title: 'Status'
     }
   ]
-
 });

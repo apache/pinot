@@ -4,7 +4,7 @@ import c3 from 'c3';
 import d3 from 'd3';
 import _ from 'lodash';
 import moment from 'moment';
-
+/* eslint-disable ember/avoid-leaking-state-in-ember-objects */
 export default Component.extend({
   tagName: 'div',
   classNames: ['timeseries-chart'],
@@ -113,23 +113,14 @@ export default Component.extend({
     const cache = this.get('_seriesCache') || {};
     const series = this.get('series') || {};
     const colorMapping = this.get('colorMapping');
-    const { axis, legend, tooltip, focusedIds } = this.getProperties(
-      'axis',
-      'legend',
-      'tooltip',
-      'focusedIds'
-    );
+    const { axis, legend, tooltip, focusedIds } = this.getProperties('axis', 'legend', 'tooltip', 'focusedIds');
 
     const seriesKeys = Object.keys(series).sort();
 
     const addedKeys = seriesKeys.filter((sid) => !cache[sid]);
-    const changedKeys = seriesKeys.filter(
-      (sid) => cache[sid] && !_.isEqual(cache[sid], series[sid])
-    );
+    const changedKeys = seriesKeys.filter((sid) => cache[sid] && !_.isEqual(cache[sid], series[sid]));
     const deletedKeys = Object.keys(cache).filter((sid) => !series[sid]);
-    const regionKeys = seriesKeys.filter(
-      (sid) => series[sid] && series[sid].type == 'region'
-    );
+    const regionKeys = seriesKeys.filter((sid) => series[sid] && series[sid].type == 'region');
     // keys containing '-region' should not appear in the graph legend.
     const noLegendKeys = seriesKeys.filter((sid) => sid.includes('-region'));
 
@@ -145,38 +136,26 @@ export default Component.extend({
     });
 
     const unloadKeys = deletedKeys.concat(noLegendKeys);
-    const unload = unloadKeys.concat(
-      unloadKeys.map((sid) => `${sid}-timestamps`)
-    );
+    const unload = unloadKeys.concat(unloadKeys.map((sid) => `${sid}-timestamps`));
 
-    const loadKeys = addedKeys
-      .concat(changedKeys)
-      .filter((sid) => !noLegendKeys.includes(sid));
+    const loadKeys = addedKeys.concat(changedKeys).filter((sid) => !noLegendKeys.includes(sid));
     const xs = {};
     loadKeys.forEach((sid) => (xs[sid] = `${sid}-timestamps`));
 
     const values = loadKeys.map((sid) => [sid].concat(series[sid].values));
 
-    const timestamps = loadKeys.map((sid) =>
-      [`${sid}-timestamps`].concat(series[sid].timestamps)
-    );
+    const timestamps = loadKeys.map((sid) => [`${sid}-timestamps`].concat(series[sid].timestamps));
 
     const columns = values.concat(timestamps);
 
     const colors = {};
-    loadKeys
-      .filter((sid) => series[sid].color)
-      .forEach((sid) => (colors[sid] = colorMapping[series[sid].color]));
+    loadKeys.filter((sid) => series[sid].color).forEach((sid) => (colors[sid] = colorMapping[series[sid].color]));
 
     const types = {};
-    loadKeys
-      .filter((sid) => series[sid].type)
-      .forEach((sid) => (types[sid] = series[sid].type));
+    loadKeys.filter((sid) => series[sid].type).forEach((sid) => (types[sid] = series[sid].type));
 
     const axes = {};
-    loadKeys
-      .filter((sid) => 'axis' in series[sid])
-      .forEach((sid) => (axes[sid] = series[sid].axis));
+    loadKeys.filter((sid) => 'axis' in series[sid]).forEach((sid) => (axes[sid] = series[sid].axis));
     // keep the lower bound line in graph but remove in from the legend
     legend.hide = ['lowerBound', 'old-anomaly-edges', 'new-anomaly-edges'];
     const config = {
@@ -260,20 +239,10 @@ export default Component.extend({
     const parentElement = this.api.internal.config.bindto;
     d3.select(parentElement).select('.confidence-bounds').remove();
     d3.select(parentElement).select('.sub-confidence-bounds').remove();
-    d3.select(parentElement)
-      .select('.timeseries-graph__slider-circle')
-      .remove();
-    d3.select(parentElement)
-      .selectAll('timeseries-graph__slider-line')
-      .remove();
+    d3.select(parentElement).select('.timeseries-graph__slider-circle').remove();
+    d3.select(parentElement).selectAll('timeseries-graph__slider-line').remove();
     const chart = this.api;
-    if (
-      chart &&
-      chart.legend &&
-      chart.internal &&
-      chart.internal.data &&
-      chart.internal.data.targets
-    ) {
+    if (chart && chart.legend && chart.internal && chart.internal.data && chart.internal.data.targets) {
       if (chart.internal.data.targets.length > 24) {
         chart.legend.hide();
       }
@@ -286,9 +255,7 @@ export default Component.extend({
       chart.internal.data.xs &&
       Array.isArray(chart.internal.data.xs['Upper and lower bound'])
     ) {
-      const indices = d3.range(
-        chart.internal.data.xs['Upper and lower bound'].length
-      );
+      const indices = d3.range(chart.internal.data.xs['Upper and lower bound'].length);
       const yscale = chart.internal.y;
       const xscale = chart.internal.x;
       const yscaleSub = chart.internal.subY;
@@ -333,17 +300,9 @@ export default Component.extend({
         const bothCharts = d3.select(parentElement).selectAll('.c3-chart-bars');
         bothCharts.each(function () {
           if (i === 0 && this) {
-            d3.select(this)
-              .insert('path')
-              .datum(indices)
-              .attr('class', 'confidence-bounds')
-              .attr('d', area_main);
+            d3.select(this).insert('path').datum(indices).attr('class', 'confidence-bounds').attr('d', area_main);
           } else if (i === 1 && this) {
-            d3.select(this)
-              .insert('path')
-              .datum(indices)
-              .attr('class', 'sub-confidence-bounds')
-              .attr('d', area_sub);
+            d3.select(this).insert('path').datum(indices).attr('class', 'sub-confidence-bounds').attr('d', area_sub);
           }
           i++;
         });

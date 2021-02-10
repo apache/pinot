@@ -1,10 +1,7 @@
 import { bool } from '@ember/object/computed';
 import Component from '@ember/component';
 import { get, getProperties, computed } from '@ember/object';
-import {
-  makeTime,
-  dateFormatFull
-} from 'thirdeye-frontend/utils/rca-utils';
+import { makeTime, dateFormatFull } from 'thirdeye-frontend/utils/rca-utils';
 
 export default Component.extend({
   classNames: ['rootcause-header'],
@@ -116,11 +113,7 @@ export default Component.extend({
      * Edit action on changing session title or comments
      */
     onChange() {
-      const {
-        sessionName,
-        sessionText,
-        onChange
-      } = getProperties(this, 'sessionName', 'sessionText', 'onChange');
+      const { sessionName, sessionText, onChange } = getProperties(this, 'sessionName', 'sessionText', 'onChange');
 
       onChange(sessionName, sessionText);
     }

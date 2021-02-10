@@ -12,9 +12,7 @@
  */
 
 import Component from '@ember/component';
-import {
-  get, set, getProperties
-} from '@ember/object';
+import { set, getProperties } from '@ember/object';
 import { inject as service } from '@ember/service';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import fetch from 'fetch';
@@ -22,13 +20,12 @@ import fetch from 'fetch';
 import createEventApi from 'thirdeye-frontend/utils/api/create-event';
 
 export default Component.extend({
-
   session: service(),
   /**
    * Custom classes to be applied
    */
   classes: Object.freeze({
-    theadCell: "te-modal__table-header"
+    theadCell: 'te-modal__table-header'
   }),
 
   actions: {
@@ -45,16 +42,22 @@ export default Component.extend({
      * @return {undefined}
      */
     onSave() {
-      const {
-        startTime, endTime, eventName, countryCode
-      } = getProperties(this, 'startTime', 'endTime', 'eventName', 'countryCode');
+      const { startTime, endTime, eventName, countryCode } = getProperties(
+        this,
+        'startTime',
+        'endTime',
+        'eventName',
+        'countryCode'
+      );
 
       const startTimeSinceEpoch = new Date(startTime).getTime();
       const endTimeSinceEpoch = new Date(endTime).getTime();
 
-      fetch(createEventApi.createEventUrl(startTimeSinceEpoch, endTimeSinceEpoch, eventName, countryCode), {method: 'POST'})
+      fetch(createEventApi.createEventUrl(startTimeSinceEpoch, endTimeSinceEpoch, eventName, countryCode), {
+        method: 'POST'
+      })
         .then(checkStatus)
-        .then(res => set(this, 'showCreateEventModal', false))
+        .then((/* res */) => set(this, 'showCreateEventModal', false));
 
       // TODO catch error on create
     }

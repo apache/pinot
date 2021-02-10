@@ -44,7 +44,7 @@ export default Component.extend({
 
     const { alertData: { metric: metrics = [] } = {} } = this;
 
-    this.set('firstMetric', metrics[0]);
+    this.set('firstMetric', metrics[0] || undefined);
     this.set('remainingMetricCount', metrics.length - 1);
   },
 

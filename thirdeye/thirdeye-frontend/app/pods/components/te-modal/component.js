@@ -29,7 +29,7 @@
  */
 
 import Component from '@ember/component';
-import { set } from  '@ember/object';
+/* eslint-disable ember/avoid-leaking-state-in-ember-objects */
 
 export default Component.extend({
   containerClassNames: 'te-modal',
@@ -47,39 +47,15 @@ export default Component.extend({
   submitButtonText: 'Save',
   isShowingModal: true,
 
-  actions: {
-    /**
-     * Invokes the passed submit closure action
-     */
-    submitAction() {
-      const action = this.attrs.submitAction;
-      if (action) {
-        return action();
-      }
-    },
+  /**
+   * The injected action for handling submit action
+   * @public
+   */
+  submitAction: () => {},
 
-    /**
-     * Invokes the passed cancel closure action
-     */
-    cancelAction() {
-      const action = this.attrs.cancelAction;
-      if (action) {
-        return action();
-      }
-    },
-
-    /**
-     * Performs the cancel action and closes the modal
-     */
-    async onCancel() {
-      await this.send('cancelAction');
-    },
-
-    /**
-     * Performs the submit action and closes the modal
-     */
-    async onSubmit() {
-      await this.send('submitAction');
-    }
-  }
+  /**
+   * The injected action for handling cancel action
+   * @public
+   */
+  cancelAction: () => {}
 });

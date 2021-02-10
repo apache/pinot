@@ -36,29 +36,27 @@ export default Component.extend({
        { groupName: 'Selected Metrics', options: [{alias:'one', id: '1'}, {alias:'two', id: '2'}, {alias:'three', id: '3'}] }
      ]
    */
-  recommendedMetrics: computed(
-    'entities', 'selectedUrns',
-    function() {
-      const { selectedUrns, entities } = this.getProperties('selectedUrns', 'entities');
+  recommendedMetrics: computed('entities', 'selectedUrns', function () {
+    const { selectedUrns, entities } = this.getProperties('selectedUrns', 'entities');
 
-      // NOTE: all of this is very hacky as it merges data from two different sources - entities and the autocomplete
+    // NOTE: all of this is very hacky as it merges data from two different sources - entities and the autocomplete
 
-      const selectedMetrics = filterPrefix(selectedUrns, 'thirdeye:metric:')
-        .filter(urn => urn in entities)
-        .map((urn) => {
-          const entity = entities[urn];
-          const labelParts = entity.label.split('::');
-          return {
-            alias: entity.label,
-            urn: entity.urn,
-            name: toMetricLabel(urn, entities),
-            dataset: labelParts[0],
-            isSelected: true
-          };
-        });
+    const selectedMetrics = filterPrefix(selectedUrns, 'thirdeye:metric:')
+      .filter((urn) => urn in entities)
+      .map((urn) => {
+        const entity = entities[urn];
+        const labelParts = entity.label.split('::');
+        return {
+          alias: entity.label,
+          urn: entity.urn,
+          name: toMetricLabel(urn, entities),
+          dataset: labelParts[0],
+          isSelected: true
+        };
+      });
 
-      const relatedMetrics = filterPrefix(Object.keys(entities), 'thirdeye:metric:')
-      .filter(urn => urn in entities && !selectedUrns.has(urn))
+    const relatedMetrics = filterPrefix(Object.keys(entities), 'thirdeye:metric:')
+      .filter((urn) => urn in entities && !selectedUrns.has(urn))
       .map((urn) => {
         const entity = entities[urn];
         const labelParts = entity.label.split('::');
@@ -71,29 +69,24 @@ export default Component.extend({
         };
       });
 
-      return [
-        { groupName: 'Selected Metrics', options: _.sortBy(selectedMetrics || [], (row) => row.alias) },
-        { groupName: 'Related Metrics', options: _.sortBy(relatedMetrics || [], (row) => row.alias) }
-      ];
-    }
-  ),
+    return [
+      { groupName: 'Selected Metrics', options: _.sortBy(selectedMetrics || [], (row) => row.alias) },
+      { groupName: 'Related Metrics', options: _.sortBy(relatedMetrics || [], (row) => row.alias) }
+    ];
+  }),
 
   /**
    * Ember concurrency task that triggers the metric autocomplete
    */
   searchMetrics: task(function* (metric) {
     yield timeout(1000);
-    return fetch(autocompleteAPI.metric(metric))
-      .then(checkStatus);
+    return fetch(autocompleteAPI.metric(metric)).then(checkStatus);
   }),
 
   didReceiveAttrs() {
     this._super(...arguments);
 
-    const {
-      selectedUrn,
-      selectedUrnCache
-    } = this.getProperties('selectedUrn', 'selectedUrnCache');
+    const { selectedUrn, selectedUrnCache } = this.getProperties('selectedUrn', 'selectedUrnCache');
 
     if (!_.isEqual(selectedUrn, selectedUrnCache)) {
       this.set('selectedUrnCache', selectedUrn);
@@ -126,10 +119,14 @@ export default Component.extend({
      */
     onChange(metric) {
       const { onSelection } = this.getProperties('onSelection');
-      if (!onSelection) { return; }
+      if (!onSelection) {
+        return;
+      }
 
       const { urn, id } = metric;
-      if (!urn && !id) { return; }
+      if (!urn && !id) {
+        return;
+      }
 
       const metricUrn = urn ? urn : `thirdeye:metric:${id}`;
 
@@ -143,10 +140,12 @@ export default Component.extend({
      * @param {Object} selectObj - metric selected
      */
     onFocus(selectObj) {
-      const {
-        selectionEditable,
-        searchInputSelector
-      } = getProperties(this, 'onFocus', 'selectionEditable', 'searchInputSelector');
+      const { selectionEditable, searchInputSelector } = getProperties(
+        this,
+        'onFocus',
+        'selectionEditable',
+        'searchInputSelector'
+      );
       if (selectionEditable && selectObj.isActive && selectObj.selected) {
         const selectInputEl = document.querySelector(searchInputSelector);
         selectInputEl.value = selectObj.selected.alias;

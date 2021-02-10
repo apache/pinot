@@ -140,6 +140,7 @@ export default Component.extend({
     info.mape = floatToPercent(NaN); // set default to Nan
     let rule = selectedRule ? selectedRule.detectorName : null;
     info.status = 'Unknown';
+    // TODO: refactor nested if statement
     // 3 possibilities: selectedRule, no selectedRule and rules available, no rules available
     if (health && health.regressionStatus && typeof health.regressionStatus === 'object') {
       const regressionStatus = health.regressionStatus;

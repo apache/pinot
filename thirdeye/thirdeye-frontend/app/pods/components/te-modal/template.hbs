@@ -15,7 +15,7 @@
           </div>
           {{#if isCancellable}}
             <div class="te-modal__close-icon">
-              <button {{action "onCancel"}} class="thirdeye-link thirdeye-link--tertiary thirdeye-link--muted" title="cancel">
+              <button {{action cancelAction}} class="thirdeye-link thirdeye-link--tertiary thirdeye-link--muted" title="cancel">
                 <span class="thirdeye-link__icon">
                   <i class="glyphicon glyphicon-remove"></i>
                 </span>
@@ -34,12 +34,12 @@
           {{footerText}}
 
           {{#unless noButtons}}
-            <button {{action "onCancel"}} type="Cancel" class="te-button te-button--small te-button--muted btn">
+            <button {{action cancelAction}} type="Cancel" class="te-button te-button--small te-button--muted btn">
               {{cancelButtonText}}
             </button>
 
             {{#unless hideSubmit}}
-              <button {{action "onSubmit"}} type="submit" class="te-button te-button--small te-button--submit btn" disabled={{isInvalid}}>
+              <button {{action submitAction}} type="submit" class="te-button te-button--small te-button--submit btn" disabled={{isInvalid}}>
                 {{submitButtonText}}
               </button>
             {{/unless}}

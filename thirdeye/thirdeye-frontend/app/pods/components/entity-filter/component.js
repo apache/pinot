@@ -30,11 +30,7 @@
  *
  * @exports entity-filter
  */
-import {
-  set,
-  get,
-  setProperties
-} from '@ember/object';
+import { set, get, setProperties } from '@ember/object';
 import { isPresent } from '@ember/utils';
 import Component from '@ember/component';
 import { autocompleteAPI } from 'thirdeye-frontend/utils/api/self-serve';
@@ -42,7 +38,6 @@ import { task, timeout } from 'ember-concurrency';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 
 export default Component.extend({
-
   /**
    * List of associated classes
    */
@@ -56,6 +51,7 @@ export default Component.extend({
   //
   // internal
   //
+  // eslint-disable-next-line ember/avoid-leaking-state-in-ember-objects
   mostRecentSearches: {}, // promise
 
   /**
@@ -82,7 +78,7 @@ export default Component.extend({
       // If any pre-selected items, bring them into the new filter object
       multiSelectKeys[tag] = block.selected ? block.selected : null;
       // Dedupe and remove null or empty values
-      filterKeys = Array.from(new Set(block.filterKeys.filter(value => isPresent(value) && value !== 'undefined')));
+      filterKeys = Array.from(new Set(block.filterKeys.filter((value) => isPresent(value) && value !== 'undefined')));
       // Generate a name and Id for each one based on provided filter keys
       if (block.type !== 'select') {
         filterKeys.forEach((filterName, index) => {
@@ -110,6 +106,7 @@ export default Component.extend({
    * Array containing the running list of all user-selected filters
    * @type {Array}
    */
+  // eslint-disable-next-line ember/avoid-leaking-state-in-ember-objects
   alertFilters: [],
 
   /**
@@ -117,35 +114,34 @@ export default Component.extend({
    */
   searchTypes: task(function* (type, text) {
     yield timeout(1000);
-    switch(type) {
+    switch (type) {
       case 'metric': {
         return fetch(autocompleteAPI.metric(text))
           .then(checkStatus)
-          .then(metrics => [...new Set(metrics.map(m => m.name))]);
+          .then((metrics) => [...new Set(metrics.map((m) => m.name))]);
       }
       case 'application': {
         return fetch(autocompleteAPI.application(text))
           .then(checkStatus)
-          .then(applications => applications.map(a => a.application));
+          .then((applications) => applications.map((a) => a.application));
       }
       case 'subscription': {
         return fetch(autocompleteAPI.subscriptionGroup(text))
           .then(checkStatus)
-          .then(groups => groups.map(g => g.name));
+          .then((groups) => groups.map((g) => g.name));
       }
       case 'owner': {
-        return fetch(autocompleteAPI.owner(text))
-          .then(checkStatus);
+        return fetch(autocompleteAPI.owner(text)).then(checkStatus);
       }
       case 'dataset': {
         return fetch(autocompleteAPI.dataset(text))
           .then(checkStatus)
-          .then(datasets =>  [...new Set(datasets.map(d => d.name))]);
+          .then((datasets) => [...new Set(datasets.map((d) => d.name))]);
       }
       case 'alertName': {
         return fetch(autocompleteAPI.alertByName(text))
           .then(checkStatus)
-          .then(detections => detections.map(d => d.name));
+          .then((detections) => detections.map((d) => d.name));
       }
     }
   }),
@@ -173,14 +169,14 @@ export default Component.extend({
         // Map selected status to array - will add to filter map
         selectedArr = filterObj.filtersArray.filterBy('isActive').mapBy('name');
         // Make sure 'Active' is selected by default when both are un-checked
-        if (filterObj.filtersArray.filter(item => item.isActive).length === 0) {
+        if (filterObj.filtersArray.filter((item) => item.isActive).length === 0) {
           selectedArr = ['Active'];
         }
       }
       // Handle 'global' or 'primary' filter field toggling
       if (filterObj.tag === 'primary') {
-        filterObj.filtersArray.forEach(filter => set(filter, 'isActive', false));
-        const activeFilter = filterObj.filtersArray.find(filter => filter.name === selectedItems);
+        filterObj.filtersArray.forEach((filter) => set(filter, 'isActive', false));
+        const activeFilter = filterObj.filtersArray.find((filter) => filter.name === selectedItems);
         set(activeFilter, 'isActive', true);
       }
 
