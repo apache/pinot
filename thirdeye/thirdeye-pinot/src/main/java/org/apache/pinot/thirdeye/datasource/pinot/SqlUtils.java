@@ -198,7 +198,7 @@ public class SqlUtils {
     return escapeSqlReservedKeywords(dimensionAsMetricPql);
   }
 
-  private static String escapeSqlReservedKeywords(String query) {
+  public static String escapeSqlReservedKeywords(String query) {
     // escape all reserve keywords with double quotes
     return RESERVED_KEYWORD_PATTERN.matcher(query).replaceAll(RESERVED_KEYWORD_REPLACEMENT);
   }
