@@ -62,7 +62,7 @@ import org.apache.pinot.core.segment.index.readers.Dictionary;
  */
 public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   // NOTE: map size = map capacity (power of 2) * load factor
-  private static final int INITIAL_MAP_SIZE = (int) ((1 << 10) * 0.75f);
+  private static final int INITIAL_MAP_SIZE = (int) ((1 << 9) * 0.75f);
   private static final int MAX_CACHING_MAP_SIZE = (int) ((1 << 20) * 0.75f);
 
   private static final ThreadLocal<IntGroupIdMap> THREAD_LOCAL_INT_MAP = ThreadLocal.withInitial(IntGroupIdMap::new);
@@ -143,7 +143,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         if (cardinalityProduct > arrayBasedThreshold) {
           // IntMapBasedHolder
           IntGroupIdMap groupIdMap = THREAD_LOCAL_INT_MAP.get();
-          groupIdMap.clear();
+          groupIdMap.clearAndTrim();
           _rawKeyHolder = new IntMapBasedHolder(groupIdMap);
         } else {
           _rawKeyHolder = new ArrayBasedHolder();
@@ -793,7 +793,12 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     private int _size;
 
     public IntGroupIdMap() {
-      _capacity = 1 << 10;
+      init();
+    }
+
+    private void init() {
+      // Initialize the map with capacity 512 so that the _keyValueHolder can fit into a single memory page
+      _capacity = 1 << 9;
       int holderSize = _capacity << 1;
       _keyValueHolder = new int[holderSize];
       _mask = holderSize - 1;
@@ -905,18 +910,16 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     /**
      * Clears the map and trims the map if the size is larger than the {@link #MAX_CACHING_MAP_SIZE}.
      */
-    public void clear() {
+    public void clearAndTrim() {
       if (_size == 0) {
         return;
       }
       if (_size <= MAX_CACHING_MAP_SIZE) {
+        // Clear the map
         Arrays.fill(_keyValueHolder, 0);
       } else {
-        _capacity = 1 << 10;
-        int holderSize = _capacity << 1;
-        _keyValueHolder = new int[holderSize];
-        _mask = holderSize - 1;
-        _maxNumEntries = (int) (_capacity * LOAD_FACTOR);
+        // Init the map (clear and trim)
+        init();
       }
       _size = 0;
     }
