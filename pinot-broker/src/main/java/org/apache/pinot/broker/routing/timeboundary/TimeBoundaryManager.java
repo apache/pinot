@@ -113,20 +113,11 @@ public class TimeBoundaryManager {
     long maxEndTimeMs = INVALID_END_TIME_MS;
     for (int i = 0; i < numSegments; i++) {
       String segment = segments.get(i);
-      long endTimeMs = extractEndTimeMs(segment, znRecords.get(i));
+      long endTimeMs = extractEndTimeMsFromSegmentZKMetadataZNRecord(segment, znRecords.get(i));
       _endTimeMsMap.put(segment, endTimeMs);
       maxEndTimeMs = Math.max(maxEndTimeMs, endTimeMs);
     }
     updateTimeBoundaryInfo(maxEndTimeMs);
-  }
-
-  private long extractEndTimeMs(String segment, @Nullable ZNRecord znRecord) {
-    long totalDocs = extractTotalDocsFromSegmentZKMetaZNRecord(segment, znRecord);
-    long endTimeMs = INVALID_END_TIME_MS;
-    if (totalDocs != 0) {
-      endTimeMs = extractEndTimeMsFromSegmentZKMetadataZNRecord(segment, znRecord);
-    }
-    return endTimeMs;
   }
 
   private long extractEndTimeMsFromSegmentZKMetadataZNRecord(String segment, @Nullable ZNRecord znRecord) {
@@ -134,23 +125,18 @@ public class TimeBoundaryManager {
       LOGGER.warn("Failed to find segment ZK metadata for segment: {}, table: {}", segment, _offlineTableName);
       return INVALID_END_TIME_MS;
     }
-
-    long endTime = znRecord.getLongField(CommonConstants.Segment.END_TIME, -1);
-    if (endTime > 0) {
-      TimeUnit timeUnit = znRecord.getEnumField(CommonConstants.Segment.TIME_UNIT, TimeUnit.class, TimeUnit.DAYS);
-      return timeUnit.toMillis(endTime);
-    } else {
-      LOGGER.warn("Failed to find valid end time for segment: {}, table: {}", segment, _offlineTableName);
-      return INVALID_END_TIME_MS;
+    long totalDocs = znRecord.getLongField(CommonConstants.Segment.TOTAL_DOCS, -1);
+    long endTimeMs = INVALID_END_TIME_MS;
+    if (totalDocs != 0) {
+      long endTime = znRecord.getLongField(CommonConstants.Segment.END_TIME, -1);
+      if (endTime > 0) {
+        TimeUnit timeUnit = znRecord.getEnumField(CommonConstants.Segment.TIME_UNIT, TimeUnit.class, TimeUnit.DAYS);
+        endTimeMs = timeUnit.toMillis(endTime);
+      } else {
+        LOGGER.warn("Failed to find valid end time for segment: {}, table: {}", segment, _offlineTableName);
+      }
     }
-  }
-
-  private long extractTotalDocsFromSegmentZKMetaZNRecord(String segment, @Nullable ZNRecord znRecord) {
-    if (znRecord == null) {
-      LOGGER.warn("Failed to find segment ZK metadata for segment: {}, table: {}", segment, _offlineTableName);
-      return -1;
-    }
-    return znRecord.getLongField(CommonConstants.Segment.TOTAL_DOCS, -1);
+    return endTimeMs;
   }
 
   private void updateTimeBoundaryInfo(long maxEndTimeMs) {
@@ -180,7 +166,7 @@ public class TimeBoundaryManager {
   public synchronized void onExternalViewChange(ExternalView externalView, IdealState idealState,
       Set<String> onlineSegments) {
     for (String segment : onlineSegments) {
-      _endTimeMsMap.computeIfAbsent(segment, k -> extractEndTimeMs(segment,
+      _endTimeMsMap.computeIfAbsent(segment, k -> extractEndTimeMsFromSegmentZKMetadataZNRecord(segment,
           _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT)));
     }
     _endTimeMsMap.keySet().retainAll(onlineSegments);
@@ -199,7 +185,7 @@ public class TimeBoundaryManager {
    * Refreshes the metadata for the given segment (called when segment is getting refreshed).
    */
   public synchronized void refreshSegment(String segment) {
-    _endTimeMsMap.put(segment, extractEndTimeMs(segment,
+    _endTimeMsMap.put(segment, extractEndTimeMsFromSegmentZKMetadataZNRecord(segment,
         _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT)));
     updateTimeBoundaryInfo(getMaxEndTimeMs());
   }
