@@ -194,6 +194,17 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
     }
     File localTempDir = new File(FileUtils.getTempDirectory(), "pinot-" + UUID.randomUUID());
     try {
+      //create localTempDir for input and output
+      File localInputTempDir = new File(localTempDir, "input");
+      FileUtils.forceMkdir(localInputTempDir);
+      File localOutputTempDir = new File(localTempDir, "output");
+      FileUtils.forceMkdir(localOutputTempDir);
+
+      //Read TableConfig, Schema
+      Schema schema = SegmentGenerationUtils.getSchema(_spec.getTableSpec().getSchemaURI(), _spec.getAuthToken());
+      TableConfig tableConfig =
+          SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), _spec.getAuthToken());
+
       int numInputFiles = filteredFiles.size();
       _segmentCreationTaskCountDownLatch = new CountDownLatch(numInputFiles);
 

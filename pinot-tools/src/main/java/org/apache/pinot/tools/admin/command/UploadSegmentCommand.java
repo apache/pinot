@@ -58,6 +58,9 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
   @Option(name = "-password", required = false, metaVar = "<String>", usage = "Password for basic auth.")
   private String _password;
 
+  @Option(name = "-authToken", required = false, metaVar = "<String>", usage = "Http auth token.")
+  private String _authToken;
+
   @Option(name = "-segmentDir", required = true, metaVar = "<string>", usage = "Path to segment directory.")
   private String _segmentDir = null;
 
@@ -119,6 +122,11 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
     return this;
   }
 
+  public UploadSegmentCommand setAuthToken(String authToken) {
+    _authToken = authToken;
+    return this;
+  }
+
   public UploadSegmentCommand setSegmentDir(String segmentDir) {
     _segmentDir = segmentDir;
     return this;
@@ -159,7 +167,7 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
         LOGGER.info("Uploading segment tar file: {}", segmentTarFile);
         fileUploadDownloadClient
             .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile,
-                makeBasicAuth(_user, _password), Collections.singletonList(new BasicNameValuePair(
+                makeAuthHeader(makeAuthToken(_authToken, _user, _password)), Collections.singletonList(new BasicNameValuePair(
                     FileUploadDownloadClient.QueryParameters.TABLE_NAME, _tableName)),
                 FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
       }

@@ -118,7 +118,7 @@ public class BootstrapTableTool {
     return new AddTableCommand().setSchemaFile(schemaFile.getAbsolutePath())
         .setTableConfigFile(tableConfigFile.getAbsolutePath()).setControllerProtocol(_controllerProtocol)
         .setControllerHost(_controllerHost).setControllerPort(String.valueOf(_controllerPort)).setExecute(true)
-        .execute();
+        .setAuthToken(_token).execute();
   }
 
   private boolean bootstrapOfflineTable(File setupTableTmpDir, String tableName, File schemaFile,
@@ -177,6 +177,8 @@ public class BootstrapTableTool {
             TlsUtils.installDefaultSSLSocketFactory(tlsSpec.getKeyStorePath(), tlsSpec.getKeyStorePassword(),
                 tlsSpec.getTrustStorePath(), tlsSpec.getTrustStorePassword());
           }
+
+          spec.setAuthToken(_token);
 
           IngestionJobLauncher.runIngestionJob(spec);
         }

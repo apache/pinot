@@ -26,8 +26,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
+import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -50,6 +53,10 @@ public class SegmentGenerationUtils {
   }
 
   public static Schema getSchema(String schemaURIString) {
+    return getSchema(schemaURIString, null);
+  }
+
+  public static Schema getSchema(String schemaURIString, String authToken) {
     URI schemaURI;
     try {
       schemaURI = new URI(schemaURIString);
@@ -75,7 +82,7 @@ public class SegmentGenerationUtils {
     } else {
       // Try to directly read from URI.
       try {
-        schemaJson = IOUtils.toString(schemaURI, StandardCharsets.UTF_8);
+        schemaJson = fetchUrl(schemaURI.toURL(), authToken);
       } catch (IOException e) {
         throw new RuntimeException("Failed to read from Schema URI - '" + schemaURI + "'", e);
       }
@@ -88,6 +95,10 @@ public class SegmentGenerationUtils {
   }
 
   public static TableConfig getTableConfig(String tableConfigURIStr) {
+    return getTableConfig(tableConfigURIStr, null);
+  }
+
+  public static TableConfig getTableConfig(String tableConfigURIStr, String authToken) {
     URI tableConfigURI;
     try {
       tableConfigURI = new URI(tableConfigURIStr);
@@ -106,7 +117,7 @@ public class SegmentGenerationUtils {
       }
     } else {
       try {
-        tableConfigJson = IOUtils.toString(tableConfigURI, StandardCharsets.UTF_8);
+        tableConfigJson = fetchUrl(tableConfigURI.toURL(), authToken);
       } catch (IOException e) {
         throw new RuntimeException(
             "Failed to read from table config file data stream on Pinot fs - '" + tableConfigURI + "'", e);
@@ -142,7 +153,8 @@ public class SegmentGenerationUtils {
   public static URI getRelativeOutputPath(URI baseInputDir, URI inputFile, URI outputDir) {
     URI relativePath = baseInputDir.relativize(inputFile);
     Preconditions.checkState(relativePath.getPath().length() > 0 && !relativePath.equals(inputFile),
-        "Unable to extract out the relative path for input file '" + inputFile + "', based on base input path: " + baseInputDir);
+        "Unable to extract out the relative path for input file '" + inputFile + "', based on base input path: "
+            + baseInputDir);
     String outputDirStr = outputDir.toString();
     outputDir = !outputDirStr.endsWith("/") ? URI.create(outputDirStr.concat("/")) : outputDir;
     URI relativeOutputURI = outputDir.resolve(relativePath).resolve(".");
@@ -176,10 +188,11 @@ public class SegmentGenerationUtils {
       throws URISyntaxException {
     URI fileURI = URI.create(uriStr);
     if (fileURI.getScheme() == null) {
-      return new URI(fullUriForPathOnlyUriStr.getScheme(), fullUriForPathOnlyUriStr.getUserInfo(), fullUriForPathOnlyUriStr.getHost(),
-          fullUriForPathOnlyUriStr.getPort(), fileURI.getPath(), fileURI.getQuery(), fileURI.getFragment());
+      return new URI(fullUriForPathOnlyUriStr.getScheme(), fullUriForPathOnlyUriStr.getUserInfo(),
+          fullUriForPathOnlyUriStr.getHost(), fullUriForPathOnlyUriStr.getPort(), fileURI.getPath(), fileURI.getQuery(),
+          fileURI.getFragment());
     }
-    
+
     return fileURI;
   }
 
@@ -197,5 +210,23 @@ public class SegmentGenerationUtils {
       uri = new File(uriStr).toURI();
     }
     return uri;
+  }
+
+  /**
+   * Retrieve a URL via GET request, with an optional authorization token.
+   *
+   * @param url target url
+   * @param authToken optional auth token, or null
+   * @return fetched document
+   * @throws IOException on connection problems
+   */
+  private static String fetchUrl(URL url, String authToken)
+      throws IOException {
+    URLConnection connection = url.openConnection();
+
+    if (StringUtils.isNotBlank(authToken)) {
+      connection.setRequestProperty("Authorization", authToken);
+    }
+    return IOUtils.toString(connection.getInputStream(), StandardCharsets.UTF_8);
   }
 }

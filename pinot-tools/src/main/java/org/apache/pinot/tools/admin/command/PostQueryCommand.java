@@ -21,8 +21,8 @@ package org.apache.pinot.tools.admin.command;
 import java.util.Collections;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Broker.Request;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.common.utils.NetUtil;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
@@ -53,6 +53,9 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
   @Option(name = "-password", required = false, metaVar = "<String>", usage = "Password for basic auth.")
   private String _password;
 
+  @Option(name = "-authToken", required = false, metaVar = "<String>", usage = "Http auth token.")
+  private String _authToken;
+
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
@@ -68,8 +71,8 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
 
   @Override
   public String toString() {
-    return ("PostQuery -brokerProtocol " + _brokerProtocol + " -brokerHost " + _brokerHost + " -brokerPort " +
-        _brokerPort + " -queryType " + _queryType + " -query " + _query);
+    return ("PostQuery -brokerProtocol " + _brokerProtocol + " -brokerHost " + _brokerHost + " -brokerPort "
+        + _brokerPort + " -queryType " + _queryType + " -query " + _query);
   }
 
   @Override
@@ -107,6 +110,11 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
     return this;
   }
 
+  public PostQueryCommand setauthToken(String authToken) {
+    _authToken = authToken;
+    return this;
+  }
+
   public PostQueryCommand setQueryType(String queryType) {
     _queryType = queryType;
     return this;
@@ -133,7 +141,7 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
       request = JsonUtils.objectToString(Collections.singletonMap(Request.PQL, _query));
     }
 
-    return sendRequest("POST", urlString, request, makeBasicAuth(_user, _password));
+    return sendRequest("POST", urlString, request, makeAuthHeader(makeAuthToken(_authToken, _user, _password)));
   }
 
   @Override

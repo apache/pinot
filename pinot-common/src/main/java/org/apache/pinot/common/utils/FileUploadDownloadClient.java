@@ -58,6 +58,7 @@ import org.apache.http.entity.mime.content.FileBody;
 import org.apache.http.entity.mime.content.InputStreamBody;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
@@ -340,7 +341,14 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   private static HttpUriRequest getDownloadFileRequest(URI uri, int socketTimeoutMs) {
+    return getDownloadFileRequest(uri, socketTimeoutMs, null);
+  }
+
+  private static HttpUriRequest getDownloadFileRequest(URI uri, int socketTimeoutMs, String authToken) {
     RequestBuilder requestBuilder = RequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
+    if (StringUtils.isNotBlank(authToken)) {
+      requestBuilder.addHeader("Authorization", authToken);
+    }
     setTimeout(requestBuilder, socketTimeoutMs);
     String userInfo = uri.getUserInfo();
     if (userInfo != null) {
@@ -687,7 +695,23 @@ public class FileUploadDownloadClient implements Closeable {
    */
   public int downloadFile(URI uri, int socketTimeoutMs, File dest)
       throws IOException, HttpErrorStatusException {
-    HttpUriRequest request = getDownloadFileRequest(uri, socketTimeoutMs);
+    return downloadFile(uri, socketTimeoutMs, dest, null);
+  }
+
+  /**
+   * Download a file using default settings, with an optional auth token
+   *
+   * @param uri URI
+   * @param socketTimeoutMs Socket timeout in milliseconds
+   * @param dest File destination
+   * @param authToken optional auth token, or null
+   * @return Response status code
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public int downloadFile(URI uri, int socketTimeoutMs, File dest, String authToken)
+      throws IOException, HttpErrorStatusException {
+    HttpUriRequest request = getDownloadFileRequest(uri, socketTimeoutMs, authToken);
     try (CloseableHttpResponse response = _httpClient.execute(request)) {
       StatusLine statusLine = response.getStatusLine();
       int statusCode = statusLine.getStatusCode();
@@ -728,6 +752,21 @@ public class FileUploadDownloadClient implements Closeable {
     return downloadFile(uri, DEFAULT_SOCKET_TIMEOUT_MS, dest);
   }
 
+  /**
+   * Download a file, with an optional auth token.
+   *
+   * @param uri URI
+   * @param dest File destination
+   * @param authToken optional auth token, or null
+   * @return Response status code
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public int downloadFile(URI uri, File dest, String authToken)
+      throws IOException, HttpErrorStatusException {
+    return downloadFile(uri, DEFAULT_SOCKET_TIMEOUT_MS, dest, authToken);
+  }
+
   @Override
   public void close()
       throws IOException {
@@ -741,5 +780,18 @@ public class FileUploadDownloadClient implements Closeable {
    */
   public static void installDefaultSSLContext(SSLContext sslContext) {
     _defaultSSLContext = sslContext;
+  }
+
+  /**
+   * Generate an (optional) HTTP Authorization header given an auth token
+   *
+   * @param authToken auth token
+   * @return list of 0 or 1 "Authorization" headers
+   */
+  public static List<Header> makeAuthHeader(String authToken) {
+    if (org.apache.commons.lang3.StringUtils.isBlank(authToken)) {
+      return Collections.emptyList();
+    }
+    return Collections.singletonList(new BasicHeader("Authorization", authToken));
   }
 }

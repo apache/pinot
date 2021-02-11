@@ -19,16 +19,18 @@
 package org.apache.pinot.broker.broker;
 
 import com.google.common.base.Preconditions;
-import javax.annotation.Nullable;
-import org.apache.commons.lang3.StringUtils;
+import java.util.Collection;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.core.auth.BasicAuthPrincipal;
+import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import java.nio.charset.StandardCharsets;
-import java.util.*;
-import java.util.stream.Collectors;
 
 
 /**
@@ -43,10 +45,7 @@ import java.util.stream.Collectors;
  * </pre>
  */
 public class BasicAuthAccessControlFactory extends AccessControlFactory {
-  private static final String PRINCIPALS = "principals";
-  private static final String PASSWORD = "password";
-  private static final String TABLES = "tables";
-  private static final String TABLES_ALL = "*";
+  private static final String PREFIX = "principals";
 
   private static final String HEADER_AUTHORIZATION = "authorization";
 
@@ -57,26 +56,7 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
   }
 
   public void init(PinotConfiguration configuration) {
-    String principalNames = configuration.getProperty(PRINCIPALS);
-    Preconditions.checkArgument(StringUtils.isNotBlank(principalNames), "must provide principals");
-
-    List<BasicAuthPrincipal> principals = Arrays.stream(principalNames.split(",")).map(rawName -> {
-      String name = rawName.trim();
-      Preconditions.checkArgument(StringUtils.isNotBlank(name), "%s is not a valid name", name);
-
-      String password = configuration.getProperty(String.format("%s.%s.%s", PRINCIPALS, name, PASSWORD));
-      Preconditions.checkArgument(StringUtils.isNotBlank(password), "must provide a password for %s", name);
-
-      Set<String> tables = new HashSet<>();
-      String tableNames = configuration.getProperty(String.format("%s.%s.%s", PRINCIPALS, name, TABLES));
-      if (StringUtils.isNotBlank(tableNames) && !TABLES_ALL.equals(tableNames)) {
-        tables.addAll(Arrays.asList(tableNames.split(",")));
-      }
-
-      return new BasicAuthPrincipal(name, toToken(name, password), tables);
-    }).collect(Collectors.toList());
-
-    _accessControl = new BasicAuthAccessControl(principals);
+    _accessControl = new BasicAuthAccessControl(BasicAuthUtils.extractBasicAuthPrincipals(configuration, PREFIX));
   }
 
   public AccessControl create() {
@@ -100,8 +80,8 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
 
       Collection<String> tokens = identity.getHttpHeaders().get(HEADER_AUTHORIZATION);
       Optional<BasicAuthPrincipal> principalOpt =
-          tokens.stream().map(BasicAuthAccessControlFactory::normalizeToken).map(_principals::get)
-              .filter(Objects::nonNull).findFirst();
+          tokens.stream().map(BasicAuthUtils::normalizeBase64Token).map(_principals::get).filter(Objects::nonNull)
+              .findFirst();
 
       if (!principalOpt.isPresent()) {
         // no matching token? reject
@@ -109,61 +89,12 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       }
 
       BasicAuthPrincipal principal = principalOpt.get();
-      if (principal.getTables().isEmpty() || !brokerRequest.isSetQuerySource() || !brokerRequest.getQuerySource()
-          .isSetTableName()) {
+      if (!brokerRequest.isSetQuerySource() || !brokerRequest.getQuerySource().isSetTableName()) {
         // no table restrictions? accept
         return true;
       }
 
-      return principal.getTables().contains(brokerRequest.getQuerySource().getTableName());
+      return principal.hasTable(brokerRequest.getQuerySource().getTableName());
     }
-  }
-
-  /**
-   * Container object for basic auth principal
-   */
-  private static class BasicAuthPrincipal {
-    private final String _name;
-    private final String _token;
-    private final Set<String> _tables;
-
-    public BasicAuthPrincipal(String name, String token, Set<String> tables) {
-      _name = name;
-      _token = token;
-      _tables = tables;
-    }
-
-    public String getName() {
-      return _name;
-    }
-
-    public Set<String> getTables() {
-      return _tables;
-    }
-
-    public String getToken() {
-      return _token;
-    }
-  }
-
-  private static String toToken(String name, String password) {
-    String identifier = String.format("%s:%s", name, password);
-    return normalizeToken(
-        String.format("Basic %s", Base64.getEncoder().encodeToString(identifier.getBytes(StandardCharsets.UTF_8))));
-  }
-
-  /**
-   * Implementations of base64 encoding vary and may generate different numbers of padding characters "=". We normalize
-   * these by removing any padding.
-   *
-   * @param token raw token
-   * @return normalized token
-   */
-  @Nullable
-  private static String normalizeToken(String token) {
-    if (token == null) {
-      return null;
-    }
-    return StringUtils.remove(token.trim(), '=');
   }
 }

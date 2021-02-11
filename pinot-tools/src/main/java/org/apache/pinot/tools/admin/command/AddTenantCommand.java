@@ -67,6 +67,9 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
   @Option(name = "-password", required = false, metaVar = "<String>", usage = "Password for basic auth.")
   private String _password;
 
+  @Option(name = "-authToken", required = false, metaVar = "<String>", usage = "Http auth token.")
+  private String _authToken;
+
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
@@ -112,6 +115,11 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
     return this;
   }
 
+  public AddTenantCommand setAuthToken(String authToken) {
+    _authToken = authToken;
+    return this;
+  }
+
   public AddTenantCommand setExecute(boolean exec) {
     _exec = exec;
     return this;
@@ -137,7 +145,7 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
     Tenant tenant = new Tenant(_role, _name, _instanceCount, _offlineInstanceCount, _realtimeInstanceCount);
     String res = AbstractBaseAdminCommand
         .sendRequest("POST", ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTenantCreate(),
-            tenant.toJsonString(), makeBasicAuth(_user, _password));
+            tenant.toJsonString(), makeAuthHeader(makeAuthToken(_authToken, _user, _password)));
 
     LOGGER.info(res);
     System.out.print(res);

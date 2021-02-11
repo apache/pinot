@@ -60,6 +60,9 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
   @Option(name = "-password", required = false, metaVar = "<String>", usage = "Password for basic auth.")
   private String _password;
 
+  @Option(name = "-authToken", required = false, metaVar = "<String>", usage = "Http auth token.")
+  private String _authToken;
+
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
@@ -80,10 +83,9 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
 
   @Override
   public String toString() {
-    String retString =
-        ("AddSchema -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost
-            + " -controllerPort " + _controllerPort + " -schemaFile " + _schemaFile + " -user " + _user + " -password "
-                + "[hidden]");
+    String retString = ("AddSchema -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost
+        + " -controllerPort " + _controllerPort + " -schemaFile " + _schemaFile + " -user " + _user + " -password "
+        + "[hidden]");
 
     return ((_exec) ? (retString + " -exec") : retString);
   }
@@ -114,11 +116,15 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
   }
 
   public void setUser(String user) {
-    this._user = user;
+    _user = user;
   }
 
   public void setPassword(String password) {
-    this._password = password;
+    _password = password;
+  }
+
+  public void setAuthToken(String authToken) {
+    _authToken = authToken;
   }
 
   public AddSchemaCommand setExecute(boolean exec) {
@@ -147,9 +153,10 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
 
     Schema schema = Schema.fromFile(schemaFile);
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-      fileUploadDownloadClient.addSchema(
-          FileUploadDownloadClient.getUploadSchemaURI(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort)),
-          schema.getSchemaName(), schemaFile, makeBasicAuth(_user, _password), Collections.emptyList());
+      fileUploadDownloadClient.addSchema(FileUploadDownloadClient
+              .getUploadSchemaURI(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort)),
+          schema.getSchemaName(), schemaFile, makeAuthHeader(makeAuthToken(_authToken, _user, _password)),
+          Collections.emptyList());
     } catch (Exception e) {
       LOGGER.error("Got Exception to upload Pinot Schema: " + schema.getSchemaName(), e);
       return false;

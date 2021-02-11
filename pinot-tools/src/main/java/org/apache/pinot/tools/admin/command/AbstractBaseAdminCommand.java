@@ -31,10 +31,13 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
+import javax.annotation.Nullable;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.Header;
 import org.apache.http.message.BasicHeader;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.utils.PinotConfigUtils;
 
@@ -83,10 +86,9 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
     final URL url = new URL(urlString);
     final HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 
-    conn.setDoOutput(true);
+    headers.forEach(header -> conn.setRequestProperty(header.getName(), header.getValue()));
     conn.setRequestMethod(requestMethod);
-    headers.stream().flatMap(header -> Arrays.stream(header.getElements()))
-            .forEach(elem -> conn.setRequestProperty(elem.getName(), elem.getValue()));
+    conn.setDoOutput(true);
     if (payload != null) {
       final BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(),
           StandardCharsets.UTF_8));
@@ -123,16 +125,35 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
     return PinotConfigUtils.readConfigFromFile(configFileName);
   }
 
-  static List<Header> makeBasicAuth(String user, String password) {
-    if (StringUtils.isBlank(user)) {
-      return Collections.emptyList();
+  /**
+   * Generate an (optional) HTTP Authorization header given an auth token
+   * @see FileUploadDownloadClient#makeAuthHeader(String)
+   *
+   * @param authToken auth token
+   * @return list of 0 or 1 "Authorization" headers
+   */
+  static List<Header> makeAuthHeader(String authToken) {
+    return FileUploadDownloadClient.makeAuthHeader(authToken);
+  }
+
+  /**
+   * Generate auth token from pass-thru token or generate basic auth from user/password pair
+   *
+   * @param authToken optional pass-thru token
+   * @param user optional username
+   * @param password optional password
+   * @return auth token, or null if neither pass-thru token nor user info available
+   */
+  @Nullable
+  static String makeAuthToken(String authToken, String user, String password) {
+    if (StringUtils.isNotBlank(authToken)) {
+      return authToken;
     }
 
-    if (StringUtils.isBlank(password)) {
-      password = "";
+    if (StringUtils.isNotBlank(user)) {
+      return BasicAuthUtils.toBasicAuthToken(user, password);
     }
 
-    String token = "Basic " + Base64.getEncoder().encodeToString((user + ":" + password).getBytes());
-    return Collections.singletonList(new BasicHeader("Authorization", token));
+    return null;
   }
 }

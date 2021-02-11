@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -202,9 +203,10 @@ public class QuickstartRunner {
 
   public void bootstrapTable()
       throws Exception {
+    String token = BasicAuthUtils.toBasicAuthToken("admin", "verysecret");
     for (QuickstartTableRequest request : _tableRequests) {
       if (!new BootstrapTableTool("http", InetAddress.getLocalHost().getHostName(), _controllerPorts.get(0),
-          request.getBootstrapTableDir(), null).execute()) {
+          request.getBootstrapTableDir(), token).execute()) {
         throw new RuntimeException("Failed to bootstrap table with request - " + request);
       }
     }

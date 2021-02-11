@@ -18,13 +18,16 @@
  */
 package org.apache.pinot.controller.api.access;
 
-import com.google.common.base.Preconditions;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.spi.env.PinotConfiguration;
-
-import javax.ws.rs.core.HttpHeaders;
-import java.util.*;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
+import javax.ws.rs.core.HttpHeaders;
+import org.apache.pinot.core.auth.BasicAuthPrincipal;
+import org.apache.pinot.core.auth.BasicAuthUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
@@ -41,43 +44,13 @@ import java.util.stream.Collectors;
  */
 public class BasicAuthAccessControlFactory implements AccessControlFactory {
   private static final String PREFIX = "controller.admin.access.control.principals";
-  private static final String PASSWORD = "password";
-  private static final String PERMISSIONS = "permissions";
-  private static final String TABLES = "tables";
-  private static final String ALL = "*";
 
   private static final String HEADER_AUTHORIZATION = "Authorization";
 
   private AccessControl _accessControl;
 
   public void init(PinotConfiguration configuration) {
-    String principalNames = configuration.getProperty(PREFIX);
-    Preconditions.checkArgument(StringUtils.isNotBlank(principalNames), "must provide principals");
-
-    List<BasicAuthPrincipal> principals = Arrays.stream(principalNames.split(",")).map(rawName -> {
-      String name = rawName.trim();
-      Preconditions.checkArgument(StringUtils.isNotBlank(name), "%s is not a valid name", name);
-
-      String password = configuration.getProperty(String.format("%s.%s.%s", PREFIX, name, PASSWORD));
-      Preconditions.checkArgument(StringUtils.isNotBlank(password), "must provide a password for %s", name);
-
-      Set<String> tables = new HashSet<>();
-      String tableNames = configuration.getProperty(String.format("%s.%s.%s", PREFIX, name, TABLES));
-      if (StringUtils.isNotBlank(tableNames) && !ALL.equals(tableNames)) {
-        tables = Arrays.stream(tableNames.split(",")).map(String::trim).collect(Collectors.toSet());
-      }
-
-      Set<AccessType> permissions = new HashSet<>();
-      String permissionNames = configuration.getProperty(String.format("%s.%s.%s", PREFIX, name, PERMISSIONS));
-      if (StringUtils.isNotBlank(permissionNames) && !ALL.equals(tableNames)) {
-        permissions = Arrays.stream(permissionNames.split(",")).map(String::trim).map(String::toUpperCase)
-                .map(AccessType::valueOf).collect(Collectors.toSet());
-      }
-
-      return new BasicAuthPrincipal(name, toToken(name, password), tables, permissions);
-    }).collect(Collectors.toList());
-
-    _accessControl = new BasicAuthAccessControl(principals);
+    _accessControl = new BasicAuthAccessControl(BasicAuthUtils.extractBasicAuthPrincipals(configuration, PREFIX));
   }
 
   @Override
@@ -97,67 +70,40 @@ public class BasicAuthAccessControlFactory implements AccessControlFactory {
 
     @Override
     public boolean hasDataAccess(HttpHeaders httpHeaders, String tableName) {
+      Optional<BasicAuthPrincipal> principal = getPrincipal(httpHeaders);
+      boolean response = getPrincipal(httpHeaders).filter(p -> p.hasTable(tableName)).isPresent();
       return getPrincipal(httpHeaders).filter(p -> p.hasTable(tableName)).isPresent();
     }
 
     @Override
     public boolean hasAccess(String tableName, AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
-      return getPrincipal(httpHeaders).filter(p -> p.hasTable(tableName) && p.hasPermission(accessType)).isPresent();
+      Optional<BasicAuthPrincipal> principal = getPrincipal(httpHeaders);
+      boolean response =
+          getPrincipal(httpHeaders).filter(p -> p.hasTable(tableName) && p.hasPermission(Objects.toString(accessType)))
+              .isPresent();
+      return getPrincipal(httpHeaders)
+          .filter(p -> p.hasTable(tableName) && p.hasPermission(Objects.toString(accessType))).isPresent();
     }
 
     @Override
     public boolean hasAccess(AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
+      Optional<BasicAuthPrincipal> principal = getPrincipal(httpHeaders);
+      boolean response = getPrincipal(httpHeaders).isPresent();
       return getPrincipal(httpHeaders).isPresent();
     }
 
     private Optional<BasicAuthPrincipal> getPrincipal(HttpHeaders headers) {
-      return headers.getRequestHeader(HEADER_AUTHORIZATION).stream().map(BasicAuthAccessControlFactory::normalizeToken)
-              .map(_principals::get).filter(Objects::nonNull).findFirst();
+      if (headers == null) {
+        return Optional.empty();
+      }
+
+      List<String> authHeaders = headers.getRequestHeader(HEADER_AUTHORIZATION);
+      if (authHeaders == null) {
+        return Optional.empty();
+      }
+
+      return authHeaders.stream().map(BasicAuthUtils::normalizeBase64Token).map(_principals::get)
+          .filter(Objects::nonNull).findFirst();
     }
-  }
-
-  /**
-   * Container object for basic auth principal
-   */
-  private static class BasicAuthPrincipal {
-    private final String _name;
-    private final String _token;
-    private final Set<String> _tables;
-    private final Set<AccessType> _permissions;
-
-    public BasicAuthPrincipal(String name, String token, Set<String> tables, Set<AccessType> permissions) {
-      this._name = name;
-      this._token = token;
-      this._tables = tables;
-      this._permissions = permissions;
-    }
-
-    public String getName() {
-      return _name;
-    }
-
-    public String getToken() {
-      return _token;
-    }
-
-    public boolean hasTable(String tableName) {
-      return _tables.isEmpty() || _tables.contains(tableName);
-    }
-
-    public boolean hasPermission(AccessType accessType) {
-      return _permissions.isEmpty() || _permissions.contains(accessType);
-    }
-  }
-
-  private static String toToken(String name, String password) {
-    String identifier = String.format("%s:%s", name, password);
-    return normalizeToken(String.format("Basic %s", Base64.getEncoder().encodeToString(identifier.getBytes())));
-  }
-
-  private static String normalizeToken(String token) {
-    if (token == null) {
-      return null;
-    }
-    return token.trim().replace("=", "");
   }
 }
