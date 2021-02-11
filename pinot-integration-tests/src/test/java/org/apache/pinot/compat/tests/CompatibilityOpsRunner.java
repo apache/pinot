@@ -24,8 +24,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import java.io.IOException;
 import java.io.InputStream;
-import org.apache.pinot.compat.tests.BaseOp;
-import org.apache.pinot.compat.tests.CompatTestOperation;
+import java.util.concurrent.TimeUnit;
+
 
 public class CompatibilityOpsRunner {
   private static final String ROOT_DIR = "compat-tests";
@@ -36,8 +36,7 @@ public class CompatibilityOpsRunner {
     _configFileName = configFileName;
   }
 
-  private boolean runOps()
-      throws IOException, JsonParseException, JsonMappingException {
+  private boolean runOps() throws IOException, JsonParseException, JsonMappingException, InterruptedException {
     String filePath = ROOT_DIR + "/" + _configFileName;
     InputStream inputStream = getClass().getClassLoader().getResourceAsStream(filePath);
 
@@ -52,6 +51,11 @@ public class CompatibilityOpsRunner {
         System.out.println("Failure");
         break;
       }
+      /*
+       Brokers take time to update route table after a segment is created/uploaded/deleted, so sleep 1s between
+       two operations
+       */
+      TimeUnit.SECONDS.sleep(1);
     }
     return passed;
   }
