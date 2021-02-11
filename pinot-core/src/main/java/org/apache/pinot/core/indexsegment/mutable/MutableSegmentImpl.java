@@ -807,6 +807,8 @@ public class MutableSegmentImpl implements MutableSegment {
           return forwardIndex.getDouble(docId);
         case STRING:
           return forwardIndex.getString(docId);
+        case BYTES:
+          return forwardIndex.getBytes(docId);
         default:
           throw new IllegalStateException();
       }
