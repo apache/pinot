@@ -193,8 +193,8 @@ public class PinotPreparedStatement extends AbstractBasePreparedStatement {
       _resultSetGroup = _preparedStatement.execute();
 
       if (_resultSetGroup.getResultSetCount() == 0) {
-        _resultSet =  PinotResultSet.empty();
-      }else {
+        _resultSet = PinotResultSet.empty();
+      } else {
         _resultSet = new PinotResultSet(_resultSetGroup.getResultSet(0));
       }
       return _resultSet;
