@@ -19,7 +19,42 @@
 package org.apache.pinot.compat.tests;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import java.util.List;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.base.Function;
+import java.io.File;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+import java.util.UUID;
+import javax.annotation.Nullable;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.admin.KafkaAdminClient;
+import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
+import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.integration.tests.ClusterTest;
+import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.FileFormat;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderFactory;
+import org.apache.pinot.spi.stream.StreamDataProducer;
+import org.apache.pinot.spi.stream.StreamDataProvider;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.StringUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.tools.utils.KafkaStarterUtils;
+import org.apache.pinot.util.TestUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -35,20 +70,40 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class StreamOp extends BaseOp {
   public enum Op {
-    PRODUCE
+    CREATE, PRODUCE
   }
 
+  private Op _op;
   private String _streamConfigFileName;
   private int _numRows;
   private String _inputDataFileName;
-  private List<String> _tableConfigFileNames;
+  private String _tableConfigFileName;
+  private String _recordReaderConfigFileName;
 
-  public String getStreamConfigFileName() {
-    return _streamConfigFileName;
-  }
+  private static final Logger LOGGER = LoggerFactory.getLogger(StreamOp.class);
+  private static final String TOPIC_NAME = "topicName";
+  private static final String NUM_PARTITIONS = "numPartitions";
+  private static final String PARTITION_COLUMN = "partitionColumn";
+  private static final String EXCEPTIONS = "exceptions";
+  private static final String NUM_SERVERS_QUERIED = "numServersQueried";
+  private static final String NUM_SERVERS_RESPONEDED = "numServersResponded";
+  private static final String TOTAL_DOCS = "totalDocs";
+  private static final short KAFKA_REPLICATION_FACTOR = 1;
 
   public StreamOp() {
     super(OpType.STREAM_OP);
+  }
+
+  public Op getOp() {
+    return _op;
+  }
+
+  public void setOp(Op op) {
+    _op = op;
+  }
+
+  public String getStreamConfigFileName() {
+    return _streamConfigFileName;
   }
 
   public void setStreamConfigFileName(String streamConfigFileName) {
@@ -71,18 +126,170 @@ public class StreamOp extends BaseOp {
     _inputDataFileName = inputDataFileName;
   }
 
+  public String getTableConfigFileName() {
+    return _tableConfigFileName;
+  }
+
+  public void setTableConfigFileName(String tableConfigFileName) {
+    _tableConfigFileName = tableConfigFileName;
+  }
+
+  public String getRecordReaderConfigFileName() {
+    return _recordReaderConfigFileName;
+  }
+
+  public void setRecordReaderConfigFileName(String recordReaderConfigFileName) {
+    _recordReaderConfigFileName = recordReaderConfigFileName;
+  }
+
   @Override
   boolean runOp() {
-    System.out.println("Produce rows into stream " + _streamConfigFileName + " and verify rows in tables "
-        + _tableConfigFileNames);
+    switch(_op) {
+      case CREATE:
+        return createKafkaTopic();
+      case PRODUCE:
+        return produceData();
+    }
     return true;
   }
 
-  public List<String> getTableConfigFileNames() {
-    return _tableConfigFileNames;
+  private boolean createKafkaTopic() {
+    try {
+      Properties streamConfigMap = JsonUtils.fileToObject(new File(_streamConfigFileName), Properties.class);
+      String topicName = streamConfigMap.getProperty(TOPIC_NAME);
+      int partitions = Integer.parseInt(streamConfigMap.getProperty(NUM_PARTITIONS));
+
+      final Map<String, Object> config = new HashMap<>();
+      config.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, ClusterDescriptor.DEFAULT_HOST + ":" + ClusterDescriptor.KAFKA_PORT);
+      config.put(AdminClientConfig.CLIENT_ID_CONFIG, "Kafka2AdminClient-" + UUID.randomUUID().toString());
+      config.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, 15000);
+      AdminClient adminClient = KafkaAdminClient.create(config);
+      NewTopic topic = new NewTopic(topicName, partitions, KAFKA_REPLICATION_FACTOR);
+      adminClient.createTopics(Collections.singletonList(topic)).all().get();
+    } catch (Exception e) {
+      LOGGER.error("Failed to create Kafka topic with stream config file: {}", _streamConfigFileName, e);
+      return false;
+    }
+    return true;
   }
 
-  public void setTableConfigFileNames(List<String> tableConfigFileNames) {
-    _tableConfigFileNames = tableConfigFileNames;
+
+  private boolean produceData() {
+    try {
+      // get kafka topic
+      Properties streamConfigMap = JsonUtils.fileToObject(new File(_streamConfigFileName), Properties.class);
+      String topicName = streamConfigMap.getProperty(TOPIC_NAME);
+      String partitionColumn = streamConfigMap.getProperty(PARTITION_COLUMN);
+
+      // get table config
+      TableConfig tableConfig = JsonUtils.fileToObject(new File(_tableConfigFileName), TableConfig.class);
+      String tableName = tableConfig.getTableName();
+      long existingTotalDoc = 0;
+
+      // get original rows
+      existingTotalDoc = fetchExistingTotalDocs(tableName);
+
+      // push csv data to kafka
+      Properties publisherProps = new Properties();
+      publisherProps.put("metadata.broker.list", KafkaStarterUtils.DEFAULT_KAFKA_BROKER);
+      publisherProps.put("serializer.class", "kafka.serializer.DefaultEncoder");
+      publisherProps.put("request.required.acks", "1");
+      StreamDataProducer producer =
+          StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, publisherProps);
+
+      File csvFile = new File(_inputDataFileName);
+      CSVRecordReaderConfig recordReaderConfig =
+          JsonUtils.fileToObject(new File(_recordReaderConfigFileName), CSVRecordReaderConfig.class);
+      Set<String> columnNames = new HashSet<>();
+      Collections.addAll(columnNames,
+          recordReaderConfig.getHeader().split(Character.toString(recordReaderConfig.getDelimiter())));
+
+      String timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
+      String schemaName = TableNameBuilder.extractRawTableName(tableName);
+      String schemaString = ControllerTest.
+          sendGetRequest(ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL).forSchemaGet(schemaName));
+      Schema schema = JsonUtils.stringToObject(schemaString, Schema.class);
+      DateTimeFormatSpec dateTimeFormatSpec = new DateTimeFormatSpec(schema.getSpecForTimeColumn(timeColumn).getFormat());
+
+      try (RecordReader csvRecordReader = RecordReaderFactory
+          .getRecordReader(FileFormat.CSV, csvFile, columnNames, recordReaderConfig)) {
+        int count = 0;
+        while (count < _numRows) {
+          if (!csvRecordReader.hasNext()) {
+            csvRecordReader.rewind();
+          }
+          GenericRow genericRow = csvRecordReader.next();
+          // add time column value
+          genericRow.putValue(timeColumn, dateTimeFormatSpec.fromMillisToFormat(System.currentTimeMillis()));
+
+          JsonNode messageJson = JsonUtils.stringToJsonNode(genericRow.toString());
+          ObjectNode extractedJson = JsonUtils.newObjectNode();
+          for (String key : genericRow.getFieldToValueMap().keySet()) {
+            extractedJson.set(key, messageJson.get("fieldToValueMap").get(key));
+          }
+
+          if (partitionColumn == null) {
+            producer.produce(topicName, StringUtils.encodeUtf8(extractedJson.toString()));
+          } else {
+            producer.produce(topicName, StringUtils.encodeUtf8(partitionColumn), StringUtils.encodeUtf8(extractedJson.toString()));
+          }
+          count++;
+        }
+      }
+
+      // verify number of rows increases as expected
+      waitForDocsLoaded(tableName, existingTotalDoc + _numRows, 60_000L);
+      LOGGER.info("Verified {} new rows in table: {}", _numRows, tableName);
+      return true;
+    } catch (Exception e) {
+      LOGGER.error("Failed to ingest stream data", e);
+      return false;
+    }
+  }
+
+  private long fetchExistingTotalDocs(String tableName) throws Exception  {
+    String query = "SELECT count(*) FROM " + tableName;
+    JsonNode response = ClusterTest.postQuery(query, ClusterDescriptor.BROKER_URL, false, "sql");
+    if (response == null) {
+      String errorMsg = String.format("Failed to query Table: %s", tableName);
+      LOGGER.error(errorMsg);
+      throw new RuntimeException(errorMsg);
+    }
+
+    if (response.has(EXCEPTIONS) && response.get(EXCEPTIONS).size() > 0) {
+      String errorMsg = String.format("Failed when running query: %s; the response contains exceptions", query);
+      LOGGER.error(errorMsg);
+      throw new RuntimeException(errorMsg);
+    }
+
+    if (response.has(NUM_SERVERS_QUERIED) &&
+        response.has(NUM_SERVERS_RESPONEDED) &&
+        response.get(NUM_SERVERS_QUERIED).asInt() > response.get(NUM_SERVERS_RESPONEDED).asInt()) {
+      String errorMsg = String.format("Failed when running query: %s; the response contains partial results", query);
+      LOGGER.error(errorMsg);
+      throw new RuntimeException(errorMsg);
+    }
+
+    if (!response.has(TOTAL_DOCS)) {
+      String errorMsg = String.format("Failed when running query: %s; the response contains no docs", query);
+      LOGGER.error(errorMsg);
+      throw new RuntimeException(errorMsg);
+    }
+    return response.get(TOTAL_DOCS).asLong();
+  }
+
+  private void waitForDocsLoaded(String tableName, long targetDocs, long timeoutMs) {
+    LOGGER.info("Wait Doc to load ...");
+    TestUtils.waitForCondition(new Function<Void, Boolean>() {
+      @Nullable
+      @Override
+      public Boolean apply(@Nullable Void aVoid) {
+        try {
+          return fetchExistingTotalDocs(tableName) == targetDocs;
+        } catch (Exception e) {
+          return null;
+        }
+      }
+    }, 100L, timeoutMs, "Failed to load " + targetDocs + " documents", true);
   }
 }

@@ -21,12 +21,11 @@
 description: tst file for stream op PRODUCE
 operations:
     - type: streamOp
-      description: publish rows to topic1.cfg
+      description: publish rows to PinotRealtimeFeatureTest1Event
       op: PRODUCE
-      streamConfigFileName: kafka/topic1.cfg
+      streamConfigFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/feature-test-1-realtime-stream-config.json
       numRows: 1
       inputDataFileName: pinot-integration-tests/src/test/resources/compat-tests/data/FeatureTest1-data-00.csv
       recordReaderConfigFileName: pinot-integration-tests/src/test/resources/compat-tests/data/recordReaderConfig.json
-      tableConfigFileName: configs/feature-test-1-realtime.json
-      avroSchemaFileName: /foo/bar
+      tableConfigFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/feature-test-1-realtime.json
 
