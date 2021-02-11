@@ -40,10 +40,6 @@ public class ImmutableDataSource extends BaseDataSource {
         columnIndexContainer.getNullValueVector());
   }
 
-  public ImmutableDataSource(ColumnMetadata columnMetadata) {
-    super(new ImmutableDataSourceMetadata(columnMetadata), null, null, null, null, null, null, null, null, null, null);
-  }
-
   private static class ImmutableDataSourceMetadata implements DataSourceMetadata {
     final FieldSpec _fieldSpec;
     final boolean _sorted;

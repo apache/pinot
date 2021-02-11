@@ -105,13 +105,16 @@ public class ImmutableSegmentLoader {
     // Load the segment
     ReadMode readMode = indexLoadingConfig.getReadMode();
     SegmentDirectory segmentDirectory = SegmentDirectory.createFromLocalFS(indexDir, segmentMetadata, readMode);
-    Map<String, ColumnIndexContainer> indexContainerMap = new HashMap<>();
-    StarTreeIndexContainer starTreeIndexContainer = null;
 
     if (segmentMetadata.getTotalDocs() > 0) {
+
+      Map<String, ColumnIndexContainer> indexContainerMap = new HashMap<>();
+      StarTreeIndexContainer starTreeIndexContainer = null;
+
       SegmentDirectory.Reader segmentReader = segmentDirectory.createReader();
       for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
-        indexContainerMap.put(entry.getKey(), new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig, indexDir));
+        indexContainerMap.put(entry.getKey(),
+            new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig, indexDir));
       }
 
       // Instantiate virtual columns
@@ -133,11 +136,12 @@ public class ImmutableSegmentLoader {
             new StarTreeIndexContainer(SegmentDirectoryPaths.findSegmentDirectory(indexDir), segmentMetadata,
                 indexContainerMap, readMode);
       }
+      ImmutableSegmentImpl segment =
+          new ImmutableSegmentImpl(segmentDirectory, segmentMetadata, indexContainerMap, starTreeIndexContainer);
+      LOGGER.info("Successfully loaded segment {} with readMode: {}", segmentName, readMode);
+      return segment;
+    } else {
+      return new EmptyIndexSegment(segmentDirectory, segmentMetadata);
     }
-
-    ImmutableSegmentImpl segment =
-        new ImmutableSegmentImpl(segmentDirectory, segmentMetadata, indexContainerMap, starTreeIndexContainer);
-    LOGGER.info("Successfully loaded segment {} with readMode: {}", segmentName, readMode);
-    return segment;
   }
 }
