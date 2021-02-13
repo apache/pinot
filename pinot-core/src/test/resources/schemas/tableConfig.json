@@ -1,0 +1,296 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Pinot TableConfig",
+  "description": "define the table properties",
+  "type": "object",
+  "properties": {
+    "tableName": {
+      "description": "Name of the table",
+      "type": "string"
+    },
+    "tableType": {
+      "description": "Type of the table",
+      "type": "string",
+      "enum": ["OFFLINE", "REALTIME"]
+    },
+    "quota": {
+      "description": "Specifies quota for storage and queries per second",
+      "type": "object",
+      "properties": {
+        "maxQueriesPerSecond": { "type": "integer" },
+        "storage": { "type": "string", "pattern": "[0-9]+[M,G]" }
+      }
+    },
+    "routing": {
+      "type": "object",
+      "properties": {
+        "segmentPrunerTypes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["partition"]
+          }
+        },
+        "instanceSelectorType": {
+          "type": "string",
+          "enum": ["replicaGroup", "balanced"]
+        }
+      }
+    },
+    "segmentsConfig": {
+      "type": "object",
+      "properties": {
+        "schemaName": { "type": "string" },
+        "timeColumnName": { "type": "string" },
+        "timeType": { "type": "string" },
+        "replication": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "integer", "minimum": 1 }
+          ]
+        },
+        "retentionTimeUnit": {
+          "type": "string",
+          "enum": ["DAYS", "HOURS", "MINUTES", "SECONDS"]
+        },
+        "retentionTimeValue": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "integer" }
+          ]
+        },
+        "replicasPerPartition": { "type": ["string", "integer"] },
+        "completionConfig": { 
+          "type": "object",
+          "properties": {
+            "completionMode": {
+              "type": ["string", "null"],
+              "$comment": "can be DOWNLOAD or empty"
+            }
+          }
+        },
+        "peerSegmentDownloadScheme": { "type": "string", "enum": ["http", "https"] }
+      }
+    },
+    "tableIndexConfig": {
+      "type": "object",
+      "properties": {
+        "invertedIndexColumns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "createInvertedIndexDuringSegmentGeneration": {
+          "type": "boolean"
+        },
+        "sortedColumn": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true,
+          "maxItems": 1
+        },
+        "bloomFilterColumns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "bloomFilterConfigs": {
+          "type": "object"
+        },
+        "rangeIndexColumns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "starTreeIndexConfigs": {
+          "type": "array",
+          "items": { 
+            "type": "object",
+            "properties": {
+              "dimensionsSplitOrder": { 
+                "type": "array", 
+                "uniqueItems": true 
+              },
+              "skipStarNodeCreationForDimensions": { "type": "array" },
+              "functionColumnPairs": { 
+                "type": "array", 
+                "uniqueItems": true 
+              },
+              "maxLeafRecords": { 
+                "type": "integer", 
+                "default": 10000 
+              }
+            },
+            "required": ["dimensionsSplitOrder", "functionColumnPairs"]
+          }
+        },
+        "enableDefaultStarTree": {
+          "type": "boolean"
+        },
+        "enableDynamicStarTreeCreation": {
+          "type": "boolean"
+        },
+        "noDictionaryColumns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "onHeapDictionaryColumns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "varLengthDictionaryColumns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "loadMode": {
+          "type": "string",
+          "enum": ["HEAP", "MMAP"]
+        },
+        "columnMinMaxValueGeneratorMode": {
+          "type": "string",
+          "enum": ["NONE", "ALL", "TIME", "NON_METRIC"]
+        },
+        "nullHandlingEnabled": {
+          "type": "boolean"
+        },
+        "aggregateMetrics": {
+          "type": "boolean",
+          "$comment": "only applicable for stream"
+        },
+        "fieldConfigList": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "encodingType": {
+                "type": "string",
+                "enum": ["RAW", "DICTIONARY"]
+              },
+              "indexType": {
+                "type": "string",
+                "enum": ["INVERTED", "SORTED", "TEXT", "FST", "H3"]
+              },
+              "properties": {
+                "type": "object",
+                "properties": {
+                  "enableQueryCacheForTextIndex": { "type": "boolean" },
+                  "rawIndexWriterVersion": { "type": "string" },
+                  "deriveNumDocsPerChunkForRawIndex": { "type": "string" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "tenants": {
+      "type": "object",
+      "properties": {
+        "broker": { "type": "string" },
+        "server": { "type": "string" },
+        "tagOverrideConfig": {
+          "type": "object",
+          "properties": {
+            "realtimeConsuming": { "type": "string" },
+            "realtimeCompleted": { "type": "string" }
+          }
+        }
+      }
+    },
+    "ingestionConfig": {
+      "type": "object",
+      "properties": {
+        "batchIngestionConfig": {
+          "segmentPushFrequency": {
+            "type": "string",
+            "enum": ["HOURLY", "DAILY", "WEEKLY", "MONTHLY"]
+          },
+          "segmentPushType": { 
+            "type": "string", 
+            "enum": ["APPEND", "REFRESH"]
+          },
+          "batchConfigMaps": { "type": "array" },
+          "segmentNameSpec": { "type": "object" },
+          "pushSpec": { "type": "objects" }
+        },
+        "streamIngestionConfig": {
+          "streamType": { 
+            "type": "string",
+            "enum": ["kafka"]
+          },
+          "^stream.[a-zA-Z]+.consumer.type$": {
+            "type": "string",
+            "enum": ["lowLevel", "highLevel"]
+          },
+          "^stream.[a-zA-Z]+.topic.name$": { "type": "string" },
+          "^stream.[a-zA-Z]+.decoder.class.name$": {
+            "type": "string",
+            "enum": ["org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder"]
+          },
+          "^stream.[a-zA-Z]+.consumer.factory.class.name$": {
+            "type": "string",
+            "enum": ["org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory"]
+          },
+          "^stream.[a-zA-Z]+.hlc.zk.connect.string$": { "type": "string" },
+          "^stream.[a-zA-Z]+.zk.broker.url$": { "type": "string" },
+          "^stream.[a-zA-Z]+.broker.list$": { "type": "string" },
+          "realtime.segment.flush.threshold.rows": { "type": "string" },
+          "realtime.segment.flush.threshold.time": { "type": "string" },
+          "realtime.segment.flush.threshold.segment.size": { "type": "string" },
+          "^stream.[a-zA-Z0-9]+.consumer.prop.auto.offset.reset$": {
+            "type": "string",
+            "enum": ["smallest", "largest"]
+          },
+          "realtime.segment.flush.autotune.initialRows": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "filterConfig": {
+          "type": "object",
+          "properties": {
+            "filterFunction": { "type": "string" }
+          }
+        },
+        "transformConfigs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "columnName": { "type": "string" },
+              "transformFunction": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "tierConfigs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "segmentSelectorType": {
+            "type": "string",
+            "enum": ["time"]
+          },
+          "segmentAge": { "type": "string" },
+          "storageType": {
+            "type": "string",
+            "enum": ["pinot_server"]
+          },
+          "serverTag": { "type": "string" }
+        }
+      }
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "isDimTable": { "type": "boolean" }
+  },
+  "required": ["tableName", "tableType", "segmentsConfig", "tableIndexConfig", "ingestionConfig"]
+}
