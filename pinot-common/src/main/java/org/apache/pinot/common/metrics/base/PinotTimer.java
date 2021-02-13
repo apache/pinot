@@ -16,15 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics;
+package org.apache.pinot.common.metrics.base;
 
-import org.apache.pinot.common.metrics.base.PinotMetricsRegistry;
+import java.util.concurrent.TimeUnit;
 
 
-/**
- * Interface to implement operations that occur whenever a new MetricsRegistry is registered with the MetricsHelper.
- *
- */
-public interface MetricsRegistryRegistrationListener {
-  void onMetricsRegistryRegistered(PinotMetricsRegistry metricsRegistry);
+public interface PinotTimer extends PinotMetered {
+
+  void update(long duration, TimeUnit unit);
+
+  Object getTimer();
 }

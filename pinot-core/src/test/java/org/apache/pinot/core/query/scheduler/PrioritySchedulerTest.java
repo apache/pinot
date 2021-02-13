@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.scheduler;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.Uninterruptibles;
-import com.yammer.metrics.core.MetricsRegistry;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -40,6 +39,7 @@ import java.util.concurrent.atomic.LongAccumulator;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.metrics.base.PinotMetricUtilsFactory;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.utils.DataTable;
@@ -63,7 +63,8 @@ import static org.testng.Assert.assertTrue;
 
 
 public class PrioritySchedulerTest {
-  private static final ServerMetrics metrics = new ServerMetrics(new MetricsRegistry());
+  private static final ServerMetrics metrics = new ServerMetrics(PinotMetricUtilsFactory.getPinotMetricsRegistry());
+
   private static boolean useBarrier = false;
   private static CyclicBarrier startupBarrier;
   private static CyclicBarrier validationBarrier;

@@ -16,15 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics;
-
-import org.apache.pinot.common.metrics.base.PinotMetricsRegistry;
+package org.apache.pinot.common.metrics.base;
 
 
-/**
- * Interface to implement operations that occur whenever a new MetricsRegistry is registered with the MetricsHelper.
- *
- */
-public interface MetricsRegistryRegistrationListener {
-  void onMetricsRegistryRegistered(PinotMetricsRegistry metricsRegistry);
+public interface PinotGauge<T> extends PinotMetric {
+
+  Object getGauge();
+
+  /**
+   * Returns the metric's current value.
+   *
+   * @return the metric's current value
+   */
+  public abstract T value();
 }

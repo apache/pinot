@@ -19,8 +19,6 @@
 package org.apache.pinot.common.metrics;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.yammer.metrics.core.MetricName;
-import com.yammer.metrics.core.MetricsRegistry;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -32,6 +30,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.metrics.base.PinotMeter;
+import org.apache.pinot.common.metrics.base.PinotMetricName;
+import org.apache.pinot.common.metrics.base.PinotMetricUtilsFactory;
+import org.apache.pinot.common.metrics.base.PinotMetricsRegistry;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,7 +49,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
   protected final String _metricPrefix;
 
-  protected final MetricsRegistry _metricsRegistry;
+  protected final PinotMetricsRegistry _metricsRegistry;
 
   private final Class _clazz;
 
@@ -58,11 +60,11 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   // Table level metrics are still emitted for allowed tables even if emitting table level metrics is disabled
   private final Set<String> _allowedTables;
 
-  public AbstractMetrics(String metricPrefix, MetricsRegistry metricsRegistry, Class clazz) {
+  public AbstractMetrics(String metricPrefix, PinotMetricsRegistry metricsRegistry, Class clazz) {
     this(metricPrefix, metricsRegistry, clazz, true, Collections.emptySet());
   }
 
-  public AbstractMetrics(String metricPrefix, MetricsRegistry metricsRegistry, Class clazz,
+  public AbstractMetrics(String metricPrefix, PinotMetricsRegistry metricsRegistry, Class clazz,
       boolean isTableLevelMetricsEnabled, Collection<String> allowedTables) {
     _metricPrefix = metricPrefix;
     _metricsRegistry = metricsRegistry;
@@ -76,12 +78,11 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * name to the allowed entries to make sure that all metrics are checked against the allowed tables.
    */
   private static Set<String> addNameVariations(Collection<String> allowedTables) {
-    return allowedTables.stream()
-        .flatMap(tableName -> TableNameBuilder.getTableNameVariations(tableName).stream())
+    return allowedTables.stream().flatMap(tableName -> TableNameBuilder.getTableNameVariations(tableName).stream())
         .collect(Collectors.toCollection(HashSet::new));
   }
 
-  public MetricsRegistry getMetricsRegistry() {
+  public PinotMetricsRegistry getMetricsRegistry() {
     return _metricsRegistry;
   }
 
@@ -149,9 +150,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param timeUnit The log time duration time unit
    */
   private void addValueToTimer(String fullTimerName, final long duration, final TimeUnit timeUnit) {
-    final MetricName metricName = new MetricName(_clazz, fullTimerName);
-    com.yammer.metrics.core.Timer timer =
-        MetricsHelper.newTimer(_metricsRegistry, metricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS);
+    final PinotMetricName metricName = PinotMetricUtilsFactory.generatePinotMetricName(_clazz, fullTimerName);
     MetricsHelper.newTimer(_metricsRegistry, metricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS)
         .update(duration, timeUnit);
   }
@@ -173,8 +172,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param unitCount The number of units to add to the meter
    * @param reusedMeter The meter to reuse
    */
-  public com.yammer.metrics.core.Meter addMeteredGlobalValue(final M meter, final long unitCount,
-      com.yammer.metrics.core.Meter reusedMeter) {
+  public PinotMeter addMeteredGlobalValue(final M meter, final long unitCount, PinotMeter reusedMeter) {
     if (reusedMeter != null) {
       reusedMeter.mark(unitCount);
       return reusedMeter;
@@ -182,9 +180,9 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
       final String fullMeterName;
       String meterName = meter.getMeterName();
       fullMeterName = _metricPrefix + meterName;
-      final MetricName metricName = new MetricName(_clazz, fullMeterName);
+      final PinotMetricName metricName = PinotMetricUtilsFactory.generatePinotMetricName(_clazz, fullMeterName);
 
-      final com.yammer.metrics.core.Meter newMeter =
+      final PinotMeter newMeter =
           MetricsHelper.newMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
       newMeter.mark(unitCount);
       return newMeter;
@@ -209,8 +207,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param unitCount The number of units to add to the meter
    * @param reusedMeter The meter to reuse
    */
-  public com.yammer.metrics.core.Meter addMeteredTableValue(final String tableName, final M meter, final long unitCount,
-      com.yammer.metrics.core.Meter reusedMeter) {
+  public PinotMeter addMeteredTableValue(final String tableName, final M meter, final long unitCount,
+      PinotMeter reusedMeter) {
     if (reusedMeter != null) {
       reusedMeter.mark(unitCount);
       return reusedMeter;
@@ -218,20 +216,20 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
       final String fullMeterName;
       String meterName = meter.getMeterName();
       fullMeterName = _metricPrefix + getTableName(tableName) + "." + meterName;
-      final MetricName metricName = new MetricName(_clazz, fullMeterName);
+      final PinotMetricName metricName = PinotMetricUtilsFactory.generatePinotMetricName(_clazz, fullMeterName);
 
-      final com.yammer.metrics.core.Meter newMeter =
+      final PinotMeter newMeter =
           MetricsHelper.newMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
       newMeter.mark(unitCount);
       return newMeter;
     }
   }
 
-  public com.yammer.metrics.core.Meter getMeteredTableValue(final String tableName, final M meter) {
+  public PinotMeter getMeteredTableValue(final String tableName, final M meter) {
     final String fullMeterName;
     String meterName = meter.getMeterName();
     fullMeterName = _metricPrefix + getTableName(tableName) + "." + meterName;
-    final MetricName metricName = new MetricName(_clazz, fullMeterName);
+    final PinotMetricName metricName = PinotMetricUtilsFactory.generatePinotMetricName(_clazz, fullMeterName);
 
     return MetricsHelper.newMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
   }
@@ -462,19 +460,17 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param valueCallback The callback function used to retrieve the value of the gauge
    */
   public void addCallbackGauge(final String metricName, final Callable<Long> valueCallback) {
-    MetricsHelper.newGauge(_metricsRegistry, new MetricName(_clazz, _metricPrefix + metricName),
-        new com.yammer.metrics.core.Gauge<Long>() {
-          @Override
-          public Long value() {
-            try {
-              return valueCallback.call();
-            } catch (Exception e) {
-              LOGGER.error("Caught exception", e);
-              Utils.rethrowException(e);
-              throw new AssertionError("Should not reach this");
-            }
-          }
-        });
+    MetricsHelper
+        .newGauge(_metricsRegistry, PinotMetricUtilsFactory.generatePinotMetricName(_clazz, _metricPrefix + metricName),
+            PinotMetricUtilsFactory.generatePinotGauge(avoid -> {
+              try {
+                return valueCallback.call();
+              } catch (Exception e) {
+                LOGGER.error("Caught exception", e);
+                Utils.rethrowException(e);
+                throw new AssertionError("Should not reach this");
+              }
+            }));
   }
 
   protected abstract QP[] getQueryPhases();

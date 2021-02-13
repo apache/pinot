@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.common.metrics;
 
-import com.yammer.metrics.core.MetricsRegistry;
 import java.util.Collection;
 import java.util.Collections;
+import org.apache.pinot.common.metrics.base.PinotMetricsRegistry;
 
 import static org.apache.pinot.common.utils.CommonConstants.Server.DEFAULT_ENABLE_TABLE_LEVEL_METRICS;
 import static org.apache.pinot.common.utils.CommonConstants.Server.DEFAULT_METRICS_PREFIX;
@@ -32,16 +32,16 @@ import static org.apache.pinot.common.utils.CommonConstants.Server.DEFAULT_METRI
  */
 public class ServerMetrics extends AbstractMetrics<ServerQueryPhase, ServerMeter, ServerGauge, ServerTimer> {
 
-  public ServerMetrics(MetricsRegistry metricsRegistry) {
+  public ServerMetrics(PinotMetricsRegistry metricsRegistry) {
     this(DEFAULT_METRICS_PREFIX, metricsRegistry, DEFAULT_ENABLE_TABLE_LEVEL_METRICS, Collections.emptySet());
   }
 
-  public ServerMetrics(MetricsRegistry metricsRegistry, boolean isTableLevelMetricsEnabled,
+  public ServerMetrics(PinotMetricsRegistry metricsRegistry, boolean isTableLevelMetricsEnabled,
       Collection<String> allowedTables) {
     this(DEFAULT_METRICS_PREFIX, metricsRegistry, isTableLevelMetricsEnabled, allowedTables);
   }
 
-  public ServerMetrics(String prefix, MetricsRegistry metricsRegistry, boolean isTableLevelMetricsEnabled,
+  public ServerMetrics(String prefix, PinotMetricsRegistry metricsRegistry, boolean isTableLevelMetricsEnabled,
       Collection<String> allowedTables) {
     super(prefix, metricsRegistry, ServerMetrics.class, isTableLevelMetricsEnabled, allowedTables);
   }

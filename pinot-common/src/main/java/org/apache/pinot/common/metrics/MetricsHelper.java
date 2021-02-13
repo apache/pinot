@@ -18,17 +18,6 @@
  */
 package org.apache.pinot.common.metrics;
 
-import com.yammer.metrics.Metrics;
-import com.yammer.metrics.core.Counter;
-import com.yammer.metrics.core.Gauge;
-import com.yammer.metrics.core.Histogram;
-import com.yammer.metrics.core.Meter;
-import com.yammer.metrics.core.Metered;
-import com.yammer.metrics.core.MetricName;
-import com.yammer.metrics.core.MetricsRegistry;
-import com.yammer.metrics.core.Sampling;
-import com.yammer.metrics.core.Stoppable;
-import com.yammer.metrics.core.Timer;
 import java.lang.reflect.Constructor;
 import java.util.Arrays;
 import java.util.List;
@@ -36,6 +25,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.metrics.base.PinotCounter;
+import org.apache.pinot.common.metrics.base.PinotGauge;
+import org.apache.pinot.common.metrics.base.PinotHistogram;
+import org.apache.pinot.common.metrics.base.PinotMeter;
+import org.apache.pinot.common.metrics.base.PinotMetricName;
+import org.apache.pinot.common.metrics.base.PinotMetricsRegistry;
+import org.apache.pinot.common.metrics.base.PinotTimer;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,7 +40,7 @@ import org.slf4j.LoggerFactory;
 public class MetricsHelper {
   private static final Logger LOGGER = LoggerFactory.getLogger(MetricsHelper.class);
 
-  private static Map<MetricsRegistry, Boolean> metricsRegistryMap = new ConcurrentHashMap<>();
+  private static Map<PinotMetricsRegistry, Boolean> metricsRegistryMap = new ConcurrentHashMap<>();
 
   private static Map<MetricsRegistryRegistrationListener, Boolean> metricsRegistryRegistrationListenersMap =
       new ConcurrentHashMap<>();
@@ -91,9 +87,9 @@ public class MetricsHelper {
       metricsRegistryRegistrationListenersMap.put(listener, Boolean.TRUE);
 
       // Fire events to register all previously registered metrics registries
-      Set<MetricsRegistry> metricsRegistries = metricsRegistryMap.keySet();
+      Set<PinotMetricsRegistry> metricsRegistries = metricsRegistryMap.keySet();
       LOGGER.info("Number of metrics registry: {}", metricsRegistries.size());
-      for (MetricsRegistry metricsRegistry : metricsRegistries) {
+      for (PinotMetricsRegistry metricsRegistry : metricsRegistries) {
         listener.onMetricsRegistryRegistered(metricsRegistry);
       }
     }
@@ -104,7 +100,7 @@ public class MetricsHelper {
    *
    * @param registry The registry to register
    */
-  public static void registerMetricsRegistry(MetricsRegistry registry) {
+  public static void registerMetricsRegistry(PinotMetricsRegistry registry) {
     synchronized (MetricsHelper.class) {
       metricsRegistryMap.put(registry, Boolean.TRUE);
 
@@ -129,30 +125,8 @@ public class MetricsHelper {
    * @param unit TimeUnit for rate determination
    * @return Meter
    */
-  public static Meter newMeter(MetricsRegistry registry, MetricName name, String eventType, TimeUnit unit) {
-    if (registry != null) {
-      return registry.newMeter(name, eventType, unit);
-    } else {
-      return Metrics.newMeter(name, eventType, unit);
-    }
-  }
-
-  /**
-   *
-   * Return an existing aggregated meter if registry is not null and a aggregated meter already exist
-   * with the same metric name. Otherwise, creates a new aggregated meter and registers (if registry not null)
-   *
-   * @param registry MetricsRegistry
-   * @param name metric name
-   * @return AggregatedMeter
-   */
-  public static <T extends Metered & Stoppable> AggregatedMeter<T> newAggregatedMeter(
-      AggregatedMetricsRegistry registry, MetricName name) {
-    if (registry != null) {
-      return registry.newAggregatedMeter(name);
-    } else {
-      return new AggregatedMeter<T>(); //not registered
-    }
+  public static PinotMeter newMeter(PinotMetricsRegistry registry, PinotMetricName name, String eventType, TimeUnit unit) {
+    return registry.newMeter(name, eventType, unit);
   }
 
   /**
@@ -165,29 +139,8 @@ public class MetricsHelper {
    * @param name metric name
    * @return Counter
    */
-  public static Counter newCounter(MetricsRegistry registry, MetricName name) {
-    if (registry != null) {
-      return registry.newCounter(name);
-    } else {
-      return Metrics.newCounter(name);
-    }
-  }
-
-  /**
-   *
-   * Return an existing aggregated counter if registry is not null and a aggregated counter already exist
-   * with the same metric name. Otherwise, creates a new aggregated counter and registers (if registry not null)
-   *
-   * @param registry MetricsRegistry
-   * @param name metric name
-   * @return AggregatedCounter
-   */
-  public static AggregatedCounter newAggregatedCounter(AggregatedMetricsRegistry registry, MetricName name) {
-    if (registry != null) {
-      return registry.newAggregatedCounter(name);
-    } else {
-      return new AggregatedCounter();
-    }
+  public static PinotCounter newCounter(PinotMetricsRegistry registry, PinotMetricName name) {
+    return registry.newCounter(name);
   }
 
   /**
@@ -201,30 +154,8 @@ public class MetricsHelper {
    * @param biased (true if uniform distribution, otherwise exponential weighted)
    * @return histogram
    */
-  public static Histogram newHistogram(MetricsRegistry registry, MetricName name, boolean biased) {
-    if (registry != null) {
-      return registry.newHistogram(name, biased);
-    } else {
-      return Metrics.newHistogram(name, biased);
-    }
-  }
-
-  /**
-   *
-   * Return an existing aggregated histogram if registry is not null and a aggregated histogram already exist
-   * with the same metric name. Otherwise, creates a new aggregated histogram and registers (if registry not null)
-   *
-   * @param registry MetricsRegistry
-   * @param name metric name
-   * @return AggregatedHistogram
-   */
-  public static <T extends Sampling> AggregatedHistogram<T> newAggregatedHistogram(AggregatedMetricsRegistry registry,
-      MetricName name) {
-    if (registry != null) {
-      return registry.newAggregatedHistogram(name);
-    } else {
-      return new AggregatedHistogram<T>();
-    }
+  public static PinotHistogram newHistogram(PinotMetricsRegistry registry, PinotMetricName name, boolean biased) {
+    return registry.newHistogram(name, biased);
   }
 
   /**
@@ -238,41 +169,15 @@ public class MetricsHelper {
    * @param gauge Underlying gauge to be tracked
    * @return gauge
    */
-  public static <T> Gauge<T> newGauge(MetricsRegistry registry, MetricName name, Gauge<T> gauge) {
-    if (registry != null) {
-      return registry.newGauge(name, gauge);
-    } else {
-      return Metrics.newGauge(name, gauge);
-    }
+  public static <T> PinotGauge<T> newGauge(PinotMetricsRegistry registry, PinotMetricName name, PinotGauge<T> gauge) {
+    return registry.newGauge(name, gauge);
   }
 
   /**
    * Removes an existing metric
    */
-  public static void removeMetric(MetricsRegistry registry, MetricName name) {
-    if (registry != null) {
-      registry.removeMetric(name);
-    } else {
-      Metrics.defaultRegistry().removeMetric(name);
-    }
-  }
-
-  /**
-   *
-   * Return an existing aggregated long gauge if registry is not null and a aggregated long gauge already exist
-   * with the same metric name. Otherwise, creates a new aggregated long gauge and registers (if registry not null)
-   *
-   * @param registry MetricsRegistry
-   * @param name metric name
-   * @return AggregatedLongGauge
-   */
-  public static <T extends Number, V extends Gauge<T>> AggregatedLongGauge<T, V> newAggregatedLongGauge(
-      AggregatedMetricsRegistry registry, MetricName name) {
-    if (registry != null) {
-      return registry.newAggregatedLongGauge(name);
-    } else {
-      return new AggregatedLongGauge<T, V>();
-    }
+  public static void removeMetric(PinotMetricsRegistry registry, PinotMetricName name) {
+    registry.removeMetric(name);
   }
 
   /**
@@ -287,12 +192,8 @@ public class MetricsHelper {
    * @param rateUnit TimeUnit for rate determination
    * @return Timer
    */
-  public static Timer newTimer(MetricsRegistry registry, MetricName name, TimeUnit durationUnit, TimeUnit rateUnit) {
-    if (registry != null) {
-      return registry.newTimer(name, durationUnit, rateUnit);
-    } else {
-      return Metrics.newTimer(name, durationUnit, rateUnit);
-    }
+  public static PinotTimer newTimer(PinotMetricsRegistry registry, PinotMetricName name, TimeUnit durationUnit, TimeUnit rateUnit) {
+    return registry.newTimer(name, durationUnit, rateUnit);
   }
 
   /**

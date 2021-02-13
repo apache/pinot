@@ -20,7 +20,6 @@ package org.apache.pinot.core.data.manager.realtime;
 
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
-import com.yammer.metrics.core.Meter;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -33,6 +32,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metrics.base.PinotMeter;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -99,8 +99,8 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final Logger _segmentLogger;
   private final SegmentVersion _segmentVersion;
 
-  private Meter _tableAndStreamRowsConsumed = null;
-  private Meter _tableRowsConsumed = null;
+  private PinotMeter _tableAndStreamRowsConsumed = null;
+  private PinotMeter _tableRowsConsumed = null;
 
   // An instance of this class exists only for the duration of the realtime segment that is currently being consumed.
   // Once the segment is committed, the segment is handled by OfflineSegmentDataManager

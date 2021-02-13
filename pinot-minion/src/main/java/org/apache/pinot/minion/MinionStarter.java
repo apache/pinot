@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.minion;
 
-import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.io.IOException;
 import javax.net.ssl.SSLContext;
@@ -32,6 +31,8 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.task.TaskStateModelFactory;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metrics.MetricsHelper;
+import org.apache.pinot.common.metrics.base.PinotMetricsRegistry;
+import org.apache.pinot.common.metrics.base.PinotMetricUtilsFactory;
 import org.apache.pinot.common.utils.ClientSSLContextGenerator;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.NetUtil;
@@ -53,6 +54,7 @@ import org.apache.pinot.spi.services.ServiceStartable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.common.metrics.base.PinotMetricUtilsFactory.LIBRARY_NAME_KEY;
 import static org.apache.pinot.common.utils.CommonConstants.HTTPS_PROTOCOL;
 
 
@@ -151,8 +153,14 @@ public class MinionStarter implements ServiceStartable {
 
     // Initialize metrics
     LOGGER.info("Initializing metrics");
+    // TODO: put all the metrics related configs down to "pinot.server.metrics"
+    PinotConfiguration metricsConfiguration = _config;
+    PinotMetricUtilsFactory.init(metricsConfiguration.getProperty(LIBRARY_NAME_KEY));
+    PinotMetricsRegistry metricsRegistry = PinotMetricUtilsFactory.getPinotMetricsRegistry();
+
+
     MetricsHelper.initializeMetrics(_config);
-    MetricsRegistry metricsRegistry = new MetricsRegistry();
+
     MetricsHelper.registerMetricsRegistry(metricsRegistry);
     MinionMetrics minionMetrics = new MinionMetrics(_config
         .getProperty(CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX_KEY,

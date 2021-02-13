@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.common.metrics;
 
-import com.yammer.metrics.core.MetricsRegistry;
+import org.apache.pinot.common.metrics.base.PinotMetricsRegistry;
 
 import static org.apache.pinot.common.utils.CommonConstants.Controller.DEFAULT_METRICS_PREFIX;
 
@@ -28,11 +28,11 @@ import static org.apache.pinot.common.utils.CommonConstants.Controller.DEFAULT_M
  */
 public class ControllerMetrics extends AbstractMetrics<AbstractMetrics.QueryPhase, ControllerMeter, ControllerGauge, ControllerTimer> {
 
-  public ControllerMetrics(MetricsRegistry metricsRegistry) {
+  public ControllerMetrics(PinotMetricsRegistry metricsRegistry) {
     this(DEFAULT_METRICS_PREFIX, metricsRegistry);
   }
 
-  public ControllerMetrics(String prefix, MetricsRegistry metricsRegistry) {
+  public ControllerMetrics(String prefix, PinotMetricsRegistry metricsRegistry) {
     super(prefix, metricsRegistry, ControllerMetrics.class);
   }
 

@@ -19,12 +19,12 @@
 package org.apache.pinot.controller.helix.core.realtime;
 
 import com.google.common.base.Preconditions;
-import com.yammer.metrics.core.MetricsRegistry;
 import java.lang.reflect.Field;
 import java.util.Map;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.metrics.base.PinotMetricUtilsFactory;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -1366,7 +1366,7 @@ public class SegmentCompletionTest {
     public HelixManager _helixManager = mock(HelixManager.class);
 
     protected MockPinotLLCRealtimeSegmentManager(PinotHelixResourceManager pinotHelixResourceManager) {
-      this(pinotHelixResourceManager, new ControllerMetrics(new MetricsRegistry()));
+      this(pinotHelixResourceManager, new ControllerMetrics(PinotMetricUtilsFactory.getPinotMetricsRegistry()));
     }
 
     protected MockPinotLLCRealtimeSegmentManager(PinotHelixResourceManager pinotHelixResourceManager,
@@ -1410,7 +1410,7 @@ public class SegmentCompletionTest {
 
     protected MockSegmentCompletionManager(HelixManager helixManager, PinotLLCRealtimeSegmentManager segmentManager,
         boolean isLeader) {
-      this(helixManager, segmentManager, isLeader, new ControllerMetrics(new MetricsRegistry()));
+      this(helixManager, segmentManager, isLeader, new ControllerMetrics(PinotMetricUtilsFactory.getPinotMetricsRegistry()));
     }
 
     protected MockSegmentCompletionManager(HelixManager helixManager, PinotLLCRealtimeSegmentManager segmentManager,

@@ -16,15 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics;
+package org.apache.pinot.common.metrics.yammer;
 
-import org.apache.pinot.common.metrics.base.PinotMetricsRegistry;
+import com.yammer.metrics.core.Counter;
+import org.apache.pinot.common.metrics.base.PinotCounter;
+import org.apache.pinot.common.metrics.base.PinotMetricName;
+import org.apache.pinot.common.metrics.base.PinotMetricProcessor;
 
 
-/**
- * Interface to implement operations that occur whenever a new MetricsRegistry is registered with the MetricsHelper.
- *
- */
-public interface MetricsRegistryRegistrationListener {
-  void onMetricsRegistryRegistered(PinotMetricsRegistry metricsRegistry);
+public class YammerCounter extends YammerMetric implements PinotCounter {
+  private Counter _counter;
+
+  public YammerCounter(Counter counter) {
+    super(counter);
+    _counter = counter;
+  }
+
+  @Override
+  public Object getCounter() {
+    return _counter;
+  }
+
+  @Override
+  public <T> void processWith(PinotMetricProcessor<T> processor, PinotMetricName name, T context)
+      throws Exception {
+    processor.processCounter(name, this, context);
+  }
 }

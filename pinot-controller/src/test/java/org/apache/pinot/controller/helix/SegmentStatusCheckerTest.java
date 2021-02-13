@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.helix;
 
 import com.google.common.collect.Lists;
-import com.yammer.metrics.core.MetricsRegistry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -31,6 +30,8 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.metrics.base.PinotMetricsRegistry;
+import org.apache.pinot.common.metrics.base.PinotMetricUtilsFactory;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.ControllerConf;
@@ -49,7 +50,7 @@ public class SegmentStatusCheckerTest {
   private SegmentStatusChecker segmentStatusChecker;
   private PinotHelixResourceManager helixResourceManager;
   private LeadControllerManager leadControllerManager;
-  private MetricsRegistry metricsRegistry;
+  private PinotMetricsRegistry metricsRegistry;
   private ControllerMetrics controllerMetrics;
   private ControllerConf config;
 
@@ -91,7 +92,7 @@ public class SegmentStatusCheckerTest {
       leadControllerManager = mock(LeadControllerManager.class);
       when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
     }
-    metricsRegistry = new MetricsRegistry();
+    metricsRegistry = PinotMetricUtilsFactory.getPinotMetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
     segmentStatusChecker =
         new SegmentStatusChecker(helixResourceManager, leadControllerManager, config, controllerMetrics);
@@ -158,7 +159,7 @@ public class SegmentStatusCheckerTest {
       leadControllerManager = mock(LeadControllerManager.class);
       when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
     }
-    metricsRegistry = new MetricsRegistry();
+    metricsRegistry = PinotMetricUtilsFactory.getPinotMetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
     segmentStatusChecker =
         new SegmentStatusChecker(helixResourceManager, leadControllerManager, config, controllerMetrics);
@@ -239,7 +240,7 @@ public class SegmentStatusCheckerTest {
       leadControllerManager = mock(LeadControllerManager.class);
       when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
     }
-    metricsRegistry = new MetricsRegistry();
+    metricsRegistry = PinotMetricUtilsFactory.getPinotMetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
     segmentStatusChecker =
         new SegmentStatusChecker(helixResourceManager, leadControllerManager, config, controllerMetrics);
@@ -286,7 +287,7 @@ public class SegmentStatusCheckerTest {
       leadControllerManager = mock(LeadControllerManager.class);
       when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
     }
-    metricsRegistry = new MetricsRegistry();
+    metricsRegistry = PinotMetricUtilsFactory.getPinotMetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
     segmentStatusChecker =
         new SegmentStatusChecker(helixResourceManager, leadControllerManager, config, controllerMetrics);
@@ -318,7 +319,7 @@ public class SegmentStatusCheckerTest {
       leadControllerManager = mock(LeadControllerManager.class);
       when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
     }
-    metricsRegistry = new MetricsRegistry();
+    metricsRegistry = PinotMetricUtilsFactory.getPinotMetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
     segmentStatusChecker =
         new SegmentStatusChecker(helixResourceManager, leadControllerManager, config, controllerMetrics);
@@ -381,7 +382,7 @@ public class SegmentStatusCheckerTest {
       leadControllerManager = mock(LeadControllerManager.class);
       when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
     }
-    metricsRegistry = new MetricsRegistry();
+    metricsRegistry = PinotMetricUtilsFactory.getPinotMetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
     segmentStatusChecker =
         new SegmentStatusChecker(helixResourceManager, leadControllerManager, config, controllerMetrics);
@@ -427,7 +428,7 @@ public class SegmentStatusCheckerTest {
       leadControllerManager = mock(LeadControllerManager.class);
       when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
     }
-    metricsRegistry = new MetricsRegistry();
+    metricsRegistry = PinotMetricUtilsFactory.getPinotMetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
     segmentStatusChecker =
         new SegmentStatusChecker(helixResourceManager, leadControllerManager, config, controllerMetrics);
@@ -471,7 +472,7 @@ public class SegmentStatusCheckerTest {
       leadControllerManager = mock(LeadControllerManager.class);
       when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
     }
-    metricsRegistry = new MetricsRegistry();
+    metricsRegistry = PinotMetricUtilsFactory.getPinotMetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
     segmentStatusChecker =
         new SegmentStatusChecker(helixResourceManager, leadControllerManager, config, controllerMetrics);
@@ -510,7 +511,7 @@ public class SegmentStatusCheckerTest {
       leadControllerManager = mock(LeadControllerManager.class);
       when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
     }
-    metricsRegistry = new MetricsRegistry();
+    metricsRegistry = PinotMetricUtilsFactory.getPinotMetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
     segmentStatusChecker =
         new SegmentStatusChecker(helixResourceManager, leadControllerManager, config, controllerMetrics);
@@ -560,7 +561,7 @@ public class SegmentStatusCheckerTest {
       leadControllerManager = mock(LeadControllerManager.class);
       when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
     }
-    metricsRegistry = new MetricsRegistry();
+    metricsRegistry = PinotMetricUtilsFactory.getPinotMetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
     segmentStatusChecker =
         new SegmentStatusChecker(helixResourceManager, leadControllerManager, config, controllerMetrics);

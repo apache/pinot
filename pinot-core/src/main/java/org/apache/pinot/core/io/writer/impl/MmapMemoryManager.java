@@ -19,7 +19,6 @@
 package org.apache.pinot.core.io.writer.impl;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
@@ -27,6 +26,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.LinkedList;
 import java.util.List;
+import org.apache.pinot.common.metrics.base.PinotMetricUtilsFactory;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
@@ -101,7 +101,7 @@ public class MmapMemoryManager extends RealtimeIndexOffHeapMemoryManager {
 
   @VisibleForTesting
   public MmapMemoryManager(String dirPathName, String segmentName) {
-    this(dirPathName, segmentName, new ServerMetrics(new MetricsRegistry()));
+    this(dirPathName, segmentName, new ServerMetrics(PinotMetricUtilsFactory.getPinotMetricsRegistry()));
   }
 
   private String getFilePrefix() {

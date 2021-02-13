@@ -24,11 +24,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.metrics.base.PinotMetricsRegistry;
+import org.apache.pinot.common.metrics.base.PinotMetricUtilsFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.annotations.Test;
-
-import com.yammer.metrics.core.MetricName;
-import com.yammer.metrics.core.MetricsRegistry;
 
 
 /**
@@ -41,36 +41,37 @@ public class MetricsHelperTest {
 
   public static class ListenerOne implements MetricsRegistryRegistrationListener {
     @Override
-    public void onMetricsRegistryRegistered(MetricsRegistry metricsRegistry) {
+    public void onMetricsRegistryRegistered(PinotMetricsRegistry metricsRegistry) {
       listenerOneOkay = true;
     }
   }
 
   public static class ListenerTwo implements MetricsRegistryRegistrationListener {
     @Override
-    public void onMetricsRegistryRegistered(MetricsRegistry metricsRegistry) {
+    public void onMetricsRegistryRegistered(PinotMetricsRegistry metricsRegistry) {
       listenerTwoOkay = true;
     }
   }
 
   @Test
-  public void testMetricsHelperRegistration() {
+  public void testMetricsHelperRegistration()
+      throws InvalidConfigException {
     listenerOneOkay = false;
     listenerTwoOkay = false;
 
     Map<String, Object> properties = new HashMap<>();
     properties.put("pinot.broker.metrics.metricsRegistryRegistrationListeners",
         ListenerOne.class.getName() + "," + ListenerTwo.class.getName());
-    
-    PinotConfiguration configuration = new PinotConfiguration(properties);
 
-    MetricsRegistry registry = new MetricsRegistry();
+    PinotConfiguration configuration = new PinotConfiguration(properties);
+    PinotMetricUtilsFactory.init(configuration.getProperty(PinotMetricUtilsFactory.LIBRARY_NAME_KEY));
+    PinotMetricsRegistry registry = PinotMetricUtilsFactory.getPinotMetricsRegistry();
 
     // Initialize the MetricsHelper and create a new timer
     MetricsHelper.initializeMetrics(configuration.subset("pinot.broker.metrics"));
     MetricsHelper.registerMetricsRegistry(registry);
-    MetricsHelper.newTimer(registry, new MetricName(MetricsHelperTest.class, "dummy"), TimeUnit.MILLISECONDS,
-        TimeUnit.MILLISECONDS);
+    MetricsHelper.newTimer(registry, PinotMetricUtilsFactory.generatePinotMetricName(MetricsHelperTest.class, "dummy"),
+        TimeUnit.MILLISECONDS, TimeUnit.MILLISECONDS);
 
     // Check that the two listeners fired
     assertTrue(listenerOneOkay);

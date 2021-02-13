@@ -23,7 +23,6 @@ import com.google.common.collect.HashBiMap;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
-import com.yammer.metrics.core.MetricsRegistry;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
@@ -39,6 +38,7 @@ import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.metrics.base.PinotMetricUtilsFactory;
 import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
 import org.apache.pinot.common.restlet.resources.TableSizeInfo;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -64,7 +64,8 @@ public class TableSizeReaderTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableSizeReaderTest.class);
   private final Executor executor = Executors.newFixedThreadPool(1);
   private final HttpConnectionManager connectionManager = new MultiThreadedHttpConnectionManager();
-  private final ControllerMetrics _controllerMetrics = new ControllerMetrics(new MetricsRegistry());
+  private final ControllerMetrics _controllerMetrics =
+      new ControllerMetrics(PinotMetricUtilsFactory.getPinotMetricsRegistry());
   private PinotHelixResourceManager helix;
   private Map<String, FakeSizeServer> serverMap = new HashMap<>();
   private final String URI_PATH = "/table/";
