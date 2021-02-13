@@ -59,6 +59,9 @@ public class KafkaStreamConfigProperties {
     public static final String KAFKA_FETCHER_SIZE_BYTES = "kafka.fetcher.size";
     public static final String KAFKA_FETCHER_MIN_BYTES = "kafka.fetcher.minBytes";
     public static final int KAFKA_FETCHER_MIN_BYTES_DEFAULT = 100000;
+    public static final String KAFKA_ISOLATION_LEVEL = "kafka.isolation.level";
+    public static final String KAFKA_ISOLATION_LEVEL_READ_COMMITTED = "read_committed";
+    public static final String KAFKA_ISOLATION_LEVEL_READ_UNCOMMITTED = "read_uncommitted";
   }
 
   public static final String KAFKA_CONSUMER_PROP_PREFIX = "kafka.consumer.prop";

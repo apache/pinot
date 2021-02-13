@@ -97,6 +97,7 @@ public class KafkaStreamLevelConsumerManager {
       consumerProp.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaStreamLevelStreamConfig.getBootstrapServers());
       consumerProp.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
       consumerProp.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, BytesDeserializer.class.getName());
+
       if (consumerProp.containsKey(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG) && consumerProp
           .getProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG).equals("smallest")) {
         consumerProp.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
