@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -41,6 +42,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.exception.QueryException;
@@ -210,7 +212,14 @@ public class PinotQueryResource {
     String url = getQueryURL(protocol, hostNameWithPrefix.substring(hostNameWithPrefix.indexOf("_") + 1),
         String.valueOf(port), querySyntax);
     ObjectNode requestJson = getRequestJson(query, traceEnabled, queryOptions, querySyntax);
-    return sendRequestRaw(url, query, requestJson);
+
+    // forward client-supplied headers
+    Map<String, String> headers = httpHeaders.getRequestHeaders().entrySet().stream()
+        .filter(entry -> !entry.getValue().isEmpty())
+        .map(entry -> Pair.of(entry.getKey(), entry.getValue().get(0)))
+        .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
+
+    return sendRequestRaw(url, query, requestJson, headers);
   }
 
   private ObjectNode getRequestJson(String query, String traceEnabled, String queryOptions, String querySyntax) {
@@ -325,10 +334,10 @@ public class PinotQueryResource {
     }
   }
 
-  public String sendRequestRaw(String url, String query, ObjectNode requestJson) {
+  public String sendRequestRaw(String url, String query, ObjectNode requestJson, Map<String, String> headers) {
     try {
       final long startTime = System.currentTimeMillis();
-      final String pinotResultString = sendPostRaw(url, requestJson.toString(), null);
+      final String pinotResultString = sendPostRaw(url, requestJson.toString(), headers);
 
       final long queryTime = System.currentTimeMillis() - startTime;
       LOGGER.info("Query: " + query + " Time: " + queryTime);

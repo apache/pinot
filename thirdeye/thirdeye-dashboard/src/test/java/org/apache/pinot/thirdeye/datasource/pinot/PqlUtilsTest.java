@@ -185,7 +185,7 @@ public class PqlUtilsTest {
 
     String pql = SqlUtils.getSql(request, metricFunction, ArrayListMultimap.<String, String>create(), timeSpec);
 
-    Assert.assertEquals(pql, "SELECT dimension, AVG(metric) FROM collection WHERE  Date >= 1 AND Date < 2 GROUP BY dimension LIMIT 12345");
+    Assert.assertEquals(pql, "SELECT dimension, AVG(metric) FROM collection WHERE  \"Date\" >= 1 AND \"Date\" < 2 GROUP BY dimension LIMIT 12345");
   }
 
   @Test
@@ -201,8 +201,8 @@ public class PqlUtilsTest {
         .setGroupBy("dimension")
         .build("ref");
 
-    String pql = SqlUtils.getSql(request, metricFunction, ArrayListMultimap.<String, String>create(), timeSpec);
+    String pql = SqlUtils.getSql(request, metricFunction, ArrayListMultimap.create(), timeSpec);
 
-    Assert.assertEquals(pql, "SELECT dimension, AVG(metric) FROM collection WHERE  Date >= 1 AND Date < 2 GROUP BY dimension LIMIT 100000");
+    Assert.assertEquals(pql, "SELECT dimension, AVG(metric) FROM collection WHERE  \"Date\" >= 1 AND \"Date\" < 2 GROUP BY dimension LIMIT 100000");
   }
 }

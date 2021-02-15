@@ -22,7 +22,8 @@ export default [
     metricName: 'Metric Name 1',
     metricId: 12345,
     functionName: 'Alert Name 1'
-  }, {
+  },
+  {
     id: 2,
     anomalyId: 33330876,
     start: 1491804013000,
@@ -39,7 +40,8 @@ export default [
     metricName: 'Metric Name 1',
     metricId: 12345,
     functionName: 'Alert Name 1'
-  }, {
+  },
+  {
     id: 3,
     anomalyId: 33330893,
     start: 1491804013000,
@@ -56,7 +58,8 @@ export default [
     metricName: 'Metric Name 1',
     metricId: 12345,
     functionName: 'Alert Name 1'
-  }, {
+  },
+  {
     id: 4,
     anomalyId: 33340923,
     start: 1491804013000,
@@ -68,7 +71,8 @@ export default [
     metricName: 'Metric Name 1',
     metricId: 12345,
     functionName: 'Alert Name 1'
-  }, {
+  },
+  {
     id: 5,
     anomalyId: 33381509,
     start: 1491804013000,
@@ -85,7 +89,8 @@ export default [
     metricName: 'Metric Name 1',
     metricId: 12345,
     functionName: 'Alert Name 1'
-  }, {
+  },
+  {
     id: 6,
     anomalyId: 33381877,
     start: 1491804013000,
@@ -102,7 +107,8 @@ export default [
     metricName: 'Metric Name 1',
     metricId: 12345,
     functionName: 'Alert Name 1'
-  }, {
+  },
+  {
     id: 7,
     anomalyId: 33302982,
     start: 1491804013000,
@@ -119,7 +125,8 @@ export default [
     metricName: 'Metric Name 1',
     metricId: 12345,
     functionName: 'Alert Name 1'
-  }, {
+  },
+  {
     id: 8,
     anomalyId: 33306049,
     start: 1491804013000,
@@ -136,7 +143,8 @@ export default [
     metricName: 'Metric Name 2',
     metricId: 12345,
     functionName: 'Alert Name 2'
-  }, {
+  },
+  {
     id: 9,
     anomalyId: 33306058,
     start: 1491804013000,
@@ -153,7 +161,8 @@ export default [
     metricName: 'Metric Name 2',
     metricId: 12345,
     functionName: 'Alert Name 2'
-  }, {
+  },
+  {
     id: 10,
     anomalyId: 33314704,
     start: 1491804013000,
@@ -170,7 +179,8 @@ export default [
     metricName: 'Metric Name 2',
     metricId: 12345,
     functionName: 'Alert Name 2'
-  }, {
+  },
+  {
     id: 11,
     anomalyId: 33314705,
     start: 1491804013000,

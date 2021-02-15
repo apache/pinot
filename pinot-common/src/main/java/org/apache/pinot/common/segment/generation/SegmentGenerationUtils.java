@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.ingestion.batch.common;
+package org.apache.pinot.common.segment.generation;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -142,7 +142,7 @@ public class SegmentGenerationUtils {
   public static URI getRelativeOutputPath(URI baseInputDir, URI inputFile, URI outputDir) {
     URI relativePath = baseInputDir.relativize(inputFile);
     Preconditions.checkState(relativePath.getPath().length() > 0 && !relativePath.equals(inputFile),
-        "Unable to extract out the relative path based on base input path: " + baseInputDir);
+        "Unable to extract out the relative path for input file '" + inputFile + "', based on base input path: " + baseInputDir);
     String outputDirStr = outputDir.toString();
     outputDir = !outputDirStr.endsWith("/") ? URI.create(outputDirStr.concat("/")) : outputDir;
     URI relativeOutputURI = outputDir.resolve(relativePath).resolve(".");
@@ -162,5 +162,40 @@ public class SegmentGenerationUtils {
     }
     String[] pathSplits = inputFileURI.getPath().split("/");
     return pathSplits[pathSplits.length - 1];
+  }
+
+  /**
+   * Convert a File URI String to URI Object, use parent URI scheme/userInfo/host/port if sheme is not specified.
+   *
+   * @param uriStr
+   * @param fullUriForPathOnlyUriStr
+   * @return
+   * @throws URISyntaxException
+   */
+  public static URI getFileURI(String uriStr, URI fullUriForPathOnlyUriStr)
+      throws URISyntaxException {
+    URI fileURI = URI.create(uriStr);
+    if (fileURI.getScheme() == null) {
+      return new URI(fullUriForPathOnlyUriStr.getScheme(), fullUriForPathOnlyUriStr.getUserInfo(), fullUriForPathOnlyUriStr.getHost(),
+          fullUriForPathOnlyUriStr.getPort(), fileURI.getPath(), fileURI.getQuery(), fileURI.getFragment());
+    }
+    
+    return fileURI;
+  }
+
+  /**
+   * Convert Directory URI String to URI Object, default to local file system scheme.
+   *
+   * @param uriStr
+   * @return
+   * @throws URISyntaxException
+   */
+  public static URI getDirectoryURI(String uriStr)
+      throws URISyntaxException {
+    URI uri = new URI(uriStr);
+    if (uri.getScheme() == null) {
+      uri = new File(uriStr).toURI();
+    }
+    return uri;
   }
 }

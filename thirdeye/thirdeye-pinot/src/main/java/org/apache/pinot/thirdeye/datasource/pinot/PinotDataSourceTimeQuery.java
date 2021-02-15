@@ -85,7 +85,8 @@ public class PinotDataSourceTimeQuery {
       String timeClause = SqlUtils
           .getBetweenClause(new DateTime(0, DateTimeZone.UTC), new DateTime(cutoffTime, DateTimeZone.UTC), timeSpec, dataset);
 
-      String maxTimeSql = String.format(TIME_QUERY_TEMPLATE, functionName, timeSpec.getColumnName(), dataset, timeClause);
+      String maxTimeSql = SqlUtils.escapeSqlReservedKeywords(
+          String.format(TIME_QUERY_TEMPLATE, functionName, timeSpec.getColumnName(), dataset, timeClause));
       PinotQuery maxTimePinotQuery = new PinotQuery(maxTimeSql, dataset);
 
       ThirdEyeResultSetGroup resultSetGroup;

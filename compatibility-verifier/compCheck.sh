@@ -143,6 +143,30 @@ trap cleanup EXIT
 
 setupCompatTester
 
+###############################################################################
+# XXX BEGIN Temporary
+# While the individual components are under development, it is useful to start
+# zookeeper, controler, broker, server and kafka outside of this command and
+# debug as needed.
+#
+# Start the components as follows (or in debugger, if debugging)
+#
+#   rm -rf /tmp/zkdir && ${PINOT_ADMIN_CMD} StartZookeeper -dataDir /tmp/zkdir
+#   ${PINOT_ADMIN_CMD} StartController
+#   ${PINOT_ADMIN_CMD} StartBroker
+#   ${PINOT_ADMIN_CMD} StartKafka -zkAddress localhost:2181
+#
+# To compile the compat tester command alone, do the following:
+#   cd incubator-pinot
+#   mvn clean install -DskipTests
+#   mvn -pl pinot-integration-tests  package -DskipTests
+#
+if [ $# -ne 1 ]; then echo "Usage: $0 <yaml-file-name> (Be sure to start all components)"; exit 1; fi
+${COMPAT_TESTER} $1; if [ $? -ne 0 ]; then echo "Command failed"; exit 1; fi
+exit 0
+# XXX END Temporary
+##############################################################################
+
 if [ $# -lt 2 ] || [ $# -gt 3 ] ; then
   usage compCheck
 fi

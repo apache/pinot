@@ -331,6 +331,11 @@ public class IndexLoadingConfig {
   }
 
   @VisibleForTesting
+  public void setJsonIndexColumns(Set<String> jsonIndexColumns) {
+    _jsonIndexColumns = jsonIndexColumns;
+  }
+
+  @VisibleForTesting
   public void setH3IndexConfigs(Map<String, H3IndexConfig> h3IndexConfigs) {
     _h3IndexConfigs = h3IndexConfigs;
   }

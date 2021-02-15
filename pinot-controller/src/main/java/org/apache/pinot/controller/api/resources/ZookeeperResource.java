@@ -42,6 +42,8 @@ import javax.ws.rs.core.Response;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
+import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.zookeeper.data.Stat;
@@ -82,6 +84,7 @@ public class ZookeeperResource {
 
   @DELETE
   @Path("/zk/delete")
+  @Authenticate(AccessType.DELETE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Delete the znode at this path")
   @ApiResponses(value = { //
@@ -105,6 +108,7 @@ public class ZookeeperResource {
 
   @PUT
   @Path("/zk/put")
+  @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update the content of the node")
   @ApiResponses(value = { //

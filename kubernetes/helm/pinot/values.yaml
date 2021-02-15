@@ -85,6 +85,7 @@ controller:
   extra:
     configs: |-
       pinot.set.instance.id.to.hostname=true
+      controller.task.scheduler.enabled=true
 
 broker:
   name: broker

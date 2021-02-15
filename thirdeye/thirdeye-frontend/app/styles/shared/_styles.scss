@@ -237,13 +237,13 @@ body {
 }
 
 .te-content-block {
-  font-family: "Source Sans Pro", sans-serif;
+  font-family: 'Source Sans Pro', sans-serif;
   border-radius: 5px;
   background: white;
   padding: 24px;
 
   &__date-picker-section {
-    display:flex;
+    display: flex;
     flex-direction: row;
     align-items: center;
 
@@ -263,14 +263,14 @@ body {
 
   &__date-picker-label {
     margin-bottom: 15px;
-    
+
     color: rgba(0, 0, 0, 0.9);
     font-weight: 500;
     font-size: 14px;
   }
 
   &__alert-performance {
-    font-family: "Source Sans Pro", sans-serif;
+    font-family: 'Source Sans Pro', sans-serif;
     background: white;
     padding: 24px;
     flex-basis: 75%;
@@ -279,10 +279,10 @@ body {
 
   &__detection-health {
     margin-left: 10px;
-    font-family: "Source Sans Pro", sans-serif;
+    font-family: 'Source Sans Pro', sans-serif;
     background: white;
     padding: 24px;
-    flex-basis: 25%
+    flex-basis: 25%;
   }
 
   &__performance-health-wrapper {
@@ -775,7 +775,7 @@ body {
     &:before {
       display: block;
       position: absolute;
-      content: "";
+      content: '';
       left: -200px;
       width: 200px;
       height: 4px;
@@ -808,7 +808,7 @@ body {
   &__list {
     list-style: none;
     font-weight: normal;
-    margin-bottom: 0;
+    margin-top: 17px;
 
     &--summary-block {
       padding: 0;
@@ -829,12 +829,10 @@ body {
 
     &--list {
       display: inline-block;
-      width: 137px;
-      min-width: 137px;
       font-size: 15px;
       overflow: hidden;
       text-overflow: ellipsis;
-      text-align: right;
+      text-align: left;
       margin-right: 10px;
       color: app-shade(black, 4);
     }
@@ -852,8 +850,19 @@ body {
   }
 
   &__value {
+    flex-shrink: 9015;
     overflow: hidden;
     text-overflow: ellipsis;
+
+    &--remaining-metric-count {
+      font-family: Lato;
+      font-style: normal;
+      font-weight: normal;
+      font-size: 14px;
+      line-height: 20px;
+
+      color: #0073b1;
+    }
   }
 
   &__value-solo {
@@ -867,10 +876,6 @@ body {
   &__title-group {
     color: app-shade(black, 0.85);
     font-size: 21px;
-    display: flex;
-    align-items: center;
-    flex-shrink: 1;
-    overflow: hidden;
   }
 
   &__title {
@@ -878,11 +883,16 @@ body {
     display: flex;
   }
 
+  &__title-link {
+    line-height: 25px;
+    overflow: hidden;
+  }
+
   &__title-name {
+    height: 31px;
+    line-height: 35px;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 80%;
-    display: inline-block;
     font-weight: 600;
     margin: 0 $te-spacing 0 0;
   }

@@ -26,6 +26,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.FileSystems;
 import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
@@ -33,13 +34,14 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
-import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
@@ -47,7 +49,7 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUtils;
+import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -166,6 +168,11 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
           .format("The scheme of staging directory URI [%s] and output directory URI [%s] has to be same.",
               stagingDirURI, outputDirURI));
     }
+    if (outputDirFS.exists(stagingDirURI)) {
+      LOGGER.info("Clearing out existing staging directory: [{}]", stagingDirURI);
+      outputDirFS.delete(stagingDirURI, true);
+    }
+    
     outputDirFS.mkdir(stagingDirURI);
     Path stagingInputDir = new Path(stagingDirURI.toString(), "input");
     outputDirFS.mkdir(stagingInputDir.toUri());
@@ -212,11 +219,12 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
     } else {
       LOGGER.info("Creating segments with data files: {}", filteredFiles);
       for (int i = 0; i < numDataFiles; i++) {
-        String dataFilePath = filteredFiles.get(i);
-
+        // Typically PinotFS implementations list files without a protocol, so we lose (for example) the
+        // hdfs:// portion of the path. Call getFileURI() to fix this up.
+        URI inputFileURI = SegmentGenerationUtils.getFileURI(filteredFiles.get(i), inputDirURI);
         File localFile = File.createTempFile("pinot-filepath-", ".txt");
         try (DataOutputStream dataOutputStream = new DataOutputStream(new FileOutputStream(localFile))) {
-          dataOutputStream.write(StringUtil.encodeUtf8(dataFilePath + " " + i));
+          dataOutputStream.write(StringUtil.encodeUtf8(inputFileURI + " " + i));
           dataOutputStream.flush();
           outputDirFS.copyFromLocalFile(localFile, new Path(stagingInputDir, Integer.toString(i)).toUri());
         }
@@ -226,7 +234,18 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
     try {
       // Set up the job
       Job job = Job.getInstance(getConf());
-      job.setJobName(getClass().getName());
+      job.setJobName(getClass().getSimpleName());
+
+      // Our class is in the batch-ingestion-hadoop plugin, so we want to pick a class
+      // that's in the main jar (the pinot-all-${PINOT_VERSION}-jar-with-dependencies.jar)
+      job.setJarByClass(SegmentGenerationJobSpec.class);
+
+      // Disable speculative execution, as otherwise two map tasks can wind up writing to the same staging file.
+      job.getConfiguration().setBoolean(MRJobConfig.MAP_SPECULATIVE, false);
+
+      // But we have to copy ourselves to HDFS, and add us to the distributed cache, so
+      // that the mapper code is available. 
+      addMapperJarToDistributedCache(job, outputDirFS, stagingDirURI);
 
       // Our class is in the batch-ingestion-hadoop plugin, so we want to pick a class
       // that's in the main jar (the pinot-all-${PINOT_VERSION}-jar-with-dependencies.jar)
@@ -251,13 +270,19 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
       // In order to ensure pinot plugins would be loaded to each worker, this method
       // tars entire plugins directory and set this file into Distributed cache.
       // Then each mapper job will untar the plugin tarball, and set system properties accordingly.
+      // Note that normally we'd just use Hadoop's support for putting jars on the 
+      // classpath via the distributed cache, but some of the plugins (e.g. the pinot-parquet
+      // input format) include Hadoop classes, which can be incompatibile with the Hadoop
+      // installation/jars being used to run the mapper, leading to errors such as:
+      // java.lang.NoSuchMethodError: org.apache.hadoop.ipc.RPC.getServer(...
+      //
       packPluginsToDistributedCache(job, outputDirFS, stagingDirURI);
 
       // Add dependency jars, if we're provided with a directory containing these.
-      String dependencyJarsDir = _spec.getExecutionFrameworkSpec().getExtraConfigs().get(DEPS_JAR_DIR_FIELD);
-      if (dependencyJarsDir != null) {
-        Path dependencyJarsPath = new Path(stagingDirURI.toString(), DEPS_JAR_SUBDIR_NAME);
-        addDepsJarToDistributedCache(job, dependencyJarsDir, outputDirFS, dependencyJarsPath.toUri());
+      String dependencyJarsSrcDir = _spec.getExecutionFrameworkSpec().getExtraConfigs().get(DEPS_JAR_DIR_FIELD);
+      if (dependencyJarsSrcDir != null) {
+        Path dependencyJarsDestPath = new Path(stagingDirURI.toString(), DEPS_JAR_SUBDIR_NAME);
+        addJarsToDistributedCache(job, new File(dependencyJarsSrcDir), outputDirFS, dependencyJarsDestPath.toUri(), false);
       }
 
       _spec.setOutputDirURI(stagingSegmentTarUri.toUri().toString());
@@ -282,12 +307,39 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
         throw new RuntimeException("Job failed: " + job);
       }
 
-      LOGGER.info("Trying to copy segment tars from staging directory: [{}] to output directory [{}]", stagingDirURI,
+      LOGGER.info("Moving segment tars from staging directory [{}] to output directory [{}]", stagingDirURI,
           outputDirURI);
-      outputDirFS.copy(new Path(stagingDir, SEGMENT_TAR_SUBDIR_NAME).toUri(), outputDirURI);
+      moveFiles(outputDirFS, new Path(stagingDir, SEGMENT_TAR_SUBDIR_NAME).toUri(), outputDirURI, _spec.isOverwriteOutput());
     } finally {
       LOGGER.info("Trying to clean up staging directory: [{}]", stagingDirURI);
       outputDirFS.delete(stagingDirURI, true);
+    }
+  }
+
+  /**
+   * Move all files from the <sourceDir> to the <destDir>, but don't delete existing contents of destDir.
+   * If <overwrite> is true, and the source file exists in the destination directory, then replace it, otherwise
+   * log a warning and continue. We assume that source and destination directories are on the same filesystem,
+   * so that move() can be used.
+   * 
+   * @param fs 
+   * @param sourceDir
+   * @param destDir
+   * @param overwrite
+   * @throws IOException 
+   * @throws URISyntaxException 
+   */
+  private void moveFiles(PinotFS fs, URI sourceDir, URI destDir, boolean overwrite) throws IOException, URISyntaxException {
+    for (String sourcePath : fs.listFiles(sourceDir, true)) {
+      URI sourceFileUri = SegmentGenerationUtils.getFileURI(sourcePath, sourceDir);
+      String sourceFilename = SegmentGenerationUtils.getFileName(sourceFileUri);
+      URI destFileUri = SegmentGenerationUtils.getRelativeOutputPath(sourceDir, sourceFileUri, destDir).resolve(sourceFilename);
+      
+      if (!overwrite && fs.exists(destFileUri)) {
+        LOGGER.warn("Can't overwrite existing output segment tar file: {}", destFileUri);
+      } else {
+        fs.move(sourceFileUri, destFileUri, true);
+      }
     }
   }
 
@@ -326,7 +378,7 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
         outputDirFS.copyFromLocalFile(pluginsTarGzFile, cachedPluginsTarball.toUri());
         job.addCacheFile(cachedPluginsTarball.toUri());
       } catch (Exception e) {
-        LOGGER.error("Failed to tar plugins directory", e);
+        LOGGER.error("Failed to tar plugins directory and upload to staging dir", e);
         throw new RuntimeException(e);
       }
 
@@ -339,31 +391,25 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
     }
   }
 
-  protected void addDepsJarToDistributedCache(Job job, String srcDirName, PinotFS dstFS, URI dstDirUri)
-      throws IOException {
-    if (srcDirName != null) {
-      URI srcDirUri = URI.create(srcDirName);
-      if (srcDirUri.getScheme() == null) {
-        srcDirUri = new File(srcDirName).toURI();
-      }
-      
-      Path dstDirPath = new Path(dstDirUri);
-      PinotFS srcFS = PinotFSFactory.create(srcDirUri.getScheme());
-      String[] files = srcFS.listFiles(srcDirUri, true);
-      for (String srcFilename : files) {
-        URI srcFileUri = URI.create(srcFilename);
-        if (!srcFS.isDirectory(srcFileUri) && srcFilename.endsWith(".jar")) {
-          LOGGER.info("Adding deps jar: {} to distributed cache", srcFilename);
-          
-          // Copy the local file to our destination directory, and then add it.
-          String jarName = FilenameUtils.getName(srcFileUri.getPath());
-          Path dstFilePath = new Path(dstDirPath, jarName);
-          URI dstFileUri = dstFilePath.toUri();
-          dstFS.copy(srcFileUri, dstFileUri);
-          
-          job.addFileToClassPath(dstFilePath);
-        }
-      }
+  protected void addJarsToDistributedCache(Job job, File srcDir, PinotFS dstFS, URI dstDirUri, boolean recursive)
+      throws Exception {
+    if (!srcDir.exists()) {
+      LOGGER.warn("No jars directory at [{}]", srcDir);
+      return;
+    }
+
+    Path dstDirPath = new Path(dstDirUri);
+    for (File jarFile : FileUtils.listFiles(srcDir, new String[] {"jar"}, recursive)) {
+      LOGGER.info("Adding jar {} to distributed cache", jarFile);
+
+      String jarName = jarFile.getName();
+      Path dstFilePath = new Path(dstDirPath, jarName);
+      URI dstFileUri = dstFilePath.toUri();
+
+      dstFS.copyFromLocalFile(jarFile, dstFileUri);
+
+      job.addFileToClassPath(dstFilePath);
     }
   }
+
 }

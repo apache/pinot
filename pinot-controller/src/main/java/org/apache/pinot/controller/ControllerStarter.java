@@ -153,7 +153,7 @@ public class ControllerStarter implements ServiceStartable {
     _listenerConfigs = ListenerConfigUtil.buildControllerConfigs(_config);
 
     String host = conf.getControllerHost();
-    int port = inferPort();
+    int port = _listenerConfigs.get(0).getPort();
     
     _helixControllerInstanceId = host + "_" + port;
     _helixParticipantInstanceId = LeadControllerUtils.generateParticipantInstanceId(host, port);
@@ -191,13 +191,6 @@ public class ControllerStarter implements ServiceStartable {
         }
       }
     }
-  }
-
-  private int inferPort() {
-    return Optional.ofNullable(_config.getControllerPort()).map(Integer::parseInt)
-        .orElseGet(() -> _listenerConfigs.stream().findFirst().map(ListenerConfig::getPort).orElseThrow(() ->
-            new IllegalStateException(String.format("Requires at least one ingress config or '%s'",
-                ControllerConf.CONTROLLER_PORT))));
   }
 
   private void setupHelixSystemProperties() {

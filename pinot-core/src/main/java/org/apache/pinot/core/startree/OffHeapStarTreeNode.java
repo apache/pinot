@@ -39,7 +39,7 @@ public class OffHeapStarTreeNode implements StarTreeNode {
 
   public OffHeapStarTreeNode(PinotDataBuffer dataBuffer, int nodeId) {
     _dataBuffer = dataBuffer;
-    long offset = nodeId * SERIALIZABLE_SIZE_IN_BYTES;
+    long offset = (long) nodeId * SERIALIZABLE_SIZE_IN_BYTES;
 
     _dimensionId = dataBuffer.getInt(offset);
     offset += Integer.BYTES;
@@ -77,7 +77,7 @@ public class OffHeapStarTreeNode implements StarTreeNode {
     if (_firstChildId == INVALID_ID) {
       return INVALID_ID;
     } else {
-      return _dataBuffer.getInt(_firstChildId * SERIALIZABLE_SIZE_IN_BYTES);
+      return _dataBuffer.getInt((long) _firstChildId * SERIALIZABLE_SIZE_IN_BYTES);
     }
   }
 

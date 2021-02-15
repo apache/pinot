@@ -9,9 +9,10 @@ import { helper } from '@ember/component/helper';
  * @return {Object} dict[key]
  */
 export function getSafe([dict, key]) {
-  if (!dict) { return; }
+  if (!dict) {
+    return;
+  }
   return dict[key];
 }
 
 export default helper(getSafe);
-

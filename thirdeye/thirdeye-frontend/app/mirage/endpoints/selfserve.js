@@ -6,7 +6,6 @@ import anomalyChangeData from 'thirdeye-frontend/mocks/anomalyWowChange';
 import { performanceData } from 'thirdeye-frontend/mocks/anomalyPerformance';
 
 export default function (server) {
-
   server.loadFixtures();
 
   /**
@@ -35,13 +34,13 @@ export default function (server) {
    */
   server.get('/thirdeye-admin/metric-config/metrics', () => {
     return {
-      "Result":"OK",
-      "Records":[
-        "thirdeye-demo::thirdeye_rec1",
-        "thirdeye-demo::Thirdeye_rec2",
-        "thirdeye-demo::Thirdeye_rec3",
-        "thirdeye-demo::Thirdeye_rec4",
-        "thirdeye-demo::Thirdeye_rec5"
+      Result: 'OK',
+      Records: [
+        'thirdeye-demo::thirdeye_rec1',
+        'thirdeye-demo::Thirdeye_rec2',
+        'thirdeye-demo::Thirdeye_rec3',
+        'thirdeye-demo::Thirdeye_rec4',
+        'thirdeye-demo::Thirdeye_rec5'
       ]
     };
   });
@@ -128,7 +127,7 @@ export default function (server) {
    * Tune alert: GET request to fetch new projected anomalies
    */
   server.get('/detection-job/eval/projected/anomalies/:id', () => {
-    return [ 38456269 ];
+    return [38456269];
   });
 
   /**
@@ -149,7 +148,7 @@ export default function (server) {
 
     return server.db.jobs.update(jobId, {
       jobStatus,
-      taskStatuses:[
+      taskStatuses: [
         { taskName: 'DataPreparation', taskStatus },
         { taskName: 'FunctionAlertCreation', taskStatus },
         { taskName: 'FunctionReplay', taskStatus }
@@ -186,7 +185,7 @@ export default function (server) {
    * get request for metric import verification
    */
   server.get('/dashboard/anomaly-function/:id/anomalies', () => {
-    return [ 38456269, 382977991, 38293331 ];
+    return [38456269, 382977991, 38293331];
   });
 
   /**
@@ -207,7 +206,7 @@ export default function (server) {
    * get request for metric import verification
    */
   server.get('/anomalies/search/anomalyIds/0/0/1', (schema, request) => {
-    const idArray = request.queryParams.anomalyIds ? request.queryParams.anomalyIds : [ 38456269 ];
+    const idArray = request.queryParams.anomalyIds ? request.queryParams.anomalyIds : [38456269];
     return anomalySet(idArray.split(','));
   });
 
