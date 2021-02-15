@@ -70,15 +70,13 @@ public class KafkaPartitionLevelStreamConfig {
     _kafkaFetcherMinBytes = getIntConfigWithDefault(_streamConfigMap, fetcherMinBytesKey,
         KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_FETCHER_MIN_BYTES_DEFAULT);
 
-    if (_streamConfigMap.containsKey(isolationLevelKey)) {
-      Preconditions.checkArgument(_streamConfigMap.get(isolationLevelKey)
-              .equals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL_READ_COMMITTED) || _streamConfigMap
-              .get(isolationLevelKey)
+    _kafkaIsolationLevel = _streamConfigMap.get(isolationLevelKey);
+    if (_kafkaIsolationLevel != null) {
+      Preconditions.checkArgument(
+          _kafkaIsolationLevel.equals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL_READ_COMMITTED)
+              || _kafkaIsolationLevel
               .equals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL_READ_UNCOMMITTED),
-          String.format("Unrecognized Kafka isolation level: %s", _streamConfigMap.get(isolationLevelKey)));
-      _kafkaIsolationLevel = _streamConfigMap.get(isolationLevelKey);
-    } else {
-      _kafkaIsolationLevel = null;
+          String.format("Unrecognized Kafka isolation level: %s", _kafkaIsolationLevel));
     }
 
     Preconditions.checkNotNull(_bootstrapHosts,
