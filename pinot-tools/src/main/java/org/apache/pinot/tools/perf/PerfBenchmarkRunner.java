@@ -161,12 +161,14 @@ public class PerfBenchmarkRunner extends AbstractBaseCommand implements Command 
     File[] segments = new File(dataDir, tableName).listFiles();
     Preconditions.checkNotNull(segments);
     for (File segment : segments) {
-      SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segment);
-      if (!tableConfigured) {
-        driver.configureTable(tableName, invertedIndexColumns, bloomFilterColumns);
-        tableConfigured = true;
+      if (segment.isDirectory()) {
+        SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segment);
+        if (!tableConfigured) {
+          driver.configureTable(tableName, invertedIndexColumns, bloomFilterColumns);
+          tableConfigured = true;
+        }
+        driver.addSegment(tableName, segmentMetadata);
       }
-      driver.addSegment(tableName, segmentMetadata);
     }
   }
 

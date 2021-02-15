@@ -75,8 +75,6 @@ public class DictionaryBasedGroupKeyGeneratorTest {
   private static final String FILTER_COLUMN = "docId";
   private static final String[] SV_COLUMNS = {"s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10"};
   private static final String[] MV_COLUMNS = {"m1", "m2"};
-  private static final ThreadLocal<Map> THREAD_LOCAL_DICTIONARY_BASED_GROUP_KEY_HOLDERS =
-      ThreadLocal.withInitial(() -> new HashMap());
 
   private final long _randomSeed = System.currentTimeMillis();
   private final Random _random = new Random(_randomSeed);
@@ -170,8 +168,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
         new DictionaryBasedGroupKeyGenerator(_transformOperator, getExpressions(groupByColumns),
             InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT,
-            InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY,
-            THREAD_LOCAL_DICTIONARY_BASED_GROUP_KEY_HOLDERS.get());
+            InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
     assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(), UNIQUE_ROWS, _errorMessage);
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), UNIQUE_ROWS, _errorMessage);
 
@@ -191,8 +188,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
         new DictionaryBasedGroupKeyGenerator(_transformOperator, getExpressions(groupByColumns),
             InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT,
-            InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY,
-            THREAD_LOCAL_DICTIONARY_BASED_GROUP_KEY_HOLDERS.get());
+            InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
     assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(),
         InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, _errorMessage);
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
@@ -213,8 +209,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
         new DictionaryBasedGroupKeyGenerator(_transformOperator, getExpressions(groupByColumns),
             InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT,
-            InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY,
-            THREAD_LOCAL_DICTIONARY_BASED_GROUP_KEY_HOLDERS.get());
+            InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
     assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(),
         InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, _errorMessage);
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
@@ -235,8 +230,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
         new DictionaryBasedGroupKeyGenerator(_transformOperator, getExpressions(groupByColumns),
             InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT,
-            InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY,
-            THREAD_LOCAL_DICTIONARY_BASED_GROUP_KEY_HOLDERS.get());
+            InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
     assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(),
         InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, _errorMessage);
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
@@ -271,8 +265,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
         new DictionaryBasedGroupKeyGenerator(_transformOperator, getExpressions(groupByColumns),
             InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT,
-            InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY,
-            THREAD_LOCAL_DICTIONARY_BASED_GROUP_KEY_HOLDERS.get());
+            InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
     int groupKeyUpperBound = dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound();
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), groupKeyUpperBound, _errorMessage);
 
@@ -293,8 +286,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
         new DictionaryBasedGroupKeyGenerator(_transformOperator, getExpressions(groupByColumns),
             InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT,
-            InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY,
-            THREAD_LOCAL_DICTIONARY_BASED_GROUP_KEY_HOLDERS.get());
+            InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
     assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(),
         InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, _errorMessage);
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
@@ -316,8 +308,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
         new DictionaryBasedGroupKeyGenerator(_transformOperator, getExpressions(groupByColumns),
             InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT,
-            InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY,
-            THREAD_LOCAL_DICTIONARY_BASED_GROUP_KEY_HOLDERS.get());
+            InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
     assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(),
         InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, _errorMessage);
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
@@ -339,8 +330,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
         new DictionaryBasedGroupKeyGenerator(_transformOperator, getExpressions(groupByColumns),
             InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT,
-            InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY,
-            THREAD_LOCAL_DICTIONARY_BASED_GROUP_KEY_HOLDERS.get());
+            InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
     assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(),
         InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, _errorMessage);
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
@@ -360,7 +350,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     // NOTE: arrayBasedThreshold must be smaller or equal to numGroupsLimit
     DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
         new DictionaryBasedGroupKeyGenerator(_transformOperator, getExpressions(groupByColumns), numGroupsLimit,
-            numGroupsLimit, THREAD_LOCAL_DICTIONARY_BASED_GROUP_KEY_HOLDERS.get());
+            numGroupsLimit);
     assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(), numGroupsLimit, _errorMessage);
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
 
