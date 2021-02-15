@@ -307,39 +307,27 @@ public abstract class AbstractBaseResultSet implements ResultSet {
   }
 
   @Override
-  public Object getObject(int columnIndex)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
   public Object getObject(String columnLabel)
       throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+    return getObject(findColumn(columnLabel));
   }
 
   @Override
   public Object getObject(int columnIndex, Map<String, Class<?>> map)
       throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+    return getObject(columnIndex);
   }
 
   @Override
   public Object getObject(String columnLabel, Map<String, Class<?>> map)
       throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public <T> T getObject(int columnIndex, Class<T> type)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+    return getObject(findColumn(columnLabel), map);
   }
 
   @Override
   public <T> T getObject(String columnLabel, Class<T> type)
       throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+    return getObject(findColumn(columnLabel), type);
   }
 
   @Override

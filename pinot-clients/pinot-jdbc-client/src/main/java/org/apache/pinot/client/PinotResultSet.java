@@ -29,6 +29,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.sql.Date;
 import java.sql.ResultSetMetaData;
+import java.sql.SQLDataException;
 import java.sql.SQLException;
 import java.sql.Time;
 import java.sql.Timestamp;
@@ -38,6 +39,7 @@ import java.util.Map;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.client.base.AbstractBaseResultSet;
 import org.apache.pinot.client.utils.DateTimeUtils;
+import org.apache.pinot.client.utils.DriverUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -295,6 +297,54 @@ public class PinotResultSet extends AbstractBaseResultSet {
     }
 
     return val;
+  }
+
+  @Override
+  public Object getObject(int columnIndex)
+      throws SQLException {
+
+    String dataType = _columnDataTypes.getOrDefault(columnIndex, "");
+
+    if (dataType.isEmpty()) {
+      throw new SQLDataException("Data type not supported for " + dataType);
+    }
+
+    switch (dataType) {
+      case "STRING":
+        return getString(columnIndex);
+      case "INT":
+        return getInt(columnIndex);
+      case "LONG":
+        return getLong(columnIndex);
+      case "FLOAT":
+        return getFloat(columnIndex);
+      case "DOUBLE":
+        return getDouble(columnIndex);
+      case "BOOLEAN":
+        return getBoolean(columnIndex);
+      case "BYTES":
+        return getBytes(columnIndex);
+      default:
+        throw new SQLDataException("Data type not supported for " + dataType);
+    }
+  }
+
+  @Override
+  public <T> T getObject(int columnIndex, Class<T> type)
+      throws SQLException {
+    Object value = getObject(columnIndex);
+
+    try {
+      return type.cast(value);
+    } catch (ClassCastException e) {
+      throw new SQLDataException("Data type conversion is not supported from :" + value.getClass() + " to: " + type);
+    }
+  }
+
+  @Override
+  public <T> T getObject(String columnLabel, Class<T> type)
+      throws SQLException {
+    return super.getObject(columnLabel, type);
   }
 
   private boolean checkIsNull(String val) {
