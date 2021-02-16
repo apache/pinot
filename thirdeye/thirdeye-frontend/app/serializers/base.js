@@ -8,11 +8,11 @@ export default DS.JSONAPISerializer.extend({
   /*
    * @summary normalizing the payload from api response with array type ([{},{}..]) to correct json-api format spec. See  http://jsonapi.org/
    */
-  normalizeArrayResponse(store, primaryModelClass, payload, id, requestType) {
+  normalizeArrayResponse(store, primaryModelClass, payload /**,id, requestType */) {
     //we are kind of doing the job of the this._super(...) here to convert a 'classic JSON' payload into JSON API.
     let data = payload.map((resourcePayload) => {
       let attributes = {};
-      primaryModelClass.eachAttribute(key => {
+      primaryModelClass.eachAttribute((key) => {
         attributes[key] = resourcePayload[key];
       });
 
@@ -32,7 +32,7 @@ export default DS.JSONAPISerializer.extend({
    * serializing the data to send to the api server
    * https://www.emberjs.com/api/ember-data/3.3/classes/DS.JSONAPISerializer/methods/serialize?anchor=serialize
    */
-  serialize(snapshot, options) {
+  serialize(/** snapshot, options */) {
     let json = this._super(...arguments);
     return json;
   }

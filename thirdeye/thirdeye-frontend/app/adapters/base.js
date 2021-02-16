@@ -3,25 +3,25 @@ import { inject as service } from '@ember/service';
 
 const S_401_UNAUTHORIZED = 401;
 
+const REST_HEADER = { Accept: '*/*' };
+
 /**
  * @summary This base supports the standard advanced configurations needed for making the requests.
  */
 export default DS.RESTAdapter.extend({
   session: service(),
   shareDashboardApiService: service('services/api/share-dashboard'),
-  headers: {
-    'Accept': '*/*'
-  },
+  headers: REST_HEADER,
   ajaxOptions() {
     let ajaxOptions = this._super(...arguments);
 
     //TODO: update this to use another hook - lohuynh
     if (ajaxOptions.data.shareId) {
-      delete ajaxOptions.data.shareId;//remove from query as not needed for actual request
+      delete ajaxOptions.data.shareId; //remove from query as not needed for actual request
     }
     // when server returns an empty response, we'll make it valid by replacing with {}
     ajaxOptions.converters = {
-      'text json': function(data) {
+      'text json': function (data) {
         return data === '' ? {} : JSON.parse(data);
       }
     };
@@ -54,16 +54,15 @@ export default DS.RESTAdapter.extend({
       if (unauthorized) {
         this.get('session').invalidate();
       }
-
     }
   },
 
   /**
    * @summary The urlForQuery (called with query) works like the `query` hook above. Both allow mutating the request url.
    */
-  urlForQuery (query, modelName) {
+  urlForQuery(query, modelName) {
     /* The switch allows for adding more model names that needs custom request url */
-    switch(modelName) {
+    switch (modelName) {
       case 'performance': {
         return `${this.get('namespace')}/${query.appName}`;
       }
@@ -91,9 +90,9 @@ export default DS.RESTAdapter.extend({
    * @param {DS.Snapshot} snapshot
    * @return {string} url
    */
-  urlForCreateRecord (modelName/*, snapshot*/) {
+  urlForCreateRecord(modelName /*, snapshot*/) {
     /* The switch allows for adding more model names that needs custom request url */
-    switch(modelName) {
+    switch (modelName) {
       case 'share': {
         const hashKey = this.get('shareDashboardApiService').getHashKey();
         return `${this.get('namespace')}/${hashKey}`;
@@ -108,7 +107,7 @@ export default DS.RESTAdapter.extend({
    * @summary Defining buildURL depending on what properties have changed
    * In this method, you need to examine the snapshot and adjust the URL accordingly.
    */
-  urlForUpdateRecord: function(id, modelName/*, snapshot*/) {
+  urlForUpdateRecord: function (id, modelName /*, snapshot*/) {
     return this._buildURL(modelName, id);
   }
 });
