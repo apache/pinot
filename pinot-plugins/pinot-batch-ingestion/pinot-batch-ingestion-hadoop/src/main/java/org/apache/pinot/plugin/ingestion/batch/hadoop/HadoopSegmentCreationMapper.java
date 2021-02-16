@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.UUID;
@@ -172,7 +173,7 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
 
       // Tar segment directory to compress file
       File localSegmentDir = new File(localOutputTempDir, segmentName);
-      String segmentTarFileName = segmentName + Constants.TAR_GZ_FILE_EXT;
+      String segmentTarFileName = URLEncoder.encode(segmentName + Constants.TAR_GZ_FILE_EXT, "UTF-8");
       File localSegmentTarFile = new File(localOutputTempDir, segmentTarFileName);
       LOGGER.info("Tarring segment from: {} to: {}", localSegmentDir, localSegmentTarFile);
       TarGzCompressionUtils.createTarGzFile(localSegmentDir, localSegmentTarFile);
