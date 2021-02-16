@@ -2,7 +2,6 @@ import moment from 'moment';
 import _ from 'lodash';
 import config from 'thirdeye-frontend/config/environment';
 
-
 const ROOTCAUSE_ANALYSIS_DURATION_MAX = 1209600000; // 14 days (in millis)
 const ROOTCAUSE_ANOMALY_DURATION_MAX = 604800000; // 7 days (in millis)
 
@@ -25,11 +24,11 @@ export const colorMapping = {
   'light-teal': '#98DADE',
   'light-pink': '#FFB9E2',
   'light-grey': '#CFCFCF',
-  'confidence-bounds-blue' : '#dcf8f3',
-  'screenshot-current' : '#1B1B1E',
-  'screenshot-predicted' : '#FF9505',
-  'screenshot-anomaly' : '#EEF2F5',
-  'screenshot-bounds' : '#1CAFED'
+  'confidence-bounds-blue': '#dcf8f3',
+  'screenshot-current': '#1B1B1E',
+  'screenshot-predicted': '#FF9505',
+  'screenshot-anomaly': '#EEF2F5',
+  'screenshot-bounds': '#1CAFED'
 };
 
 // TODO load from config
@@ -50,7 +49,9 @@ export const dateFormatFull = 'ddd, MMM D YYYY, h:mm a z';
  * Returns a timestamp pinned to the default RCA time zone
  */
 export function makeTime(t, args) {
-  if (typeof t === 'undefined') { t = moment().valueOf(); }
+  if (typeof t === 'undefined') {
+    t = moment().valueOf();
+  }
   return moment(t, args).tz(config.timeZone);
 }
 
@@ -95,10 +96,11 @@ export function makeIterable(obj) {
  */
 export function filterObject(obj, func) {
   const out = {};
-  Object.keys(obj).filter(key => func(obj[key])).forEach(key => out[key] = obj[key]);
+  Object.keys(obj)
+    .filter((key) => func(obj[key]))
+    .forEach((key) => (out[key] = obj[key]));
   return out;
 }
-
 
 /**
  * Returns the base entity URN by removing any optional long tail.
@@ -140,22 +142,22 @@ export function stripTail(urn) {
 export function extractTail(urn) {
   const parts = urn.split(':');
   if (urn.startsWith('thirdeye:metric:')) {
-    return _.slice(parts, 3).filter(p => !_.isEmpty(p));
+    return _.slice(parts, 3).filter((p) => !_.isEmpty(p));
   }
   if (urn.startsWith('frontend:metric:')) {
-    return _.slice(parts, 4).filter(p => !_.isEmpty(p));
+    return _.slice(parts, 4).filter((p) => !_.isEmpty(p));
   }
   if (urn.startsWith('frontend:anomalyfunction:')) {
-    return _.slice(parts, 3).filter(p => !_.isEmpty(p));
+    return _.slice(parts, 3).filter((p) => !_.isEmpty(p));
   }
   if (urn.startsWith('thirdeye:event:anomaly:')) {
-    return _.slice(parts, 4).filter(p => !_.isEmpty(p));
+    return _.slice(parts, 4).filter((p) => !_.isEmpty(p));
   }
   if (urn.startsWith('thirdeye:dimensions:')) {
-    return _.slice(parts, 2).filter(p => !_.isEmpty(p));
+    return _.slice(parts, 2).filter((p) => !_.isEmpty(p));
   }
   if (urn.startsWith('thirdeye:callgraph:')) {
-    return _.slice(parts, 2).filter(p => !_.isEmpty(p));
+    return _.slice(parts, 2).filter((p) => !_.isEmpty(p));
   }
   return [];
 }
@@ -188,7 +190,7 @@ export function appendTail(urn, tail) {
  * @returns {string} merged metric urn
  */
 export function appendFilters(urn, filters) {
-  const tail = filters.map(t => {
+  const tail = filters.map((t) => {
     // protects against special characters being in value string
     const encodedValue = encodeURIComponent(t[2]);
     return encodeURIComponent(`${t[0]}${t[1]}${encodedValue}`);
@@ -299,17 +301,19 @@ export function toWidthNumber(width) {
 export function toMetricLabel(urn, entities) {
   let metricName;
   try {
-    metricName = entities[urn].label.split("::")[1].split("_").join(' ');
-  }
-  catch (err) {
+    metricName = entities[urn].label.split('::')[1].split('_').join(' ');
+  } catch (err) {
     metricName = urn;
   }
 
-  const filters = toFilters(urn).map(t => filter2value(t));
+  const filters = toFilters(urn).map((t) => filter2value(t));
 
   // TODO support range filters
-  const inclusionFilters = filters.filter(f => !f.startsWith('!')).sort();
-  const exclusionFilters = filters.filter(f => f.startsWith('!')).map(f => f.substring(1)).sort();
+  const inclusionFilters = filters.filter((f) => !f.startsWith('!')).sort();
+  const exclusionFilters = filters
+    .filter((f) => f.startsWith('!'))
+    .map((f) => f.substring(1))
+    .sort();
 
   const inclusionFiltersString = _.isEmpty(inclusionFilters) ? '' : ` (${inclusionFilters.join(', ')})`;
   const exclusionFiltersString = _.isEmpty(exclusionFilters) ? '' : ` (Excludes ${exclusionFilters.join(', ')})`;
@@ -342,8 +346,7 @@ export function toEventLabel(urn, entities) {
   let label;
   try {
     label = entities[urn].label;
-  }
-  catch (err) {
+  } catch (err) {
     label = urn;
   }
 
@@ -403,7 +406,7 @@ function makeUrnTail(parts, baseLen) {
  * @returns {boolean}
  */
 export function hasPrefix(urn, prefixes) {
-  return urn && !_.isEmpty(makeIterable(prefixes).filter(pre => urn.startsWith(pre)));
+  return urn && !_.isEmpty(makeIterable(prefixes).filter((pre) => urn.startsWith(pre)));
 }
 
 /**
@@ -416,7 +419,7 @@ export function hasPrefix(urn, prefixes) {
  * @returns {boolean}
  */
 export function filterPrefix(urns, prefixes) {
-  return makeIterable(urns).filter(urn => hasPrefix(urn, prefixes));
+  return makeIterable(urns).filter((urn) => hasPrefix(urn, prefixes));
 }
 
 /**
@@ -468,7 +471,6 @@ export function toBaselineRange(range, offset) {
     mean6m: [1, 'months'], // no backend support
     min6m: [1, 'months'], // no backend support
     max6m: [1, 'months'] // no backend support
-
   }[offset.toLowerCase()];
 
   if (!timeOffset || timeOffset[0] === 0) {
@@ -510,15 +512,45 @@ export function toAbsoluteRange(urn, currentRange, baselineCompareMode) {
  */
 export function toFilters(urns) {
   const flatten = (agg, l) => agg.concat(l);
-  const dimensionFilters = filterPrefix(urns, 'thirdeye:dimension:').map(urn => _.slice(urn.split(':').map(decodeURIComponent), 2, 4).insertAt(1, '='));
-  const dimensionsFilters = filterPrefix(urns, 'thirdeye:dimensions:').map(extractTail).map(enc => enc.map(tup => splitFilterFragment(decodeURIComponent(tup)))).reduce(flatten, []);
-  const metricFilters = filterPrefix(urns, 'thirdeye:metric:').map(extractTail).map(enc => enc.map(tup => splitFilterFragment(decodeURIComponent(tup)))).reduce(flatten, []);
-  const frontendMetricFilters = filterPrefix(urns, 'frontend:metric:').map(extractTail).map(enc => enc.map(tup => splitFilterFragment(decodeURIComponent(tup)))).reduce(flatten, []);
-  const anomalyFunctionFilters = filterPrefix(urns, 'frontend:anomalyfunction:').map(extractTail).map(enc => enc.map(tup => splitFilterFragment(decodeURIComponent(tup)))).reduce(flatten, []);
-  const anomalyFilters = filterPrefix(urns, 'thirdeye:event:anomaly:').map(extractTail).map(enc => enc.map(tup => splitFilterFragment(decodeURIComponent(tup)))).reduce(flatten, []);
-  const callgraphFilters = filterPrefix(urns, 'thirdeye:callgraph:').map(extractTail).map(enc => enc.map(tup => splitFilterFragment(decodeURIComponent(tup)))).reduce(flatten, []);
+  const dimensionFilters = filterPrefix(urns, 'thirdeye:dimension:').map((urn) =>
+    _.slice(urn.split(':').map(decodeURIComponent), 2, 4).insertAt(1, '=')
+  );
+  const dimensionsFilters = filterPrefix(urns, 'thirdeye:dimensions:')
+    .map(extractTail)
+    .map((enc) => enc.map((tup) => splitFilterFragment(decodeURIComponent(tup))))
+    .reduce(flatten, []);
+  const metricFilters = filterPrefix(urns, 'thirdeye:metric:')
+    .map(extractTail)
+    .map((enc) => enc.map((tup) => splitFilterFragment(decodeURIComponent(tup))))
+    .reduce(flatten, []);
+  const frontendMetricFilters = filterPrefix(urns, 'frontend:metric:')
+    .map(extractTail)
+    .map((enc) => enc.map((tup) => splitFilterFragment(decodeURIComponent(tup))))
+    .reduce(flatten, []);
+  const anomalyFunctionFilters = filterPrefix(urns, 'frontend:anomalyfunction:')
+    .map(extractTail)
+    .map((enc) => enc.map((tup) => splitFilterFragment(decodeURIComponent(tup))))
+    .reduce(flatten, []);
+  const anomalyFilters = filterPrefix(urns, 'thirdeye:event:anomaly:')
+    .map(extractTail)
+    .map((enc) => enc.map((tup) => splitFilterFragment(decodeURIComponent(tup))))
+    .reduce(flatten, []);
+  const callgraphFilters = filterPrefix(urns, 'thirdeye:callgraph:')
+    .map(extractTail)
+    .map((enc) => enc.map((tup) => splitFilterFragment(decodeURIComponent(tup))))
+    .reduce(flatten, []);
 
-  return [...new Set([...dimensionFilters, ...dimensionsFilters, ...metricFilters, ...frontendMetricFilters, ...anomalyFunctionFilters, ...anomalyFilters, ...callgraphFilters])].sort();
+  return [
+    ...new Set([
+      ...dimensionFilters,
+      ...dimensionsFilters,
+      ...metricFilters,
+      ...frontendMetricFilters,
+      ...anomalyFunctionFilters,
+      ...anomalyFilters,
+      ...callgraphFilters
+    ])
+  ].sort();
 }
 
 /**
@@ -555,8 +587,8 @@ export function splitFilterFragment(fragment) {
  */
 export function fromFilterMap(filterMap) {
   const filters = [];
-  Object.keys(filterMap).forEach(key => {
-    [...filterMap[key]].forEach(value => {
+  Object.keys(filterMap).forEach((key) => {
+    [...filterMap[key]].forEach((value) => {
       filters.push(value2filter(key, value));
     });
   });
@@ -573,7 +605,7 @@ export function fromFilterMap(filterMap) {
  */
 export function toFilterMap(filters) {
   const filterMap = {};
-  filters.forEach(t => {
+  filters.forEach((t) => {
     const dimName = t[0];
     if (!filterMap[dimName]) {
       filterMap[dimName] = new Set();
@@ -582,7 +614,7 @@ export function toFilterMap(filters) {
   });
 
   // Set to list
-  Object.keys(filterMap).forEach(dimName => filterMap[dimName] = [...filterMap[dimName]]);
+  Object.keys(filterMap).forEach((dimName) => (filterMap[dimName] = [...filterMap[dimName]]));
 
   return filterMap;
 }
@@ -630,7 +662,7 @@ export function value2filter(key, value) {
  * @returns {boolean}
  */
 export function hasExclusionFilters(filters) {
-  return !_.isEmpty(filters.map(t => t[1]).filter(op => op !== '='));
+  return !_.isEmpty(filters.map((t) => t[1]).filter((op) => op !== '='));
 }
 
 /**
@@ -642,16 +674,7 @@ export function hasExclusionFilters(filters) {
  * @returns {string} color identifier
  */
 export function toColor(urn) {
-  const metricColors = [
-    'blue',
-    'green',
-    'red',
-    'purple',
-    'orange',
-    'teal',
-    'pink',
-    'grey'
-  ];
+  const metricColors = ['blue', 'green', 'red', 'purple', 'orange', 'teal', 'pink', 'grey'];
   // TODO move to controller, requires color loading from backend
   if (urn.startsWith('thirdeye:event:')) {
     return eventColorMapping[urn.split(':')[2]];
@@ -672,14 +695,21 @@ export function toColor(urn) {
  * @returns {string} direction identifier ('negative', 'neutral', 'positive')
  */
 export function toColorDirection(delta, inverse = false) {
-  if (Number.isNaN(delta)) { return 'neutral'; }
+  if (Number.isNaN(delta)) {
+    return 'neutral';
+  }
 
-  if (inverse) { delta *= -1; }
+  if (inverse) {
+    delta *= -1;
+  }
 
   switch (Math.sign(delta)) {
-    case -1: return 'negative';
-    case 0: return 'neutral';
-    case 1: return 'positive';
+    case -1:
+      return 'negative';
+    case 0:
+      return 'neutral';
+    case 1:
+      return 'positive';
   }
 }
 
@@ -695,7 +725,7 @@ export function toColorDirection(delta, inverse = false) {
  */
 export function isInverse(urn, entities) {
   try {
-    return (entities[urn].attributes.inverse[0] === 'true');
+    return entities[urn].attributes.inverse[0] === 'true';
   } catch (error) {
     return false;
   }
@@ -710,7 +740,7 @@ export function isInverse(urn, entities) {
  */
 export function isAdditive(urn, entities) {
   try {
-    return (entities[urn].attributes.additive[0] === 'true');
+    return entities[urn].attributes.additive[0] === 'true';
   } catch (error) {
     return false;
   }
@@ -724,7 +754,7 @@ export function isAdditive(urn, entities) {
 export function isExclusionWarning(urn, entities) {
   try {
     return !isAdditive(urn, entities) && hasExclusionFilters(toFilters([urn]));
-  } catch(error) {
+  } catch (error) {
     return false;
   }
 }
@@ -735,11 +765,13 @@ export function isExclusionWarning(urn, entities) {
  */
 export function findLabelMapping(label, config) {
   let labelMapping = '';
-  config.some(filterBlock => filterBlock.inputs.some(input => {
-    if (input.label === label) {
-      labelMapping = input.labelMapping;
-    }
-  }));
+  config.some((filterBlock) =>
+    filterBlock.inputs.some((input) => {
+      if (input.label === label) {
+        labelMapping = input.labelMapping;
+      }
+    })
+  );
   return labelMapping;
 }
 
@@ -760,10 +792,10 @@ export function trimTimeRanges(anomalyRange, analysisRange) {
   const newAnalysisRangeStart = Math.max(analysisRange[0], anomalyRange[1] - newAnalysisDuration);
   const newAnalysisRange = [newAnalysisRangeStart, anomalyRange[1]];
 
-  return Object.assign({}, {
+  return {
     anomalyRange: newAnomalyRange,
     analysisRange: newAnalysisRange
-  });
+  };
 }
 
 export default {
