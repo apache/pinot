@@ -21,7 +21,10 @@ package org.apache.pinot.server.starter.helix;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -65,11 +68,14 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.server.api.access.AccessControlFactory;
+import org.apache.pinot.common.rackawareness.InstanceMetadataFetchable;
 import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.server.starter.ServerQueriesDisabledTracker;
+import org.apache.pinot.common.rackawareness.InstanceMetadata;
+import org.apache.pinot.common.rackawareness.InstanceMetadataFetcherProperties;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.plugin.PluginManager;
@@ -101,6 +107,8 @@ import org.slf4j.LoggerFactory;
  */
 public class HelixServerStarter implements ServiceStartable {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixServerStarter.class);
+  private static final String FAULT_DOMAIN = "faultDomain";
+  private static final String HOSTNAME = "hostname";
 
   private final String _helixClusterName;
   private final String _zkAddress;
@@ -336,6 +344,31 @@ public class HelixServerStarter implements ServiceStartable {
     _helixAdmin = _helixManager.getClusterManagmentTool();
     updateInstanceConfigIfNeeded(_host, _port);
 
+    final HelixConfigScope helixConfigScope =
+        new HelixConfigScopeBuilder(ConfigScopeProperty.CLUSTER).forCluster(_helixClusterName).build();
+    final Map<String, String> rackAwarenessConfigMap = _helixAdmin.getConfig(helixConfigScope,
+        Arrays.asList(Helix.RACK_AWARENESS_ENABLED_KEY,
+            Helix.RACK_AWARENESS_PROCESSOR_CLASS_KEY,
+            Helix.RACK_AWARENESS_CONNECTION_MAX_RETRY_KEY,
+            Helix.RACK_AWARENESS_CONNECTION_CONNECTION_TIME_OUT_KEY,
+            Helix.RACK_AWARENESS_CONNECTION_REQUEST_TIME_OUT_KEY));
+    final boolean rackAwarenessEnabled = Boolean.parseBoolean(rackAwarenessConfigMap.get(Helix.RACK_AWARENESS_ENABLED_KEY));
+    if (rackAwarenessEnabled) {
+      final InstanceMetadataFetcherProperties instanceMetadataFetcherProperties = new InstanceMetadataFetcherProperties(
+          Integer.parseInt(rackAwarenessConfigMap.get(Helix.RACK_AWARENESS_CONNECTION_MAX_RETRY_KEY)),
+          Integer.parseInt(rackAwarenessConfigMap.get(Helix.RACK_AWARENESS_CONNECTION_CONNECTION_TIME_OUT_KEY)),
+          Integer.parseInt(rackAwarenessConfigMap.get(Helix.RACK_AWARENESS_CONNECTION_REQUEST_TIME_OUT_KEY))
+      );
+      final InstanceMetadata instanceMetadata = getInstanceMetadata(
+          rackAwarenessConfigMap.get(Helix.RACK_AWARENESS_PROCESSOR_CLASS_KEY),
+          instanceMetadataFetcherProperties);
+
+      final String domain = FAULT_DOMAIN + "=" + instanceMetadata.getFaultDomain() + "," + HOSTNAME + "=" + _instanceId;
+
+      InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(_helixClusterName, _instanceId);
+      instanceConfig.setDomain(domain);
+    }
+
     // Start restlet server for admin API endpoint
     String accessControlFactoryClass =
         _serverConf.getProperty(Server.ACCESS_CONTROL_FACTORY_CLASS, Server.DEFAULT_ACCESS_CONTROL_FACTORY_CLASS);
@@ -460,6 +493,41 @@ public class HelixServerStarter implements ServiceStartable {
     LOGGER.info("Deregistering service status handler");
     ServiceStatus.removeServiceStatusCallback(_instanceId);
     LOGGER.info("Finish shutting down Pinot server for {}", _instanceId);
+  }
+
+  private static InstanceMetadata getInstanceMetadata(String cloudMetadataFetcherClassName,
+      InstanceMetadataFetcherProperties instanceMetadataFetcherProperties) {
+    Class<? extends InstanceMetadataFetchable> fetcherClass;
+    try {
+      fetcherClass = (Class<? extends InstanceMetadataFetchable>) Class.forName(cloudMetadataFetcherClassName);
+    } catch (ClassNotFoundException e) {
+      throw new RuntimeException(String.format("Class %s not found", cloudMetadataFetcherClassName), e);
+    }
+
+    Constructor<? extends InstanceMetadataFetchable> constructor;
+    try {
+      constructor = fetcherClass.getConstructor(InstanceMetadataFetcherProperties.class);
+    } catch (NoSuchMethodException e) {
+      throw new RuntimeException(String.format("No public constructor with parameter type class %s",
+          InstanceMetadataFetcherProperties.class.getName()), e);
+    }
+
+    InstanceMetadataFetchable fetchable;
+
+    try {
+      fetchable = constructor.newInstance(instanceMetadataFetcherProperties);
+    } catch (IllegalAccessException e) {
+      throw new RuntimeException("Constructor not accessible.", e);
+    } catch (InstantiationException e) {
+      throw new RuntimeException("Class not instantiable.", e);
+    } catch (InvocationTargetException e) {
+      throw new RuntimeException("Invocation target exception.", e);
+    } catch (ClassCastException e) {
+      throw new RuntimeException(String.format("Class does not implement interface %s",
+          InstanceMetadataFetchable.class.getName()), e);
+    }
+
+    return fetchable.fetch();
   }
 
   /**
