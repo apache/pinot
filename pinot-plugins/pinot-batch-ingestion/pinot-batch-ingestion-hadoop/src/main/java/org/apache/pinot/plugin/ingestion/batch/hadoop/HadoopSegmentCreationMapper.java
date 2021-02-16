@@ -20,7 +20,11 @@ package org.apache.pinot.plugin.ingestion.batch.hadoop;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.io.IOException;
 import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.file.Files;
+import java.util.List;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -30,11 +34,13 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
-import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUtils;
+import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.spec.Constants;
+import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationTaskSpec;
 import org.apache.pinot.spi.utils.DataSizeUtils;
@@ -42,9 +48,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
-import static org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUtils.PINOT_PLUGINS_DIR;
-import static org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUtils.PINOT_PLUGINS_TAR_GZ;
-import static org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUtils.getFileName;
+import static org.apache.pinot.common.segment.generation.SegmentGenerationUtils.PINOT_PLUGINS_DIR;
+import static org.apache.pinot.common.segment.generation.SegmentGenerationUtils.PINOT_PLUGINS_TAR_GZ;
+import static org.apache.pinot.common.segment.generation.SegmentGenerationUtils.getFileName;
 import static org.apache.pinot.plugin.ingestion.batch.hadoop.HadoopSegmentGenerationJobRunner.SEGMENT_GENERATION_JOB_SPEC;
 import static org.apache.pinot.spi.plugin.PluginManager.PLUGINS_DIR_PROPERTY_NAME;
 import static org.apache.pinot.spi.plugin.PluginManager.PLUGINS_INCLUDE_PROPERTY_NAME;
@@ -61,7 +67,7 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
   private File _localTempDir;
 
   @Override
-  public void setup(Context context) {
+  public void setup(Context context) throws IOException {
     _jobConf = context.getConfiguration();
     Yaml yaml = new Yaml();
     String segmentGenerationJobSpecStr = _jobConf.get(SEGMENT_GENERATION_JOB_SPEC);
@@ -69,10 +75,9 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
     LOGGER.info("Segment generation job spec : {}", segmentGenerationJobSpecStr);
     _localTempDir = new File(FileUtils.getTempDirectory(), "pinot-" + UUID.randomUUID());
 
-    // Load Pinot Plugins copied from Distributed cache.
     File localPluginsTarFile = new File(PINOT_PLUGINS_TAR_GZ);
     if (localPluginsTarFile.exists()) {
-      File pluginsDirFile = new File(PINOT_PLUGINS_DIR);
+      File pluginsDirFile = Files.createTempDirectory(PINOT_PLUGINS_DIR).toFile();
       try {
         TarGzCompressionUtils.untar(localPluginsTarFile, pluginsDirFile);
       } catch (Exception e) {
@@ -90,6 +95,12 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
           System.getProperty(PLUGINS_DIR_PROPERTY_NAME), System.getProperty(PLUGINS_INCLUDE_PROPERTY_NAME));
     } else {
       LOGGER.warn("Cannot find local Pinot plugins directory at [{}]", localPluginsTarFile.getAbsolutePath());
+    }
+    
+    // Register file systems
+    List<PinotFSSpec> pinotFSSpecs = _spec.getPinotFSSpecs();
+    for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
+      PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
     }
   }
 
@@ -162,7 +173,7 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
 
       // Tar segment directory to compress file
       File localSegmentDir = new File(localOutputTempDir, segmentName);
-      String segmentTarFileName = segmentName + Constants.TAR_GZ_FILE_EXT;
+      String segmentTarFileName = URLEncoder.encode(segmentName + Constants.TAR_GZ_FILE_EXT, "UTF-8");
       File localSegmentTarFile = new File(localOutputTempDir, segmentTarFileName);
       LOGGER.info("Tarring segment from: {} to: {}", localSegmentDir, localSegmentTarFile);
       TarGzCompressionUtils.createTarGzFile(localSegmentDir, localSegmentTarFile);
@@ -173,12 +184,9 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
       //move segment to output PinotFS
       URI outputSegmentTarURI = SegmentGenerationUtils.getRelativeOutputPath(inputDirURI, inputFileURI, outputDirURI)
           .resolve(segmentTarFileName);
-      LOGGER.info("Trying to move segment tar file from: [{}] to [{}]", localSegmentTarFile, outputSegmentTarURI);
-      if (!_spec.isOverwriteOutput() && outputDirFS.exists(outputSegmentTarURI)) {
-        LOGGER.warn("Not overwrite existing output segment tar file: {}", outputDirFS.exists(outputSegmentTarURI));
-      } else {
-        outputDirFS.copyFromLocalFile(localSegmentTarFile, outputSegmentTarURI);
-      }
+      LOGGER.info("Copying segment tar file from [{}] to [{}]", localSegmentTarFile, outputSegmentTarURI);
+      outputDirFS.copyFromLocalFile(localSegmentTarFile, outputSegmentTarURI);
+      
       FileUtils.deleteQuietly(localSegmentDir);
       FileUtils.deleteQuietly(localSegmentTarFile);
       FileUtils.deleteQuietly(localInputDataFile);

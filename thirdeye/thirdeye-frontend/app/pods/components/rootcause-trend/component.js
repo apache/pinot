@@ -1,9 +1,4 @@
-import {
-  get,
-  set,
-  computed,
-  getProperties
-} from '@ember/object';
+import { get, set, computed, getProperties } from '@ember/object';
 import {
   toCurrentUrn,
   toBaselineUrn,
@@ -20,7 +15,6 @@ import {
 import Component from '@ember/component';
 import { humanizeChange } from 'thirdeye-frontend/utils/utils';
 import _ from 'lodash';
-
 
 const ROOTCAUSE_TREND_MAX_COLUMNS = 12;
 
@@ -81,21 +75,16 @@ export default Component.extend({
    * Actual start time for time table (from context or dropdown)
    * @type {int}
    */
-  startTime: computed(
-    'context',
-    'desiredStartTime',
-    function () {
-      const { context, desiredStartTime } = getProperties(this, 'context', 'desiredStartTime');
+  startTime: computed('context', 'desiredStartTime', function () {
+    const { context, desiredStartTime } = getProperties(this, 'context', 'desiredStartTime');
 
-      const startTime = desiredStartTime || context.analysisRange[0];
-      if (startTime < context.analysisRange[0]
-          || startTime >= context.analysisRange[1]) {
-        return context.analysisRange[0];
-      }
-
-      return startTime;
+    const startTime = desiredStartTime || context.analysisRange[0];
+    if (startTime < context.analysisRange[0] || startTime >= context.analysisRange[1]) {
+      return context.analysisRange[0];
     }
-  ),
+
+    return startTime;
+  }),
 
   /**
    * Start time formatted
@@ -142,7 +131,7 @@ export default Component.extend({
     const context = get(this, 'context');
 
     const buckets = [];
-    const [stepSize, stepUnit] = context.granularity.split('_').map(s => s.toLowerCase());
+    const [stepSize, stepUnit] = context.granularity.split('_').map((s) => s.toLowerCase());
     const limit = makeTime(context.analysisRange[1]);
     let time = makeTime(context.analysisRange[0]);
     while (time < limit) {
@@ -157,18 +146,14 @@ export default Component.extend({
    * Actual time buckets for columns
    * @type {int[]}
    */
-  buckets: computed(
-    'availableBuckets',
-    'startTime',
-    function () {
-      const { availableBuckets, startTime } = getProperties(this, 'availableBuckets', 'startTime');
+  buckets: computed('availableBuckets', 'startTime', function () {
+    const { availableBuckets, startTime } = getProperties(this, 'availableBuckets', 'startTime');
 
-      const startOffset = startTime || availableBuckets[0];
-      const startIndex = availableBuckets.findIndex(t => t >= startOffset);
+    const startOffset = startTime || availableBuckets[0];
+    const startIndex = availableBuckets.findIndex((t) => t >= startOffset);
 
-      return _.slice(availableBuckets, startIndex, startIndex + ROOTCAUSE_TREND_MAX_COLUMNS);
-    }
-  ),
+    return _.slice(availableBuckets, startIndex, startIndex + ROOTCAUSE_TREND_MAX_COLUMNS);
+  }),
 
   /**
    * Columns for trend table
@@ -183,10 +168,12 @@ export default Component.extend({
         isHidden: true,
         sortDirection: 'desc',
         sortPrecedence: 0
-      }, {
+      },
+      {
         template: 'custom/table-checkbox',
         className: 'metrics-table__column'
-      }, {
+      },
+      {
         propertyName: 'label',
         template: 'custom/metrics-table-metric',
         title: 'Metric',
@@ -194,7 +181,7 @@ export default Component.extend({
       }
     ];
 
-    buckets.forEach(t => {
+    buckets.forEach((t) => {
       columns.push({
         propertyName: `${t}`,
         template: 'custom/trend-table-cell',
@@ -221,88 +208,81 @@ export default Component.extend({
    * Change values, per metric/row
    * @type {object}
    */
-  changes: computed(
-    'entities',
-    'timeseries',
-    'buckets',
-    function () {
-      const { entities, timeseries, buckets } =
-        getProperties(this, 'entities', 'timeseries', 'buckets');
+  changes: computed('entities', 'timeseries', 'buckets', function () {
+    const { entities, timeseries, buckets } = getProperties(this, 'entities', 'timeseries', 'buckets');
 
-      const changes = {};
-      const metricUrns = filterPrefix(Object.keys(entities), 'thirdeye:metric:');
+    const changes = {};
+    const metricUrns = filterPrefix(Object.keys(entities), 'thirdeye:metric:');
 
-      metricUrns.forEach(urn => {
-        const currUrn = toCurrentUrn(urn);
-        const baseUrn = toBaselineUrn(urn);
-        changes[urn] = Array(buckets.length).fill(Number.NaN);
+    metricUrns.forEach((urn) => {
+      const currUrn = toCurrentUrn(urn);
+      const baseUrn = toBaselineUrn(urn);
+      changes[urn] = Array(buckets.length).fill(Number.NaN);
 
-        if (!timeseries[currUrn] || !timeseries[baseUrn]) {
-          return;
+      if (!timeseries[currUrn] || !timeseries[baseUrn]) {
+        return;
+      }
+
+      // NOTE: lookup table to tolerate missing baseline values
+      const baseValueLookup = {};
+      for (let i = 0; i < timeseries[baseUrn].timestamp.length; i++) {
+        baseValueLookup[timeseries[baseUrn].timestamp[i]] = timeseries[baseUrn].value[i];
+      }
+
+      timeseries[currUrn].timestamp.forEach((t, i) => {
+        const change = timeseries[currUrn].value[i] / (baseValueLookup[t] || Number.NaN) - 1;
+
+        // TODO use O(logN) data structure (e.g. treemap)
+        const index = buckets.findIndex((b) => b >= t);
+        if (index >= 0 && index < buckets.length) {
+          changes[urn][index] = change;
         }
-
-        // NOTE: lookup table to tolerate missing baseline values
-        const baseValueLookup = {};
-        for (let i = 0; i < timeseries[baseUrn].timestamp.length; i++) {
-          baseValueLookup[timeseries[baseUrn].timestamp[i]] = timeseries[baseUrn].value[i];
-        }
-
-        timeseries[currUrn].timestamp.forEach((t, i) => {
-          const change = timeseries[currUrn].value[i] / (baseValueLookup[t] || Number.NaN) - 1;
-
-          // TODO use O(logN) data structure (e.g. treemap)
-          const index = buckets.findIndex(b => b >= t);
-          if (index >= 0 && index < buckets.length) {
-            changes[urn][index] = change;
-          }
-        });
       });
+    });
 
-      return changes;
-    }
-  ),
+    return changes;
+  }),
 
   /**
    * Table data in rows
    * @type {object[]}
    */
-  data: computed(
-    'entities',
-    'buckets',
-    'changes',
-    'links',
-    'selectedUrns',
-    function () {
-      const { entities, buckets, changes, links, selectedUrns } =
-        getProperties(this, 'entities', 'buckets', 'changes', 'links', 'selectedUrns');
+  data: computed('entities', 'buckets', 'changes', 'links', 'selectedUrns', function () {
+    const { entities, buckets, changes, links, selectedUrns } = getProperties(
+      this,
+      'entities',
+      'buckets',
+      'changes',
+      'links',
+      'selectedUrns'
+    );
 
-      const metricUrns = filterPrefix(Object.keys(entities), 'thirdeye:metric:');
+    const metricUrns = filterPrefix(Object.keys(entities), 'thirdeye:metric:');
 
-      const rows = metricUrns.map(urn => {
-        const row = {
-          urn,
-          label: toMetricLabel(urn, entities),
-          dataset: toMetricDataset(urn, entities),
-          isSelected: selectedUrns.has(urn),
-          links: links[urn],
-          isExclusionWarning: isExclusionWarning(urn, entities)
+    const rows = metricUrns.map((urn) => {
+      const row = {
+        urn,
+        label: toMetricLabel(urn, entities),
+        dataset: toMetricDataset(urn, entities),
+        isSelected: selectedUrns.has(urn),
+        links: links[urn],
+        isExclusionWarning: isExclusionWarning(urn, entities)
+      };
+
+      buckets.forEach((t, i) => {
+        const change = changes[urn][i];
+        row[`${t}`] = {
+          change: humanizeChange(change),
+          direction: toColorDirection(change, isInverse(urn, entities))
         };
-
-        buckets.forEach((t, i) => {
-          const change = changes[urn][i];
-          row[`${t}`] = {
-            change: humanizeChange(change),
-            direction: toColorDirection(change, isInverse(urn, entities))
-          };
-          row[`${t}_raw`] = makeSortable(change);
-        });
-
-        return row;
+        row[`${t}_raw`] = makeSortable(change);
       });
 
-      return _.sortBy(rows, (row) => row.label);
-    }
-  ),
+      return row;
+    });
+
+    return _.sortBy(rows, (row) => row.label);
+  }),
 
   /**
    * A mapping of each metric and its url(s)
@@ -317,26 +297,25 @@ export default Component.extend({
    *  ]
    * }
    */
-  links: computed('entities', function() {
+  links: computed('entities', function () {
     const entities = get(this, 'entities');
     let metricUrlMapping = {};
 
-    filterPrefix(Object.keys(entities), 'thirdeye:metric:')
-      .forEach(urn => {
-        const attributes = entities[urn].attributes;
-        const { externalUrls = [] } = attributes;
-        let urlArr = [];
+    filterPrefix(Object.keys(entities), 'thirdeye:metric:').forEach((urn) => {
+      const attributes = entities[urn].attributes;
+      const { externalUrls = [] } = attributes;
+      let urlArr = [];
 
-        // Add the list of urls for each url type
-        externalUrls.forEach(urlLabel => {
-          urlArr.push({
-            [urlLabel]: attributes[urlLabel][0] // each type should only have 1 url
-          });
+      // Add the list of urls for each url type
+      externalUrls.forEach((urlLabel) => {
+        urlArr.push({
+          [urlLabel]: attributes[urlLabel][0] // each type should only have 1 url
         });
-
-        // Map all the url lists to a metric urn
-        metricUrlMapping[urn] = urlArr;
       });
+
+      // Map all the url lists to a metric urn
+      metricUrlMapping[urn] = urlArr;
+    });
 
     return metricUrlMapping;
   }),
@@ -346,10 +325,10 @@ export default Component.extend({
    * @type {Array}
    */
   preselectedItems: computed({
-    get () {
+    get() {
       return [];
     },
-    set () {
+    set() {
       // ignore
     }
   }),
@@ -380,17 +359,21 @@ export default Component.extend({
      * Updates the currently selected urns based on user selection on the table
      * @param {Object} e
      */
-    displayDataChanged (e) {
-      if (_.isEmpty(e.selectedItems)) { return; }
+    displayDataChanged(e) {
+      if (_.isEmpty(e.selectedItems)) {
+        return;
+      }
 
       const { selectedUrns, onSelection } = getProperties(this, 'selectedUrns', 'onSelection');
 
-      if (!onSelection) { return; }
+      if (!onSelection) {
+        return;
+      }
 
       const urn = e.selectedItems[0].urn;
       const state = !selectedUrns.has(urn);
 
-      const updates = {[urn]: state};
+      const updates = { [urn]: state };
       if (hasPrefix(urn, 'thirdeye:metric:')) {
         updates[toCurrentUrn(urn)] = state;
         updates[toBaselineUrn(urn)] = state;

@@ -47,7 +47,7 @@ export default Component.extend({
     'viewAnomalyStart',
     'viewAnomalyEnd',
     'anomalyLinks',
-    function() {
+    function () {
       const postObj = {
         startTime: moment(this.get('viewAnomalyStart')).utc().valueOf(),
         endTime: moment(this.get('viewAnomalyEnd')).utc().valueOf(),
@@ -66,18 +66,11 @@ export default Component.extend({
    * @method reportAnomalyPayload
    * @return {Object} Post data
    */
-  showDimension: computed(
-    'alertHasDimensions',
-    'selectedDimension',
-    function() {
-      const {
-        alertHasDimensions,
-        selectedDimension
-      } = this.getProperties('alertHasDimensions', 'selectedDimension');
+  showDimension: computed('alertHasDimensions', 'selectedDimension', function () {
+    const { alertHasDimensions, selectedDimension } = this.getProperties('alertHasDimensions', 'selectedDimension');
 
-      return (alertHasDimensions && selectedDimension !== 'Choose a dimension');
-    }
-  ),
+    return alertHasDimensions && selectedDimension !== 'Choose a dimension';
+  }),
 
   /**
    * Sends post object as is to parent
@@ -88,7 +81,6 @@ export default Component.extend({
   },
 
   actions: {
-
     /**
      * Handle selected dimension filter
      * @method onSelectDimension
@@ -116,6 +108,5 @@ export default Component.extend({
     onAnomalyInput() {
       this.bubbleModalInput();
     }
-
   }
 });

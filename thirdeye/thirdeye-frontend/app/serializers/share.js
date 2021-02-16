@@ -9,7 +9,7 @@ export default DS.JSONSerializer.extend({
    * @param {Object} payload - the data object
    * @return {Object}
    */
-  normalizeQueryResponse(store, primaryModelClass, payload, id, requestType) {
+  normalizeQueryResponse(store, primaryModelClass, payload /** ,id, requestType */) {
     // The response for this is just an object. So we need to normalize it into the meta.
     return {
       meta: payload,

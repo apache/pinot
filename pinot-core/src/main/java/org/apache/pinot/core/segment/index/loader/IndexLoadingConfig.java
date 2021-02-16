@@ -74,9 +74,12 @@ public class IndexLoadingConfig {
   // constructed from FieldConfig
   private Map<String, Map<String, String>> _columnProperties = new HashMap<>();
 
+  private TableConfig _tableConfig;
+
   public IndexLoadingConfig(InstanceDataManagerConfig instanceDataManagerConfig, TableConfig tableConfig) {
     extractFromInstanceConfig(instanceDataManagerConfig);
     extractFromTableConfig(tableConfig);
+    _tableConfig = tableConfig;
   }
 
   private void extractFromTableConfig(TableConfig tableConfig) {
@@ -328,6 +331,11 @@ public class IndexLoadingConfig {
   }
 
   @VisibleForTesting
+  public void setJsonIndexColumns(Set<String> jsonIndexColumns) {
+    _jsonIndexColumns = jsonIndexColumns;
+  }
+
+  @VisibleForTesting
   public void setH3IndexConfigs(Map<String, H3IndexConfig> h3IndexConfigs) {
     _h3IndexConfigs = h3IndexConfigs;
   }
@@ -420,5 +428,14 @@ public class IndexLoadingConfig {
 
   public int getRealtimeAvgMultiValueCount() {
     return _realtimeAvgMultiValueCount;
+  }
+
+  public TableConfig getTableConfig() {
+    return _tableConfig;
+  }
+
+  @VisibleForTesting
+  public void setTableConfig(TableConfig tableConfig) {
+    _tableConfig = tableConfig;
   }
 }

@@ -55,6 +55,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
             updatedBy: detection_json.updatedBy,
             exploreDimensions: detection_json.dimensions,
             dataset: detection_json.datasetNames,
+            metric: detection_json.metric,
             filters: formatYamlFilter(detectionInfo.filters),
             dimensionExploration: formatYamlFilter(detectionInfo.dimensionExploration),
             lastDetectionTime:

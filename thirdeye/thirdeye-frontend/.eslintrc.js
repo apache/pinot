@@ -18,7 +18,7 @@ module.exports = {
     'no-console': 'error',
     'no-debugger': 'error',
     'eol-last': ['warn', 'always'],
-    indent: ['warn', 2, { SwitchCase: 1 }],
+    'indent': ['warn', 2, { 'SwitchCase': 1 }],
     'space-in-parens': ['warn', 'never'],
     'no-trailing-spaces': ['warn'],
     'comma-dangle': ['warn', 'never'],
@@ -26,6 +26,11 @@ module.exports = {
     semi: ['warn', 'always'],
     'comma-style': ['warn', 'last'],
     'no-unused-vars': ['warn', { vars: 'all', args: 'after-used', ignoreRestSiblings: false }],
+    "space-before-function-paren": ["warn", {
+      "anonymous": "always",
+      "named": "never",
+      "asyncArrow": "always"
+    }],
     // TODO: fix all warnings and change rules back to "error"
     'ember/avoid-leaking-state-in-ember-objects': ['warn'],
     'ember/no-attrs-in-components': ['warn'],
@@ -34,7 +39,12 @@ module.exports = {
   overrides: [
     // node files
     {
-      files: ['testem.js', 'ember-cli-build.js', 'config/**/*.js', 'lib/*/index.js'],
+      files: [
+        'ember-cli-build.js',
+        'testem.js',
+        'config/**/*.js',
+        'lib/*/index.js'
+      ],
       parserOptions: {
         sourceType: 'script',
         ecmaVersion: 2015

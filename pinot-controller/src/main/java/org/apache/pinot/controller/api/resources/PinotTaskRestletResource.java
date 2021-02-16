@@ -38,6 +38,8 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.QueryParam;
 import org.apache.helix.task.TaskState;
+import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.core.minion.PinotTaskConfig;
@@ -289,6 +291,7 @@ public class PinotTaskRestletResource {
 
   @POST
   @Path("/tasks/schedule")
+  @Authenticate(AccessType.UPDATE)
   @ApiOperation("Schedule tasks and return a map from task type to task name scheduled")
   public Map<String, String> scheduleTasks(@ApiParam(value = "Task type") @QueryParam("taskType") String taskType,
       @ApiParam(value = "Table name (with type suffix)") @QueryParam("tableName") String tableName) {
@@ -306,6 +309,7 @@ public class PinotTaskRestletResource {
   @Deprecated
   @PUT
   @Path("/tasks/scheduletasks")
+  @Authenticate(AccessType.UPDATE)
   @ApiOperation("Schedule tasks (deprecated)")
   public Map<String, String> scheduleTasksDeprecated() {
     return _pinotTaskManager.scheduleTasks();
@@ -313,6 +317,7 @@ public class PinotTaskRestletResource {
 
   @PUT
   @Path("/tasks/{taskType}/cleanup")
+  @Authenticate(AccessType.UPDATE)
   @ApiOperation("Clean up finished tasks (COMPLETED, FAILED) for the given task type")
   public SuccessResponse cleanUpTasks(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType) {
@@ -323,6 +328,7 @@ public class PinotTaskRestletResource {
   @Deprecated
   @PUT
   @Path("/tasks/cleanuptasks/{taskType}")
+  @Authenticate(AccessType.UPDATE)
   @ApiOperation("Clean up finished tasks (COMPLETED, FAILED) for the given task type (deprecated)")
   public SuccessResponse cleanUpTasksDeprecated(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType) {
@@ -332,6 +338,7 @@ public class PinotTaskRestletResource {
 
   @PUT
   @Path("/tasks/{taskType}/stop")
+  @Authenticate(AccessType.UPDATE)
   @ApiOperation("Stop all running/pending tasks (as well as the task queue) for the given task type")
   public SuccessResponse stopTasks(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType) {
@@ -341,6 +348,7 @@ public class PinotTaskRestletResource {
 
   @PUT
   @Path("/tasks/{taskType}/resume")
+  @Authenticate(AccessType.UPDATE)
   @ApiOperation("Resume all stopped tasks (as well as the task queue) for the given task type")
   public SuccessResponse resumeTasks(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType) {
@@ -351,6 +359,7 @@ public class PinotTaskRestletResource {
   @Deprecated
   @PUT
   @Path("/tasks/taskqueue/{taskType}")
+  @Authenticate(AccessType.UPDATE)
   @ApiOperation("Stop/resume a task queue (deprecated)")
   public SuccessResponse toggleTaskQueueState(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
@@ -369,6 +378,7 @@ public class PinotTaskRestletResource {
 
   @DELETE
   @Path("/tasks/{taskType}")
+  @Authenticate(AccessType.DELETE)
   @ApiOperation("Delete all tasks (as well as the task queue) for the given task type")
   public SuccessResponse deleteTasks(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
@@ -380,6 +390,7 @@ public class PinotTaskRestletResource {
   @Deprecated
   @DELETE
   @Path("/tasks/taskqueue/{taskType}")
+  @Authenticate(AccessType.DELETE)
   @ApiOperation("Delete a task queue (deprecated)")
   public SuccessResponse deleteTaskQueue(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,

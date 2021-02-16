@@ -28,7 +28,7 @@ const makeValues = (dataPointsNum = 100) => {
   const valueArray = [];
   let i = 0;
   while (i++ < dataPointsNum) {
-    let newValue = faker.random.number({min:1, max:100});
+    let newValue = faker.random.number({ min: 1, max: 100 });
     valueArray.push(newValue);
   }
   return valueArray;
@@ -40,7 +40,7 @@ let valueArray = makeValues();
 export default Factory.extend({
   anomalyFunctionName: 'example_metric_name',
   currentStart: dateArray[0],
-  currentEnd: dateArray[dateArray.length-1],
+  currentEnd: dateArray[dateArray.length - 1],
   dates: dateArray,
   anomalyRegionStart: dateArray[40],
   anomalyRegionEnd: dateArray[50],
@@ -49,8 +49,8 @@ export default Factory.extend({
   metricId: 1234,
   baselineValues: valueArray,
   currentValues() {
-    return this.baselineValues.map(value => {
-      return value + faker.random.number({min:-50, max:50});
+    return this.baselineValues.map((value) => {
+      return value + faker.random.number({ min: -50, max: 50 });
     });
   }
 });

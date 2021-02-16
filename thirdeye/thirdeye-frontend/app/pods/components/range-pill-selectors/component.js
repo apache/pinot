@@ -32,13 +32,13 @@ const RANGE_FORMAT = 'YYYY-MM-DD HH:mm';
 const DEFAULT_END_DATE = moment().startOf('day').add(1, 'days');
 
 export default Component.extend({
-
   classNames: ['range-pill-selectors'],
 
   /**
    * Properties we expect to receive for the date-range-picker
    */
   maxTime: '',
+  // eslint-disable-next-line ember/avoid-leaking-state-in-ember-objects
   timeRangeOptions: [],
   timePickerIncrement: 5,
   activeRangeStart: '',
@@ -50,46 +50,35 @@ export default Component.extend({
   /**
    * A set of arbitrary time ranges to help user with quick selection in date-time-picker
    */
+  // eslint-disable-next-line ember/avoid-leaking-state-in-ember-objects
   predefinedRanges: {
-    'Today': [DEFAULT_END_DATE],
+    Today: [DEFAULT_END_DATE],
     'Last 1 month': [moment().subtract(1, 'months').startOf('day'), DEFAULT_END_DATE],
     'Last 2 months': [moment().subtract(2, 'months').startOf('day'), DEFAULT_END_DATE]
   },
 
-  fixedTimeRangeOptions: computed(
-    'timeRangeOptions.@each',
-    function() {
-      const timeRangeOptions = get(this, 'timeRangeOptions');
-      return timeRangeOptions.filter(option => option.name !== 'Custom');
-    }
-  ),
+  fixedTimeRangeOptions: computed('timeRangeOptions.@each', function () {
+    const timeRangeOptions = get(this, 'timeRangeOptions');
+    return timeRangeOptions.filter((option) => option.name !== 'Custom');
+  }),
 
-  triggerClass: computed(
-    'timeRangeOptions.@each',
-    function() {
-      const timeRangeOptions = get(this, 'timeRangeOptions');
-      const active = timeRangeOptions.find(option => option.isActive === true);
-      if (active && active.name !== 'Custom') {
-        return 'range-pill-selectors__option--active';
-      }
-      return 'range-pill-selectors__option';
+  triggerClass: computed('timeRangeOptions.@each', function () {
+    const timeRangeOptions = get(this, 'timeRangeOptions');
+    const active = timeRangeOptions.find((option) => option.isActive === true);
+    if (active && active.name !== 'Custom') {
+      return 'range-pill-selectors__option--active';
     }
-  ),
+    return 'range-pill-selectors__option';
+  }),
 
-  customRange: computed(
-    'timeRangeOptions.@each',
-    function() {
-      const timeRangeOptions = get(this, 'timeRangeOptions');
-      return timeRangeOptions.find(option => option.name === 'Custom');
-    }
-  ),
+  customRange: computed('timeRangeOptions.@each', function () {
+    const timeRangeOptions = get(this, 'timeRangeOptions');
+    return timeRangeOptions.find((option) => option.name === 'Custom');
+  }),
 
-  isCustomRange: computed(
-    'customRange',
-    function() {
-      return !(this.get('customRange') == null);
-    }
-  ),
+  isCustomRange: computed('customRange', function () {
+    return !(this.get('customRange') == null);
+  }),
 
   /**
    * Pick a custom date range input class (width) based on the incoming date format
@@ -99,16 +88,17 @@ export default Component.extend({
     const uiDateFormat = get(this, 'uiDateFormat');
     const pickerClassName = 'range-pill-selectors__range-picker';
     let dateMode = 'default';
-    if (uiDateFormat.includes('h a')) { dateMode = 'hours'; }
-    if (uiDateFormat.includes('hh:mm a')) { dateMode = 'minutes'; }
+    if (uiDateFormat.includes('h a')) {
+      dateMode = 'hours';
+    }
+    if (uiDateFormat.includes('hh:mm a')) {
+      dateMode = 'minutes';
+    }
     set(this, 'inputClassName', `${pickerClassName} ${pickerClassName}--${dateMode}`);
-    const {
-      selectedRange,
-      fixedTimeRangeOptions
-    } = this.getProperties('selectedRange', 'fixedTimeRangeOptions');
+    const { selectedRange, fixedTimeRangeOptions } = this.getProperties('selectedRange', 'fixedTimeRangeOptions');
     if (!selectedRange) {
       if (fixedTimeRangeOptions) {
-        const selected = fixedTimeRangeOptions.find(option => {
+        const selected = fixedTimeRangeOptions.find((option) => {
           if (typeof option === 'object') {
             return option.isActive === true;
           }
@@ -162,7 +152,7 @@ export default Component.extend({
      */
     async onRangeSelection(start, end) {
       const toggledOptions = this.newTimeRangeOptions('custom', start, end);
-      const customOption = toggledOptions.find(op => op.value === 'custom');
+      const customOption = toggledOptions.find((op) => op.value === 'custom');
       this.set('timeRangeOptions', toggledOptions);
       await this.send('selectAction', customOption);
     },
@@ -181,7 +171,7 @@ export default Component.extend({
         // Set date picker defaults to new start/end dates
         const isLast24Hours = name === 'Last 24 hours';
         this.setProperties({
-          activeRangeStart:  isLast24Hours ? this.get('activeRangeStart') : moment(start).format(RANGE_FORMAT),
+          activeRangeStart: isLast24Hours ? this.get('activeRangeStart') : moment(start).format(RANGE_FORMAT),
           activeRangeEnd: isLast24Hours ? this.get('activeRangeEnd') : moment(DEFAULT_END_DATE).format(RANGE_FORMAT)
         });
         // Reset options and highlight selected one. Bubble selection to parent controller.

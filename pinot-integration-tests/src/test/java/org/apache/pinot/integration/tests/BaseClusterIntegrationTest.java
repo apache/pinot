@@ -125,6 +125,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return false;
   }
 
+  protected boolean useKafkaTransaction() {
+    return false;
+  }
+
   protected String getStreamConsumerFactoryClassName() {
     return KafkaStarterUtils.KAFKA_STREAM_CONSUMER_FACTORY_CLASS_NAME;
   }
@@ -307,6 +311,11 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       streamConfigMap.put(KafkaStreamConfigProperties
               .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST),
           KafkaStarterUtils.DEFAULT_KAFKA_BROKER);
+      if (useKafkaTransaction()) {
+        streamConfigMap.put(KafkaStreamConfigProperties
+                .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL),
+            KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL_READ_COMMITTED);
+      }
     } else {
       // HLC
       streamConfigMap
@@ -435,7 +444,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected List<File> getAllAvroFiles()
-          throws Exception {
+      throws Exception {
     // Unpack the Avro files
     int numSegments = unpackAvroData(_tempDir).size();
 

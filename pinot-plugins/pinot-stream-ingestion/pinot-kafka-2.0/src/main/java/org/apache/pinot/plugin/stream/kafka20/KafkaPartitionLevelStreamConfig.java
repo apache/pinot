@@ -37,6 +37,7 @@ public class KafkaPartitionLevelStreamConfig {
   private final int _kafkaSocketTimeout;
   private final int _kafkaFetcherSizeBytes;
   private final int _kafkaFetcherMinBytes;
+  private final String _kafkaIsolationLevel;
   private final Map<String, String> _streamConfigMap;
 
   /**
@@ -58,6 +59,8 @@ public class KafkaPartitionLevelStreamConfig {
         .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_FETCHER_SIZE_BYTES);
     String fetcherMinBytesKey = KafkaStreamConfigProperties
         .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_FETCHER_MIN_BYTES);
+    String isolationLevelKey = KafkaStreamConfigProperties
+        .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL);
     _bootstrapHosts = _streamConfigMap.get(llcBrokerListKey);
     _kafkaBufferSize = getIntConfigWithDefault(_streamConfigMap, llcBufferKey,
         KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BUFFER_SIZE_DEFAULT);
@@ -66,6 +69,16 @@ public class KafkaPartitionLevelStreamConfig {
     _kafkaFetcherSizeBytes = getIntConfigWithDefault(_streamConfigMap, fetcherSizeKey, _kafkaBufferSize);
     _kafkaFetcherMinBytes = getIntConfigWithDefault(_streamConfigMap, fetcherMinBytesKey,
         KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_FETCHER_MIN_BYTES_DEFAULT);
+
+    _kafkaIsolationLevel = _streamConfigMap.get(isolationLevelKey);
+    if (_kafkaIsolationLevel != null) {
+      Preconditions.checkArgument(
+          _kafkaIsolationLevel.equals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL_READ_COMMITTED)
+              || _kafkaIsolationLevel
+              .equals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL_READ_UNCOMMITTED),
+          String.format("Unrecognized Kafka isolation level: %s", _kafkaIsolationLevel));
+    }
+
     Preconditions.checkNotNull(_bootstrapHosts,
         "Must specify kafka brokers list " + llcBrokerListKey + " in case of low level kafka consumer");
   }
@@ -92,6 +105,10 @@ public class KafkaPartitionLevelStreamConfig {
 
   public int getKafkaFetcherMinBytes() {
     return _kafkaFetcherMinBytes;
+  }
+
+  public String getKafkaIsolationLevel() {
+    return _kafkaIsolationLevel;
   }
 
   private int getIntConfigWithDefault(Map<String, String> configMap, String key, int defaultValue) {

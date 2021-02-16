@@ -43,6 +43,8 @@ import javax.ws.rs.core.Response;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -206,6 +208,7 @@ public class PinotBrokerRestletResource {
 
   @POST
   @Path("/brokers/instances/{instanceName}/qps")
+  @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.TEXT_PLAIN)
   @ApiOperation(value = "Enable/disable the query rate limiting for a broker instance", notes = "Enable/disable the query rate limiting for a broker instance")

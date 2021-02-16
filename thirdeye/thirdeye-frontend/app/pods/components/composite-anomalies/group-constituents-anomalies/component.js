@@ -16,37 +16,11 @@ import Component from '@ember/component';
 import { computed } from '@ember/object';
 import { A as EmberArray } from '@ember/array';
 
-import moment from 'moment';
-import config from 'thirdeye-frontend/config/environment';
-import { getAnomaliesStartDuration, getFeedback } from 'thirdeye-frontend/utils/composite-anomalies';
-
-const TABLE_COLUMNS = [
-  {
-    component: 'custom/composite-anomalies-table/start-duration',
-    propertyName: 'startDuration',
-    title: `Start / Duration (${moment.tz([2012, 5], config.timeZone).format('z')})`
-  },
-  {
-    component: 'custom/composite-anomalies-table/group-name',
-    propertyName: 'groupName',
-    title: 'Group Name'
-  },
-  {
-    component: 'custom/composite-anomalies-table/criticality',
-    propertyName: 'criticalityScore',
-    title: 'Criticality Score'
-  },
-  {
-    component: 'custom/composite-anomalies-table/current-predicted',
-    propertyName: 'currentPredicted',
-    title: 'Current / Predicted'
-  },
-  {
-    component: 'custom/composite-anomalies-table/resolution',
-    propertyName: 'feedback',
-    title: 'Feedback'
-  }
-];
+import {
+  getAnomaliesStartDuration,
+  getFeedback,
+  GROUP_CONSTITUENTS_COLUMNS
+} from 'thirdeye-frontend/utils/composite-anomalies';
 
 const CUSTOM_TABLE_CLASSES = {
   table: 'composite-anomalies-table'
@@ -62,14 +36,14 @@ export default Component.extend({
     const computedTableData = [];
 
     if (this.data && this.data.length > 0) {
-      this.data.map((d) => {
+      this.data.map(({ id, startTime, endTime, groupName, criticality, currentPredicted, feedback }) => {
         const row = {
-          anomalyId: d.id,
-          startDuration: getAnomaliesStartDuration(d.startTime, d.endTime, false),
-          groupName: d.groupName,
-          criticalityScore: d.criticality,
-          currentPredicted: d.currentPredicted,
-          feedback: getFeedback(d.feedback),
+          anomalyId: id,
+          startDuration: getAnomaliesStartDuration(startTime, endTime, false),
+          groupName: groupName,
+          criticalityScore: criticality,
+          currentPredicted: currentPredicted,
+          feedback: getFeedback(feedback),
           isLeaf: false
         };
         computedTableData.push(row);
@@ -78,5 +52,5 @@ export default Component.extend({
 
     return computedTableData;
   }),
-  tableColumns: TABLE_COLUMNS
+  tableColumns: GROUP_CONSTITUENTS_COLUMNS
 });

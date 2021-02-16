@@ -1,8 +1,8 @@
 <div class="rootcause-legend__wrapper">
   {{#if hasMetrics}}
-    <ul class="rootcause-legend__list" onMouseLeave={{action "onMouseLeave"}}>
+    <ul class="rootcause-legend__list" onMouseLeave={{action "_onMouseLeave"}}>
       {{#each-in metrics as |urn label|}}
-        <li class="rootcause-legend__item" onMouseEnter={{action "onMouseEnter" urn}}>
+        <li class="rootcause-legend__item" onMouseEnter={{action "_onMouseEnter" urn}}>
           <div class="rootcause-legend__label-group {{if (set-has invisibleUrns urn) 'rootcause-legend__label-group--inactive'}}">
             <div class="rootcause-legend__indicator" {{action "toggleVisibility" urn}}>
               <span class="entity-indicator entity-indicator--{{get-safe colors urn}} entity-indicator--square {{if (set-has invisibleUrns urn) 'entity-indicator--inactive'}}">
@@ -30,9 +30,9 @@
 
   {{#if hasEvents}}
     {{#each-in events as |type eventList|}}
-      <ul class="rootcause-legend__list" onMouseLeave={{action "onMouseLeave"}}>
+      <ul class="rootcause-legend__list" onMouseLeave={{action "_onMouseLeave"}}>
         {{#each-in eventList as |urn label|}}
-          <li class="rootcause-legend__item" onMouseEnter={{action "onMouseEnter" urn}}>
+          <li class="rootcause-legend__item" onMouseEnter={{action "_onMouseEnter" urn}}>
             <div class="rootcause-legend__label-group {{if (set-has invisibleUrns urn) 'rootcause-legend__label-group--inactive'}}" {{action
               "toggleVisibility" urn}}>
               <div class="rootcause-legend__indicator rootcause-legend__indicator--flush">

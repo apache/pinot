@@ -44,6 +44,8 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -114,6 +116,7 @@ public class PinotInstanceAssignmentRestletResource {
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/assignInstances")
+  @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Assign server instances to a table")
   public Map<InstancePartitionsType, InstancePartitions> assignInstances(
       @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName,
@@ -198,6 +201,7 @@ public class PinotInstanceAssignmentRestletResource {
   @PUT
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/instancePartitions")
+  @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Create/update the instance partitions")
   public Map<InstancePartitionsType, InstancePartitions> setInstancePartitions(
       @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName, String instancePartitionsStr) {
@@ -236,6 +240,7 @@ public class PinotInstanceAssignmentRestletResource {
   @DELETE
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/instancePartitions")
+  @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Remove the instance partitions")
   public SuccessResponse removeInstancePartitions(
       @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName,
@@ -270,6 +275,7 @@ public class PinotInstanceAssignmentRestletResource {
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/replaceInstance")
+  @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Replace an instance in the instance partitions")
   public Map<InstancePartitionsType, InstancePartitions> replaceInstance(
       @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName,

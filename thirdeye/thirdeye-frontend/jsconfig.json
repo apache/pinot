@@ -1,1 +1,19 @@
-{"compilerOptions":{"target":"es6","experimentalDecorators":true},"exclude":["node_modules","tmp","vendor",".git","dist"]}
+{
+    "compilerOptions": {
+        "target": "es6",
+        "experimentalDecorators": true,
+        "baseUrl": "./",
+        "paths": {
+            "thirdeye-frontend/*": [
+                "./app/*"
+            ]
+        }
+    },
+    "exclude": [
+        "node_modules",
+        "tmp",
+        "vendor",
+        ".git",
+        "dist"
+    ]
+}

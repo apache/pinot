@@ -26,31 +26,26 @@ import { computed } from '@ember/object';
 import Component from '@ember/component';
 
 export default Component.extend({
-
   /**
    * @type Array
    * Default value for selected values in the filter bar input
    */
+  // eslint-disable-next-line ember/avoid-leaking-state-in-ember-objects
   selected: [],
 
   /**
    * options to populate dropdown (required by power-select addon)
    * @type {Array}
    */
-  options: computed(
-    'labelMapping',
-    'attributesMap',
-    'eventType',
-    function() {
-      const { labelMapping, attributesMap, eventType } = this.getProperties('labelMapping', 'attributesMap', 'eventType');
+  options: computed('labelMapping', 'attributesMap', 'eventType', function () {
+    const { labelMapping, attributesMap, eventType } = this.getProperties('labelMapping', 'attributesMap', 'eventType');
 
-      if (!attributesMap || !attributesMap[eventType] || !labelMapping) {
-        return [];
-      }
-
-      return Array.from(attributesMap[eventType][labelMapping] || []).sort();
+    if (!attributesMap || !attributesMap[eventType] || !labelMapping) {
+      return [];
     }
-  ),
+
+    return Array.from(attributesMap[eventType][labelMapping] || []).sort();
+  }),
 
   actions: {
     /**
@@ -60,7 +55,11 @@ export default Component.extend({
      */
     onSubfilterSelection(selectedValue) {
       this.set('selected', selectedValue);
-      const { eventType, labelMapping, onFilterChange } = this.getProperties('eventType', 'labelMapping', 'onFilterChange');
+      const { eventType, labelMapping, onFilterChange } = this.getProperties(
+        'eventType',
+        'labelMapping',
+        'onFilterChange'
+      );
       onFilterChange(eventType, labelMapping, selectedValue);
     }
   }

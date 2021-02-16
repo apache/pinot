@@ -1,11 +1,11 @@
-export default function(server) {
+export default function (server) {
   /**
    * Get request for auth
    * @return {Object}
    */
   server.get(`/auth`, () => {
     return {
-      name: "thirdeye_user@example.com",
+      name: 'thirdeye_user@example.com',
       groups: []
     };
   });
@@ -15,7 +15,6 @@ export default function(server) {
    * @return {Object}
    */
   server.post(`/auth/authenticate`, () => {
-    return {
-    };
+    return {};
   });
 }

@@ -64,7 +64,13 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   TABLE_STORAGE_QUOTA_UTILIZATION("TableStorageQuotaUtilization", false),
 
   // Percentage of segments we failed to get size for
-  TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT("TableStorageEstMissingSegmentPercent", false);
+  TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT("TableStorageEstMissingSegmentPercent", false),
+
+  // Number of scheduled Cron jobs
+  CRON_SCHEDULER_JOB_SCHEDULED("cronSchedulerJobScheduled", false),
+
+  // Number of Tasks Status
+  TASK_STATUS("taskStatus", false);
 
   private final String gaugeName;
   private final String unit;

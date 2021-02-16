@@ -1,15 +1,8 @@
 import Component from '@ember/component';
-import {
-  computed,
-  setProperties,
-  getProperties
-} from '@ember/object';
+import { computed, setProperties, getProperties } from '@ember/object';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import fetch from 'fetch';
-import {
-  makeTime,
-  dateFormatFull
-} from 'thirdeye-frontend/utils/rca-utils';
+import { makeTime, dateFormatFull } from 'thirdeye-frontend/utils/rca-utils';
 import _ from 'lodash';
 
 export default Component.extend({
@@ -43,7 +36,7 @@ export default Component.extend({
 
     fetch(`/rootcause/raw?framework=identity&urns=${selectedUrn}`)
       .then(checkStatus)
-      .then(res => {
+      .then((res) => {
         if (_.isEmpty(res[0].attributes.maxTime)) {
           setProperties(this, { maxTime: null });
         } else {
@@ -59,7 +52,9 @@ export default Component.extend({
   hasMaxTimeWarning: computed('anomalyRange', 'maxTime', function () {
     const { anomalyRange, maxTime } = getProperties(this, 'anomalyRange', 'maxTime');
 
-    if (!anomalyRange || !maxTime) { return false; }
+    if (!anomalyRange || !maxTime) {
+      return false;
+    }
 
     return anomalyRange[1] > maxTime;
   }),
@@ -71,9 +66,10 @@ export default Component.extend({
   maxTimeFormatted: computed('maxTime', function () {
     const { maxTime } = getProperties(this, 'maxTime');
 
-    if (!maxTime) { return; }
+    if (!maxTime) {
+      return;
+    }
 
     return makeTime(maxTime).format(dateFormatFull);
   })
-
 });

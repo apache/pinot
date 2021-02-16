@@ -60,6 +60,8 @@ import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
@@ -338,6 +340,7 @@ public class PinotSegmentRestletResource {
 
   @POST
   @Path("segments/{tableName}/{segmentName}/reload")
+  @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Reload a segment", notes = "Reload a segment")
   public SuccessResponse reloadSegment(
@@ -362,6 +365,7 @@ public class PinotSegmentRestletResource {
    */
   @POST
   @Path("segments/{tableNameWithType}/{segmentName}/reset")
+  @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Resets a segment by first disabling it, waiting for external view to stabilize, and finally enabling it again", notes = "Resets a segment by disabling and then enabling the segment")
   public SuccessResponse resetSegment(
@@ -395,6 +399,7 @@ public class PinotSegmentRestletResource {
   @POST
   @Path("segments/{tableNameWithType}/reset")
   @Produces(MediaType.APPLICATION_JSON)
+  @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Resets all segments of the table, by first disabling them, waiting for external view to stabilize, and finally enabling the segments", notes = "Resets a segment by disabling and then enabling a segment")
   public SuccessResponse resetAllSegments(
       @ApiParam(value = "Name of the table with type", required = true) @PathParam("tableNameWithType") String tableNameWithType,
@@ -419,6 +424,7 @@ public class PinotSegmentRestletResource {
   @Deprecated
   @POST
   @Path("tables/{tableName}/segments/{segmentName}/reload")
+  @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Reload a segment (deprecated, use 'POST /segments/{tableName}/{segmentName}/reload' instead)", notes = "Reload a segment (deprecated, use 'POST /segments/{tableName}/{segmentName}/reload' instead)")
   public SuccessResponse reloadSegmentDeprecated1(
@@ -438,6 +444,7 @@ public class PinotSegmentRestletResource {
   @Deprecated
   @GET
   @Path("tables/{tableName}/segments/{segmentName}/reload")
+  @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Reload a segment (deprecated, use 'POST /segments/{tableName}/{segmentName}/reload' instead)", notes = "Reload a segment (deprecated, use 'POST /segments/{tableName}/{segmentName}/reload' instead)")
   public SuccessResponse reloadSegmentDeprecated2(
@@ -449,6 +456,7 @@ public class PinotSegmentRestletResource {
 
   @POST
   @Path("segments/{tableName}/reload")
+  @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Reload all segments", notes = "Reload all segments")
   public SuccessResponse reloadAllSegments(
@@ -466,6 +474,7 @@ public class PinotSegmentRestletResource {
   @Deprecated
   @POST
   @Path("tables/{tableName}/segments/reload")
+  @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Reload all segments (deprecated, use 'POST /segments/{tableName}/reload' instead)", notes = "Reload all segments (deprecated, use 'POST /segments/{tableName}/reload' instead)")
   public SuccessResponse reloadAllSegmentsDeprecated1(
@@ -483,6 +492,7 @@ public class PinotSegmentRestletResource {
   @Deprecated
   @GET
   @Path("tables/{tableName}/segments/reload")
+  @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Reload all segments (deprecated, use 'POST /segments/{tableName}/reload' instead)", notes = "Reload all segments (deprecated, use 'POST /segments/{tableName}/reload' instead)")
   public SuccessResponse reloadAllSegmentsDeprecated2(
@@ -494,6 +504,7 @@ public class PinotSegmentRestletResource {
   @DELETE
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/segments/{tableName}/{segmentName}")
+  @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Delete a segment", notes = "Delete a segment")
   public SuccessResponse deleteSegment(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
@@ -508,6 +519,7 @@ public class PinotSegmentRestletResource {
   @DELETE
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/segments/{tableName}")
+  @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Delete all segments", notes = "Delete all segments")
   public SuccessResponse deleteAllSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
@@ -525,6 +537,7 @@ public class PinotSegmentRestletResource {
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/segments/{tableName}/delete")
+  @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Delete the segments in the JSON array payload", notes = "Delete the segments in the JSON array payload")
   public SuccessResponse deleteSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,

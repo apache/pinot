@@ -8,11 +8,7 @@
  */
 
 import Component from '@ember/component';
-import {
-  set,
-  computed,
-  getProperties
-} from '@ember/object';
+import { set, computed, getProperties } from '@ember/object';
 
 const UNIT_OVER_UNIT = 'Unit over x units';
 const MEAN_UNIT = 'Mean of x units';
@@ -26,10 +22,11 @@ export default Component.extend({
 
   selectedBaselineType: 'Unit over x units',
 
+  // eslint-disable-next-line ember/avoid-leaking-state-in-ember-objects
   baselineTypes: [UNIT_OVER_UNIT, MEAN_UNIT, MEDIAN_UNIT, MAX_UNIT, MIN_UNIT],
 
   selectedTimeUnit: 'Week',
-
+  // eslint-disable-next-line ember/avoid-leaking-state-in-ember-objects
   timeUnits: ['Month', 'Week', 'Day', 'Hour'],
 
   selectedNumber: 1,
@@ -38,42 +35,37 @@ export default Component.extend({
    * Baseline derived from selections made by user
    * @returns {String} baseline to request
    */
-  configuredBaseline: computed(
-    'selectedBaselineType',
-    'selectedTimeUnit',
-    'selectedNumber',
-    function() {
-      const {
-        selectedBaselineType,
-        selectedTimeUnit,
-        selectedNumber
-      } = getProperties(this, 'selectedBaselineType', 'selectedTimeUnit', 'selectedNumber');
-      const unitAbbreviation = selectedTimeUnit.charAt(0).toLowerCase();
-      switch(selectedBaselineType) {
-        case UNIT_OVER_UNIT: {
-          return `${unitAbbreviation}o${selectedNumber}${unitAbbreviation}`;
-        }
-        case MEAN_UNIT: {
-          return `mean${selectedNumber}${unitAbbreviation}`;
-        }
-        case MEDIAN_UNIT: {
-          return `median${selectedNumber}${unitAbbreviation}`;
-        }
-        case MAX_UNIT: {
-          return `max${selectedNumber}${unitAbbreviation}`;
-        }
-        case MIN_UNIT: {
-          return `min${selectedNumber}${unitAbbreviation}`;
-        }
-        default: {
-          return 'wo1w';
-        }
+  configuredBaseline: computed('selectedBaselineType', 'selectedTimeUnit', 'selectedNumber', function () {
+    const { selectedBaselineType, selectedTimeUnit, selectedNumber } = getProperties(
+      this,
+      'selectedBaselineType',
+      'selectedTimeUnit',
+      'selectedNumber'
+    );
+    const unitAbbreviation = selectedTimeUnit.charAt(0).toLowerCase();
+    switch (selectedBaselineType) {
+      case UNIT_OVER_UNIT: {
+        return `${unitAbbreviation}o${selectedNumber}${unitAbbreviation}`;
+      }
+      case MEAN_UNIT: {
+        return `mean${selectedNumber}${unitAbbreviation}`;
+      }
+      case MEDIAN_UNIT: {
+        return `median${selectedNumber}${unitAbbreviation}`;
+      }
+      case MAX_UNIT: {
+        return `max${selectedNumber}${unitAbbreviation}`;
+      }
+      case MIN_UNIT: {
+        return `min${selectedNumber}${unitAbbreviation}`;
+      }
+      default: {
+        return 'wo1w';
       }
     }
-  ),
+  }),
 
   actions: {
-
     /**
      * @method onSelectBaselineType
      * @param {String} baselineType - the baseline type selected by user

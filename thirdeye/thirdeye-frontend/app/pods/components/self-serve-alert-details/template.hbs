@@ -95,8 +95,8 @@
         </div>
       {{/if}}
       {{#if (eq displayMode "list")}}
-        {{#link-to "manage.explore" alertData.id}}
-          <div class="te-search-results__title-name" title={{alertData.functionName}}>{{alertData.functionName}}</div>
+        {{#link-to "manage.explore" alertData.id class="te-search-results__title-link"}}
+          <p class="te-search-results__title-name" title={{alertData.functionName}}>{{alertData.functionName}}</p>
         {{/link-to}}
       {{/if}}
     </div>

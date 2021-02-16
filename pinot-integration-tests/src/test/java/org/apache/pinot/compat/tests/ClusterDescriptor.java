@@ -18,14 +18,17 @@
  */
 package org.apache.pinot.compat.tests;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 
 public class ClusterDescriptor {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ClusterDescriptor.class);
 
-  public static final String CONTROLLER_HOST = "localhost";
-  public static final String CONTROLLER_POST = "9000";
-  public static final String CONTROLLER_URL = String.format("http://%s:%s", CONTROLLER_HOST, CONTROLLER_POST);
+  public static final String DEFAULT_HOST = "localhost";
+  public static final String ZOOKEEPER_PORT = "2181";
+  public static final String KAFKA_PORT = "19092";
+  public static final String CONTROLLER_PORT = "9000";
+  public static final String BROKER_PORT = "8099";
+
+  public static final String ZOOKEEPER_URL = String.format("http://%s:%s", DEFAULT_HOST, ZOOKEEPER_PORT);
+  public static final String KAFKA_URL = String.format("http://%s:%s", DEFAULT_HOST, KAFKA_PORT);
+  public static final String CONTROLLER_URL = String.format("http://%s:%s", DEFAULT_HOST, CONTROLLER_PORT);
+  public static final String BROKER_URL = String.format("http://%s:%s", DEFAULT_HOST, BROKER_PORT);
 }

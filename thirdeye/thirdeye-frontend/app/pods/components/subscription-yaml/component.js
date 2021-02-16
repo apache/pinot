@@ -39,29 +39,26 @@ export default Component.extend({
   isEditMode: false,
   showSettings: true,
   disableSubGroupSave: true,
-  subscriptionMsg: '',                //General subscription failures
-  subscriptionYaml:  null,            // The YAML for the subscription group
+  subscriptionMsg: '', //General subscription failures
+  subscriptionYaml: null, // The YAML for the subscription group
   currentYamlSettingsOriginal: defaultSubscriptionYaml,
   showAnomalyModal: false,
   showNotificationModal: false,
   setSubscriptionYaml: null, // function passed in from parent
   createGroup: null,
 
-
-
   init() {
     this._super(...arguments);
-    const {
-      subscriptionYaml,
-      currentYamlSettingsOriginal
-    } = this.getProperties('subscriptionYaml', 'currentYamlSettingsOriginal');
+    const { subscriptionYaml, currentYamlSettingsOriginal } = this.getProperties(
+      'subscriptionYaml',
+      'currentYamlSettingsOriginal'
+    );
     if (!subscriptionYaml) {
       set(this, 'subscriptionYaml', currentYamlSettingsOriginal);
     }
   },
 
   actions: {
-
     /**
      * Closes modal for Subscription Error
      */
@@ -73,12 +70,12 @@ export default Component.extend({
      * resets given yaml field to default value for creation mode and server value for edit mode
      */
     resetYAML() {
-      const {
-        selectSubscriptionGroup,
-        createGroup,
-        subscriptionGroupNamesDisplay,
-        isEditMode
-      } = this.getProperties('selectSubscriptionGroup', 'createGroup', 'subscriptionGroupNamesDisplay', 'isEditMode');
+      const { selectSubscriptionGroup, createGroup, subscriptionGroupNamesDisplay, isEditMode } = this.getProperties(
+        'selectSubscriptionGroup',
+        'createGroup',
+        'subscriptionGroupNamesDisplay',
+        'isEditMode'
+      );
       isEditMode ? selectSubscriptionGroup(createGroup) : selectSubscriptionGroup(subscriptionGroupNamesDisplay[0]);
     },
 
@@ -101,7 +98,7 @@ export default Component.extend({
      * Updates the subscription settings yaml with user section
      */
     onSubscriptionGroupSelectionAction(value) {
-      if(value.yaml) {
+      if (value.yaml) {
         const selectSubscriptionGroup = get(this, 'selectSubscriptionGroup');
         selectSubscriptionGroup(value);
       }

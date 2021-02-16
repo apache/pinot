@@ -58,12 +58,19 @@ public class TimeSpecFunctionEvaluator implements FunctionEvaluator {
    */
   @Override
   public Object evaluate(GenericRow genericRow) {
-    Object incomingTimeValue = genericRow.getValue(_incomingTimeColumn);
+    return evaluate(genericRow.getValue(_incomingTimeColumn));
+  }
+
+  @Override
+  public Object evaluate(Object[] values) {
+    return evaluate(values[0]);
+  }
+
+  private Object evaluate(Object incomingTimeValue) {
     if (!_isValidated) {
       if (_incomingTimeColumn == null || !TimeUtils
           .timeValueInValidRange(_incomingTimeConverter.toMillisSinceEpoch(incomingTimeValue))) {
-        throw new IllegalStateException(
-            "No valid time value found in incoming time column: " + _incomingTimeColumn);
+        throw new IllegalStateException("No valid time value found in incoming time column: " + _incomingTimeColumn);
       }
       _isValidated = true;
     }

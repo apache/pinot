@@ -33,11 +33,16 @@ public class KafkaPartitionLevelStreamConfigTest {
 
   private KafkaPartitionLevelStreamConfig getStreamConfig(String topic, String bootstrapHosts, String buffer,
       String socketTimeout) {
-    return getStreamConfig(topic, bootstrapHosts, buffer, socketTimeout, null, null);
+    return getStreamConfig(topic, bootstrapHosts, buffer, socketTimeout, null, null, null);
   }
 
   private KafkaPartitionLevelStreamConfig getStreamConfig(String topic, String bootstrapHosts, String buffer,
-      String socketTimeout, String fetcherSize, String fetcherMinBytes) {
+      String socketTimeout, String isolationLevel) {
+    return getStreamConfig(topic, bootstrapHosts, buffer, socketTimeout, null, null, isolationLevel);
+  }
+
+  private KafkaPartitionLevelStreamConfig getStreamConfig(String topic, String bootstrapHosts, String buffer,
+      String socketTimeout, String fetcherSize, String fetcherMinBytes, String isolationLevel) {
     Map<String, String> streamConfigMap = new HashMap<>();
     String streamType = "kafka";
     String consumerType = StreamConfig.ConsumerType.LOWLEVEL.toString();
@@ -69,7 +74,16 @@ public class KafkaPartitionLevelStreamConfigTest {
     if (fetcherMinBytes != null) {
       streamConfigMap.put("stream.kafka.fetcher.minBytes", fetcherMinBytes);
     }
+    if (isolationLevel != null) {
+      streamConfigMap.put("stream.kafka.isolation.level", isolationLevel);
+    }
     return new KafkaPartitionLevelStreamConfig(new StreamConfig(tableNameWithType, streamConfigMap));
+  }
+
+  @Test
+  public void testGetKafkaIsolationLevel() {
+    KafkaPartitionLevelStreamConfig config = getStreamConfig("topic", "", "", "", "read_committed");
+    Assert.assertEquals("read_committed", config.getKafkaIsolationLevel());
   }
 
   @Test
@@ -127,38 +141,38 @@ public class KafkaPartitionLevelStreamConfigTest {
   @Test
   public void testGetFetcherSize() {
     // test default
-    KafkaPartitionLevelStreamConfig config = getStreamConfig("topic", "host1", "", "", "", null);
+    KafkaPartitionLevelStreamConfig config = getStreamConfig("topic", "host1", "", "", "", null, null);
     Assert.assertEquals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BUFFER_SIZE_DEFAULT,
         config.getKafkaFetcherSizeBytes());
 
-    config = getStreamConfig("topic", "host1", "100", "", "", null);
+    config = getStreamConfig("topic", "host1", "100", "", "", null, null);
     Assert.assertEquals(100, config.getKafkaFetcherSizeBytes());
 
-    config = getStreamConfig("topic", "host1", "100", "", "bad value", null);
+    config = getStreamConfig("topic", "host1", "100", "", "bad value", null, null);
     Assert.assertEquals(100, config.getKafkaFetcherSizeBytes());
 
     // correct config
-    config = getStreamConfig("topic", "host1", "100", "", "200", null);
+    config = getStreamConfig("topic", "host1", "100", "", "200", null, null);
     Assert.assertEquals(200, config.getKafkaFetcherSizeBytes());
   }
 
   @Test
   public void testGetFetcherMinBytes() {
     // test default
-    KafkaPartitionLevelStreamConfig config = getStreamConfig("topic", "host1", "", "", "", null);
+    KafkaPartitionLevelStreamConfig config = getStreamConfig("topic", "host1", "", "", "", null, null);
     Assert.assertEquals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_FETCHER_MIN_BYTES_DEFAULT,
         config.getKafkaFetcherMinBytes());
 
-    config = getStreamConfig("topic", "host1", "", "", "", "");
+    config = getStreamConfig("topic", "host1", "", "", "", "", null);
     Assert.assertEquals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_FETCHER_MIN_BYTES_DEFAULT,
         config.getKafkaFetcherMinBytes());
 
-    config = getStreamConfig("topic", "host1", "", "", "", "bad value");
+    config = getStreamConfig("topic", "host1", "", "", "", "bad value", null);
     Assert.assertEquals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_FETCHER_MIN_BYTES_DEFAULT,
         config.getKafkaFetcherMinBytes());
 
     // correct config
-    config = getStreamConfig("topic", "host1", "", "", "", "100");
+    config = getStreamConfig("topic", "host1", "", "", "", "100", null);
     Assert.assertEquals(100, config.getKafkaFetcherMinBytes());
   }
 }

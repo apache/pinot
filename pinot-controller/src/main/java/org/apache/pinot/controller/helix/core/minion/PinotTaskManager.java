@@ -29,6 +29,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
+import org.apache.helix.task.TaskState;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
@@ -71,12 +73,15 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
 
   private static final String TABLE_CONFIG_PARENT_PATH = "/CONFIGS/TABLE";
   private static final String TABLE_CONFIG_PATH_PREFIX = "/CONFIGS/TABLE/";
+  private static final String TASK_QUEUE_PATH_PATTERN = "/TaskRebalancer/TaskQueue_%s/Context";
 
   private final PinotHelixTaskResourceManager _helixTaskResourceManager;
   private final ClusterInfoAccessor _clusterInfoAccessor;
   private final TaskGeneratorRegistry _taskGeneratorRegistry;
   private final Map<String, Map<String, String>> _tableTaskTypeToCronExpressionMap = new ConcurrentHashMap<>();
   private final Map<String, TableTaskSchedulerUpdater> _tableTaskSchedulerUpdaterMap = new ConcurrentHashMap<>();
+  private final Map<String, TaskTypeMetricsUpdater> _taskTypeMetricsUpdaterMap = new ConcurrentHashMap<>();
+  private final Map<TaskState, Integer> _taskStateToCountMap = new ConcurrentHashMap<>();
 
   private Scheduler _scheduledExecutorService = null;
 
@@ -124,12 +129,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     return TABLE_CONFIG_PATH_PREFIX + tableWithType;
   }
 
-  protected synchronized void cleanupCronTaskScheduler() {
-    try {
-      _scheduledExecutorService.clear();
-    } catch (SchedulerException e) {
-      LOGGER.error("Failed to clear all tasks in scheduler", e);
-    }
+  private String getPropertyStorePathForTaskQueue(String taskType) {
+    return String.format(TASK_QUEUE_PATH_PATTERN, taskType);
   }
 
   public synchronized void cleanUpCronTaskSchedulerForTable(String tableWithType) {
@@ -158,12 +159,18 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       if (jobKey.getName().equals(tableWithType)) {
         try {
           _scheduledExecutorService.deleteJob(jobKey);
+          _controllerMetrics.addValueToTableGauge(getCronJobName(tableWithType, jobKey.getGroup()),
+              ControllerGauge.CRON_SCHEDULER_JOB_SCHEDULED, -1L);
         } catch (SchedulerException e) {
           LOGGER.error("Got exception when deleting the scheduled job - {}", jobKey, e);
         }
       }
     }
     _tableTaskTypeToCronExpressionMap.remove(tableWithType);
+  }
+
+  public static String getCronJobName(String tableWithType, String taskType) {
+    return String.format("%s.%s", tableWithType, taskType);
   }
 
   public synchronized void subscribeTableConfigChanges(String tableWithType) {
@@ -220,6 +227,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
         if (!taskToCronExpressionMap.containsKey(existingTaskType)) {
           try {
             _scheduledExecutorService.deleteJob(JobKey.jobKey(tableWithType, existingTaskType));
+            _controllerMetrics.addValueToTableGauge(getCronJobName(tableWithType, existingTaskType),
+                ControllerGauge.CRON_SCHEDULER_JOB_SCHEDULED, -1L);
           } catch (SchedulerException e) {
             LOGGER.error("Failed to delete scheduled job for table {}, task type {}", tableWithType,
                 existingScheduledTasks, e);
@@ -278,8 +287,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       LOGGER.error("Failed to check job existence for job key - table: {}, task: {} ", tableWithType, taskType, e);
     }
     if (!exists) {
-      LOGGER
-          .info("Trying to put cron expression: {} for table {}, task type: {}", cronExprStr, tableWithType, taskType);
+      LOGGER.info("Trying to schedule a job with cron expression: {} for table {}, task type: {}", cronExprStr,
+          tableWithType, taskType);
       Trigger trigger = TriggerBuilder.newTrigger().withIdentity(TriggerKey.triggerKey(tableWithType, taskType))
           .withSchedule(CronScheduleBuilder.cronSchedule(cronExprStr)).build();
       JobDataMap jobDataMap = new JobDataMap();
@@ -290,6 +299,9 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
               .build();
       try {
         _scheduledExecutorService.scheduleJob(jobDetail, trigger);
+        _controllerMetrics
+            .addValueToTableGauge(getCronJobName(tableWithType, taskType), ControllerGauge.CRON_SCHEDULER_JOB_SCHEDULED,
+                1L);
       } catch (Exception e) {
         LOGGER.error("Failed to parse Cron expression - " + cronExprStr, e);
         throw e;
@@ -367,6 +379,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       PinotTaskGenerator taskGenerator = _taskGeneratorRegistry.getTaskGenerator(taskType);
       if (taskGenerator != null) {
         _helixTaskResourceManager.ensureTaskQueueExists(taskType);
+        addTaskTypeMetricsUpdaterIfNeeded(taskType);
         tasksScheduled.put(taskType, scheduleTask(taskGenerator, enabledTableConfigs, isLeader));
       } else {
         List<String> enabledTables = new ArrayList<>(enabledTableConfigs.size());
@@ -435,6 +448,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     }
 
     _helixTaskResourceManager.ensureTaskQueueExists(taskType);
+    addTaskTypeMetricsUpdaterIfNeeded(taskType);
     return scheduleTask(taskGenerator, enabledTableConfigs, false);
   }
 
@@ -455,6 +469,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
             "Table: %s does not have task type: %s enabled", tableNameWithType, taskType);
 
     _helixTaskResourceManager.ensureTaskQueueExists(taskType);
+    addTaskTypeMetricsUpdaterIfNeeded(taskType);
     return scheduleTask(taskGenerator, Collections.singletonList(tableConfig), false);
   }
 
@@ -473,5 +488,32 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
 
   public Scheduler getScheduler() {
     return _scheduledExecutorService;
+  }
+
+  public synchronized void reportMetrics(String taskType) {
+    Map<String, TaskState> taskStates = _helixTaskResourceManager.getTaskStates(taskType);
+    Map<TaskState, Integer> taskStateToCountMap = new HashMap<>();
+    for (TaskState taskState : taskStates.values()) {
+      taskStateToCountMap.merge(taskState, 1, Integer::sum);
+    }
+    // Reset all the status to 0
+    for (TaskState taskState : _taskStateToCountMap.keySet()) {
+      _taskStateToCountMap.put(taskState, 0);
+    }
+    _taskStateToCountMap.putAll(taskStateToCountMap);
+    for (Map.Entry<TaskState, Integer> taskStateEntry : _taskStateToCountMap.entrySet()) {
+      _controllerMetrics
+          .setValueOfTableGauge(String.format("%s.%s", taskType, taskStateEntry.getKey()), ControllerGauge.TASK_STATUS,
+              taskStateEntry.getValue());
+    }
+  }
+
+  private synchronized void addTaskTypeMetricsUpdaterIfNeeded(String taskType) {
+    if (!_taskTypeMetricsUpdaterMap.containsKey(taskType)) {
+      TaskTypeMetricsUpdater taskTypeMetricsUpdater = new TaskTypeMetricsUpdater(taskType, this);
+      _pinotHelixResourceManager.getPropertyStore()
+          .subscribeDataChanges(getPropertyStorePathForTaskQueue(taskType), taskTypeMetricsUpdater);
+      _taskTypeMetricsUpdaterMap.put(taskType, taskTypeMetricsUpdater);
+    }
   }
 }

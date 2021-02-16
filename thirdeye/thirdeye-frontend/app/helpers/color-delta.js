@@ -9,7 +9,9 @@ import { toColorDirection } from 'thirdeye-frontend/utils/rca-utils';
  * @return {String} positive, neutral, or negative modifier for BEM class
  */
 export function colorDelta([value = 'N/A', inverse = false]) {
-  if (value ===  'N/A') { return 'neutral'; }
+  if (value === 'N/A') {
+    return 'neutral';
+  }
   return toColorDirection(value, inverse);
 }
 

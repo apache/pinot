@@ -43,6 +43,8 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.configuration.BaseConfiguration;
@@ -52,6 +54,10 @@ import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.api.access.AccessControlFactory;
+import org.apache.pinot.controller.api.access.AccessControlUtils;
+import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
@@ -72,6 +78,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.glassfish.grizzly.http.server.Request;
 import org.quartz.CronScheduleBuilder;
 import org.slf4j.LoggerFactory;
 
@@ -112,6 +119,10 @@ public class PinotTableRestletResource {
   @Inject
   ExecutorService _executorService;
 
+  @Inject
+  AccessControlFactory _accessControlFactory;
+  AccessControlUtils _accessControlUtils = new AccessControlUtils();
+
   /**
    * API to create a table. Before adding, validations will be done (min number of replicas,
    * checking offline and realtime table configs match, checking for tenants existing)
@@ -121,11 +132,19 @@ public class PinotTableRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables")
   @ApiOperation(value = "Adds a table", notes = "Adds a table")
-  public SuccessResponse addTable(String tableConfigStr) {
+  public SuccessResponse addTable(String tableConfigStr, @Context HttpHeaders httpHeaders, @Context Request request) {
     // TODO introduce a table config ctor with json string.
     TableConfig tableConfig;
+    String tableName;
     try {
       tableConfig = JsonUtils.stringToObject(tableConfigStr, TableConfig.class);
+
+      // validate permission
+      tableName = tableConfig.getTableName();
+      String endpointUrl = request.getRequestURL().toString();
+      _accessControlUtils
+          .validatePermission(tableName, AccessType.CREATE, httpHeaders, endpointUrl, _accessControlFactory.create());
+
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
 
       TunerConfig tunerConfig = tableConfig.getTunerConfig();
@@ -143,7 +162,6 @@ public class PinotTableRestletResource {
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     }
-    String tableName = tableConfig.getTableName();
     try {
       ensureMinReplicas(tableConfig);
       ensureStorageQuotaConstraints(tableConfig);
@@ -232,6 +250,7 @@ public class PinotTableRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}")
+  @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Get/Enable/Disable/Drop a table", notes =
       "Get/Enable/Disable/Drop a table. If table name is the only parameter specified "
           + ", the tableconfig will be printed")
@@ -285,6 +304,7 @@ public class PinotTableRestletResource {
 
   @DELETE
   @Path("/tables/{tableName}")
+  @Authenticate(AccessType.DELETE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Deletes a table", notes = "Deletes a table")
   public SuccessResponse deleteTable(
@@ -339,6 +359,7 @@ public class PinotTableRestletResource {
 
   @PUT
   @Path("/tables/{tableName}")
+  @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Updates table config for a table", notes = "Updates table config for a table")
   public SuccessResponse updateTableConfig(
@@ -566,6 +587,7 @@ public class PinotTableRestletResource {
 
   @POST
   @Produces(MediaType.APPLICATION_JSON)
+  @Authenticate(AccessType.UPDATE)
   @Path("/tables/{tableName}/rebalance")
   @ApiOperation(value = "Rebalances a table (reassign instances and segments for a table)", notes = "Rebalances a table (reassign instances and segments for a table)")
   public RebalanceResult rebalance(

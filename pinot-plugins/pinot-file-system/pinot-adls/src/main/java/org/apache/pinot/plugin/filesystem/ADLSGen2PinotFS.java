@@ -18,6 +18,27 @@
  */
 package org.apache.pinot.plugin.filesystem;
 
+import com.azure.core.http.rest.PagedIterable;
+import com.azure.core.util.Context;
+import com.azure.identity.ClientSecretCredential;
+import com.azure.identity.ClientSecretCredentialBuilder;
+import com.azure.storage.blob.BlobClient;
+import com.azure.storage.blob.BlobServiceClient;
+import com.azure.storage.blob.BlobServiceClientBuilder;
+import com.azure.storage.common.StorageSharedKeyCredential;
+import com.azure.storage.common.Utility;
+import com.azure.storage.file.datalake.DataLakeDirectoryClient;
+import com.azure.storage.file.datalake.DataLakeFileClient;
+import com.azure.storage.file.datalake.DataLakeFileSystemClient;
+import com.azure.storage.file.datalake.DataLakeServiceClient;
+import com.azure.storage.file.datalake.DataLakeServiceClientBuilder;
+import com.azure.storage.file.datalake.models.DataLakeRequestConditions;
+import com.azure.storage.file.datalake.models.DataLakeStorageException;
+import com.azure.storage.file.datalake.models.ListPathsOptions;
+import com.azure.storage.file.datalake.models.PathHttpHeaders;
+import com.azure.storage.file.datalake.models.PathItem;
+import com.azure.storage.file.datalake.models.PathProperties;
+import com.google.common.annotations.VisibleForTesting;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -36,37 +57,15 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.Map;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.azure.core.http.rest.PagedIterable;
-import com.azure.core.util.Context;
-import com.azure.storage.blob.BlobClient;
-import com.azure.storage.blob.BlobServiceClient;
-import com.azure.storage.blob.BlobServiceClientBuilder;
-import com.azure.storage.common.StorageSharedKeyCredential;
-import com.azure.storage.common.Utility;
-import com.azure.storage.file.datalake.DataLakeDirectoryClient;
-import com.azure.storage.file.datalake.DataLakeFileClient;
-import com.azure.storage.file.datalake.DataLakeFileSystemClient;
-import com.azure.storage.file.datalake.DataLakeServiceClient;
-import com.azure.storage.file.datalake.DataLakeServiceClientBuilder;
-import com.azure.storage.file.datalake.models.DataLakeRequestConditions;
-import com.azure.storage.file.datalake.models.DataLakeStorageException;
-import com.azure.storage.file.datalake.models.ListPathsOptions;
-import com.azure.storage.file.datalake.models.PathHttpHeaders;
-import com.azure.storage.file.datalake.models.PathItem;
-import com.azure.storage.file.datalake.models.PathProperties;
-
 
 /**
  * Azure Data Lake Storage Gen2 implementation for the PinotFS interface.
- *
- * TODO: add the unit test
  */
 public class ADLSGen2PinotFS extends PinotFS {
   private static final Logger LOGGER = LoggerFactory.getLogger(ADLSGen2PinotFS.class);
@@ -75,12 +74,16 @@ public class ADLSGen2PinotFS extends PinotFS {
   private static final String ACCESS_KEY = "accessKey";
   private static final String FILE_SYSTEM_NAME = "fileSystemName";
   private static final String ENABLE_CHECKSUM = "enableChecksum";
+  private static final String CLIENT_ID = "clientId";
+  private static final String CLIENT_SECRET = "clientSecret";
+  private static final String TENANT_ID = "tenantId";
 
   private static final String HTTPS_URL_PREFIX = "https://";
 
   private static final String AZURE_STORAGE_DNS_SUFFIX = ".dfs.core.windows.net";
   private static final String AZURE_BLOB_DNS_SUFFIX = ".blob.core.windows.net";
   private static final String PATH_ALREADY_EXISTS_ERROR_CODE = "PathAlreadyExists";
+  private static final String FILE_SYSTEM_NOT_FOUND_ERROR_CODE = "FilesystemNotFound";
   private static final String IS_DIRECTORY_KEY = "hdi_isfolder";
 
   private static final int NOT_FOUND_STATUS_CODE = 404;
@@ -96,6 +99,15 @@ public class ADLSGen2PinotFS extends PinotFS {
   // However, there's some overhead in computing hash. (Adds roughly 3 seconds for 1GB file)
   private boolean _enableChecksum;
 
+  public ADLSGen2PinotFS() {
+  }
+
+  public ADLSGen2PinotFS(DataLakeFileSystemClient fileSystemClient,
+      BlobServiceClient blobServiceClient) {
+    _fileSystemClient = fileSystemClient;
+    _blobServiceClient = blobServiceClient;
+  }
+
   @Override
   public void init(PinotConfiguration config) {
     _enableChecksum = config.getProperty(ENABLE_CHECKSUM, false);
@@ -106,24 +118,75 @@ public class ADLSGen2PinotFS extends PinotFS {
     // TODO: consider to add the encryption of the following config
     String accessKey = config.getProperty(ACCESS_KEY);
     String fileSystemName = config.getProperty(FILE_SYSTEM_NAME);
+    String clientId = config.getProperty(CLIENT_ID);
+    String clientSecret = config.getProperty(CLIENT_SECRET);
+    String tenantId = config.getProperty(TENANT_ID);
 
     String dfsServiceEndpointUrl = HTTPS_URL_PREFIX + accountName + AZURE_STORAGE_DNS_SUFFIX;
     String blobServiceEndpointUrl = HTTPS_URL_PREFIX + accountName + AZURE_BLOB_DNS_SUFFIX;
 
-    StorageSharedKeyCredential sharedKeyCredential = new StorageSharedKeyCredential(accountName, accessKey);
+    DataLakeServiceClientBuilder dataLakeServiceClientBuilder = new DataLakeServiceClientBuilder().endpoint(dfsServiceEndpointUrl);
+    BlobServiceClientBuilder blobServiceClientBuilder = new BlobServiceClientBuilder().endpoint(blobServiceEndpointUrl);
 
-    DataLakeServiceClient serviceClient = new DataLakeServiceClientBuilder().credential(sharedKeyCredential)
-        .endpoint(dfsServiceEndpointUrl)
-        .buildClient();
+    if (accountName!= null && accessKey != null) {
+      LOGGER.info("Authenticating using the access key to the account.");
+      StorageSharedKeyCredential sharedKeyCredential = new StorageSharedKeyCredential(accountName, accessKey);
+      dataLakeServiceClientBuilder.credential(sharedKeyCredential);
+      blobServiceClientBuilder.credential(sharedKeyCredential);
+    } else if (clientId != null && clientSecret != null && tenantId != null) {
+      LOGGER.info("Authenticating using Azure Active Directory");
+      ClientSecretCredential clientSecretCredential = new ClientSecretCredentialBuilder()
+          .clientId(clientId)
+          .clientSecret(clientSecret)
+          .tenantId(tenantId)
+          .build();
+      dataLakeServiceClientBuilder.credential(clientSecretCredential);
+      blobServiceClientBuilder.credential(clientSecretCredential);
+    } else {
+      // Error out as at least one mode of auth info needed
+      throw new IllegalArgumentException("Expecting either (accountName, accessKey) or (clientId, clientSecret, tenantId)");
+    }
 
-    _blobServiceClient =
-        new BlobServiceClientBuilder().credential(sharedKeyCredential).endpoint(blobServiceEndpointUrl).buildClient();
-    _fileSystemClient = serviceClient.getFileSystemClient(fileSystemName);
+    _blobServiceClient = blobServiceClientBuilder.buildClient();
+    DataLakeServiceClient serviceClient = dataLakeServiceClientBuilder.buildClient();
+    _fileSystemClient = getOrCreateClientWithFileSystem(serviceClient, fileSystemName);
+
     LOGGER.info("ADLSGen2PinotFS is initialized (accountName={}, fileSystemName={}, dfsServiceEndpointUrl={}, "
             + "blobServiceEndpointUrl={}, enableChecksum={})", accountName, fileSystemName, dfsServiceEndpointUrl,
         blobServiceEndpointUrl, _enableChecksum);
   }
 
+  /**
+   * Returns the DataLakeFileSystemClient to the specified file system creating if it doesn't exist.
+   *
+   * @param serviceClient authenticated data lake service client to an account
+   * @param fileSystemName name of the file system (blob container)
+   * @return DataLakeFileSystemClient with the specified fileSystemName.
+   */
+  @VisibleForTesting
+  public DataLakeFileSystemClient getOrCreateClientWithFileSystem(DataLakeServiceClient serviceClient,
+      String fileSystemName) {
+    try {
+      DataLakeFileSystemClient fileSystemClient = serviceClient.getFileSystemClient(fileSystemName);
+      // The return value is irrelevant. This is to test if the filesystem exists.
+      fileSystemClient.getProperties();
+      return fileSystemClient;
+    } catch (DataLakeStorageException e) {
+      if (e.getStatusCode() == NOT_FOUND_STATUS_CODE && e.getErrorCode().equals(FILE_SYSTEM_NOT_FOUND_ERROR_CODE)) {
+        LOGGER.info("FileSystem with name {} does not exist. Creating one with the same name.", fileSystemName);
+        return serviceClient.createFileSystem(fileSystemName);
+      } else {
+        throw e;
+      }
+    }
+  }
+
+  /**
+   * Make a new directory at the given location.
+   *
+   * @param uri location to make the directory.
+   * @return true if creation succeeds else false.
+   */
   @Override
   public boolean mkdir(URI uri) throws IOException {
     LOGGER.debug("mkdir is called with uri='{}'", uri);
@@ -144,6 +207,13 @@ public class ADLSGen2PinotFS extends PinotFS {
     }
   }
 
+  /**
+   * Deletes a file/directory at a given location.
+   *
+   * @param segmentUri location to delete
+   * @param forceDelete to force delete non empty directory.
+   * @return true if deletion succeeds else false.
+   */
   @Override
   public boolean delete(URI segmentUri, boolean forceDelete) throws IOException {
     LOGGER.debug("delete is called with segmentUri='{}', forceDelete='{}'", segmentUri, forceDelete);
@@ -165,13 +235,17 @@ public class ADLSGen2PinotFS extends PinotFS {
     }
   }
 
+  /**
+   * Move a file from source location to destination location.
+   *
+   * @param srcUri location to move the file from
+   * @param dstUri location to move the file to
+   * @return true if move succeeds else false.
+   */
   @Override
   public boolean doMove(URI srcUri, URI dstUri) throws IOException {
     LOGGER.debug("doMove is called with srcUri='{}', dstUri='{}'", srcUri, dstUri);
     try {
-      // TODO: currently, azure-sdk has a bug in "rename" when the path includes some special characters that gets
-      // changed during the url encoding (e.g '%' -> '%25', ' ' -> '%20')
-      // https://github.com/Azure/azure-sdk-for-java/issues/8761
       DataLakeDirectoryClient directoryClient =
           _fileSystemClient.getDirectoryClient(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(srcUri));
       directoryClient.rename(null, AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(dstUri));
@@ -181,6 +255,13 @@ public class ADLSGen2PinotFS extends PinotFS {
     }
   }
 
+  /**
+   * Copy a file from source location to destination location.
+   *
+   * @param srcUri location to copy the file from
+   * @param dstUri location to copy the file to
+   * @return true if move succeeds else false.
+   */
   @Override
   public boolean copy(URI srcUri, URI dstUri) throws IOException {
     LOGGER.debug("copy is called with srcUri='{}', dstUri='{}'", srcUri, dstUri);
@@ -227,6 +308,12 @@ public class ADLSGen2PinotFS extends PinotFS {
     }
   }
 
+  /**
+   * Checks if the file exists at a given location
+   *
+   * @param fileUri location to check the existance of the file.
+   * @return true if exists else false.
+   */
   @Override
   public boolean exists(URI fileUri) throws IOException {
     try {
@@ -241,6 +328,12 @@ public class ADLSGen2PinotFS extends PinotFS {
     }
   }
 
+  /**
+   * Find the size of the file.
+   *
+   * @param fileUri location of the file to find the size of.
+   * @return size of the file
+   */
   @Override
   public long length(URI fileUri) throws IOException {
     try {
@@ -253,6 +346,13 @@ public class ADLSGen2PinotFS extends PinotFS {
     }
   }
 
+  /**
+   * List the names of files in a given directory.
+   *
+   * @param fileUri location to move the file from
+   * @param recursive flag to check the sub directories.
+   * @return array of all the files in the target directory.
+   */
   @Override
   public String[] listFiles(URI fileUri, boolean recursive) throws IOException {
     LOGGER.debug("listFiles is called with fileUri='{}', recursive='{}'", fileUri, recursive);
@@ -271,6 +371,13 @@ public class ADLSGen2PinotFS extends PinotFS {
     }
   }
 
+  /**
+   * Copy a file from ADL to local location.
+   *
+   * @param srcUri location of the file.
+   * @param dstFile location to move the file to.
+   * @return nothing.
+   */
   @Override
   public void copyToLocalFile(URI srcUri, File dstFile) throws Exception {
     LOGGER.debug("copyToLocalFile is called with srcUri='{}', dstFile='{}'", srcUri, dstFile);
@@ -306,6 +413,13 @@ public class ADLSGen2PinotFS extends PinotFS {
     }
   }
 
+  /**
+   * Copy a local file to the destination location in ADL.
+   *
+   * @param srcFile location of the file locally
+   * @param dstUri location to move the file to.
+   * @return nothing.
+   */
   @Override
   public void copyFromLocalFile(File srcFile, URI dstUri) throws Exception {
     LOGGER.debug("copyFromLocalFile is called with srcFile='{}', dstUri='{}'", srcFile, dstUri);
@@ -315,6 +429,12 @@ public class ADLSGen2PinotFS extends PinotFS {
     }
   }
 
+  /**
+   * Check if a given location is a directory.
+   *
+   * @param uri location make the check.
+   * @return true if it's a directory else false.
+   */
   @Override
   public boolean isDirectory(URI uri) throws IOException {
     try {
@@ -329,6 +449,12 @@ public class ADLSGen2PinotFS extends PinotFS {
     }
   }
 
+  /**
+   * Get the last modified time of the given file location.
+   *
+   * @param uri location of the file to get the last modified time.
+   * @return the last modified time of the target file.
+   */
   @Override
   public long lastModified(URI uri) throws IOException {
     try {
@@ -341,6 +467,12 @@ public class ADLSGen2PinotFS extends PinotFS {
     }
   }
 
+  /**
+   * Touch (access) a given file.
+   *
+   * @param uri location of the file to touch the file
+   * @return true if touch succeeds else false.
+   */
   @Override
   public boolean touch(URI uri) throws IOException {
     // The following data lake gen2 API provides a way to update file properties including last modified time.
@@ -360,6 +492,12 @@ public class ADLSGen2PinotFS extends PinotFS {
     }
   }
 
+  /**
+   * Open the file at a given location.
+   *
+   * @param uri location of the file to open.
+   * @return the input stream with the contents of the file.
+   */
   @Override
   public InputStream open(URI uri) throws IOException {
     // Use Blob API since read() function from Data Lake Client currently takes "OutputStream" as an input and

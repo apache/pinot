@@ -27,10 +27,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
-import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentPushUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -102,7 +103,8 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     LOGGER.info("Executing SegmentGenerationAndPushTask with task config: {}", pinotTaskConfig);
     Map<String, String> taskConfigs = pinotTaskConfig.getConfigs();
     SegmentGenerationAndPushResult.Builder resultBuilder = new SegmentGenerationAndPushResult.Builder();
-    File localTempDir = new File(FileUtils.getTempDirectory(), "pinot-" + UUID.randomUUID());
+    File localTempDir = new File(new File(MinionContext.getInstance().getDataDir(), "SegmentGenerationAndPushResult"),
+        "tmp-" + UUID.randomUUID());
 
     try {
       // Generate Pinot Segment

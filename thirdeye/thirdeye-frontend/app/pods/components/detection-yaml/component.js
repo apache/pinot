@@ -20,12 +20,10 @@ import { set, get, getProperties, setProperties } from '@ember/object';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import { toastOptions } from 'thirdeye-frontend/utils/constants';
 import { defaultDetectionYaml, redundantParse } from 'thirdeye-frontend/utils/yaml-tools';
-import RSVP from "rsvp";
+import RSVP from 'rsvp';
 import fetch from 'fetch';
-import {
-  selfServeApiGraph, autocompleteAPI
-} from 'thirdeye-frontend/utils/api/self-serve';
-import {inject as service} from '@ember/service';
+import { selfServeApiGraph, autocompleteAPI } from 'thirdeye-frontend/utils/api/self-serve';
+import { inject as service } from '@ember/service';
 import config from 'thirdeye-frontend/config/environment';
 import { task } from 'ember-concurrency';
 
@@ -40,7 +38,7 @@ export default Component.extend({
   alertTitle: 'Define detection configuration',
   isEditMode: false,
   disableYamlSave: true,
-  detectionYaml: null,                // The YAML for the anomaly detection
+  detectionYaml: null, // The YAML for the anomaly detection
   currentYamlAlertOriginal: defaultDetectionYaml,
   alertId: null, // only needed in edit mode
   setDetectionYaml: null, // bubble up detectionYaml changes to parent
@@ -49,13 +47,9 @@ export default Component.extend({
   detectionErrorInfo: null,
   detectionErrorScroll: false,
 
-
   init() {
     this._super(...arguments);
-    const {
-      detectionYaml,
-      currentYamlAlertOriginal
-    } = this.getProperties('detectionYaml', 'currentYamlAlertOriginal');
+    const { detectionYaml, currentYamlAlertOriginal } = this.getProperties('detectionYaml', 'currentYamlAlertOriginal');
     if (!detectionYaml) {
       set(this, 'detectionYaml', currentYamlAlertOriginal);
     }
@@ -64,14 +58,14 @@ export default Component.extend({
   didRender() {
     this._super(...arguments);
     if (this.get('detectionErrorScroll')) {
-      document.getElementById("detection-error").scrollIntoView();
+      document.getElementById('detection-error').scrollIntoView();
       const parentResetScroll = this.get('resetScroll');
       // reset detectionErrorScroll in parent if present, then set in component
       parentResetScroll ? parentResetScroll('detectionErrorScroll') : null;
       set(this, 'detectionErrorScroll', false);
     }
     if (this.get('previewErrorScroll')) {
-      document.getElementById("preview-error").scrollIntoView();
+      document.getElementById('preview-error').scrollIntoView();
       const parentResetScroll = this.get('resetScroll');
       // reset previewErrorScroll in parent if present, then set in component
       parentResetScroll ? parentResetScroll('previewErrorScroll') : null;
@@ -97,15 +91,19 @@ export default Component.extend({
     };
     try {
       const alert_result = yield fetch(alert_url, alertPostProps);
-      const alert_status  = get(alert_result, 'status');
+      const alert_status = get(alert_result, 'status');
       const alert_json = yield alert_result.json();
       if (alert_status !== 200) {
         set(this, 'errorMsg', get(alert_json, 'message'));
-        notifications.error(`Failed to save the detection configuration due to: ${alert_json.message}.`, 'Error', toastOptions);
+        notifications.error(
+          `Failed to save the detection configuration due to: ${alert_json.message}.`,
+          'Error',
+          toastOptions
+        );
         this.setProperties({
           detectionError: true,
           detectionErrorMsg: alert_json.message,
-          detectionErrorInfo: alert_json["more-info"],
+          detectionErrorInfo: alert_json['more-info'],
           detectionErrorScroll: true
         });
       } else {
@@ -129,8 +127,8 @@ export default Component.extend({
    */
   _loadAutocompleteById(metricId) {
     const promiseHash = {
-      filters: fetch(selfServeApiGraph.metricFilters(metricId)).then(res => checkStatus(res, 'get', true)),
-      dimensions: fetch(selfServeApiGraph.metricDimensions(metricId)).then(res => checkStatus(res, 'get', true))
+      filters: fetch(selfServeApiGraph.metricFilters(metricId)).then((res) => checkStatus(res, 'get', true)),
+      dimensions: fetch(selfServeApiGraph.metricDimensions(metricId)).then((res) => checkStatus(res, 'get', true))
     };
     return RSVP.hash(promiseHash);
   },
@@ -140,17 +138,16 @@ export default Component.extend({
    * @method _buildYamlSuggestions
    * @return Promise
    */
-  _buildYamlSuggestions(currentMetric, yamlAsObject, prefix, noResultsArray,
-    filtersCache, dimensionsCache, position) {
+  _buildYamlSuggestions(currentMetric, yamlAsObject, prefix, noResultsArray, filtersCache, dimensionsCache, position) {
     // holds default result to return if all checks fail
     let defaultReturn = Promise.resolve(noResultsArray);
     // when metric is being autocompleted, entire text field will be replaced and metricId stored in editor
     if (yamlAsObject.metric === prefix) {
       return fetch(autocompleteAPI.metric(prefix))
         .then(checkStatus)
-        .then(metrics => {
+        .then((metrics) => {
           if (metrics && metrics.length > 0) {
-            return metrics.map(metric => {
+            return metrics.map((metric) => {
               const [dataset, metricname] = metric.alias.split('::');
               return {
                 value: metricname,
@@ -160,30 +157,41 @@ export default Component.extend({
                 metricname,
                 dataset,
                 id: metric.id,
-                completer:{
+                completer: {
                   insertMatch: (editor, data) => {
                     // replace metric row with selected metric
-                    editor.session.replace({
-                      start: { row: data.row, column: 0 },
-                      end: { row: data.row, column: Number.MAX_VALUE }},
-                    `metric: ${data.metricname}`);
+                    editor.session.replace(
+                      {
+                        start: { row: data.row, column: 0 },
+                        end: { row: data.row, column: Number.MAX_VALUE }
+                      },
+                      `metric: ${data.metricname}`
+                    );
                     // find dataset: field in text
                     const datasetLocation = editor.find('dataset:');
                     // if found, replace with dataset
                     if (datasetLocation) {
-                      editor.session.replace({
-                        start: { row: datasetLocation.start.row, column: 0},
-                        end: { row: datasetLocation.end.row, column: Number.MAX_VALUE }},
-                      `dataset: ${data.dataset}`);
+                      editor.session.replace(
+                        {
+                          start: { row: datasetLocation.start.row, column: 0 },
+                          end: { row: datasetLocation.end.row, column: Number.MAX_VALUE }
+                        },
+                        `dataset: ${data.dataset}`
+                      );
                       // otherwise, add it to the line below the metric field
                     } else {
-                      editor.session.insert({
-                        row: data.row + 1, column: 0 },
-                      `dataset: ${data.dataset}\n`);
+                      editor.session.insert(
+                        {
+                          row: data.row + 1,
+                          column: 0
+                        },
+                        `dataset: ${data.dataset}\n`
+                      );
                     }
                     editor.metricId = data.id;
                   }
-                }};
+                }
+              };
             });
           }
           return noResultsArray;
@@ -195,43 +203,52 @@ export default Component.extend({
     // if a currentMetric has been stored, we can check autocomplete filters and dimensions
     if (currentMetric) {
       const dimensionValues = yamlAsObject.dimensionExploration.dimensions;
-      const filterTypes = typeof yamlAsObject.filters === "object" ? Object.keys(yamlAsObject.filters) : [];
+      const filterTypes = typeof yamlAsObject.filters === 'object' ? Object.keys(yamlAsObject.filters) : [];
       if (Array.isArray(dimensionValues) && dimensionValues.includes(prefix)) {
         if (dimensionsCache.length > 0) {
           // wraps result in Promise.resolve because return of Promise is expected by yamlSuggestions
-          return Promise.resolve(dimensionsCache.map(dimension => {
-            return {
-              value: dimension
-            };
-          }));
+          return Promise.resolve(
+            dimensionsCache.map((dimension) => {
+              return {
+                value: dimension
+              };
+            })
+          );
         }
       }
       let filterKey = '';
       let i = 0;
       while (i < filterTypes.length) {
-        if (filterTypes[i] === prefix){
+        if (filterTypes[i] === prefix) {
           i = filterTypes.length;
           // wraps result in Promise.resolve because return of Promise is expected by yamlSuggestions
-          return Promise.resolve(Object.keys(filtersCache).map(filterType => {
-            return {
-              value: `${filterType}:`,
-              caption: `${filterType}:`,
-              snippet: filterType
-            };
-          }));
+          return Promise.resolve(
+            Object.keys(filtersCache).map((filterType) => {
+              return {
+                value: `${filterType}:`,
+                caption: `${filterType}:`,
+                snippet: filterType
+              };
+            })
+          );
         }
-        if (Array.isArray(yamlAsObject.filters[filterTypes[i]]) && yamlAsObject.filters[filterTypes[i]].includes(prefix)) {
+        if (
+          Array.isArray(yamlAsObject.filters[filterTypes[i]]) &&
+          yamlAsObject.filters[filterTypes[i]].includes(prefix)
+        ) {
           filterKey = filterTypes[i];
         }
         i++;
       }
       if (filterKey) {
         // wraps result in Promise.resolve because return of Promise is expected by yamlSuggestions
-        return Promise.resolve(filtersCache[filterKey].map(filterParam => {
-          return {
-            value: filterParam
-          };
-        }));
+        return Promise.resolve(
+          filtersCache[filterKey].map((filterParam) => {
+            return {
+              value: filterParam
+            };
+          })
+        );
       }
     }
     return defaultReturn;
@@ -271,10 +288,7 @@ export default Component.extend({
      * returns array of suggestions for Yaml editor autocompletion
      */
     yamlSuggestions(editor, session, position, prefix) {
-      const {
-        detectionYaml,
-        noResultsArray
-      } = getProperties(this, 'detectionYaml', 'noResultsArray');
+      const { detectionYaml, noResultsArray } = getProperties(this, 'detectionYaml', 'noResultsArray');
       let yamlAsObject = {};
       try {
         yamlAsObject = redundantParse(detectionYaml);
@@ -284,11 +298,14 @@ export default Component.extend({
         return noResultsArray;
       }
       // if editor.metricId field contains a value, metric was just chosen.  Populate caches for filters and dimensions
-      if(editor.metricId){
+      if (editor.metricId) {
         const currentMetric = set(this, 'currentMetric', editor.metricId);
         editor.metricId = '';
-        return get(this, '_loadAutocompleteById')(currentMetric)
-          .then(resultObj => {
+        return get(
+          this,
+          '_loadAutocompleteById'
+        )(currentMetric)
+          .then((resultObj) => {
             const { filters, dimensions } = resultObj;
             setProperties(this, {
               dimensionsCache: dimensions,
@@ -296,19 +313,28 @@ export default Component.extend({
             });
           })
           .then(() => {
-            return get(this, '_buildYamlSuggestions')(currentMetric,
-              yamlAsObject, prefix, noResultsArray, get(this, 'filtersCache'),
-              get(this, 'dimensionsCache'), position)
-              .then(results => results);
+            return get(this, '_buildYamlSuggestions')(
+              currentMetric,
+              yamlAsObject,
+              prefix,
+              noResultsArray,
+              get(this, 'filtersCache'),
+              get(this, 'dimensionsCache'),
+              position
+            ).then((results) => results);
           });
       }
       const currentMetric = get(this, 'currentMetric');
       // deals with no metricId, which could be autocomplete for metric or for filters and dimensions already cached
-      return get(this, '_buildYamlSuggestions')(currentMetric, yamlAsObject,
-        prefix, noResultsArray, get(this, 'filtersCache'),
-        get(this, 'dimensionsCache'), position)
-        .then(results => results);
-
+      return get(this, '_buildYamlSuggestions')(
+        currentMetric,
+        yamlAsObject,
+        prefix,
+        noResultsArray,
+        get(this, 'filtersCache'),
+        get(this, 'dimensionsCache'),
+        position
+      ).then((results) => results);
     },
 
     /**
@@ -328,11 +354,12 @@ export default Component.extend({
      */
     submitAlertEdit() {
       set(this, 'detectionError', false);
-      const {
-        detectionYaml,
-        notifications,
-        alertId
-      } = getProperties(this, 'detectionYaml', 'notifications', 'alertId');
+      const { detectionYaml, notifications, alertId } = getProperties(
+        this,
+        'detectionYaml',
+        'notifications',
+        'alertId'
+      );
 
       this.get('_updateDetection').perform(detectionYaml, notifications, alertId);
     }

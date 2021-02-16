@@ -62,14 +62,14 @@
     "ember-cli-text-support-mixins": "^2.0.2",
     "ember-cli-textarea-autosize": "^1.1.1",
     "ember-cli-uglify": "^2.0.0",
-    "ember-cli-update": "^0.43.3",
+    "ember-cli-update": "^0.55.2",
     "ember-composable-helpers": "^2.3.1",
     "ember-concurrency": "^1.1.0",
     "ember-d3": "^0.5.1",
-    "ember-data": "~2.18.0",
+    "ember-data": "~3.0.0",
     "ember-export-application-global": "^2.0.0",
     "ember-faker": "^1.5.0",
-    "ember-fetch": "^2.1.0",
+    "ember-fetch": "6.2.0",
     "ember-load-initializers": "^1.0.0",
     "ember-lodash-shim": "^4.0.0",
     "ember-modal-dialog": "^3.0.0-beta.4",
@@ -80,7 +80,7 @@
     "ember-resolver": "^4.0.0",
     "ember-simple-auth": "^1.9.2",
     "ember-sinon": "^5.0.0",
-    "ember-source": "~2.18.0",
+    "ember-source": "~3.0.0",
     "ember-symbol-observable": "^1.0.6",
     "ember-tether": "^1.0.0-beta.0",
     "ember-toastr": "^1.7.2",
@@ -115,5 +115,9 @@
     "moment": "^2.24.0",
     "source-sans-pro": "^3.6.0",
     "yamljs": "^0.3.0"
+  },
+  "resolutions": {
+    "human-signals": "1.1.0",
+    "whatwg-fetch": "3.3.1"
   }
 }

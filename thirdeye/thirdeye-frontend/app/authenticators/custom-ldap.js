@@ -19,12 +19,14 @@ export default Base.extend({
       headers: { 'content-type': 'Application/Json' }
     };
 
-    return fetch(url, postProps).then(checkStatus).then((res) => {
-      // set expiration to 7 days
-      let expiration = 60 * 60 * 24 * 7;
-      this.set('session.store.cookieExpirationTime', expiration);
-      return res;
-    });
+    return fetch(url, postProps)
+      .then(checkStatus)
+      .then((res) => {
+        // set expiration to 7 days
+        let expiration = 60 * 60 * 24 * 7;
+        this.set('session.store.cookieExpirationTime', expiration);
+        return res;
+      });
   },
 
   restore(data) {
@@ -37,9 +39,8 @@ export default Base.extend({
    */
   invalidate() {
     const url = '/auth/logout';
-    return fetch(url)
-      .then(() => {
-        return this._super();
-      });
+    return fetch(url).then(() => {
+      return this._super();
+    });
   }
 });

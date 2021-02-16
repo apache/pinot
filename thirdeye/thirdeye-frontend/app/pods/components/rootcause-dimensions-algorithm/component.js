@@ -30,13 +30,7 @@ import { task } from 'ember-concurrency';
 import { inject as service } from '@ember/service';
 import { checkStatus, makeFilterString } from 'thirdeye-frontend/utils/utils';
 import { selfServeApiGraph } from 'thirdeye-frontend/utils/api/self-serve';
-import {
-  get,
-  set,
-  computed,
-  getProperties,
-  setProperties
-} from '@ember/object';
+import { get, set, computed, getProperties, setProperties } from '@ember/object';
 import {
   toCurrentUrn,
   toBaselineUrn,
@@ -46,14 +40,12 @@ import {
   toFilters,
   hasExclusionFilters
 } from 'thirdeye-frontend/utils/rca-utils';
-import {
-  groupedHeaders,
-  baseColumns
-} from 'thirdeye-frontend/shared/dimensionAnalysisTableConfig';
+import { groupedHeaders, baseColumns } from 'thirdeye-frontend/shared/dimensionAnalysisTableConfig';
 import d3 from 'd3';
 
 const EXTRA_WIDTH = 0;
 
+/* eslint-disable ember/avoid-leaking-state-in-ember-objects */
 export default Component.extend({
   classNames: ['rootcause-dimensions'],
   dimensionsApiService: service('services/api/dimensions'),
@@ -145,8 +137,8 @@ export default Component.extend({
    * Caches for state of previous request
    */
   previousDimensionValues: [], // previous row's dimension names array
-  previousMetricSettings: '',  // previous request's metric urn and settings string
-  previousCustomSettings: '',  // previous request's custom settings string
+  previousMetricSettings: '', // previous request's metric urn and settings string
+  previousCustomSettings: '', // previous request's custom settings string
 
   /**
    * Override for table classes
@@ -181,10 +173,10 @@ export default Component.extend({
   init() {
     this._super(...arguments);
     this._resetSettings(['initialTableSettings', 'savedSettings'], 'customTableSettings');
-    const {
-      sessionTableSettings,
-      sessionUserCustomized
-    } = this.getProperties('sessionTableSettings', 'sessionUserCustomized');
+    const { sessionTableSettings, sessionUserCustomized } = this.getProperties(
+      'sessionTableSettings',
+      'sessionUserCustomized'
+    );
     if (sessionTableSettings && sessionUserCustomized) {
       set(this, 'customTableSettings', sessionTableSettings);
       this.send('onSave');
@@ -206,58 +198,55 @@ export default Component.extend({
    * Data for each column of dimensions table
    * @type Array - array of objects, each corresponding to a row in the table
    */
-  dimensionTableData: computed(
-    'dimensionsRawData.length',
-    'selectedUrns',
-    function () {
-      const { dimensionsRawData, selectedUrns } = this.getProperties('dimensionsRawData', 'selectedUrns');
-      const toFixedIfDecimal = (number) => (number % 1 !== 0) ? number.toFixed(2).toLocaleString() : number.toLocaleString();
-      const dimensionNames = dimensionsRawData.dimensions || [];
-      const dimensionRows = dimensionsRawData.responseRows || [];
-      let newDimensionRows = [];
+  dimensionTableData: computed('dimensionsRawData.length', 'selectedUrns', function () {
+    const { dimensionsRawData, selectedUrns } = this.getProperties('dimensionsRawData', 'selectedUrns');
+    const toFixedIfDecimal = (number) =>
+      number % 1 !== 0 ? number.toFixed(2).toLocaleString() : number.toLocaleString();
+    const dimensionNames = dimensionsRawData.dimensions || [];
+    const dimensionRows = dimensionsRawData.responseRows || [];
+    let newDimensionRows = [];
 
-      // If "sub-totals" rows are needed for each dimension grouping...
-      if (get(this, 'enableSubTotals')) {
-        this._insertDimensionTotalRows(dimensionRows);
-      }
-
-      // Build new dimension array for display as table rows
-      if (dimensionRows.length) {
-        let totalCost = 0;
-        dimensionRows.map(record => totalCost += record.cost);
-        dimensionRows.forEach((record, index) => {
-          let {
-            dimensionArr, // Generate array of cell-specific objects for each dimension
-            dimensionUrn // Generate URN for each record from dimension names/values
-          } = this._generateDimensionMeta(dimensionNames, record);
-          let nodeSize = (record.sizeFactor || 0) * 100;
-          let cost = (totalCost !== 0) ? (record.cost || 0) / totalCost : (record.cost || 0);
-          cost = cost * 100;
-          // New records of template-ready data
-          newDimensionRows.push({
-            id: index + 1,
-            dimensionUrn,
-            dimensionArr,
-            names: record.names,
-            dimensions: dimensionNames,
-            isSelected: selectedUrns.has(dimensionUrn),
-            percentageChange: record.percentageChange,
-            percentageChangeNum: parseFloat(record.percentageChange),
-            nodeSize: `${nodeSize.toFixed(4)}%`,
-            nodeSizeNum: parseFloat(nodeSize),
-            cost: `${cost.toFixed(4)}%`,
-            costNum: parseFloat(cost),
-            baseline: `${toFixedIfDecimal(record.baselineValue) || 0}`,
-            baselineNum: parseFloat(record.baselineValue),
-            current: `${toFixedIfDecimal(record.currentValue) || 0}`,
-            currentNum: parseFloat(record.currentValue),
-            elementWidth: this._calculateContributionBarWidth(dimensionRows, record)
-          });
-        });
-      }
-      return newDimensionRows;
+    // If "sub-totals" rows are needed for each dimension grouping...
+    if (get(this, 'enableSubTotals')) {
+      this._insertDimensionTotalRows(dimensionRows);
     }
-  ),
+
+    // Build new dimension array for display as table rows
+    if (dimensionRows.length) {
+      let totalCost = 0;
+      dimensionRows.map((record) => (totalCost += record.cost));
+      dimensionRows.forEach((record, index) => {
+        let {
+          dimensionArr, // Generate array of cell-specific objects for each dimension
+          dimensionUrn // Generate URN for each record from dimension names/values
+        } = this._generateDimensionMeta(dimensionNames, record);
+        let nodeSize = (record.sizeFactor || 0) * 100;
+        let cost = totalCost !== 0 ? (record.cost || 0) / totalCost : record.cost || 0;
+        cost = cost * 100;
+        // New records of template-ready data
+        newDimensionRows.push({
+          id: index + 1,
+          dimensionUrn,
+          dimensionArr,
+          names: record.names,
+          dimensions: dimensionNames,
+          isSelected: selectedUrns.has(dimensionUrn),
+          percentageChange: record.percentageChange,
+          percentageChangeNum: parseFloat(record.percentageChange),
+          nodeSize: `${nodeSize.toFixed(4)}%`,
+          nodeSizeNum: parseFloat(nodeSize),
+          cost: `${cost.toFixed(4)}%`,
+          costNum: parseFloat(cost),
+          baseline: `${toFixedIfDecimal(record.baselineValue) || 0}`,
+          baselineNum: parseFloat(record.baselineValue),
+          current: `${toFixedIfDecimal(record.currentValue) || 0}`,
+          currentNum: parseFloat(record.currentValue),
+          elementWidth: this._calculateContributionBarWidth(dimensionRows, record)
+        });
+      });
+    }
+    return newDimensionRows;
+  }),
 
   hasExclusion: computed('metricUrn', function () {
     const metricUrn = get(this, 'metricUrn');
@@ -268,49 +257,41 @@ export default Component.extend({
    * Builds the columns array, pushing incoming dimensions into the base columns
    * @type {Array} Array of column objects
    */
-  dimensionTableColumns: computed(
-    'dimensionsRawData.length',
-    function () {
-      const dimensionsRawData = get(this, 'dimensionsRawData');
-      const dimensionNamesArr = dimensionsRawData.dimensions || [];
-      const tableBaseClass = 'rootcause-dimensions-table__column';
-      let dimensionColumns = [];
+  dimensionTableColumns: computed('dimensionsRawData.length', function () {
+    const dimensionsRawData = get(this, 'dimensionsRawData');
+    const dimensionNamesArr = dimensionsRawData.dimensions || [];
+    const tableBaseClass = 'rootcause-dimensions-table__column';
+    let dimensionColumns = [];
 
-      if (dimensionNamesArr.length) {
-        dimensionNamesArr.forEach((dimension, index) => {
-          let isLastDimension = index === dimensionNamesArr.length - 1;
-          dimensionColumns.push({
-            disableSorting: true,
-            isFirstColumn: index === 0,
-            disableFiltering: isLastDimension, // currently overridden by headerFilteringRowTemplate
-            propertyName: 'dimensionValue',
-            dimensionCategory: dimension,
-            title: dimension.capitalize(),
-            component: 'custom/dimensions-table/dimension',
-            className: `${tableBaseClass} ${tableBaseClass}--med-width ${tableBaseClass}--custom`
-          });
+    if (dimensionNamesArr.length) {
+      dimensionNamesArr.forEach((dimension, index) => {
+        let isLastDimension = index === dimensionNamesArr.length - 1;
+        dimensionColumns.push({
+          disableSorting: true,
+          isFirstColumn: index === 0,
+          disableFiltering: isLastDimension, // currently overridden by headerFilteringRowTemplate
+          propertyName: 'dimensionValue',
+          dimensionCategory: dimension,
+          title: dimension.capitalize(),
+          component: 'custom/dimensions-table/dimension',
+          className: `${tableBaseClass} ${tableBaseClass}--med-width ${tableBaseClass}--custom`
         });
-      }
-      // Merge the dynamic columns with the preset ones for the complete table
-      return dimensionNamesArr.length ? [ ...dimensionColumns, ...baseColumns ] : [];
+      });
     }
-  ),
+    // Merge the dynamic columns with the preset ones for the complete table
+    return dimensionNamesArr.length ? [...dimensionColumns, ...baseColumns] : [];
+  }),
 
   /**
    * Builds the headers array dynamically, based on availability of dimension records
    * @type {Array} Array of grouped headers
    */
-  dimensionTableHeaders: computed(
-    'dimensionsRawData.length',
-    'selectedUrns',
-    'overallChange',
-    function () {
-      const { overallChange, dimensionsRawData }  = getProperties(this, 'overallChange', 'dimensionsRawData');
-      const dimensionNames = dimensionsRawData.dimensions || [];
-      const tableHeaders = dimensionNames ? groupedHeaders(dimensionNames.length, overallChange) : [];
-      return tableHeaders;
-    }
-  ),
+  dimensionTableHeaders: computed('dimensionsRawData.length', 'selectedUrns', 'overallChange', function () {
+    const { overallChange, dimensionsRawData } = getProperties(this, 'overallChange', 'dimensionsRawData');
+    const dimensionNames = dimensionsRawData.dimensions || [];
+    const tableHeaders = dimensionNames ? groupedHeaders(dimensionNames.length, overallChange) : [];
+    return tableHeaders;
+  }),
 
   /**
    * Prepare new rows for table to display rolled up totals for sub-dimensions
@@ -321,20 +302,22 @@ export default Component.extend({
    */
   _insertDimensionTotalRows(dimensionRows) {
     // Get all unique parent dimension names
-    const firstLevelGroups = [...new Set(dimensionRows.map(row => row.names[0]))];
+    const firstLevelGroups = [...new Set(dimensionRows.map((row) => row.names[0]))];
     firstLevelGroups.forEach((topGroupName) => {
       if (!topGroupName.toLowerCase().includes('all')) {
         // Insert a "totals" row for each major dimension value (across all subdimensions)
         let dimNames = [topGroupName, 'All', 'All'];
-        let dimGroup = dimensionRows.filter(rec => rec.names[0] === topGroupName);
-        let whereToInsert = dimensionRows.findIndex(record => record.names[0] === topGroupName);
+        let dimGroup = dimensionRows.filter((rec) => rec.names[0] === topGroupName);
+        let whereToInsert = dimensionRows.findIndex((record) => record.names[0] === topGroupName);
         this._rollUpSubDimensionTotals(dimensionRows, dimGroup, whereToInsert, dimNames);
         // Insert a "totals" row for each child value (sub-dimensions)
-        let secondLevelGroups = [...new Set(dimGroup.map(item => item.names[1]))];
+        let secondLevelGroups = [...new Set(dimGroup.map((item) => item.names[1]))];
         secondLevelGroups.forEach((subGroupName) => {
           let dimNames = [topGroupName, subGroupName, 'All'];
-          let subGroup = dimGroup.filter(rec => rec.names[1] === subGroupName);
-          let whereToInsert = dimensionRows.findIndex(record => record.names[0] === topGroupName && record.names[1] === subGroupName);
+          let subGroup = dimGroup.filter((rec) => rec.names[1] === subGroupName);
+          let whereToInsert = dimensionRows.findIndex(
+            (record) => record.names[0] === topGroupName && record.names[1] === subGroupName
+          );
           this._rollUpSubDimensionTotals(dimensionRows, subGroup, whereToInsert, dimNames);
         });
       }
@@ -356,8 +339,8 @@ export default Component.extend({
     const recordToCopy = dimensionRows[whereToInsert]; // Placeholder for actual values
     const newRecordObj = {
       names,
-      currentValue: dimSubGroup.map(row => row.currentValue).reduce((total, amount) => total + amount),
-      baselineValue: dimSubGroup.map(row => row.baselineValue).reduce((total, amount) => total + amount),
+      currentValue: dimSubGroup.map((row) => row.currentValue).reduce((total, amount) => total + amount),
+      baselineValue: dimSubGroup.map((row) => row.baselineValue).reduce((total, amount) => total + amount),
       percentageChange: recordToCopy.percentageChange,
       cost: recordToCopy.cost
     };
@@ -374,9 +357,11 @@ export default Component.extend({
     const baseUrnArr = get(this, 'baseUrnArr');
     const metricArr = metricUrn.length ? metricUrn.split(':') : ['0'];
     // Isolate filter keys/values from incoming metric URN
-    const rawFilterStr = metricArr.filter((urnFragment) => {
-      return isNaN(urnFragment) && !baseUrnArr.includes(urnFragment);
-    }).join(';');
+    const rawFilterStr = metricArr
+      .filter((urnFragment) => {
+        return isNaN(urnFragment) && !baseUrnArr.includes(urnFragment);
+      })
+      .join(';');
     // Construct API-ready filter string
     const finalFilterStr = makeFilterString(decodeURIComponent(rawFilterStr));
     return rawFilterStr.length ? finalFilterStr : '';
@@ -414,9 +399,9 @@ export default Component.extend({
     const newMetricSettings = `${metricUrn}:${range[0]}:${range[1]}:${mode}`;
     const newCustomSettings = Object.values(customTableSettings).join(':');
     // Compare current and incoming metric settings if there are previous settings
-    const isSameMetricSettings = previousMetricSettings ? (previousMetricSettings === newMetricSettings) : true;
+    const isSameMetricSettings = previousMetricSettings ? previousMetricSettings === newMetricSettings : true;
     // Compare current and incoming custom settings
-    const isSameCustomSettings = (previousCustomSettings === newCustomSettings);
+    const isSameCustomSettings = previousCustomSettings === newCustomSettings;
 
     // Reset settings if metrics have changed
     if (!isSameMetricSettings) {
@@ -427,7 +412,9 @@ export default Component.extend({
     }
 
     // Abort if metric with exclusion filters
-    if (hasExclusion) { return; }
+    if (hasExclusion) {
+      return;
+    }
 
     // If we have new settings, and a metric to work with, we can trigger fetch/reload. Otherwise, do nothing
     if (metricEntity && (!isSameCustomSettings || isUserCustomizingRequest)) {
@@ -491,21 +478,21 @@ export default Component.extend({
    * @private
    */
   _calculateContributionBarWidth(dimensionRows, record) {
-    const overallChangeValues = dimensionRows.map(row => row.cost ? row.cost : 0);
-    const allValuesPositive = overallChangeValues.every(val => val >= 0);
-    const allValuesNegative = overallChangeValues.every(val => val < 0);
+    const overallChangeValues = dimensionRows.map((row) => (row.cost ? row.cost : 0));
+    const allValuesPositive = overallChangeValues.every((val) => val >= 0);
+    const allValuesNegative = overallChangeValues.every((val) => val < 0);
     const widthAdditivePositive = allValuesPositive ? EXTRA_WIDTH : 0;
     const widthAdditiveNegative = allValuesNegative ? EXTRA_WIDTH : 0;
 
     // Find the largest change value across all rows
-    const maxChange = d3.max(dimensionRows.map((row) => {
-      return Math.abs(row.cost ? row.cost : 0);
-    }));
+    const maxChange = d3.max(
+      dimensionRows.map((row) => {
+        return Math.abs(row.cost ? row.cost : 0);
+      })
+    );
 
     // Generate a scale mapping the change value span to a specific range
-    const widthScale = d3.scaleLinear()
-      .domain([0, maxChange])
-      .range([0, 100]);
+    const widthScale = d3.scaleLinear().domain([0, maxChange]).range([0, 100]);
 
     // Get sign of percentageChange
     const percentageValue = record.percentageChange ? toWidthNumber(record.percentageChange) : 0;
@@ -517,8 +504,8 @@ export default Component.extend({
 
     // These will be used to set our bar widths/classes in dimensions-table/change-bars component
     return {
-      positive: (signCarrier >= 0) ? `${widthPercent + widthAdditivePositive}%` : '0%',
-      negative: (signCarrier >= 0) ? '0%' : `${widthPercent + widthAdditiveNegative}%`
+      positive: signCarrier >= 0 ? `${widthPercent + widthAdditivePositive}%` : '0%',
+      negative: signCarrier >= 0 ? '0%' : `${widthPercent + widthAdditiveNegative}%`
     };
   },
 
@@ -552,9 +539,9 @@ export default Component.extend({
     });
 
     // Create a string version of dimension name/value pairs
-    const encodedDimensions = isPresent(dimensionArr) ? dimensionArr.map((dObj) => {
-      return encodeURIComponent(`${dObj.label}=${dObj.value}`);
-    }).join(':') : '';
+    const encodedDimensions = isPresent(dimensionArr)
+      ? dimensionArr.map((dObj) => encodeURIComponent(`${dObj.label}=${dObj.value}`)).join(':')
+      : '';
     // Append dimensions string to metricUrn. This will be sent to the graph legend for display
     const dimensionUrn = `${get(this, 'metricUrn')}:${encodedDimensions}`;
     // Now save the current record names as 'previous'
@@ -564,7 +551,6 @@ export default Component.extend({
   },
 
   actions: {
-
     /**
      * Handle submission of custom settings from settings modal
      */
@@ -603,14 +589,18 @@ export default Component.extend({
      * @param {Object} eventObj
      */
     displayDataChanged(eventObj) {
-      if (isEmpty(eventObj.selectedItems)) { return; }
+      if (isEmpty(eventObj.selectedItems)) {
+        return;
+      }
       const onSelection = get(this, 'onSelection');
       const selectedRows = eventObj.selectedItems;
-      if (!onSelection) { return; }
+      if (!onSelection) {
+        return;
+      }
       const selectedRecord = selectedRows[0];
       const urn = selectedRecord.dimensionUrn;
       const state = !selectedRecord.isSelected;
-      const updates = {[urn]: state};
+      const updates = { [urn]: state };
       if (hasPrefix(urn, 'thirdeye:metric:')) {
         updates[toCurrentUrn(urn)] = state;
         updates[toBaselineUrn(urn)] = state;
@@ -626,9 +616,9 @@ export default Component.extend({
    * @returns {Generator object}
    * @private
    */
-  fetchDimensionOptions: task(function * (metricId) {
+  fetchDimensionOptions: task(function* (metricId) {
     const dimensionList = yield fetch(selfServeApiGraph.metricDimensions(metricId)).then(checkStatus);
-    const filteredDimensionList = dimensionList.filter(item => item.toLowerCase() !== 'all');
+    const filteredDimensionList = dimensionList.filter((item) => item.toLowerCase() !== 'all');
     set(this, 'dimensionOptions', filteredDimensionList);
   }).drop(),
 
@@ -639,7 +629,7 @@ export default Component.extend({
    * @returns {Generator object}
    * @private
    */
-  fetchDimensionAnalysisData: task(function * (dimensionObj) {
+  fetchDimensionAnalysisData: task(function* (dimensionObj) {
     const dimensionsPayload = yield this.get('dimensionsApiService').queryDimensionsByMetric(dimensionObj);
     const ratio = dimensionsPayload.globalRatio;
 
@@ -647,8 +637,7 @@ export default Component.extend({
       dimensionsRawData: dimensionsPayload,
       cachedUrn: get(this, 'metricUrn'),
       isDimensionDataPresent: true,
-      overallChange: ratio ? `${((ratio -1) * 100).toFixed(2)}%` : 'N/A'
+      overallChange: ratio ? `${((ratio - 1) * 100).toFixed(2)}%` : 'N/A'
     });
-
   }).drop()
 });

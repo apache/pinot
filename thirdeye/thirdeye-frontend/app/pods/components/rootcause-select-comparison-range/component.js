@@ -1,9 +1,7 @@
 import { computed, set } from '@ember/object';
 import Component from '@ember/component';
 import $ from 'jquery';
-import {
-  makeTime
-} from 'thirdeye-frontend/utils/rca-utils';
+import { makeTime } from 'thirdeye-frontend/utils/rca-utils';
 import _ from 'lodash';
 
 // TODO consolidate rootcause-select-comparison-range2, rootcause-slider
@@ -29,9 +27,8 @@ const namedToEpocMapping = {
   '1_DAYS': 86400000
 };
 
-
 export default Component.extend({
-  timeFormat: "MMM D, hh:mm a z", //slider
+  timeFormat: 'MMM D, hh:mm a z', //slider
   range: null, // [0, 0]
   compareMode: null, // ""
   onChange: null, // func (start, end, compareMode)
@@ -40,22 +37,22 @@ export default Component.extend({
   showBaselineModal: false,
   showForecastTimeRanges: false,
   customBaselineValue: 'wo1w',
-
+  // eslint-disable-next-line ember/avoid-leaking-state-in-ember-objects
   rangeOptions: {
     'Last hour': [makeTime().subtract(1, 'hours').startOf('hour'), makeTime().startOf('hours').add(1, 'hours')],
     'Last 3 hours': [makeTime().subtract(3, 'hours').startOf('hour'), makeTime().startOf('hours').add(1, 'hours')],
     'Last 6 hours': [makeTime().subtract(6, 'hours').startOf('hour'), makeTime().startOf('hours').add(1, 'hours')],
     'Last 24 hours': [makeTime().subtract(24, 'hours').startOf('hour'), makeTime().startOf('hours').add(1, 'hours')]
   },
-
+  // eslint-disable-next-line ember/avoid-leaking-state-in-ember-objects
   compareModeOptions: [
     {
       groupName: 'Weekly',
-      options: [ 'wo1w', 'wo2w', 'wo3w', 'mean4w', 'median4w' ]
+      options: ['wo1w', 'wo2w', 'wo3w', 'mean4w', 'median4w']
     },
     {
       groupName: 'Algorithm',
-      options: [ 'predicted', 'forecast' ]
+      options: ['predicted', 'forecast']
     },
     {
       groupName: 'Custom Baseline Selector',
@@ -63,35 +60,41 @@ export default Component.extend({
     }
   ],
 
-  minDisplayWindow: computed('displayRange', function() {//display window start - slider
+  minDisplayWindow: computed('displayRange', function () {
+    //display window start - slider
     return makeTime(this.get('displayRange')[0]);
   }),
 
-  maxDisplayWindow: computed('displayRange', function() {//display window end - slider
+  maxDisplayWindow: computed('displayRange', function () {
+    //display window end - slider
     return makeTime(this.get('displayRange')[1]);
   }),
 
-  minInvestigatePeriod: computed('anomalyRange', function() {//Investigation period start - slider
+  minInvestigatePeriod: computed('anomalyRange', function () {
+    //Investigation period start - slider
     return makeTime(this.get('anomalyRange')[0]);
   }),
 
-  maxInvestigatePeriod: computed('anomalyRange', function() {//Investigation period - slider
+  maxInvestigatePeriod: computed('anomalyRange', function () {
+    //Investigation period - slider
     return makeTime(this.get('anomalyRange')[1]);
   }),
 
-  granularityOneWay: computed('granularity', function() {
+  granularityOneWay: computed('granularity', function () {
     return namedToEpocMapping[this.get('granularity')];
   }),
 
-  startFormatted: computed('anomalyRange', function() {//investigation start
+  startFormatted: computed('anomalyRange', function () {
+    //investigation start
     return makeTime(this.get('anomalyRange')[0]).format(serverDateFormat);
   }),
 
-  endFormatted: computed('anomalyRange', function() {//investigation end
+  endFormatted: computed('anomalyRange', function () {
+    //investigation end
     return makeTime(this.get('anomalyRange')[1]).format(serverDateFormat);
   }),
 
-  maxDateFormatted: computed('compareMode', function() {
+  maxDateFormatted: computed('compareMode', function () {
     const compareMode = this.get('compareMode');
     if (compareMode === 'forecast') {
       return null;
@@ -100,10 +103,10 @@ export default Component.extend({
   }),
 
   compareModeFormatted: computed('compareMode', {
-    get () {
+    get() {
       return this.get('compareMode');
     },
-    set () {
+    set() {
       // ignore to prevent override
     }
   }),

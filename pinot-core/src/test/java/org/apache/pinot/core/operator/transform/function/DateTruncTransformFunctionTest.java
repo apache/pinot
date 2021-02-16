@@ -29,6 +29,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.function.DateTimeUtils;
+import org.apache.pinot.common.function.TimeZoneKey;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
@@ -57,9 +59,6 @@ import org.joda.time.format.ISODateTimeFormat;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.core.operator.transform.function.DateTruncTransformFunction.DateTimeZoneIndex.getDateTimeZone;
-import static org.apache.pinot.core.operator.transform.function.TimeZoneKey.UTC_KEY;
-
 
 public class DateTruncTransformFunctionTest {
   private static final String TIME_COLUMN = "time";
@@ -67,7 +66,7 @@ public class DateTruncTransformFunctionTest {
   private static final DateTimeZone WEIRD_DATE_TIME_ZONE = DateTimeZone.forID(WEIRD_ZONE.getId());
   private static final DateTime WEIRD_TIMESTAMP = new DateTime(2001, 8, 22, 3, 4, 5, 321, WEIRD_DATE_TIME_ZONE);
   private static final String WEIRD_TIMESTAMP_ISO8601_STRING = "2001-08-22T03:04:05.321+07:09";
-  private static final DateTimeZone UTC_TIME_ZONE = getDateTimeZone(UTC_KEY);
+  private static final DateTimeZone UTC_TIME_ZONE = DateTimeUtils.DateTimeZoneIndex.getDateTimeZone(TimeZoneKey.UTC_KEY);
   private static final String TIMESTAMP_ISO8601_STRING = "2001-08-22T03:04:05.321+00:00";
 
   private static final DateTime TIMESTAMP = new DateTime(2001, 8, 22, 3, 4, 5, 321, UTC_TIME_ZONE);

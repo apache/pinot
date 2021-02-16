@@ -7,16 +7,15 @@ import selfserve from './endpoints/selfserve';
 import auth from './endpoints/auth';
 import entityMapping from './endpoints/entity-mapping';
 
-export default function() {
-
-  this.timing = 1000;      // delay for each request, automatically set to 0 during testing
+export default function () {
+  this.timing = 1000; // delay for each request, automatically set to 0 during testing
 
   /**
    * Mocks anomaly data end points
    */
   this.get('/anomalies/search/anomalyIds/1/1/1', (server) => {
     const anomaly = Object.assign({}, server.anomalies.first().attrs);
-    const anomalyDetailsList = [ anomaly ];
+    const anomalyDetailsList = [anomaly];
     return { anomalyDetailsList };
   });
 
@@ -41,16 +40,16 @@ export default function() {
   this.get('/data/anomalies/ranges', (server, request) => {
     const { metricIds, start, end } = request.queryParams;
 
-    const regions = metricIds
-      .split(',')
-      .reduce((regions, id) => {
-        regions[id] = [{
+    const regions = metricIds.split(',').reduce((regions, id) => {
+      regions[id] = [
+        {
           start,
           end
-        }];
+        }
+      ];
 
-        return regions;
-      }, {});
+      return regions;
+    }, {});
 
     return regions;
   });
@@ -71,7 +70,7 @@ export default function() {
       end: currentEnd,
 
       timeBucketsCurrent: [...new Array(dataPoint)].map((point, index) => {
-        return +currentStart + (index * interval);
+        return +currentStart + index * interval;
       }),
 
       subDimensionContributionMap: {
@@ -85,7 +84,7 @@ export default function() {
             return num.toFixed(2);
           }),
           percentageChange: [...new Array(dataPoint)].map(() => {
-            const num = (Math.random() * 200) - 100;
+            const num = Math.random() * 200 - 100;
             return num.toFixed(2);
           })
         }

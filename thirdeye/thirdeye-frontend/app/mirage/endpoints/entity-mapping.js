@@ -1,12 +1,11 @@
-
 export default function (server) {
-
   /**
    * get request for the entity mapping
    */
   server.get('/entityMapping/view/fromURN/:urn', () => {
     return [
-      { id: 1234567,
+      {
+        id: 1234567,
         version: 1,
         createdBy: null,
         updatedBy: null,
@@ -17,14 +16,10 @@ export default function (server) {
   });
 
   /**
- * get request to fetch all datasets
- */
+   * get request to fetch all datasets
+   */
   server.get('/data/datasets', () => {
-    return [
-      'dataset 1',
-      'dataset 2',
-      'dataset 3'
-    ];
+    return ['dataset 1', 'dataset 2', 'dataset 3'];
   });
 
   /**
@@ -35,10 +30,6 @@ export default function (server) {
   });
 
   server.get('/external/services/all', () => {
-    return [
-      'service 1',
-      'service 2',
-      'service 3'
-    ];
+    return ['service 1', 'service 2', 'service 3'];
   });
 }
