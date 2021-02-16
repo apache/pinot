@@ -1,12 +1,6 @@
-import { computed, getProperties, set } from '@ember/object';
+import { computed, getProperties } from '@ember/object';
 import Component from '@ember/component';
-import {
-  toFilters
-} from 'thirdeye-frontend/utils/rca-utils';
-import {
-  humanizeChange,
-  humanizeFloat
-} from 'thirdeye-frontend/utils/utils';
+import { toFilters } from 'thirdeye-frontend/utils/rca-utils';
 import CALLGRAPH_TABLE_COLUMNS from 'thirdeye-frontend/shared/callgraphTableColumns';
 import _ from 'lodash';
 
@@ -54,10 +48,16 @@ export default Component.extend({
    */
   fabrics: computed('metricUrn', function () {
     const { metricUrn } = getProperties(this, 'metricUrn');
-    if (_.isEmpty(metricUrn)) { return []; }
+    if (_.isEmpty(metricUrn)) {
+      return [];
+    }
 
-    const fabrics = toFilters(metricUrn).filter(t => t[0] === 'data_center').map(t => t[2]);
-    if (_.isEmpty(fabrics)) { return ['all']; }
+    const fabrics = toFilters(metricUrn)
+      .filter((t) => t[0] === 'data_center')
+      .map((t) => t[2]);
+    if (_.isEmpty(fabrics)) {
+      return ['all'];
+    }
 
     return fabrics;
   }),
@@ -68,9 +68,13 @@ export default Component.extend({
    */
   pageKeys: computed('metricUrn', function () {
     const { metricUrn } = getProperties(this, 'metricUrn');
-    if (_.isEmpty(metricUrn)) { return []; }
+    if (_.isEmpty(metricUrn)) {
+      return [];
+    }
 
-    const pageKeys = toFilters(metricUrn).filter(t => t[0] === 'page_key').map(t => t[2]);
+    const pageKeys = toFilters(metricUrn)
+      .filter((t) => t[0] === 'page_key')
+      .map((t) => t[2]);
 
     return pageKeys;
   }),
@@ -88,13 +92,19 @@ export default Component.extend({
    * Data for metrics table
    * @type {Array}
    */
-  callgraphTableData: computed('edges', function() {
+  callgraphTableData: computed('edges', function () {
     const { edges } = getProperties(this, 'edges');
 
-    if (_.isEmpty(edges)) { return []; }
+    if (_.isEmpty(edges)) {
+      return [];
+    }
 
-    return Object.keys(edges).map(edge =>
-      toFilters(edge).reduce((agg, t) => { agg[t[0]] = this._parse(t[2]); return agg; }, {}));
+    return Object.keys(edges).map((edge) =>
+      toFilters(edge).reduce((agg, t) => {
+        agg[t[0]] = this._parse(t[2]);
+        return agg;
+      }, {})
+    );
   }),
 
   /**
@@ -102,10 +112,10 @@ export default Component.extend({
    * @type {Array}
    */
   preselectedItems: computed({
-    get () {
+    get() {
       return [];
     },
-    set () {
+    set() {
       // ignore
     }
   }),
@@ -130,7 +140,7 @@ export default Component.extend({
      * Triggered on cell selection, ignored.
      * @param {Object} e
      */
-    displayDataChanged (e) {
+    displayDataChanged(/* e */) {
       // ignore
     }
   }

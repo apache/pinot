@@ -15,5 +15,4 @@ import config from 'thirdeye-frontend/config/environment';
 
 export default Component.extend({
   email: config.email
-
 });

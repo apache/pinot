@@ -22,6 +22,7 @@ const TIMESERIES_MODE_SPLIT = 'split';
 
 const EVENT_MIN_GAP = 60000;
 
+/* eslint-disable ember/avoid-leaking-state-in-ember-objects */
 export default Component.extend({
   entities: null, // {}
 
@@ -51,7 +52,7 @@ export default Component.extend({
    * Translate an urn into a chart id
    * @returns {Set}
    */
-  focusedIds: computed('focusedUrns', function() {
+  focusedIds: computed('focusedUrns', function () {
     return get(this, 'focusedUrns');
   }),
 
@@ -77,117 +78,96 @@ export default Component.extend({
     height: 200
   },
 
-  tooltip: computed(
-    'onHover',
-    function () {
-      return {
-        grouped: true,
-        position: function (data, width, height, element) {
-          const chartOffsetX = document.querySelector(".timeseries-chart").getBoundingClientRect().left;
-          const graphOffsetX = document.querySelector(".timeseries-chart g.c3-axis-y").getBoundingClientRect().right;
-          const tooltipWidth = document.getElementById('tooltip').parentNode.clientWidth;
-          const x = (parseInt(element.getAttribute('cx'))) + graphOffsetX - chartOffsetX - Math.floor(tooltipWidth/2);
-          const y = element.getAttribute('cy') - height - 14;
-          return {top: y, left: x};
-        },
-        contents: (items) => {
-          const t = makeTime(items[0].x);
-          const hoverUrns = this._onHover(t.valueOf());
+  tooltip: computed('onHover', function () {
+    return {
+      grouped: true,
+      position: function (data, width, height, element) {
+        const chartOffsetX = document.querySelector('.timeseries-chart').getBoundingClientRect().left;
+        const graphOffsetX = document.querySelector('.timeseries-chart g.c3-axis-y').getBoundingClientRect().right;
+        const tooltipWidth = document.getElementById('tooltip').parentNode.clientWidth;
+        const x = parseInt(element.getAttribute('cx')) + graphOffsetX - chartOffsetX - Math.floor(tooltipWidth / 2);
+        const y = element.getAttribute('cy') - height - 14;
+        return { top: y, left: x };
+      },
+      contents: (items) => {
+        const t = makeTime(items[0].x);
+        const hoverUrns = this._onHover(t.valueOf());
 
-          const {
-            entities,
-            timeseries
-          } = getProperties(this, 'entities', 'timeseries');
+        const { entities, timeseries } = getProperties(this, 'entities', 'timeseries');
 
-          const tooltip = this.buildTooltip.create();
+        const tooltip = this.buildTooltip.create();
 
-          return tooltip.compute({
-            entities,
-            timeseries,
-            hoverUrns,
-            hoverTimestamp: t.valueOf()
-          });
-        }
-      };
-    }
-  ),
+        return tooltip.compute({
+          entities,
+          timeseries,
+          hoverUrns,
+          hoverTimestamp: t.valueOf()
+        });
+      }
+    };
+  }),
 
-  axis: computed(
-    'context',
-    function () {
-      const { context } = getProperties(this, 'context');
+  axis: computed('context', function () {
+    const { context } = getProperties(this, 'context');
 
-      const { analysisRange } = context;
+    const { analysisRange } = context;
 
-      return {
-        y: {
-          show: true,
-          tick: {
-            format: function(d){return humanizeFloat(d);}
+    return {
+      y: {
+        show: true,
+        tick: {
+          format: function (d) {
+            return humanizeFloat(d);
           }
-        },
-        y2: {
-          show: false,
-          min: 0,
-          max: 1
-        },
-        x: {
-          type: 'timeseries',
-          show: true,
-          min: analysisRange[0],
-          max: analysisRange[1],
-          tick: {
-            fit: false,
-            format: (d) => {
-              const t = makeTime(d);
-              if (t.valueOf() === t.clone().startOf('day').valueOf()) {
-                return t.format('MMM D');
-              }
-              return t.format('h:mm a');
+        }
+      },
+      y2: {
+        show: false,
+        min: 0,
+        max: 1
+      },
+      x: {
+        type: 'timeseries',
+        show: true,
+        min: analysisRange[0],
+        max: analysisRange[1],
+        tick: {
+          fit: false,
+          format: (d) => {
+            const t = makeTime(d);
+            if (t.valueOf() === t.clone().startOf('day').valueOf()) {
+              return t.format('MMM D');
             }
+            return t.format('h:mm a');
           }
         }
-      };
-    }
-  ),
+      }
+    };
+  }),
 
   /**
    * Array of displayable urns in timeseries chart (events, metrics, metric refs)
    */
-  displayableUrns: computed(
-    'entities',
-    'timeseries',
-    'selectedUrns',
-    function () {
-      const { entities, timeseries, selectedUrns } =
-        getProperties(this, 'entities', 'timeseries', 'selectedUrns');
+  displayableUrns: computed('entities', 'timeseries', 'selectedUrns', function () {
+    const { entities, timeseries, selectedUrns } = getProperties(this, 'entities', 'timeseries', 'selectedUrns');
 
-      return filterPrefix(selectedUrns, ['thirdeye:event:', 'frontend:metric:'])
-        .filter(urn => !hasPrefix(urn, 'thirdeye:event:') || entities[urn])
-        .filter(urn => !hasPrefix(urn, 'frontend:metric:') || timeseries[urn]);
-    }
-  ),
+    return filterPrefix(selectedUrns, ['thirdeye:event:', 'frontend:metric:'])
+      .filter((urn) => !hasPrefix(urn, 'thirdeye:event:') || entities[urn])
+      .filter((urn) => !hasPrefix(urn, 'frontend:metric:') || timeseries[urn]);
+  }),
 
   /**
    * Transformed data series as ingested by timeseries-chart
    */
-  series: computed(
-    'entities',
-    'timeseries',
-    'context',
-    'displayableUrns',
-    'timeseriesMode',
-    function () {
-      const { timeseriesMode, displayableUrns } =
-        getProperties(this, 'timeseriesMode', 'displayableUrns');
+  series: computed('entities', 'timeseries', 'context', 'displayableUrns', 'timeseriesMode', function () {
+    const { timeseriesMode, displayableUrns } = getProperties(this, 'timeseriesMode', 'displayableUrns');
 
-      if (timeseriesMode === TIMESERIES_MODE_SPLIT) {
-        return {};
-      }
-
-      return this._makeChartSeries(displayableUrns);
+    if (timeseriesMode === TIMESERIES_MODE_SPLIT) {
+      return {};
     }
-  ),
+
+    return this._makeChartSeries(displayableUrns);
+  }),
 
   //
   // split view logic
@@ -200,86 +180,75 @@ export default Component.extend({
   /**
    * Dictionary of transformed data series for split view, keyed by metric ref urn.
    */
-  splitSeries: computed(
-    'entities',
-    'timeseries',
-    'context',
-    'displayableUrns',
-    'timeseriesMode',
-    function () {
-      const { displayableUrns, timeseriesMode } =
-        getProperties(this, 'displayableUrns', 'timeseriesMode');
+  splitSeries: computed('entities', 'timeseries', 'context', 'displayableUrns', 'timeseriesMode', function () {
+    const { displayableUrns, timeseriesMode } = getProperties(this, 'displayableUrns', 'timeseriesMode');
 
-      if (timeseriesMode !== TIMESERIES_MODE_SPLIT) {
-        return {};
+    if (timeseriesMode !== TIMESERIES_MODE_SPLIT) {
+      return {};
+    }
+
+    const splitSeries = {};
+    const metricUrns = new Set(filterPrefix(displayableUrns, 'frontend:metric:'));
+
+    const otherUrns = new Set([...displayableUrns].filter((urn) => !metricUrns.has(urn)));
+
+    filterPrefix(metricUrns, 'frontend:metric:current:').forEach((urn) => {
+      const splitMetricUrns = [urn];
+      const baselineUrn = toBaselineUrn(urn);
+
+      // show related baseline
+      if (metricUrns.has(baselineUrn)) {
+        splitMetricUrns.push(baselineUrn);
       }
 
-      const splitSeries = {};
-      const metricUrns = new Set(filterPrefix(displayableUrns, 'frontend:metric:'));
+      const splitUrns = new Set(splitMetricUrns.concat([...otherUrns]));
 
-      const otherUrns = new Set([...displayableUrns].filter(urn => !metricUrns.has(urn)));
+      splitSeries[urn] = this._makeChartSeries(splitUrns);
+    });
 
-      filterPrefix(metricUrns, 'frontend:metric:current:').forEach(urn => {
-        const splitMetricUrns = [urn];
-        const baselineUrn = toBaselineUrn(urn);
-
-        // show related baseline
-        if (metricUrns.has(baselineUrn)) {
-          splitMetricUrns.push(baselineUrn);
-        }
-
-        const splitUrns = new Set(splitMetricUrns.concat([...otherUrns]));
-
-        splitSeries[urn] = this._makeChartSeries(splitUrns);
-      });
-
-      return splitSeries;
-    }
-  ),
+    return splitSeries;
+  }),
 
   /**
    * Array of urns for split view. One per metric ref urn.
    */
-  splitUrns: computed(
-    'entities',
-    'displayableUrns',
-    'timeseriesMode',
-    function () {
-      const { entities, displayableUrns, timeseriesMode } =
-        getProperties(this, 'entities', 'displayableUrns', 'timeseriesMode');
+  splitUrns: computed('entities', 'displayableUrns', 'timeseriesMode', function () {
+    const { entities, displayableUrns, timeseriesMode } = getProperties(
+      this,
+      'entities',
+      'displayableUrns',
+      'timeseriesMode'
+    );
 
-      if (timeseriesMode !== TIMESERIES_MODE_SPLIT) {
-        return {};
-      }
-
-      return filterPrefix(displayableUrns, 'frontend:metric:current:')
-        .map(urn => [toMetricLabel(toMetricUrn(urn), entities), urn])
-        .map(t => t[1]);
+    if (timeseriesMode !== TIMESERIES_MODE_SPLIT) {
+      return {};
     }
-  ),
+
+    return filterPrefix(displayableUrns, 'frontend:metric:current:')
+      .map((urn) => [toMetricLabel(toMetricUrn(urn), entities), urn])
+      .map((t) => t[1]);
+  }),
 
   /**
    * Dictionary of chart labels for split view, keyed by metric ref urn.
    */
-  splitLabels: computed(
-    'entities',
-    'displayableUrns',
-    'timeseriesMode',
-    function () {
-      const { entities, displayableUrns, timeseriesMode } =
-        getProperties(this, 'entities', 'displayableUrns', 'timeseriesMode');
+  splitLabels: computed('entities', 'displayableUrns', 'timeseriesMode', function () {
+    const { entities, displayableUrns, timeseriesMode } = getProperties(
+      this,
+      'entities',
+      'displayableUrns',
+      'timeseriesMode'
+    );
 
-      if (timeseriesMode !== TIMESERIES_MODE_SPLIT) {
-        return {};
-      }
-
-      return filterPrefix(displayableUrns, 'frontend:metric:current:')
-        .reduce((agg, urn) => {
-          agg[urn] = toMetricLabel(toMetricUrn(urn), entities);
-          return agg;
-        }, {});
+    if (timeseriesMode !== TIMESERIES_MODE_SPLIT) {
+      return {};
     }
-  ),
+
+    return filterPrefix(displayableUrns, 'frontend:metric:current:').reduce((agg, urn) => {
+      agg[urn] = toMetricLabel(toMetricUrn(urn), entities);
+      return agg;
+    }, {});
+  }),
 
   /**
    * Split view indicator
@@ -301,7 +270,7 @@ export default Component.extend({
     const { anomalyRange } = context;
 
     const series = {};
-    [...urns].forEach(urn => {
+    [...urns].forEach((urn) => {
       const s = this._makeSeries(urn);
       if (!_.isEmpty(s.timestamps)) {
         series[this._makeLabel(urn)] = s;
@@ -321,74 +290,62 @@ export default Component.extend({
   /**
    * Dictionary for the min and mix timestamps of events and timeseries for hover bounds checking
    */
-  _hoverBounds: computed(
-    'entities',
-    'timeseries',
-    'displayableUrns',
-    function () {
-      const { displayableUrns } = getProperties(this, 'displayableUrns');
+  _hoverBounds: computed('entities', 'timeseries', 'displayableUrns', function () {
+    const { displayableUrns } = getProperties(this, 'displayableUrns');
 
-      const bounds = {};
-      [...displayableUrns].forEach(urn => {
-        const timestamps = this._makeSeries(urn).timestamps;
-        bounds[urn] = [timestamps[0], timestamps[timestamps.length-1]];
-      });
+    const bounds = {};
+    [...displayableUrns].forEach((urn) => {
+      const timestamps = this._makeSeries(urn).timestamps;
+      bounds[urn] = [timestamps[0], timestamps[timestamps.length - 1]];
+    });
 
-      return bounds;
-    }
-  ),
+    return bounds;
+  }),
 
   /**
    * Dictionary of y-values for event entities. Laid out by a swimlane algorithm purely for display purposes
    */
-  _eventValues: computed(
-    'entities',
-    'displayableUrns',
-    function () {
-      const { entities, displayableUrns, context } =
-        getProperties(this, 'entities', 'displayableUrns', 'context');
+  _eventValues: computed('entities', 'displayableUrns', function () {
+    const { entities, displayableUrns, context } = getProperties(this, 'entities', 'displayableUrns', 'context');
 
-      const selectedEvents = filterPrefix(displayableUrns, 'thirdeye:event:').map(urn => entities[urn]);
+    const selectedEvents = filterPrefix(displayableUrns, 'thirdeye:event:').map((urn) => entities[urn]);
 
-      const analysisRangeEnd = context.analysisRange[1];
-      const handleOngoingEnd = (e) => e.end <= 0 ? analysisRangeEnd : e.end;
+    const analysisRangeEnd = context.analysisRange[1];
+    const handleOngoingEnd = (e) => (e.end <= 0 ? analysisRangeEnd : e.end);
 
-      const starts = selectedEvents.map(e => [e.start, e.urn]);
-      const ends = selectedEvents.map(e => [handleOngoingEnd(e) + EVENT_MIN_GAP, e.urn]); // no overlap
-      const sorted = starts.concat(ends).sort();
+    const starts = selectedEvents.map((e) => [e.start, e.urn]);
+    const ends = selectedEvents.map((e) => [handleOngoingEnd(e) + EVENT_MIN_GAP, e.urn]); // no overlap
+    const sorted = starts.concat(ends).sort();
 
-      //
-      // automated layouting for event time ranges based on 'swimlanes'.
-      // events are assigned to different lanes such that their time ranges do not overlap visually
-      // the swimlanes are then converted to y values between [0.0, 1.0]
-      //
-      const lanes = {};
-      const urn2lane = {};
-      let max = 10; // default value
-      sorted.forEach(t => {
-        const urn = t[1];
+    //
+    // automated layouting for event time ranges based on 'swimlanes'.
+    // events are assigned to different lanes such that their time ranges do not overlap visually
+    // the swimlanes are then converted to y values between [0.0, 1.0]
+    //
+    const lanes = {};
+    const urn2lane = {};
+    let max = 10; // default value
+    sorted.forEach((t) => {
+      const urn = t[1];
 
-        if (!(urn in urn2lane)) {
-          // add
-          let i;
-          for (i = 0; (i in lanes); i++);
-          lanes[i] = urn;
-          urn2lane[urn] = i;
-          max = i > max ? i : max;
+      if (!(urn in urn2lane)) {
+        // add
+        let i;
+        for (i = 0; i in lanes; i++);
+        lanes[i] = urn;
+        urn2lane[urn] = i;
+        max = i > max ? i : max;
+      } else {
+        // remove
+        delete lanes[urn2lane[urn]];
+      }
+    });
 
-        } else {
-          // remove
-          delete lanes[urn2lane[urn]];
+    const normalized = {};
+    Object.keys(urn2lane).forEach((urn) => (normalized[urn] = 1 - (0.5 * urn2lane[urn]) / max));
 
-        }
-      });
-
-      const normalized = {};
-      Object.keys(urn2lane).forEach(urn => normalized[urn] = 1 - 0.5 * urn2lane[urn] / max);
-
-      return normalized;
-    }
-  ),
+    return normalized;
+  }),
 
   /**
    * Converts a urn into a valid series label as ingested by timeseries-chart
@@ -410,8 +367,14 @@ export default Component.extend({
    * @private
    */
   _makeSeries(urn) {
-    const { entities, timeseries, timeseriesMode, _eventValues, context } =
-      getProperties(this, 'entities', 'timeseries', 'timeseriesMode', '_eventValues', 'context');
+    const { entities, timeseries, timeseriesMode, _eventValues, context } = getProperties(
+      this,
+      'entities',
+      'timeseries',
+      'timeseriesMode',
+      '_eventValues',
+      'context'
+    );
 
     if (hasPrefix(urn, 'frontend:metric:current:')) {
       const metricEntity = entities[toMetricUrn(urn)];
@@ -424,7 +387,6 @@ export default Component.extend({
       };
 
       return this._transformSeries(timeseriesMode, series);
-
     } else if (hasPrefix(urn, 'frontend:metric:baseline:')) {
       const metricEntity = entities[toMetricUrn(urn)];
       const series = {
@@ -436,7 +398,6 @@ export default Component.extend({
       };
 
       return this._transformSeries(timeseriesMode, series);
-
     } else if (hasPrefix(urn, 'thirdeye:event:')) {
       const val = _eventValues[urn];
       const endRange = context.analysisRange[1];
@@ -461,7 +422,7 @@ export default Component.extend({
    * @private
    */
   _transformSeries(mode, series) {
-    switch(mode) {
+    switch (mode) {
       case TIMESERIES_MODE_ABSOLUTE:
         return series; // raw data
       case TIMESERIES_MODE_RELATIVE:
@@ -481,9 +442,9 @@ export default Component.extend({
    * @private
    */
   _transformSeriesRelative(series) {
-    const first = series.values.filter(v => v)[0] || 1.0;
+    const first = series.values.filter((v) => v)[0] || 1.0;
     const output = Object.assign({}, series);
-    output.values = series.values.map(v => v != null ? 1.0 * v / first : null);
+    output.values = series.values.map((v) => (v != null ? (1.0 * v) / first : null));
     return output;
   },
 
@@ -495,7 +456,7 @@ export default Component.extend({
    */
   _transformSeriesLog(series) {
     const output = Object.assign({}, series);
-    output.values = series.values.map(v => v != null ? this._customLog(v) : null);
+    output.values = series.values.map((v) => (v != null ? this._customLog(v) : null));
     return output;
   },
 
@@ -506,7 +467,9 @@ export default Component.extend({
    * @private
    */
   _customLog(v) {
-    if (v <= 0) { return null; }
+    if (v <= 0) {
+      return null;
+    }
     return Math.log(v);
   },
 
@@ -517,11 +480,15 @@ export default Component.extend({
    * @private
    */
   _onHover(d) {
-    const { _hoverBounds: bounds, displayableUrns, onHover } =
-      getProperties(this, '_hoverBounds', 'displayableUrns', 'onHover');
+    const { _hoverBounds: bounds, displayableUrns, onHover } = getProperties(
+      this,
+      '_hoverBounds',
+      'displayableUrns',
+      'onHover'
+    );
 
     if (onHover != null) {
-      const urns = [...displayableUrns].filter(urn => bounds[urn] && bounds[urn][0] <= d && d <= bounds[urn][1]);
+      const urns = [...displayableUrns].filter((urn) => bounds[urn] && bounds[urn][0] <= d && d <= bounds[urn][1]);
 
       const metricUrns = filterPrefix(urns, 'frontend:metric:');
       const eventUrns = filterPrefix(urns, 'thirdeye:event:');

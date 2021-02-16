@@ -16,6 +16,7 @@ import {
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import _ from 'lodash';
 
+/* eslint-disable ember/avoid-leaking-state-in-ember-objects */
 export default Component.extend({
   /**
    * Currently selected metric urn including base metric and filters
@@ -55,6 +56,7 @@ export default Component.extend({
    * Multimap (map of arrays) of available dimension names and values for the current base metric. Loaded dynamically from the backend.
    * @type {object}
    */
+  // eslint-disable-next-line ember/avoid-leaking-state-in-ember-objects
   filterOptions: {},
 
   /**
@@ -94,16 +96,16 @@ export default Component.extend({
    * @type {string}
    */
   inclusions: computed('filterMap', {
-    get () {
+    get() {
       const { filterMap } = getProperties(this, 'filterMap');
-      const inclusionsOnly = fromFilterMap(filterMap).filter(t => t[1] === '=');
+      const inclusionsOnly = fromFilterMap(filterMap).filter((t) => t[1] === '=');
       return JSON.stringify(toFilterMap(inclusionsOnly));
     },
-    set (key, value) {
+    set(key, value) {
       const { filterMap } = getProperties(this, 'filterMap');
-      const withoutInclusions = fromFilterMap(filterMap).filter(t => t[1] !== '=');
+      const withoutInclusions = fromFilterMap(filterMap).filter((t) => t[1] !== '=');
       const inclusions = fromFilterMap(JSON.parse(value));
-      setProperties(this, { filterMap: toFilterMap([...inclusions, ...withoutInclusions])});
+      setProperties(this, { filterMap: toFilterMap([...inclusions, ...withoutInclusions]) });
     }
   }),
 
@@ -115,18 +117,18 @@ export default Component.extend({
    * @type {string}
    */
   exclusions: computed('filterMap', {
-    get () {
+    get() {
       const { filterMap } = getProperties(this, 'filterMap');
-      const exclusionsOnly = fromFilterMap(filterMap).filter(t => t[1] === '!=');
-      const exclusionsAsInclusions = exclusionsOnly.map(t => [t[0], '=', t[2]]);
+      const exclusionsOnly = fromFilterMap(filterMap).filter((t) => t[1] === '!=');
+      const exclusionsAsInclusions = exclusionsOnly.map((t) => [t[0], '=', t[2]]);
       return JSON.stringify(toFilterMap(exclusionsAsInclusions));
     },
-    set (key, value) {
+    set(key, value) {
       const { filterMap } = getProperties(this, 'filterMap');
-      const withoutExclusions = fromFilterMap(filterMap).filter(t => t[1] !== '!=');
+      const withoutExclusions = fromFilterMap(filterMap).filter((t) => t[1] !== '!=');
       const exclusionsAsInclusions = fromFilterMap(JSON.parse(value));
-      const exclusions = exclusionsAsInclusions.map(t => [t[0], '!=', t[2]]);
-      setProperties(this, { filterMap: toFilterMap([...exclusions, ...withoutExclusions])});
+      const exclusions = exclusionsAsInclusions.map((t) => [t[0], '!=', t[2]]);
+      setProperties(this, { filterMap: toFilterMap([...exclusions, ...withoutExclusions]) });
     }
   }),
 
@@ -150,7 +152,7 @@ export default Component.extend({
    */
   isExclusionWarning: computed('selectedUrn', 'entities', function () {
     const { selectedUrn, entities } = getProperties(this, 'selectedUrn', 'entities');
-    return (selectedUrn in entities) && !isAdditive(selectedUrn, entities);
+    return selectedUrn in entities && !isAdditive(selectedUrn, entities);
   }),
 
   /**
@@ -164,11 +166,11 @@ export default Component.extend({
   _pruneFilters(filterOptions, filterMap) {
     const newFilterMap = {};
 
-    Object.keys(filterMap).forEach(key => {
+    Object.keys(filterMap).forEach((key) => {
       const options = new Set(filterOptions[key] || []);
       newFilterMap[key] = new Set();
 
-      filterMap[key].forEach(value => {
+      filterMap[key].forEach((value) => {
         const filter = value2filter(key, value);
         if (options.has(filter[2])) {
           newFilterMap[key].add(value);
@@ -189,13 +191,15 @@ export default Component.extend({
    * @private
    */
   _fetchFilters(baseUrn, filterMap) {
-    if (!baseUrn) { return; }
+    if (!baseUrn) {
+      return;
+    }
 
     const id = baseUrn.split(':')[2];
 
     return fetch(`/data/autocomplete/filters/metric/${id}`)
       .then(checkStatus)
-      .then(res => setProperties(this, { filterOptions: res, filterMap: this._pruneFilters(res, filterMap) }))
+      .then((res) => setProperties(this, { filterOptions: res, filterMap: this._pruneFilters(res, filterMap) }))
       .then(() => this.send('onSelect'));
   },
 
@@ -203,7 +207,9 @@ export default Component.extend({
     onMetric(updates) {
       const metricUrns = filterPrefix(Object.keys(updates), 'thirdeye:metric:');
 
-      if (_.isEmpty(metricUrns)) { return; }
+      if (_.isEmpty(metricUrns)) {
+        return;
+      }
 
       const baseUrn = metricUrns[0];
 
@@ -220,13 +226,20 @@ export default Component.extend({
     },
 
     onSelect() {
-      const { baseUrn, filterMap, selectedUrn, onSelection } =
-        getProperties(this, 'baseUrn', 'filterMap', 'selectedUrn', 'onSelection');
+      const { baseUrn, filterMap, selectedUrn, onSelection } = getProperties(
+        this,
+        'baseUrn',
+        'filterMap',
+        'selectedUrn',
+        'onSelection'
+      );
 
       const metricUrn = appendFilters(baseUrn, fromFilterMap(filterMap));
 
       // only trigger on actual metric/filter change
-      if (_.isEqual(metricUrn, selectedUrn)) { return; }
+      if (_.isEqual(metricUrn, selectedUrn)) {
+        return;
+      }
 
       const updates = { [metricUrn]: true, [toBaselineUrn(metricUrn)]: true, [toCurrentUrn(metricUrn)]: true };
 

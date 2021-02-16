@@ -25,9 +25,8 @@ import { task, timeout } from 'ember-concurrency';
  */
 const buildFilterOptions = (filters) => {
   return Object.keys(filters).map((filterName) => {
-
     const options = filters[filterName]
-      .filter(value => !!value)
+      .filter((value) => !!value)
       .map((value) => {
         return {
           name: value,
@@ -70,7 +69,7 @@ const convertHashToFilters = (filters) => {
  */
 const convertFiltersToHash = (selectedFilters) => {
   const filters = selectedFilters.reduce((filterHash, filter) => {
-    const [ filterGroup, filterName ] = filter.id.split('::');
+    const [filterGroup, filterName] = filter.id.split('::');
 
     filterHash[filterGroup] = filterHash[filterGroup] || [];
     filterHash[filterGroup].push(filterName);
@@ -108,13 +107,10 @@ const getSearchResults = (filterOptions, filterToMatch, maxNum) => {
     return foundFilters;
   }, []);
 
-  const NoMatchMessage = count
-    ? `Too Many results found (${count})`
-    : 'No results found.';
+  const NoMatchMessage = count ? `Too Many results found (${count})` : 'No results found.';
 
   return [filters, NoMatchMessage];
 };
-
 
 export default Component.extend({
   placeholder: '  Add a filter (Type to search)',
@@ -135,6 +131,7 @@ export default Component.extend({
   selected: JSON.stringify({}),
 
   // all Filters Object
+  // eslint-disable-next-line ember/avoid-leaking-state-in-ember-objects
   options: {},
 
   disabled: false,
@@ -143,7 +140,7 @@ export default Component.extend({
    * Takes the filters and massage them for the power-select grouping api
    * Currently not showing the whole list because of performance issues
    */
-  filterOptions: computed('options', function() {
+  filterOptions: computed('options', function () {
     const filters = this.get('options') || {};
 
     return buildFilterOptions(filters);
@@ -163,22 +160,18 @@ export default Component.extend({
   }),
 
   // Initial filter View (subset of FilterOptions)
-  viewFilterOptions: computed(
-    'filterOptions.@each',
-    'maxNumFilters',
-    function() {
-      const maxNumFilters = this.get('maxNumFilters');
-      return [...this.get('filterOptions')].map((filter) => {
-        const viewFilter = Object.assign({}, filter);
-        viewFilter.groupName += ` (${viewFilter.options.length})`;
+  viewFilterOptions: computed('filterOptions.@each', 'maxNumFilters', function () {
+    const maxNumFilters = this.get('maxNumFilters');
+    return [...this.get('filterOptions')].map((filter) => {
+      const viewFilter = Object.assign({}, filter);
+      viewFilter.groupName += ` (${viewFilter.options.length})`;
 
-        if (viewFilter.options.length > maxNumFilters) {
-          viewFilter.options = viewFilter.options[0];
-        }
-        return viewFilter;
-      });
-    }
-  ),
+      if (viewFilter.options.length > maxNumFilters) {
+        viewFilter.options = viewFilter.options[0];
+      }
+      return viewFilter;
+    });
+  }),
 
   /**
    * Ember concurrency generator helper tasks
@@ -189,7 +182,7 @@ export default Component.extend({
 
     const filterOptions = [...this.get('filterOptions')];
     const maxNum = this.get('maxTotalFilters');
-    const [ filters, message ] = getSearchResults(filterOptions, filter, maxNum);
+    const [filters, message] = getSearchResults(filterOptions, filter, maxNum);
     this.set('noMatchesMessage', message);
 
     return filters;

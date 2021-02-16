@@ -15,19 +15,11 @@
  *
  * @exports filter-bar
  */
-import Component from "@ember/component";
-import {
-  get,
-  set,
-  setProperties,
-  computed,
-  getProperties,
-  observer
-} from "@ember/object";
+import Component from '@ember/component';
+import { get, set, setProperties, computed, getProperties, observer } from '@ember/object';
 import _ from 'lodash';
-
+/* eslint-disable ember/avoid-leaking-state-in-ember-objects */
 export default Component.extend({
-
   /**
    * Cache for all filters selected (event type + subfilters)
    */
@@ -53,12 +45,14 @@ export default Component.extend({
    *  holiday: {urns3, urns4}
    * }
    */
+
   urnsCache: {},
 
   /**
    * Set of frameworks currently loading
    * @type {Set}
    */
+
   loadingFrameworks: {},
 
   /**
@@ -130,16 +124,10 @@ export default Component.extend({
    * observer on entities to set default event type when entities is loaded
    * @type {undefined}
    */
-  filteredUrnsObserver: observer(
-    'eventType',
-    'entities',
-    'filterCache',
-    'filteredUrns',
-    function() {
-      const { filteredUrns, onFilter } = getProperties(this, 'filteredUrns', 'onFilter');
-      onFilter(filteredUrns);
-    }
-  ),
+  filteredUrnsObserver: observer('eventType', 'entities', 'filterCache', 'filteredUrns', function () {
+    const { filteredUrns, onFilter } = getProperties(this, 'filteredUrns', 'onFilter');
+    onFilter(filteredUrns);
+  }),
 
   /**
    * Returns object that represents mapping between attributes in events and input values in config
@@ -155,38 +143,35 @@ export default Component.extend({
    * }
    * @type {Object}
    */
-  attributesMap: computed(
-    'entities',
-    function () {
-      let entities = get(this, 'entities');
-      let map = {};
-      if (!_.isEmpty(entities)) {
-        // Iterate through each event
-        Object.keys(entities).forEach(key => {
-          const event = entities[key];
-          const eventType = event.eventType;
-          if (!(eventType in map)) {
-            map[eventType] = {};
-          }
+  attributesMap: computed('entities', function () {
+    let entities = get(this, 'entities');
+    let map = {};
+    if (!_.isEmpty(entities)) {
+      // Iterate through each event
+      Object.keys(entities).forEach((key) => {
+        const event = entities[key];
+        const eventType = event.eventType;
+        if (!(eventType in map)) {
+          map[eventType] = {};
+        }
 
-          // Iterate through each property of event's attributes object
-          Object.keys(event.attributes).forEach(attr => {
-            // Check if the attribute is in the config file
-            if (this.isInConfig(attr)) {
-              if (!(attr in map[eventType])) {
-                map[eventType][attr] = new Set();
-              }
-              const attrSet = map[eventType][attr];
-
-              event.attributes[attr].forEach(val => attrSet.add(val));
+        // Iterate through each property of event's attributes object
+        Object.keys(event.attributes).forEach((attr) => {
+          // Check if the attribute is in the config file
+          if (this.isInConfig(attr)) {
+            if (!(attr in map[eventType])) {
+              map[eventType][attr] = new Set();
             }
-          });
-        });
-      }
+            const attrSet = map[eventType][attr];
 
-      return map;
+            event.attributes[attr].forEach((val) => attrSet.add(val));
+          }
+        });
+      });
     }
-  ),
+
+    return map;
+  }),
 
   /**
    * Helper method to check whether an attribute is in the config
@@ -194,57 +179,51 @@ export default Component.extend({
    * @param {String} attribute - name of attribute to check against config's input's labelMapping
    */
   isInConfig(attribute) {
-    return get(this, 'filterBlocks').some(filterBlock => filterBlock.inputs.some(input => attribute === input.labelMapping));
+    return get(this, 'filterBlocks').some((filterBlock) =>
+      filterBlock.inputs.some((input) => attribute === input.labelMapping)
+    );
   },
 
   /**
    * Computes the filtered urns when there are changes to entities, filterCache, and eventType
    */
-  filteredUrns: computed(
-    'entities',
-    'filterCache',
-    'eventType',
-    function () {
-      const { entities, filterCache, eventType } =
-        getProperties(this, 'entities', 'filterCache', 'eventType');
+  filteredUrns: computed('entities', 'filterCache', 'eventType', function () {
+    const { entities, filterCache, eventType } = getProperties(this, 'entities', 'filterCache', 'eventType');
 
-      if (!eventType) { return []; }
-
-      const filters = filterCache[eventType] || {};
-
-      const filteredUrns = Object.keys(entities).filter(urn => {
-        const e = entities[urn];
-        return e.type == 'event' && e.eventType == eventType && this.applyFilters(e, filters);
-      });
-
-      return filteredUrns;
+    if (!eventType) {
+      return [];
     }
-  ),
+
+    const filters = filterCache[eventType] || {};
+
+    const filteredUrns = Object.keys(entities).filter((urn) => {
+      const e = entities[urn];
+      return e.type == 'event' && e.eventType == eventType && this.applyFilters(e, filters);
+    });
+
+    return filteredUrns;
+  }),
 
   /**
    * A mapping of event type and number of events of that type
    * @type {Object}
    */
-  eventTypeMap: computed(
-    'entities',
-    'filterBlocks',
-    function() {
-      const entities = get(this, 'entities');
-      const counts = {};
-      const filterBlocks = get(this, 'filterBlocks');
-      filterBlocks.forEach(block => {
-        counts[block.eventType] = 0;
-      });
-      Object.keys(entities).forEach(urn => {
-        const e = entities[urn];
-        if (e.type === 'event') {
-          counts[e.eventType] = (counts[e.eventType] || 0) + 1;
-        }
-      });
+  eventTypeMap: computed('entities', 'filterBlocks', function () {
+    const entities = get(this, 'entities');
+    const counts = {};
+    const filterBlocks = get(this, 'filterBlocks');
+    filterBlocks.forEach((block) => {
+      counts[block.eventType] = 0;
+    });
+    Object.keys(entities).forEach((urn) => {
+      const e = entities[urn];
+      if (e.type === 'event') {
+        counts[e.eventType] = (counts[e.eventType] || 0) + 1;
+      }
+    });
 
-      return counts;
-    }
-  ),
+    return counts;
+  }),
 
   /**
    * Determines whether to apply filters
@@ -257,8 +236,10 @@ export default Component.extend({
     }
 
     return Object.keys(filters).every((dimName) => {
-      return !filters[dimName].size
-        || (e.attributes[dimName] && e.attributes[dimName].some(dimValue => filters[dimName].has(dimValue)));
+      return (
+        !filters[dimName].size ||
+        (e.attributes[dimName] && e.attributes[dimName].some((dimValue) => filters[dimName].has(dimValue)))
+      );
     });
   },
 
@@ -280,7 +261,8 @@ export default Component.extend({
 
       setProperties(this, {
         filterCache: Object.assign({}, filterCache),
-        eventType });
+        eventType
+      });
     },
 
     /**
@@ -293,7 +275,7 @@ export default Component.extend({
       let filterBlocks = get(this, 'filterBlocks');
 
       // Hide all other blocks when one is clicked
-      filterBlocks.forEach(block => {
+      filterBlocks.forEach((block) => {
         const isHidden = block.eventType !== eventType;
         set(block, 'isHidden', isHidden);
       });

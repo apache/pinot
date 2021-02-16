@@ -14,8 +14,8 @@ import config from 'thirdeye-frontend/config/environment';
 export default Component.extend({
   actions: {
     /**
-   * Links to cube algorithm wiki
-   */
+     * Links to cube algorithm wiki
+     */
     triggerDoc() {
       window.open(config.docs.cubeWiki);
     }

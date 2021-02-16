@@ -8,13 +8,9 @@ import {
   toColorDirection,
   makeSortable,
   appendFilters,
-  hasPrefix,
   isAdditive
 } from 'thirdeye-frontend/utils/rca-utils';
-import {
-  humanizeChange,
-  humanizeFloat
-} from 'thirdeye-frontend/utils/utils';
+import { humanizeChange, humanizeFloat } from 'thirdeye-frontend/utils/utils';
 import DIMENSIONS_TABLE_COLUMNS from 'thirdeye-frontend/shared/dimensionsTableColumns';
 import _ from 'lodash';
 
@@ -99,77 +95,83 @@ export default Component.extend({
    * Data for metrics table
    * @type {Array}
    */
-  dimensionsTableData: computed(
-    'selectedUrns',
-    'entities',
-    'breakdowns',
-    'metricUrn',
-    function() {
-      const { selectedUrns, entities, breakdowns, metricUrn } =
-        getProperties(this, 'selectedUrns', 'entities', 'breakdowns', 'metricUrn');
+  dimensionsTableData: computed('selectedUrns', 'entities', 'breakdowns', 'metricUrn', function () {
+    const { selectedUrns, entities, breakdowns, metricUrn } = getProperties(
+      this,
+      'selectedUrns',
+      'entities',
+      'breakdowns',
+      'metricUrn'
+    );
 
-      const current = breakdowns[toCurrentUrn(metricUrn)];
-      const baseline = breakdowns[toBaselineUrn(metricUrn)];
+    const current = breakdowns[toCurrentUrn(metricUrn)];
+    const baseline = breakdowns[toBaselineUrn(metricUrn)];
 
-      if (_.isEmpty(current) || _.isEmpty(baseline)) { return []; }
+    if (_.isEmpty(current) || _.isEmpty(baseline)) {
+      return [];
+    }
 
-      const rows = [];
+    const rows = [];
 
-      const inverse = isInverse(metricUrn, entities);
+    const inverse = isInverse(metricUrn, entities);
 
-      const contribTransform = (v) => Math.round(v * 10000) / 100.0;
+    const contribTransform = (v) => Math.round(v * 10000) / 100.0;
 
-      Object.keys(current).forEach(name => {
-        const currTotal = this._sum(current, name);
-        const baseTotal = this._sum(baseline, name);
+    Object.keys(current).forEach((name) => {
+      const currTotal = this._sum(current, name);
+      const baseTotal = this._sum(baseline, name);
 
-        Object.keys(current[name]).forEach(value => {
-          if (value === ROOTCAUSE_VALUE_OTHER) { return; }
+      Object.keys(current[name]).forEach((value) => {
+        if (value === ROOTCAUSE_VALUE_OTHER) {
+          return;
+        }
 
-          const urn = appendFilters(metricUrn, [[name, '=', value]]);
-          const curr = (current[name] || {})[value] || 0;
-          const base = (baseline[name] || {})[value] || 0;
+        const urn = appendFilters(metricUrn, [[name, '=', value]]);
+        const curr = (current[name] || {})[value] || 0;
+        const base = (baseline[name] || {})[value] || 0;
 
-          if (curr === 0 && base === 0) { return; }
+        if (curr === 0 && base === 0) {
+          return;
+        }
 
-          if (curr / currTotal < ROOTCAUSE_TRUNCATION_FRACTION
-            && base / baseTotal < ROOTCAUSE_TRUNCATION_FRACTION) { return; }
+        if (curr / currTotal < ROOTCAUSE_TRUNCATION_FRACTION && base / baseTotal < ROOTCAUSE_TRUNCATION_FRACTION) {
+          return;
+        }
 
-          const change = curr / base - 1;
-          const changeContribution = curr / currTotal - base / baseTotal;
-          const contributionToChange =  (curr - base) / baseTotal;
+        const change = curr / base - 1;
+        const changeContribution = curr / currTotal - base / baseTotal;
+        const contributionToChange = (curr - base) / baseTotal;
 
-          rows.pushObject({
-            urn,
-            isSelected: selectedUrns.has(urn),
-            label: `${value} (${name})`,
-            current: humanizeFloat(curr),
-            baseline: humanizeFloat(base),
-            change: this._makeRecord(change, inverse, humanizeChange),
-            changeContribution: this._makeRecord(changeContribution, inverse, contribTransform),
-            contributionToChange: this._makeRecord(contributionToChange, inverse, contribTransform),
-            sortable_current: makeSortable(curr),
-            sortable_baseline: makeSortable(base),
-            sortable_change: makeSortable(change),
-            sortable_changeContribution: makeSortable(changeContribution),
-            sortable_contributionToChange: makeSortable(contributionToChange)
-          });
+        rows.pushObject({
+          urn,
+          isSelected: selectedUrns.has(urn),
+          label: `${value} (${name})`,
+          current: humanizeFloat(curr),
+          baseline: humanizeFloat(base),
+          change: this._makeRecord(change, inverse, humanizeChange),
+          changeContribution: this._makeRecord(changeContribution, inverse, contribTransform),
+          contributionToChange: this._makeRecord(contributionToChange, inverse, contribTransform),
+          sortable_current: makeSortable(curr),
+          sortable_baseline: makeSortable(base),
+          sortable_change: makeSortable(change),
+          sortable_changeContribution: makeSortable(changeContribution),
+          sortable_contributionToChange: makeSortable(contributionToChange)
         });
       });
+    });
 
-      return _.sortBy(rows, (row) => row.label);
-    }
-  ),
+    return _.sortBy(rows, (row) => row.label);
+  }),
 
   /**
    * Keeps track of items that are selected in the table
    * @type {Array}
    */
   preselectedItems: computed({
-    get () {
+    get() {
       return [];
     },
-    set () {
+    set() {
       // ignore
     }
   }),
@@ -207,12 +209,16 @@ export default Component.extend({
      * Updates the currently selected urns based on user selection on the table
      * @param {Object} e
      */
-    displayDataChanged (e) {
-      if (_.isEmpty(e.selectedItems)) { return; }
+    displayDataChanged(e) {
+      if (_.isEmpty(e.selectedItems)) {
+        return;
+      }
 
       const { selectedUrns, onSelection } = getProperties(this, 'selectedUrns', 'onSelection');
 
-      if (!onSelection) { return; }
+      if (!onSelection) {
+        return;
+      }
 
       const urn = e.selectedItems[0].urn;
       const state = !selectedUrns.has(urn);

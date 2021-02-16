@@ -21,18 +21,10 @@
  */
 
 import Component from '@ember/component';
-import {
-  get,
-  set,
-  computed,
-  getProperties,
-  setProperties
-} from '@ember/object';
-import {
-  reads,
-  equal
-} from '@ember/object/computed';
+import { get, set, computed, getProperties } from '@ember/object';
+import { reads, equal } from '@ember/object/computed';
 
+/* eslint-disable ember/avoid-leaking-state-in-ember-objects */
 export default Component.extend({
   tagName: 'main',
   classNames: ['rootcause-dimensions-settings-modal'],
@@ -63,37 +55,37 @@ export default Component.extend({
   // Text for field tooltips
   tooltips: {
     maintain: 'Keep this order as dimension columns in analysis table',
-    oneSide: 'Set to true to display only results for which change direction is same as global change. For example, If the global change is negative, the algorithm will only show negative changes in the summary.'
+    oneSide:
+      'Set to true to display only results for which change direction is same as global change. For example, If the global change is negative, the algorithm will only show negative changes in the summary.'
   },
 
   /**
    * Selection options for "include dimensions". Do not include options selected to exclude
    * @returns {Array} Dimension options to include
    */
-  dimensionOptionsInclude: computed(
-    'dimensionOptions',
-    'selectedExcludeDimensions',
-    function() {
-      const { dimensionOptions, selectedExcludeDimensions } = getProperties(this, 'dimensionOptions', 'selectedExcludeDimensions');
-      return dimensionOptions ? dimensionOptions.filter(option => !selectedExcludeDimensions.includes(option)) : [];
-    }
-  ),
+  dimensionOptionsInclude: computed('dimensionOptions', 'selectedExcludeDimensions', function () {
+    const { dimensionOptions, selectedExcludeDimensions } = getProperties(
+      this,
+      'dimensionOptions',
+      'selectedExcludeDimensions'
+    );
+    return dimensionOptions ? dimensionOptions.filter((option) => !selectedExcludeDimensions.includes(option)) : [];
+  }),
 
   /**
    * Selection options for "exclude dimensions". Do not include options selected to include
    * @returns {Array} Dimension options to exclude
    */
-  dimensionOptionsExclude: computed(
-    'dimensionOptions',
-    'selectedIncludeDimensions',
-    function() {
-      const { dimensionOptions, selectedIncludeDimensions } = getProperties(this, 'dimensionOptions', 'selectedIncludeDimensions');
-      return dimensionOptions ? dimensionOptions.filter(option => !selectedIncludeDimensions.includes(option)) : [];
-    }
-  ),
+  dimensionOptionsExclude: computed('dimensionOptions', 'selectedIncludeDimensions', function () {
+    const { dimensionOptions, selectedIncludeDimensions } = getProperties(
+      this,
+      'dimensionOptions',
+      'selectedIncludeDimensions'
+    );
+    return dimensionOptions ? dimensionOptions.filter((option) => !selectedIncludeDimensions.includes(option)) : [];
+  }),
 
   actions: {
-
     /**
      * Pipe changing field values into our 'customTableSettings' object given to us by the parent
      * @method onInput
@@ -101,7 +93,6 @@ export default Component.extend({
      * @param {String} inputValue - field value
      */
     onInput(inputName, inputValue) {
-      const customTableSettings = get(this, 'customTableSettings');
       const apiKey = get(this, 'fieldKeyMap')[inputName];
       // Set shared custom settings object props
       set(this, `customTableSettings.${apiKey}`, inputValue);

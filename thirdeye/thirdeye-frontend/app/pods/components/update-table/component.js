@@ -7,7 +7,6 @@ import _ from 'lodash';
  * the table's selected items should reflect this
  */
 export default modelsTable.extend({
-
   classNames: ['events-table'],
 
   // Necessary to avoid displaying a warning in console (false positive)
