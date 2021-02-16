@@ -86,7 +86,9 @@ function startService() {
     sh -c 'echo $$ > $0/broker.pid; exec ./pinot-admin.sh StartBroker' "${dirName}" &
   elif [ "$serviceName" = "server" ]; then
     sh -c 'echo $$ > $0/server.pid; exec ./pinot-admin.sh StartServer' "${dirName}" &
-  fi 
+  elif [ "$serviceName" = "kafka" ]; then
+    sh -c 'echo $$ > $0/kafka.pid; exec ./pinot-admin.sh StartKafka -zkAddress localhost:2181/kafka' "${dirName}" &
+  fi
   popd || exit 1
 }
 
@@ -112,6 +114,7 @@ function startServices() {
   startService controller "$dirName"
   startService broker "$dirName"
   startService server "$dirName"
+  startService kafka "$dirName"
   echo "Cluster started."
 }
 
@@ -122,6 +125,7 @@ function stopServices() {
   stopService broker "$dirName"
   stopService server "$dirName"
   stopService zookeeper "$dirName"
+  stopService kafka "$dirName"
   echo "Cluster stopped."
 } 
 
@@ -226,14 +230,14 @@ startService server "$newTargetDir"
 #$COMPAT_TESTER post-server-upgrade.yaml; if [ $? -ne 0 ]; then exit 1; fi
 
 # Upgrade complated, now do a rollback
-stopService controller "$newTargetDir"
-startService controller "$oldTargetDir"
+stopService server "$newTargetDir"
+startService server "$oldTargetDir"
 #$COMPAT_TESTER post-server-rollback.yaml; if [ $? -ne 0 ]; then exit 1; fi
 stopService broker "$newTargetDir"
 startService broker "$oldTargetDir"
 #$COMPAT_TESTER post-broker-rollback.yaml; if [ $? -ne 0 ]; then exit 1; fi
-stopService server "$newTargetDir"
-startService server "$oldTargetDir"
+stopService controller "$newTargetDir"
+startService controller "$oldTargetDir"
 #$COMPAT_TESTER post-controller-rollback.yaml; if [ $? -ne 0 ]; then exit 1; fi
 stopServices "$oldTargetDir"
 
