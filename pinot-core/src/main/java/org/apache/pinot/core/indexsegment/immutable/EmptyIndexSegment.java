@@ -30,7 +30,6 @@ import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.ValidDocIndexReader;
-import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.slf4j.Logger;
@@ -44,11 +43,9 @@ import org.slf4j.LoggerFactory;
 public class EmptyIndexSegment implements ImmutableSegment {
   private static final Logger LOGGER = LoggerFactory.getLogger(EmptyIndexSegment.class);
 
-  private final SegmentDirectory _segmentDirectory;
   private final SegmentMetadataImpl _segmentMetadata;
 
-  public EmptyIndexSegment(SegmentDirectory segmentDirectory, SegmentMetadataImpl segmentMetadata) {
-    _segmentDirectory = segmentDirectory;
+  public EmptyIndexSegment(SegmentMetadataImpl segmentMetadata) {
     _segmentMetadata = segmentMetadata;
   }
 
@@ -82,13 +79,6 @@ public class EmptyIndexSegment implements ImmutableSegment {
 
   @Override
   public void destroy() {
-    String segmentName = getSegmentName();
-    LOGGER.info("Trying to destroy segment : {}", segmentName);
-    try {
-      _segmentDirectory.close();
-    } catch (Exception e) {
-      LOGGER.error("Failed to close segment directory: {}. Continuing with error.", _segmentDirectory, e);
-    }
   }
 
   @Override

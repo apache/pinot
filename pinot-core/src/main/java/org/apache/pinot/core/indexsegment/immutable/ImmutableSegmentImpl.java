@@ -27,7 +27,6 @@ import javax.annotation.Nullable;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
-import org.apache.pinot.core.segment.index.datasource.EmptyDataSource;
 import org.apache.pinot.core.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
@@ -116,11 +115,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
     Preconditions.checkNotNull(columnMetadata,
         "ColumnMetadata for " + column + " should not be null. " + "Potentially invalid column name specified.");
-    if (_indexContainerMap.containsKey(column)) {
-      return new ImmutableDataSource(columnMetadata, _indexContainerMap.get(column));
-    } else {
-      return new EmptyDataSource(columnMetadata);
-    }
+    return new ImmutableDataSource(columnMetadata, _indexContainerMap.get(column));
   }
 
   @Override

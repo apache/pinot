@@ -101,47 +101,44 @@ public class ImmutableSegmentLoader {
 
     // Load the metadata again since converter and pre-processor may have changed it
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
+    if (segmentMetadata.getTotalDocs() == 0) {
+      return new EmptyIndexSegment(segmentMetadata);
+    }
 
     // Load the segment
     ReadMode readMode = indexLoadingConfig.getReadMode();
     SegmentDirectory segmentDirectory = SegmentDirectory.createFromLocalFS(indexDir, segmentMetadata, readMode);
-
-    if (segmentMetadata.getTotalDocs() > 0) {
-
-      Map<String, ColumnIndexContainer> indexContainerMap = new HashMap<>();
-      StarTreeIndexContainer starTreeIndexContainer = null;
-
-      SegmentDirectory.Reader segmentReader = segmentDirectory.createReader();
-      for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
-        indexContainerMap.put(entry.getKey(),
-            new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig, indexDir));
-      }
-
-      // Instantiate virtual columns
-      Schema segmentSchema = segmentMetadata.getSchema();
-      VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(segmentSchema, segmentName);
-      for (FieldSpec fieldSpec : segmentSchema.getAllFieldSpecs()) {
-        if (fieldSpec.isVirtualColumn()) {
-          String columnName = fieldSpec.getName();
-          VirtualColumnContext context = new VirtualColumnContext(fieldSpec, segmentMetadata.getTotalDocs());
-          VirtualColumnProvider provider = VirtualColumnProviderFactory.buildProvider(context);
-          indexContainerMap.put(columnName, provider.buildColumnIndexContainer(context));
-          segmentMetadata.getColumnMetadataMap().put(columnName, provider.buildMetadata(context));
-        }
-      }
-
-      // Load star-tree index if it exists
-      if (segmentMetadata.getStarTreeV2MetadataList() != null) {
-        starTreeIndexContainer =
-            new StarTreeIndexContainer(SegmentDirectoryPaths.findSegmentDirectory(indexDir), segmentMetadata,
-                indexContainerMap, readMode);
-      }
-      ImmutableSegmentImpl segment =
-          new ImmutableSegmentImpl(segmentDirectory, segmentMetadata, indexContainerMap, starTreeIndexContainer);
-      LOGGER.info("Successfully loaded segment {} with readMode: {}", segmentName, readMode);
-      return segment;
-    } else {
-      return new EmptyIndexSegment(segmentDirectory, segmentMetadata);
+    SegmentDirectory.Reader segmentReader = segmentDirectory.createReader();
+    Map<String, ColumnIndexContainer> indexContainerMap = new HashMap<>();
+    for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
+      indexContainerMap.put(entry.getKey(),
+          new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig, indexDir));
     }
+
+    // Instantiate virtual columns
+    Schema segmentSchema = segmentMetadata.getSchema();
+    VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(segmentSchema, segmentName);
+    for (FieldSpec fieldSpec : segmentSchema.getAllFieldSpecs()) {
+      if (fieldSpec.isVirtualColumn()) {
+        String columnName = fieldSpec.getName();
+        VirtualColumnContext context = new VirtualColumnContext(fieldSpec, segmentMetadata.getTotalDocs());
+        VirtualColumnProvider provider = VirtualColumnProviderFactory.buildProvider(context);
+        indexContainerMap.put(columnName, provider.buildColumnIndexContainer(context));
+        segmentMetadata.getColumnMetadataMap().put(columnName, provider.buildMetadata(context));
+      }
+    }
+
+    // Load star-tree index if it exists
+    StarTreeIndexContainer starTreeIndexContainer = null;
+    if (segmentMetadata.getStarTreeV2MetadataList() != null) {
+      starTreeIndexContainer =
+          new StarTreeIndexContainer(SegmentDirectoryPaths.findSegmentDirectory(indexDir), segmentMetadata,
+              indexContainerMap, readMode);
+    }
+    
+    ImmutableSegmentImpl segment =
+        new ImmutableSegmentImpl(segmentDirectory, segmentMetadata, indexContainerMap, starTreeIndexContainer);
+    LOGGER.info("Successfully loaded segment {} with readMode: {}", segmentName, readMode);
+    return segment;
   }
 }
