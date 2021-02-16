@@ -291,7 +291,7 @@ public class RootCauseMetricResource {
     List<String> forecastOffsets = Arrays.asList(OFFSET_FORECAST, OFFSET_LOWER, OFFSET_UPPER);
     Map<Pair<String, String>, Double> offsetToForecastAggregate = new HashMap<>();
 
-    if(offsets.contains(OFFSET_FORECAST)) {
+    if(offsets.contains(OFFSET_FORECAST) || offsets.contains(OFFSET_LOWER) || offsets.contains(OFFSET_UPPER)) {
       String forecastClassName = DetectionRegistry.getInstance().lookup("FORECAST");
       InputDataFetcher dataFetcher = new DefaultInputDataFetcher(dataProvider, -1);
       Map<String, Object> componentSpec = new HashMap<>();
@@ -309,7 +309,14 @@ public class RootCauseMetricResource {
       for (String urn : urns) {
         MetricSlice baseSlice = alignSlice(makeSlice(urn, start, end), timezone);
         try {
-          TimeSeries forecastResponse = forecastProvider.computePredictedTimeSeries(baseSlice);
+          Future<TimeSeries> future = this.executor.submit(new Callable<TimeSeries>() {
+            @Override
+            public TimeSeries call() throws Exception {
+              return forecastProvider.computePredictedTimeSeries(baseSlice);
+            }
+          });
+          TimeSeries forecastResponse = future.get(TIMEOUT, TimeUnit.MILLISECONDS);
+
           Pair<String, String> forecastKey = Pair.of(urn, OFFSET_FORECAST);
           Pair<String, String> upperKey = Pair.of(urn, OFFSET_UPPER);
           Pair<String, String> lowerKey = Pair.of(urn, OFFSET_LOWER);
@@ -323,7 +330,7 @@ public class RootCauseMetricResource {
           offsetToForecastAggregate.put(lowerKey, lower.sum().value());
         }
         catch (Exception e) {
-          LOG.info("Failed to get Forecast baseline");
+          LOG.info("Failed to get Forecast baseline: {}", e.getStackTrace());
         }
       }
     }
@@ -410,7 +417,7 @@ public class RootCauseMetricResource {
       @ApiParam(value = "limit results to the top k elements, plus 'OTHER' rollup element")
       @QueryParam("limit") Integer limit) throws Exception {
 
-    if (StringUtils.isBlank(offset)) {
+    if (StringUtils.isBlank(offset) || OFFSET_FORECAST.equals(offset)) {
       offset = OFFSET_DEFAULT;
     }
 
@@ -500,11 +507,17 @@ public class RootCauseMetricResource {
         AbstractSpec forecastSpec = AbstractSpec.fromProperties(componentSpec, specClazz);
 
         forecastProvider.init(forecastSpec, dataFetcher);
-        TimeSeries forecast = forecastProvider.computePredictedTimeSeries(baseSlice);
+        Future<TimeSeries> future = this.executor.submit(new Callable<TimeSeries>() {
+          @Override
+          public TimeSeries call() throws Exception {
+            return forecastProvider.computePredictedTimeSeries(baseSlice);
+          }
+        });
+        TimeSeries forecast = future.get(TIMEOUT, TimeUnit.MILLISECONDS);
         return makeTimeSeriesMap(forecast.getDataFrame());
       }
       catch (Exception e) {
-        LOG.info("Failed to get Forecast baseline");
+        LOG.info("Failed to get Forecast baseline: {}", e.getStackTrace());
         offset = OFFSET_DEFAULT;
       }
     }
@@ -515,6 +528,7 @@ public class RootCauseMetricResource {
     logSlices(baseSlice, slices);
 
     Map<MetricSlice, DataFrame> data = fetchTimeSeries(slices);
+
     DataFrame rawResult = range.gather(baseSlice, data);
 
     DataFrame imputedResult = this.imputeExpectedTimestamps(rawResult, baseSlice, timezone);
