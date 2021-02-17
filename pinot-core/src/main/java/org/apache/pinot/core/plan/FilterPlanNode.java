@@ -221,19 +221,9 @@ public class FilterPlanNode implements PlanNode {
                 return new MatchAllFilterOperator(_numDocs);
               }
             default:
-              FieldSpec.DataType columnType = dataSource.getDataSourceMetadata().getDataType();
-              if (columnType == FieldSpec.DataType.INT || columnType == FieldSpec.DataType.LONG
-                  || columnType == FieldSpec.DataType.FLOAT || columnType == FieldSpec.DataType.DOUBLE) {
-                // As part of plan generation, we rewrite certain predicates based on the data type of the column. This allows
-                // for generating correct results after literal value of one numerical type is converted to the column type. In
-                // certain cases, this also allows us to precompute the result of predicate evaluation to either TRUE or FALSE
-                // thereby making query execution more efficient by avoiding the need to evaluate the predicate during runtime.
-                predicate.rewrite(columnType);
-              }
-
               PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider
                   .getPredicateEvaluator(predicate, dataSource.getDictionary(),
-                      columnType);
+                      dataSource.getDataSourceMetadata().getDataType());
               return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, _numDocs);
           }
         }

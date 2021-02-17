@@ -28,6 +28,7 @@ import org.apache.pinot.core.query.request.context.predicate.Predicate;
 import org.apache.pinot.core.query.request.context.predicate.RangePredicate;
 import org.apache.pinot.core.query.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -37,6 +38,15 @@ public class PredicateEvaluatorProvider {
 
   public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, @Nullable Dictionary dictionary,
       DataType dataType) {
+    if (dataType == FieldSpec.DataType.INT || dataType == FieldSpec.DataType.LONG
+        || dataType == FieldSpec.DataType.FLOAT || dataType == FieldSpec.DataType.DOUBLE) {
+      // As part of plan generation, we rewrite certain predicates based on the data type of the column. This allows
+      // for generating correct results after literal value of one numerical type is converted to the column type. In
+      // certain cases, this also allows us to precompute the result of predicate evaluation to either TRUE or FALSE
+      // thereby making query execution more efficient by avoiding the need to evaluate the predicate during runtime.
+      predicate.rewrite(dataType);
+    }
+
     try {
       if (dictionary != null) {
         // dictionary based predicate evaluators
