@@ -447,21 +447,6 @@ public class FileUploadDownloadClient implements Closeable {
    * @param uri URI
    * @param schemaName Schema name
    * @param schemaFile Schema file
-   * @return Response
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
-  public SimpleHttpResponse addSchema(URI uri, String schemaName, File schemaFile)
-      throws IOException, HttpErrorStatusException {
-    return sendRequest(getAddSchemaRequest(uri, schemaName, schemaFile, null, null));
-  }
-
-  /**
-   * Add schema.
-   *
-   * @param uri URI
-   * @param schemaName Schema name
-   * @param schemaFile Schema file
    * @param headers HTTP headers
    * @param parameters HTTP parameters
    * @return Response
@@ -472,21 +457,6 @@ public class FileUploadDownloadClient implements Closeable {
       @Nullable List<NameValuePair> parameters)
       throws IOException, HttpErrorStatusException {
     return sendRequest(getAddSchemaRequest(uri, schemaName, schemaFile, headers, parameters));
-  }
-
-  /**
-   * Update schema.
-   *
-   * @param uri URI
-   * @param schemaName Schema name
-   * @param schemaFile Schema file
-   * @return Response
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
-  public SimpleHttpResponse updateSchema(URI uri, String schemaName, File schemaFile)
-      throws IOException, HttpErrorStatusException {
-    return sendRequest(getUpdateSchemaRequest(uri, schemaName, schemaFile));
   }
 
   /**
@@ -578,25 +548,6 @@ public class FileUploadDownloadClient implements Closeable {
       @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs)
       throws IOException, HttpErrorStatusException {
     return sendRequest(getUploadSegmentRequest(uri, segmentName, inputStream, headers, parameters, socketTimeoutMs));
-  }
-
-  /**
-   * Upload segment with segment file input stream using default settings. Include table name as a request parameter.
-   *
-   * @param uri URI
-   * @param segmentName Segment name
-   * @param inputStream Segment file input stream
-   * @param rawTableName Raw table name
-   * @return Response
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
-  public SimpleHttpResponse uploadSegment(URI uri, String segmentName, InputStream inputStream, String rawTableName)
-      throws IOException, HttpErrorStatusException {
-    // Add table name as a request parameter
-    NameValuePair tableNameValuePair = new BasicNameValuePair(QueryParameters.TABLE_NAME, rawTableName);
-    List<NameValuePair> parameters = Arrays.asList(tableNameValuePair);
-    return uploadSegment(uri, segmentName, inputStream, null, parameters, DEFAULT_SOCKET_TIMEOUT_MS);
   }
 
   /**
@@ -783,7 +734,7 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   /**
-   * Generate an (optional) HTTP Authorization header given an auth token
+   * Generate an (optional) HTTP Authorization header given an auth token.
    *
    * @param authToken auth token
    * @return list of 0 or 1 "Authorization" headers
@@ -793,5 +744,16 @@ public class FileUploadDownloadClient implements Closeable {
       return Collections.emptyList();
     }
     return Collections.singletonList(new BasicHeader("Authorization", authToken));
+  }
+
+  /**
+   * Generate a param list with a table name attribute.
+   *
+   * @param tableName table name
+   * @return param list
+   */
+  public static List<NameValuePair> makeTableParam(String tableName) {
+    return Collections
+        .singletonList(new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME, tableName));
   }
 }

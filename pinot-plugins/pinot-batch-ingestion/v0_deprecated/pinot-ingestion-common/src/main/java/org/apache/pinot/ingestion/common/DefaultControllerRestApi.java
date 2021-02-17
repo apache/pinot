@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -37,6 +38,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * Deprecated. Does not support HTTPS or authentication
+ */
 public class DefaultControllerRestApi implements ControllerRestApi {
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultControllerRestApi.class);
 
@@ -114,7 +118,9 @@ public class DefaultControllerRestApi implements ControllerRestApi {
           try (InputStream inputStream = fileSystem.open(tarFilePath)) {
             SimpleHttpResponse response = _fileUploadDownloadClient.uploadSegment(
                 FileUploadDownloadClient.getUploadSegmentHttpURI(pushLocation.getHost(), pushLocation.getPort()),
-                segmentName, inputStream, _rawTableName);
+                segmentName, inputStream, Collections.emptyList(),
+                FileUploadDownloadClient.makeTableParam(_rawTableName),
+                FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
             LOGGER.info("Response {}: {}", response.getStatusCode(), response.getResponse());
             break;
           } catch (Exception e) {

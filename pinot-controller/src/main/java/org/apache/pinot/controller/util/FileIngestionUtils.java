@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.controller.util;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileInputStream;
@@ -28,8 +26,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.IOUtils;
@@ -42,13 +38,10 @@ import org.apache.pinot.core.segment.name.SimpleSegmentNameGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
-import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.BatchConfig;
-import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -141,8 +134,7 @@ public final class FileIngestionUtils {
   /**
    * Uploads the segment tar files to the provided controller
    */
-  public static void uploadSegment(String tableNameWithType, List<File> tarFiles, String controllerHost,
-      int controllerPort)
+  public static void uploadSegment(String tableNameWithType, List<File> tarFiles, URI controllerUri, String authToken)
       throws RetriableOperationException, AttemptsExceededException {
     for (File tarFile : tarFiles) {
       String fileName = tarFile.getName();
@@ -154,8 +146,10 @@ public final class FileIngestionUtils {
       RetryPolicies.exponentialBackoffRetryPolicy(DEFAULT_ATTEMPTS, DEFAULT_RETRY_WAIT_MS, 5).attempt(() -> {
         try (InputStream inputStream = new FileInputStream(tarFile)) {
           SimpleHttpResponse response = FILE_UPLOAD_DOWNLOAD_CLIENT
-              .uploadSegment(FileUploadDownloadClient.getUploadSegmentHttpURI(controllerHost, controllerPort),
-                  segmentName, inputStream, tableNameWithType);
+              .uploadSegment(FileUploadDownloadClient.getUploadSegmentURI(controllerUri), segmentName, inputStream,
+                  FileUploadDownloadClient.makeAuthHeader(authToken),
+                  FileUploadDownloadClient.makeTableParam(tableNameWithType),
+                  FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
           LOGGER.info("Response for pushing table {} segment {} - {}: {}", tableNameWithType, segmentName,
               response.getStatusCode(), response.getResponse());
           return true;

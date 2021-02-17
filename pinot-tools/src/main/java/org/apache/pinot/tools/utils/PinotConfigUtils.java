@@ -76,7 +76,7 @@ public class PinotConfigUtils {
     properties.put("controller.admin.access.control.principals.user.password", "secret");
     properties.put("controller.admin.access.control.principals.user.tables", "baseballStats");
     properties.put("controller.admin.access.control.principals.user.permissions", "read");
-    properties.put("pinot.controller.segment.fetcher.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
+    properties.put("controller.segment.fetcher.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
 
     return properties;
   }
