@@ -3,7 +3,6 @@
   "tableType": "REALTIME",
   "segmentsConfig": {
     "timeColumnName": "mergedTimeMillis",
-    "timeType": "MILLISECONDS",
     "retentionTimeUnit": "DAYS",
     "retentionTimeValue": "60",
     "schemaName": "pullRequestMergedEvents",
