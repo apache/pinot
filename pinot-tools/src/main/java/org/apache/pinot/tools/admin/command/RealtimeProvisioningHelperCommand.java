@@ -50,6 +50,7 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
   private static final int DEFAULT_RETENTION_FOR_DAILY_PUSH = 72;
   private static final int DEFAULT_RETENTION_FOR_WEEKLY_PUSH = 24*7 + 72;
   private static final int DEFAULT_RETENTION_FOR_MONTHLY_PUSH = 24*31 + 72;
+  private static final int DEFAULT_NUMBER_OF_ROWS = 10_000;
 
   @Option(name = "-tableConfigFile", required = true, metaVar = "<String>")
   private String _tableConfigFile;
@@ -75,11 +76,11 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
   @Option(name = "-sampleCompletedSegmentDir", required = false, metaVar = "<String>", usage = "Consume from the topic for n hours and provide the path of the segment dir after it completes")
   private String _sampleCompletedSegmentDir;
 
-  @Option(name = "-dataCharacteristicsFile", required = false, metaVar = "<String>", usage = "File containing characteristics by which a segment will be generated")
-  private String _dataCharacteristicsFile;
+  @Option(name = "-schemaWithMetadataFile", required = false, metaVar = "<String>", usage = "Schema file with extra information on each column describing characteristics of data")
+  private String _schemaWithMetadataFile;
 
-  @Option(name = "-schemaFile", required = false, metaVar = "<String>")
-  private String _schemaFile;
+  @Option(name = "-numRows", required = false, metaVar = "<String>", usage = "Number of rows to be generated based on schema with metadata file")
+  private int _numRows;
 
   @Option(name = "-ingestionRate", required = true, metaVar = "<String>", usage = "Avg number of messages per second ingested on any one stream partition (assumed all partitions are uniform)")
   private int _ingestionRate;
@@ -135,11 +136,16 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     return this;
   }
 
+  public RealtimeProvisioningHelperCommand setNumRows(int numRows) {
+    _numRows = numRows;
+    return this;
+  }
+
   @Override
   public String toString() {
     String segmentStr = _sampleCompletedSegmentDir != null
         ? " -sampleCompletedSegmentDir " + _sampleCompletedSegmentDir
-        : " -schemaFile " + _schemaFile + " -dataCharacteristicsFile " + _dataCharacteristicsFile;
+        : " -schemaWithMetadataFile " + _schemaWithMetadataFile + " -numRows " + _numRows;
     return "RealtimeProvisioningHelper -tableConfigFile " + _tableConfigFile + " -numPartitions " + _numPartitions
         + " -pushFrequency " + _pushFrequency + " -numHosts " + _numHosts + " -numHours " + _numHours + segmentStr
         + " -ingestionRate " + _ingestionRate + " -maxUsableHostMemory " + _maxUsableHostMemory + " -retentionHours "
@@ -156,7 +162,7 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     return
         "Given the table config, partitions, retention and a sample completed segment for a realtime table to be setup, "
             + "this tool will provide memory used by each host and an optimal segment size for various combinations of hours to consume and hosts. "
-            + "Instead of a completed segment, if characteristics of data is provided, a segment will be generated and used for memory estimation.";
+            + "Instead of a completed segment, if schema with characteristics of data is provided, a segment will be generated and used for memory estimation.";
   }
 
   @Override
@@ -184,8 +190,8 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
       throws IOException {
 
     boolean segmentProvided = _sampleCompletedSegmentDir != null;
-    boolean characteristicsProvided = _schemaFile != null && _dataCharacteristicsFile != null;
-    Preconditions.checkState(segmentProvided ^ characteristicsProvided, "Either completed segment should be provided or both characteristic & schema files!");
+    boolean characteristicsProvided = _schemaWithMetadataFile != null;
+    Preconditions.checkState(segmentProvided ^ characteristicsProvided, "Either completed segment should be provided or schema with characteristics file!");
 
     LOGGER.info("Executing command: {}", toString());
 
@@ -236,9 +242,13 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
 
     long maxUsableHostMemBytes = DataSizeUtils.toBytes(_maxUsableHostMemory);
 
+    if (_numRows == 0) {
+      _numRows = DEFAULT_NUMBER_OF_ROWS;
+    }
+
     MemoryEstimator memoryEstimator = segmentProvided
         ? new MemoryEstimator(tableConfig, new File(_sampleCompletedSegmentDir), _ingestionRate, maxUsableHostMemBytes, tableRetentionHours)
-        : new MemoryEstimator(tableConfig, new File(_dataCharacteristicsFile), new File(_schemaFile), _ingestionRate, maxUsableHostMemBytes, tableRetentionHours);
+        : new MemoryEstimator(tableConfig, new File(_schemaWithMetadataFile), _numRows, _ingestionRate, maxUsableHostMemBytes, tableRetentionHours);
     File sampleStatsHistory = memoryEstimator.initializeStatsHistory();
     memoryEstimator
         .estimateMemoryUsed(sampleStatsHistory, numHosts, numHours, totalConsumingPartitions, _retentionHours);

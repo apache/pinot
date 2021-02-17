@@ -39,7 +39,7 @@ public class DataGeneratorSpec {
   private final Map<String, IntRange> rangeMap;
   private final Map<String, Map<String, Object>> patternMap;
   private final Map<String, Double> mvCountMap; // map of column name to average number of values per entry
-  private final Map<String, Integer> lengthMap; // map of column name to average length of th entry (used for string generator)
+  private final Map<String, Integer> lengthMap; // map of column name to average length of th entry (used for string/byte generator)
 
   private final Map<String, DataType> dataTypesMap;
   private final Map<String, FieldType> fieldTypesMap;

@@ -31,8 +31,14 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.data.schema.DateTimeFieldSpecMetadata;
+import org.apache.pinot.common.data.schema.FieldMetadata;
+import org.apache.pinot.common.data.schema.SchemaWithMetaData;
+import org.apache.pinot.common.data.schema.TimeFieldSpecMetadata;
+import org.apache.pinot.common.data.schema.TimeGranularitySpecMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
@@ -49,6 +55,7 @@ import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
@@ -92,6 +99,9 @@ public class MemoryEstimator {
   private String[][] _consumingMemoryPerHost;
   private String[][] _numSegmentsQueriedPerHost;
 
+  /**
+   * Constructor used for processing the given completed segment
+   */
   public MemoryEstimator(TableConfig tableConfig, File sampleCompletedSegment, int ingestionRate,
       long maxUsableHostMemory, int tableRetentionHours) {
     _maxUsableHostMemory = maxUsableHostMemory;
@@ -129,10 +139,13 @@ public class MemoryEstimator {
     _tableDataDir.mkdir();
   }
 
-  public MemoryEstimator(TableConfig tableConfig, File dataCharacteristicsFile, File schemaFile, int ingestionRate,
+  /**
+   * Constructor used for processing the given data characteristics (instead of completed segment)
+   */
+  public MemoryEstimator(TableConfig tableConfig, File schemaWithMetadataFile, int numberOfRows, int ingestionRate,
       long maxUsableHostMemory, int tableRetentionHours) {
     this(tableConfig,
-        generateCompletedSegment(dataCharacteristicsFile, schemaFile, tableConfig),
+        generateCompletedSegment(schemaWithMetadataFile, tableConfig, numberOfRows),
         ingestionRate,
         maxUsableHostMemory,
         tableRetentionHours);
@@ -419,8 +432,8 @@ public class MemoryEstimator {
     return _numSegmentsQueriedPerHost;
   }
 
-  private static File generateCompletedSegment(File dataCharacteristicsFile, File schemaFile, TableConfig tableConfig) {
-    SegmentGenerator segmentGenerator = new SegmentGenerator(dataCharacteristicsFile, schemaFile, tableConfig, true);
+  private static File generateCompletedSegment(File schemaWithMetadataFile, TableConfig tableConfig, int numberOfRows) {
+    SegmentGenerator segmentGenerator = new SegmentGenerator(schemaWithMetadataFile, tableConfig, numberOfRows, true);
     return segmentGenerator.generate();
   }
 
@@ -431,47 +444,37 @@ public class MemoryEstimator {
     private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGenerator.class);
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd_HH:mm:ss");
 
-    private File _dataCharacteristicsFile;
-    private File _schemaFile;
+    private File _schemaWithMetadataFile;
     private TableConfig _tableConfig;
-    private final boolean _deleteCsv;
+    private int _numberOfRows;
+    private boolean _deleteCsv;
 
-    public SegmentGenerator(File dataCharacteristicsFile, File schemaFile, TableConfig tableConfig, boolean deleteCsv) {
-      _dataCharacteristicsFile = dataCharacteristicsFile;
-      _schemaFile = schemaFile;
+    public SegmentGenerator(File schemaWithMetadataFile, TableConfig tableConfig, int numberOfRows, boolean deleteCsv) {
+      _schemaWithMetadataFile = schemaWithMetadataFile;
       _tableConfig = tableConfig;
+      _numberOfRows = numberOfRows;
       _deleteCsv = deleteCsv;
     }
 
     public File generate() {
       Date now = new Date();
-
-      // extract schema
-      Schema schema;
-      try {
-        schema = JsonUtils.fileToObject(_schemaFile, Schema.class);
-      } catch (Exception e) {
-        throw new RuntimeException(String.format("Cannot read schema file '%s' to schema object.", _schemaFile));
-      }
-
-      // generate data & creat segment
-      File csvDataFile = generateData(schema, now);
-      File segment = createSegment(csvDataFile, schema, now);
-
+      File csvDataFile = generateData(now);
+      File segment = createSegment(csvDataFile, now);
       if (_deleteCsv) {
         csvDataFile.delete();
       }
       return segment;
     }
 
-    private File generateData(Schema schema, Date now) {
+    private File generateData(Date now) {
 
-      // extract data characteristics
-      DataCharacteristics dataCharacteristics;
+      // deserialize schema
+      SchemaWithMetaData schema;
       try {
-         dataCharacteristics = JsonUtils.fileToObject(_dataCharacteristicsFile, DataCharacteristics.class);
+        schema = JsonUtils.fileToObject(_schemaWithMetadataFile, SchemaWithMetaData.class);
       } catch (Exception e) {
-        throw new RuntimeException("Cannot deserialize data characteristic file " + _dataCharacteristicsFile);
+        throw new RuntimeException(String.format("Cannot read schema file '%s' to SchemaWithMetaData object.",
+            _schemaWithMetadataFile));
       }
 
       // create maps of "column name" to ...
@@ -482,19 +485,34 @@ public class MemoryEstimator {
       Map<String, FieldSpec.FieldType> fieldTypes = new HashMap<>();
       Map<String, TimeUnit> timeUnits = new HashMap<>();
       List<String> colNames = new ArrayList<>();
-      dataCharacteristics.columnCharacteristics.forEach(column -> {
-        colNames.add(column.name);
-        lengths.put(column.name, column.averageLength);
-        mvCounts.put(column.name, column.numberOfValuesPerEntry);
-        cardinalities.put(column.name, column.cardinality);
+      List<FieldMetadata> dimensions = schema.getDimensionFieldSpecs();
+      List<FieldMetadata> metrics = schema.getMetricFieldSpecs();
+      List<DateTimeFieldSpecMetadata> dateTimes = schema.getDateTimeFieldSpecs();
+      Stream.concat(Stream.concat(dimensions.stream(), metrics.stream()), dateTimes.stream()).forEach(column -> {
+        String name = column.getName();
+        colNames.add(name);
+        lengths.put(name, column.getAverageLength());
+        mvCounts.put(name, column.getNumValuesPerEntry());
+        cardinalities.put(name, column.getCardinality());
+        dataTypes.put(name, column.getDataType());
+        fieldTypes.put(name, column.getFieldType());
       });
-      schema.getAllFieldSpecs().forEach(fieldSpec -> {
-        String name = fieldSpec.getName();
-        dataTypes.put(name, fieldSpec.getDataType());
-        fieldTypes.put(name, fieldSpec.getFieldType());
+      dateTimes.forEach(dateTimeColumn -> {
+        TimeUnit timeUnit = new DateTimeFormatSpec(dateTimeColumn.getFormat()).getColumnUnit();
+        timeUnits.put(dateTimeColumn.getName(), timeUnit);
       });
-      timeUnits.put(schema.getTimeFieldSpec().getName(),
-          schema.getTimeFieldSpec().getIncomingGranularitySpec().getTimeType());
+      TimeFieldSpecMetadata timeSpec = schema.getTimeFieldSpec();
+      if (timeSpec != null) {
+        String name = timeSpec.getName();
+        colNames.add(name);
+        cardinalities.put(name, timeSpec.getCardinality());
+        dataTypes.put(name, timeSpec.getDataType());
+        fieldTypes.put(name, timeSpec.getFieldType());
+        TimeGranularitySpecMetadata timeGranSpec = timeSpec.getOutgoingGranularitySpec() != null
+            ? timeSpec.getOutgoingGranularitySpec()
+            : timeSpec.getIncomingGranularitySpec();
+        timeUnits.put(name, timeGranSpec.getTimeType());
+      }
 
       // generate data
       String outputDir = getOutputDir(now, "-csv");
@@ -504,7 +522,7 @@ public class MemoryEstimator {
       DataGenerator dataGenerator = new DataGenerator();
       try {
         dataGenerator.init(spec);
-        dataGenerator.generateCsv(dataCharacteristics.numberOfRows, 1);
+        dataGenerator.generateCsv(_numberOfRows, 1);
         File outputFile = Paths.get(outputDir, "output_0.csv").toFile();
         LOGGER.info("Successfully generated data file: {}", outputFile);
         return outputFile;
@@ -513,7 +531,16 @@ public class MemoryEstimator {
       }
     }
 
-    private File createSegment(File csvDataFile, Schema schema, Date now) {
+    private File createSegment(File csvDataFile, Date now) {
+
+      // deserialize schema
+      Schema schema;
+      try {
+        schema = JsonUtils.fileToObject(_schemaWithMetadataFile, Schema.class);
+      } catch (Exception e) {
+        throw new RuntimeException(
+            String.format("Cannot read schema file '%s' to schema object.", _schemaWithMetadataFile));
+      }
 
       // create segment
       LOGGER.info("Started creating segment from file: {}", csvDataFile);
@@ -550,7 +577,7 @@ public class MemoryEstimator {
       segmentGeneratorConfig.setInputFilePath(csvDataFile.getPath());
       segmentGeneratorConfig.setFormat(FileFormat.CSV);
       segmentGeneratorConfig.setOutDir(outDir);
-      segmentGeneratorConfig.setReaderConfig(new CSVRecordReaderConfig()); // FIXME
+      segmentGeneratorConfig.setReaderConfig(new CSVRecordReaderConfig());
       segmentGeneratorConfig.setTableName(_tableConfig.getTableName());
       segmentGeneratorConfig.setSequenceId(0);
       return segmentGeneratorConfig;
@@ -558,42 +585,6 @@ public class MemoryEstimator {
 
     private String getOutputDir(Date date, String suffix) {
       return Paths.get(System.getProperty("java.io.tmpdir"), DATE_FORMAT.format(date) + suffix).toString();
-    }
-
-    public static class DataCharacteristics {
-      int numberOfRows;
-      List<ColumnCharacteristics> columnCharacteristics;
-
-      public void setNumberOfRows(int numberOfRows) {
-        this.numberOfRows = numberOfRows;
-      }
-
-      public List<ColumnCharacteristics> getColumnCharacteristics() {
-        return columnCharacteristics;
-      }
-    }
-
-    public static class ColumnCharacteristics {
-      String name;
-      int cardinality;
-      int averageLength;
-      double numberOfValuesPerEntry;
-
-      public void setName(String name) {
-        this.name = name;
-      }
-
-      public void setCardinality(int cardinality) {
-        this.cardinality = cardinality;
-      }
-
-      public void setAverageLength(int averageLength) {
-        this.averageLength = averageLength;
-      }
-
-      public void setNumberOfValuesPerEntry(double numberOfValuesPerEntry) {
-        this.numberOfValuesPerEntry = numberOfValuesPerEntry;
-      }
     }
   }
 }

@@ -79,7 +79,7 @@ public class NumberGenerator implements Generator {
         break;
       case FLOAT:
         floatValues = new ArrayList<Float>();
-        final float floatStart = Math.round(rand.nextFloat()* 100.0f) / 100.0f;
+        final float floatStart = Math.round(rand.nextFloat()* 100.0f) / 100.0f; // round to two decimal places
         int floatCounter = 1;
         while (true) {
           floatValues.add(floatStart + floatCounter);
@@ -91,7 +91,7 @@ public class NumberGenerator implements Generator {
         break;
       case DOUBLE:
         doubleValues = new ArrayList<Double>();
-        final double doubleStart = Math.round(rand.nextDouble() * 100.0) / 100.0;
+        final double doubleStart = Math.round(rand.nextDouble() * 100.0) / 100.0; // round to two decimal places
         int doubleCounter = 1;
         while (true) {
           doubleValues.add(doubleStart + doubleCounter);

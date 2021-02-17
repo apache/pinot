@@ -29,8 +29,8 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.controller.recommender.exceptions.InvalidInputException;
-import org.apache.pinot.controller.recommender.io.metadata.FieldMetadata;
-import org.apache.pinot.controller.recommender.io.metadata.SchemaWithMetaData;
+import org.apache.pinot.common.data.schema.FieldMetadata;
+import org.apache.pinot.common.data.schema.SchemaWithMetaData;
 import org.apache.pinot.controller.recommender.rules.RulesToExecute;
 import org.apache.pinot.controller.recommender.rules.io.params.FlagQueryRuleParams;
 import org.apache.pinot.controller.recommender.rules.io.params.*;
@@ -155,8 +155,9 @@ public class InputManager {
     }
 
     _metaDataMap.keySet().forEach(colName -> {
-      double cardinality = _metaDataMap.get(colName).getCardinality();
-      _metaDataMap.get(colName).setCardinality(regulateCardinalityInfinitePopulation(cardinality, sampleSize));
+      int cardinality = _metaDataMap.get(colName).getCardinality();
+      double regulatedCardinality = regulateCardinalityInfinitePopulation(cardinality, sampleSize);
+      _metaDataMap.get(colName).setCardinality((int) Math.round(regulatedCardinality));
     });
   }
 

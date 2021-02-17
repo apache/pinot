@@ -16,16 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.recommender.io.metadata;
+package org.apache.pinot.common.data.schema;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 import org.apache.pinot.spi.data.FieldSpec;
 
-import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.DEFAULT_AVERAGE_NUM_VALUES_PER_ENTRY;
-import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.DEFAULT_CARDINALITY;
-import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.DEFAULT_DATA_LENGTH;
+import static org.apache.pinot.common.data.schema.SchemaMetadataConstants.DEFAULT_AVERAGE_NUM_VALUES_PER_ENTRY;
+import static org.apache.pinot.common.data.schema.SchemaMetadataConstants.DEFAULT_CARDINALITY;
+import static org.apache.pinot.common.data.schema.SchemaMetadataConstants.DEFAULT_DATA_LENGTH;
 
 
 /**
@@ -33,7 +33,7 @@ import static org.apache.pinot.controller.recommender.rules.io.params.Recommende
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class FieldMetadata extends FieldSpec {
-  double _cardinality = DEFAULT_CARDINALITY;
+  int _cardinality = DEFAULT_CARDINALITY;
   int _averageLength = DEFAULT_DATA_LENGTH;
   double _numValuesPerEntry = DEFAULT_AVERAGE_NUM_VALUES_PER_ENTRY; // for multi-values
 
@@ -55,12 +55,12 @@ public class FieldMetadata extends FieldSpec {
     this._numValuesPerEntry = numValuesPerEntry;
   }
 
-  public double getCardinality() {
+  public int getCardinality() {
     return _cardinality;
   }
 
   @JsonSetter(nulls = Nulls.SKIP)
-  public void setCardinality(double cardinality) {
+  public void setCardinality(int cardinality) {
     this._cardinality = cardinality;
   }
 
