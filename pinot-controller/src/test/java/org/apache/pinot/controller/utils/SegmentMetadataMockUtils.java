@@ -53,12 +53,12 @@ public class SegmentMetadataMockUtils {
 
   public static SegmentMetadata mockSegmentMetadata(String tableName) {
     String uniqueNumericString = Long.toString(System.nanoTime());
-    return mockSegmentMetadata(tableName, tableName + uniqueNumericString, 0, uniqueNumericString);
+    return mockSegmentMetadata(tableName, tableName + uniqueNumericString, 100, uniqueNumericString);
   }
 
   public static SegmentMetadata mockSegmentMetadata(String tableName, String segmentName) {
     String uniqueNumericString = Long.toString(System.nanoTime());
-    return mockSegmentMetadata(tableName, segmentName, 0, uniqueNumericString);
+    return mockSegmentMetadata(tableName, segmentName, 100, uniqueNumericString);
   }
 
   public static RealtimeSegmentZKMetadata mockRealtimeSegmentZKMetadata(String tableName, String segmentName,
@@ -90,7 +90,7 @@ public class SegmentMetadataMockUtils {
     SegmentMetadata segmentMetadata = Mockito.mock(SegmentMetadata.class);
     Mockito.when(segmentMetadata.getTableName()).thenReturn(tableName);
     Mockito.when(segmentMetadata.getName()).thenReturn(segmentName);
-    Mockito.when(segmentMetadata.getTotalDocs()).thenReturn(0);
+    Mockito.when(segmentMetadata.getTotalDocs()).thenReturn(10);
     Mockito.when(segmentMetadata.getCrc()).thenReturn(Long.toString(System.nanoTime()));
     Mockito.when(segmentMetadata.getPushTime()).thenReturn(Long.MIN_VALUE);
     Mockito.when(segmentMetadata.getRefreshTime()).thenReturn(Long.MIN_VALUE);

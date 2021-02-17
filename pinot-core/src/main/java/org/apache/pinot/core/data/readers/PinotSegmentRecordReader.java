@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -75,34 +76,37 @@ public class PinotSegmentRecordReader implements RecordReader {
     try {
       SegmentMetadata segmentMetadata = _immutableSegment.getSegmentMetadata();
       _numDocs = segmentMetadata.getTotalDocs();
-      if (schema == null) {
-        // In order not to expose virtual columns to client, schema shouldn't be fetched from segmentMetadata;
-        // otherwise the original metadata will be modified. Hence, initialize a new schema.
-        _schema = new SegmentMetadataImpl(indexDir).getSchema();
-        Collection<String> columnNames = _schema.getColumnNames();
-        _columnReaderMap = new HashMap<>(columnNames.size());
-        for (String columnName : columnNames) {
-          _columnReaderMap.put(columnName, new PinotSegmentColumnReader(_immutableSegment, columnName));
+      // In order not to expose virtual columns to client, schema shouldn't be fetched from segmentMetadata;
+      // otherwise the original metadata will be modified. Hence, initialize a new schema.
+      _schema = schema == null ? new SegmentMetadataImpl(indexDir).getSchema() : schema;
+      if (_numDocs > 0) {
+        _columnReaderMap = new HashMap<>();
+        if (schema == null) {
+          Collection<String> columnNames = _schema.getColumnNames();
+          for (String columnName : columnNames) {
+            _columnReaderMap.put(columnName, new PinotSegmentColumnReader(_immutableSegment, columnName));
+          }
+        } else {
+          Schema segmentSchema = segmentMetadata.getSchema();
+          Collection<FieldSpec> fieldSpecs = _schema.getAllFieldSpecs();
+          for (FieldSpec fieldSpec : fieldSpecs) {
+            String columnName = fieldSpec.getName();
+            FieldSpec segmentFieldSpec = segmentSchema.getFieldSpecFor(columnName);
+            Preconditions.checkState(fieldSpec.equals(segmentFieldSpec),
+                "Field spec mismatch for column: %s, in the given schema: %s, in the segment schema: %s", columnName,
+                fieldSpec, segmentFieldSpec);
+            _columnReaderMap.put(columnName, new PinotSegmentColumnReader(_immutableSegment, columnName));
+          }
+        }
+        // Initialize sorted doc ids
+        if (sortOrder != null && !sortOrder.isEmpty()) {
+          _docIdsInSortedColumnOrder =
+              new PinotSegmentSorter(_numDocs, _schema, _columnReaderMap).getSortedDocIds(sortOrder);
+        } else {
+          _docIdsInSortedColumnOrder = null;
         }
       } else {
-        _schema = schema;
-        Schema segmentSchema = segmentMetadata.getSchema();
-        Collection<FieldSpec> fieldSpecs = _schema.getAllFieldSpecs();
-        _columnReaderMap = new HashMap<>(fieldSpecs.size());
-        for (FieldSpec fieldSpec : fieldSpecs) {
-          String columnName = fieldSpec.getName();
-          FieldSpec segmentFieldSpec = segmentSchema.getFieldSpecFor(columnName);
-          Preconditions.checkState(fieldSpec.equals(segmentFieldSpec),
-              "Field spec mismatch for column: %s, in the given schema: %s, in the segment schema: %s", columnName,
-              fieldSpec, segmentFieldSpec);
-          _columnReaderMap.put(columnName, new PinotSegmentColumnReader(_immutableSegment, columnName));
-        }
-      }
-      // Initialize sorted doc ids
-      if (sortOrder != null && !sortOrder.isEmpty()) {
-        _docIdsInSortedColumnOrder =
-            new PinotSegmentSorter(_numDocs, _schema, _columnReaderMap).getSortedDocIds(sortOrder);
-      } else {
+        _columnReaderMap = Collections.emptyMap();
         _docIdsInSortedColumnOrder = null;
       }
     } catch (Exception e) {

@@ -40,7 +40,8 @@ public class RealtimeSegmentRecordReader implements RecordReader {
   public RealtimeSegmentRecordReader(MutableSegmentImpl realtimeSegment, @Nullable String sortedColumn) {
     _realtimeSegment = realtimeSegment;
     _numDocs = realtimeSegment.getNumDocsIndexed();
-    _sortedDocIdIterationOrder = sortedColumn != null ? realtimeSegment.getSortedDocIdIterationOrderWithSortedColumn(sortedColumn) : null;
+    _sortedDocIdIterationOrder = sortedColumn != null && realtimeSegment.getNumDocsIndexed() > 0 ? realtimeSegment
+        .getSortedDocIdIterationOrderWithSortedColumn(sortedColumn) : null;
   }
 
   public int[] getSortedDocIdIterationOrder() {

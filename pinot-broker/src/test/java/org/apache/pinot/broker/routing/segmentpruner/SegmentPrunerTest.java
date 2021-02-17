@@ -117,49 +117,64 @@ public class SegmentPrunerTest {
     when(tableConfig.getIndexingConfig()).thenReturn(indexingConfig);
 
     // Routing config is missing
-    assertEquals(SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore), Collections.emptySet());
+    List<SegmentPruner> segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
+    assertEquals(segmentPruners.size(), 1);
+    assertTrue(segmentPruners.get(0) instanceof EmptySegmentPruner);
 
     // Segment pruner type is not configured
     RoutingConfig routingConfig = mock(RoutingConfig.class);
     when(tableConfig.getRoutingConfig()).thenReturn(routingConfig);
-    assertEquals(SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore), Collections.emptySet());
+    segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
+    assertEquals(segmentPruners.size(), 1);
+    assertTrue(segmentPruners.get(0) instanceof EmptySegmentPruner);
 
     // Segment partition config is missing
     when(routingConfig.getSegmentPrunerTypes())
         .thenReturn(Collections.singletonList(RoutingConfig.PARTITION_SEGMENT_PRUNER_TYPE));
-    assertEquals(SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore), Collections.emptySet());
+    segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
+    assertEquals(segmentPruners.size(), 1);
+    assertTrue(segmentPruners.get(0) instanceof EmptySegmentPruner);
 
     // Column partition config is missing
     Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
     when(indexingConfig.getSegmentPartitionConfig()).thenReturn(new SegmentPartitionConfig(columnPartitionConfigMap));
-    assertEquals(SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore), Collections.emptySet());
+    segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
+    assertEquals(segmentPruners.size(), 1);
+    assertTrue(segmentPruners.get(0) instanceof EmptySegmentPruner);
 
     // Partition-aware segment pruner should be returned
     columnPartitionConfigMap.put(PARTITION_COLUMN, new ColumnPartitionConfig("Modulo", 5));
-    List<SegmentPruner> segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
-    assertEquals(segmentPruners.size(), 1);
-    assertTrue(segmentPruners.get(0) instanceof PartitionSegmentPruner);
+    segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
+    assertEquals(segmentPruners.size(), 2);
+    assertTrue(segmentPruners.get(0) instanceof EmptySegmentPruner);
+    assertTrue(segmentPruners.get(1) instanceof PartitionSegmentPruner);
 
     // Do not allow multiple partition columns
     columnPartitionConfigMap.put("anotherPartitionColumn", new ColumnPartitionConfig("Modulo", 5));
-    assertEquals(SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore), Collections.emptySet());
+    segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
+    assertEquals(segmentPruners.size(), 1);
+    assertTrue(segmentPruners.get(0) instanceof EmptySegmentPruner);
 
     // Should be backward-compatible with legacy config
     columnPartitionConfigMap.remove("anotherPartitionColumn");
     when(routingConfig.getSegmentPrunerTypes()).thenReturn(null);
-    assertEquals(SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore), Collections.emptySet());
+    segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
+    assertEquals(segmentPruners.size(), 1);
+    assertTrue(segmentPruners.get(0) instanceof EmptySegmentPruner);
     when(tableConfig.getTableType()).thenReturn(TableType.OFFLINE);
     when(routingConfig.getRoutingTableBuilderName())
         .thenReturn(SegmentPrunerFactory.LEGACY_PARTITION_AWARE_OFFLINE_ROUTING);
     segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
-    assertEquals(segmentPruners.size(), 1);
-    assertTrue(segmentPruners.get(0) instanceof PartitionSegmentPruner);
+    assertEquals(segmentPruners.size(), 2);
+    assertTrue(segmentPruners.get(0) instanceof EmptySegmentPruner);
+    assertTrue(segmentPruners.get(1) instanceof PartitionSegmentPruner);
     when(tableConfig.getTableType()).thenReturn(TableType.REALTIME);
     when(routingConfig.getRoutingTableBuilderName())
         .thenReturn(SegmentPrunerFactory.LEGACY_PARTITION_AWARE_REALTIME_ROUTING);
     segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
-    assertEquals(segmentPruners.size(), 1);
-    assertTrue(segmentPruners.get(0) instanceof PartitionSegmentPruner);
+    assertEquals(segmentPruners.size(), 2);
+    assertTrue(segmentPruners.get(0) instanceof EmptySegmentPruner);
+    assertTrue(segmentPruners.get(1) instanceof PartitionSegmentPruner);
   }
 
   @Test
@@ -169,29 +184,37 @@ public class SegmentPrunerTest {
     setSchemaDateTimeFieldSpec(RAW_TABLE_NAME, TimeUnit.HOURS);
 
     // Routing config is missing
-    assertEquals(SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore), Collections.emptySet());
+    List<SegmentPruner> segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
+    assertEquals(segmentPruners.size(), 1);
+    assertTrue(segmentPruners.get(0) instanceof EmptySegmentPruner);
 
     // Segment pruner type is not configured
     RoutingConfig routingConfig = mock(RoutingConfig.class);
     when(tableConfig.getRoutingConfig()).thenReturn(routingConfig);
-    assertEquals(SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore), Collections.emptySet());
+    segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
+    assertEquals(segmentPruners.size(), 1);
+    assertTrue(segmentPruners.get(0) instanceof EmptySegmentPruner);
 
     // Validation config is missing
     when(routingConfig.getSegmentPrunerTypes())
         .thenReturn(Collections.singletonList(RoutingConfig.TIME_SEGMENT_PRUNER_TYPE));
-    assertEquals(SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore), Collections.emptySet());
+    segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
+    assertEquals(segmentPruners.size(), 1);
+    assertTrue(segmentPruners.get(0) instanceof EmptySegmentPruner);
 
     // Time column is missing
     SegmentsValidationAndRetentionConfig validationConfig = mock(SegmentsValidationAndRetentionConfig.class);
     when(tableConfig.getValidationConfig()).thenReturn(validationConfig);
-    assertEquals(SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore), Collections.emptySet());
+    segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
+    assertEquals(segmentPruners.size(), 1);
+    assertTrue(segmentPruners.get(0) instanceof EmptySegmentPruner);
 
     // Time range pruner should be returned
     when(validationConfig.getTimeColumnName()).thenReturn(TIME_COLUMN);
-    List<SegmentPruner> segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
-    assertEquals(segmentPruners.size(), 1);
-    assertTrue(segmentPruners.get(0) instanceof TimeSegmentPruner);
-
+    segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
+    assertEquals(segmentPruners.size(), 2);
+    assertTrue(segmentPruners.get(0) instanceof EmptySegmentPruner);
+    assertTrue(segmentPruners.get(1) instanceof TimeSegmentPruner);
   }
 
   @Test
@@ -460,6 +483,128 @@ public class SegmentPrunerTest {
     assertEquals(segmentPruner.prune(brokerRequest5, onlineSegments), Collections.emptySet());
   }
 
+  @Test
+  public void testEmptySegmentPruner() {
+    CalciteSqlCompiler sqlCompiler = new CalciteSqlCompiler();
+    BrokerRequest brokerRequest1 = sqlCompiler.compileToBrokerRequest(QUERY_1);
+    BrokerRequest brokerRequest2 = sqlCompiler.compileToBrokerRequest(QUERY_2);
+    BrokerRequest brokerRequest3 = sqlCompiler.compileToBrokerRequest(QUERY_3);
+
+    ExternalView externalView = Mockito.mock(ExternalView.class);
+    IdealState idealState = Mockito.mock(IdealState.class);
+
+    TableConfig tableConfig = getTableConfig(RAW_TABLE_NAME, TableType.REALTIME);
+
+    // init with list of segments
+    EmptySegmentPruner segmentPruner = new EmptySegmentPruner(tableConfig, _propertyStore);
+    Set<String> onlineSegments = new HashSet<>();
+    String segment0 = "segment0";
+    onlineSegments.add(segment0);
+    setRealtimeSegmentZKTotalDocsMetadata(segment0, 10);
+    String segment1 = "segment1";
+    onlineSegments.add(segment1);
+    setRealtimeSegmentZKTotalDocsMetadata(segment1, 0);
+    segmentPruner.init(externalView, idealState, onlineSegments);
+    assertEquals(segmentPruner.prune(brokerRequest1, new HashSet<>(Arrays.asList(segment0, segment1))),
+        new HashSet<>(Collections.singletonList(segment0)));
+    assertEquals(segmentPruner.prune(brokerRequest2, new HashSet<>(Arrays.asList(segment0, segment1))),
+        new HashSet<>(Collections.singletonList(segment0)));
+    assertEquals(segmentPruner.prune(brokerRequest3, new HashSet<>(Arrays.asList(segment0, segment1))),
+        new HashSet<>(Collections.singletonList(segment0)));
+
+    // init with empty list of segments
+    segmentPruner = new EmptySegmentPruner(tableConfig, _propertyStore);
+    onlineSegments.clear();
+    segmentPruner.init(externalView, idealState, onlineSegments);
+    assertEquals(segmentPruner.prune(brokerRequest1, Collections.emptySet()), Collections.emptySet());
+    assertEquals(segmentPruner.prune(brokerRequest2, Collections.emptySet()), Collections.emptySet());
+    assertEquals(segmentPruner.prune(brokerRequest3, Collections.emptySet()), Collections.emptySet());
+
+    // Segments without metadata (not updated yet) should not be pruned
+    String newSegment = "newSegment";
+    onlineSegments.add(newSegment);
+    segmentPruner.onExternalViewChange(externalView, idealState, onlineSegments);
+    assertEquals(segmentPruner.prune(brokerRequest1, new HashSet<>(Collections.singletonList(newSegment))),
+        Collections.singletonList(newSegment));
+    assertEquals(segmentPruner.prune(brokerRequest2, new HashSet<>(Collections.singletonList(newSegment))),
+        Collections.singletonList(newSegment));
+    assertEquals(segmentPruner.prune(brokerRequest3, new HashSet<>(Collections.singletonList(newSegment))),
+        Collections.singletonList(newSegment));
+
+    // Segments without totalDocs metadata should not be pruned
+    onlineSegments.clear();
+    String segmentWithoutTotalDocsMetadata = "segmentWithoutTotalDocsMetadata";
+    onlineSegments.add(segmentWithoutTotalDocsMetadata);
+    RealtimeSegmentZKMetadata segmentZKMetadataWithoutTotalDocsMetadata = new RealtimeSegmentZKMetadata();
+    segmentZKMetadataWithoutTotalDocsMetadata.setSegmentName(segmentWithoutTotalDocsMetadata);
+    segmentZKMetadataWithoutTotalDocsMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
+    ZKMetadataProvider
+        .setRealtimeSegmentZKMetadata(_propertyStore, REALTIME_TABLE_NAME, segmentZKMetadataWithoutTotalDocsMetadata);
+    segmentPruner.onExternalViewChange(externalView, idealState, onlineSegments);
+    assertEquals(
+        segmentPruner.prune(brokerRequest1, new HashSet<>(Collections.singletonList(segmentWithoutTotalDocsMetadata))),
+        Collections.singletonList(segmentWithoutTotalDocsMetadata));
+    assertEquals(
+        segmentPruner.prune(brokerRequest2, new HashSet<>(Collections.singletonList(segmentWithoutTotalDocsMetadata))),
+        Collections.singletonList(segmentWithoutTotalDocsMetadata));
+    assertEquals(
+        segmentPruner.prune(brokerRequest3, new HashSet<>(Collections.singletonList(segmentWithoutTotalDocsMetadata))),
+        Collections.singletonList(segmentWithoutTotalDocsMetadata));
+
+    // Segments with -1 totalDocs should not be pruned
+    onlineSegments.clear();
+    String segmentWithNegativeTotalDocsMetadata = "segmentWithNegativeTotalDocsMetadata";
+    onlineSegments.add(segmentWithNegativeTotalDocsMetadata);
+    setRealtimeSegmentZKTotalDocsMetadata(segmentWithNegativeTotalDocsMetadata, -1);
+    segmentPruner.onExternalViewChange(externalView, idealState, onlineSegments);
+    assertEquals(segmentPruner
+            .prune(brokerRequest1, new HashSet<>(Collections.singletonList(segmentWithNegativeTotalDocsMetadata))),
+        Collections.singletonList(segmentWithNegativeTotalDocsMetadata));
+    assertEquals(segmentPruner
+            .prune(brokerRequest2, new HashSet<>(Collections.singletonList(segmentWithNegativeTotalDocsMetadata))),
+        Collections.singletonList(segmentWithNegativeTotalDocsMetadata));
+    assertEquals(segmentPruner
+            .prune(brokerRequest3, new HashSet<>(Collections.singletonList(segmentWithNegativeTotalDocsMetadata))),
+        Collections.singletonList(segmentWithNegativeTotalDocsMetadata));
+
+    // Prune segments with 0 total docs
+    onlineSegments.clear();
+    onlineSegments.add(segment0);
+    setRealtimeSegmentZKTotalDocsMetadata(segment0, 10);
+    onlineSegments.add(segment1);
+    setRealtimeSegmentZKTotalDocsMetadata(segment1, 0);
+    String segment2 = "segment2";
+    onlineSegments.add(segment2);
+    setRealtimeSegmentZKTotalDocsMetadata(segment2, -1);
+
+    segmentPruner.onExternalViewChange(externalView, idealState, onlineSegments);
+    assertEquals(segmentPruner.prune(brokerRequest1, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+        new HashSet<>(Arrays.asList(segment0, segment2)));
+    assertEquals(segmentPruner.prune(brokerRequest2, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+        new HashSet<>(Arrays.asList(segment0, segment2)));
+    assertEquals(segmentPruner.prune(brokerRequest3, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+        new HashSet<>(Arrays.asList(segment0, segment2)));
+
+    // Update metadata without external view change or refreshing should have no effect
+    setSegmentZKTimeRangeMetadata(segment2, 20, 30, TimeUnit.DAYS);
+    setRealtimeSegmentZKTotalDocsMetadata(segment2, 0);
+    assertEquals(segmentPruner.prune(brokerRequest1, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+        new HashSet<>(Arrays.asList(segment0, segment2)));
+    assertEquals(segmentPruner.prune(brokerRequest2, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+        new HashSet<>(Arrays.asList(segment0, segment2)));
+    assertEquals(segmentPruner.prune(brokerRequest3, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+        new HashSet<>(Arrays.asList(segment0, segment2)));
+
+    // Refresh the changed segment should update the segment pruner
+    segmentPruner.refreshSegment(segment2);
+    assertEquals(segmentPruner.prune(brokerRequest1, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+        new HashSet<>(Collections.singletonList(segment0)));
+    assertEquals(segmentPruner.prune(brokerRequest2, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+        new HashSet<>(Collections.singletonList(segment0)));
+    assertEquals(segmentPruner.prune(brokerRequest3, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+        new HashSet<>(Collections.singletonList(segment0)));
+  }
+
   private TableConfig getTableConfig(String rawTableName, TableType type) {
     return new TableConfigBuilder(type).setTableName(rawTableName).setTimeColumnName(TIME_COLUMN).build();
   }
@@ -491,6 +636,14 @@ public class SegmentPrunerTest {
     realtimeSegmentZKMetadata.setStartTime(startTime);
     realtimeSegmentZKMetadata.setEndTime(endTime);
     realtimeSegmentZKMetadata.setTimeUnit(unit);
+    ZKMetadataProvider.setRealtimeSegmentZKMetadata(_propertyStore, REALTIME_TABLE_NAME, realtimeSegmentZKMetadata);
+  }
+
+  private void setRealtimeSegmentZKTotalDocsMetadata(String segment, long totalDocs) {
+    RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = new RealtimeSegmentZKMetadata();
+    realtimeSegmentZKMetadata.setSegmentName(segment);
+    realtimeSegmentZKMetadata.setTotalDocs(totalDocs);
+    realtimeSegmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
     ZKMetadataProvider.setRealtimeSegmentZKMetadata(_propertyStore, REALTIME_TABLE_NAME, realtimeSegmentZKMetadata);
   }
 }

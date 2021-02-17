@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.query.config.SegmentPrunerConfig;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,6 +31,7 @@ import org.slf4j.LoggerFactory;
 /**
  * The <code>SegmentPrunerService</code> class contains multiple segment pruners and provides service to prune segments
  * against all pruners.
+ * {@link ValidSegmentPruner} is always set as the first pruner
  */
 public class SegmentPrunerService {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPrunerService.class);
@@ -38,11 +40,18 @@ public class SegmentPrunerService {
 
   public SegmentPrunerService(SegmentPrunerConfig config) {
     int numPruners = config.numSegmentPruners();
-    _segmentPruners = new ArrayList<>(numPruners);
+    _segmentPruners = new ArrayList<>(numPruners + 1);
+
+    String validSegmentPrunerName = ValidSegmentPruner.class.getSimpleName();
+    _segmentPruners.add(SegmentPrunerProvider.getSegmentPruner(validSegmentPrunerName, new PinotConfiguration()));
+
     for (int i = 0; i < numPruners; i++) {
-      LOGGER.info("Adding segment pruner: " + config.getSegmentPrunerName(i));
-      _segmentPruners.add(
-          SegmentPrunerProvider.getSegmentPruner(config.getSegmentPrunerName(i), config.getSegmentPrunerConfig(i)));
+      String segmentPrunerName = config.getSegmentPrunerName(i);
+      if (!validSegmentPrunerName.equalsIgnoreCase(segmentPrunerName)) {
+        LOGGER.info("Adding segment pruner: " + segmentPrunerName);
+        _segmentPruners
+            .add(SegmentPrunerProvider.getSegmentPruner(segmentPrunerName, config.getSegmentPrunerConfig(i)));
+      }
     }
   }
 

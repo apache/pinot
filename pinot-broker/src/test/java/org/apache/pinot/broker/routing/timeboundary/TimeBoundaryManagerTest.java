@@ -125,6 +125,13 @@ public class TimeBoundaryManagerTest {
     timeBoundaryManager.onExternalViewChange(externalView, idealState, onlineSegments);
     verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), timeUnit.convert(3, TimeUnit.DAYS));
 
+    // Add new segment with larger end time but 0 total docs, should not update time boundary
+    String segmentEmpty = "segmentEmpty";
+    onlineSegments.add(segmentEmpty);
+    setSegmentZKMetadataWithTotalDocs(rawTableName, segmentEmpty, 6, timeUnit, 0);
+    timeBoundaryManager.onExternalViewChange(externalView, idealState, onlineSegments);
+    verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), timeUnit.convert(3, TimeUnit.DAYS));
+
     // Add a new segment with smaller end time should not change the time boundary
     String segment2 = "segment2";
     onlineSegments.add(segment2);
@@ -189,6 +196,18 @@ public class TimeBoundaryManagerTest {
     offlineSegmentZKMetadata.setSegmentName(segment);
     offlineSegmentZKMetadata.setEndTime(timeUnit.convert(endTimeInDays, TimeUnit.DAYS));
     offlineSegmentZKMetadata.setTimeUnit(timeUnit);
+    ZKMetadataProvider
+        .setOfflineSegmentZKMetadata(_propertyStore, TableNameBuilder.OFFLINE.tableNameWithType(rawTableName),
+            offlineSegmentZKMetadata);
+  }
+
+  private void setSegmentZKMetadataWithTotalDocs(String rawTableName, String segment, int endTimeInDays,
+      TimeUnit timeUnit, long totalDocs) {
+    OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
+    offlineSegmentZKMetadata.setSegmentName(segment);
+    offlineSegmentZKMetadata.setEndTime(timeUnit.convert(endTimeInDays, TimeUnit.DAYS));
+    offlineSegmentZKMetadata.setTimeUnit(timeUnit);
+    offlineSegmentZKMetadata.setTotalDocs(totalDocs);
     ZKMetadataProvider
         .setOfflineSegmentZKMetadata(_propertyStore, TableNameBuilder.OFFLINE.tableNameWithType(rawTableName),
             offlineSegmentZKMetadata);
