@@ -179,17 +179,6 @@ public class NoDictionaryRangePredicateEvaluatorTest {
     for (int i = -20; i < 20; i++) {
       Assert.assertTrue(predicateEvaluator.applySV((float) i));
     }
-    Assert.assertTrue(predicateEvaluator.applySV(Float.NEGATIVE_INFINITY));
-    Assert.assertTrue(predicateEvaluator.applySV(Float.POSITIVE_INFINITY));
-
-    predicateEvaluator =
-        buildRangePredicate(String.format("(%f\000%f)", Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY),
-            FieldSpec.DataType.FLOAT);
-    for (int i = -20; i < 20; i++) {
-      Assert.assertTrue(predicateEvaluator.applySV((float) i));
-    }
-    Assert.assertFalse(predicateEvaluator.applySV(Float.NEGATIVE_INFINITY));
-    Assert.assertFalse(predicateEvaluator.applySV(Float.POSITIVE_INFINITY));
   }
 
   @Test
@@ -233,17 +222,6 @@ public class NoDictionaryRangePredicateEvaluatorTest {
     for (int i = -20; i < 20; i++) {
       Assert.assertTrue(predicateEvaluator.applySV((double) i));
     }
-    Assert.assertTrue(predicateEvaluator.applySV(Double.NEGATIVE_INFINITY));
-    Assert.assertTrue(predicateEvaluator.applySV(Double.POSITIVE_INFINITY));
-
-    predicateEvaluator =
-        buildRangePredicate(String.format("(%f\000%f)", Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY),
-            FieldSpec.DataType.DOUBLE);
-    for (int i = -20; i < 20; i++) {
-      Assert.assertTrue(predicateEvaluator.applySV((double) i));
-    }
-    Assert.assertFalse(predicateEvaluator.applySV(Double.NEGATIVE_INFINITY));
-    Assert.assertFalse(predicateEvaluator.applySV(Double.POSITIVE_INFINITY));
   }
 
   @Test
