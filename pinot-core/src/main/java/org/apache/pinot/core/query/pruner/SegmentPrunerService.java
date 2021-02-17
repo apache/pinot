@@ -31,6 +31,7 @@ import org.slf4j.LoggerFactory;
 /**
  * The <code>SegmentPrunerService</code> class contains multiple segment pruners and provides service to prune segments
  * against all pruners.
+ * {@link ValidSegmentPruner} is always set as the first pruner
  */
 public class SegmentPrunerService {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPrunerService.class);
@@ -40,20 +41,17 @@ public class SegmentPrunerService {
   public SegmentPrunerService(SegmentPrunerConfig config) {
     int numPruners = config.numSegmentPruners();
     _segmentPruners = new ArrayList<>(numPruners + 1);
-    boolean hasValidSegmentPruner = false;
+
+    String validSegmentPrunerName = ValidSegmentPruner.class.getSimpleName();
+    _segmentPruners.add(SegmentPrunerProvider.getSegmentPruner(validSegmentPrunerName, new PinotConfiguration()));
+
     for (int i = 0; i < numPruners; i++) {
-      LOGGER.info("Adding segment pruner: " + config.getSegmentPrunerName(i));
-      SegmentPruner segmentPruner =
-          SegmentPrunerProvider.getSegmentPruner(config.getSegmentPrunerName(i), config.getSegmentPrunerConfig(i));
-      _segmentPruners.add(
-          segmentPruner);
-      if (segmentPruner instanceof ValidSegmentPruner) {
-        hasValidSegmentPruner = true;
+      String segmentPrunerName = config.getSegmentPrunerName(i);
+      if (!validSegmentPrunerName.equalsIgnoreCase(segmentPrunerName)) {
+        LOGGER.info("Adding segment pruner: " + segmentPrunerName);
+        _segmentPruners
+            .add(SegmentPrunerProvider.getSegmentPruner(segmentPrunerName, config.getSegmentPrunerConfig(i)));
       }
-    }
-    if (!hasValidSegmentPruner) {
-      _segmentPruners.add(
-          SegmentPrunerProvider.getSegmentPruner(ValidSegmentPruner.class.getSimpleName(), new PinotConfiguration()));
     }
   }
 
