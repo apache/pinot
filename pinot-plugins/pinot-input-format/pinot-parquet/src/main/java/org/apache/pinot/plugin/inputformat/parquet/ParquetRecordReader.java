@@ -22,37 +22,34 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.avro.generic.GenericRecord;
-import org.apache.hadoop.fs.Path;
-import org.apache.parquet.hadoop.ParquetReader;
-import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
 
 /**
- * Record reader for Parquet file.
+ * Pinot Record reader for Parquet file.<p>
+ * It has two implementations: {@link ParquetAvroRecordReader} (Default) and {@link ParquetNativeRecordReader}.
  */
 public class ParquetRecordReader implements RecordReader {
-  private Path _dataFilePath;
-  private AvroRecordExtractor _recordExtractor;
-  private ParquetReader<GenericRecord> _parquetReader;
-  private GenericRecord _nextRecord;
+  private RecordReader _internalParquetRecordReader;
+  private boolean _useAvroParquetRecordReader = true;
 
   @Override
   public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
-    _dataFilePath = new Path(dataFile.getAbsolutePath());
-    _parquetReader = ParquetUtils.getParquetReader(_dataFilePath);
-    _recordExtractor = new AvroRecordExtractor();
-    _recordExtractor.init(fieldsToRead, null);
-    _nextRecord = _parquetReader.read();
+    if (recordReaderConfig == null || ((ParquetRecordReaderConfig) recordReaderConfig).useParquetAvroRecordReader()) {
+      _internalParquetRecordReader = new ParquetAvroRecordReader();
+    } else {
+      _useAvroParquetRecordReader = false;
+      _internalParquetRecordReader = new ParquetNativeRecordReader();
+    }
+    _internalParquetRecordReader.init(dataFile, fieldsToRead, recordReaderConfig);
   }
 
   @Override
   public boolean hasNext() {
-    return _nextRecord != null;
+    return _internalParquetRecordReader.hasNext();
   }
 
   @Override
@@ -64,22 +61,22 @@ public class ParquetRecordReader implements RecordReader {
   @Override
   public GenericRow next(GenericRow reuse)
       throws IOException {
-    _recordExtractor.extract(_nextRecord, reuse);
-    _nextRecord = _parquetReader.read();
-    return reuse;
+    return _internalParquetRecordReader.next(reuse);
   }
 
   @Override
   public void rewind()
       throws IOException {
-    _parquetReader.close();
-    _parquetReader = ParquetUtils.getParquetReader(_dataFilePath);
-    _nextRecord = _parquetReader.read();
+    _internalParquetRecordReader.rewind();
   }
 
   @Override
   public void close()
       throws IOException {
-    _parquetReader.close();
+    _internalParquetRecordReader.close();
+  }
+
+  public boolean useAvroParquetRecordReader() {
+    return _useAvroParquetRecordReader;
   }
 }
