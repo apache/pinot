@@ -90,6 +90,8 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getResponse();
     _brokerMetrics
         .addPhaseTiming(rawTableName, BrokerQueryPhase.SCATTER_GATHER, System.nanoTime() - scatterGatherStartTimeNs);
+    _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_SIZE,
+        originalBrokerRequest.toString().length());
     // TODO Use scatterGatherStats as serverStats
     serverStats.setServerStats(asyncQueryResponse.getStats());
 
@@ -130,6 +132,7 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED, 1);
     }
     _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.TOTAL_SERVER_RESPONSE_SIZE, totalResponseSize);
+    _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.RESPONSE_SIZE, totalResponseSize);
 
     return brokerResponse;
   }
