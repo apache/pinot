@@ -17,9 +17,16 @@
  * under the License.
  */
 
-package org.apache.pinot.common.data.schema;
+package org.apache.pinot.controller.recommender.io.metadata;
+
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.Schema;
 
 
+/**
+ * This class is used in {@link SchemaWithMetaData} to add metadata to {@link DateTimeFieldSpec}. Without this object,
+ * json representation of {@link SchemaWithMetaData} object cannot be deserialized to {@link Schema} object.
+ */
 public class DateTimeFieldSpecMetadata extends FieldMetadata {
   private String _format;
   private String _granularity;

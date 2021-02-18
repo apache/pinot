@@ -16,16 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.data.schema;
+package org.apache.pinot.controller.recommender.io.metadata;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 import org.apache.pinot.spi.data.FieldSpec;
 
-import static org.apache.pinot.common.data.schema.SchemaMetadataConstants.DEFAULT_AVERAGE_NUM_VALUES_PER_ENTRY;
-import static org.apache.pinot.common.data.schema.SchemaMetadataConstants.DEFAULT_CARDINALITY;
-import static org.apache.pinot.common.data.schema.SchemaMetadataConstants.DEFAULT_DATA_LENGTH;
+import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.DEFAULT_AVERAGE_NUM_VALUES_PER_ENTRY;
+import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.DEFAULT_CARDINALITY;
+import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.DEFAULT_DATA_LENGTH;
 
 
 /**

@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.data.schema;
+package org.apache.pinot.controller.recommender.io.metadata;
 
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 
-import static org.apache.pinot.common.data.schema.SchemaMetadataConstants.DEFAULT_CARDINALITY;
-import static org.apache.pinot.common.data.schema.SchemaMetadataConstants.DEFAULT_DATA_LENGTH;
+import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.DEFAULT_CARDINALITY;
+import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.DEFAULT_DATA_LENGTH;
 
 
 public class TimeFieldSpecMetadata extends FieldMetadata {

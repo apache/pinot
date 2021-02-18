@@ -17,13 +17,13 @@
  * under the License.
  */
 
-package org.apache.pinot.common.data.schema;
+package org.apache.pinot.controller.recommender.io.metadata;
 
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 
-import static org.apache.pinot.common.data.schema.SchemaMetadataConstants.DEFAULT_CARDINALITY;
+import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.DEFAULT_CARDINALITY;
 
 
 public class TimeGranularitySpecMetadata extends TimeGranularitySpec {
