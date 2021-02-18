@@ -27,8 +27,6 @@ import org.apache.pinot.core.operator.blocks.TransformBlock;
  * Interface for generating group keys.
  */
 public interface GroupKeyGenerator {
-  // TODO: Remove LEGACY_DELIMITER after releasing 0.5.0
-  char LEGACY_DELIMITER = '\t';
   char DELIMITER = '\0';
   int INVALID_ID = -1;
 
