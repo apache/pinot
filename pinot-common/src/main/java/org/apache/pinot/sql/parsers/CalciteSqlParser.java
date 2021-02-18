@@ -910,30 +910,32 @@ public class CalciteSqlParser {
   }
 
   private static void validateFunction(String functionName, List<Expression> operands) {
-    switch (functionName.toUpperCase()) {
-      case "JSONEXTRACTSCALAR":
-        validateJsonExtractScalarFunction(functionName, operands);
+    switch (canonicalize(functionName)) {
+      case "jsonextractscalar":
+        validateJsonExtractScalarFunction(operands);
         break;
-      case "JSONEXTRACTKEY":
-        validateJsonExtractKeyFunction(functionName, operands);
+      case "jsonextractkey":
+        validateJsonExtractKeyFunction(operands);
         break;
     }
   }
 
-  private static void validateJsonExtractScalarFunction(String functionName, List<Expression> operands) {
+  private static void validateJsonExtractScalarFunction(List<Expression> operands) {
+    int numOperands = operands.size();
+
     // Check that there are exactly 3 or 4 arguments
-    if (operands.size() != 3 && operands.size() != 4) {
+    if (numOperands != 3 && numOperands != 4) {
       throw new SqlCompilationException(
           "Expect 3 or 4 arguments for transform function: jsonExtractScalar(jsonFieldName, 'jsonPath', 'resultsType', ['defaultValue'])");
     }
-    if (!operands.get(1).isSetLiteral() || !operands.get(2).isSetLiteral() || (operands.size() == 4 && !operands.get(3)
+    if (!operands.get(1).isSetLiteral() || !operands.get(2).isSetLiteral() || (numOperands == 4 && !operands.get(3)
         .isSetLiteral())) {
       throw new SqlCompilationException(
           "Expect the 2nd/3rd/4th argument of transform function: jsonExtractScalar(jsonFieldName, 'jsonPath', 'resultsType', ['defaultValue']) to be a single-quoted literal value.");
     }
   }
 
-  private static void validateJsonExtractKeyFunction(String functionName, List<Expression> operands) {
+  private static void validateJsonExtractKeyFunction(List<Expression> operands) {
     // Check that there are exactly 2 arguments
     if (operands.size() != 2) {
       throw new SqlCompilationException(
