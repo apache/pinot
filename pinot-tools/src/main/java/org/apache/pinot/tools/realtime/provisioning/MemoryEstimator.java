@@ -20,23 +20,52 @@ package org.apache.pinot.tools.realtime.provisioning;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Paths;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.controller.recommender.io.metadata.DateTimeFieldSpecMetadata;
+import org.apache.pinot.controller.recommender.io.metadata.FieldMetadata;
+import org.apache.pinot.controller.recommender.io.metadata.SchemaWithMetaData;
+import org.apache.pinot.controller.recommender.io.metadata.TimeFieldSpecMetadata;
+import org.apache.pinot.controller.recommender.io.metadata.TimeGranularitySpecMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
+import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
+import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.DataSizeUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.tools.data.generator.DataGenerator;
+import org.apache.pinot.tools.data.generator.DataGeneratorSpec;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -70,6 +99,9 @@ public class MemoryEstimator {
   private String[][] _consumingMemoryPerHost;
   private String[][] _numSegmentsQueriedPerHost;
 
+  /**
+   * Constructor used for processing the given completed segment
+   */
   public MemoryEstimator(TableConfig tableConfig, File sampleCompletedSegment, int ingestionRate,
       long maxUsableHostMemory, int tableRetentionHours) {
     _maxUsableHostMemory = maxUsableHostMemory;
@@ -105,6 +137,18 @@ public class MemoryEstimator {
       throw new RuntimeException("Exception in deleting directory " + _tableDataDir.getAbsolutePath(), e);
     }
     _tableDataDir.mkdir();
+  }
+
+  /**
+   * Constructor used for processing the given data characteristics (instead of completed segment)
+   */
+  public MemoryEstimator(TableConfig tableConfig, File schemaWithMetadataFile, int numberOfRows, int ingestionRate,
+      long maxUsableHostMemory, int tableRetentionHours) {
+    this(tableConfig,
+        generateCompletedSegment(schemaWithMetadataFile, tableConfig, numberOfRows),
+        ingestionRate,
+        maxUsableHostMemory,
+        tableRetentionHours);
   }
 
   /**
@@ -386,5 +430,161 @@ public class MemoryEstimator {
 
   public String[][] getNumSegmentsQueriedPerHost() {
     return _numSegmentsQueriedPerHost;
+  }
+
+  private static File generateCompletedSegment(File schemaWithMetadataFile, TableConfig tableConfig, int numberOfRows) {
+    SegmentGenerator segmentGenerator = new SegmentGenerator(schemaWithMetadataFile, tableConfig, numberOfRows, true);
+    return segmentGenerator.generate();
+  }
+
+  /**
+   * This class is used in Memory Estimator to generate segment based on the the given characteristics of data
+   */
+  public static class SegmentGenerator {
+    private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGenerator.class);
+    private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd_HH:mm:ss");
+
+    private File _schemaWithMetadataFile;
+    private TableConfig _tableConfig;
+    private int _numberOfRows;
+    private boolean _deleteCsv;
+
+    public SegmentGenerator(File schemaWithMetadataFile, TableConfig tableConfig, int numberOfRows, boolean deleteCsv) {
+      _schemaWithMetadataFile = schemaWithMetadataFile;
+      _tableConfig = tableConfig;
+      _numberOfRows = numberOfRows;
+      _deleteCsv = deleteCsv;
+    }
+
+    public File generate() {
+      Date now = new Date();
+      File csvDataFile = generateData(now);
+      File segment = createSegment(csvDataFile, now);
+      if (_deleteCsv) {
+        csvDataFile.delete();
+      }
+      return segment;
+    }
+
+    private File generateData(Date now) {
+
+      // deserialize schema
+      SchemaWithMetaData schema;
+      try {
+        schema = JsonUtils.fileToObject(_schemaWithMetadataFile, SchemaWithMetaData.class);
+      } catch (Exception e) {
+        throw new RuntimeException(String.format("Cannot read schema file '%s' to SchemaWithMetaData object.",
+            _schemaWithMetadataFile));
+      }
+
+      // create maps of "column name" to ...
+      Map<String, Integer> lengths = new HashMap<>();
+      Map<String, Double> mvCounts = new HashMap<>();
+      Map<String, Integer> cardinalities = new HashMap<>();
+      Map<String, FieldSpec.DataType> dataTypes = new HashMap<>();
+      Map<String, FieldSpec.FieldType> fieldTypes = new HashMap<>();
+      Map<String, TimeUnit> timeUnits = new HashMap<>();
+      List<String> colNames = new ArrayList<>();
+      List<FieldMetadata> dimensions = schema.getDimensionFieldSpecs();
+      List<FieldMetadata> metrics = schema.getMetricFieldSpecs();
+      List<DateTimeFieldSpecMetadata> dateTimes = schema.getDateTimeFieldSpecs();
+      Stream.concat(Stream.concat(dimensions.stream(), metrics.stream()), dateTimes.stream()).forEach(column -> {
+        String name = column.getName();
+        colNames.add(name);
+        lengths.put(name, column.getAverageLength());
+        mvCounts.put(name, column.getNumValuesPerEntry());
+        cardinalities.put(name, column.getCardinality());
+        dataTypes.put(name, column.getDataType());
+        fieldTypes.put(name, column.getFieldType());
+      });
+      dateTimes.forEach(dateTimeColumn -> {
+        TimeUnit timeUnit = new DateTimeFormatSpec(dateTimeColumn.getFormat()).getColumnUnit();
+        timeUnits.put(dateTimeColumn.getName(), timeUnit);
+      });
+      TimeFieldSpecMetadata timeSpec = schema.getTimeFieldSpec();
+      if (timeSpec != null) {
+        String name = timeSpec.getName();
+        colNames.add(name);
+        cardinalities.put(name, timeSpec.getCardinality());
+        dataTypes.put(name, timeSpec.getDataType());
+        fieldTypes.put(name, timeSpec.getFieldType());
+        TimeGranularitySpecMetadata timeGranSpec = timeSpec.getOutgoingGranularitySpec() != null
+            ? timeSpec.getOutgoingGranularitySpec()
+            : timeSpec.getIncomingGranularitySpec();
+        timeUnits.put(name, timeGranSpec.getTimeType());
+      }
+
+      // generate data
+      String outputDir = getOutputDir(now, "-csv");
+      DataGeneratorSpec spec =
+          new DataGeneratorSpec(colNames, cardinalities, new HashMap<>(), new HashMap<>(), mvCounts, lengths, dataTypes,
+              fieldTypes, timeUnits, FileFormat.CSV, outputDir, true);
+      DataGenerator dataGenerator = new DataGenerator();
+      try {
+        dataGenerator.init(spec);
+        dataGenerator.generateCsv(_numberOfRows, 1);
+        File outputFile = Paths.get(outputDir, "output_0.csv").toFile();
+        LOGGER.info("Successfully generated data file: {}", outputFile);
+        return outputFile;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }
+
+    private File createSegment(File csvDataFile, Date now) {
+
+      // deserialize schema
+      Schema schema;
+      try {
+        schema = JsonUtils.fileToObject(_schemaWithMetadataFile, Schema.class);
+      } catch (Exception e) {
+        throw new RuntimeException(
+            String.format("Cannot read schema file '%s' to schema object.", _schemaWithMetadataFile));
+      }
+
+      // create segment
+      LOGGER.info("Started creating segment from file: {}", csvDataFile);
+      String outDir = getOutputDir(now, "-segment");
+      SegmentGeneratorConfig segmentGeneratorConfig = getSegmentGeneratorConfig(csvDataFile, schema, outDir);
+      SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
+      try {
+        driver.init(segmentGeneratorConfig);
+        driver.build();
+      } catch (Exception e) {
+        throw new RuntimeException("Caught exception while generating segment from file: " + csvDataFile, e);
+      }
+      String segmentName = driver.getSegmentName();
+      File indexDir = new File(outDir, segmentName);
+      LOGGER.info("Successfully created segment: {} at directory: {}", segmentName, indexDir);
+
+      // verify segment
+      LOGGER.info("Verifying the segment by loading it");
+      ImmutableSegment segment;
+      try {
+        segment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
+      } catch (Exception e) {
+        throw new RuntimeException("Caught exception while verifying the created segment", e);
+      }
+      LOGGER.info("Successfully loaded segment: {} of size: {} bytes", segmentName,
+          segment.getSegmentSizeBytes());
+      segment.destroy();
+
+      return indexDir;
+    }
+
+    private SegmentGeneratorConfig getSegmentGeneratorConfig(File csvDataFile, Schema schema, String outDir) {
+      SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, schema);
+      segmentGeneratorConfig.setInputFilePath(csvDataFile.getPath());
+      segmentGeneratorConfig.setFormat(FileFormat.CSV);
+      segmentGeneratorConfig.setOutDir(outDir);
+      segmentGeneratorConfig.setReaderConfig(new CSVRecordReaderConfig());
+      segmentGeneratorConfig.setTableName(_tableConfig.getTableName());
+      segmentGeneratorConfig.setSequenceId(0);
+      return segmentGeneratorConfig;
+    }
+
+    private String getOutputDir(Date date, String suffix) {
+      return Paths.get(System.getProperty("java.io.tmpdir"), DATE_FORMAT.format(date) + suffix).toString();
+    }
   }
 }

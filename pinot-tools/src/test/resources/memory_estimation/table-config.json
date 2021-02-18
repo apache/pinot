@@ -1,0 +1,49 @@
+{
+  "metadata": {},
+  "routing": {
+    "routingTableBuilderName": "PartitionAwareRealtime",
+    "routingTableBuilderOptions": {}
+  },
+  "segmentsConfig": {
+    "replicasPerPartition": 3,
+    "replication": "3",
+    "retentionTimeUnit": "DAYS",
+    "retentionTimeValue": "5",
+    "schemaName": "testTable",
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+    "segmentPushFrequency": "daily",
+    "segmentPushType": "APPEND",
+    "timeColumnName": "colTime",
+    "timeType": "DAYS"
+  },
+  "tableIndexConfig": {
+    "aggregateMetrics": true,
+    "invertedIndexColumns": [
+      "colInt",
+      "colString"
+    ],
+    "loadMode": "MMAP",
+    "noDictionaryColumns": [
+      "colBytes"
+    ],
+    "segmentFormatVersion": "v3",
+    "sortedColumn": [],
+    "streamConfigs": {
+      "realtime.segment.flush.threshold.size": 100000000,
+      "realtime.segment.flush.threshold.time": "6h",
+      "stream.kafka.clusterGroup": "aggregate-tracking",
+      "stream.kafka.consumer.factory.class.name": "com.linkedin.pinot.v2.server.LiPinotKafkaConsumerFactory",
+      "stream.kafka.consumer.prop.auto.offset.reset": "largest",
+      "stream.kafka.consumer.type": "simple",
+      "stream.kafka.decoder.class.name": "com.linkedin.pinot.v2.server.LiKafkaDecoder",
+      "stream.kafka.topic.name": "UserGeneratedContentGestureCountEvent",
+      "streamType": "kafka"
+    }
+  },
+  "tableName": "testTable",
+  "tableType": "REALTIME",
+  "tenants": {
+    "broker": "test",
+    "server": "test"
+  }
+}

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.tools.data.generator;
 
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 import java.util.Map;
@@ -28,12 +29,18 @@ import java.util.Map;
  */
 
 public class GeneratorFactory {
-  public static Generator getGeneratorFor(DataType type, int cardinality) {
+  public static Generator getGeneratorFor(DataType type, Integer cardinality, Double numberOfValuesPerEntry,
+      Integer entryLength, TimeUnit timeUnit) {
     if (type == DataType.STRING) {
-      return new StringGenerator(cardinality);
+      return new StringGenerator(cardinality, numberOfValuesPerEntry, entryLength);
     }
-
-    return new NumberGenerator(cardinality, type, false);
+    if (type == DataType.BYTES) {
+      return new BytesGenerator(cardinality, entryLength);
+    }
+    if (timeUnit != null) {
+      return new TimeGenerator(cardinality, type, timeUnit);
+    }
+    return new NumberGenerator(cardinality, type, numberOfValuesPerEntry);
   }
 
   public static Generator getGeneratorFor(DataType dataType, int start, int end) {

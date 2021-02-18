@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.tools.data.generator;
 
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.math.IntRange;
@@ -31,7 +34,6 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -71,26 +73,27 @@ public class DataGenerator {
     for (final String column : genSpec.getColumns()) {
       DataType dataType = genSpec.getDataTypesMap().get(column);
 
+      Generator generator;
       if (genSpec.getPatternMap().containsKey(column)) {
-        generators.put(column,
-                GeneratorFactory.getGeneratorFor(
-                        PatternType.valueOf(genSpec.getPatternMap().get(column).get("type").toString()),
-                        genSpec.getPatternMap().get(column)));
+         generator = GeneratorFactory
+            .getGeneratorFor(PatternType.valueOf(genSpec.getPatternMap().get(column).get("type").toString()),
+                genSpec.getPatternMap().get(column));
 
       } else if (genSpec.getCardinalityMap().containsKey(column)) {
-        generators.put(column, GeneratorFactory.getGeneratorFor(dataType, genSpec.getCardinalityMap().get(column)));
-
+        generator = GeneratorFactory.getGeneratorFor(dataType,
+            genSpec.getCardinalityMap().get(column),
+            genSpec.getMvCountMap().get(column),
+            genSpec.getLengthMap().get(column),
+            genSpec.getTimeUnitMap().get(column));
       } else if (genSpec.getRangeMap().containsKey(column)) {
         IntRange range = genSpec.getRangeMap().get(column);
-        generators.put(column,
-                GeneratorFactory.getGeneratorFor(dataType, range.getMinimumInteger(), range.getMaximumInteger()));
-
+        generator = GeneratorFactory.getGeneratorFor(dataType, range.getMinimumInteger(), range.getMaximumInteger());
       } else {
         LOGGER.error("cardinality for this column does not exist : " + column);
         throw new RuntimeException("cardinality for this column does not exist");
       }
-
-      generators.get(column).init();
+      generator.init();
+      generators.put(column, generator);
     }
   }
 
@@ -115,12 +118,20 @@ public class DataGenerator {
         for (int j = 0; j < numPerFiles; j++) {
           Object[] values = new Object[genSpec.getColumns().size()];
           for (int k = 0; k < genSpec.getColumns().size(); k++) {
-            values[k] = generators.get(genSpec.getColumns().get(k)).next();
+            Object next = generators.get(genSpec.getColumns().get(k)).next();
+            values[k] = serializeIfMultiValue(next);
           }
           writer.append(StringUtils.join(values, ",")).append('\n');
         }
       }
     }
+  }
+
+  private Object serializeIfMultiValue(Object obj) {
+    if (obj instanceof List) {
+      return StringUtils.join((List) obj, ";");
+    }
+    return obj;
   }
 
   public Schema fetchSchema() {
@@ -163,7 +174,7 @@ public class DataGenerator {
 
   public static void main(String[] args)
       throws IOException {
-    final String[] columns = {"column1", "column2", "column3", "column4", "column5"};
+
     final Map<String, DataType> dataTypes = new HashMap<>();
     final Map<String, FieldType> fieldTypes = new HashMap<>();
     final Map<String, TimeUnit> timeUnits = new HashMap<>();
@@ -171,18 +182,67 @@ public class DataGenerator {
     final Map<String, Integer> cardinality = new HashMap<>();
     final Map<String, IntRange> range = new HashMap<>();
     final Map<String, Map<String, Object>> template = new HashMap<>();
+    Map<String, Double> mvCountMap = new HashMap<>();
+    Map<String, Integer> lengthMap = new HashMap<>();
+    List<String> columnNames = new ArrayList<>();
 
-    for (final String col : columns) {
-      dataTypes.put(col, DataType.INT);
-      fieldTypes.put(col, FieldType.DIMENSION);
-      cardinality.put(col, 1000);
+    int cardinalityValue = 5;
+    int strLength = 5;
+
+    String colName = "colInt";
+    dataTypes.put(colName, DataType.INT);
+    fieldTypes.put(colName, FieldType.DIMENSION);
+    cardinality.put(colName, cardinalityValue);
+    columnNames.add(colName);
+    mvCountMap.put(colName, 3.7);
+
+    String colName2 = "colFloat";
+    dataTypes.put(colName2, DataType.FLOAT);
+    fieldTypes.put(colName2, FieldType.DIMENSION);
+    cardinality.put(colName2, cardinalityValue);
+    columnNames.add(colName2);
+    mvCountMap.put(colName2, 3.7);
+
+    String colName3 = "colString";
+    dataTypes.put(colName3, DataType.STRING);
+    fieldTypes.put(colName3, FieldType.DIMENSION);
+    cardinality.put(colName3, cardinalityValue);
+    columnNames.add(colName3);
+    mvCountMap.put(colName3, 3.7);
+    lengthMap.put(colName3, strLength);
+
+    String colName4 = "metric";
+    dataTypes.put(colName4, DataType.DOUBLE);
+    fieldTypes.put(colName4, FieldType.METRIC);
+    cardinality.put(colName4, cardinalityValue);
+    columnNames.add(colName4);
+
+    String colName5 = "colBytes";
+    dataTypes.put(colName5, DataType.BYTES);
+    fieldTypes.put(colName5, FieldType.DIMENSION);
+    cardinality.put(colName5, cardinalityValue);
+    columnNames.add(colName5);
+    mvCountMap.put(colName5, 3.7);
+    lengthMap.put(colName5, strLength + 1);
+
+    for (int i = 0; i < 2; i++) {
+      colName = "colString" + (i + 2);
+      dataTypes.put(colName, DataType.STRING);
+      fieldTypes.put(colName, FieldType.DIMENSION);
+      cardinality.put(colName, cardinalityValue);
+      columnNames.add(colName);
+      lengthMap.put(colName, strLength + i + 2);
     }
+
+    String outputDir = Paths.get(System.getProperty("java.io.tmpdir"), "csv-data").toString();
     final DataGeneratorSpec spec =
-        new DataGeneratorSpec(Arrays.asList(columns), cardinality, range, template, dataTypes, fieldTypes, timeUnits,
-            FileFormat.AVRO, "/tmp/out", true);
+        new DataGeneratorSpec(columnNames, cardinality, range, template, mvCountMap, lengthMap,
+            dataTypes, fieldTypes, timeUnits,
+            FileFormat.CSV, outputDir, true);
 
     final DataGenerator gen = new DataGenerator();
     gen.init(spec);
-    gen.generateAvro(1000000L, 2);
+    gen.generateCsv(100, 1);
+    System.out.println("CSV data is generated under: " + outputDir);
   }
 }
