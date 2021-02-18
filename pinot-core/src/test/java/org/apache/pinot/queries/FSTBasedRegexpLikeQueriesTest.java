@@ -18,7 +18,14 @@
  */
 package org.apache.pinot.queries;
 
+import java.io.File;
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -49,14 +56,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
-import java.io.File;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Set;
 
 
 public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
@@ -249,11 +248,11 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
 
   private void matchGroupResult(AggregationGroupByResult result, String key, long count) {
     Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = result.getGroupKeyIterator();
-    Boolean found = false;
+    boolean found = false;
     while (groupKeyIterator.hasNext()) {
       GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
-      if (groupKey._stringKey.equals(key)) {
-        Assert.assertEquals(((Number) result.getResultForKey(groupKey, 0)).longValue(), count);
+      if (groupKey._keys[0].equals(key)) {
+        Assert.assertEquals(((Number) result.getResultForGroupId(0, groupKey._groupId)).longValue(), count);
         found = true;
       }
     }

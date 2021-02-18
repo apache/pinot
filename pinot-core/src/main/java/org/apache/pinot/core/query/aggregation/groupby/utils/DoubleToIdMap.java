@@ -58,4 +58,9 @@ public class DoubleToIdMap extends BaseValueToIdMap {
   public String getString(int id) {
     return Double.toString(getDouble(id));
   }
+
+  @Override
+  public Object get(int id) {
+    return getDouble(id);
+  }
 }

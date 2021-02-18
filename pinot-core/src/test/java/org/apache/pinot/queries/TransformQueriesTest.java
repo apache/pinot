@@ -214,7 +214,8 @@ public class TransformQueriesTest extends BaseQueriesTest {
     IntermediateResultsBlock resultsBlock = aggregationGroupByOperator.nextBlock();
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
     assertNotNull(aggregationGroupByResult);
-    List<GroupKeyGenerator.GroupKey> groupKeys = ImmutableList.copyOf(aggregationGroupByResult.getGroupKeyIterator());
+    List<GroupKeyGenerator.StringGroupKey> groupKeys =
+        ImmutableList.copyOf(aggregationGroupByResult.getStringGroupKeyIterator());
     assertEquals(groupKeys.size(), 1);
     assertEquals(groupKeys.get(0)._stringKey, expectedStringKey);
     Object resultForKey = aggregationGroupByResult.getResultForKey(groupKeys.get(0), 0);
