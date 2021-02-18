@@ -903,9 +903,46 @@ public class CalciteSqlParser {
         operands.add(toExpression(childNode));
       }
     }
+    validateFunction(functionName, operands);
     Expression functionExpression = RequestUtils.getFunctionExpression(functionName);
     functionExpression.getFunctionCall().setOperands(operands);
     return functionExpression;
+  }
+
+  private static void validateFunction(String functionName, List<Expression> operands) {
+    switch (functionName.toUpperCase()) {
+      case "JSONEXTRACTSCALAR":
+        validateJsonExtractScalarFunction(functionName, operands);
+        break;
+      case "JSONEXTRACTKEY":
+        validateJsonExtractKeyFunction(functionName, operands);
+        break;
+    }
+  }
+
+  private static void validateJsonExtractScalarFunction(String functionName, List<Expression> operands) {
+    // Check that there are exactly 3 or 4 arguments
+    if (operands.size() != 3 && operands.size() != 4) {
+      throw new SqlCompilationException(
+          "Expect 3 or 4 arguments for transform function: jsonExtractScalar(jsonFieldName, 'jsonPath', 'resultsType', ['defaultValue'])");
+    }
+    if (!operands.get(1).isSetLiteral() || !operands.get(2).isSetLiteral() || (operands.size() == 4 && !operands.get(3)
+        .isSetLiteral())) {
+      throw new SqlCompilationException(
+          "Expect the 2nd/3rd/4th argument of transform function: jsonExtractScalar(jsonFieldName, 'jsonPath', 'resultsType', ['defaultValue']) to be a single-quoted literal value.");
+    }
+  }
+
+  private static void validateJsonExtractKeyFunction(String functionName, List<Expression> operands) {
+    // Check that there are exactly 2 arguments
+    if (operands.size() != 2) {
+      throw new SqlCompilationException(
+          "Expect 2 arguments are required for transform function: jsonExtractKey(jsonFieldName, 'jsonPath')");
+    }
+    if (!operands.get(1).isSetLiteral()) {
+      throw new SqlCompilationException(
+          "Expect the 2nd argument for transform function: jsonExtractKey(jsonFieldName, 'jsonPath') to be a single-quoted literal value.");
+    }
   }
 
   /**
