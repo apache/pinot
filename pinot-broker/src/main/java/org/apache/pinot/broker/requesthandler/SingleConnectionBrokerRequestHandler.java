@@ -90,8 +90,6 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getResponse();
     _brokerMetrics
         .addPhaseTiming(rawTableName, BrokerQueryPhase.SCATTER_GATHER, System.nanoTime() - scatterGatherStartTimeNs);
-    _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_SIZE,
-        originalBrokerRequest.toString().length());
     // TODO Use scatterGatherStats as serverStats
     serverStats.setServerStats(asyncQueryResponse.getStats());
 

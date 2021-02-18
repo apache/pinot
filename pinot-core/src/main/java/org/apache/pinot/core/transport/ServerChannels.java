@@ -38,6 +38,7 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.core.util.TlsUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TCompactProtocol;
 
@@ -147,6 +148,9 @@ public class ServerChannels {
       _channel.writeAndFlush(Unpooled.wrappedBuffer(requestBytes), _channel.voidPromise());
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_REQUESTS_SENT, 1);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_BYTES_SENT, requestBytes.length);
+      String tableName = instanceRequest.getQuery().getQuerySource().getTableName();
+      String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_SIZE, requestBytes.length);
     }
   }
 }
