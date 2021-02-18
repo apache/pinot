@@ -37,10 +37,10 @@ import org.apache.parquet.schema.MessageType;
 
 
 public class ParquetUtils {
+  private static final String DEFAULT_FS = "file:///";
+
   private ParquetUtils() {
   }
-
-  private static final String DEFAULT_FS = "file:///";
 
   /**
    * Returns a ParquetReader with the given path.
@@ -57,7 +57,8 @@ public class ParquetUtils {
    */
   public static ParquetWriter<GenericRecord> getParquetAvroWriter(Path path, Schema schema)
       throws IOException {
-    return AvroParquetWriter.<GenericRecord>builder(path).withSchema(schema).withConf(getParquetAvroReaderConfiguration()).build();
+    return AvroParquetWriter.<GenericRecord>builder(path).withSchema(schema)
+        .withConf(getParquetAvroReaderConfiguration()).build();
   }
 
   /**
@@ -65,7 +66,8 @@ public class ParquetUtils {
    */
   public static Schema getParquetAvroSchema(Path path)
       throws IOException {
-    ParquetMetadata footer = ParquetFileReader.readFooter(getParquetAvroReaderConfiguration(), path, ParquetMetadataConverter.NO_FILTER);
+    ParquetMetadata footer =
+        ParquetFileReader.readFooter(getParquetAvroReaderConfiguration(), path, ParquetMetadataConverter.NO_FILTER);
     Map<String, String> metaData = footer.getFileMetaData().getKeyValueMetaData();
     String schemaString = metaData.get("parquet.avro.schema");
     if (schemaString == null) {

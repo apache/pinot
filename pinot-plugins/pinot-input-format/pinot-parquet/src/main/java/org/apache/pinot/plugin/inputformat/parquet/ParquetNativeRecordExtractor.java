@@ -34,6 +34,7 @@ import javax.annotation.Nullable;
 import org.apache.parquet.example.data.Group;
 import org.apache.parquet.io.api.Binary;
 import org.apache.parquet.schema.DecimalMetadata;
+import org.apache.parquet.schema.GroupType;
 import org.apache.parquet.schema.OriginalType;
 import org.apache.parquet.schema.Type;
 import org.apache.pinot.spi.data.readers.BaseRecordExtractor;
@@ -44,6 +45,9 @@ import org.joda.time.DateTimeConstants;
 import static java.lang.Math.pow;
 
 
+/**
+ * ParquetNativeRecordExtractor extract values from Parquet {@link Group}.
+ */
 public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
 
   /**
@@ -57,6 +61,34 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
   private Set<String> _fields;
   private boolean _extractAll = false;
 
+  public static BigDecimal binaryToDecimal(Binary value, int precision, int scale) {
+    /*
+     * Precision <= 18 checks for the max number of digits for an unscaled long,
+     * else treat with big integer conversion
+     */
+    if (precision <= 18) {
+      ByteBuffer buffer = value.toByteBuffer();
+      byte[] bytes = buffer.array();
+      int start = buffer.arrayOffset() + buffer.position();
+      int end = buffer.arrayOffset() + buffer.limit();
+      long unscaled = 0L;
+      int i = start;
+      while (i < end) {
+        unscaled = (unscaled << 8 | bytes[i] & 0xff);
+        i++;
+      }
+      int bits = 8 * (end - start);
+      long unscaledNew = (unscaled << (64 - bits)) >> (64 - bits);
+      if (unscaledNew <= -pow(10, 18) || unscaledNew >= pow(10, 18)) {
+        return new BigDecimal(unscaledNew);
+      } else {
+        return BigDecimal.valueOf(unscaledNew / pow(10, scale));
+      }
+    } else {
+      return new BigDecimal(new BigInteger(value.getBytes()), scale);
+    }
+  }
+
   @Override
   public void init(@Nullable Set<String> fields, RecordExtractorConfig recordExtractorConfig) {
     if (fields == null || fields.isEmpty()) {
@@ -69,11 +101,12 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
 
   @Override
   public GenericRow extract(Group from, GenericRow to) {
+    GroupType fromType = from.getType();
     if (_extractAll) {
-      List<Type> fields = from.getType().getFields();
+      List<Type> fields = fromType.getFields();
       for (Type field : fields) {
         String fieldName = field.getName();
-        Object value = extractValue(from, from.getType().getFieldIndex(fieldName));
+        Object value = extractValue(from, fromType.getFieldIndex(fieldName));
         if (value != null) {
           value = convert(value);
         }
@@ -81,7 +114,7 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
       }
     } else {
       for (String fieldName : _fields) {
-        Object value = extractValue(from, from.getType().getFieldIndex(fieldName));
+        Object value = extractValue(from, fromType.getFieldIndex(fieldName));
         if (value != null) {
           value = convert(value);
         }
@@ -100,6 +133,7 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
     if (valueCount == 1) {
       return extractValue(from, fieldIndex, fieldType, 0);
     }
+    // For multi-value (repeated field)
     Object[] results = new Object[valueCount];
     for (int index = 0; index < valueCount; index++) {
       results[index] = extractValue(from, fieldIndex, fieldType, index);
@@ -179,34 +213,6 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
       resultMap.put(group.getType().getType(repFieldIdx).getName(), value);
     }
     return resultMap;
-  }
-
-  public static BigDecimal binaryToDecimal(Binary value, int precision, int scale) {
-    /*
-     * Precision <= 18 checks for the max number of digits for an unscaled long,
-     * else treat with big integer conversion
-     */
-    if (precision <= 18) {
-      ByteBuffer buffer = value.toByteBuffer();
-      byte[] bytes = buffer.array();
-      int start = buffer.arrayOffset() + buffer.position();
-      int end = buffer.arrayOffset() + buffer.limit();
-      long unscaled = 0L;
-      int i = start;
-      while (i < end) {
-        unscaled = (unscaled << 8 | bytes[i] & 0xff);
-        i++;
-      }
-      int bits = 8 * (end - start);
-      long unscaledNew = (unscaled << (64 - bits)) >> (64 - bits);
-      if (unscaledNew <= -pow(10, 18) || unscaledNew >= pow(10, 18)) {
-        return new BigDecimal(unscaledNew);
-      } else {
-        return BigDecimal.valueOf(unscaledNew / pow(10, scale));
-      }
-    } else {
-      return new BigDecimal(new BigInteger(value.getBytes()), scale);
-    }
   }
 
   @Override

@@ -22,14 +22,19 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
 
+/**
+ * Config for ParquetRecordReader
+ */
 public class ParquetRecordReaderConfig implements RecordReaderConfig {
   private static final String USE_PARQUET_AVRO_RECORDER_READER = "useParquetAvroRecordReader";
   private boolean _useParquetAvroRecordReader = true;
+  private Configuration _conf;
 
   public ParquetRecordReaderConfig() {
   }
 
   public ParquetRecordReaderConfig(Configuration conf) {
+    _conf = conf;
     _useParquetAvroRecordReader = conf.getBoolean(USE_PARQUET_AVRO_RECORDER_READER, true);
   }
 
@@ -39,5 +44,9 @@ public class ParquetRecordReaderConfig implements RecordReaderConfig {
 
   public void setUseParquetAvroRecordReader(boolean useParquetAvroRecordReader) {
     _useParquetAvroRecordReader = useParquetAvroRecordReader;
+  }
+
+  public Configuration getConfig() {
+    return _conf;
   }
 }

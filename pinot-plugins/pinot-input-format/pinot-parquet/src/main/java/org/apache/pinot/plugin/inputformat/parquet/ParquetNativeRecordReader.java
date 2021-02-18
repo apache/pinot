@@ -39,7 +39,7 @@ import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
 
 /**
- * Record reader for Parquet file.
+ * Record reader for Native Parquet file.
  */
 public class ParquetNativeRecordReader implements RecordReader {
   private Path _dataFilePath;

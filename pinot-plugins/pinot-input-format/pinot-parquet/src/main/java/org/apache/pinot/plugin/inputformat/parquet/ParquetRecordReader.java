@@ -28,7 +28,8 @@ import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
 
 /**
- * Record reader for Parquet file.
+ * Pinot Record reader for Parquet file.<p>
+ * It has two implementations: {@link ParquetAvroRecordReader} (Default) and {@link ParquetNativeRecordReader}.
  */
 public class ParquetRecordReader implements RecordReader {
   private RecordReader _internalParquetRecordReader;
