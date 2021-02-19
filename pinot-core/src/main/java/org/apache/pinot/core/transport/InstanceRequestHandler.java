@@ -64,6 +64,10 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     _serverMetrics = serverMetrics;
   }
 
+  /**
+   * Always return a response even when query execution throws exception; otherwise, broker
+   * will keep waiting until timeout.
+   */
   @Override
   protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg) {
     final long queryArrivalTimeMs = System.currentTimeMillis();
@@ -76,15 +80,15 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     byte[] requestBytes = new byte[requestSize];
 
     try {
-      // parse netty request into a ServerQueryRequest object for execution.
+      // parse instance request into a query result.
       msg.readBytes(requestBytes);
       _deserializer.deserialize(instanceRequest, requestBytes);
       queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics, queryArrivalTimeMs);
       queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.REQUEST_DESERIALIZATION, queryArrivalTimeMs)
           .stopAndRecord();
     } catch (Exception e) {
-      LOGGER.error("Caught exception while creating query request: {}", BytesUtils.toHexString(requestBytes), e);
-      sendErrorResponse(ctx, instanceRequest.getRequestId(), queryArrivalTimeMs, new DataTableImplV2(), e);
+      LOGGER.error("Exception while deserializing the instance request: {}", BytesUtils.toHexString(requestBytes), e);
+      sendResponse(ctx, instanceRequest.getRequestId(), queryArrivalTimeMs, new DataTableImplV2(), e);
       return;
     }
 
@@ -93,38 +97,36 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       @Override
       public void onSuccess(@Nullable byte[] responseBytes) {
         if (responseBytes != null) {
-          // We have a query response (either serialized query results or serialized error message).
+          // responseBytes contains either query results or exception.
           sendResponse(ctx, queryArrivalTimeMs, responseBytes);
         } else {
-          // response should never be null; otherwise, it will cause broker to wait until timeout.
-          sendErrorResponse(ctx, queryRequest.getRequestId(), queryArrivalTimeMs, new DataTableImplV2(),
+          // Send exception response.
+          sendResponse(ctx, queryRequest.getRequestId(), queryArrivalTimeMs, new DataTableImplV2(),
               new Exception("Null query response."));
         }
       }
 
       @Override
       public void onFailure(Throwable t) {
-        // Query execution failed.
-        LOGGER.error("Caught exception while processing instance request", t);
-        sendErrorResponse(ctx, instanceRequest.getRequestId(), queryArrivalTimeMs, new DataTableImplV2(),
-            new Exception(t));
+        // Send exception response.
+        LOGGER.error("Exception while processing instance request", t);
+        sendResponse(ctx, instanceRequest.getRequestId(), queryArrivalTimeMs, new DataTableImplV2(), new Exception(t));
       }
     }, MoreExecutors.directExecutor());
   }
 
   @Override
   public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-    // This will happen only if there is an unexpected "Throwable" event in channelRead0 function
-    // which has not been caught and handled yet.
-    LOGGER.error("Caught exception while fetching instance request", cause);
-    sendErrorResponse(ctx, 0, System.currentTimeMillis(), new DataTableImplV2(), new Exception(cause));
+    // Send exception response.
+    LOGGER.error("Exception while fetching instance request", cause);
+    sendResponse(ctx, 0, System.currentTimeMillis(), new DataTableImplV2(), new Exception(cause));
   }
 
   /**
    * Send an exception back to broker as response to the query request.
    */
-  private void sendErrorResponse(ChannelHandlerContext ctx, long requestId, long queryArrivalTimeMs,
-      DataTable dataTable, Exception e) {
+  private void sendResponse(ChannelHandlerContext ctx, long requestId, long queryArrivalTimeMs, DataTable dataTable,
+      Exception e) {
     try {
       Map<String, String> dataTableMetadata = dataTable.getMetadata();
       dataTableMetadata.put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(requestId));
@@ -134,8 +136,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       sendResponse(ctx, queryArrivalTimeMs, serializedDataTable);
 
       _serverMetrics.addMeteredGlobalValue(ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
-    } catch (Exception ex2) {
-      // ignore this exception since we are already dealing with a higher level exceptions.
+    } catch (Throwable t) {
+      // Ignore since we are already handling a higher level exceptions.
     }
   }
 
