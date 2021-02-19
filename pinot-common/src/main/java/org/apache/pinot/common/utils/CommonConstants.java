@@ -235,6 +235,9 @@ public class CommonConstants {
         "pinot.server.instance.realtime.alloc.offheap.direct";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.server.storage.factory";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "pinot.server.crypter";
+
+    public static final String CONFIG_OF_AUTH_TOKEN = "auth.token";
+
     // Configuration to consider the server ServiceStatus as being STARTED if the percent of resources (tables) that
     // are ONLINE for this this server has crossed the threshold percentage of the total number of tables
     // that it is expected to serve.
@@ -304,6 +307,7 @@ public class CommonConstants {
       public static final String CONFIG_OF_CONTROLLER_HTTPS_ENABLED = "enabled";
       public static final String CONFIG_OF_CONTROLLER_HTTPS_PORT = "controller.port";
       public static final String CONFIG_OF_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS = "upload.request.timeout.ms";
+      public static final String CONFIG_OF_SEGMENT_UPLOAD_AUTH_TOKEN = "upload.auth.token";
 
       public static final int DEFAULT_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS = 300_000;
       public static final int DEFAULT_OTHER_REQUESTS_TIMEOUT = 10_000;
@@ -357,6 +361,8 @@ public class CommonConstants {
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "segment.fetcher";
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "segment.uploader";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "crypter";
+
+    public static final String CONFIG_OF_TASK_AUTH_TOKEN = "task.auth.token";
   }
 
   public static class Segment {

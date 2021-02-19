@@ -50,4 +50,6 @@ public interface InstanceDataManagerConfig {
   boolean isDirectRealtimeOffHeapAllocation();
 
   int getMaxParallelSegmentBuilds();
+
+  String getAuthToken();
 }

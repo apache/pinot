@@ -83,6 +83,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     _instanceId = _instanceDataManagerConfig.getInstanceId();
     _helixManager = helixManager;
     _serverMetrics = serverMetrics;
+    _authToken = config.getProperty(CommonConstants.Server.CONFIG_OF_AUTH_TOKEN);
 
     File instanceDataDir = new File(_instanceDataManagerConfig.getInstanceDataDir());
     if (!instanceDataDir.exists()) {
@@ -142,7 +143,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     LOGGER.info("Creating table data manager for table: {}", tableNameWithType);
     TableDataManagerConfig tableDataManagerConfig =
         TableDataManagerConfig.getDefaultHelixTableDataManagerConfig(_instanceDataManagerConfig, tableNameWithType);
-    tableDataManagerConfig.overrideConfigs(tableConfig);
+    tableDataManagerConfig.overrideConfigs(tableConfig, _authToken);
     TableDataManager tableDataManager = TableDataManagerProvider
         .getTableDataManager(tableDataManagerConfig, _instanceId, _propertyStore, _serverMetrics, _helixManager);
     tableDataManager.start();

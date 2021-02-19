@@ -178,6 +178,8 @@ public class PinotConfigUtils {
     properties.put(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR, serverDataDir);
     properties.put(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, serverSegmentDir);
     properties.put("pinot.server.segment.fetcher.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
+    properties.put("pinot.server.segment.upload.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
+    properties.put("pinot.server.instance.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
 
     return properties;
   }
@@ -191,6 +193,7 @@ public class PinotConfigUtils {
     properties.put(CommonConstants.Helix.KEY_OF_MINION_HOST, minionHost);
     properties.put(CommonConstants.Helix.KEY_OF_MINION_PORT, minionPort != 0 ? minionPort : getAvailablePort());
     properties.put("segment.fetcher.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
+    properties.put("task.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
 
     return properties;
   }

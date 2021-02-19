@@ -160,6 +160,9 @@ public class MinionStarter implements ServiceStartable {
     minionMetrics.initializeGlobalMeters();
     minionContext.setMinionMetrics(minionMetrics);
 
+    // initialize authentication
+    minionContext.setTaskAuthToken(_config.getProperty(CommonConstants.Minion.CONFIG_OF_TASK_AUTH_TOKEN));
+
     // Start all components
     LOGGER.info("Initializing PinotFSFactory");
     PinotConfiguration pinotFSConfig = _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);

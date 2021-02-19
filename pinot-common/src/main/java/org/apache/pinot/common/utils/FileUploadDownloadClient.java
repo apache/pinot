@@ -46,7 +46,6 @@ import org.apache.http.StatusLine;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.client.methods.RequestBuilder;
 import org.apache.http.entity.ContentType;
@@ -140,11 +139,13 @@ public class FileUploadDownloadClient implements Closeable {
     return new URI(protocol, null, host, port, path, null, null);
   }
 
+  @Deprecated
   public static URI getRetrieveTableConfigHttpURI(String host, int port, String rawTableName)
       throws URISyntaxException {
     return getURI(HTTP, host, port, TABLES_PATH + "/" + rawTableName);
   }
 
+  @Deprecated
   public static URI getDeleteSegmentHttpUri(String host, int port, String rawTableName, String segmentName,
       String tableType)
       throws URISyntaxException {
@@ -152,6 +153,7 @@ public class FileUploadDownloadClient implements Closeable {
         rawTableName + "/" + URIUtils.encode(segmentName) + TYPE_DELIMITER + tableType));
   }
 
+  @Deprecated
   public static URI getRetrieveAllSegmentWithTableTypeHttpUri(String host, int port, String rawTableName,
       String tableType)
       throws URISyntaxException {
@@ -159,6 +161,7 @@ public class FileUploadDownloadClient implements Closeable {
         rawTableName + TYPE_DELIMITER + tableType));
   }
 
+  @Deprecated
   public static URI getRetrieveSchemaHttpURI(String host, int port, String schemaName)
       throws URISyntaxException {
     return getURI(HTTP, host, port, SCHEMA_PATH + "/" + schemaName);
@@ -167,16 +170,6 @@ public class FileUploadDownloadClient implements Closeable {
   public static URI getRetrieveSchemaURI(String protocol, String host, int port, String schemaName)
       throws URISyntaxException {
     return getURI(protocol, host, port, SCHEMA_PATH + "/" + schemaName);
-  }
-
-  public static URI getUploadSchemaHttpURI(String host, int port)
-      throws URISyntaxException {
-    return getURI(HTTP, host, port, SCHEMA_PATH);
-  }
-
-  public static URI getUploadSchemaHttpsURI(String host, int port)
-      throws URISyntaxException {
-    return getURI(HTTPS, host, port, SCHEMA_PATH);
   }
 
   public static URI getUploadSchemaURI(String protocol, String host, int port)
@@ -189,34 +182,10 @@ public class FileUploadDownloadClient implements Closeable {
     return getURI(controllerURI.getScheme(), controllerURI.getHost(), controllerURI.getPort(), SCHEMA_PATH);
   }
 
-  /**
-   * This method calls the old segment upload endpoint. We will deprecate this behavior soon. Please call
-   * getUploadSegmentHttpURI to construct your request.
-   */
   @Deprecated
-  public static URI getOldUploadSegmentHttpURI(String host, int port)
-      throws URISyntaxException {
-    return getURI(HTTP, host, port, OLD_SEGMENT_PATH);
-  }
-
-  /**
-   * This method calls the old segment upload endpoint. We will deprecate this behavior soon. Please call
-   * getUploadSegmentHttpsURI to construct your request.
-   */
-  @Deprecated
-  public static URI getOldUploadSegmentHttpsURI(String host, int port)
-      throws URISyntaxException {
-    return getURI(HTTPS, host, port, OLD_SEGMENT_PATH);
-  }
-
   public static URI getUploadSegmentHttpURI(String host, int port)
       throws URISyntaxException {
     return getURI(HTTP, host, port, SEGMENT_PATH);
-  }
-
-  public static URI getUploadSegmentHttpsURI(String host, int port)
-      throws URISyntaxException {
-    return getURI(HTTPS, host, port, SEGMENT_PATH);
   }
 
   public static URI getUploadSegmentURI(String protocol, String host, int port)
@@ -257,12 +226,14 @@ public class FileUploadDownloadClient implements Closeable {
     return requestBuilder.build();
   }
 
+  @Deprecated
   private static HttpUriRequest constructGetRequest(URI uri) {
     RequestBuilder requestBuilder = RequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
     setTimeout(requestBuilder, GET_REQUEST_SOCKET_TIMEOUT_MS);
     return requestBuilder.build();
   }
 
+  @Deprecated
   private static HttpUriRequest constructDeleteRequest(URI uri) {
     RequestBuilder requestBuilder = RequestBuilder.delete(uri).setVersion(HttpVersion.HTTP_1_1);
     setTimeout(requestBuilder, DELETE_REQUEST_SOCKET_TIMEOUT_MS);
@@ -272,11 +243,6 @@ public class FileUploadDownloadClient implements Closeable {
   private static HttpUriRequest getAddSchemaRequest(URI uri, String schemaName, File schemaFile,
       @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters) {
     return getUploadFileRequest(HttpPost.METHOD_NAME, uri, getContentBody(schemaName, schemaFile), headers, parameters,
-        DEFAULT_SOCKET_TIMEOUT_MS);
-  }
-
-  private static HttpUriRequest getUpdateSchemaRequest(URI uri, String schemaName, File schemaFile) {
-    return getUploadFileRequest(HttpPut.METHOD_NAME, uri, getContentBody(schemaName, schemaFile), null, null,
         DEFAULT_SOCKET_TIMEOUT_MS);
   }
 
@@ -299,7 +265,7 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   private static HttpUriRequest getUploadSegmentMetadataFilesRequest(URI uri, Map<String, File> metadataFiles,
-      int segmentUploadRequestTimeoutMs) {
+      @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int segmentUploadRequestTimeoutMs) {
     MultipartEntityBuilder multipartEntityBuilder = MultipartEntityBuilder.create().
         setMode(HttpMultipartMode.BROWSER_COMPATIBLE);
     for (Map.Entry<String, File> entry : metadataFiles.entrySet()) {
@@ -310,6 +276,7 @@ public class FileUploadDownloadClient implements Closeable {
     // Build the POST request.
     RequestBuilder requestBuilder =
         RequestBuilder.create(HttpPost.METHOD_NAME).setVersion(HttpVersion.HTTP_1_1).setUri(uri).setEntity(entity);
+    addHeadersAndParameters(requestBuilder, headers, parameters);
     setTimeout(requestBuilder, segmentUploadRequestTimeoutMs);
     return requestBuilder.build();
   }
@@ -334,14 +301,11 @@ public class FileUploadDownloadClient implements Closeable {
     return requestBuilder.build();
   }
 
-  private static HttpUriRequest getSegmentCompletionProtocolRequest(URI uri, int socketTimeoutMs) {
+  private static HttpUriRequest getSegmentCompletionProtocolRequest(URI uri, @Nullable List<Header> headers,
+      @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
     RequestBuilder requestBuilder = RequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
     setTimeout(requestBuilder, socketTimeoutMs);
     return requestBuilder.build();
-  }
-
-  private static HttpUriRequest getDownloadFileRequest(URI uri, int socketTimeoutMs) {
-    return getDownloadFileRequest(uri, socketTimeoutMs, null);
   }
 
   private static HttpUriRequest getDownloadFileRequest(URI uri, int socketTimeoutMs, String authToken) {
@@ -431,11 +395,13 @@ public class FileUploadDownloadClient implements Closeable {
     return errorMessage;
   }
 
+  @Deprecated
   public SimpleHttpResponse sendGetRequest(URI uri)
       throws IOException, HttpErrorStatusException {
     return sendRequest(constructGetRequest(uri));
   }
 
+  @Deprecated
   public SimpleHttpResponse sendDeleteRequest(URI uri)
       throws IOException, HttpErrorStatusException {
     return sendRequest(constructDeleteRequest(uri));
@@ -481,9 +447,10 @@ public class FileUploadDownloadClient implements Closeable {
 
   // Upload a set of segment metadata files (e.g., meta.properties and creation.meta) to controllers.
   public SimpleHttpResponse uploadSegmentMetadataFiles(URI uri, Map<String, File> metadataFiles,
-      int segmentUploadRequestTimeoutMs)
+      @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int segmentUploadRequestTimeoutMs)
       throws IOException, HttpErrorStatusException {
-    return sendRequest(getUploadSegmentMetadataFilesRequest(uri, metadataFiles, segmentUploadRequestTimeoutMs));
+    return sendRequest(
+        getUploadSegmentMetadataFilesRequest(uri, metadataFiles, headers, parameters, segmentUploadRequestTimeoutMs));
   }
 
   /**
@@ -513,6 +480,8 @@ public class FileUploadDownloadClient implements Closeable {
   /**
    * Upload segment with segment file using default settings. Include table name as a request parameter.
    *
+   * NOTE: does not support auth tokens
+   *
    * @param uri URI
    * @param segmentName Segment name
    * @param segmentFile Segment file
@@ -521,6 +490,7 @@ public class FileUploadDownloadClient implements Closeable {
    * @throws IOException
    * @throws HttpErrorStatusException
    */
+  @Deprecated
   public SimpleHttpResponse uploadSegment(URI uri, String segmentName, File segmentFile, String tableName)
       throws IOException, HttpErrorStatusException {
     // Add table name as a request parameter
@@ -580,6 +550,7 @@ public class FileUploadDownloadClient implements Closeable {
    * @throws IOException
    * @throws HttpErrorStatusException
    */
+  @Deprecated
   public SimpleHttpResponse sendSegmentUri(URI uri, String downloadUri, String rawTableName)
       throws IOException, HttpErrorStatusException {
     // Add table name as a request parameter
@@ -615,6 +586,7 @@ public class FileUploadDownloadClient implements Closeable {
    * @throws IOException
    * @throws HttpErrorStatusException
    */
+  @Deprecated
   public SimpleHttpResponse sendSegmentJson(URI uri, String jsonString)
       throws IOException, HttpErrorStatusException {
     return sendSegmentJson(uri, jsonString, null, null, DEFAULT_SOCKET_TIMEOUT_MS);
@@ -629,24 +601,10 @@ public class FileUploadDownloadClient implements Closeable {
    * @throws IOException
    * @throws HttpErrorStatusException
    */
-  public SimpleHttpResponse sendSegmentCompletionProtocolRequest(URI uri, int socketTimeoutMs)
+  public SimpleHttpResponse sendSegmentCompletionProtocolRequest(URI uri, @Nullable List<Header> headers,
+      @Nullable List<NameValuePair> parameters, int socketTimeoutMs)
       throws IOException, HttpErrorStatusException {
-    return sendRequest(getSegmentCompletionProtocolRequest(uri, socketTimeoutMs));
-  }
-
-  /**
-   * Download a file using default settings.
-   *
-   * @param uri URI
-   * @param socketTimeoutMs Socket timeout in milliseconds
-   * @param dest File destination
-   * @return Response status code
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
-  public int downloadFile(URI uri, int socketTimeoutMs, File dest)
-      throws IOException, HttpErrorStatusException {
-    return downloadFile(uri, socketTimeoutMs, dest, null);
+    return sendRequest(getSegmentCompletionProtocolRequest(uri, headers, parameters, socketTimeoutMs));
   }
 
   /**
@@ -687,20 +645,6 @@ public class FileUploadDownloadClient implements Closeable {
 
       return statusCode;
     }
-  }
-
-  /**
-   * Download a file.
-   *
-   * @param uri URI
-   * @param dest File destination
-   * @return Response status code
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
-  public int downloadFile(URI uri, File dest)
-      throws IOException, HttpErrorStatusException {
-    return downloadFile(uri, DEFAULT_SOCKET_TIMEOUT_MS, dest);
   }
 
   /**

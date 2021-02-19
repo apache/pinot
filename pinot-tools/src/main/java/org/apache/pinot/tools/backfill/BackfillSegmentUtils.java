@@ -152,7 +152,10 @@ public class BackfillSegmentUtils {
 
   /**
    * Uploads the segment tar to the controller.
+   *
+   * NOTE: this method does not support auth tokens
    */
+  @Deprecated
   public boolean uploadSegment(String rawTableName, String segmentName, File segmentDir, File outputDir) {
     boolean success = true;
 

@@ -24,7 +24,6 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -118,8 +117,7 @@ public class DefaultControllerRestApi implements ControllerRestApi {
           try (InputStream inputStream = fileSystem.open(tarFilePath)) {
             SimpleHttpResponse response = _fileUploadDownloadClient.uploadSegment(
                 FileUploadDownloadClient.getUploadSegmentHttpURI(pushLocation.getHost(), pushLocation.getPort()),
-                segmentName, inputStream, Collections.emptyList(),
-                FileUploadDownloadClient.makeTableParam(_rawTableName),
+                segmentName, inputStream, null, FileUploadDownloadClient.makeTableParam(_rawTableName),
                 FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
             LOGGER.info("Response {}: {}", response.getStatusCode(), response.getResponse());
             break;
