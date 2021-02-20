@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.ingestion.batch.spark;
 
-import static org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner.LOCAL_DIRECTORY_SEQUENCE_ID;
 import static org.apache.pinot.common.segment.generation.SegmentGenerationUtils.PINOT_PLUGINS_DIR;
 import static org.apache.pinot.common.segment.generation.SegmentGenerationUtils.PINOT_PLUGINS_TAR_GZ;
 import static org.apache.pinot.common.segment.generation.SegmentGenerationUtils.getFileName;
@@ -43,6 +42,7 @@ import java.util.UUID;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationJobUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
 import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -210,7 +210,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
       }
 
       List<String> pathAndIdxList = new ArrayList<>();
-      if (getLocalDirectorySequenceId(_spec.getSegmentNameGeneratorSpec())) {
+      if (SegmentGenerationJobUtils.useLocalDirectorySequenceId(_spec.getSegmentNameGeneratorSpec())) {
         Map<String, List<String>> localDirIndex = new HashMap<>();
         for (String filteredFile : filteredFiles) {
           Path filteredParentPath = Paths.get(filteredFile).getParent();
@@ -349,13 +349,6 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
         outputDirFS.delete(stagingDirURI, true);
       }
     }
-  }
-
-  private static boolean getLocalDirectorySequenceId(SegmentNameGeneratorSpec spec) {
-    if (spec == null || spec.getConfigs() == null) {
-      return false;
-    }
-    return Boolean.parseBoolean(spec.getConfigs().get(LOCAL_DIRECTORY_SEQUENCE_ID));
   }
 
   protected void addDepsJarToDistributedCache(JavaSparkContext sparkContext, String depsJarDir)
