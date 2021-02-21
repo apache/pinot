@@ -72,14 +72,15 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
   protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg) {
     final long queryArrivalTimeMs = System.currentTimeMillis();
     final int requestSize = msg.readableBytes();
-    _serverMetrics.addMeteredGlobalValue(ServerMeter.QUERIES, 1);
-    _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_BYTES_RECEIVED, requestSize);
 
     InstanceRequest instanceRequest = new InstanceRequest();
     ServerQueryRequest queryRequest;
     byte[] requestBytes = new byte[requestSize];
 
     try {
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.QUERIES, 1);
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_BYTES_RECEIVED, requestSize);
+
       // parse instance request into a query result.
       msg.readBytes(requestBytes);
       _deserializer.deserialize(instanceRequest, requestBytes);
@@ -117,8 +118,11 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
 
   @Override
   public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-    // Send exception response.
-    LOGGER.error("Exception while fetching instance request", cause);
+    // Since we do not know the requestId of the original request here, there is no way for Broker to know which query
+    // request this response belongs to. Hence, Broker will continue to wait for the original request until time out.
+    // To prevent broker from waiting unncessarily,try to catch and handle all exceptions in channelRead0 method so that
+    // this function is never called.
+    LOGGER.error("Unhandled Exception in " + getClass().getCanonicalName(), cause);
     sendResponse(ctx, 0, System.currentTimeMillis(), new DataTableImplV2(), new Exception(cause));
   }
 
