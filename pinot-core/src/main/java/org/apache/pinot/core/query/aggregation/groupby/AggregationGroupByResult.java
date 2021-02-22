@@ -27,6 +27,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
  * It provides an iterator over group-by keys, and provides a method
  * to get the aggregation result for the given group-by key.
  */
+@SuppressWarnings("rawtypes")
 public class AggregationGroupByResult {
   private final GroupKeyGenerator _groupKeyGenerator;
   private final AggregationFunction[] _aggregationFunctions;
@@ -40,11 +41,17 @@ public class AggregationGroupByResult {
   }
 
   /**
-   * Returns an iterator for group-by keys.
-   * @return
+   * Returns an iterator of {@link GroupKeyGenerator.GroupKey}.
    */
   public Iterator<GroupKeyGenerator.GroupKey> getGroupKeyIterator() {
-    return _groupKeyGenerator.getUniqueGroupKeys();
+    return _groupKeyGenerator.getGroupKeys();
+  }
+
+  /**
+   * Returns an iterator of {@link GroupKeyGenerator.StringGroupKey}.
+   */
+  public Iterator<GroupKeyGenerator.StringGroupKey> getStringGroupKeyIterator() {
+    return _groupKeyGenerator.getStringGroupKeys();
   }
 
   /**
@@ -64,7 +71,11 @@ public class AggregationGroupByResult {
    * @param index
    * @return
    */
-  public Object getResultForKey(GroupKeyGenerator.GroupKey groupKey, int index) {
-    return _aggregationFunctions[index].extractGroupByResult(_resultHolders[index], groupKey._groupId);
+  public Object getResultForKey(GroupKeyGenerator.StringGroupKey groupKey, int index) {
+    return getResultForGroupId(index, groupKey._groupId);
+  }
+
+  public Object getResultForGroupId(int index, int groupId) {
+    return _aggregationFunctions[index].extractGroupByResult(_resultHolders[index], groupId);
   }
 }

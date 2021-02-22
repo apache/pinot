@@ -23,11 +23,11 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-public class GroupKeyTest {
+public class StringGroupKeyTest {
 
   @Test
   public void testGetKeys() {
-    GroupKeyGenerator.GroupKey groupKey = new GroupKeyGenerator.GroupKey();
+    GroupKeyGenerator.StringGroupKey groupKey = new GroupKeyGenerator.StringGroupKey();
     groupKey._stringKey = "foo\0bar\0";
     String[] keys = groupKey.getKeys();
     Assert.assertEquals(keys.length, 3);

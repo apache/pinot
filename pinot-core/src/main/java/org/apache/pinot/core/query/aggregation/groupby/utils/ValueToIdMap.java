@@ -50,4 +50,18 @@ public interface ValueToIdMap {
   String getString(int id);
 
   ByteArray getBytes(int id);
+
+  /**
+   * Returns the value for the given id.
+   * <p>The Object type returned for each value type:
+   * <ul>
+   *   <li>INT -> Integer</li>
+   *   <li>LONG -> Long</li>
+   *   <li>FLOAT -> Float</li>
+   *   <li>DOUBLE -> Double</li>
+   *   <li>STRING -> String</li>
+   *   <li>BYTES -> ByteArray</li>
+   * </ul>
+   */
+  Object get(int id);
 }

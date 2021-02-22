@@ -244,9 +244,10 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
     while (groupKeyIterator.hasNext()) {
       numGroups++;
       GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
-      assertTrue(_values.contains(Integer.parseInt(groupKey._stringKey)));
+      Integer key = (Integer) groupKey._keys[0];
+      assertTrue(_values.contains(key));
       for (int i = 0; i < 6; i++) {
-        assertEquals(((Set<Integer>) aggregationGroupByResult.getResultForKey(groupKey, i)).size(), 1);
+        assertEquals(((Set<Integer>) aggregationGroupByResult.getResultForGroupId(i, groupKey._groupId)).size(), 1);
       }
     }
     assertEquals(numGroups, _values.size());

@@ -152,9 +152,10 @@ public class GroupByCombineOperator extends BaseOperator<IntermediateResultsBloc
             AggregationGroupByResult aggregationGroupByResult = intermediateResultsBlock.getAggregationGroupByResult();
             if (aggregationGroupByResult != null) {
               // Iterate over the group-by keys, for each key, update the group-by result in the resultsMap.
-              Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
+              Iterator<GroupKeyGenerator.StringGroupKey> groupKeyIterator =
+                  aggregationGroupByResult.getStringGroupKeyIterator();
               while (groupKeyIterator.hasNext()) {
-                GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
+                GroupKeyGenerator.StringGroupKey groupKey = groupKeyIterator.next();
                 resultsMap.compute(groupKey._stringKey, (key, value) -> {
                   if (value == null) {
                     if (numGroups.getAndIncrement() < _interSegmentNumGroupsLimit) {

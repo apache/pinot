@@ -223,7 +223,7 @@ public class DistinctCountThetaSketchQueriesTest extends BaseQueriesTest {
         numGroups++;
         GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
         for (int i = 0; i < 6; i++) {
-          List<Sketch> sketches = (List<Sketch>) aggregationGroupByResult.getResultForKey(groupKey, i);
+          List<Sketch> sketches = (List<Sketch>) aggregationGroupByResult.getResultForGroupId(i, groupKey._groupId);
           assertEquals(sketches.size(), 1);
           Sketch sketch = sketches.get(0);
           if (i < 5) {

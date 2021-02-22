@@ -59,6 +59,11 @@ public class BytesDictionary extends BaseImmutableDictionary {
   }
 
   @Override
+  public Object getInternal(int dictId) {
+    return new ByteArray(getBytes(dictId));
+  }
+
+  @Override
   public int getIntValue(int dictId) {
     throw new UnsupportedOperationException();
   }
