@@ -97,9 +97,14 @@ sed -i -e "s/\"tableName\": \"$TEMPLATE_NAME\"/\"tableName\": \"$TABLE_NAME\"/g"
 sed -i -e "s/\"schemaName\": \"$TEMPLATE_NAME\"/\"schemaName\": \"$TABLE_NAME\"/g" "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_config.json"
 sed -i -e "s/\"schemaName\": \"$TEMPLATE_NAME\"/\"schemaName\": \"$TABLE_NAME\"/g" "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_schema.json"
 
+NUM_RECORDS=354780
+if [ "$TEMPLATE_NAME" = "complexWebsite" ]; then
+  NUM_RECORDS=631152
+fi
+
 echo "Generating data for ${TEMPLATE_NAME} in ${DATA_DIR}"
 JAVA_OPTS="" ${ADMIN_PATH} GenerateData \
--numFiles 1 -numRecords 631152  -format csv \
+-numFiles 1 -numRecords $NUM_RECORDS -format csv \
 -schemaFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_schema.json" \
 -schemaAnnotationFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_generator.json" \
 -outDir "$DATA_DIR"
