@@ -70,14 +70,19 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
    */
   @Override
   protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg) {
-    final long queryArrivalTimeMs = System.currentTimeMillis();
-    final int requestSize = msg.readableBytes();
-
-    InstanceRequest instanceRequest = new InstanceRequest();
-    ServerQueryRequest queryRequest;
-    byte[] requestBytes = new byte[requestSize];
+    long queryArrivalTimeMs = 0;
+    InstanceRequest instanceRequest = null;
+    ServerQueryRequest queryRequest = null;
+    byte[] requestBytes = null;
 
     try {
+      // all code inside try code, so that we are able to catch all exceptions.
+      queryArrivalTimeMs = System.currentTimeMillis();
+      instanceRequest = new InstanceRequest();
+
+      final int requestSize = msg.readableBytes();
+      requestBytes = new byte[requestSize];
+
       _serverMetrics.addMeteredGlobalValue(ServerMeter.QUERIES, 1);
       _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_BYTES_RECEIVED, requestSize);
 
@@ -88,7 +93,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.REQUEST_DESERIALIZATION, queryArrivalTimeMs)
           .stopAndRecord();
     } catch (Exception e) {
-      LOGGER.error("Exception while deserializing the instance request: {}", BytesUtils.toHexString(requestBytes), e);
+      String hexString = requestBytes != null ? BytesUtils.toHexString(requestBytes) : "";
+      LOGGER.error("Exception while deserializing the instance request: {}", hexString, e);
       sendResponse(ctx, instanceRequest.getRequestId(), queryArrivalTimeMs, new DataTableImplV2(), e);
       return;
     }
@@ -120,8 +126,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
   public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
     // Since we do not know the requestId of the original request here, there is no way for Broker to know which query
     // request this response belongs to. Hence, Broker will continue to wait for the original request until time out.
-    // To prevent broker from waiting unncessarily,try to catch and handle all exceptions in channelRead0 method so that
-    // this function is never called.
+    // To prevent Broker from waiting unnecessarily, try to catch and handle all exceptions in channelRead0 method so
+    // that this function is never called.
     LOGGER.error("Unhandled Exception in " + getClass().getCanonicalName(), cause);
     sendResponse(ctx, 0, System.currentTimeMillis(), new DataTableImplV2(), new Exception(cause));
   }
