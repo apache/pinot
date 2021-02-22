@@ -24,11 +24,9 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.metrics.base.PinotGauge;
-import org.apache.pinot.common.metrics.base.PinotMetricName;
-import org.apache.pinot.common.metrics.base.PinotMetricProcessor;
-import org.apache.pinot.common.metrics.base.PinotMetricUtilsFactory;
-import org.apache.pinot.common.metrics.base.PinotMetricsRegistry;
+import org.apache.pinot.spi.metrics.PinotGauge;
+import org.apache.pinot.spi.metrics.PinotMetricName;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
 
 /**
@@ -56,11 +54,12 @@ public class ValidationMetrics {
 
     @Override
     public Object getGauge() {
-      return PinotMetricUtilsFactory.generatePinotGauge(avoid -> value()).getGauge();
+      return PinotMetricUtils.generatePinotGauge(avoid -> value()).getGauge();
     }
 
     @Override
-    public <T> void processWith(PinotMetricProcessor<T> processor, PinotMetricName name, T context) {
+    public Object getMetric() {
+      return getGauge();
     }
   }
 
@@ -89,12 +88,13 @@ public class ValidationMetrics {
     }
 
     @Override
-    public Object getGauge() {
-      return PinotMetricUtilsFactory.generatePinotGauge(avoid -> value()).getGauge();
+    public Object getMetric() {
+      return getGauge();
     }
 
     @Override
-    public <T> void processWith(PinotMetricProcessor<T> processor, PinotMetricName name, T context) {
+    public Object getGauge() {
+      return PinotMetricUtils.generatePinotGauge(avoid -> value()).getGauge();
     }
   }
 
@@ -205,7 +205,7 @@ public class ValidationMetrics {
   }
 
   private PinotMetricName makeMetricName(final String gaugeName) {
-    return PinotMetricUtilsFactory.generatePinotMetricName(ValidationMetrics.class, gaugeName);
+    return PinotMetricUtils.generatePinotMetricName(ValidationMetrics.class, gaugeName);
   }
 
   private void makeGauge(final String gaugeName, final PinotMetricName metricName, final GaugeFactory<?> gaugeFactory,

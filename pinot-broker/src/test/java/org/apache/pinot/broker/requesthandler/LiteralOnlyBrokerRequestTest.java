@@ -24,7 +24,7 @@ import java.util.Collections;
 import java.util.Random;
 import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.metrics.base.PinotMetricUtilsFactory;
+import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -92,7 +92,7 @@ public class LiteralOnlyBrokerRequestTest {
       throws Exception {
     SingleConnectionBrokerRequestHandler requestHandler =
         new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), null, null, null, null,
-            new BrokerMetrics("", PinotMetricUtilsFactory.getPinotMetricsRegistry(), true, Collections.emptySet()),
+            new BrokerMetrics("", PinotMetricUtils.getPinotMetricsRegistry(), true, Collections.emptySet()),
             null);
     long randNum = RANDOM.nextLong();
     byte[] randBytes = new byte[12];
@@ -120,7 +120,7 @@ public class LiteralOnlyBrokerRequestTest {
       throws Exception {
     SingleConnectionBrokerRequestHandler requestHandler =
         new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), null, null, null, null,
-            new BrokerMetrics("", PinotMetricUtilsFactory.getPinotMetricsRegistry(), true, Collections.emptySet()),
+            new BrokerMetrics("", PinotMetricUtils.getPinotMetricsRegistry(), true, Collections.emptySet()),
             null);
     long currentTsMin = System.currentTimeMillis();
     JsonNode request = new ObjectMapper().readTree(

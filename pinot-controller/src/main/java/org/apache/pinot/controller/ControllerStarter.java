@@ -53,8 +53,8 @@ import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.MetricsHelper;
-import org.apache.pinot.common.metrics.base.PinotMetricsRegistry;
-import org.apache.pinot.common.metrics.base.PinotMetricUtilsFactory;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.NetUtil;
@@ -96,8 +96,6 @@ import org.apache.pinot.spi.services.ServiceStartable;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.common.metrics.base.PinotMetricUtilsFactory.LIBRARY_NAME_KEY;
 
 
 public class ControllerStarter implements ServiceStartable {
@@ -485,8 +483,8 @@ public class ControllerStarter implements ServiceStartable {
   private void initControllerMetrics() {
     PinotConfiguration metricsConfiguration = _config.subset(METRICS_REGISTRY_NAME);
     try {
-      PinotMetricUtilsFactory.init(metricsConfiguration.getProperty(LIBRARY_NAME_KEY));
-      _metricsRegistry = PinotMetricUtilsFactory.getPinotMetricsRegistry();
+      PinotMetricUtils.init(metricsConfiguration);
+      _metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
     } catch (InvalidConfigException e) {
       throw new RuntimeException("Caught InvalidConfigException when initializing metricsRegistry", e);
     }

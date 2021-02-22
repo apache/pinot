@@ -16,19 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics.base;
+package org.apache.pinot.spi.metrics;
+
+import java.util.concurrent.TimeUnit;
 
 
-public interface PinotMetric {
+/**
+ * A timer metric which aggregates timing durations and provides duration statistics, plus
+ * throughput statistics via {@link PinotMeter}.
+ */
+public interface PinotTimer extends PinotMetered {
 
   /**
-   * Allow the given {@link PinotMetricProcessor} to process {@code this} as a metric.
+   * Adds a recorded duration. It's basically the same as using time() and then stop().
+   * Hereby we can update the time duration by calling just one method.
+   * This is used to log the time span of each of the phase during query execution in Pinot.
    *
-   * @param processor    a {@link PinotMetricProcessor}
-   * @param name         the name of the current metric
-   * @param context      a given context which should be passed on to {@code processor}
-   * @param <T>          the type of the context object
-   * @throws Exception if something goes wrong
+   * @param duration the length of the duration
+   * @param unit     the scale unit of {@code duration}
    */
-  <T> void processWith(PinotMetricProcessor<T> processor, PinotMetricName name, T context) throws Exception;
+  void update(long duration, TimeUnit unit);
+
+  /**
+   * Returns the actual object of timer.
+   */
+  Object getTimer();
 }

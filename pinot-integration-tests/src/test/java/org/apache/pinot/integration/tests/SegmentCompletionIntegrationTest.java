@@ -31,7 +31,7 @@ import org.apache.helix.participant.statemachine.StateModel;
 import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.participant.statemachine.StateModelInfo;
 import org.apache.helix.participant.statemachine.Transition;
-import org.apache.pinot.common.metrics.base.PinotMetricUtilsFactory;
+import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.CommonConstants;
@@ -141,7 +141,7 @@ public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest
 
     // Now report to the controller that we had to stop consumption
     ServerSegmentCompletionProtocolHandler protocolHandler = new ServerSegmentCompletionProtocolHandler(
-        new ServerMetrics(PinotMetricUtilsFactory.getPinotMetricsRegistry()), realtimeTableName);
+        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), realtimeTableName);
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
     params.withStreamPartitionMsgOffset(new LongMsgOffset(45688L).toString()).withSegmentName(_currentSegment)
         .withReason("RandomReason").withInstanceId(_serverInstance);

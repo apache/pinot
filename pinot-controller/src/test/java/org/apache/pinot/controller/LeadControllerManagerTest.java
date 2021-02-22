@@ -25,7 +25,7 @@ import org.apache.helix.PropertyKey;
 import org.apache.helix.model.LiveInstance;
 import org.apache.helix.model.ResourceConfig;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.metrics.base.PinotMetricUtilsFactory;
+import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
@@ -48,7 +48,7 @@ public class LeadControllerManagerTest {
 
   @BeforeMethod
   public void setup() {
-    _controllerMetrics = new ControllerMetrics(PinotMetricUtilsFactory.getPinotMetricsRegistry());
+    _controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     _helixManager = mock(HelixManager.class);
     HelixDataAccessor helixDataAccessor = mock(HelixDataAccessor.class);
     when(_helixManager.getHelixDataAccessor()).thenReturn(helixDataAccessor);

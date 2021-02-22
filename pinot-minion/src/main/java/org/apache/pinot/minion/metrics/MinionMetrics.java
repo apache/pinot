@@ -19,7 +19,7 @@
 package org.apache.pinot.minion.metrics;
 
 import org.apache.pinot.common.metrics.AbstractMetrics;
-import org.apache.pinot.common.metrics.base.PinotMetricsRegistry;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.common.utils.CommonConstants;
 
 

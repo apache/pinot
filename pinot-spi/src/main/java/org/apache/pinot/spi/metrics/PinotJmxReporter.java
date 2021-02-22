@@ -16,9 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics.base;
+package org.apache.pinot.spi.metrics;
 
-
+/**
+ * A reporter which exposes application metric as JMX MBeans in Pinot.
+ */
 public interface PinotJmxReporter {
 
   void start();

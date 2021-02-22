@@ -20,7 +20,7 @@ package org.apache.pinot.common.metrics;
 
 import java.util.Collection;
 import java.util.Collections;
-import org.apache.pinot.common.metrics.base.PinotMetricsRegistry;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
 import static org.apache.pinot.common.utils.CommonConstants.Server.DEFAULT_ENABLE_TABLE_LEVEL_METRICS;
 import static org.apache.pinot.common.utils.CommonConstants.Server.DEFAULT_METRICS_PREFIX;

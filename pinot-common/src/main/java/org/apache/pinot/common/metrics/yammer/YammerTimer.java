@@ -20,13 +20,11 @@ package org.apache.pinot.common.metrics.yammer;
 
 import com.yammer.metrics.core.Timer;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.metrics.base.PinotMetricName;
-import org.apache.pinot.common.metrics.base.PinotMetricProcessor;
-import org.apache.pinot.common.metrics.base.PinotTimer;
+import org.apache.pinot.spi.metrics.PinotTimer;
 
 
 public class YammerTimer implements PinotTimer {
-  private Timer _timer;
+  private final Timer _timer;
 
   public YammerTimer(Timer timer) {
     _timer = timer;
@@ -44,6 +42,11 @@ public class YammerTimer implements PinotTimer {
 
   @Override
   public Object getMetered() {
+    return _timer;
+  }
+
+  @Override
+  public Object getMetric() {
     return _timer;
   }
 
@@ -80,11 +83,5 @@ public class YammerTimer implements PinotTimer {
   @Override
   public double oneMinuteRate() {
     return _timer.oneMinuteRate();
-  }
-
-  @Override
-  public <T> void processWith(PinotMetricProcessor<T> processor, PinotMetricName name, T context)
-      throws Exception {
-    processor.processTimer(name, this, context);
   }
 }

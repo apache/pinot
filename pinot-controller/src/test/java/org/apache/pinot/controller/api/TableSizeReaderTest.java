@@ -38,7 +38,7 @@ import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.metrics.base.PinotMetricUtilsFactory;
+import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
 import org.apache.pinot.common.restlet.resources.TableSizeInfo;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -65,7 +65,7 @@ public class TableSizeReaderTest {
   private final Executor executor = Executors.newFixedThreadPool(1);
   private final HttpConnectionManager connectionManager = new MultiThreadedHttpConnectionManager();
   private final ControllerMetrics _controllerMetrics =
-      new ControllerMetrics(PinotMetricUtilsFactory.getPinotMetricsRegistry());
+      new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
   private PinotHelixResourceManager helix;
   private Map<String, FakeSizeServer> serverMap = new HashMap<>();
   private final String URI_PATH = "/table/";

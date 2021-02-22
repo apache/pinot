@@ -16,11 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics.base;
+package org.apache.pinot.spi.metrics;
 
 import java.util.concurrent.TimeUnit;
 
-
+/**
+ * An object which maintains mean and exponentially-weighted rate in Pinot.
+ */
 public interface PinotMetered extends PinotMetric {
 
   Object getMetered();

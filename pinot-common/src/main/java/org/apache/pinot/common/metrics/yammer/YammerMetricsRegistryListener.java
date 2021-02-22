@@ -18,23 +18,33 @@
  */
 package org.apache.pinot.common.metrics.yammer;
 
+import com.yammer.metrics.core.Metric;
 import com.yammer.metrics.core.MetricName;
+import com.yammer.metrics.core.MetricsRegistryListener;
+import org.apache.pinot.spi.metrics.PinotMetric;
 import org.apache.pinot.spi.metrics.PinotMetricName;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistryListener;
 
 
-public class YammerMetricName implements PinotMetricName {
-  private MetricName _metricName;
+public class YammerMetricsRegistryListener implements PinotMetricsRegistryListener {
+  private final MetricsRegistryListener _metricsRegistryListener;
 
-  public YammerMetricName(Class<?> klass, String name) {
-    _metricName = new MetricName(klass, name);
-  }
-
-  public YammerMetricName(MetricName metricName) {
-    _metricName = metricName;
+  public YammerMetricsRegistryListener(MetricsRegistryListener metricsRegistryListener) {
+    _metricsRegistryListener = metricsRegistryListener;
   }
 
   @Override
-  public MetricName getMetricName() {
-    return _metricName;
+  public void onMetricAdded(PinotMetricName name, PinotMetric metric) {
+    _metricsRegistryListener.onMetricAdded((MetricName) name.getMetricName(), (Metric) metric.getMetric());
+  }
+
+  @Override
+  public void onMetricRemoved(PinotMetricName name) {
+    _metricsRegistryListener.onMetricRemoved((MetricName) name.getMetricName());
+  }
+
+  @Override
+  public Object getMetricsRegistryListener() {
+    return _metricsRegistryListener;
   }
 }

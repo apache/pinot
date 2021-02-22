@@ -23,17 +23,19 @@ import com.yammer.metrics.core.Gauge;
 import com.yammer.metrics.core.Metric;
 import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricsRegistry;
+import com.yammer.metrics.core.MetricsRegistryListener;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.metrics.base.PinotCounter;
-import org.apache.pinot.common.metrics.base.PinotGauge;
-import org.apache.pinot.common.metrics.base.PinotHistogram;
-import org.apache.pinot.common.metrics.base.PinotMeter;
-import org.apache.pinot.common.metrics.base.PinotMetric;
-import org.apache.pinot.common.metrics.base.PinotMetricName;
-import org.apache.pinot.common.metrics.base.PinotMetricsRegistry;
-import org.apache.pinot.common.metrics.base.PinotTimer;
+import org.apache.pinot.spi.metrics.PinotCounter;
+import org.apache.pinot.spi.metrics.PinotGauge;
+import org.apache.pinot.spi.metrics.PinotHistogram;
+import org.apache.pinot.spi.metrics.PinotMeter;
+import org.apache.pinot.spi.metrics.PinotMetric;
+import org.apache.pinot.spi.metrics.PinotMetricName;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistryListener;
+import org.apache.pinot.spi.metrics.PinotTimer;
 
 
 public class YammerMetricsRegistry implements PinotMetricsRegistry {
@@ -49,7 +51,7 @@ public class YammerMetricsRegistry implements PinotMetricsRegistry {
 
   @Override
   public void removeMetric(PinotMetricName name) {
-
+    _metricsRegistry.removeMetric((MetricName) name.getMetricName());
   }
 
   @Override
@@ -85,6 +87,11 @@ public class YammerMetricsRegistry implements PinotMetricsRegistry {
       allMetrics.put(new YammerMetricName(entry.getKey()), new YammerMetric(entry.getValue()));
     }
     return allMetrics;
+  }
+
+  @Override
+  public void addListener(PinotMetricsRegistryListener listener) {
+    _metricsRegistry.addListener((MetricsRegistryListener) listener.getMetricsRegistryListener());
   }
 
   @Override

@@ -20,7 +20,7 @@ package org.apache.pinot.common.metrics.yammer;
 
 import com.yammer.metrics.core.Metered;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.metrics.base.PinotMetered;
+import org.apache.pinot.spi.metrics.PinotMetered;
 
 
 public abstract class YammerMetered implements PinotMetered {
@@ -68,5 +68,10 @@ public abstract class YammerMetered implements PinotMetered {
   @Override
   public double oneMinuteRate() {
     return _metered.oneMinuteRate();
+  }
+
+  @Override
+  public Object getMetric() {
+    return _metered;
   }
 }

@@ -16,17 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics.base;
+package org.apache.pinot.spi.metrics;
 
+/**
+ * Metric Name in Pinot.
+ */
+public interface PinotMetricName {
 
-public interface PinotGauge<T> extends PinotMetric {
-
-  Object getGauge();
-
-  /**
-   * Returns the metric's current value.
-   *
-   * @return the metric's current value
-   */
-  public abstract T value();
+  Object getMetricName();
 }

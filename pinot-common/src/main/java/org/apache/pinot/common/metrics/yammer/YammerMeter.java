@@ -19,13 +19,11 @@
 package org.apache.pinot.common.metrics.yammer;
 
 import com.yammer.metrics.core.Meter;
-import org.apache.pinot.common.metrics.base.PinotMeter;
-import org.apache.pinot.common.metrics.base.PinotMetricName;
-import org.apache.pinot.common.metrics.base.PinotMetricProcessor;
+import org.apache.pinot.spi.metrics.PinotMeter;
 
 
 public class YammerMeter extends YammerMetered implements PinotMeter {
-  private Meter _meter;
+  private final Meter _meter;
 
   public YammerMeter(Meter meter) {
     super(meter);
@@ -38,8 +36,7 @@ public class YammerMeter extends YammerMetered implements PinotMeter {
   }
 
   @Override
-  public <T> void processWith(PinotMetricProcessor<T> processor, PinotMetricName name, T context)
-      throws Exception {
-    processor.processMeter(name, this, context);
+  public Object getMetric() {
+    return _meter;
   }
 }

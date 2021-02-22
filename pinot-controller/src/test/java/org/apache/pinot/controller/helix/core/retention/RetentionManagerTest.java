@@ -28,7 +28,7 @@ import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.metrics.base.PinotMetricUtilsFactory;
+import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.ControllerConf;
@@ -95,7 +95,7 @@ public class RetentionManagerTest {
     when(pinotHelixResourceManager.getOfflineSegmentMetadata(OFFLINE_TABLE_NAME)).thenReturn(metadataList);
 
     ControllerConf conf = new ControllerConf();
-    ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtilsFactory.getPinotMetricsRegistry());
+    ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     conf.setRetentionControllerFrequencyInSeconds(0);
     conf.setDeletedSegmentsRetentionInDays(0);
     RetentionManager retentionManager =
@@ -221,7 +221,7 @@ public class RetentionManagerTest {
     when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
 
     ControllerConf conf = new ControllerConf();
-    ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtilsFactory.getPinotMetricsRegistry());
+    ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     conf.setRetentionControllerFrequencyInSeconds(0);
     conf.setDeletedSegmentsRetentionInDays(0);
     RetentionManager retentionManager =

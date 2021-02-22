@@ -16,10 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics.base;
+package org.apache.pinot.spi.metrics;
 
+/**
+ * A meter metric which measures mean throughput and one-, five-, and fifteen-minute
+ * exponentially-weighted moving average throughputs.
+ *
+ * @see <a href="http://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average">EMA</a>
+ */
+public interface PinotMeter {
 
-public interface PinotHistogram extends PinotMetric {
-
-  Object getHistogram();
+  void mark(final long unitCount);
 }

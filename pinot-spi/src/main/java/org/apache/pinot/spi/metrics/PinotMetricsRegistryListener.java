@@ -16,36 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics.base;
+package org.apache.pinot.spi.metrics;
 
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-
-
-public interface PinotMetricsRegistry {
-
-  void removeMetric(PinotMetricName name);
-
-  <T>PinotGauge<T> newGauge(PinotMetricName name, PinotGauge<T> gauge);
-
-  PinotMeter newMeter(PinotMetricName name, String eventType, TimeUnit unit);
-
-  PinotCounter newCounter(PinotMetricName name);
-
-  PinotTimer newTimer(PinotMetricName name, TimeUnit durationUnit, TimeUnit rateUnit);
-
-  PinotHistogram newHistogram(PinotMetricName name, boolean biased);
+/**
+ * Listeners for events from the registry.  Listeners must be thread-safe.
+ */
+public interface PinotMetricsRegistryListener {
+  /**
+   * Called when a metric has been added to the {@link PinotMetricsRegistry}.
+   *
+   * @param name   the name of the {@link PinotMetric}
+   * @param metric the {@link PinotMetric}
+   */
+  void onMetricAdded(PinotMetricName name, PinotMetric metric);
 
   /**
-   * Returns an unmodifiable map of all metrics and their names.
+   * Called when a metric has been removed from the {@link PinotMetricsRegistry}.
    *
-   * @return an unmodifiable map of all metrics and their names
+   * @param name the name of the {@link PinotMetric}
    */
-  Map<PinotMetricName, PinotMetric> allMetrics();
+  void onMetricRemoved(PinotMetricName name);
 
-  Object getMetricsRegistry();
-
-//  newAggregatedMeter(PinotMetricName name);
-
-  void shutdown();
+  /**
+   * Returned the actual object of MetricsRegistryListener.
+   */
+  Object getMetricsRegistryListener();
 }

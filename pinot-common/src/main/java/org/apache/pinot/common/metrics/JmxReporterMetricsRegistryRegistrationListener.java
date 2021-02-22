@@ -18,8 +18,7 @@
  */
 package org.apache.pinot.common.metrics;
 
-import org.apache.pinot.common.metrics.base.PinotMetricUtilsFactory;
-import org.apache.pinot.common.metrics.base.PinotMetricsRegistry;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,7 +33,7 @@ public class JmxReporterMetricsRegistryRegistrationListener implements MetricsRe
   @Override
   public void onMetricsRegistryRegistered(PinotMetricsRegistry metricsRegistry) {
     LOGGER.info("Registering JmxReporterMetricsRegistryRegistrationListener");
-    PinotMetricUtilsFactory.generatePinotJmxReporter(metricsRegistry).start();
+    PinotMetricUtils.generatePinotJmxReporter(metricsRegistry).start();
     LOGGER.info("Number of metrics in metricsRegistry: {}", metricsRegistry.allMetrics().size());
   }
 }

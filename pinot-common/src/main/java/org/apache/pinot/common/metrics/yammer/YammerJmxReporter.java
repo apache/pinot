@@ -20,8 +20,8 @@ package org.apache.pinot.common.metrics.yammer;
 
 import com.yammer.metrics.core.MetricsRegistry;
 import com.yammer.metrics.reporting.JmxReporter;
-import org.apache.pinot.common.metrics.base.PinotJmxReporter;
-import org.apache.pinot.common.metrics.base.PinotMetricsRegistry;
+import org.apache.pinot.spi.metrics.PinotJmxReporter;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
 
 public class YammerJmxReporter implements PinotJmxReporter {

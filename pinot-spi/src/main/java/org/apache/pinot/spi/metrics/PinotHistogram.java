@@ -16,9 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics.base;
+package org.apache.pinot.spi.metrics;
 
-public interface PinotCounter extends PinotMetric {
+/**
+ * A metric which calculates the distribution of a value.
+ *
+ * @see <a href="http://www.johndcook.com/standard_deviation.html">Accurately computing running
+ *      variance</a>
+ */
+public interface PinotHistogram extends PinotMetric {
 
-  Object getCounter();
+  Object getHistogram();
 }

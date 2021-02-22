@@ -25,13 +25,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.metrics.base.PinotCounter;
-import org.apache.pinot.common.metrics.base.PinotGauge;
-import org.apache.pinot.common.metrics.base.PinotHistogram;
-import org.apache.pinot.common.metrics.base.PinotMeter;
-import org.apache.pinot.common.metrics.base.PinotMetricName;
-import org.apache.pinot.common.metrics.base.PinotMetricsRegistry;
-import org.apache.pinot.common.metrics.base.PinotTimer;
+import org.apache.pinot.spi.metrics.PinotCounter;
+import org.apache.pinot.spi.metrics.PinotGauge;
+import org.apache.pinot.spi.metrics.PinotHistogram;
+import org.apache.pinot.spi.metrics.PinotMeter;
+import org.apache.pinot.spi.metrics.PinotMetricName;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import org.apache.pinot.spi.metrics.PinotTimer;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,9 +40,9 @@ import org.slf4j.LoggerFactory;
 public class MetricsHelper {
   private static final Logger LOGGER = LoggerFactory.getLogger(MetricsHelper.class);
 
-  private static Map<PinotMetricsRegistry, Boolean> metricsRegistryMap = new ConcurrentHashMap<>();
+  private static final Map<PinotMetricsRegistry, Boolean> metricsRegistryMap = new ConcurrentHashMap<>();
 
-  private static Map<MetricsRegistryRegistrationListener, Boolean> metricsRegistryRegistrationListenersMap =
+  private static final Map<MetricsRegistryRegistrationListener, Boolean> metricsRegistryRegistrationListenersMap =
       new ConcurrentHashMap<>();
 
   /**
@@ -125,7 +125,8 @@ public class MetricsHelper {
    * @param unit TimeUnit for rate determination
    * @return Meter
    */
-  public static PinotMeter newMeter(PinotMetricsRegistry registry, PinotMetricName name, String eventType, TimeUnit unit) {
+  public static PinotMeter newMeter(PinotMetricsRegistry registry, PinotMetricName name, String eventType,
+      TimeUnit unit) {
     return registry.newMeter(name, eventType, unit);
   }
 
@@ -192,7 +193,8 @@ public class MetricsHelper {
    * @param rateUnit TimeUnit for rate determination
    * @return Timer
    */
-  public static PinotTimer newTimer(PinotMetricsRegistry registry, PinotMetricName name, TimeUnit durationUnit, TimeUnit rateUnit) {
+  public static PinotTimer newTimer(PinotMetricsRegistry registry, PinotMetricName name, TimeUnit durationUnit,
+      TimeUnit rateUnit) {
     return registry.newTimer(name, durationUnit, rateUnit);
   }
 

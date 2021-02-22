@@ -39,7 +39,7 @@ import java.util.concurrent.atomic.LongAccumulator;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.metrics.base.PinotMetricUtilsFactory;
+import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.utils.DataTable;
@@ -63,7 +63,7 @@ import static org.testng.Assert.assertTrue;
 
 
 public class PrioritySchedulerTest {
-  private static final ServerMetrics metrics = new ServerMetrics(PinotMetricUtilsFactory.getPinotMetricsRegistry());
+  private static final ServerMetrics metrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
 
   private static boolean useBarrier = false;
   private static CyclicBarrier startupBarrier;

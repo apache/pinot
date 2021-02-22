@@ -30,10 +30,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.Utils;
-import org.apache.pinot.common.metrics.base.PinotMeter;
-import org.apache.pinot.common.metrics.base.PinotMetricName;
-import org.apache.pinot.common.metrics.base.PinotMetricUtilsFactory;
-import org.apache.pinot.common.metrics.base.PinotMetricsRegistry;
+import org.apache.pinot.spi.metrics.PinotMeter;
+import org.apache.pinot.spi.metrics.PinotMetricName;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -150,7 +149,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param timeUnit The log time duration time unit
    */
   private void addValueToTimer(String fullTimerName, final long duration, final TimeUnit timeUnit) {
-    final PinotMetricName metricName = PinotMetricUtilsFactory.generatePinotMetricName(_clazz, fullTimerName);
+    final PinotMetricName metricName = PinotMetricUtils.generatePinotMetricName(_clazz, fullTimerName);
     MetricsHelper.newTimer(_metricsRegistry, metricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS)
         .update(duration, timeUnit);
   }
@@ -180,7 +179,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
       final String fullMeterName;
       String meterName = meter.getMeterName();
       fullMeterName = _metricPrefix + meterName;
-      final PinotMetricName metricName = PinotMetricUtilsFactory.generatePinotMetricName(_clazz, fullMeterName);
+      final PinotMetricName metricName = PinotMetricUtils.generatePinotMetricName(_clazz, fullMeterName);
 
       final PinotMeter newMeter =
           MetricsHelper.newMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
@@ -216,7 +215,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
       final String fullMeterName;
       String meterName = meter.getMeterName();
       fullMeterName = _metricPrefix + getTableName(tableName) + "." + meterName;
-      final PinotMetricName metricName = PinotMetricUtilsFactory.generatePinotMetricName(_clazz, fullMeterName);
+      final PinotMetricName metricName = PinotMetricUtils.generatePinotMetricName(_clazz, fullMeterName);
 
       final PinotMeter newMeter =
           MetricsHelper.newMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
@@ -229,7 +228,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     final String fullMeterName;
     String meterName = meter.getMeterName();
     fullMeterName = _metricPrefix + getTableName(tableName) + "." + meterName;
-    final PinotMetricName metricName = PinotMetricUtilsFactory.generatePinotMetricName(_clazz, fullMeterName);
+    final PinotMetricName metricName = PinotMetricUtils.generatePinotMetricName(_clazz, fullMeterName);
 
     return MetricsHelper.newMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
   }
@@ -461,8 +460,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   public void addCallbackGauge(final String metricName, final Callable<Long> valueCallback) {
     MetricsHelper
-        .newGauge(_metricsRegistry, PinotMetricUtilsFactory.generatePinotMetricName(_clazz, _metricPrefix + metricName),
-            PinotMetricUtilsFactory.generatePinotGauge(avoid -> {
+        .newGauge(_metricsRegistry, PinotMetricUtils.generatePinotMetricName(_clazz, _metricPrefix + metricName),
+            PinotMetricUtils.generatePinotGauge(avoid -> {
               try {
                 return valueCallback.call();
               } catch (Exception e) {

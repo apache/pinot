@@ -19,24 +19,18 @@
 package org.apache.pinot.common.metrics.yammer;
 
 import com.yammer.metrics.core.Metric;
-import org.apache.pinot.common.metrics.base.PinotMetric;
-import org.apache.pinot.common.metrics.base.PinotMetricName;
-import org.apache.pinot.common.metrics.base.PinotMetricProcessor;
+import org.apache.pinot.spi.metrics.PinotMetric;
 
 
 public class YammerMetric implements PinotMetric {
-  private Metric _metric;
+  private final Metric _metric;
 
   public YammerMetric(Metric metric) {
     _metric = metric;
   }
 
+  @Override
   public Metric getMetric() {
     return _metric;
-  }
-
-  @Override
-  public <T> void processWith(PinotMetricProcessor<T> processor, PinotMetricName name, T context)
-      throws Exception {
   }
 }

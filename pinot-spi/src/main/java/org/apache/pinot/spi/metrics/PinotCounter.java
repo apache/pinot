@@ -16,10 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics.base;
+package org.apache.pinot.spi.metrics;
 
+/**
+ * An incrementing and decrementing counter metric in Pinot.
+ */
+public interface PinotCounter extends PinotMetric {
 
-public interface PinotMetricName {
-
-  Object getMetricName();
+  Object getCounter();
 }

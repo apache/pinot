@@ -28,7 +28,7 @@ import org.apache.pinot.common.lineage.LineageEntryState;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.metrics.base.PinotMetricUtilsFactory;
+import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.controller.LeadControllerManager;
@@ -79,7 +79,7 @@ public class SegmentLineageCleanupTest {
     LeadControllerManager leadControllerManager = mock(LeadControllerManager.class);
     when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
     ControllerConf conf = new ControllerConf();
-    ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtilsFactory.getPinotMetricsRegistry());
+    ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     conf.setRetentionControllerFrequencyInSeconds(0);
     conf.setDeletedSegmentsRetentionInDays(0);
     _retentionManager = new RetentionManager(ControllerTestUtils.getHelixResourceManager(), leadControllerManager, conf, controllerMetrics);

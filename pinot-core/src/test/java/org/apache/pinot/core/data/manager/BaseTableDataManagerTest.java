@@ -31,7 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.pinot.common.metrics.base.PinotMetricUtilsFactory;
+import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
@@ -110,7 +110,7 @@ public class BaseTableDataManagerTest {
     }
     tableDataManager
         .init(config, "dummyInstance", mock(ZkHelixPropertyStore.class),
-            new ServerMetrics(PinotMetricUtilsFactory.getPinotMetricsRegistry()),
+            new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()),
             mock(HelixManager.class));
     tableDataManager.start();
     Field segsMapField = BaseTableDataManager.class.getDeclaredField("_segmentDataManagerMap");

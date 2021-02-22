@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.common.metrics;
 
-import org.apache.pinot.common.metrics.base.PinotMetricsRegistry;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
 
 /**

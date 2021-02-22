@@ -18,35 +18,43 @@
  */
 package org.apache.pinot.common.metrics;
 
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.pinot.common.exception.InvalidConfigException;
-import org.apache.pinot.common.metrics.base.PinotMetricsRegistry;
-import org.apache.pinot.common.metrics.base.PinotMetricUtilsFactory;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-public class PinotMetricUtilsFactoryTest {
+public class PinotMetricUtilsTest {
 
   @Test
   public void testPinotMetricsRegistryFactory() {
-    PinotMetricsRegistry pinotMetricsRegistry = PinotMetricUtilsFactory.getPinotMetricsRegistry();
+    PinotMetricsRegistry pinotMetricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
     Assert.assertNotNull(pinotMetricsRegistry);
     Assert.assertEquals(pinotMetricsRegistry.getClass().getSimpleName(), "YammerMetricsRegistry");
 
     try {
-      PinotMetricUtilsFactory.init("badLibraryName");
+      Map<String, Object> properties = new HashMap<>();
+      properties.put(PinotMetricUtils.LIBRARY_NAME_KEY, "badLibraryName");
+      PinotConfiguration configuration = new PinotConfiguration(properties);
+      PinotMetricUtils.init(configuration);
       Assert.fail("Fail to initialize PinotMetricsRegistry of yammer");
     } catch (InvalidConfigException e) {
       // Expected.
     }
 
     try {
-      PinotMetricUtilsFactory.init("yammer");
+      Map<String, Object> properties = new HashMap<>();
+      properties.put(PinotMetricUtils.LIBRARY_NAME_KEY, "yammer");
+      PinotConfiguration configuration = new PinotConfiguration(properties);
+      PinotMetricUtils.init(configuration);
     } catch (InvalidConfigException e) {
       Assert.fail("Fail to initialize PinotMetricsRegistry of yammer");
     }
 
-    pinotMetricsRegistry = PinotMetricUtilsFactory.getPinotMetricsRegistry();
+    pinotMetricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
     Assert.assertNotNull(pinotMetricsRegistry);
     Assert.assertEquals(pinotMetricsRegistry.getClass().getSimpleName(), "YammerMetricsRegistry");
   }

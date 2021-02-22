@@ -16,9 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics.base;
+package org.apache.pinot.spi.metrics;
 
-public interface PinotMeter {
+/**
+ * A gauge metric is an instantaneous reading of a particular value. To instrument a queue's depth,
+ * for example:<br>
+ * <pre><code>
+ * final Queue&lt;String&gt; queue = new ConcurrentLinkedQueue&lt;String&gt;();
+ * final Gauge&lt;Integer&gt; queueDepth = new Gauge&lt;Integer&gt;() {
+ *     public Integer value() {
+ *         return queue.size();
+ *     }
+ * };
+ * </code></pre>
+ *
+ * @param <T> the type of the metric's value
+ */
+public interface PinotGauge<T> extends PinotMetric {
 
-  void mark(final long unitCount);
+  Object getGauge();
+
+  /**
+   * Returns the metric's current value.
+   *
+   * @return the metric's current value
+   */
+  public abstract T value();
 }

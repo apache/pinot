@@ -30,7 +30,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.pinot.common.metrics.base.PinotMetricUtilsFactory;
+import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
 import org.apache.pinot.core.query.scheduler.resources.ResourceLimitPolicy;
@@ -45,7 +45,7 @@ import com.google.common.base.Preconditions;
 
 public class MultiLevelPriorityQueueTest {
   SchedulerGroup group;
-  final ServerMetrics metrics = new ServerMetrics(PinotMetricUtilsFactory.getPinotMetricsRegistry());
+  final ServerMetrics metrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
 
   final SchedulerGroupMapper groupMapper = new TableBasedGroupMapper();
   final TestSchedulerGroupFactory groupFactory = new TestSchedulerGroupFactory();

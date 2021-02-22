@@ -25,8 +25,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.pinot.common.exception.InvalidConfigException;
-import org.apache.pinot.common.metrics.base.PinotMetricsRegistry;
-import org.apache.pinot.common.metrics.base.PinotMetricUtilsFactory;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.annotations.Test;
 
@@ -64,13 +63,13 @@ public class MetricsHelperTest {
         ListenerOne.class.getName() + "," + ListenerTwo.class.getName());
 
     PinotConfiguration configuration = new PinotConfiguration(properties);
-    PinotMetricUtilsFactory.init(configuration.getProperty(PinotMetricUtilsFactory.LIBRARY_NAME_KEY));
-    PinotMetricsRegistry registry = PinotMetricUtilsFactory.getPinotMetricsRegistry();
+    PinotMetricUtils.init(configuration);
+    PinotMetricsRegistry registry = PinotMetricUtils.getPinotMetricsRegistry();
 
     // Initialize the MetricsHelper and create a new timer
     MetricsHelper.initializeMetrics(configuration.subset("pinot.broker.metrics"));
     MetricsHelper.registerMetricsRegistry(registry);
-    MetricsHelper.newTimer(registry, PinotMetricUtilsFactory.generatePinotMetricName(MetricsHelperTest.class, "dummy"),
+    MetricsHelper.newTimer(registry, PinotMetricUtils.generatePinotMetricName(MetricsHelperTest.class, "dummy"),
         TimeUnit.MILLISECONDS, TimeUnit.MILLISECONDS);
 
     // Check that the two listeners fired

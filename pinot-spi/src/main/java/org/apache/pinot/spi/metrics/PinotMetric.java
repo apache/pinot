@@ -16,14 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics.base;
+package org.apache.pinot.spi.metrics;
 
-import java.util.concurrent.TimeUnit;
+/**
+ * A tag interface to indicate that a class is a metric in Pinot.
+ */
+public interface PinotMetric {
 
-
-public interface PinotTimer extends PinotMetered {
-
-  void update(long duration, TimeUnit unit);
-
-  Object getTimer();
+  /**
+   * Return the actual object
+   */
+  Object getMetric();
 }

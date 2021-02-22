@@ -52,8 +52,8 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.MetricsHelper;
-import org.apache.pinot.common.metrics.base.PinotMetricsRegistry;
-import org.apache.pinot.common.metrics.base.PinotMetricUtilsFactory;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Broker;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
@@ -70,8 +70,6 @@ import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.common.metrics.base.PinotMetricUtilsFactory.LIBRARY_NAME_KEY;
 
 
 @SuppressWarnings("unused")
@@ -229,8 +227,8 @@ public class HelixBrokerStarter implements ServiceStartable {
     LOGGER.info("Setting up broker request handler");
     // Set up metric registry and broker metrics
     PinotConfiguration metricsConfiguration = _brokerConf.subset(Broker.METRICS_CONFIG_PREFIX);
-    PinotMetricUtilsFactory.init(metricsConfiguration.getProperty(LIBRARY_NAME_KEY));
-    _metricsRegistry = PinotMetricUtilsFactory.getPinotMetricsRegistry();
+    PinotMetricUtils.init(metricsConfiguration);
+    _metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
     MetricsHelper.initializeMetrics(metricsConfiguration);
     MetricsHelper.registerMetricsRegistry(_metricsRegistry);
     _brokerMetrics = new BrokerMetrics(

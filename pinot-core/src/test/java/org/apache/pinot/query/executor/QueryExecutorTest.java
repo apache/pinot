@@ -32,7 +32,7 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.pinot.common.metrics.base.PinotMetricUtilsFactory;
+import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.segment.ReadMode;
@@ -124,7 +124,7 @@ public class QueryExecutorTest {
     }
 
     // Mock the instance data manager
-    _serverMetrics = new ServerMetrics(PinotMetricUtilsFactory.getPinotMetricsRegistry());
+    _serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     TableDataManagerConfig tableDataManagerConfig = mock(TableDataManagerConfig.class);
     when(tableDataManagerConfig.getTableDataManagerType()).thenReturn("OFFLINE");
     when(tableDataManagerConfig.getTableName()).thenReturn(TABLE_NAME);
