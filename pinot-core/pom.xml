@@ -147,13 +147,7 @@
     </dependency>
     <dependency>
       <groupId>org.xerial.larray</groupId>
-      <artifactId>larray</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>org.scala-lang</groupId>
-          <artifactId>scala-library</artifactId>
-        </exclusion>
-      </exclusions>
+      <artifactId>larray-mmap</artifactId>
     </dependency>
     <dependency>
       <groupId>net.sf.jopt-simple</groupId>
