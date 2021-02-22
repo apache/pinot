@@ -72,17 +72,17 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
   protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg) {
     long queryArrivalTimeMs = 0;
     InstanceRequest instanceRequest = null;
-    ServerQueryRequest queryRequest = null;
     byte[] requestBytes = null;
 
     try {
       // all code inside try code, so that we are able to catch all exceptions.
-      queryArrivalTimeMs = System.currentTimeMillis();
-      instanceRequest = new InstanceRequest();
-
       final int requestSize = msg.readableBytes();
+
+      instanceRequest = new InstanceRequest();
+      ServerQueryRequest queryRequest;
       requestBytes = new byte[requestSize];
 
+      queryArrivalTimeMs = System.currentTimeMillis();
       _serverMetrics.addMeteredGlobalValue(ServerMeter.QUERIES, 1);
       _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_BYTES_RECEIVED, requestSize);
 
@@ -92,15 +92,21 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics, queryArrivalTimeMs);
       queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.REQUEST_DESERIALIZATION, queryArrivalTimeMs)
           .stopAndRecord();
+
+      // Submit query for execution and register callback for execution results.
+      Futures.addCallback(_queryScheduler.submit(queryRequest),
+          createCallback(ctx, queryArrivalTimeMs, instanceRequest, queryRequest), MoreExecutors.directExecutor());
     } catch (Exception e) {
       String hexString = requestBytes != null ? BytesUtils.toHexString(requestBytes) : "";
+      long reqestId = instanceRequest != null ? instanceRequest.getRequestId() : 0;
       LOGGER.error("Exception while deserializing the instance request: {}", hexString, e);
-      sendResponse(ctx, instanceRequest.getRequestId(), queryArrivalTimeMs, new DataTableImplV2(), e);
-      return;
+      sendResponse(ctx, reqestId, queryArrivalTimeMs, new DataTableImplV2(), e);
     }
-
-    // Submit query for execution and register callback for execution results.
-    Futures.addCallback(_queryScheduler.submit(queryRequest), new FutureCallback<byte[]>() {
+  }
+  
+  private FutureCallback<byte[]> createCallback(ChannelHandlerContext ctx, long queryArrivalTimeMs,
+      InstanceRequest instanceRequest, ServerQueryRequest queryRequest) {
+    return new FutureCallback<byte[]>() {
       @Override
       public void onSuccess(@Nullable byte[] responseBytes) {
         if (responseBytes != null) {
@@ -119,7 +125,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
         LOGGER.error("Exception while processing instance request", t);
         sendResponse(ctx, instanceRequest.getRequestId(), queryArrivalTimeMs, new DataTableImplV2(), new Exception(t));
       }
-    }, MoreExecutors.directExecutor());
+    };
   }
 
   @Override
