@@ -43,6 +43,7 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   LLC_SIMULTANEOUS_SEGMENT_BUILDS("llcSimultaneousSegmentBuilds", true),
 
   // Upsert metrics
+  UPSERT_METADATA_MEMORY_USED("bytes", false),
   UPSERT_PRIMARY_KEYS_COUNT("upsertPrimaryKeysCount", false);
 
   private final String gaugeName;
