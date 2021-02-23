@@ -441,8 +441,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   /** Check if server returns error response quickly without timing out Broker. */
   @Test
-  public void testServerErrorWithBrokerTimeout() {
-    try {
+  public void testServerErrorWithBrokerTimeout()
+    throws Exception {
       // Set query timeout
       long queryTimeout = 5000;
       TableConfig tableConfig = getOfflineTableConfig();
@@ -460,10 +460,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       // Remove timeout
       tableConfig.setQueryConfig(null);
       updateTableConfig(tableConfig);
-
-    } catch (Exception e) {
-      e.printStackTrace();
-    }
   }
 
   @Test
