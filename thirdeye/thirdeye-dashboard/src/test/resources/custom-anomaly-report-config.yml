@@ -1,6 +1,0 @@
-startTimeIso: "2016-11-13T00:00:00-0800"
-endTimeIso: "2016-11-20T00:00:00-0800"
-datasets: mny-ads-inmail-alerts,mny-ads-sasproc-alerts,mny-ads-su-kpi-alerts,mny-ads-tscp-serving-autoanomaly
-thirdEyeConfigDirectoryPath: /opt/Code/thirdeye-configs/prod-configs
-teBaseUrl: http://localhost:1426/dashboard
-emailRecipients: pjaiswal@linkedin.com

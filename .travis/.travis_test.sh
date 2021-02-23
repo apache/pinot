@@ -18,31 +18,6 @@
 # under the License.
 #
 
-# ThirdEye related changes
-git diff --name-only $TRAVIS_COMMIT_RANGE | egrep '^(thirdeye)'
-if [ $? -eq 0 ]; then
-  echo 'ThirdEye changes.'
-
-  if [ "$TRAVIS_JDK_VERSION" != 'oraclejdk8' ]; then
-    echo 'Skip ThirdEye tests for version other than oracle jdk8.'
-    exit 0
-  fi
-
-  if [ "RUN_INTEGRATION_TESTS" == 'false' ]; then
-    echo 'Skip ThirdEye tests when integration tests off'
-    exit 0
-  fi
-
-  cd thirdeye
-  mvn test -B ${DEPLOY_BUILD_OPTS}
-  failed=$?
-  if [ $failed -eq 0 ]; then
-    exit 0
-  else
-    exit 1
-  fi
-fi
-
 # Only run tests for JDK 8
 if [ "$TRAVIS_JDK_VERSION" != 'oraclejdk8' ]; then
   echo 'Skip tests for version other than oracle jdk8.'
