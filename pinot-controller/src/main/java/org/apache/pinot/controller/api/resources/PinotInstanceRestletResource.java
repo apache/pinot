@@ -39,6 +39,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
@@ -104,17 +105,34 @@ public class PinotInstanceRestletResource {
     response.set("tags", JsonUtils.objectToJsonNode(instanceConfig.getTags()));
     response.set("pools", JsonUtils.objectToJsonNode(instanceConfig.getRecord().getMapField(InstanceUtils.POOL_KEY)));
     response.put("grpcPort", getGrpcPort(instanceConfig));
+    response.put("adminPort", getAdminPort(instanceConfig));
+    String queriesDisabled = instanceConfig.getRecord().getSimpleField(CommonConstants.Helix.QUERIES_DISABLED);
+    if ("true".equalsIgnoreCase(queriesDisabled)) {
+      response.put(CommonConstants.Helix.QUERIES_DISABLED, "true");
+    }
     return response.toString();
   }
 
   private int getGrpcPort(InstanceConfig instanceConfig) {
     int grpcPort;
     try {
-      grpcPort = Integer.parseInt(instanceConfig.getRecord().getSimpleField(InstanceUtils.GRPC_PORT_KEY));
+      grpcPort = Integer.parseInt(instanceConfig.getRecord().getSimpleField(CommonConstants.Helix.Instance.GRPC_PORT_KEY));
     } catch (Exception e) {
+      LOGGER.warn("Grpc port is not set for instance: {}", instanceConfig.getInstanceName(), e);
       grpcPort = Instance.NOT_SET_GRPC_PORT_VALUE;
     }
     return grpcPort;
+  }
+
+  private int getAdminPort(InstanceConfig instanceConfig) {
+    int adminPort;
+    try {
+      adminPort = Integer.parseInt(instanceConfig.getRecord().getSimpleField(CommonConstants.Helix.Instance.ADMIN_PORT_KEY));
+    } catch (Exception e) {
+      LOGGER.warn("Admin port is not set for instance: {}", instanceConfig.getInstanceName(), e);
+      adminPort = Instance.NOT_SET_ADMIN_PORT_VALUE;
+    }
+    return adminPort;
   }
 
   @POST

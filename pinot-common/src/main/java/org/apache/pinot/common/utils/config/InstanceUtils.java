@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.config.instance.Instance;
 
@@ -31,7 +32,6 @@ public class InstanceUtils {
   }
 
   public static final String POOL_KEY = "pool";
-  public static final String GRPC_PORT_KEY = "grpcPort";
 
   /**
    * Returns the Helix instance id (e.g. {@code Server_localhost_1234}) for the given instance.
@@ -76,7 +76,11 @@ public class InstanceUtils {
       }
       instanceConfig.getRecord().setMapField(POOL_KEY, mapValue);
     }
-    instanceConfig.getRecord().setSimpleField(GRPC_PORT_KEY, Integer.toString(instance.getGrpcPort()));
+    instanceConfig.getRecord().setSimpleField(CommonConstants.Helix.Instance.GRPC_PORT_KEY, Integer.toString(instance.getGrpcPort()));
+    instanceConfig.getRecord().setSimpleField(CommonConstants.Helix.Instance.ADMIN_PORT_KEY, Integer.toString(instance.getAdminPort()));
+    if (instance.isQueriesDisabled()) {
+      instanceConfig.getRecord().setBooleanField(Helix.QUERIES_DISABLED, true);
+    }
     return instanceConfig;
   }
 }

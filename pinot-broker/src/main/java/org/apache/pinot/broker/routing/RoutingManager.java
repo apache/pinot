@@ -272,14 +272,14 @@ public class RoutingManager implements ClusterChangeHandler {
 
   private static boolean isInstanceEnabled(ZNRecord instanceConfigZNRecord) {
     if ("false"
-        .equals(instanceConfigZNRecord.getSimpleField(InstanceConfig.InstanceConfigProperty.HELIX_ENABLED.name()))) {
+        .equalsIgnoreCase(instanceConfigZNRecord.getSimpleField(InstanceConfig.InstanceConfigProperty.HELIX_ENABLED.name()))) {
       return false;
     }
-    if ("true".equals(instanceConfigZNRecord.getSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS))) {
+    if ("true".equalsIgnoreCase(instanceConfigZNRecord.getSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS))) {
       return false;
     }
     //noinspection RedundantIfStatement
-    if ("true".equals(instanceConfigZNRecord.getSimpleField(CommonConstants.Helix.QUERIES_DISABLED))) {
+    if ("true".equalsIgnoreCase(instanceConfigZNRecord.getSimpleField(CommonConstants.Helix.QUERIES_DISABLED))) {
       return false;
     }
     return true;
