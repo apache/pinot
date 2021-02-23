@@ -141,33 +141,31 @@ public class PqlUtilsTest {
     String output = SqlUtils.getDimensionWhereClause(dimensions);
 
     Assert.assertEquals(output, ""
-        + "key < \"value\" AND "
-        + "key <= \"value\" AND "
-        + "key > \"value\" AND "
-        + "key >= \"value\" AND "
-        + "key IN (\"value\") AND "
-        + "key NOT IN (\"value\") AND "
-        + "key1 IN (\"value11\", \"value12\") AND "
-        + "key2 NOT IN (\"value21\", \"value22\") AND "
-        + "key3 < \"value3\" AND "
-        + "key4 <= \"value4\" AND "
-        + "key5 > \"value5\" AND "
-        + "key6 >= \"value6\" AND "
-        + "key7 IN (\"value71\'\", \'value72\"\')");
+        + "key < 'value' AND "
+        + "key <= 'value' AND "
+        + "key > 'value' AND "
+        + "key >= 'value' AND "
+        + "key IN ('value') AND "
+        + "key NOT IN ('value') AND "
+        + "key1 IN ('value11', 'value12') AND "
+        + "key2 NOT IN ('value21', 'value22') AND "
+        + "key3 < 'value3' AND "
+        + "key4 <= 'value4' AND "
+        + "key5 > 'value5' AND "
+        + "key6 >= 'value6' AND "
+        + "key7 IN ('value71''', 'value72\"')");
   }
 
   @Test
   public  void testQuote() {
     Assert.assertEquals(SqlUtils.quote("123"), "123");
-    Assert.assertEquals(SqlUtils.quote("abc"), "\"abc\"");
-    Assert.assertEquals(SqlUtils.quote("123\'"), "\"123\'\"");
-    Assert.assertEquals(SqlUtils.quote("abc\""), "\'abc\"\'");
+    Assert.assertEquals(SqlUtils.quote("abc"), "'abc'");
+    Assert.assertEquals(SqlUtils.quote("123\'"), "'123'''");
+    Assert.assertEquals(SqlUtils.quote("abc\""), "'abc\"'");
+    Assert.assertEquals(SqlUtils.quote("123\"\'"), "'123\"'''");
+
   }
 
-  @Test(expectedExceptions = IllegalArgumentException.class)
-  public  void testQuoteFail() {
-    SqlUtils.quote("123\"\'");
-  }
 
   @Test
   public void testLimit() throws Exception {

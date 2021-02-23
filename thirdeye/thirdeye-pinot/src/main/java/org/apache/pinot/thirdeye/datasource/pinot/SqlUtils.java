@@ -420,9 +420,6 @@ public class SqlUtils {
         // if have single quotes inside a string, it should be specified as 2 consecutive single quotes
         value = value.replace(quoteChar, "''");
       }
-      if (value.contains(quoteChar)) {
-        throw new IllegalArgumentException(String.format("Could not find quote char for expression: %s", value));
-      }
     }
     return String.format("%s%s%s", quoteChar, value, quoteChar);
   }
