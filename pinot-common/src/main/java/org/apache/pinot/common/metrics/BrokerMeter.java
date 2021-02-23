@@ -64,7 +64,6 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   ENTRIES_SCANNED_IN_FILTER("documents", false),
   ENTRIES_SCANNED_POST_FILTER("documents", false),
   REQUEST_SIZE("requestSize", false),
-  RESPONSE_SIZE("responseSize", false),
 
   NUM_RESIZES("resizes", false),
   RESIZE_TIME_MS("resizeTimeMs", false),

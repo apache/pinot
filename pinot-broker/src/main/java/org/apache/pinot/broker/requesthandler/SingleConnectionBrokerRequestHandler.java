@@ -130,7 +130,6 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED, 1);
     }
     _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.TOTAL_SERVER_RESPONSE_SIZE, totalResponseSize);
-    _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.RESPONSE_SIZE, totalResponseSize);
 
     return brokerResponse;
   }
