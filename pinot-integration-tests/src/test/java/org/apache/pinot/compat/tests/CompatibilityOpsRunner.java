@@ -24,7 +24,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.concurrent.TimeUnit;
 
 
 public class CompatibilityOpsRunner {
@@ -51,11 +50,6 @@ public class CompatibilityOpsRunner {
         System.out.println("Failure");
         break;
       }
-      /*
-       Brokers take time to update route table after a segment is created/uploaded/deleted, so sleep 1s between
-       two operations
-       */
-      TimeUnit.SECONDS.sleep(1);
     }
     return passed;
   }

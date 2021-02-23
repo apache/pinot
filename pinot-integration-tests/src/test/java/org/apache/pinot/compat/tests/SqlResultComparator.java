@@ -71,13 +71,12 @@ public class SqlResultComparator {
   private static final String FIELD_TYPE_STRING_ARRAY = "STRING_ARRAY";
   private static final String FIELD_TYPE_BYTES_ARRRAY = "BYTES_ARRRAY";
 
-  private static final SqlParser.Config SQL_PARSER_CONFIG = SqlParser.configBuilder()
-      .setLex(Lex.MYSQL_ANSI)
-      .setConformance(SqlConformanceEnum.BABEL)
-      .setParserFactory(SqlBabelParserImpl.FACTORY)
-      .build();
+  private static final SqlParser.Config SQL_PARSER_CONFIG =
+      SqlParser.configBuilder().setLex(Lex.MYSQL_ANSI).setConformance(SqlConformanceEnum.BABEL)
+          .setParserFactory(SqlBabelParserImpl.FACTORY).build();
 
-  public static boolean areEqual(JsonNode actual, JsonNode expected, String query) throws IOException {
+  public static boolean areEqual(JsonNode actual, JsonNode expected, String query)
+      throws IOException {
     if (hasExceptions(actual)) {
       return false;
     }
@@ -215,8 +214,9 @@ public class SqlResultComparator {
     long actualNumEntriesScannedInFilter = actual.get(FIELD_NUM_ENTRIES_SCANNED_IN_FILTER).asLong();
     long expectedNumEntriesScannedInFilter = expected.get(FIELD_NUM_ENTRIES_SCANNED_IN_FILTER).asLong();
     if (actualNumEntriesScannedInFilter != expectedNumEntriesScannedInFilter) {
-      LOGGER.error("The numEntriesScannedInFilter don't match! Actual: {}, Expected: {}",
-          actualNumEntriesScannedInFilter, expectedNumEntriesScannedInFilter);
+      LOGGER
+          .error("The numEntriesScannedInFilter don't match! Actual: {}, Expected: {}", actualNumEntriesScannedInFilter,
+              expectedNumEntriesScannedInFilter);
       return false;
     }
     return true;
@@ -245,15 +245,17 @@ public class SqlResultComparator {
   }
 
   private static boolean areEmpty(JsonNode actual, JsonNode expected) {
-    int actualNumDocsScanned = actual.get(FIELD_NUM_DOCS_SCANNED).asInt();
-    int expectedNumDocsScanned = expected.get(FIELD_NUM_DOCS_SCANNED).asInt();
-    if ((actualNumDocsScanned == 0 && expectedNumDocsScanned == 0) || (!actual.has(FIELD_RESULT_TABLE) && !expected.has(
-        FIELD_RESULT_TABLE)) || (actual.get(FIELD_RESULT_TABLE).get(FIELD_ROWS).size() == 0
-        && expected.get(FIELD_RESULT_TABLE).get(FIELD_ROWS).size() == 0)) {
+    if (isEmpty(actual) && isEmpty(expected)) {
       LOGGER.debug("Empty results, nothing to compare.");
       return true;
     }
     return false;
+  }
+
+  public static boolean isEmpty(JsonNode response) {
+    int numDocsScanned = response.get(FIELD_NUM_DOCS_SCANNED).asInt();
+    return numDocsScanned == 0 || !response.has(FIELD_RESULT_TABLE)
+        || response.get(FIELD_RESULT_TABLE).get(FIELD_ROWS).size() == 0;
   }
 
   private static boolean areLengthsEqual(JsonNode actual, JsonNode expected) {
@@ -310,7 +312,8 @@ public class SqlResultComparator {
     return true;
   }
 
-  private static void convertNumbersToString(ArrayNode rows, ArrayNode columnDataTypes) throws IOException {
+  private static void convertNumbersToString(ArrayNode rows, ArrayNode columnDataTypes)
+      throws IOException {
     for (int i = 0; i < rows.size(); i++) {
       for (int j = 0; j < columnDataTypes.size(); j++) {
         ArrayNode row = (ArrayNode) rows.get(i);

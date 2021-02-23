@@ -20,21 +20,10 @@ package org.apache.pinot.compat.tests;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
-import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,7 +42,6 @@ public class QueryOp extends BaseOp {
 
   private static final String NUM_DOCS_SCANNED = "numDocsScanned";
   private static final String TIME_USED_MS = "timeUsedMs";
-  private final String _brokerBaseApiUrl = ClusterDescriptor.CONTROLLER_URL;
   private String _queryFileName;
   private String _expectedResultsFileName;
 
@@ -61,20 +49,9 @@ public class QueryOp extends BaseOp {
     super(OpType.QUERY_OP);
   }
 
-  private static boolean shouldIgnore(String line) {
+  private boolean shouldIgnore(String line) {
     String trimmedLine = line.trim();
     return trimmedLine.isEmpty() || trimmedLine.startsWith("#");
-  }
-
-  private static String constructResponse(InputStream inputStream) throws IOException {
-    try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
-      StringBuilder responseBuilder = new StringBuilder();
-      String line;
-      while ((line = reader.readLine()) != null) {
-        responseBuilder.append(line);
-      }
-      return responseBuilder.toString();
-    }
   }
 
   public String getQueryFileName() {
@@ -104,7 +81,8 @@ public class QueryOp extends BaseOp {
     }
   }
 
-  boolean verifyQueries() throws Exception {
+  boolean verifyQueries()
+      throws Exception {
     BufferedReader expectedResultReader = null;
     boolean testPassed = false;
 
@@ -144,7 +122,7 @@ public class QueryOp extends BaseOp {
         JsonNode actualJson = null;
         if (expectedJson != null) {
           try {
-            actualJson = postSqlQuery(query);
+            actualJson = QueryProcessor.postSqlQuery(query);
           } catch (Exception e) {
             LOGGER.error("Comparison FAILED: Line: {} Exception caught while running query: '{}'", queryLineNum, query,
                 e);
@@ -186,47 +164,5 @@ public class QueryOp extends BaseOp {
       }
     }
     return testPassed;
-  }
-
-  /**
-   * Queries the broker's sql query endpoint (/sql)
-   */
-  private JsonNode postSqlQuery(String query) throws Exception {
-    return postSqlQuery(query, _brokerBaseApiUrl);
-  }
-
-  /**
-   * Queries the broker's sql query endpoint (/sql)
-   */
-  private JsonNode postSqlQuery(String query, String brokerBaseApiUrl) throws Exception {
-    ObjectNode payload = JsonUtils.newObjectNode();
-    payload.put("sql", query);
-    payload.put("queryOptions", "groupByMode=sql;responseFormat=sql");
-
-    return JsonUtils.stringToJsonNode(sendPostRequest(brokerBaseApiUrl + "/sql", payload.toString()));
-  }
-
-  public String sendPostRequest(String urlString, String payload) throws IOException {
-    return sendPostRequest(urlString, payload, Collections.EMPTY_MAP);
-  }
-
-  public String sendPostRequest(String urlString, String payload, Map<String, String> headers) throws IOException {
-    HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
-    httpConnection.setRequestMethod("POST");
-    if (headers != null) {
-      for (String key : headers.keySet()) {
-        httpConnection.setRequestProperty(key, headers.get(key));
-      }
-    }
-
-    if (payload != null && !payload.isEmpty()) {
-      httpConnection.setDoOutput(true);
-      try (BufferedWriter writer = new BufferedWriter(
-          new OutputStreamWriter(httpConnection.getOutputStream(), StandardCharsets.UTF_8))) {
-        writer.write(payload, 0, payload.length());
-        writer.flush();
-      }
-    }
-    return constructResponse(httpConnection.getInputStream());
   }
 }
