@@ -59,4 +59,9 @@ public class BytesToIdMap extends BaseValueToIdMap {
     assert id < _idToValueMap.size();
     return _idToValueMap.get(id);
   }
+
+  @Override
+  public Object get(int id) {
+    return getBytes(id);
+  }
 }

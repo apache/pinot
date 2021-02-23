@@ -27,7 +27,6 @@ import java.nio.channels.FileChannel;
 import javax.annotation.concurrent.ThreadSafe;
 import xerial.larray.buffer.LBuffer;
 import xerial.larray.buffer.LBufferAPI;
-import xerial.larray.buffer.WrappedLBuffer;
 import xerial.larray.mmap.MMapBuffer;
 
 
@@ -132,13 +131,9 @@ public abstract class BasePinotLBuffer extends PinotDataBuffer {
   @Override
   public PinotDataBuffer view(long start, long end, ByteOrder byteOrder) {
     if (byteOrder == NATIVE_ORDER) {
-      // Workaround to handle cases where offset is not page-aligned or view of view
-      return new PinotNativeOrderLBuffer(
-          new WrappedLBuffer(_buffer.m, start + _buffer.address() - _buffer.m.address(), end - start), false, false);
+      return new PinotNativeOrderLBuffer(_buffer.view(start, end), false, false);
     } else {
-      // Workaround to handle cases where offset is not page-aligned or view of view
-      return new PinotNonNativeOrderLBuffer(
-          new WrappedLBuffer(_buffer.m, start + _buffer.address() - _buffer.m.address(), end - start), false, false);
+      return new PinotNonNativeOrderLBuffer(_buffer.view(start, end), false, false);
     }
   }
 

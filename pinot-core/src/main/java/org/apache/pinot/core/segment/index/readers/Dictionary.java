@@ -22,6 +22,7 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 import java.io.Closeable;
 import java.util.Arrays;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
@@ -107,6 +108,22 @@ public interface Dictionary extends Closeable {
    */
   Object get(int dictId);
 
+  /**
+   * Returns the value at the given dictId in the dictionary.
+   * <p>The Object type returned for each value type:
+   * <ul>
+   *   <li>INT -> Integer</li>
+   *   <li>LONG -> Long</li>
+   *   <li>FLOAT -> Float</li>
+   *   <li>DOUBLE -> Double</li>
+   *   <li>STRING -> String</li>
+   *   <li>BYTES -> ByteArray</li>
+   * </ul>
+   */
+  default Object getInternal(int dictId) {
+    return get(dictId);
+  }
+
   int getIntValue(int dictId);
 
   long getLongValue(int dictId);
@@ -122,6 +139,10 @@ public interface Dictionary extends Closeable {
    */
   default byte[] getBytesValue(int dictId) {
     throw new UnsupportedOperationException();
+  }
+
+  default ByteArray getByteArrayValue(int dictId) {
+    return new ByteArray(getBytesValue(dictId));
   }
 
   // Batch read APIs

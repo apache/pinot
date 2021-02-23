@@ -58,4 +58,9 @@ public class FloatToIdMap extends BaseValueToIdMap {
   public String getString(int id) {
     return Float.toString(getFloat(id));
   }
+
+  @Override
+  public Object get(int id) {
+    return getFloat(id);
+  }
 }

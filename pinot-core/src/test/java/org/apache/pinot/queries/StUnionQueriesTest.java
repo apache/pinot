@@ -218,7 +218,8 @@ public class StUnionQueriesTest extends BaseQueriesTest {
     while (groupKeyIterator.hasNext()) {
       numGroups++;
       GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
-      assertTrue(_values.containsKey(Integer.parseInt(groupKey._stringKey)));
+      Integer key = (Integer) groupKey._keys[0];
+      assertTrue(_values.containsKey(key));
     }
     assertEquals(numGroups, _values.size());
 
