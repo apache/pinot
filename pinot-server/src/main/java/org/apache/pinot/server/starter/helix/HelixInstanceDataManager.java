@@ -41,7 +41,6 @@ import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.data.manager.TableDataManager;
 import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
-import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
@@ -149,11 +148,16 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @Override
   public void removeSegment(String tableNameWithType, String segmentName) {
     LOGGER.info("Removing segment: {} from table: {}", segmentName, tableNameWithType);
-    TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
-    if (tableDataManager != null) {
-      tableDataManager.removeSegment(segmentName);
-      LOGGER.info("Removed segment: {} from table: {}", segmentName, tableNameWithType);
-    }
+    _tableDataManagerMap.computeIfPresent(tableNameWithType, (k, v) -> {
+      v.removeSegment(segmentName);
+      LOGGER.info("Removed segment: {} from table: {}", segmentName, k);
+      if (v.getNumSegments() == 0) {
+        v.shutDown();
+        return null;
+      } else {
+        return v;
+      }
+    });
   }
 
   @Override

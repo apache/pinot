@@ -211,6 +211,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Override
+  public int getNumSegments() {
+    return _segmentDataManagerMap.size();
+  }
+
+  @Override
   public String getTableName() {
     return _tableNameWithType;
   }

@@ -109,8 +109,8 @@ public class BaseTableDataManagerTest {
       when(config.getDataDir()).thenReturn(_tmpDir.getAbsolutePath());
     }
     tableDataManager
-        .init(config, "dummyInstance", mock(ZkHelixPropertyStore.class), new ServerMetrics(new MetricsRegistry()), mock(
-            HelixManager.class));
+        .init(config, "dummyInstance", mock(ZkHelixPropertyStore.class), new ServerMetrics(new MetricsRegistry()),
+            mock(HelixManager.class));
     tableDataManager.start();
     Field segsMapField = BaseTableDataManager.class.getDeclaredField("_segmentDataManagerMap");
     segsMapField.setAccessible(true);
@@ -136,15 +136,18 @@ public class BaseTableDataManagerTest {
   public void basicTest()
       throws Exception {
     TableDataManager tableDataManager = makeTestableManager();
+    Assert.assertEquals(tableDataManager.getNumSegments(), 0);
     final String segmentName = "TestSegment";
     final int totalDocs = 23456;
     // Add the segment, get it for use, remove the segment, and then return it.
     // Make sure that the segment is not destroyed before return.
     ImmutableSegment immutableSegment = makeImmutableSegment(segmentName, totalDocs);
     tableDataManager.addSegment(immutableSegment);
+    Assert.assertEquals(tableDataManager.getNumSegments(), 1);
     SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
     Assert.assertEquals(segmentDataManager.getReferenceCount(), 2);
     tableDataManager.removeSegment(segmentName);
+    Assert.assertEquals(tableDataManager.getNumSegments(), 0);
     Assert.assertEquals(segmentDataManager.getReferenceCount(), 1);
     Assert.assertEquals(_nDestroys, 0);
     tableDataManager.releaseSegment(segmentDataManager);
@@ -159,11 +162,13 @@ public class BaseTableDataManagerTest {
 
     // Removing the segment again is fine.
     tableDataManager.removeSegment(segmentName);
+    Assert.assertEquals(tableDataManager.getNumSegments(), 0);
 
     // Add a new segment and remove it in order this time.
     final String anotherSeg = "AnotherSegment";
     ImmutableSegment ix1 = makeImmutableSegment(anotherSeg, totalDocs);
     tableDataManager.addSegment(ix1);
+    Assert.assertEquals(tableDataManager.getNumSegments(), 1);
     SegmentDataManager sdm1 = tableDataManager.acquireSegment(anotherSeg);
     Assert.assertNotNull(sdm1);
     Assert.assertEquals(sdm1.getReferenceCount(), 2);
@@ -181,6 +186,7 @@ public class BaseTableDataManagerTest {
     // Now replace the segment with another one.
     ImmutableSegment ix2 = makeImmutableSegment(anotherSeg, totalDocs + 1);
     tableDataManager.addSegment(ix2);
+    Assert.assertEquals(tableDataManager.getNumSegments(), 1);
     // Now the previous one should have been destroyed, and
     Assert.assertEquals(sdm1.getReferenceCount(), 0);
     verify(ix1, times(1)).destroy();
@@ -188,6 +194,7 @@ public class BaseTableDataManagerTest {
     SegmentDataManager sdm2 = _internalSegMap.get(anotherSeg);
     Assert.assertEquals(sdm2.getReferenceCount(), 1);
     tableDataManager.removeSegment(anotherSeg);
+    Assert.assertEquals(tableDataManager.getNumSegments(), 0);
     Assert.assertEquals(sdm2.getReferenceCount(), 0);
     verify(ix2, times(1)).destroy();
     tableDataManager.shutDown();
