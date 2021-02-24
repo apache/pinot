@@ -63,6 +63,12 @@ public class PinotClientRequest {
   @Inject
   private BrokerMetrics brokerMetrics;
 
+  /**
+   * Legacy API to query Pinot using PQL (Pinot Query Language) syntax
+   * and semantics. This API is deprecated and PQL is no longer supported
+   * by Pinot. The API will be removed in the next release. Please use
+   * the standard SQL syntax (API /query/sql) to query Pinot.
+   */
   @Deprecated
   @GET
   @ManagedAsync
@@ -94,6 +100,12 @@ public class PinotClientRequest {
     }
   }
 
+  /**
+   * Legacy API to query Pinot using PQL (Pinot Query Language) syntax
+   * and semantics. This API is deprecated and PQL is no longer supported
+   * by Pinot. The API will be removed in the next release. Please use
+   * the standard SQL syntax (API /query/sql) to query Pinot.
+   */
   @Deprecated
   @POST
   @ManagedAsync
