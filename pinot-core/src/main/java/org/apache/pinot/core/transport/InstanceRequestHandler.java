@@ -40,6 +40,7 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.thrift.TDeserializer;
+import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TCompactProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,7 +77,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
 
     try {
       // put all inside try block to catch all exceptions.
-      final int requestSize = msg.readableBytes();
+      int requestSize = msg.readableBytes();
 
       instanceRequest = new InstanceRequest();
       ServerQueryRequest queryRequest;
@@ -86,7 +87,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       _serverMetrics.addMeteredGlobalValue(ServerMeter.QUERIES, 1);
       _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_BYTES_RECEIVED, requestSize);
 
-      // parse instance request into a query result.
+      // parse instance request into ServerQueryRequest.
       msg.readBytes(requestBytes);
       _deserializer.deserialize(instanceRequest, requestBytes);
       queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics, queryArrivalTimeMs);
@@ -97,9 +98,15 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       Futures.addCallback(_queryScheduler.submit(queryRequest),
           createCallback(ctx, queryArrivalTimeMs, instanceRequest, queryRequest), MoreExecutors.directExecutor());
     } catch (Exception e) {
+      if (e instanceof TException) {
+        // deserialization exception
+        _serverMetrics.addMeteredGlobalValue(ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
+      }
+
+      // send error response
       String hexString = requestBytes != null ? BytesUtils.toHexString(requestBytes) : "";
       long reqestId = instanceRequest != null ? instanceRequest.getRequestId() : 0;
-      LOGGER.error("Exception while deserializing the instance request: {}", hexString, e);
+      LOGGER.error("Exception while processing instance request: {}", hexString, e);
       sendErrorResponse(ctx, reqestId, queryArrivalTimeMs, new DataTableImplV2(), e);
     }
   }
@@ -123,7 +130,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       public void onFailure(Throwable t) {
         // Send exception response.
         LOGGER.error("Exception while processing instance request", t);
-        sendErrorResponse(ctx, instanceRequest.getRequestId(), queryArrivalTimeMs, new DataTableImplV2(), new Exception(t));
+        sendErrorResponse(ctx, instanceRequest.getRequestId(), queryArrivalTimeMs, new DataTableImplV2(),
+            new Exception(t));
       }
     };
   }
@@ -140,12 +148,11 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
   /**
    * Send an exception back to broker as response to the query request.
    */
-  private void sendErrorResponse(ChannelHandlerContext ctx, long requestId, long queryArrivalTimeMs, DataTable dataTable,
-      Exception e) {
+  private void sendErrorResponse(ChannelHandlerContext ctx, long requestId, long queryArrivalTimeMs,
+      DataTable dataTable, Exception e) {
     try {
       Map<String, String> dataTableMetadata = dataTable.getMetadata();
       dataTableMetadata.put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(requestId));
-
       dataTable.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
       byte[] serializedDataTable = dataTable.toBytes();
       sendResponse(ctx, queryArrivalTimeMs, serializedDataTable);
