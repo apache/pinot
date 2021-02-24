@@ -25,7 +25,6 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.util.AttributeKey;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
@@ -53,7 +52,6 @@ import org.slf4j.LoggerFactory;
 public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf> {
   private static final Logger LOGGER = LoggerFactory.getLogger(InstanceRequestHandler.class);
 
-  private final AttributeKey<Integer> auth = AttributeKey.valueOf("auth");
   // TODO: make it configurable
   private static final int SLOW_QUERY_LATENCY_THRESHOLD_MS = 100;
 
