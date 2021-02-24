@@ -25,6 +25,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.util.AttributeKey;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
@@ -52,6 +53,7 @@ import org.slf4j.LoggerFactory;
 public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf> {
   private static final Logger LOGGER = LoggerFactory.getLogger(InstanceRequestHandler.class);
 
+  private final AttributeKey<Integer> auth = AttributeKey.valueOf("auth");
   // TODO: make it configurable
   private static final int SLOW_QUERY_LATENCY_THRESHOLD_MS = 100;
 
@@ -75,7 +77,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     byte[] requestBytes = null;
 
     try {
-      // all code inside try code, so that we are able to catch all exceptions.
+      // put all inside try block to catch all exceptions.
       final int requestSize = msg.readableBytes();
 
       instanceRequest = new InstanceRequest();
@@ -100,10 +102,10 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       String hexString = requestBytes != null ? BytesUtils.toHexString(requestBytes) : "";
       long reqestId = instanceRequest != null ? instanceRequest.getRequestId() : 0;
       LOGGER.error("Exception while deserializing the instance request: {}", hexString, e);
-      sendResponse(ctx, reqestId, queryArrivalTimeMs, new DataTableImplV2(), e);
+      sendErrorResponse(ctx, reqestId, queryArrivalTimeMs, new DataTableImplV2(), e);
     }
   }
-  
+
   private FutureCallback<byte[]> createCallback(ChannelHandlerContext ctx, long queryArrivalTimeMs,
       InstanceRequest instanceRequest, ServerQueryRequest queryRequest) {
     return new FutureCallback<byte[]>() {
@@ -114,7 +116,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
           sendResponse(ctx, queryArrivalTimeMs, responseBytes);
         } else {
           // Send exception response.
-          sendResponse(ctx, queryRequest.getRequestId(), queryArrivalTimeMs, new DataTableImplV2(),
+          sendErrorResponse(ctx, queryRequest.getRequestId(), queryArrivalTimeMs, new DataTableImplV2(),
               new Exception("Null query response."));
         }
       }
@@ -123,25 +125,24 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       public void onFailure(Throwable t) {
         // Send exception response.
         LOGGER.error("Exception while processing instance request", t);
-        sendResponse(ctx, instanceRequest.getRequestId(), queryArrivalTimeMs, new DataTableImplV2(), new Exception(t));
+        sendErrorResponse(ctx, instanceRequest.getRequestId(), queryArrivalTimeMs, new DataTableImplV2(), new Exception(t));
       }
     };
   }
 
   @Override
   public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-    // Since we do not know the requestId of the original request here, there is no way for Broker to know which query
-    // request this response belongs to. Hence, Broker will continue to wait for the original request until time out.
-    // To prevent Broker from waiting unnecessarily, try to catch and handle all exceptions in channelRead0 method so
-    // that this function is never called.
-    LOGGER.error("Unhandled Exception in " + getClass().getCanonicalName(), cause);
-    sendResponse(ctx, 0, System.currentTimeMillis(), new DataTableImplV2(), new Exception(cause));
+    // All exceptions should be caught and handled in channelRead0 method. This is a fallback method that
+    // will only be called if for some remote reason we are unable to handle exceptions in channelRead0.
+    String message = "Unhandled Exception in " + getClass().getCanonicalName();
+    LOGGER.error(message, cause);
+    sendErrorResponse(ctx, 0, System.currentTimeMillis(), new DataTableImplV2(), new Exception(message, cause));
   }
 
   /**
    * Send an exception back to broker as response to the query request.
    */
-  private void sendResponse(ChannelHandlerContext ctx, long requestId, long queryArrivalTimeMs, DataTable dataTable,
+  private void sendErrorResponse(ChannelHandlerContext ctx, long requestId, long queryArrivalTimeMs, DataTable dataTable,
       Exception e) {
     try {
       Map<String, String> dataTableMetadata = dataTable.getMetadata();
@@ -150,10 +151,12 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       dataTable.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
       byte[] serializedDataTable = dataTable.toBytes();
       sendResponse(ctx, queryArrivalTimeMs, serializedDataTable);
-
+    } catch (Exception exception) {
+      LOGGER.error("Exception while sending query processing error to Broker.", exception);
+    } finally {
+      // log query processing exception
+      LOGGER.error("Query processing error: ", e);
       _serverMetrics.addMeteredGlobalValue(ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
-    } catch (Throwable t) {
-      // Ignore since we are already handling a higher level exceptions.
     }
   }
 
