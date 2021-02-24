@@ -18,13 +18,6 @@
 # under the License.
 #
 
-# ThirdEye related changes
-git diff --name-only "${TRAVIS_COMMIT_RANGE}" | egrep '^(thirdeye)'
-if [ $? -eq 0 ]; then
-  echo 'Skip ThirdEye tests for Quickstart'
-  exit 0
-fi
-
 # Java version
 java -version
 

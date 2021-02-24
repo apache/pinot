@@ -1,6 +1,0 @@
-zookeeperUrl: '<change_me_zk_host>:<change_me_zk_port>/<change_me_chroot>'
-clusterName: '<change_me_pinot_cluster_name>'
-controllerHost: '<change_me_controller_host>'
-controllerPort: 11984
-tag: <change_me_pinot_broker_tag>
-brokerUrl: ''

@@ -1,7 +1,0 @@
-persistenceFile: /tmp/persistence.yml
-detectorHost: localhost
-detectorPort: 8080
-startTimeIso: 2016-08-26
-endTimeIso: 2016-09-26
-datasets: dataset1,dataset2
-functionIds: 1,2,43,6

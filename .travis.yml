@@ -81,7 +81,6 @@ jobs:
     - stage: deploy
       script:
         - travis_wait 40 ./.travis/.travis_nightly_build.sh
-        - travis_wait 60 ./.travis/.travis_te_nightly_build.sh
 
 env:
   global:
