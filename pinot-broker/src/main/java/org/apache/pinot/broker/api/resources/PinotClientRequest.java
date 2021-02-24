@@ -63,11 +63,12 @@ public class PinotClientRequest {
   @Inject
   private BrokerMetrics brokerMetrics;
 
+  @Deprecated
   @GET
   @ManagedAsync
   @Produces(MediaType.APPLICATION_JSON)
   @Path("query")
-  @ApiOperation(value = "Querying pinot")
+  @ApiOperation(value = "Querying pinot using PQL")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Query response"), @ApiResponse(code = 500, message = "Internal Server Error")})
   public void processQueryGet(
       // Query param "bql" is for backward compatibility
@@ -93,11 +94,12 @@ public class PinotClientRequest {
     }
   }
 
+  @Deprecated
   @POST
   @ManagedAsync
   @Produces(MediaType.APPLICATION_JSON)
   @Path("query")
-  @ApiOperation(value = "Querying pinot")
+  @ApiOperation(value = "Querying pinot using PQL")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Query response"), @ApiResponse(code = 500, message = "Internal Server Error")})
   public void processQueryPost(String query, @Suspended AsyncResponse asyncResponse,
       @Context org.glassfish.grizzly.http.server.Request requestContext) {
