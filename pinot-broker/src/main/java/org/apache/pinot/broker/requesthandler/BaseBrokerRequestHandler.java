@@ -308,6 +308,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e));
     }
 
+    _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_SIZE, query.length());
+
     // Prepare offline and real-time requests
     BrokerRequest offlineBrokerRequest = null;
     BrokerRequest realtimeBrokerRequest = null;
