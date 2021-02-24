@@ -36,14 +36,14 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 public class QueryProcessor {
 
-  private static final String _brokerBaseApiUrl = ClusterDescriptor.CONTROLLER_URL;
+  private static final String BROKER_BASE_API_URL = ClusterDescriptor.CONTROLLER_URL;
 
   /**
    * Queries the broker's sql query endpoint (/sql)
    */
   public static JsonNode postSqlQuery(String query)
       throws Exception {
-    return postSqlQuery(query, _brokerBaseApiUrl);
+    return postSqlQuery(query, BROKER_BASE_API_URL);
   }
 
   /**

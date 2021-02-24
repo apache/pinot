@@ -40,8 +40,9 @@ import org.slf4j.LoggerFactory;
 public class QueryOp extends BaseOp {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryOp.class);
 
-  private static final String NUM_DOCS_SCANNED = "numDocsScanned";
-  private static final String TIME_USED_MS = "timeUsedMs";
+  private static final String NUM_DOCS_SCANNED_KEY = "numDocsScanned";
+  private static final String TIME_USED_MS_KEY = "timeUsedMs";
+  private static final String COMMENT_DELIMITER = "#";
   private String _queryFileName;
   private String _expectedResultsFileName;
 
@@ -51,7 +52,7 @@ public class QueryOp extends BaseOp {
 
   private boolean shouldIgnore(String line) {
     String trimmedLine = line.trim();
-    return trimmedLine.isEmpty() || trimmedLine.startsWith("#");
+    return trimmedLine.isEmpty() || trimmedLine.startsWith(COMMENT_DELIMITER);
   }
 
   public String getQueryFileName() {
@@ -83,18 +84,12 @@ public class QueryOp extends BaseOp {
 
   boolean verifyQueries()
       throws Exception {
-    BufferedReader expectedResultReader = null;
     boolean testPassed = false;
 
     try (BufferedReader queryReader = new BufferedReader(
-        new InputStreamReader(new FileInputStream(_queryFileName), StandardCharsets.UTF_8))) {
-      if (_queryFileName == null) {
-        LOGGER.error("Result file is missing!");
-        return testPassed;
-      } else {
-        expectedResultReader = new BufferedReader(
-            new InputStreamReader(new FileInputStream(_expectedResultsFileName), StandardCharsets.UTF_8));
-      }
+        new InputStreamReader(new FileInputStream(_queryFileName), StandardCharsets.UTF_8));
+        BufferedReader expectedResultReader = new BufferedReader(
+            new InputStreamReader(new FileInputStream(_expectedResultsFileName), StandardCharsets.UTF_8))) {
 
       int passed = 0;
       int total = 0;
@@ -135,8 +130,8 @@ public class QueryOp extends BaseOp {
             if (comparisonResult) {
               passed++;
               LOGGER.info("Comparison PASSED: Line: {} actual Time: {} ms expected Time: {} ms Docs Scanned: {}",
-                  queryLineNum, actualJson.get(TIME_USED_MS), expectedJson.get(TIME_USED_MS),
-                  actualJson.get(NUM_DOCS_SCANNED));
+                  queryLineNum, actualJson.get(TIME_USED_MS_KEY), expectedJson.get(TIME_USED_MS_KEY),
+                  actualJson.get(NUM_DOCS_SCANNED_KEY));
               LOGGER.debug("actual Response: {}", actualJson);
               LOGGER.debug("expected Response: {}", expectedJson);
             } else {
@@ -157,10 +152,6 @@ public class QueryOp extends BaseOp {
       LOGGER.info("Total {} out of {} queries passed.", passed, total);
       if (total == passed) {
         testPassed = true;
-      }
-    } finally {
-      if (expectedResultReader != null) {
-        expectedResultReader.close();
       }
     }
     return testPassed;

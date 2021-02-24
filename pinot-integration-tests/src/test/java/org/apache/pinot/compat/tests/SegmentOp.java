@@ -246,7 +246,6 @@ public class SegmentOp extends BaseOp {
       throws Exception {
     String query = "SELECT count(*) FROM " + _tableName;
     JsonNode result = QueryProcessor.postSqlQuery(query);
-    System.out.println(result);
     long startTime = System.currentTimeMillis();
     while (SqlResultComparator.isEmpty(result)) {
       if ((System.currentTimeMillis() - startTime) > DEFAULT_MAX_SLEEP_TIME_MS) {
