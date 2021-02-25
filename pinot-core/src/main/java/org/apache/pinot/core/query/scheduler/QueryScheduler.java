@@ -306,6 +306,10 @@ public abstract class QueryScheduler {
   protected ListenableFuture<byte[]> immediateErrorResponse(ServerQueryRequest queryRequest,
       ProcessingException error) {
     DataTable result = new DataTableImplV2();
+
+    Map<String, String> dataTableMetadata = result.getMetadata();
+    dataTableMetadata.put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(queryRequest.getRequestId()));
+
     result.addException(error);
     return Futures.immediateFuture(serializeDataTable(queryRequest, result));
   }
