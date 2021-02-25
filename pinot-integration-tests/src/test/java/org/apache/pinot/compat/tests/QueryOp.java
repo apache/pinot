@@ -73,7 +73,7 @@ public class QueryOp extends BaseOp {
 
   @Override
   boolean runOp() {
-    System.out.printf("Verifying queries in %s against results in %s\n", _queryFileName, _expectedResultsFileName);
+    System.out.println("Verifying queries in " + _queryFileName + " against results in " + _expectedResultsFileName);
     try {
       return verifyQueries();
     } catch (Exception e) {
