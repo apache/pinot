@@ -76,7 +76,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     byte[] requestBytes = null;
 
     try {
-      // put all inside try block to catch all exceptions.
+      // Put all code inside try block to catch all exceptions.
       int requestSize = msg.readableBytes();
 
       instanceRequest = new InstanceRequest();
@@ -87,7 +87,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       _serverMetrics.addMeteredGlobalValue(ServerMeter.QUERIES, 1);
       _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_BYTES_RECEIVED, requestSize);
 
-      // parse instance request into ServerQueryRequest.
+      // Parse instance request into ServerQueryRequest.
       msg.readBytes(requestBytes);
       _deserializer.deserialize(instanceRequest, requestBytes);
       queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics, queryArrivalTimeMs);
@@ -99,11 +99,11 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
           createCallback(ctx, queryArrivalTimeMs, instanceRequest, queryRequest), MoreExecutors.directExecutor());
     } catch (Exception e) {
       if (e instanceof TException) {
-        // deserialization exception
+        // Deserialization exception
         _serverMetrics.addMeteredGlobalValue(ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
       }
 
-      // send error response
+      // Send error response
       String hexString = requestBytes != null ? BytesUtils.toHexString(requestBytes) : "";
       long reqestId = instanceRequest != null ? instanceRequest.getRequestId() : 0;
       LOGGER.error("Exception while processing instance request: {}", hexString, e);
@@ -159,7 +159,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     } catch (Exception exception) {
       LOGGER.error("Exception while sending query processing error to Broker.", exception);
     } finally {
-      // log query processing exception
+      // Log query processing exception
       LOGGER.error("Query processing error: ", e);
       _serverMetrics.addMeteredGlobalValue(ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
     }
