@@ -40,7 +40,7 @@ public class MemoryEstimatorTest {
   @Test
   public void testSegmentGenerator() throws Exception {
     runTest("memory_estimation/schema-with-metadata.json", metadata -> {
-      assertEquals(extract(metadata, "segment.total.docs = (\\d+)"), "10000");
+      assertEquals(extract(metadata, "segment.total.docs = (\\d+)"), "100000");
       assertEquals(extract(metadata, "column.colInt.cardinality = (\\d+)"), "100");
       assertEquals(extract(metadata, "column.colIntMV.cardinality = (\\d+)"), "150");
       assertEquals(extract(metadata, "column.colFloat.cardinality = (\\d+)"), "200");
@@ -75,7 +75,7 @@ public class MemoryEstimatorTest {
   @Test
   public void testSegmentGenerator_withDateTimeFieldSpec() throws Exception {
     runTest("memory_estimation/schema-with-metadata__dateTimeFieldSpec.json", metadata -> {
-      assertEquals(extract(metadata, "segment.total.docs = (\\d+)"), "10000");
+      assertEquals(extract(metadata, "segment.total.docs = (\\d+)"), "100000");
       assertEquals(extract(metadata, "column.colInt.cardinality = (\\d+)"), "500");
       assertEquals(extract(metadata, "column.colFloat.cardinality = (\\d+)"), "600");
       assertEquals(extract(metadata, "column.colString.cardinality = (\\d+)"), "700");
@@ -99,7 +99,7 @@ public class MemoryEstimatorTest {
     File schemaFile = readFile(schemaFileName);
     File tableConfigFile = readFile("memory_estimation/table-config.json");
     TableConfig tableConfig = JsonUtils.fileToObject(tableConfigFile, TableConfig.class);
-    int numberOfRows = 10_000;
+    int numberOfRows = 100_000;
 
     // act
     MemoryEstimator.SegmentGenerator
