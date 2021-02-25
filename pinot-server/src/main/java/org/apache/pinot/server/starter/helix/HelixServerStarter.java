@@ -354,6 +354,7 @@ public class HelixServerStarter implements ServiceStartable {
             Helix.RACK_AWARENESS_CONNECTION_REQUEST_TIME_OUT_KEY));
     final boolean rackAwarenessEnabled = Boolean.parseBoolean(rackAwarenessConfigMap.get(Helix.RACK_AWARENESS_ENABLED_KEY));
     if (rackAwarenessEnabled) {
+      LOGGER.info("Rack awareness enabled. Setting instance domain with FD metadata.");
       final InstanceMetadataFetcherProperties instanceMetadataFetcherProperties = new InstanceMetadataFetcherProperties(
           Integer.parseInt(rackAwarenessConfigMap.get(Helix.RACK_AWARENESS_CONNECTION_MAX_RETRY_KEY)),
           Integer.parseInt(rackAwarenessConfigMap.get(Helix.RACK_AWARENESS_CONNECTION_CONNECTION_TIME_OUT_KEY)),
@@ -364,9 +365,11 @@ public class HelixServerStarter implements ServiceStartable {
           instanceMetadataFetcherProperties);
 
       final String domain = FAULT_DOMAIN + "=" + instanceMetadata.getFaultDomain() + "," + HOSTNAME + "=" + _instanceId;
+      LOGGER.info("Instance domain: " + domain);
 
       InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(_helixClusterName, _instanceId);
       instanceConfig.setDomain(domain);
+      _helixAdmin.setInstanceConfig(_helixClusterName, _instanceId, instanceConfig);
     }
 
     // Start restlet server for admin API endpoint
