@@ -52,6 +52,7 @@ import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.function.TransformFunctionType;
+import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
@@ -308,7 +309,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e));
     }
 
-    _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_SIZE, query.length());
+    _brokerMetrics.addValueToTableGauge(rawTableName, BrokerGauge.REQUEST_SIZE, query.length());
 
     // Prepare offline and real-time requests
     BrokerRequest offlineBrokerRequest = null;
