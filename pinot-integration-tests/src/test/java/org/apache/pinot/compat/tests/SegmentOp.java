@@ -68,7 +68,8 @@ public class SegmentOp extends BaseOp {
   private static final int DEFAULT_SLEEP_INTERVAL_MS = 200;
 
   public enum Op {
-    UPLOAD, DELETE
+    UPLOAD,
+    DELETE
   }
 
   private Op _op;
@@ -242,6 +243,8 @@ public class SegmentOp extends BaseOp {
     return true;
   }
 
+  // TODO: verify by getting the number of rows before adding the segment, and the number of rows after adding the
+  //       segment, then make sure that it has increased by the number of rows in the segment.
   private boolean verifyRoutingTableUpdated()
       throws Exception {
     String query = "SELECT count(*) FROM " + _tableName;

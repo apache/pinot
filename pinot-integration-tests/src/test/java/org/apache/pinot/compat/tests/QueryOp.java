@@ -91,8 +91,8 @@ public class QueryOp extends BaseOp {
         BufferedReader expectedResultReader = new BufferedReader(
             new InputStreamReader(new FileInputStream(_expectedResultsFileName), StandardCharsets.UTF_8))) {
 
-      int passed = 0;
-      int total = 0;
+      int succeededQueryCount = 0;
+      int totalQueryCount = 0;
       int queryLineNum = 0;
       String query;
 
@@ -126,18 +126,14 @@ public class QueryOp extends BaseOp {
 
         if (expectedJson != null && actualJson != null) {
           try {
-            boolean comparisonResult = SqlResultComparator.areEqual(actualJson, expectedJson, query);
-            if (comparisonResult) {
-              passed++;
-              LOGGER.info("Comparison PASSED: Line: {} actual Time: {} ms expected Time: {} ms Docs Scanned: {}",
-                  queryLineNum, actualJson.get(TIME_USED_MS_KEY), expectedJson.get(TIME_USED_MS_KEY),
-                  actualJson.get(NUM_DOCS_SCANNED_KEY));
-              LOGGER.debug("actual Response: {}", actualJson);
-              LOGGER.debug("expected Response: {}", expectedJson);
+            boolean passed = SqlResultComparator.areEqual(actualJson, expectedJson, query);
+            if (passed) {
+              succeededQueryCount++;
+              LOGGER.debug("Comparison PASSED: Line: {}, query: '{}', actual response: {}, expected response: {}",
+                  queryLineNum, query, actualJson, expectedJson);
             } else {
-              LOGGER.error("Comparison FAILED: Line: {} query: {}", queryLineNum, query);
-              LOGGER.info("actual Response: {}", actualJson);
-              LOGGER.info("expected Response: {}", expectedJson);
+              LOGGER.error("Comparison FAILED: Line: {}, query: '{}', actual response: {}, expected response: {}",
+                  queryLineNum, query, actualJson, expectedJson);
             }
           } catch (Exception e) {
             LOGGER.error(
@@ -145,12 +141,11 @@ public class QueryOp extends BaseOp {
                 queryLineNum, query, actualJson, expectedJson, e);
           }
         }
-
-        total++;
+        totalQueryCount++;
       }
 
-      LOGGER.info("Total {} out of {} queries passed.", passed, total);
-      if (total == passed) {
+      LOGGER.info("Total {} out of {} queries passed.", succeededQueryCount, totalQueryCount);
+      if (succeededQueryCount == totalQueryCount) {
         testPassed = true;
       }
     }
