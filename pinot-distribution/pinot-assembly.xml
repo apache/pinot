@@ -122,6 +122,12 @@
       <destName>plugins/pinot-input-format/pinot-protobuf/pinot-protobuf-${project.version}-shaded.jar</destName>
     </file>
     <!-- End Include Pinot Input Format Plugins-->
+    <!-- Start Include Pinot Minion Tasks Plugins-->
+    <file>
+      <source>${pinot.root}/pinot-plugins/pinot-minion-tasks/pinot-minion-builtin-tasks/target/pinot-minion-builtin-tasks-${project.version}-shaded.jar</source>
+      <destName>plugins/pinot-minion-tasks/pinot-minion-builtin-tasks/pinot-minion-builtin-tasks-${project.version}-shaded.jar</destName>
+    </file>
+    <!-- End Include Pinot Minion Tasks Plugins-->
     <!-- End Include Pinot Plugins-->
   </files>
   <fileSets>
