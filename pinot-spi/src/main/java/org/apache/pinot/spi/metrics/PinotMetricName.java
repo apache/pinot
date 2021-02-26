@@ -16,15 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics;
-
-import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
-
+package org.apache.pinot.spi.metrics;
 
 /**
- * Interface to implement operations that occur whenever a new MetricsRegistry is registered with the MetricsHelper.
- *
+ * Metric Name in Pinot.
  */
-public interface MetricsRegistryRegistrationListener {
-  void onMetricsRegistryRegistered(PinotMetricsRegistry metricsRegistry);
+public interface PinotMetricName {
+
+  Object getMetricName();
 }

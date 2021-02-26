@@ -16,15 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics;
+package org.apache.pinot.common.metrics.yammer;
 
-import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import com.yammer.metrics.core.MetricName;
+import org.apache.pinot.spi.metrics.PinotMetricName;
 
 
-/**
- * Interface to implement operations that occur whenever a new MetricsRegistry is registered with the MetricsHelper.
- *
- */
-public interface MetricsRegistryRegistrationListener {
-  void onMetricsRegistryRegistered(PinotMetricsRegistry metricsRegistry);
+public class YammerMetricName implements PinotMetricName {
+  private MetricName _metricName;
+
+  public YammerMetricName(Class<?> klass, String name) {
+    _metricName = new MetricName(klass, name);
+  }
+
+  public YammerMetricName(MetricName metricName) {
+    _metricName = metricName;
+  }
+
+  @Override
+  public MetricName getMetricName() {
+    return _metricName;
+  }
 }

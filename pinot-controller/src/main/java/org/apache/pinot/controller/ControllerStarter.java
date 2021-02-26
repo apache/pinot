@@ -21,7 +21,6 @@ package org.apache.pinot.controller;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.primitives.Longs;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -30,7 +29,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -50,10 +48,13 @@ import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.helix.model.Message;
 import org.apache.helix.task.TaskDriver;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.MetricsHelper;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.NetUtil;
@@ -104,15 +105,13 @@ public class ControllerStarter implements ServiceStartable {
   private static final Long DATA_DIRECTORY_MISSING_VALUE = 1000000L;
   private static final Long DATA_DIRECTORY_EXCEPTION_VALUE = 1100000L;
   private static final String METADATA_EVENT_NOTIFIER_PREFIX = "metadata.event.notifier";
-  private static final String MAX_STATE_TRANSITIONS_PER_INSTANCE =  "MaxStateTransitionsPerInstance";
+  private static final String MAX_STATE_TRANSITIONS_PER_INSTANCE = "MaxStateTransitionsPerInstance";
 
   private final ControllerConf _config;
   private final List<ListenerConfig> _listenerConfigs;
   private final ControllerAdminApiApplication _adminApp;
   // TODO: rename this variable once it's full separated with Helix controller.
   private final PinotHelixResourceManager _helixResourceManager;
-  private final MetricsRegistry _metricsRegistry;
-  private final ControllerMetrics _controllerMetrics;
   private final ExecutorService _executorService;
 
   private final String _helixZkURL;
@@ -125,6 +124,8 @@ public class ControllerStarter implements ServiceStartable {
 
   private HelixManager _helixControllerManager;
   private HelixManager _helixParticipantManager;
+  private PinotMetricsRegistry _metricsRegistry;
+  private ControllerMetrics _controllerMetrics;
 
   // Can only be constructed after resource manager getting started
   private OfflineSegmentIntervalChecker _offlineSegmentIntervalChecker;
@@ -156,14 +157,12 @@ public class ControllerStarter implements ServiceStartable {
 
     String host = conf.getControllerHost();
     int port = _listenerConfigs.get(0).getPort();
-    
+
     _helixControllerInstanceId = host + "_" + port;
     _helixParticipantInstanceId = LeadControllerUtils.generateParticipantInstanceId(host, port);
     _isUpdateStateModel = _config.isUpdateSegmentStateModel();
     _enableBatchMessageMode = _config.getEnableBatchMessageMode();
 
-    _metricsRegistry = new MetricsRegistry();
-    _controllerMetrics = new ControllerMetrics(conf.getMetricsPrefix(), _metricsRegistry);
     _serviceStatusCallbackList = new ArrayList<>();
     if (_controllerMode == ControllerConf.ControllerMode.HELIX_ONLY) {
       _adminApp = null;
@@ -279,9 +278,7 @@ public class ControllerStarter implements ServiceStartable {
     Utils.logVersions();
 
     // Set up controller metrics
-    MetricsHelper.initializeMetrics(_config.subset(METRICS_REGISTRY_NAME));
-    MetricsHelper.registerMetricsRegistry(_metricsRegistry);
-    _controllerMetrics.initializeGlobalMeters();
+    initControllerMetrics();
 
     switch (_controllerMode) {
       case DUAL:
@@ -298,8 +295,8 @@ public class ControllerStarter implements ServiceStartable {
         LOGGER.error("Invalid mode: " + _controllerMode);
     }
 
-    ServiceStatus
-        .setServiceStatusCallback(_helixParticipantInstanceId, new ServiceStatus.MultipleCallbackServiceStatusCallback(_serviceStatusCallbackList));
+    ServiceStatus.setServiceStatusCallback(_helixParticipantInstanceId,
+        new ServiceStatus.MultipleCallbackServiceStatusCallback(_serviceStatusCallbackList));
   }
 
   private void setUpHelixController() {
@@ -325,8 +322,8 @@ public class ControllerStarter implements ServiceStartable {
   private void setUpPinotController() {
     // install default SSL context if necessary (even if not force-enabled everywhere)
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_config, ControllerConf.CONTROLLER_TLS_PREFIX);
-    if (StringUtils.isNotBlank(tlsDefaults.getKeyStorePath())
-        || StringUtils.isNotBlank(tlsDefaults.getTrustStorePath())) {
+    if (StringUtils.isNotBlank(tlsDefaults.getKeyStorePath()) || StringUtils
+        .isNotBlank(tlsDefaults.getTrustStorePath())) {
       LOGGER.info("Installing default SSL context for any client requests");
       TlsUtils.installDefaultSSLSocketFactory(tlsDefaults);
     }
@@ -483,9 +480,24 @@ public class ControllerStarter implements ServiceStartable {
     };
   }
 
+  private void initControllerMetrics() {
+    PinotConfiguration metricsConfiguration = _config.subset(METRICS_REGISTRY_NAME);
+    try {
+      PinotMetricUtils.init(metricsConfiguration);
+      _metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
+    } catch (InvalidConfigException e) {
+      throw new RuntimeException("Caught InvalidConfigException when initializing metricsRegistry", e);
+    }
+    _controllerMetrics = new ControllerMetrics(_config.getMetricsPrefix(), _metricsRegistry);
+
+    MetricsHelper.initializeMetrics(metricsConfiguration);
+    MetricsHelper.registerMetricsRegistry(_metricsRegistry);
+    _controllerMetrics.initializeGlobalMeters();
+  }
+
   private void initPinotFSFactory() {
     LOGGER.info("Initializing PinotFSFactory");
-    
+
     PinotFSFactory.init(_config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY));
   }
 
@@ -510,7 +522,8 @@ public class ControllerStarter implements ServiceStartable {
   }
 
   private void initPinotCrypterFactory() {
-    PinotConfiguration pinotCrypterConfig = _config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
+    PinotConfiguration pinotCrypterConfig =
+        _config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
     LOGGER.info("Initializing PinotCrypterFactory");
     try {
       PinotCrypterFactory.init(pinotCrypterConfig);
@@ -657,7 +670,7 @@ public class ControllerStarter implements ServiceStartable {
     }
   }
 
-  public MetricsRegistry getMetricsRegistry() {
+  public PinotMetricsRegistry getMetricsRegistry() {
     return _metricsRegistry;
   }
 

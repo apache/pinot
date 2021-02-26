@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.minion;
 
-import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.io.IOException;
 import javax.net.ssl.SSLContext;
@@ -32,6 +31,8 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.task.TaskStateModelFactory;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metrics.MetricsHelper;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.utils.ClientSSLContextGenerator;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.NetUtil;
@@ -52,8 +53,6 @@ import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.common.utils.CommonConstants.HTTPS_PROTOCOL;
 
 
 /**
@@ -77,9 +76,9 @@ public class MinionStarter implements ServiceStartable {
     String host = _config.getProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST,
         _config.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtil
             .getHostnameOrAddress() : NetUtil.getHostAddress());
-    int port = _config
-        .getProperty(CommonConstants.Helix.KEY_OF_MINION_PORT, CommonConstants.Minion.DEFAULT_HELIX_PORT);
-    _instanceId = _config.getProperty(CommonConstants.Helix.Instance.INSTANCE_ID_KEY, CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE + host + "_" + port);
+    int port = _config.getProperty(CommonConstants.Helix.KEY_OF_MINION_PORT, CommonConstants.Minion.DEFAULT_HELIX_PORT);
+    _instanceId = _config.getProperty(CommonConstants.Helix.Instance.INSTANCE_ID_KEY,
+        CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE + host + "_" + port);
     setupHelixSystemProperties();
     _helixManager = new ZKHelixManager(helixClusterName, _instanceId, InstanceType.PARTICIPANT, zkAddress);
     MinionTaskZkMetadataManager minionTaskZkMetadataManager = new MinionTaskZkMetadataManager(_helixManager);
@@ -151,8 +150,13 @@ public class MinionStarter implements ServiceStartable {
 
     // Initialize metrics
     LOGGER.info("Initializing metrics");
+    // TODO: put all the metrics related configs down to "pinot.server.metrics"
+    PinotConfiguration metricsConfiguration = _config;
+    PinotMetricUtils.init(metricsConfiguration);
+    PinotMetricsRegistry metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
+
     MetricsHelper.initializeMetrics(_config);
-    MetricsRegistry metricsRegistry = new MetricsRegistry();
+
     MetricsHelper.registerMetricsRegistry(metricsRegistry);
     MinionMetrics minionMetrics = new MinionMetrics(_config
         .getProperty(CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX_KEY,
@@ -176,8 +180,8 @@ public class MinionStarter implements ServiceStartable {
 
     // Need to do this before we start receiving state transitions.
     LOGGER.info("Initializing ssl context for segment uploader");
-    PinotConfiguration httpsConfig =
-        _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER).subset(HTTPS_PROTOCOL);
+    PinotConfiguration httpsConfig = _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER)
+        .subset(CommonConstants.HTTPS_PROTOCOL);
     if (httpsConfig.getProperty(HTTPS_ENABLED, false)) {
       SSLContext sslContext =
           new ClientSSLContextGenerator(httpsConfig.subset(CommonConstants.PREFIX_OF_SSL_SUBSET)).generate();

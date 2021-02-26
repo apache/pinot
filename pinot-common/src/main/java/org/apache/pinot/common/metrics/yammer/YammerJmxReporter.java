@@ -16,15 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics;
+package org.apache.pinot.common.metrics.yammer;
 
+import com.yammer.metrics.core.MetricsRegistry;
+import com.yammer.metrics.reporting.JmxReporter;
+import org.apache.pinot.spi.metrics.PinotJmxReporter;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
 
-/**
- * Interface to implement operations that occur whenever a new MetricsRegistry is registered with the MetricsHelper.
- *
- */
-public interface MetricsRegistryRegistrationListener {
-  void onMetricsRegistryRegistered(PinotMetricsRegistry metricsRegistry);
+public class YammerJmxReporter implements PinotJmxReporter {
+  private final JmxReporter _jmxReporter;
+
+  public YammerJmxReporter(PinotMetricsRegistry metricsRegistry) {
+    _jmxReporter = new JmxReporter((MetricsRegistry) metricsRegistry.getMetricsRegistry());
+  }
+
+  @Override
+  public void start() {
+    _jmxReporter.start();
+  }
 }

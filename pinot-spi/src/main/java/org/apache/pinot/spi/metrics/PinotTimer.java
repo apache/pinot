@@ -16,15 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics;
+package org.apache.pinot.spi.metrics;
 
-import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import java.util.concurrent.TimeUnit;
 
 
 /**
- * Interface to implement operations that occur whenever a new MetricsRegistry is registered with the MetricsHelper.
- *
+ * A timer metric which aggregates timing durations and provides duration statistics, plus
+ * throughput statistics via {@link PinotMeter}.
  */
-public interface MetricsRegistryRegistrationListener {
-  void onMetricsRegistryRegistered(PinotMetricsRegistry metricsRegistry);
+public interface PinotTimer extends PinotMetered {
+
+  /**
+   * Adds a recorded duration. It's basically the same as using time() and then stop().
+   * Hereby we can update the time duration by calling just one method.
+   * This is used to log the time span of each of the phase during query execution in Pinot.
+   *
+   * @param duration the length of the duration
+   * @param unit     the scale unit of {@code duration}
+   */
+  void update(long duration, TimeUnit unit);
+
+  /**
+   * Returns the actual object of timer.
+   */
+  Object getTimer();
 }

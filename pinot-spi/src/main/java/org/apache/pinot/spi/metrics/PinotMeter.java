@@ -16,15 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics;
-
-import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
-
+package org.apache.pinot.spi.metrics;
 
 /**
- * Interface to implement operations that occur whenever a new MetricsRegistry is registered with the MetricsHelper.
+ * A meter metric which measures mean throughput and one-, five-, and fifteen-minute
+ * exponentially-weighted moving average throughputs.
  *
+ * @see <a href="http://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average">EMA</a>
  */
-public interface MetricsRegistryRegistrationListener {
-  void onMetricsRegistryRegistered(PinotMetricsRegistry metricsRegistry);
+public interface PinotMeter {
+
+  void mark(final long unitCount);
 }

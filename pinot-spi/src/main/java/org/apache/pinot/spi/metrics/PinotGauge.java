@@ -16,15 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics;
-
-import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
-
+package org.apache.pinot.spi.metrics;
 
 /**
- * Interface to implement operations that occur whenever a new MetricsRegistry is registered with the MetricsHelper.
+ * A gauge metric is an instantaneous reading of a particular value. To instrument a queue's depth,
+ * for example:<br>
+ * <pre><code>
+ * final Queue&lt;String&gt; queue = new ConcurrentLinkedQueue&lt;String&gt;();
+ * final Gauge&lt;Integer&gt; queueDepth = new Gauge&lt;Integer&gt;() {
+ *     public Integer value() {
+ *         return queue.size();
+ *     }
+ * };
+ * </code></pre>
  *
+ * @param <T> the type of the metric's value
  */
-public interface MetricsRegistryRegistrationListener {
-  void onMetricsRegistryRegistered(PinotMetricsRegistry metricsRegistry);
+public interface PinotGauge<T> extends PinotMetric {
+
+  Object getGauge();
+
+  /**
+   * Returns the metric's current value.
+   *
+   * @return the metric's current value
+   */
+  public abstract T value();
 }

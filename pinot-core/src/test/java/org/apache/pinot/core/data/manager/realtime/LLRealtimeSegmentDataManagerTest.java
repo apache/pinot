@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
-import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -33,6 +32,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -130,7 +130,7 @@ public class LLRealtimeSegmentDataManagerTest {
 
   private RealtimeTableDataManager createTableDataManager() {
     final String instanceId = "server-1";
-    SegmentBuildTimeLeaseExtender.create(instanceId, new ServerMetrics(new MetricsRegistry()), _tableName);
+    SegmentBuildTimeLeaseExtender.create(instanceId, new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), _tableName);
     RealtimeTableDataManager tableDataManager = mock(RealtimeTableDataManager.class);
     when(tableDataManager.getServerInstance()).thenReturn(instanceId);
     RealtimeSegmentStatsHistory statsHistory = mock(RealtimeSegmentStatsHistory.class);
@@ -159,7 +159,7 @@ public class LLRealtimeSegmentDataManagerTest {
     LLCSegmentName llcSegmentName = new LLCSegmentName(_segmentNameStr);
     _partitionIdToSemaphoreMap.putIfAbsent(_partitionId, new Semaphore(1));
     Schema schema = Schema.fromString(makeSchema());
-    ServerMetrics serverMetrics = new ServerMetrics(new MetricsRegistry());
+    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     FakeLLRealtimeSegmentDataManager segmentDataManager =
         new FakeLLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, tableDataManager, resourceDir, schema,
             llcSegmentName, _partitionIdToSemaphoreMap, serverMetrics);
