@@ -38,3 +38,8 @@ operations:
       op: DELETE
       tableConfigFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/feature-test-1.json
       segmentName: FeatureTest1_Segment
+    - type: tableOp
+      description: Delete table feature-test-1.json
+      op: DELETE
+      schemaFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/FeatureTest1-schema.json
+      tableConfigFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/feature-test-1.json

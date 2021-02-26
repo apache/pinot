@@ -1,4 +1,15 @@
 {
+  "fieldConfigList": [
+    {
+      "encodingType": "RAW",
+      "indexType": "TEXT",
+      "name": "textDim1",
+      "properties": {
+        "deriveNumDocsPerChunkForRawIndex": "true",
+        "rawIndexWriterVersion": "3"
+      }
+    }
+  ],
   "metadata": {
     "customConfigs": {
       "d2Name": ""

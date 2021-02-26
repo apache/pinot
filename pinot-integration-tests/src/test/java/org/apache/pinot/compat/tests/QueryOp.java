@@ -19,6 +19,14 @@
 package org.apache.pinot.compat.tests;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.JsonNode;
+import java.io.BufferedReader;
+import java.io.FileInputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -30,11 +38,21 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class QueryOp extends BaseOp {
+  private static final Logger LOGGER = LoggerFactory.getLogger(QueryOp.class);
+
+  private static final String NUM_DOCS_SCANNED_KEY = "numDocsScanned";
+  private static final String TIME_USED_MS_KEY = "timeUsedMs";
+  private static final String COMMENT_DELIMITER = "#";
   private String _queryFileName;
   private String _expectedResultsFileName;
 
   public QueryOp() {
     super(OpType.QUERY_OP);
+  }
+
+  private boolean shouldIgnore(String line) {
+    String trimmedLine = line.trim();
+    return trimmedLine.isEmpty() || trimmedLine.startsWith(COMMENT_DELIMITER);
   }
 
   public String getQueryFileName() {
@@ -56,6 +74,81 @@ public class QueryOp extends BaseOp {
   @Override
   boolean runOp() {
     System.out.println("Verifying queries in " + _queryFileName + " against results in " + _expectedResultsFileName);
-    return true;
+    try {
+      return verifyQueries();
+    } catch (Exception e) {
+      LOGGER.error("FAILED to verify queries in {}: {}", _queryFileName, e);
+      return false;
+    }
+  }
+
+  boolean verifyQueries()
+      throws Exception {
+    boolean testPassed = false;
+
+    try (BufferedReader queryReader = new BufferedReader(
+        new InputStreamReader(new FileInputStream(_queryFileName), StandardCharsets.UTF_8));
+        BufferedReader expectedResultReader = new BufferedReader(
+            new InputStreamReader(new FileInputStream(_expectedResultsFileName), StandardCharsets.UTF_8))) {
+
+      int succeededQueryCount = 0;
+      int totalQueryCount = 0;
+      int queryLineNum = 0;
+      String query;
+
+      while ((query = queryReader.readLine()) != null) {
+        queryLineNum++;
+        if (shouldIgnore(query)) {
+          continue;
+        }
+
+        JsonNode expectedJson = null;
+        try {
+          String expectedResultLine = expectedResultReader.readLine();
+          while (shouldIgnore(expectedResultLine)) {
+            expectedResultLine = expectedResultReader.readLine();
+          }
+          expectedJson = JsonUtils.stringToJsonNode(expectedResultLine);
+        } catch (Exception e) {
+          LOGGER.error("Comparison FAILED: Line: {} Exception caught while getting expected response for query: '{}'",
+              queryLineNum, query, e);
+        }
+
+        JsonNode actualJson = null;
+        if (expectedJson != null) {
+          try {
+            actualJson = QueryProcessor.postSqlQuery(query);
+          } catch (Exception e) {
+            LOGGER.error("Comparison FAILED: Line: {} Exception caught while running query: '{}'", queryLineNum, query,
+                e);
+          }
+        }
+
+        if (expectedJson != null && actualJson != null) {
+          try {
+            boolean passed = SqlResultComparator.areEqual(actualJson, expectedJson, query);
+            if (passed) {
+              succeededQueryCount++;
+              LOGGER.debug("Comparison PASSED: Line: {}, query: '{}', actual response: {}, expected response: {}",
+                  queryLineNum, query, actualJson, expectedJson);
+            } else {
+              LOGGER.error("Comparison FAILED: Line: {}, query: '{}', actual response: {}, expected response: {}",
+                  queryLineNum, query, actualJson, expectedJson);
+            }
+          } catch (Exception e) {
+            LOGGER.error(
+                "Comparison FAILED: Line: {} Exception caught while comparing query: '{}' actual response: {}, expected response: {}",
+                queryLineNum, query, actualJson, expectedJson, e);
+          }
+        }
+        totalQueryCount++;
+      }
+
+      LOGGER.info("Total {} out of {} queries passed.", succeededQueryCount, totalQueryCount);
+      if (succeededQueryCount == totalQueryCount) {
+        testPassed = true;
+      }
+    }
+    return testPassed;
   }
 }

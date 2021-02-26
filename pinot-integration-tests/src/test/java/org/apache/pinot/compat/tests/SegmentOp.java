@@ -19,6 +19,7 @@
 package org.apache.pinot.compat.tests;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -154,7 +155,8 @@ public class SegmentOp extends BaseOp {
       FileUtils.forceMkdir(localOutputTempDir);
       File segmentTarFile = generateSegment(localOutputTempDir);
       uploadSegment(segmentTarFile);
-      return verifySegmentInState(CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE);
+      return verifySegmentInState(CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE)
+          && verifyRoutingTableUpdated();
     } catch (Exception e) {
       LOGGER.error("Failed to create and upload segment for input data file {}.", _inputDataFileName, e);
       return false;
@@ -238,6 +240,28 @@ public class SegmentOp extends BaseOp {
     }
 
     LOGGER.info("Successfully verified segment {} and its current status is {}.", _segmentName, state);
+    return true;
+  }
+
+  // TODO: verify by getting the number of rows before adding the segment, and the number of rows after adding the
+  //       segment, then make sure that it has increased by the number of rows in the segment.
+  private boolean verifyRoutingTableUpdated()
+      throws Exception {
+    String query = "SELECT count(*) FROM " + _tableName;
+    JsonNode result = QueryProcessor.postSqlQuery(query);
+    long startTime = System.currentTimeMillis();
+    while (SqlResultComparator.isEmpty(result)) {
+      if ((System.currentTimeMillis() - startTime) > DEFAULT_MAX_SLEEP_TIME_MS) {
+        LOGGER
+            .error("Upload segment verification failed, routing table has not been updated after max wait time {} ms.",
+                DEFAULT_MAX_SLEEP_TIME_MS);
+        return false;
+      }
+      LOGGER.warn("Routing table has not been updated yet, will retry after {} ms.", DEFAULT_SLEEP_INTERVAL_MS);
+      Thread.sleep(DEFAULT_SLEEP_INTERVAL_MS);
+      result = QueryProcessor.postSqlQuery(query);
+    }
+    LOGGER.info("Routing table has been updated.");
     return true;
   }
 
