@@ -20,11 +20,29 @@ package org.apache.pinot.spi.metrics;
 
 /**
  * A meter metric which measures mean throughput and one-, five-, and fifteen-minute
- * exponentially-weighted moving average throughputs.
+ * exponentially-weighted moving average throughput.
  *
  * @see <a href="http://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average">EMA</a>
  */
 public interface PinotMeter {
 
+
+  /**
+   * Mark the occurrence of an event.
+   */
+  void mark();
+
+  /**
+   * Mark the occurrence of a given number of events.
+   *
+   * @param unitCount the number of events
+   */
   void mark(final long unitCount);
+
+  /**
+   * Returns the number of events which have been marked.
+   *
+   * @return the number of events which have been marked
+   */
+  long count();
 }
