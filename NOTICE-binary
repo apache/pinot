@@ -1,14 +1,13 @@
-Apache Pinot (incubating)
-Copyright 2018 and onwards The Apache Software Foundation
-
 This product includes software developed at
 The Apache Software Foundation (http://www.apache.org/).
 
 // ------------------------------------------------------------------
 // NOTICE file corresponding to the section 4d of The Apache License,
-// Version 2.0, in this case for
+// Version 2.0, in this case for 
 // ------------------------------------------------------------------
 
+Apache Pinot (incubating)
+Copyright 2018-2021 Apache Software Foundation
 
 This product includes software developed at
 The Apache Software Foundation (http://www.apache.org/).
@@ -24,7 +23,7 @@ This product includes software developed by
 The Apache Software Foundation (http://www.apache.org/).
 
 --------------------------------------------------------------------------------
-src/test/org/apache/commons/codec/language/DoubleMetaphoneTest.java contains
+src/test/org/apache/commons/codec/language/DoubleMetaphoneTest.java contains 
 test data from http://aspell.sourceforge.net/test/batch0.tab.
 
 Copyright (C) 2002 Kevin Atkinson (kevina@gnu.org). Verbatim copying
@@ -98,7 +97,7 @@ For additional credits (generally to people who reported problems)
 see CREDITS file.
 
 Apache Groovy
-Copyright 2003-2017 The Apache Software Foundation
+Copyright 2003-2020 The Apache Software Foundation
 
 This product includes/uses ANTLR (http://www.antlr2.org/)
 developed by Terence Parr 1989-2006
@@ -163,16 +162,16 @@ are met:
 1. Redistributions of source code must retain the above copyright
    notice, this list of conditions and the following disclaimer.
 
-2. The origin of this software must not be misrepresented; you must
-   not claim that you wrote the original software.  If you use this
-   software in a product, an acknowledgment in the product
+2. The origin of this software must not be misrepresented; you must 
+   not claim that you wrote the original software.  If you use this 
+   software in a product, an acknowledgment in the product 
    documentation would be appreciated but is not required.
 
 3. Altered source versions must be plainly marked as such, and must
    not be misrepresented as being the original software.
 
-4. The name of the author may not be used to endorse or promote
-   products derived from this software without specific prior written
+4. The name of the author may not be used to endorse or promote 
+   products derived from this software without specific prior written 
    permission.
 
 THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS
@@ -307,6 +306,12 @@ framework implementation, which can be obtained at:
     * license/LICENSE.felix.txt (Apache License 2.0)
   * HOMEPAGE:
     * http://felix.apache.org/
+
+Apache ZooKeeper - Server
+Copyright 2008-2020 The Apache Software Foundation
+
+Apache ZooKeeper - Jute
+Copyright 2008-2020 The Apache Software Foundation
 
 Apache Yetus - Audience Annotations
 Copyright 2015-2017 The Apache Software Foundation

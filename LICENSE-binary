@@ -206,16 +206,18 @@ License Version 2.0:
 
 com.101tec:zkclient:0.7
 com.clearspring.analytics:stream:2.7.0
-com.fasterxml.jackson.core:jackson-annotations:2.9.8
-com.fasterxml.jackson.core:jackson-core:2.9.8
-com.fasterxml.jackson.core:jackson-databind:2.9.8
-com.fasterxml.jackson.dataformat:jackson-dataformat-xml:2.9.8
-com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.9.8
-com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.10.0
-com.fasterxml.jackson.jaxrs:jackson-jaxrs-base:2.9.8
-com.fasterxml.jackson.jaxrs:jackson-jaxrs-json-provider:2.9.8
-com.fasterxml.jackson.module:jackson-module-jaxb-annotations:2.9.8
-com.fasterxml.woodstox:woodstox-core:5.0.3
+com.fasterxml.jackson.core:jackson-annotations:2.10.0
+com.fasterxml.jackson.core:jackson-core:2.10.0
+com.fasterxml.jackson.core:jackson-databind:2.10.0
+com.fasterxml.jackson.dataformat:jackson-dataformat-xml:2.10.0
+com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.10.0
+com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.11.3
+com.fasterxml.jackson.jaxrs:jackson-jaxrs-base:2.10.0
+com.fasterxml.jackson.jaxrs:jackson-jaxrs-json-provider:2.10.0
+com.fasterxml.jackson.module:jackson-module-jaxb-annotations:2.10.0
+com.fasterxml.woodstox:woodstox-core:6.0.1
+om.fasterxml:aalto-xml:1.0.0
+com.github.stephenc.jcip:jcip-annotations:1.0-1
 com.google.android:annotations:4.1.1.4
 com.google.api.grpc:proto-google-common-protos:1.17.0
 com.google.api.grpc:proto-google-iam-v1:0.13.0
@@ -243,12 +245,18 @@ com.google.oauth-client:google-oauth-client:1.30.3
 com.google.protobuf:protobuf-java-util:3.10.0
 com.jayway.jsonpath:json-path:2.4.0
 com.lmax:disruptor:3.3.4
+com.nimbusds:content-type:2.0
+com.nimbusds:lang-tag:1.4.4
+com.nimbusds:nimbus-jose-jwt:8.8
+com.nimbusds:oauth2-oidc-sdk:7.1.1
 com.ning:async-http-client:1.9.21
 com.tdunning:t-digest:3.2
 com.typesafe.netty:netty-reactive-streams-http:2.0.4
 com.typesafe.netty:netty-reactive-streams:2.0.4
 com.typesafe.scala-logging:scala-logging_2.11:3.9.0
+com.uber:h3:3.0.3
 com.yammer.metrics:metrics-core:2.2.0
+com.zaxxer:HikariCP-java7:2.4.13
 commons-cli:commons-cli:1.2
 commons-codec:commons-codec:1.6
 commons-collections:commons-collections:3.2.1
@@ -270,27 +278,27 @@ io.grpc:grpc-netty-shaded:1.30.0
 io.grpc:grpc-protobuf-lite:1.30.0
 io.grpc:grpc-protobuf:1.30.0
 io.grpc:grpc-stub:1.30.0
-io.netty:netty-all:4.1.42.Final
-io.netty:netty-buffer:4.1.42.Final
-io.netty:netty-codec-http2:4.1.42.Final
-io.netty:netty-codec-http:4.1.42.Final
-io.netty:netty-codec-socks:4.1.42.Final
-io.netty:netty-codec:4.1.42.Final
-io.netty:netty-common:4.1.42.Final
-io.netty:netty-handler-proxy:4.1.42.Final
-io.netty:netty-handler:4.1.42.Final
-io.netty:netty-resolver:4.1.42.Final
-io.netty:netty-tcnative-boringssl-static:2.0.26.Final
-io.netty:netty-transport-native-epoll:4.1.42.Final
-io.netty:netty-transport-native-unix-common:4.1.42.Final
-io.netty:netty-transport:4.1.42.Final
+io.netty:netty-all:4.1.54.Final
+io.netty:netty-buffer:4.1.54.Final
+io.netty:netty-codec-http2:4.1.54.Final
+io.netty:netty-codec-http:4.1.54.Final
+io.netty:netty-codec-socks:4.1.54.Final
+io.netty:netty-codec:4.1.54.Final
+io.netty:netty-common:4.1.54.Final
+io.netty:netty-handler-proxy:4.1.54.Final
+io.netty:netty-handler:4.1.54.Final
+io.netty:netty-resolver:4.1.54.Final
+io.netty:netty-tcnative-boringssl-static:2.0.35.Final
+io.netty:netty-transport-native-epoll:4.1.54.Final
+io.netty:netty-transport-native-kqueue:4.1.54.Final
+io.netty:netty-transport-native-unix-common:4.1.54.Final
+io.netty:netty-transport:4.1.54.Final
 io.netty:netty:3.9.6.Final
 io.opencensus:opencensus-api:0.24.0
 io.opencensus:opencensus-contrib-http-util:0.24.0
 io.perfmark:perfmark-api:0.19.0
-io.projectreactor.addons:reactor-pool:0.1.0.RELEASE
-io.projectreactor.netty:reactor-netty:0.9.0.RELEASE
-io.projectreactor:reactor-core:3.3.0.RELEASE
+io.projectreactor.netty:reactor-netty:0.9.15.RELEASE
+io.projectreactor:reactor-core:3.3.12.RELEASE
 io.swagger:swagger-annotations:1.5.16
 io.swagger:swagger-core:1.5.16
 io.swagger:swagger-jaxrs:1.5.16
@@ -301,6 +309,8 @@ javax.inject:javax.inject:1
 javax.validation:validation-api:2.0.1.Final
 joda-time:joda-time:2.10.5
 me.lemire.integercompression:JavaFastPFOR:0.0.13
+net.java.dev.jna:jna-platform:5.6.0
+net.java.dev.jna:jna:5.5.0
 net.minidev:accessors-smart:1.2
 net.minidev:json-smart:2.3
 org.apache.avro:avro:1.7.6
@@ -343,21 +353,31 @@ org.apache.parquet:parquet-hadoop:1.8.0
 org.apache.parquet:parquet-jackson:1.8.0
 org.apache.thrift:libthrift:0.12.0
 org.apache.yetus:audience-annotations:0.5.0
-org.apache.zookeeper:zookeeper:3.4.11
-org.codehaus.groovy:groovy-all:2.4.8
+org.apache.zookeeper:zookeeper-jute:3.5.8
+org.apache.zookeeper:zookeeper:3.5.8
+org.codehaus.groovy:groovy-all:2.4.21
 org.codehaus.jackson:jackson-core-asl:1.9.13
 org.codehaus.jackson:jackson-mapper-asl:1.9.13
+org.jetbrains:annotations:15.0
 org.javassist:javassist:3.19.0-GA
+org.linguafranca.pwdb:KeePassJava2-dom:2.1.4
+org.linguafranca.pwdb:KeePassJava2-jaxb:2.1.4
+org.linguafranca.pwdb:KeePassJava2-kdb:2.1.4
+org.linguafranca.pwdb:KeePassJava2-kdbx:2.1.4
+org.linguafranca.pwdb:KeePassJava2-simple:2.1.4
+org.linguafranca.pwdb:KeePassJava2:2.1.4
+org.linguafranca.pwdb:database:2.1.4
 org.lz4:lz4-java:1.4.1
+org.quartz-scheduler:quartz:2.3.2
 org.roaringbitmap:RoaringBitmap:0.9.0
 org.roaringbitmap:shims:0.9.0
 org.scala-lang:scala-library:2.11.11
+org.simpleframework:simple-xml:2.7.1
 org.webjars:swagger-ui:3.18.2
-org.xerial.java:xerial-core:2.1
+org.wildfly.openssl:wildfly-openssl:1.0.7.Final
 org.xerial.larray:larray-buffer:0.4.1
 org.xerial.larray:larray-mmap:0.4.1
 org.xerial.snappy:snappy-java:1.1.1.7
-org.xerial:xerial-core:3.2.2
 org.yaml:snakeyaml:1.16
 software.amazon.awssdk:annotations:2.13.46
 software.amazon.awssdk:apache-client:2.13.46
@@ -375,6 +395,8 @@ software.amazon.awssdk:s3:2.13.46
 software.amazon.awssdk:sdk-core:2.13.46
 software.amazon.awssdk:utils:2.13.46
 software.amazon.eventstream:eventstream:1.0.1
+stax:stax-api:1.0.1
+stax:stax:1.2.0
 
 
 ------------------------------------------------------------------------------------
@@ -386,12 +408,16 @@ of these licenses.
 MIT License
 -----------
 args4j:args4j:2.32
-com.azure:azure-core-http-netty:1.3.0
-com.azure:azure-core:1.2.0
-com.azure:azure-storage-blob:12.4.0
-com.azure:azure-storage-common:12.4.0
-com.azure:azure-storage-file-datalake:12.0.0-beta.12
-com.microsoft.azure:azure-data-lake-store-sdk:2.1.5
+com.azure:azure-core-http-netty:1.7.1
+com.azure:azure-core:1.12.0
+om.azure:azure-identity:1.2.2
+com.azure:azure-storage-blob:12.10.0
+com.azure:azure-storage-common:12.10.0
+com.azure:azure-storage-file-datalake:12.4.0
+com.azure:azure-storage-internal-avro:12.0.2
+com.microsoft.azure:azure-data-lake-store-sdk:2.3.9
+com.microsoft.azure:msal4j-persistence-extension:1.0.0
+com.microsoft.azure:msal4j:1.8.0
 net.sf.jopt-simple:jopt-simple:4.6
 org.codehaus.mojo:animal-sniffer-annotations:1.18
 org.slf4j:slf4j-api:1.7.25
@@ -411,8 +437,7 @@ pinot-controller/src/main/resources/*/css/lib/normalize.css
 
 BSD 2-Clause
 ------------
-jline:jline:0.9.94
-org.codehaus.woodstox:stax2-api:3.1.4
+org.codehaus.woodstox:stax2-api:4.2
 org.reflections:reflections:0.9.11
 
 
@@ -442,6 +467,7 @@ Common Development and Distribution License (CDDL) 1.1
 ------------------------------------------------------
 (see licenses-binary/LICENSE-cddl-1.1.txt)
 
+com.sun.mail:javax.mail:1.6.1
 com.sun.xml.bind:jaxb-core:2.3.0
 com.sun.xml.bind:jaxb-impl:2.3.0
 javax.annotation:javax.annotation-api:1.3.2
@@ -451,18 +477,13 @@ org.glassfish.hk2:osgi-resource-locator:1.0.1
 org.glassfish.jersey.containers:jersey-container-servlet-core:2.25.1
 
 
-Common Public License (CPL) 1.0
--------------------------------
-(see licenses-binary/LICENSE-cpl-1.0.txt)
-
-junit:junit:3.8.1
-
-
 Eclipse Public License (EPL) 1.0
 --------------------------------
 (see licenses-binary/LICENSE-epl-1.0.txt)
 
 org.aspectj:aspectjrt:1.8.4
+om.mchange:c3p0:0.9.5.4
+com.mchange:mchange-commons-java:0.2.15
 
 
 Eclipse Public License (EPL) 2.0
@@ -493,6 +514,8 @@ org.locationtech.jts:jts-core:1.16.1
 
 Eclipse Distribution License (EDL) 1.0
 --------------------------------------
+jakarta.activation:jakarta.activation-api:1.2.1
+jakarta.xml.bind:jakarta.xml.bind-api:2.3.2
 org.jvnet.mimepull:mimepull:1.9.11
 
 
