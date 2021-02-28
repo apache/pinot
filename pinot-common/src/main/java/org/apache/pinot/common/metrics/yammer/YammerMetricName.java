@@ -23,7 +23,7 @@ import org.apache.pinot.spi.metrics.PinotMetricName;
 
 
 public class YammerMetricName implements PinotMetricName {
-  private MetricName _metricName;
+  private final MetricName _metricName;
 
   public YammerMetricName(Class<?> klass, String name) {
     _metricName = new MetricName(klass, name);
@@ -36,5 +36,28 @@ public class YammerMetricName implements PinotMetricName {
   @Override
   public MetricName getMetricName() {
     return _metricName;
+  }
+
+  /**
+   * Overrides equals method by calling the equals from the actual metric name.
+   */
+  @Override
+  public boolean equals(Object obj) {
+    if (this == obj) {
+      return true;
+    }
+    if (obj == null || getClass() != obj.getClass()) {
+      return false;
+    }
+    YammerMetricName that = (YammerMetricName) obj;
+    return _metricName.equals(that._metricName);
+  }
+
+  /**
+   * Overrides hashCode method by calling the hashCode method from the actual metric name.
+   */
+  @Override
+  public int hashCode() {
+    return _metricName.hashCode();
   }
 }

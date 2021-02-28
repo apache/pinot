@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.spi.metrics.PinotMeter;
+import org.apache.pinot.spi.metrics.PinotMetricName;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.Assert;
@@ -87,5 +88,16 @@ public class MetricsHelperTest {
 
     pinotMeter.mark(2L);
     Assert.assertEquals(pinotMeter.count(), 3L);
+  }
+
+  @Test
+  public void testPinotMetricName() {
+    PinotMetricName testMetricName1 =
+        PinotMetricUtils.generatePinotMetricName(MetricsHelperTest.class, "testMetricName");
+    PinotMetricName testMetricName2 =
+        PinotMetricUtils.generatePinotMetricName(MetricsHelperTest.class, "testMetricName");
+    Assert.assertNotNull(testMetricName1);
+    Assert.assertNotNull(testMetricName2);
+    Assert.assertEquals(testMetricName1, testMetricName2);
   }
 }

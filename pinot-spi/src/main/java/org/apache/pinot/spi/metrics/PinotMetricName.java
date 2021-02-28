@@ -23,5 +23,20 @@ package org.apache.pinot.spi.metrics;
  */
 public interface PinotMetricName {
 
+  /**
+   * Returns the actual metric name.
+   */
   Object getMetricName();
+
+  /**
+   * Overrides the equals method. This is needed as {@link PinotMetricName} is used as the key of the key-value pair
+   * inside the hashmap in MetricsRegistry. Without overriding equals() and hashCode() methods, all the existing k-v pairs
+   * stored in hashmap cannot be retrieved by initializing a new key.
+   */
+  boolean equals(Object obj);
+
+  /**
+   * Overrides the hashCode method. This method's contract is the same as equals() method.
+   */
+  int hashCode();
 }
