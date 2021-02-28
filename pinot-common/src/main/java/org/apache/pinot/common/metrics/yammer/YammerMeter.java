@@ -31,8 +31,18 @@ public class YammerMeter extends YammerMetered implements PinotMeter {
   }
 
   @Override
+  public void mark() {
+    _meter.mark();
+  }
+
+  @Override
   public void mark(long unitCount) {
     _meter.mark(unitCount);
+  }
+
+  @Override
+  public long count() {
+    return _meter.count();
   }
 
   @Override

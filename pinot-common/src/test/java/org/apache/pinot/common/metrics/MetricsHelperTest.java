@@ -18,15 +18,14 @@
  */
 package org.apache.pinot.common.metrics;
 
-import static org.testng.Assert.assertTrue;
-
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
@@ -73,7 +72,20 @@ public class MetricsHelperTest {
         TimeUnit.MILLISECONDS, TimeUnit.MILLISECONDS);
 
     // Check that the two listeners fired
-    assertTrue(listenerOneOkay);
-    assertTrue(listenerTwoOkay);
+    Assert.assertTrue(listenerOneOkay);
+    Assert.assertTrue(listenerTwoOkay);
+  }
+
+  @Test
+  public void testMetricValue() {
+    PinotMetricsRegistry registry = PinotMetricUtils.getPinotMetricsRegistry();
+    PinotMeter pinotMeter = MetricsHelper
+        .newMeter(registry, PinotMetricUtils.generatePinotMetricName(MetricsHelperTest.class, "testMeter"), "testMeter",
+            TimeUnit.MILLISECONDS);
+    pinotMeter.mark();
+    Assert.assertEquals(pinotMeter.count(), 1L);
+
+    pinotMeter.mark(2L);
+    Assert.assertEquals(pinotMeter.count(), 3L);
   }
 }
