@@ -65,6 +65,11 @@ public class RealtimeProvisioningRule extends AbstractRule {
   public void run()
       throws InvalidInputException {
 
+    if (_params == null) {
+      // no realtime provisioning params provided; skip
+      return;
+    }
+
     // prepare input to memory estimator
     TableConfig tableConfig = createTableConfig(_output.getIndexConfig(), _input.getSchema());
     long maxUsableHostMemoryByte = DataSizeUtils.toBytes(_params.getMaxUsableHostMemory());
