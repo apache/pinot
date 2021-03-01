@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory;
  */
 public class TaskExecutorFactoryRegistry {
   private static final Logger LOGGER = LoggerFactory.getLogger(TaskExecutorFactoryRegistry.class);
+  private static final String TASK_EXECUTOR_PACKAGE_REGEX_PATTERN = ".*\\.plugin\\.minion\\.tasks\\..*";
 
   private final Map<String, PinotTaskExecutorFactory> _taskExecutorFactoryRegistry = new HashMap<>();
 
@@ -46,10 +47,7 @@ public class TaskExecutorFactoryRegistry {
    */
   public TaskExecutorFactoryRegistry(MinionTaskZkMetadataManager zkMetadataManager) {
     long startTimeMs = System.currentTimeMillis();
-    Reflections reflections = new Reflections(
-        new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage("org.apache.pinot"))
-            .filterInputsBy(new FilterBuilder.Include(".*\\.executor\\..*")).setScanners(new TypeAnnotationsScanner()));
-    Set<Class<?>> classes = reflections.getTypesAnnotatedWith(TaskExecutorFactory.class, true);
+    Set<Class<?>> classes = getTaskExecutorFactoryClasses();
     for (Class<?> clazz : classes) {
       TaskExecutorFactory annotation = clazz.getAnnotation(TaskExecutorFactory.class);
       if (annotation.enabled()) {
@@ -66,6 +64,15 @@ public class TaskExecutorFactoryRegistry {
     LOGGER.info("Initialized TaskExecutorFactoryRegistry with {} task executor factories: {} in {}ms",
         _taskExecutorFactoryRegistry.size(), _taskExecutorFactoryRegistry.keySet(),
         System.currentTimeMillis() - startTimeMs);
+  }
+
+  public static Set<Class<?>> getTaskExecutorFactoryClasses() {
+    Reflections reflections = new Reflections(
+        new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage("org.apache.pinot"))
+            .filterInputsBy(new FilterBuilder.Include(TASK_EXECUTOR_PACKAGE_REGEX_PATTERN))
+            .setScanners(new TypeAnnotationsScanner()));
+    Set<Class<?>> classes = reflections.getTypesAnnotatedWith(TaskExecutorFactory.class, true);
+    return classes;
   }
 
   /**
