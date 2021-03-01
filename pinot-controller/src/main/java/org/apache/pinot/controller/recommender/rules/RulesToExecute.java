@@ -28,6 +28,7 @@ import org.apache.pinot.controller.recommender.rules.impl.InvertedSortedIndexJoi
 import org.apache.pinot.controller.recommender.rules.impl.KafkaPartitionRule;
 import org.apache.pinot.controller.recommender.rules.impl.NoDictionaryOnHeapDictionaryJointRule;
 import org.apache.pinot.controller.recommender.rules.impl.PinotTablePartitionRule;
+import org.apache.pinot.controller.recommender.rules.impl.RealtimeProvisioningRule;
 import org.apache.pinot.controller.recommender.rules.impl.VariedLengthDictionaryRule;
 
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.RulesToExecute.*;
@@ -57,6 +58,8 @@ public class RulesToExecute {
           return new NoDictionaryOnHeapDictionaryJointRule(inputManager, outputManager);
         case VariedLengthDictionaryRule:
           return new VariedLengthDictionaryRule(inputManager, outputManager);
+        case RealtimeProvisioningRule:
+          return new RealtimeProvisioningRule(inputManager, outputManager);
         default:
           return null;
       }
@@ -70,6 +73,7 @@ public class RulesToExecute {
   boolean _recommendNoDictionaryOnHeapDictionaryJoint = DEFAULT_RECOMMEND_NO_DICTIONARY_ONHEAP_DICTIONARY_JOINT;
   boolean _recommendVariedLengthDictionary = DEFAULT_RECOMMEND_VARIED_LENGTH_DICTIONARY;
   boolean _recommendFlagQuery = DEFAULT_RECOMMEND_FLAG_QUERY;
+  boolean _recommendRealtimeProvisioning = DEFAULT_RECOMMEND_REALTIME_PROVISIONING;
 
   @JsonSetter(nulls = Nulls.SKIP)
   public void setRecommendVariedLengthDictionary(boolean recommendVariedLengthDictionary) {
@@ -106,6 +110,11 @@ public class RulesToExecute {
     _recommendBloomFilter = recommendBloomFilter;
   }
 
+  @JsonSetter(nulls = Nulls.SKIP)
+  public void setRecommendRealtimeProvisioning(boolean recommendRealtimeProvisioning) {
+    _recommendPinotTablePartition = recommendRealtimeProvisioning;
+  }
+
   public boolean isRecommendVariedLengthDictionary() {
     return _recommendVariedLengthDictionary;
   }
@@ -134,15 +143,20 @@ public class RulesToExecute {
     return _recommendBloomFilter;
   }
 
+  public boolean isRecommendRealtimeProvisioning() {
+    return _recommendRealtimeProvisioning;
+  }
+
   // Be careful with the sequence, each rule can execute individually
   // but a rule may depend on its previous rule when they both fired
   public enum Rule {
-    FlagQueryRule, 
+    FlagQueryRule,
     KafkaPartitionRule,
     InvertedSortedIndexJointRule,
     NoDictionaryOnHeapDictionaryJointRule, // NoDictionaryOnHeapDictionaryJointRule must go after InvertedSortedIndexJointRule since we do not recommend NoDictionary on cols with indices
     VariedLengthDictionaryRule, // VariedLengthDictionaryRule must go after NoDictionaryOnHeapDictionaryJointRule  since we do not recommend dictionary on NoDictionary cols
     PinotTablePartitionRule, // PinotTablePartitionRule must go after KafkaPartitionRule to recommend realtime partitions, after NoDictionaryOnHeapDictionaryJointRule to correctly calculate record size
     BloomFilterRule,
+    RealtimeProvisioningRule
   }
 }

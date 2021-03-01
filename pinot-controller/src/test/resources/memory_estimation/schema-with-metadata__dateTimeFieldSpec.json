@@ -1,0 +1,54 @@
+{
+  "schemaName": "testTable",
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "INT",
+      "name": "colInt",
+      "singleValueField": false,
+      "cardinality": 50,
+      "numValuesPerEntry": 3
+    },
+    {
+      "dataType": "FLOAT",
+      "name": "colFloat",
+      "singleValueField": false,
+      "cardinality": 60,
+      "numValuesPerEntry": 1.7
+    },
+    {
+      "dataType": "STRING",
+      "name": "colString",
+      "cardinality": 70,
+      "averageLength": 10
+    },
+    {
+      "dataType": "BYTES",
+      "name": "colBytes",
+      "cardinality": 80,
+      "averageLength": 5
+    }
+  ],
+  "metricFieldSpecs": [
+    {
+      "dataType": "DOUBLE",
+      "name": "colMetric",
+      "cardinality": 90
+    }
+  ],
+  "dateTimeFieldSpecs": [
+    {
+      "name": "colTime",
+      "dataType": "INT",
+      "format": "1:DAYS:EPOCH",
+      "granularity": "1:DAYS",
+      "cardinality": 25
+    },
+    {
+      "name": "colTime2",
+      "dataType": "LONG",
+      "format": "1:MILLISECONDS:EPOCH",
+      "granularity": "1:MILLISECONDS",
+      "cardinality": 75
+    }
+  ]
+}

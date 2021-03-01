@@ -34,6 +34,7 @@ import org.apache.pinot.controller.recommender.io.metadata.SchemaWithMetaData;
 import org.apache.pinot.controller.recommender.rules.RulesToExecute;
 import org.apache.pinot.controller.recommender.rules.io.params.FlagQueryRuleParams;
 import org.apache.pinot.controller.recommender.rules.io.params.*;
+import org.apache.pinot.controller.recommender.rules.io.params.RealtimeProvisioningRuleParams;
 import org.apache.pinot.controller.recommender.rules.utils.FixedLenBitset;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
@@ -102,6 +103,7 @@ public class InputManager {
   public NoDictionaryOnHeapDictionaryJointRuleParams _noDictionaryOnHeapDictionaryJointRuleParams =
       new NoDictionaryOnHeapDictionaryJointRuleParams();
   public FlagQueryRuleParams _flagQueryRuleParams = new FlagQueryRuleParams();
+  public RealtimeProvisioningRuleParams _realtimeProvisioningRuleParams;
 
   // For forward compatibility: 1. dev/sre to overwrite field(s) 2. incremental recommendation on existing/staging tables
   public ConfigManager _overWrittenConfigs = new ConfigManager();
@@ -314,6 +316,11 @@ public class InputManager {
   }
 
   @JsonSetter(nulls = Nulls.SKIP)
+  public void setRealtimeProvisioningRuleParams(RealtimeProvisioningRuleParams realtimeProvisioningRuleParams) {
+    _realtimeProvisioningRuleParams = realtimeProvisioningRuleParams;
+  }
+
+  @JsonSetter(nulls = Nulls.SKIP)
   public void setPartitionRuleParams(PartitionRuleParams partitionRuleParams) {
     _partitionRuleParams = partitionRuleParams;
   }
@@ -462,6 +469,10 @@ public class InputManager {
     return _bloomFilterRuleParams;
   }
 
+  public RealtimeProvisioningRuleParams getRealtimeProvisioningRuleParams() {
+    return _realtimeProvisioningRuleParams;
+  }
+
   public PartitionRuleParams getPartitionRuleParams() {
     return _partitionRuleParams;
   }
@@ -484,6 +495,10 @@ public class InputManager {
 
   public Schema getSchema() {
     return _schema;
+  }
+
+  public SchemaWithMetaData getSchemaWithMetadata() {
+    return _schemaWithMetaData;
   }
 
   @JsonIgnore

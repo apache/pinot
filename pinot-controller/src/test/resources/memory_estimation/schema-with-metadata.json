@@ -1,0 +1,93 @@
+{
+  "schemaName": "testTable",
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "INT",
+      "name": "colInt",
+      "cardinality": 10
+    },
+    {
+      "dataType": "INT",
+      "name": "colIntMV",
+      "singleValueField": false,
+      "cardinality": 15,
+      "numValuesPerEntry": 3
+    },
+    {
+      "dataType": "FLOAT",
+      "name": "colFloat",
+      "cardinality": 20
+    },
+    {
+      "dataType": "FLOAT",
+      "name": "colFloatMV",
+      "singleValueField": false,
+      "cardinality": 25,
+      "numValuesPerEntry": 1.7
+    },
+    {
+      "dataType": "STRING",
+      "name": "colString",
+      "cardinality": 30,
+      "averageLength": 10
+    },
+    {
+      "dataType": "STRING",
+      "name": "colStringMV",
+      "singleValueField": false,
+      "cardinality": 35,
+      "averageLength": 10,
+      "numValuesPerEntry": 1.3
+    },
+    {
+      "dataType": "BYTES",
+      "name": "colBytes",
+      "cardinality": 40,
+      "averageLength": 5
+    },
+    {
+      "dataType": "LONG",
+      "name": "colLong",
+      "cardinality": 50
+    },
+    {
+      "dataType": "LONG",
+      "name": "colLongMV",
+      "singleValueField": false,
+      "cardinality": 55,
+      "numValuesPerEntry": 2.8
+    },
+    {
+      "dataType": "DOUBLE",
+      "name": "colDouble",
+      "cardinality": 60
+    },
+    {
+      "dataType": "DOUBLE",
+      "name": "colDoubleMV",
+      "singleValueField": false,
+      "cardinality": 65,
+      "numValuesPerEntry": 3.4
+    }
+  ],
+  "metricFieldSpecs": [
+    {
+      "dataType": "DOUBLE",
+      "name": "colDoubleMetric",
+      "cardinality": 70
+    },
+    {
+      "dataType": "FLOAT",
+      "name": "colFloatMetric",
+      "cardinality": 80
+    }
+  ],
+  "timeFieldSpec": {
+    "incomingGranularitySpec" : {
+      "dataType": "LONG",
+      "name": "colTime",
+      "timeType": "DAYS",
+      "cardinality": 90
+    }
+  }
+}
