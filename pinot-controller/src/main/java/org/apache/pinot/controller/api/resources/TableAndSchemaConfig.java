@@ -45,6 +45,7 @@ public class TableAndSchemaConfig {
     return _tableConfig;
   }
 
+  @Nullable
   public Schema getSchema() {
     return _schema;
   }
