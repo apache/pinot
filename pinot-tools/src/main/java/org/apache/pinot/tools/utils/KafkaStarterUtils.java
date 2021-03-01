@@ -60,6 +60,10 @@ public class KafkaStarterUtils {
     // Enable topic deletion by default for integration tests
     configureTopicDeletion(configuration, true);
 
+    // set the transaction state replication factor
+    configureTransactionStateLogReplicationFactor(configuration, (short) 1);
+    configuration.put("transaction.state.log.min.isr", 1);
+
     // Set host name
     configureHostName(configuration, "localhost");
     configureOffsetsTopicReplicationFactor(configuration, (short) 1);
@@ -73,6 +77,10 @@ public class KafkaStarterUtils {
 
   public static void configureOffsetsTopicReplicationFactor(Properties configuration, short replicationFactor) {
     configuration.put("offsets.topic.replication.factor", replicationFactor);
+  }
+
+  public static void configureTransactionStateLogReplicationFactor(Properties configuration, short replicationFactor) {
+    configuration.put("transaction.state.log.replication.factor", replicationFactor);
   }
 
   public static void configureTopicDeletion(Properties configuration, boolean topicDeletionEnabled) {

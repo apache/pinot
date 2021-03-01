@@ -40,7 +40,6 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.Record;
@@ -50,7 +49,6 @@ import org.apache.pinot.core.operator.combine.GroupByOrderByCombineOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
-import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -498,27 +496,13 @@ public class GroupByDataTableReducer implements DataTableReducer {
     // Merge results from all data tables.
     String[] columnNames = new String[_numAggregationFunctions];
     Map<String, Object>[] intermediateResultMaps = new Map[_numAggregationFunctions];
-    if (_numGroupByExpressions == 1) {
-      for (DataTable dataTable : dataTables) {
-        for (int i = 0; i < _numAggregationFunctions; i++) {
-          if (columnNames[i] == null) {
-            columnNames[i] = dataTable.getString(i, 0);
-            intermediateResultMaps[i] = dataTable.getObject(i, 1);
-          } else {
-            mergeResultMap(intermediateResultMaps[i], dataTable.getObject(i, 1), _aggregationFunctions[i]);
-          }
-        }
-      }
-    } else {
-      for (DataTable dataTable : dataTables) {
-        for (int i = 0; i < _numAggregationFunctions; i++) {
-          if (columnNames[i] == null) {
-            columnNames[i] = dataTable.getString(i, 0);
-            intermediateResultMaps[i] = convertLegacyGroupKeyDelimiter(dataTable.getObject(i, 1));
-          } else {
-            mergeResultMap(intermediateResultMaps[i], convertLegacyGroupKeyDelimiter(dataTable.getObject(i, 1)),
-                _aggregationFunctions[i]);
-          }
+    for (DataTable dataTable : dataTables) {
+      for (int i = 0; i < _numAggregationFunctions; i++) {
+        if (columnNames[i] == null) {
+          columnNames[i] = dataTable.getString(i, 0);
+          intermediateResultMaps[i] = dataTable.getObject(i, 1);
+        } else {
+          mergeResultMap(intermediateResultMaps[i], dataTable.getObject(i, 1), _aggregationFunctions[i]);
         }
       }
     }
@@ -592,27 +576,5 @@ public class GroupByDataTableReducer implements DataTableReducer {
         }
       });
     }
-  }
-
-  /**
-   * Helper method to convert the result map with legacy group key delimiter to the new delimiter for
-   * backward-compatibility.
-   */
-  private Map<String, Object> convertLegacyGroupKeyDelimiter(Map<String, Object> resultMap) {
-    assert _numGroupByExpressions > 1;
-    if (resultMap.isEmpty()) {
-      return resultMap;
-    }
-    String sampleKey = resultMap.keySet().iterator().next();
-    if (sampleKey.indexOf(GroupKeyGenerator.DELIMITER) != -1) {
-      // Already using the new delimiter, no need to convert
-      return resultMap;
-    }
-    Map<String, Object> convertedResultMap = new HashMap<>(HashUtil.getHashMapCapacity(resultMap.size()));
-    for (Map.Entry<String, Object> entry : resultMap.entrySet()) {
-      convertedResultMap.put(entry.getKey().replace(GroupKeyGenerator.LEGACY_DELIMITER, GroupKeyGenerator.DELIMITER),
-          entry.getValue());
-    }
-    return convertedResultMap;
   }
 }

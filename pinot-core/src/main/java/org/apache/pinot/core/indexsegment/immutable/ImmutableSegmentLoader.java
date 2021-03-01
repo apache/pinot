@@ -101,6 +101,9 @@ public class ImmutableSegmentLoader {
 
     // Load the metadata again since converter and pre-processor may have changed it
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
+    if (segmentMetadata.getTotalDocs() == 0) {
+      return new EmptyIndexSegment(segmentMetadata);
+    }
 
     // Load the segment
     ReadMode readMode = indexLoadingConfig.getReadMode();

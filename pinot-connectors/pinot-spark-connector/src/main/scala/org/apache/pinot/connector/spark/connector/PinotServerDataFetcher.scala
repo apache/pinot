@@ -20,9 +20,8 @@ package org.apache.pinot.connector.spark.connector
 
 import java.util.{List => JList, Map => JMap}
 
-import com.yammer.metrics.core.MetricsRegistry
 import org.apache.helix.model.InstanceConfig
-import org.apache.pinot.common.metrics.BrokerMetrics
+import org.apache.pinot.common.metrics.{BrokerMetrics, PinotMetricUtils}
 import org.apache.pinot.common.request.BrokerRequest
 import org.apache.pinot.common.utils.DataTable
 import org.apache.pinot.connector.spark.datasource.PinotDataSourceReadOptions
@@ -45,7 +44,7 @@ private[pinot] class PinotServerDataFetcher(
   extends Logging {
   private val sqlCompiler = new CalciteSqlCompiler()
   private val brokerId = "apache_spark"
-  private val metricsRegistry = new MetricsRegistry()
+  private val metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry
   private val brokerMetrics = new BrokerMetrics(metricsRegistry)
   private val queryRouter = new QueryRouter(brokerId, brokerMetrics)
   // TODO add support for TLS-secured server

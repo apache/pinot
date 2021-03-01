@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.data.manager.offline;
 
-import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.net.URL;
 import java.util.Arrays;
@@ -28,6 +27,7 @@ import org.apache.helix.AccessOption;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
@@ -106,7 +106,7 @@ public class DimensionTableDataManagerTest {
       when(config.getTableName()).thenReturn(TABLE_NAME);
       when(config.getDataDir()).thenReturn(INDEX_DIR.getAbsolutePath());
     }
-    tableDataManager.init(config, "dummyInstance", mockPropertyStore(), new ServerMetrics(new MetricsRegistry()),
+    tableDataManager.init(config, "dummyInstance", mockPropertyStore(), new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()),
         mock(HelixManager.class));
     tableDataManager.start();
 

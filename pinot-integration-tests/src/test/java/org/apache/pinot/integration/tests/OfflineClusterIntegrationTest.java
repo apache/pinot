@@ -33,6 +33,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import javax.validation.constraints.AssertTrue;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.exception.QueryException;
@@ -436,6 +437,29 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to generate bloom filter");
+  }
+
+  /** Check if server returns error response quickly without timing out Broker. */
+  @Test
+  public void testServerErrorWithBrokerTimeout()
+    throws Exception {
+      // Set query timeout
+      long queryTimeout = 5000;
+      TableConfig tableConfig = getOfflineTableConfig();
+      tableConfig.setQueryConfig(new QueryConfig(queryTimeout));
+      updateTableConfig(tableConfig);
+
+      long startTime = System.currentTimeMillis();
+      // The query below will fail execution due to use of double quotes around value in IN clause.
+      JsonNode queryResponse = postSqlQuery("SELECT count(*) FROM mytable WHERE Dest IN (\"DFW\")");
+      String result = queryResponse.toPrettyString();
+
+      assertTrue(System.currentTimeMillis() - startTime < queryTimeout);
+      assertTrue(queryResponse.get("exceptions").get(0).get("message").toString().startsWith("\"QueryExecutionError"));
+
+      // Remove timeout
+      tableConfig.setQueryConfig(null);
+      updateTableConfig(tableConfig);
   }
 
   @Test

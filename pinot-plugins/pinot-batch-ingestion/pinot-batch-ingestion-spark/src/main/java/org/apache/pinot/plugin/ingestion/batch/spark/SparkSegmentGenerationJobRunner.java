@@ -29,6 +29,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
@@ -312,7 +313,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
 
           // Tar segment directory to compress file
           File localSegmentDir = new File(localOutputTempDir, segmentName);
-          String segmentTarFileName = segmentName + Constants.TAR_GZ_FILE_EXT;
+          String segmentTarFileName = URLEncoder.encode(segmentName + Constants.TAR_GZ_FILE_EXT, "UTF-8");
           File localSegmentTarFile = new File(localOutputTempDir, segmentTarFileName);
           LOGGER.info("Tarring segment from: {} to: {}", localSegmentDir, localSegmentTarFile);
           TarGzCompressionUtils.createTarGzFile(localSegmentDir, localSegmentTarFile);

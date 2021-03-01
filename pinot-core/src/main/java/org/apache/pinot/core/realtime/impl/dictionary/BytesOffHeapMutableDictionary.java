@@ -150,6 +150,11 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
   }
 
   @Override
+  public Object getInternal(int dictId) {
+    return getByteArrayValue(dictId);
+  }
+
+  @Override
   public int getIntValue(int dictId) {
     throw new UnsupportedOperationException();
   }

@@ -274,29 +274,29 @@ public class IdSetQueriesTest extends BaseQueriesTest {
       AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
       assertNotNull(aggregationGroupByResult);
       Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
-      GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
-      RoaringBitmapIdSet intIdSet = (RoaringBitmapIdSet) aggregationGroupByResult.getResultForKey(groupKey, 0);
+      int groupId = groupKeyIterator.next()._groupId;
+      RoaringBitmapIdSet intIdSet = (RoaringBitmapIdSet) aggregationGroupByResult.getResultForGroupId(0, groupId);
       for (int i = 0; i < NUM_RECORDS; i++) {
         assertTrue(intIdSet.contains(_values[i]));
       }
       Roaring64NavigableMapIdSet longIdSet =
-          (Roaring64NavigableMapIdSet) aggregationGroupByResult.getResultForKey(groupKey, 1);
+          (Roaring64NavigableMapIdSet) aggregationGroupByResult.getResultForGroupId(1, groupId);
       for (int i = 0; i < NUM_RECORDS; i++) {
         assertTrue(longIdSet.contains(_values[i] + (long) Integer.MAX_VALUE));
       }
-      BloomFilterIdSet floatIdSet = (BloomFilterIdSet) aggregationGroupByResult.getResultForKey(groupKey, 2);
+      BloomFilterIdSet floatIdSet = (BloomFilterIdSet) aggregationGroupByResult.getResultForGroupId(2, groupId);
       for (int i = 0; i < NUM_RECORDS; i++) {
         assertTrue(floatIdSet.contains(_values[i] + 0.5f));
       }
-      BloomFilterIdSet doubleIdSet = (BloomFilterIdSet) aggregationGroupByResult.getResultForKey(groupKey, 3);
+      BloomFilterIdSet doubleIdSet = (BloomFilterIdSet) aggregationGroupByResult.getResultForGroupId(3, groupId);
       for (int i = 0; i < NUM_RECORDS; i++) {
         assertTrue(doubleIdSet.contains(_values[i] + 0.25));
       }
-      BloomFilterIdSet stringIdSet = (BloomFilterIdSet) aggregationGroupByResult.getResultForKey(groupKey, 4);
+      BloomFilterIdSet stringIdSet = (BloomFilterIdSet) aggregationGroupByResult.getResultForGroupId(4, groupId);
       for (int i = 0; i < NUM_RECORDS; i++) {
         assertTrue(stringIdSet.contains(Integer.toString(_values[i])));
       }
-      BloomFilterIdSet bytesIdSet = (BloomFilterIdSet) aggregationGroupByResult.getResultForKey(groupKey, 5);
+      BloomFilterIdSet bytesIdSet = (BloomFilterIdSet) aggregationGroupByResult.getResultForGroupId(5, groupId);
       for (int i = 0; i < NUM_RECORDS; i++) {
         assertTrue(bytesIdSet.contains(Integer.toString(_values[i]).getBytes()));
       }

@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.common.metrics;
 
-import com.yammer.metrics.core.MetricsRegistry;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
 
 /**
@@ -26,5 +26,5 @@ import com.yammer.metrics.core.MetricsRegistry;
  *
  */
 public interface MetricsRegistryRegistrationListener {
-  public void onMetricsRegistryRegistered(MetricsRegistry metricsRegistry);
+  void onMetricsRegistryRegistered(PinotMetricsRegistry metricsRegistry);
 }

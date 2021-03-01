@@ -218,12 +218,9 @@ public class NoDictionaryGroupKeyGeneratorTest {
         "Number of group keys mis-match.");
 
     // Assert all group key values are as expected
-    Iterator<GroupKeyGenerator.GroupKey> uniqueGroupKeys = groupKeyGenerator.getUniqueGroupKeys();
-    while (uniqueGroupKeys.hasNext()) {
-      GroupKeyGenerator.GroupKey groupKey = uniqueGroupKeys.next();
-      if (!expectedGroupKeys.contains(groupKey._stringKey)) {
-        System.out.println(expectedGroupKeys);
-      }
+    Iterator<GroupKeyGenerator.StringGroupKey> stringGroupKeys = groupKeyGenerator.getStringGroupKeys();
+    while (stringGroupKeys.hasNext()) {
+      GroupKeyGenerator.StringGroupKey groupKey = stringGroupKeys.next();
       assertTrue(expectedGroupKeys.contains(groupKey._stringKey), "Unexpected group key: " + groupKey._stringKey);
     }
   }

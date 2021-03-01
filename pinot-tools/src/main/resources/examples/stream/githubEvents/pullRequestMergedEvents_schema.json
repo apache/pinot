@@ -140,12 +140,12 @@
       "dataType": "LONG"
     }
   ],
-  "timeFieldSpec": {
-    "incomingGranularitySpec": {
-      "timeType": "MILLISECONDS",
-      "timeFormat": "EPOCH",
+  "dateTimeFieldSpecs": [
+    {
+      "name": "mergedTimeMillis",
       "dataType": "LONG",
-      "name": "mergedTimeMillis"
+      "format": "1:MILLISECONDS:EPOCH",
+      "granularity": "1:MILLISECONDS"
     }
-  }
+  ]
 }

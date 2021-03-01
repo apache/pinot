@@ -55,6 +55,9 @@ import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.util.Utf8;
 import org.apache.commons.lang3.math.NumberUtils;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.Producer;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.pinot.client.Request;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -344,6 +347,63 @@ public class ClusterIntegrationTestUtils {
       }
     }
   }
+
+  /**
+   * Push the records from the given Avro files into a Kafka stream.
+   *
+   * @param avroFiles List of Avro files
+   * @param kafkaBroker Kafka broker config
+   * @param kafkaTopic Kafka topic
+   * @param maxNumKafkaMessagesPerBatch Maximum number of Kafka messages per batch
+   * @param header Optional Kafka message header
+   * @param partitionColumn Optional partition column
+   * @param commit if the transaction commits or aborts
+   * @throws Exception
+   */
+  public static void pushAvroIntoKafkaWithTransaction(List<File> avroFiles, String kafkaBroker, String kafkaTopic,
+      int maxNumKafkaMessagesPerBatch, @Nullable byte[] header, @Nullable String partitionColumn, boolean commit)
+      throws Exception {
+    Properties props = new Properties();
+    props.put("bootstrap.servers", kafkaBroker);
+    props.put("key.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer");
+    props.put("value.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer");
+    props.put("request.required.acks", "1");
+    props.put("transactional.id", "test-transaction");
+    props.put("transaction.state.log.replication.factor", "2");
+
+    Producer<byte[], byte[]> producer = new KafkaProducer<>(props);
+    // initiate transaction.
+    producer.initTransactions();
+    producer.beginTransaction();
+    try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream(65536)) {
+      for (File avroFile : avroFiles) {
+        try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
+          BinaryEncoder binaryEncoder = new EncoderFactory().directBinaryEncoder(outputStream, null);
+          GenericDatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<>(reader.getSchema());
+          for (GenericRecord genericRecord : reader) {
+            outputStream.reset();
+            if (header != null && 0 < header.length) {
+              outputStream.write(header);
+            }
+            datumWriter.write(genericRecord, binaryEncoder);
+            binaryEncoder.flush();
+
+            byte[] keyBytes = (partitionColumn == null) ? Longs.toByteArray(System.currentTimeMillis())
+                : (genericRecord.get(partitionColumn)).toString().getBytes();
+            byte[] bytes = outputStream.toByteArray();
+            ProducerRecord<byte[], byte[]> record = new ProducerRecord(kafkaTopic, keyBytes, bytes);
+            producer.send(record);
+          }
+        }
+      }
+    }
+    if (commit) {
+      producer.commitTransaction();
+    } else {
+      producer.abortTransaction();
+    }
+  }
+
 
   /**
    * Push random generated

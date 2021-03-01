@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core.periodictask;
 
-import com.yammer.metrics.core.MetricsRegistry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -26,6 +25,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -46,7 +46,8 @@ public class ControllerPeriodicTaskTest {
 
   private final PinotHelixResourceManager _resourceManager = mock(PinotHelixResourceManager.class);
   private final LeadControllerManager _leadControllerManager = mock(LeadControllerManager.class);
-  private final ControllerMetrics _controllerMetrics = new ControllerMetrics(new MetricsRegistry());
+  private final ControllerMetrics _controllerMetrics =
+      new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
   private final AtomicBoolean _startTaskCalled = new AtomicBoolean();
   private final AtomicBoolean _stopTaskCalled = new AtomicBoolean();
   private final AtomicBoolean _processTablesCalled = new AtomicBoolean();

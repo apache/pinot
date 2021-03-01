@@ -93,6 +93,7 @@ public abstract class ControllerTest {
       new File(FileUtils.getTempDirectoryPath(), "test-controller-" + System.currentTimeMillis()).getAbsolutePath();
   protected static final String BROKER_INSTANCE_ID_PREFIX = "Broker_localhost_";
   protected static final String SERVER_INSTANCE_ID_PREFIX = "Server_localhost_";
+  protected static final String MINION_INSTANCE_ID_PREFIX = "Minion_localhost_";
 
   protected final List<HelixManager> _fakeInstanceHelixManagers = new ArrayList<>();
 
@@ -372,6 +373,77 @@ public abstract class ControllerTest {
       @Transition(from = "CONSUMING", to = "DROPPED")
       public void onBecomeDroppedFromConsuming(Message message, NotificationContext context) {
         LOGGER.debug("onBecomeDroppedFromConsuming(): {}", message);
+      }
+
+      @Transition(from = "ERROR", to = "OFFLINE")
+      public void onBecomeOfflineFromError(Message message, NotificationContext context) {
+        LOGGER.debug("onBecomeOfflineFromError(): {}", message);
+      }
+    }
+  }
+
+  protected void addFakeMinionInstancesToAutoJoinHelixCluster(int numInstances)
+      throws Exception {
+    for (int i = 0; i < numInstances; i++) {
+      addFakeMinionInstanceToAutoJoinHelixCluster(MINION_INSTANCE_ID_PREFIX + i);
+    }
+  }
+
+  protected void addFakeMinionInstanceToAutoJoinHelixCluster(String instanceId)
+      throws Exception {
+    HelixManager helixManager =
+        HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT,
+            ZkStarter.DEFAULT_ZK_STR);
+    helixManager.getStateMachineEngine()
+        .registerStateModelFactory(FakeMinionResourceOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
+            FakeMinionResourceOnlineOfflineStateModelFactory.FACTORY_INSTANCE);
+    helixManager.connect();
+    HelixAdmin helixAdmin = helixManager.getClusterManagmentTool();
+    helixAdmin.addInstanceTag(getHelixClusterName(), instanceId, UNTAGGED_MINION_INSTANCE);
+    _fakeInstanceHelixManagers.add(helixManager);
+  }
+
+  public static class FakeMinionResourceOnlineOfflineStateModelFactory extends StateModelFactory<StateModel> {
+    private static final String STATE_MODEL_DEF = "MinionResourceOnlineOfflineStateModel";
+    private static final FakeMinionResourceOnlineOfflineStateModelFactory FACTORY_INSTANCE =
+        new FakeMinionResourceOnlineOfflineStateModelFactory();
+    private static final FakeMinionResourceOnlineOfflineStateModel STATE_MODEL_INSTANCE =
+        new FakeMinionResourceOnlineOfflineStateModel();
+
+    private FakeMinionResourceOnlineOfflineStateModelFactory() {
+    }
+
+    @Override
+    public StateModel createNewStateModel(String resourceName, String partitionName) {
+      return STATE_MODEL_INSTANCE;
+    }
+
+    @SuppressWarnings("unused")
+    @StateModelInfo(states = "{'OFFLINE', 'ONLINE', 'DROPPED'}", initialState = "OFFLINE")
+    public static class FakeMinionResourceOnlineOfflineStateModel extends StateModel {
+      private static final Logger LOGGER = LoggerFactory.getLogger(FakeMinionResourceOnlineOfflineStateModel.class);
+
+      private FakeMinionResourceOnlineOfflineStateModel() {
+      }
+
+      @Transition(from = "OFFLINE", to = "ONLINE")
+      public void onBecomeOnlineFromOffline(Message message, NotificationContext context) {
+        LOGGER.debug("onBecomeOnlineFromOffline(): {}", message);
+      }
+
+      @Transition(from = "OFFLINE", to = "DROPPED")
+      public void onBecomeDroppedFromOffline(Message message, NotificationContext context) {
+        LOGGER.debug("onBecomeDroppedFromOffline(): {}", message);
+      }
+
+      @Transition(from = "ONLINE", to = "OFFLINE")
+      public void onBecomeOfflineFromOnline(Message message, NotificationContext context) {
+        LOGGER.debug("onBecomeOfflineFromOnline(): {}", message);
+      }
+
+      @Transition(from = "ONLINE", to = "DROPPED")
+      public void onBecomeDroppedFromOnline(Message message, NotificationContext context) {
+        LOGGER.debug("onBecomeDroppedFromOnline(): {}", message);
       }
 
       @Transition(from = "ERROR", to = "OFFLINE")

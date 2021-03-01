@@ -36,14 +36,11 @@ import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.segment.creator.impl.text.LuceneTextIndexCreator;
-import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneFSTIndexCreator;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
 
 
 // There are a couple of un-addressed issues right now
@@ -258,7 +255,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
       IndexEntry entry = offsetEntry.getValue();
       runningSize += entry.size;
 
-      if (runningSize >= MAX_ALLOCATION_SIZE) {
+      if (runningSize >= MAX_ALLOCATION_SIZE && !offsetAccum.isEmpty()) {
         mapAndSliceFile(indexStartMap, offsetAccum, offsetEntry.getKey());
         runningSize = entry.size;
         offsetAccum.clear();
@@ -266,7 +263,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
       offsetAccum.add(offsetEntry.getKey());
     }
 
-    if (offsetAccum.size() > 0) {
+    if (!offsetAccum.isEmpty()) {
       mapAndSliceFile(indexStartMap, offsetAccum, offsetAccum.get(0) + runningSize);
     }
   }
@@ -275,7 +272,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
       throws IOException {
     Preconditions.checkNotNull(startOffsets);
     Preconditions.checkNotNull(offsetAccum);
-    Preconditions.checkArgument(offsetAccum.size() >= 1);
+    Preconditions.checkArgument(!offsetAccum.isEmpty());
 
     long fromFilePos = offsetAccum.get(0);
     long size = endOffset - fromFilePos;
@@ -297,8 +294,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
       IndexEntry entry = startOffsets.get(fileOffset);
       long endSlicePoint = prevSlicePoint + entry.size;
       validateMagicMarker(buffer, prevSlicePoint);
-      PinotDataBuffer viewBuffer = buffer.view(prevSlicePoint + MAGIC_MARKER_SIZE_BYTES, endSlicePoint);
-      entry.buffer = viewBuffer;
+      entry.buffer = buffer.view(prevSlicePoint + MAGIC_MARKER_SIZE_BYTES, endSlicePoint);
       prevSlicePoint = endSlicePoint;
     }
   }

@@ -85,7 +85,7 @@ public class RecommenderConstants {
   public static final String OFFLINE = "offline";
   public static final String REALTIME = "realtime";
   public static final String HYBRID = "hybrid";
-  public static final double DEFAULT_CARDINALITY = 1;
+  public static final int DEFAULT_CARDINALITY = 1;
   public static final double MIN_CARDINALITY = 1;
   public static final double DEFAULT_AVERAGE_NUM_VALUES_PER_ENTRY = 1d;
   public static final int DEFAULT_NULL_SIZE = 0;

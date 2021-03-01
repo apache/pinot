@@ -69,6 +69,7 @@ import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.ServerInstance;
+import org.apache.pinot.server.starter.ServerQueriesDisabledTracker;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.plugin.PluginManager;
@@ -113,6 +114,7 @@ public class HelixServerStarter implements ServiceStartable {
   private HelixAdmin _helixAdmin;
   private ServerInstance _serverInstance;
   private AdminApiApplication _adminApiApplication;
+  private ServerQueriesDisabledTracker _serverQueriesDisabledTracker;
   private RealtimeLuceneIndexRefreshState _realtimeLuceneIndexRefreshState;
 
   public HelixServerStarter(String helixClusterName, String zkAddress, PinotConfiguration serverConf)
@@ -418,6 +420,10 @@ public class HelixServerStarter implements ServiceStartable {
     serverMetrics.addCallbackGauge("memory.mmapBufferUsage", PinotDataBuffer::getMmapBufferUsage);
     serverMetrics.addCallbackGauge("memory.allocationFailureCount", PinotDataBuffer::getAllocationFailureCount);
 
+    // Track metric for queries disabled
+    _serverQueriesDisabledTracker = new ServerQueriesDisabledTracker(_helixClusterName, _instanceId, _helixManager, serverMetrics);
+    _serverQueriesDisabledTracker.start();
+
     _realtimeLuceneIndexRefreshState = RealtimeLuceneIndexRefreshState.getInstance();
     _realtimeLuceneIndexRefreshState.start();
   }
@@ -449,6 +455,7 @@ public class HelixServerStarter implements ServiceStartable {
         .getProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_RESOURCE_CHECK, Server.DEFAULT_SHUTDOWN_ENABLE_RESOURCE_CHECK)) {
       shutdownResourceCheck(endTimeMs);
     }
+    _serverQueriesDisabledTracker.stop();
     _realtimeLuceneIndexRefreshState.stop();
     LOGGER.info("Deregistering service status handler");
     ServiceStatus.removeServiceStatusCallback(_instanceId);

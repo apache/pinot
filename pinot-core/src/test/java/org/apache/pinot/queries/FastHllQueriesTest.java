@@ -129,9 +129,11 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 30000L, 0L, 90000L, 30000L);
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
     GroupKeyGenerator.GroupKey firstGroupKey = aggregationGroupByResult.getGroupKeyIterator().next();
-    Assert.assertEquals(firstGroupKey._stringKey, "");
-    Assert.assertEquals(((HyperLogLog) aggregationGroupByResult.getResultForKey(firstGroupKey, 0)).cardinality(), 21L);
-    Assert.assertEquals(((HyperLogLog) aggregationGroupByResult.getResultForKey(firstGroupKey, 1)).cardinality(), 691L);
+    Assert.assertEquals(firstGroupKey._keys[0], "");
+    Assert.assertEquals(
+        ((HyperLogLog) aggregationGroupByResult.getResultForGroupId(0, firstGroupKey._groupId)).cardinality(), 21L);
+    Assert.assertEquals(
+        ((HyperLogLog) aggregationGroupByResult.getResultForGroupId(1, firstGroupKey._groupId)).cardinality(), 691L);
 
     // Test inter segments base query
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(BASE_QUERY);

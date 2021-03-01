@@ -33,7 +33,7 @@ import static org.apache.pinot.controller.recommender.rules.io.params.Recommende
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class FieldMetadata extends FieldSpec {
-  double _cardinality = DEFAULT_CARDINALITY;
+  int _cardinality = DEFAULT_CARDINALITY;
   int _averageLength = DEFAULT_DATA_LENGTH;
   double _numValuesPerEntry = DEFAULT_AVERAGE_NUM_VALUES_PER_ENTRY; // for multi-values
 
@@ -55,12 +55,12 @@ public class FieldMetadata extends FieldSpec {
     this._numValuesPerEntry = numValuesPerEntry;
   }
 
-  public double getCardinality() {
+  public int getCardinality() {
     return _cardinality;
   }
 
   @JsonSetter(nulls = Nulls.SKIP)
-  public void setCardinality(double cardinality) {
+  public void setCardinality(int cardinality) {
     this._cardinality = cardinality;
   }
 

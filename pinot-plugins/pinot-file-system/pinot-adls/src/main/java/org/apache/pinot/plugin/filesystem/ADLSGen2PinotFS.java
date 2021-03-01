@@ -83,7 +83,7 @@ public class ADLSGen2PinotFS extends PinotFS {
   private static final String AZURE_STORAGE_DNS_SUFFIX = ".dfs.core.windows.net";
   private static final String AZURE_BLOB_DNS_SUFFIX = ".blob.core.windows.net";
   private static final String PATH_ALREADY_EXISTS_ERROR_CODE = "PathAlreadyExists";
-  private static final String FILE_SYSTEM_NOT_FOUND_ERROR_CODE = "FilesystemNotFound";
+  private static final String CONTAINER_NOT_FOUND_ERROR_CODE = "ContainerNotFound";
   private static final String IS_DIRECTORY_KEY = "hdi_isfolder";
 
   private static final int NOT_FOUND_STATUS_CODE = 404;
@@ -172,7 +172,7 @@ public class ADLSGen2PinotFS extends PinotFS {
       fileSystemClient.getProperties();
       return fileSystemClient;
     } catch (DataLakeStorageException e) {
-      if (e.getStatusCode() == NOT_FOUND_STATUS_CODE && e.getErrorCode().equals(FILE_SYSTEM_NOT_FOUND_ERROR_CODE)) {
+      if (e.getStatusCode() == NOT_FOUND_STATUS_CODE && e.getErrorCode().equals(CONTAINER_NOT_FOUND_ERROR_CODE)) {
         LOGGER.info("FileSystem with name {} does not exist. Creating one with the same name.", fileSystemName);
         return serviceClient.createFileSystem(fileSystemName);
       } else {

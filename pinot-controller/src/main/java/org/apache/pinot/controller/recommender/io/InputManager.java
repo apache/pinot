@@ -155,8 +155,9 @@ public class InputManager {
     }
 
     _metaDataMap.keySet().forEach(colName -> {
-      double cardinality = _metaDataMap.get(colName).getCardinality();
-      _metaDataMap.get(colName).setCardinality(regulateCardinalityInfinitePopulation(cardinality, sampleSize));
+      int cardinality = _metaDataMap.get(colName).getCardinality();
+      double regulatedCardinality = regulateCardinalityInfinitePopulation(cardinality, sampleSize);
+      _metaDataMap.get(colName).setCardinality((int) Math.round(regulatedCardinality));
     });
   }
 

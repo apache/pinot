@@ -21,7 +21,6 @@ package org.apache.pinot.core.data.manager.realtime;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
-import com.yammer.metrics.core.Meter;
 import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -41,6 +40,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -428,8 +428,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   private void processStreamEvents(MessageBatch messagesAndOffsets, long idlePipeSleepTimeMillis) {
-    Meter realtimeRowsConsumedMeter = null;
-    Meter realtimeRowsDroppedMeter = null;
+    PinotMeter realtimeRowsConsumedMeter = null;
+    PinotMeter realtimeRowsDroppedMeter = null;
 
     int indexedMessageCount = 0;
     int streamMessageCount = 0;

@@ -129,6 +129,11 @@ public class BytesOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
   }
 
   @Override
+  public Object getInternal(int dictId) {
+    return getByteArrayValue(dictId);
+  }
+
+  @Override
   public int getIntValue(int dictId) {
     throw new UnsupportedOperationException();
   }
@@ -158,6 +163,11 @@ public class BytesOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
     return getByteArrayValue(dictId).getBytes();
   }
 
+  @Override
+  public ByteArray getByteArrayValue(int dictId) {
+    return (ByteArray) super.get(dictId);
+  }
+
   private void updateMinMax(byte[] value) {
     if (_min == null) {
       _min = value;
@@ -170,9 +180,5 @@ public class BytesOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
         _max = value;
       }
     }
-  }
-
-  private ByteArray getByteArrayValue(int dictId) {
-    return (ByteArray) super.get(dictId);
   }
 }

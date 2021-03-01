@@ -18,14 +18,10 @@
  */
 package org.apache.pinot.compat.tests;
 
-import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import java.io.IOException;
 import java.io.InputStream;
-import org.apache.pinot.compat.tests.BaseOp;
-import org.apache.pinot.compat.tests.CompatTestOperation;
+
 
 public class CompatibilityOpsRunner {
   private static final String ROOT_DIR = "compat-tests";
@@ -36,8 +32,7 @@ public class CompatibilityOpsRunner {
     _configFileName = configFileName;
   }
 
-  private boolean runOps()
-      throws IOException, JsonParseException, JsonMappingException {
+  private boolean runOps() throws Exception {
     String filePath = ROOT_DIR + "/" + _configFileName;
     InputStream inputStream = getClass().getClassLoader().getResourceAsStream(filePath);
 
@@ -56,7 +51,7 @@ public class CompatibilityOpsRunner {
     return passed;
   }
 
-  public static void main(String[] args) throws  Exception {
+  public static void main(String[] args) throws Exception {
     if (args.length < 1 || args.length > 1) {
       throw new IllegalArgumentException("Need exactly one file name as argument");
     }

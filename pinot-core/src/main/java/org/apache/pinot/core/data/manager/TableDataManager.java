@@ -114,6 +114,11 @@ public interface TableDataManager {
   void releaseSegment(SegmentDataManager segmentDataManager);
 
   /**
+   * Returns the number of segments managed by this instance.
+   */
+  int getNumSegments();
+
+  /**
    * Returns the table name managed by this instance.
    */
   String getTableName();

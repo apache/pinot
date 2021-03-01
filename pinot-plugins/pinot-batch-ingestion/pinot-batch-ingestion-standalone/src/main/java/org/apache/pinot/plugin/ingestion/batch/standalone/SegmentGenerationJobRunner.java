@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.ingestion.batch.standalone;
 
 import java.io.File;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.nio.file.FileSystems;
 import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
@@ -198,7 +199,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
             String segmentName = taskRunner.run();
             // Tar segment directory to compress file
             localSegmentDir = new File(localOutputTempDir, segmentName);
-            String segmentTarFileName = segmentName + Constants.TAR_GZ_FILE_EXT;
+            String segmentTarFileName = URLEncoder.encode(segmentName + Constants.TAR_GZ_FILE_EXT, "UTF-8");
             localSegmentTarFile = new File(localOutputTempDir, segmentTarFileName);
             LOGGER.info("Tarring segment from: {} to: {}", localSegmentDir, localSegmentTarFile);
             TarGzCompressionUtils.createTarGzFile(localSegmentDir, localSegmentTarFile);

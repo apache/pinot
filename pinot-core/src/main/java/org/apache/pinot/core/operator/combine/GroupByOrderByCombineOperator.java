@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.combine;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -30,7 +31,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.Function;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
@@ -48,7 +48,6 @@ import org.apache.pinot.core.query.exception.EarlyTerminationException;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.trace.TraceRunnable;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -149,8 +148,8 @@ public class GroupByOrderByCombineOperator extends BaseOperator<IntermediateResu
                   // there won't be any trimming during upsert in this case.
                   // thus we can avoid the overhead of read-lock and write-lock
                   // in the upsert method.
-                  _indexedTable = new UnboundedConcurrentIndexedTable(_dataSchema, _queryContext,
-                      _trimSize, _trimThreshold);
+                  _indexedTable =
+                      new UnboundedConcurrentIndexedTable(_dataSchema, _queryContext, _trimSize, _trimThreshold);
                 } else {
                   _indexedTable = new ConcurrentIndexedTable(_dataSchema, _queryContext, _trimSize, _trimThreshold);
                 }
@@ -168,53 +167,17 @@ public class GroupByOrderByCombineOperator extends BaseOperator<IntermediateResu
             // Merge aggregation group-by result.
             AggregationGroupByResult aggregationGroupByResult = intermediateResultsBlock.getAggregationGroupByResult();
             if (aggregationGroupByResult != null) {
-              if (numGroupByExpressions == 1) {
-                // Get converter function
-                Function converterFunction = getConverterFunction(_dataSchema.getColumnDataType(0));
-
-                // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
-                Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
-                while (groupKeyIterator.hasNext()) {
-                  Object[] values = new Object[numColumns];
-                  GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
-                  Object convertedKey = converterFunction.apply(groupKey._stringKey);
-                  values[0] = convertedKey;
-                  for (int i = 0; i < numAggregationFunctions; i++) {
-                    values[i + 1] = aggregationGroupByResult.getResultForKey(groupKey, i);
-                  }
-                  Key key = new Key(new Object[]{convertedKey});
-                  Record record = new Record(values);
-                  _indexedTable.upsert(key, record);
+              // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
+              Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
+              while (groupKeyIterator.hasNext()) {
+                GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
+                Object[] keys = groupKey._keys;
+                Object[] values = Arrays.copyOf(keys, numColumns);
+                int groupId = groupKey._groupId;
+                for (int i = 0; i < numAggregationFunctions; i++) {
+                  values[numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
                 }
-              } else {
-                // Get converter functions
-                Function[] converterFunctions = new Function[numGroupByExpressions];
-                for (int i = 0; i < numGroupByExpressions; i++) {
-                  converterFunctions[i] = getConverterFunction(_dataSchema.getColumnDataType(i));
-                }
-
-                // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
-                Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
-                while (groupKeyIterator.hasNext()) {
-                  Object[] values = new Object[numColumns];
-                  int columnIndex = 0;
-                  GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
-                  String[] stringKeys = groupKey.getKeys();
-                  Object[] objectKeys = new Object[numGroupByExpressions];
-                  for (int i = 0; i < numGroupByExpressions; i++) {
-                    Object convertedKey = converterFunctions[i].apply(stringKeys[i]);
-                    objectKeys[columnIndex] = convertedKey;
-                    values[columnIndex] = convertedKey;
-                    columnIndex++;
-                  }
-                  for (int i = 0; i < numAggregationFunctions; i++) {
-                    values[columnIndex] = aggregationGroupByResult.getResultForKey(groupKey, i);
-                    columnIndex++;
-                  }
-                  Key key = new Key(objectKeys);
-                  Record record = new Record(values);
-                  _indexedTable.upsert(key, record);
-                }
+                _indexedTable.upsert(new Key(keys), new Record(values));
               }
             }
           } catch (EarlyTerminationException e) {
@@ -271,26 +234,6 @@ public class GroupByOrderByCombineOperator extends BaseOperator<IntermediateResu
       }
       // Deregister the main thread and wait for all threads done
       phaser.awaitAdvance(phaser.arriveAndDeregister());
-    }
-  }
-
-  private Function<String, Object> getConverterFunction(DataSchema.ColumnDataType columnDataType) {
-    switch (columnDataType) {
-      case INT:
-        return Integer::valueOf;
-      case LONG:
-        return Long::valueOf;
-      case FLOAT:
-        return Float::valueOf;
-      case DOUBLE:
-        return Double::valueOf;
-      case STRING:
-        return s -> s;
-      case BYTES:
-        return BytesUtils::toByteArray;
-      // Add other group-by column type supports here
-      default:
-        throw new IllegalStateException();
     }
   }
 

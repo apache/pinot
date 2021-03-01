@@ -24,15 +24,6 @@ printenv
 # Java version
 java -version
 
-# Check ThirdEye related changes
-DIFF_URL=$(jq -r ".pull_request.diff_url" "${GITHUB_EVENT_PATH}")
-curl -L ${DIFF_URL} |grep -E '^diff --git'
-curl -L ${DIFF_URL} |grep -E '^diff --git' |grep -E '( a/thirdeye)|( b/thirdeye)'
-if [ $? -eq 0 ]; then
-  echo 'Skip ThirdEye tests for Quickstart'
-  exit 0
-fi
-
 # Build
 PASS=0
 for i in $(seq 1 5)
