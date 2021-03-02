@@ -60,7 +60,9 @@ public class SegmentGenerationTaskRunner implements Serializable {
   public static final String EXCLUDE_SEQUENCE_ID = "exclude.sequence.id";
 
   // Assign sequence ids to input files based at each local directory level
-  public static final String LOCAL_DIRECTORY_SEQUENCE_ID = "local.directory.sequence.id";
+  @Deprecated
+  public static final String DEPRECATED_USE_LOCAL_DIRECTORY_SEQUENCE_ID = "local.directory.sequence.id";
+  public static final String USE_GLOBAL_DIRECTORY_SEQUENCE_ID = "use.global.directory.sequence.id";
 
   private SegmentGenerationTaskSpec _taskSpec;
 
