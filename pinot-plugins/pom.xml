@@ -44,6 +44,7 @@
     <module>pinot-file-system</module>
     <module>pinot-batch-ingestion</module>
     <module>pinot-stream-ingestion</module>
+    <module>pinot-minion-tasks</module>
   </modules>
 
   <dependencies>

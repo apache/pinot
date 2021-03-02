@@ -44,17 +44,18 @@ public class TaskGeneratorRegistry {
   private final Map<String, PinotTaskGenerator> _taskGeneratorRegistry = new HashMap<>();
 
   /**
+   * The package regex pattern for auto-registered {@link TaskGenerator}.
+   */
+  public static final String TASK_GENERATOR_PACKAGE_REGEX_PATTERN = ".*\\.plugin\\.minion\\.tasks\\..*";
+
+  /**
    * Registers the task generators via reflection.
-   * NOTE: In order to plugin a class using reflection, the class should include ".generator." in its class path. This
-   *       convention can significantly reduce the time of class scanning.
+   * NOTE: In order to plugin a class using reflection, the class should include ".plugin.minion.tasks." in its class
+   * path. This convention can significantly reduce the time of class scanning.
    */
   public TaskGeneratorRegistry(ClusterInfoAccessor clusterInfoAccessor) {
     long startTimeMs = System.currentTimeMillis();
-    Reflections reflections = new Reflections(
-        new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage("org.apache.pinot"))
-            .filterInputsBy(new FilterBuilder.Include(".*\\.generator\\..*"))
-            .setScanners(new TypeAnnotationsScanner()));
-    Set<Class<?>> classes = reflections.getTypesAnnotatedWith(TaskGenerator.class, true);
+    Set<Class<?>> classes = getTaskGeneratorClasses();
     for (Class<?> clazz : classes) {
       TaskGenerator annotation = clazz.getAnnotation(TaskGenerator.class);
       if (annotation.enabled()) {
@@ -69,6 +70,15 @@ public class TaskGeneratorRegistry {
     }
     LOGGER.info("Initialized TaskGeneratorRegistry with {} task generators: {} in {}ms", _taskGeneratorRegistry.size(),
         _taskGeneratorRegistry.keySet(), System.currentTimeMillis() - startTimeMs);
+  }
+
+  public static Set<Class<?>> getTaskGeneratorClasses() {
+    Reflections reflections = new Reflections(
+        new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage("org.apache.pinot"))
+            .filterInputsBy(new FilterBuilder.Include(TASK_GENERATOR_PACKAGE_REGEX_PATTERN))
+            .setScanners(new TypeAnnotationsScanner()));
+    Set<Class<?>> classes = reflections.getTypesAnnotatedWith(TaskGenerator.class, true);
+    return classes;
   }
 
   /**

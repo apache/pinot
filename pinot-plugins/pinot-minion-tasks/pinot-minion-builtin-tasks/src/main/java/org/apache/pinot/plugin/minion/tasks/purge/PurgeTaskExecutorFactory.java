@@ -16,24 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.annotations.minion;
+package org.apache.pinot.plugin.minion.tasks.purge;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
+import org.apache.pinot.minion.executor.PinotTaskExecutor;
+import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
+import org.apache.pinot.spi.annotations.minion.TaskExecutorFactory;
 
 
-/**
- * Annotation for Minion task generators.
- *
- * NOTE:
- *   - The annotated class must implement the PinotTaskGenerator interface
- *   - The annotated class must be under the package of name 'org.apache.pinot.plugin.minion.tasks.*' to be auto-registered.
- */
-@Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.TYPE)
-public @interface TaskGenerator {
+@TaskExecutorFactory
+public class PurgeTaskExecutorFactory implements PinotTaskExecutorFactory {
 
-  boolean enabled() default true;
+  @Override
+  public void init(MinionTaskZkMetadataManager zkMetadataManager) {
+  }
+
+  @Override
+  public String getTaskType() {
+    return MinionConstants.PurgeTask.TASK_TYPE;
+  }
+
+  @Override
+  public PinotTaskExecutor create() {
+    return new PurgeTaskExecutor();
+  }
 }
