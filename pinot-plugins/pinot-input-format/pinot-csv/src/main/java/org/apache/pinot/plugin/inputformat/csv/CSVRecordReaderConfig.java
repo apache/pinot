@@ -27,13 +27,14 @@ import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 public class CSVRecordReaderConfig implements RecordReaderConfig {
   public static final char DEFAULT_DELIMITER = ',';
   public static final char DEFAULT_MULTI_VALUE_DELIMITER = ';';
+  public static final char DEFAULT_ESCAPE = '\\';
 
   private String _fileFormat;
   private String _header;
   private char _delimiter = DEFAULT_DELIMITER;
   private char _multiValueDelimiter = DEFAULT_MULTI_VALUE_DELIMITER;
   private Character _commentMarker;  // Default is null
-  private char _escapeCharacter;
+  private char _escapeCharacter = DEFAULT_ESCAPE;
 
   public String getFileFormat() {
     return _fileFormat;

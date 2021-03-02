@@ -53,7 +53,9 @@ public class CSVRecordReader implements RecordReader {
     CSVRecordReaderConfig config = (CSVRecordReaderConfig) recordReaderConfig;
     char multiValueDelimiter;
     if (config == null) {
-      _format = CSVFormat.DEFAULT.withDelimiter(CSVRecordReaderConfig.DEFAULT_DELIMITER).withHeader();
+      _format = CSVFormat.DEFAULT.
+          withDelimiter(CSVRecordReaderConfig.DEFAULT_DELIMITER).
+          withEscape(CSVRecordReaderConfig.DEFAULT_ESCAPE).withHeader();
       multiValueDelimiter = CSVRecordReaderConfig.DEFAULT_MULTI_VALUE_DELIMITER;
     } else {
       CSVFormat format;
