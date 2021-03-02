@@ -87,13 +87,9 @@ public class CSVRecordReader implements RecordReader {
       } else {
         format = format.withHeader(StringUtils.split(csvHeader, delimiter));
       }
-
       Character commentMarker = config.getCommentMarker();
       format = format.withCommentMarker(commentMarker);
-
-      char escapeCharacter = config.getEscapeCharacter();
-      format = format.withEscape(escapeCharacter);
-
+      format = format.withEscape(config.getEscapeCharacter());
       _format = format;
       multiValueDelimiter = config.getMultiValueDelimiter();
     }

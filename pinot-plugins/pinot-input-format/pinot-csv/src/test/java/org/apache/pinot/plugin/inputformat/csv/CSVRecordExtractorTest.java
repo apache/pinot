@@ -120,7 +120,6 @@ public class CSVRecordExtractorTest extends AbstractRecordExtractorTest {
     BufferedWriter writer = new BufferedWriter(new FileWriter(escapedFile));
     writer.write("first,second\n");
     writer.write("string1, string2\\, string3");
-    writer.flush();
     writer.close();
 
     // Try to parse CSV file with escaped comma.
@@ -129,12 +128,12 @@ public class CSVRecordExtractorTest extends AbstractRecordExtractorTest {
     fieldsToRead.add("first");
     fieldsToRead.add("second");
     csvRecordReader.init(escapedFile, fieldsToRead, csvRecordReaderConfig);
-
     GenericRow genericRow = new GenericRow();
     csvRecordReader.rewind();
+
+    // check if parsing succeeded.
     Assert.assertTrue(csvRecordReader.hasNext());
     csvRecordReader.next(genericRow);
-
     Assert.assertEquals(genericRow.getValue("first"), "string1");
     Assert.assertEquals(genericRow.getValue("second"), " string2, string3");
   }
