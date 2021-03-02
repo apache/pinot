@@ -113,7 +113,7 @@ public class CSVRecordExtractorTest extends AbstractRecordExtractorTest {
     throws Exception {
     // Create CSV config with backslash as escape character.
     CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
-    Assert.assertEquals(csvRecordReaderConfig.getEscapeCharacter(), '\\');
+    csvRecordReaderConfig.setEscapeCharacter('\\');
 
     // Create a CSV file where records have two values and the second value contains an escaped comma.
     File escapedFile = new File(_tempDir, "escape.csv");
