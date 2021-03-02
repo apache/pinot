@@ -25,12 +25,12 @@ import org.apache.pinot.spi.ingestion.batch.spec.SegmentNameGeneratorSpec;
 public class SegmentGenerationJobUtils implements Serializable {
 
   /**
-   * Always use local directory sequence id unless explicitly configured.
+   * Always use local directory sequence id unless explicitly config: "use.global.directory.sequence.id".
    *
    */
-  public static boolean useLocalDirectorySequenceId(SegmentNameGeneratorSpec spec) {
+  public static boolean useGlobalDirectorySequenceId(SegmentNameGeneratorSpec spec) {
     if (spec == null || spec.getConfigs() == null) {
-      return true;
+      return false;
     }
     String useGlobalDirectorySequenceId =
         spec.getConfigs().get(SegmentGenerationTaskRunner.USE_GLOBAL_DIRECTORY_SEQUENCE_ID);
@@ -38,9 +38,9 @@ public class SegmentGenerationJobUtils implements Serializable {
       String useLocalDirectorySequenceId =
           spec.getConfigs().get(SegmentGenerationTaskRunner.DEPRECATED_USE_LOCAL_DIRECTORY_SEQUENCE_ID);
       if (useLocalDirectorySequenceId != null) {
-        return Boolean.parseBoolean(useLocalDirectorySequenceId);
+        return !Boolean.parseBoolean(useLocalDirectorySequenceId);
       }
     }
-    return !Boolean.parseBoolean(useGlobalDirectorySequenceId);
+    return Boolean.parseBoolean(useGlobalDirectorySequenceId);
   }
 }

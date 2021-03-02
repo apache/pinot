@@ -55,7 +55,6 @@ import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationTaskSpec;
-import org.apache.pinot.spi.ingestion.batch.spec.SegmentNameGeneratorSpec;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.spark.SparkContext;
@@ -210,7 +209,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
       }
 
       List<String> pathAndIdxList = new ArrayList<>();
-      if (SegmentGenerationJobUtils.useLocalDirectorySequenceId(_spec.getSegmentNameGeneratorSpec())) {
+      if (!SegmentGenerationJobUtils.useGlobalDirectorySequenceId(_spec.getSegmentNameGeneratorSpec())) {
         Map<String, List<String>> localDirIndex = new HashMap<>();
         for (String filteredFile : filteredFiles) {
           Path filteredParentPath = Paths.get(filteredFile).getParent();

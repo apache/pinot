@@ -219,7 +219,7 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
       throw new RuntimeException(errorMessage);
     } else {
       LOGGER.info("Creating segments with data files: {}", filteredFiles);
-      if (SegmentGenerationJobUtils.useLocalDirectorySequenceId(_spec.getSegmentNameGeneratorSpec())) {
+      if (!SegmentGenerationJobUtils.useGlobalDirectorySequenceId(_spec.getSegmentNameGeneratorSpec())) {
         Map<String, List<String>> localDirIndex = new HashMap<>();
         for (String filteredFile : filteredFiles) {
           java.nio.file.Path filteredParentPath = Paths.get(filteredFile).getParent();

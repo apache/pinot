@@ -29,23 +29,23 @@ import org.testng.annotations.Test;
 public class SegmentGenerationJobUtilsTest {
 
   @Test
-  public void testUseLocalDirectorySequenceId() {
-    Assert.assertTrue(SegmentGenerationJobUtils.useLocalDirectorySequenceId(null));
+  public void testUseGlobalDirectorySequenceId() {
+    Assert.assertFalse(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(null));
     SegmentNameGeneratorSpec spec = new SegmentNameGeneratorSpec();
-    Assert.assertTrue(SegmentGenerationJobUtils.useLocalDirectorySequenceId(spec));
+    Assert.assertFalse(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
     spec.setConfigs(new HashMap<>());
-    Assert.assertTrue(SegmentGenerationJobUtils.useLocalDirectorySequenceId(spec));
+    Assert.assertFalse(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
     spec.setConfigs(ImmutableMap.of("use.global.directory.sequence.id", "false"));
-    Assert.assertTrue(SegmentGenerationJobUtils.useLocalDirectorySequenceId(spec));
+    Assert.assertFalse(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
     spec.setConfigs(ImmutableMap.of("use.global.directory.sequence.id", "FALSE"));
-    Assert.assertTrue(SegmentGenerationJobUtils.useLocalDirectorySequenceId(spec));
+    Assert.assertFalse(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
     spec.setConfigs(ImmutableMap.of("use.global.directory.sequence.id", "True"));
-    Assert.assertFalse(SegmentGenerationJobUtils.useLocalDirectorySequenceId(spec));
+    Assert.assertTrue(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
     spec.setConfigs(ImmutableMap.of("local.directory.sequence.id", "true"));
-    Assert.assertTrue(SegmentGenerationJobUtils.useLocalDirectorySequenceId(spec));
+    Assert.assertFalse(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
     spec.setConfigs(ImmutableMap.of("local.directory.sequence.id", "TRUE"));
-    Assert.assertTrue(SegmentGenerationJobUtils.useLocalDirectorySequenceId(spec));
+    Assert.assertFalse(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
     spec.setConfigs(ImmutableMap.of("local.directory.sequence.id", "False"));
-    Assert.assertFalse(SegmentGenerationJobUtils.useLocalDirectorySequenceId(spec));
+    Assert.assertTrue(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
   }
 }
