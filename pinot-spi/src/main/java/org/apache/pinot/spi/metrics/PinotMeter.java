@@ -24,7 +24,7 @@ package org.apache.pinot.spi.metrics;
  *
  * @see <a href="http://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average">EMA</a>
  */
-public interface PinotMeter {
+public interface PinotMeter extends PinotMetered {
 
 
   /**
