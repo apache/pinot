@@ -50,16 +50,7 @@
       <groupId>com.azure</groupId>
       <artifactId>azure-identity</artifactId>
       <version>1.2.2</version>
-      <exclusions>
-        <exclusion>
-          <groupId>com.madgag.spongycastle</groupId>
-          <artifactId>core</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>xpp3</groupId>
-          <artifactId>xpp3</artifactId>
-        </exclusion>
-      </exclusions>
+      <scope>provided</scope>
     </dependency>
   </dependencies>
   <dependencyManagement>
