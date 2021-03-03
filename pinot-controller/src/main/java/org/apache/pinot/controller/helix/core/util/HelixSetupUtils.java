@@ -43,8 +43,10 @@ import org.apache.helix.model.StateModelDefinition;
 import org.apache.helix.model.builder.CustomModeISBuilder;
 import org.apache.helix.model.builder.FullAutoModeISBuilder;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.pinot.common.rackawareness.Provider;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixBrokerResourceOnlineOfflineStateModelGenerator;
 import org.apache.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import org.slf4j.Logger;
@@ -59,13 +61,13 @@ public class HelixSetupUtils {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixSetupUtils.class);
 
-  public static HelixManager setupHelixController(String helixClusterName, String zkPath, String instanceId) {
-    setupHelixClusterIfNeeded(helixClusterName, zkPath);
+  public static HelixManager setupHelixController(String helixClusterName, String zkPath, String instanceId, ControllerConf config) {
+    setupHelixClusterIfNeeded(helixClusterName, zkPath, config);
     return HelixControllerMain
         .startHelixController(zkPath, helixClusterName, instanceId, HelixControllerMain.STANDALONE);
   }
 
-  private static void setupHelixClusterIfNeeded(String helixClusterName, String zkPath) {
+  private static void setupHelixClusterIfNeeded(String helixClusterName, String zkPath, ControllerConf config) {
     HelixAdmin admin = null;
     try {
       admin = new ZKHelixAdmin(zkPath);
@@ -82,14 +84,9 @@ public class HelixSetupUtils {
         configMap.put(ENABLE_CASE_INSENSITIVE_KEY, Boolean.toString(false));
         configMap.put(DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(DEFAULT_HYPERLOGLOG_LOG2M));
         configMap.put(CommonConstants.Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, Boolean.toString(false));
-        configMap.put(RACK_AWARENESS_ENABLED_KEY, Boolean.toString(RACK_AWARENESS_ENABLED_DEFAULT_VALUE));
-        configMap.put(RACK_AWARENESS_PROCESSOR_CLASS_KEY, RACK_AWARENESS_PROCESSOR_CLASS_DEFAULT_VALUE);
-        configMap.put(RACK_AWARENESS_CONNECTION_MAX_RETRY_KEY,
-            Integer.toString(RACK_AWARENESS_CONNECTION_MAX_RETRY_DEFAULT_VALUE));
-        configMap.put(RACK_AWARENESS_CONNECTION_CONNECTION_TIME_OUT_KEY,
-            Integer.toString(RACK_AWARENESS_CONNECTION_CONNECTION_TIME_OUT_DEFAULT_VALUE));
-        configMap.put(RACK_AWARENESS_CONNECTION_REQUEST_TIME_OUT_KEY,
-            Integer.toString(RACK_AWARENESS_CONNECTION_REQUEST_TIME_OUT_DEFAULT_VALUE));
+        configMap.put(RACK_AWARENESS_ENABLED_KEY, Boolean.toString(config.getRackAwarenessEnable()));
+        configMap.put(RACK_AWARENESS_PROVIDER_KEY, config.getRackAwarenessProvider().map(Provider::toString).orElse(
+            RACK_AWARENESS_PROVIDER_DEFAULT_VALUE));
         admin.setConfig(configScope, configMap);
         LOGGER.info("New Helix cluster: {} created", helixClusterName);
       }

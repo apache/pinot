@@ -28,6 +28,8 @@ import java.net.UnknownHostException;
 import java.util.Properties;
 import javax.net.ssl.SSLException;
 import javax.ws.rs.WebApplicationException;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.http.HttpEntityEnclosingRequest;
 import org.apache.http.HttpStatus;
 import org.apache.http.StatusLine;
@@ -39,6 +41,7 @@ import org.apache.http.client.protocol.HttpClientContext;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,20 +62,20 @@ public class AzureInstanceMetadataFetcher implements InstanceMetadataFetchable {
   private final CloseableHttpClient _closeableHttpClient;
 
 
-  public AzureInstanceMetadataFetcher(InstanceMetadataFetcherProperties properties) {
-    InstanceMetadataFetcherProperties instanceMetadataFetcherProperties =
-        new InstanceMetadataFetcherProperties(properties);
-    Preconditions.checkNotNull(instanceMetadataFetcherProperties,
-        "instanceMetadataFetcherProperties cannot be null.");
+  public AzureInstanceMetadataFetcher(ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    AzureInstanceMetadataFetcherProperties azureInstanceMetadataFetcherProperties =
+        ZKMetadataProvider.getAzureInstanceMetadataFetcherProperties(propertyStore);
+    Preconditions.checkNotNull(azureInstanceMetadataFetcherProperties,
+        "azureInstanceMetadataFetcherProperties cannot be null.");
     _imdsEndpoint = Preconditions.checkNotNull(getImdsEndpointValue(),
         "imdsEndpoint cannot be null.");
 
     final RequestConfig requestConfig = RequestConfig.custom()
-        .setConnectTimeout(instanceMetadataFetcherProperties.getConnectionTimeOut())
-        .setConnectionRequestTimeout(instanceMetadataFetcherProperties.getRequestTimeOut())
+        .setConnectTimeout(azureInstanceMetadataFetcherProperties.getConnectionTimeOut())
+        .setConnectionRequestTimeout(azureInstanceMetadataFetcherProperties.getRequestTimeOut())
         .build();
 
-    final int maxRetry = instanceMetadataFetcherProperties.getMaxRetry();
+    final int maxRetry = azureInstanceMetadataFetcherProperties.getMaxRetry();
 
     final HttpRequestRetryHandler httpRequestRetryHandler = (iOException, executionCount, httpContext) -> {
       LOGGER.debug("Counting number for retry: {}", executionCount);

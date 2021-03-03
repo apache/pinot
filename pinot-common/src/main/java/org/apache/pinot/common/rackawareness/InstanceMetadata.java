@@ -29,13 +29,13 @@ import org.slf4j.LoggerFactory;
 public class InstanceMetadata {
   private static final Logger LOGGER = LoggerFactory.getLogger(InstanceMetadata.class);
 
-  private final String _faultDomain;
+  private final String _failureDomain;
 
-  InstanceMetadata(String faultDomain) {
-    this._faultDomain = Preconditions.checkNotNull(faultDomain, "faultDomain cannot be null.");
+  InstanceMetadata(String failureDomain) {
+    this._failureDomain = Preconditions.checkNotNull(failureDomain, "failureDomain cannot be null.");
   }
 
-  public String getFaultDomain() {
-    return _faultDomain;
+  public String getFailureDomain() {
+    return _failureDomain;
   }
 }

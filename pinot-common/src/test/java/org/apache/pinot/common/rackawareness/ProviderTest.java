@@ -18,30 +18,35 @@
  */
 package org.apache.pinot.common.rackawareness;
 
+import java.util.Optional;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
 /**
- * Unit test for {@link InstanceMetadataFetcherProperties}
+ * Unit test for {@link Provider}
  */
-public class InstanceMetadataFetcherPropertiesTest {
+public class ProviderTest {
   @Test
-  public void testConstructor() {
-    InstanceMetadataFetcherProperties properties = new InstanceMetadataFetcherProperties(3, 600_000, 600_000);
-    Assert.assertEquals(properties.getMaxRetry(), 3);
-    Assert.assertEquals(properties.getConnectionTimeOut(), 600_000);
-    Assert.assertEquals(properties.getRequestTimeOut(), 600_000);
+  public void testToString() {
+    Provider provider = Provider.AZURE;
+    Assert.assertEquals(provider.toString(), "azure");
   }
 
   @Test
-  public void testConstructorCopy() {
-    InstanceMetadataFetcherProperties properties = new InstanceMetadataFetcherProperties(
-        new InstanceMetadataFetcherProperties(3, 600_000, 600_000)
-    );
-    Assert.assertEquals(properties.getMaxRetry(), 3);
-    Assert.assertEquals(properties.getConnectionTimeOut(), 600_000);
-    Assert.assertEquals(properties.getRequestTimeOut(), 600_000);
+  public void testFromValidString() {
+    Optional<Provider> provider = Provider.fromString("azure");
+    Assert.assertSame(provider.get(), Provider.AZURE);
+
+    provider = Provider.fromString("AZURE");
+    Assert.assertSame(provider.get(), Provider.AZURE);
+
+    provider = Provider.fromString("aZure");
+    Assert.assertSame(provider.get(), Provider.AZURE);
   }
 
+  @Test void testFromInvalidString() {
+    Optional<Provider> unknownProvider = Provider.fromString("unknown");
+    Assert.assertFalse(unknownProvider.isPresent());
+  }
 }

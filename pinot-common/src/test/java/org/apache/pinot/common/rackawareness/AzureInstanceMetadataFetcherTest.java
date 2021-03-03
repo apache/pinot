@@ -73,7 +73,7 @@ public class AzureInstanceMetadataFetcherTest {
 
     final InstanceMetadata instanceMetadata = _underTest.fetch();
 
-    Assert.assertEquals(instanceMetadata.getFaultDomain(), "36");
+    Assert.assertEquals(instanceMetadata.getFailureDomain(), "36");
     Mockito.verify(_mockHttpClient).execute(Mockito.any(HttpGet.class));
     Mockito.verify(_mockHttpResponse).getStatusLine();
     Mockito.verify(_mockStatusLine).getStatusCode();

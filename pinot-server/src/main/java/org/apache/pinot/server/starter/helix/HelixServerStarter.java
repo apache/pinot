@@ -39,6 +39,7 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.SystemPropertyKeys;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
@@ -48,10 +49,12 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.Message;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.participant.statemachine.StateModelFactory;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.rackawareness.Provider;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Helix.Instance;
@@ -75,7 +78,6 @@ import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.server.starter.ServerQueriesDisabledTracker;
 import org.apache.pinot.common.rackawareness.InstanceMetadata;
-import org.apache.pinot.common.rackawareness.InstanceMetadataFetcherProperties;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.plugin.PluginManager;
@@ -107,7 +109,7 @@ import org.slf4j.LoggerFactory;
  */
 public class HelixServerStarter implements ServiceStartable {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixServerStarter.class);
-  private static final String FAULT_DOMAIN = "faultDomain";
+  private static final String FAILURE_DOMAIN = "failureDomain";
   private static final String HOSTNAME = "hostname";
 
   private final String _helixClusterName;
@@ -347,24 +349,21 @@ public class HelixServerStarter implements ServiceStartable {
     final HelixConfigScope helixConfigScope =
         new HelixConfigScopeBuilder(ConfigScopeProperty.CLUSTER).forCluster(_helixClusterName).build();
     final Map<String, String> rackAwarenessConfigMap = _helixAdmin.getConfig(helixConfigScope,
-        Arrays.asList(Helix.RACK_AWARENESS_ENABLED_KEY,
-            Helix.RACK_AWARENESS_PROCESSOR_CLASS_KEY,
-            Helix.RACK_AWARENESS_CONNECTION_MAX_RETRY_KEY,
-            Helix.RACK_AWARENESS_CONNECTION_CONNECTION_TIME_OUT_KEY,
-            Helix.RACK_AWARENESS_CONNECTION_REQUEST_TIME_OUT_KEY));
+        Arrays.asList(Helix.RACK_AWARENESS_ENABLED_KEY, Helix.RACK_AWARENESS_PROVIDER_KEY));
     final boolean rackAwarenessEnabled = Boolean.parseBoolean(rackAwarenessConfigMap.get(Helix.RACK_AWARENESS_ENABLED_KEY));
     if (rackAwarenessEnabled) {
       LOGGER.info("Rack awareness enabled. Setting instance domain with FD metadata.");
-      final InstanceMetadataFetcherProperties instanceMetadataFetcherProperties = new InstanceMetadataFetcherProperties(
-          Integer.parseInt(rackAwarenessConfigMap.get(Helix.RACK_AWARENESS_CONNECTION_MAX_RETRY_KEY)),
-          Integer.parseInt(rackAwarenessConfigMap.get(Helix.RACK_AWARENESS_CONNECTION_CONNECTION_TIME_OUT_KEY)),
-          Integer.parseInt(rackAwarenessConfigMap.get(Helix.RACK_AWARENESS_CONNECTION_REQUEST_TIME_OUT_KEY))
-      );
-      final InstanceMetadata instanceMetadata = getInstanceMetadata(
-          rackAwarenessConfigMap.get(Helix.RACK_AWARENESS_PROCESSOR_CLASS_KEY),
-          instanceMetadataFetcherProperties);
 
-      final String domain = FAULT_DOMAIN + "=" + instanceMetadata.getFaultDomain() + "," + HOSTNAME + "=" + _instanceId;
+      final String providerStr = rackAwarenessConfigMap.get(Helix.RACK_AWARENESS_PROVIDER_KEY);
+      Optional<Provider> provider = Provider.fromString(providerStr);
+
+      if (!provider.isPresent()) {
+        throw new RuntimeException(String.format("Provider %s is not defined.", providerStr));
+      }
+
+      final InstanceMetadata instanceMetadata = getInstanceMetadata(provider.get().getProcessorClassName(), _helixManager.getHelixPropertyStore());
+
+      final String domain = FAILURE_DOMAIN + "=" + instanceMetadata.getFailureDomain() + "," + HOSTNAME + "=" + _instanceId;
       LOGGER.info("Instance domain: " + domain);
 
       InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(_helixClusterName, _instanceId);
@@ -499,7 +498,7 @@ public class HelixServerStarter implements ServiceStartable {
   }
 
   private static InstanceMetadata getInstanceMetadata(String cloudMetadataFetcherClassName,
-      InstanceMetadataFetcherProperties instanceMetadataFetcherProperties) {
+      ZkHelixPropertyStore<ZNRecord> propertyStore) {
     Class<? extends InstanceMetadataFetchable> fetcherClass;
     try {
       fetcherClass = (Class<? extends InstanceMetadataFetchable>) Class.forName(cloudMetadataFetcherClassName);
@@ -509,16 +508,16 @@ public class HelixServerStarter implements ServiceStartable {
 
     Constructor<? extends InstanceMetadataFetchable> constructor;
     try {
-      constructor = fetcherClass.getConstructor(InstanceMetadataFetcherProperties.class);
+      constructor = fetcherClass.getConstructor(ZkHelixPropertyStore.class);
     } catch (NoSuchMethodException e) {
       throw new RuntimeException(String.format("No public constructor with parameter type class %s",
-          InstanceMetadataFetcherProperties.class.getName()), e);
+          ZkHelixPropertyStore.class.getName()), e);
     }
 
     InstanceMetadataFetchable fetchable;
 
     try {
-      fetchable = constructor.newInstance(instanceMetadataFetcherProperties);
+      fetchable = constructor.newInstance(propertyStore);
     } catch (IllegalAccessException e) {
       throw new RuntimeException("Constructor not accessible.", e);
     } catch (InstantiationException e) {

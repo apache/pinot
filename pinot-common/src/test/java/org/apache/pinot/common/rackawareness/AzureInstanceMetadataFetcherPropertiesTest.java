@@ -23,13 +23,25 @@ import org.testng.annotations.Test;
 
 
 /**
- * Unit test for {@link InstanceMetadata}
+ * Unit test for {@link AzureInstanceMetadataFetcherProperties}
  */
-public class InstanceMetadataTest {
-  private final static String FAILURE_DOMAIN = "1";
+public class AzureInstanceMetadataFetcherPropertiesTest {
   @Test
-  public void testGetters() {
-    InstanceMetadata metadata = new InstanceMetadata(FAILURE_DOMAIN);
-    Assert.assertEquals(metadata.getFailureDomain(), "1");
+  public void testConstructor() {
+    AzureInstanceMetadataFetcherProperties properties = new AzureInstanceMetadataFetcherProperties(3, 600_000, 600_000);
+    Assert.assertEquals(properties.getMaxRetry(), 3);
+    Assert.assertEquals(properties.getConnectionTimeOut(), 600_000);
+    Assert.assertEquals(properties.getRequestTimeOut(), 600_000);
   }
+
+  @Test
+  public void testConstructorCopy() {
+    AzureInstanceMetadataFetcherProperties properties = new AzureInstanceMetadataFetcherProperties(
+        new AzureInstanceMetadataFetcherProperties(3, 600_000, 600_000)
+    );
+    Assert.assertEquals(properties.getMaxRetry(), 3);
+    Assert.assertEquals(properties.getConnectionTimeOut(), 600_000);
+    Assert.assertEquals(properties.getRequestTimeOut(), 600_000);
+  }
+
 }
