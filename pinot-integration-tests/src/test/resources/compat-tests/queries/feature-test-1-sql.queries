@@ -1,89 +1,89 @@
 # Aggregation
-SELECT count(*) FROM FeatureTest1
-SELECT sum(intMetric1), sumMV(intDimMV1), min(intMetric1), minMV(intDimMV2), max(longDimSV1), maxMV(intDimMV1) FROM FeatureTest1
-SELECT count(longDimSV1), countMV(intDimMV1), avg(floatMetric1), avgMV(intDimMV2), minMaxRange(doubleMetric1), minMaxRangeMV(intDimMV2) FROM FeatureTest1
-SELECT percentile(longDimSV1, 80), percentileMV(intDimMV1, 90), percentileEst(longDimSV1, 80), percentileEstMV(intDimMV1, 90), percentileTDigest(longDimSV1, 80), percentileTDigestMV(intDimMV1, 90) FROM FeatureTest1
-SELECT distinctCount(longDimSV1), distinctCountMV(intDimMV1), distinctCountHLL(longDimSV1), distinctCountHLLMV(intDimMV1) FROM FeatureTest1
+SELECT count(*) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER
+SELECT sum(intMetric1), sumMV(intDimMV1), min(intMetric1), minMV(intDimMV2), max(longDimSV1), maxMV(intDimMV1) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER
+SELECT count(longDimSV1), countMV(intDimMV1), avg(floatMetric1), avgMV(intDimMV2), minMaxRange(doubleMetric1), minMaxRangeMV(intDimMV2) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER
+SELECT percentile(longDimSV1, 80), percentileMV(intDimMV1, 90), percentileEst(longDimSV1, 80), percentileEstMV(intDimMV1, 90), percentileTDigest(longDimSV1, 80), percentileTDigestMV(intDimMV1, 90) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER
+SELECT distinctCount(longDimSV1), distinctCountMV(intDimMV1), distinctCountHLL(longDimSV1), distinctCountHLLMV(intDimMV1) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER
 
 # Selection
-SELECT longDimSV2, stringDimSV1, textDim1, bytesDimSV1 FROM FeatureTest1 ORDER BY longDimSV2 LIMIT 9
-SELECT longDimSV2, stringDimSV1, textDim1, bytesDimSV1 FROM FeatureTest1 ORDER BY longDimSV2 DESC LIMIT 8
-SELECT longDimSV2, stringDimSV1, textDim1, bytesDimSV1 FROM FeatureTest1 ORDER BY longDimSV2 DESC, stringDimSV1 LIMIT 8
+SELECT longDimSV2, stringDimSV1, textDim1, bytesDimSV1 FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER ORDER BY longDimSV2 LIMIT 9
+SELECT longDimSV2, stringDimSV1, textDim1, bytesDimSV1 FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER ORDER BY longDimSV2 DESC LIMIT 8
+SELECT longDimSV2, stringDimSV1, textDim1, bytesDimSV1 FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER ORDER BY longDimSV2 DESC, stringDimSV1 LIMIT 8
 
 # Selection & Filtering
-SELECT textDim1, longDimSV2, doubleMetric1 FROM FeatureTest1 WHERE bytesDimSV1 = 'deed0507'
+SELECT textDim1, longDimSV2, doubleMetric1 FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER AND bytesDimSV1 = 'deed0507'
 # This is a subset comparison query: there are 4 qualified records in total, the query limit the number of returned records as 2,
 # the test compares the returned results to be a subset of total qualified results.
 # To generate the result file, use this query instead: SELECT textDim1, longDimSV2, doubleMetric1 FROM FeatureTest1 WHERE bytesDimSV1 = 'deed0507'
-SELECT textDim1, longDimSV2, doubleMetric1 FROM FeatureTest1 WHERE bytesDimSV1 = 'deed0507' LIMIT 2
+SELECT textDim1, longDimSV2, doubleMetric1 FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER AND bytesDimSV1 = 'deed0507' LIMIT 2
 # This is a query exhausting all records: there are 4 qualified records in total, the query limit the number of returned records as 10
-SELECT textDim1, longDimSV2, doubleMetric1 FROM FeatureTest1 WHERE bytesDimSV1 = 'deed0507' LIMIT 10
-SELECT stringDimSV1, longDimSV1, intDimMV1, intDimMV2, stringDimMV2 FROM FeatureTest1 WHERE stringDimSV1 != 's1-6' AND longDimSV1 BETWEEN 10 AND 1000 OR (intDimMV1 < 42 AND stringDimMV2 IN ('m2-0-0', 'm2-2-0') AND intDimMV2 NOT IN (6,72)) ORDER BY longDimSV1 LIMIT 5
-SELECT stringDimSV1, longDimSV1, intDimMV1, intDimMV2, stringDimMV2 FROM FeatureTest1 WHERE stringDimSV1 != 's1-6' AND longDimSV1 BETWEEN 10 AND 1000 OR (intDimMV1 < 42 AND stringDimMV2 IN ('m2-0-0', 'm2-2-0') AND intDimMV2 NOT IN (6,72)) ORDER BY longDimSV1 DESC
-SELECT stringDimSV1, longDimSV1, intDimMV1, intDimMV2, stringDimMV2 FROM FeatureTest1 WHERE stringDimSV1 != 's1-6' AND longDimSV1 BETWEEN 10 AND 1000 OR (intDimMV1 < 42 AND stringDimMV2 IN ('m2-0-0', 'm2-2-0') AND intDimMV2 NOT IN (6,72)) ORDER BY longDimSV1 DESC, stringDimSV1 LIMIT 3
+SELECT textDim1, longDimSV2, doubleMetric1 FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER AND bytesDimSV1 = 'deed0507' LIMIT 10
+SELECT stringDimSV1, longDimSV1, intDimMV1, intDimMV2, stringDimMV2 FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER AND stringDimSV1 != 's1-6' AND longDimSV1 BETWEEN 10 AND 1000 OR (intDimMV1 < 42 AND stringDimMV2 IN ('m2-0-0', 'm2-2-0') AND intDimMV2 NOT IN (6,72)) ORDER BY longDimSV1 LIMIT 5
+SELECT stringDimSV1, longDimSV1, intDimMV1, intDimMV2, stringDimMV2 FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER AND stringDimSV1 != 's1-6' AND longDimSV1 BETWEEN 10 AND 1000 OR (intDimMV1 < 42 AND stringDimMV2 IN ('m2-0-0', 'm2-2-0') AND intDimMV2 NOT IN (6,72)) ORDER BY longDimSV1 DESC
+SELECT stringDimSV1, longDimSV1, intDimMV1, intDimMV2, stringDimMV2 FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER AND stringDimSV1 != 's1-6' AND longDimSV1 BETWEEN 10 AND 1000 OR (intDimMV1 < 42 AND stringDimMV2 IN ('m2-0-0', 'm2-2-0') AND intDimMV2 NOT IN (6,72)) ORDER BY longDimSV1 DESC, stringDimSV1 LIMIT 3
 
 # Selection & Grouping on Aggregation
-SELECT longDimSV1, intDimMV1, count(*) FROM FeatureTest1 GROUP BY longDimSV1, intDimMV1 ORDER BY longDimSV1 LIMIT 5
-SELECT longDimSV1, intDimMV1, sum(intMetric1), sumMV(intDimMV1), min(intMetric1), minMV(intDimMV2), max(longDimSV1), maxMV(intDimMV1) FROM FeatureTest1 GROUP BY longDimSV1, intDimMV1 ORDER BY longDimSV1 LIMIT 5
-SELECT longDimSV1, intDimMV1, count(longDimSV1), countMV(intDimMV1), avg(floatMetric1), avgMV(intDimMV2), minMaxRange(doubleMetric1), minMaxRangeMV(intDimMV2) FROM FeatureTest1 GROUP BY longDimSV1, intDimMV1 ORDER BY longDimSV1 LIMIT 5
-SELECT longDimSV1, intDimMV1, percentile(longDimSV1, 80), percentileMV(intDimMV1, 90), percentileEst(longDimSV1, 80), percentileEstMV(intDimMV1, 90), percentileTDigest(longDimSV1, 80), percentileTDigestMV(intDimMV1, 90) FROM FeatureTest1 GROUP BY longDimSV1, intDimMV1 ORDER BY longDimSV1 LIMIT 5
-SELECT longDimSV1, intDimMV1, distinctCount(longDimSV1), distinctCountMV(intDimMV1), distinctCountHLL(longDimSV1), distinctCountHLLMV(intDimMV1) FROM FeatureTest1 GROUP BY longDimSV1, intDimMV1 ORDER BY longDimSV1 LIMIT 5
+SELECT longDimSV1, intDimMV1, count(*) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER GROUP BY longDimSV1, intDimMV1 ORDER BY longDimSV1 LIMIT 5
+SELECT longDimSV1, intDimMV1, sum(intMetric1), sumMV(intDimMV1), min(intMetric1), minMV(intDimMV2), max(longDimSV1), maxMV(intDimMV1) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER GROUP BY longDimSV1, intDimMV1 ORDER BY longDimSV1 LIMIT 5
+SELECT longDimSV1, intDimMV1, count(longDimSV1), countMV(intDimMV1), avg(floatMetric1), avgMV(intDimMV2), minMaxRange(doubleMetric1), minMaxRangeMV(intDimMV2) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER GROUP BY longDimSV1, intDimMV1 ORDER BY longDimSV1 LIMIT 5
+SELECT longDimSV1, intDimMV1, percentile(longDimSV1, 80), percentileMV(intDimMV1, 90), percentileEst(longDimSV1, 80), percentileEstMV(intDimMV1, 90), percentileTDigest(longDimSV1, 80), percentileTDigestMV(intDimMV1, 90) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER GROUP BY longDimSV1, intDimMV1 ORDER BY longDimSV1 LIMIT 5
+SELECT longDimSV1, intDimMV1, distinctCount(longDimSV1), distinctCountMV(intDimMV1), distinctCountHLL(longDimSV1), distinctCountHLLMV(intDimMV1) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER GROUP BY longDimSV1, intDimMV1 ORDER BY longDimSV1 LIMIT 5
 
 # Selection & Filtering & Grouping on Aggregation
-SELECT longDimSV1, intDimMV1, count(*) FROM FeatureTest1 WHERE stringDimSV1 != 's1-6' AND longDimSV1 BETWEEN 10 AND 1000 OR (intDimMV1 < 42 AND stringDimMV2 IN ('m2-0-0', 'm2-2-0') AND intDimMV2 NOT IN (6,72)) GROUP BY longDimSV1, intDimMV1 ORDER BY longDimSV1, intDimMV1 LIMIT 5
-SELECT longDimSV1, intDimMV1, sum(intMetric1), sumMV(intDimMV1), min(intMetric1), minMV(intDimMV2), max(longDimSV1), maxMV(intDimMV1) FROM FeatureTest1 WHERE stringDimSV1 != 's1-6' AND longDimSV1 BETWEEN 10 AND 1000 OR (intDimMV1 < 42 AND stringDimMV2 IN ('m2-0-0', 'm2-2-0') AND intDimMV2 NOT IN (6,72)) GROUP BY longDimSV1, intDimMV1 ORDER BY longDimSV1, intDimMV1 LIMIT 5
-SELECT longDimSV1, intDimMV1, count(longDimSV1), countMV(intDimMV1), avg(floatMetric1), avgMV(intDimMV2), minMaxRange(doubleMetric1), minMaxRangeMV(intDimMV2) FROM FeatureTest1 WHERE stringDimSV1 != 's1-6' AND longDimSV1 BETWEEN 10 AND 1000 OR (intDimMV1 < 42 AND stringDimMV2 IN ('m2-0-0', 'm2-2-0') AND intDimMV2 NOT IN (6,72)) GROUP BY longDimSV1, intDimMV1 ORDER BY longDimSV1, intDimMV1 LIMIT 5
-SELECT longDimSV1, intDimMV1, percentile(longDimSV1, 80), percentileMV(intDimMV1, 90), percentileEst(longDimSV1, 80), percentileEstMV(intDimMV1, 90), percentileTDigest(longDimSV1, 80), percentileTDigestMV(intDimMV1, 90) FROM FeatureTest1 WHERE stringDimSV1 != 's1-6' AND longDimSV1 BETWEEN 10 AND 1000 OR (intDimMV1 < 42 AND stringDimMV2 IN ('m2-0-0', 'm2-2-0') AND intDimMV2 NOT IN (6,72)) GROUP BY longDimSV1, intDimMV1 ORDER BY longDimSV1, intDimMV1 LIMIT 5
-SELECT longDimSV1, intDimMV1, distinctCount(longDimSV1), distinctCountMV(intDimMV1), distinctCountHLL(longDimSV1), distinctCountHLLMV(intDimMV1) FROM FeatureTest1 WHERE stringDimSV1 != 's1-6' AND longDimSV1 BETWEEN 10 AND 1000 OR (intDimMV1 < 42 AND stringDimMV2 IN ('m2-0-0', 'm2-2-0') AND intDimMV2 NOT IN (6,72)) GROUP BY longDimSV1, intDimMV1 ORDER BY longDimSV1, intDimMV1 LIMIT 5
+SELECT longDimSV1, intDimMV1, count(*) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER AND stringDimSV1 != 's1-6' AND longDimSV1 BETWEEN 10 AND 1000 OR (intDimMV1 < 42 AND stringDimMV2 IN ('m2-0-0', 'm2-2-0') AND intDimMV2 NOT IN (6,72)) GROUP BY longDimSV1, intDimMV1 ORDER BY longDimSV1, intDimMV1 LIMIT 5
+SELECT longDimSV1, intDimMV1, sum(intMetric1), sumMV(intDimMV1), min(intMetric1), minMV(intDimMV2), max(longDimSV1), maxMV(intDimMV1) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER AND stringDimSV1 != 's1-6' AND longDimSV1 BETWEEN 10 AND 1000 OR (intDimMV1 < 42 AND stringDimMV2 IN ('m2-0-0', 'm2-2-0') AND intDimMV2 NOT IN (6,72)) GROUP BY longDimSV1, intDimMV1 ORDER BY longDimSV1, intDimMV1 LIMIT 5
+SELECT longDimSV1, intDimMV1, count(longDimSV1), countMV(intDimMV1), avg(floatMetric1), avgMV(intDimMV2), minMaxRange(doubleMetric1), minMaxRangeMV(intDimMV2) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER AND stringDimSV1 != 's1-6' AND longDimSV1 BETWEEN 10 AND 1000 OR (intDimMV1 < 42 AND stringDimMV2 IN ('m2-0-0', 'm2-2-0') AND intDimMV2 NOT IN (6,72)) GROUP BY longDimSV1, intDimMV1 ORDER BY longDimSV1, intDimMV1 LIMIT 5
+SELECT longDimSV1, intDimMV1, percentile(longDimSV1, 80), percentileMV(intDimMV1, 90), percentileEst(longDimSV1, 80), percentileEstMV(intDimMV1, 90), percentileTDigest(longDimSV1, 80), percentileTDigestMV(intDimMV1, 90) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER AND stringDimSV1 != 's1-6' AND longDimSV1 BETWEEN 10 AND 1000 OR (intDimMV1 < 42 AND stringDimMV2 IN ('m2-0-0', 'm2-2-0') AND intDimMV2 NOT IN (6,72)) GROUP BY longDimSV1, intDimMV1 ORDER BY longDimSV1, intDimMV1 LIMIT 5
+SELECT longDimSV1, intDimMV1, distinctCount(longDimSV1), distinctCountMV(intDimMV1), distinctCountHLL(longDimSV1), distinctCountHLLMV(intDimMV1) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER AND stringDimSV1 != 's1-6' AND longDimSV1 BETWEEN 10 AND 1000 OR (intDimMV1 < 42 AND stringDimMV2 IN ('m2-0-0', 'm2-2-0') AND intDimMV2 NOT IN (6,72)) GROUP BY longDimSV1, intDimMV1 ORDER BY longDimSV1, intDimMV1 LIMIT 5
 
 # Transformation Functions
-SELECT add(longDimSV1, sub(longDimSV2, 3)), mod(intMetric1, 10), div(doubleMetric1, mult(floatMetric1, 5)) FROM FeatureTest1 ORDER BY add(longDimSV1, sub(longDimSV2, 3)) DESC, mod(intMetric1, 10)
-SELECT floor(sqrt(doubleMetric1)), ceil(ln(longDimSV1)), exp(mod(abs(longDimSV2), 3)) FROM FeatureTest1 ORDER BY floor(sqrt(doubleMetric1)), ceil(ln(longDimSV1)), exp(mod(abs(longDimSV2), 3)) DESC
-SELECT count(*) FROM FeatureTest1 GROUP BY arrayLength(intDimMV1), arrayLength(valueIn(stringDimMV2, 'm2-2-0', 'm2-3-0'))
-SELECT valueIn(intDimMV1, 3, 32), count(*) FROM FeatureTest1 GROUP BY valueIn(intDimMV1, 3, 32)
-SELECT upper(stringDimSV1), lower(textDim1), reverse(stringDimSV2), ltrim(substr(textDim1, 4, 9)), rtrim(substr(textDim1, 4, 9)) from FeatureTest1 ORDER BY upper(stringDimSV1) LIMIT 10
-SELECT stringDimSV2, replace(stringDimSV2, 'foo', 'bar'), codePoint(stringDimSV2), rpad(stringDimSV2, 11, 'abc'), lpad(stringDimSV2, 11, 'xyz') from FeatureTest1 WHERE strPos(stringDimSV2, '2', 2) > 1 OR startsWith(stringDimSV2, 'foo') = 'true' ORDER BY codePoint(stringDimSV2), replace(stringDimSV2, 'foo', 'bar') LIMIT 10
+SELECT add(longDimSV1, sub(longDimSV2, 3)), mod(intMetric1, 10), div(doubleMetric1, mult(floatMetric1, 5)) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER ORDER BY add(longDimSV1, sub(longDimSV2, 3)) DESC, mod(intMetric1, 10)
+SELECT floor(sqrt(doubleMetric1)), ceil(ln(longDimSV1)), exp(mod(abs(longDimSV2), 3)) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER ORDER BY floor(sqrt(doubleMetric1)), ceil(ln(longDimSV1)), exp(mod(abs(longDimSV2), 3)) DESC
+SELECT count(*) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER GROUP BY arrayLength(intDimMV1), arrayLength(valueIn(stringDimMV2, 'm2-2-0', 'm2-3-0'))
+SELECT valueIn(intDimMV1, 3, 32), count(*) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER GROUP BY valueIn(intDimMV1, 3, 32)
+SELECT upper(stringDimSV1), lower(textDim1), reverse(stringDimSV2), ltrim(substr(textDim1, 4, 9)), rtrim(substr(textDim1, 4, 9)) from FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER ORDER BY upper(stringDimSV1) LIMIT 10
+SELECT stringDimSV2, replace(stringDimSV2, 'foo', 'bar'), codePoint(stringDimSV2), rpad(stringDimSV2, 11, 'abc'), lpad(stringDimSV2, 11, 'xyz') from FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER AND strPos(stringDimSV2, '2', 2) > 1 OR startsWith(stringDimSV2, 'foo') = 'true' ORDER BY codePoint(stringDimSV2), replace(stringDimSV2, 'foo', 'bar') LIMIT 10
 
 # Groovy Scripts
-SELECT longDimSV1, longDimSV2, groovy('{"returnType":"LONG","isSingleValue":true}', 'arg0 + arg1', longDimSV1, longDimSV2) FROM FeatureTest1 ORDER BY longDimSV1, longDimSV2 DESC LIMIT 10
-SELECT count(*), groovy('{"returnType":"STRING", "isSingleValue":true}', 'def result; if (arg0 < 0) { result = "NEGATIVE"; } else if (arg0 < 10) { result = "SMALL";} else if (arg0 < 50) { result = "MEDIUM";} else{result = "LARGE"}; return result', longDimSV1) FROM FeatureTest1 GROUP BY groovy('{"returnType":"STRING", "isSingleValue":true}', 'def result; if (arg0 < 0) { result = "NEGATIVE"; } else if (arg0 < 10) { result = "SMALL";} else if (arg0 < 50) { result = "MEDIUM";} else{result = "LARGE"}; return result', longDimSV1) ORDER BY count(*) DESC LIMIT 10
-SELECT groovy('{"returnType":"INT","isSingleValue":true}', 'arg0.toList().max()', intDimMV1) FROM FeatureTest1 ORDER BY groovy('{"returnType":"INT","isSingleValue":true}', 'arg0.toList().max()', intDimMV1) LIMIT 10
+SELECT longDimSV1, longDimSV2, groovy('{"returnType":"LONG","isSingleValue":true}', 'arg0 + arg1', longDimSV1, longDimSV2) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER ORDER BY longDimSV1, longDimSV2 DESC LIMIT 10
+SELECT count(*), groovy('{"returnType":"STRING", "isSingleValue":true}', 'def result; if (arg0 < 0) { result = "NEGATIVE"; } else if (arg0 < 10) { result = "SMALL";} else if (arg0 < 50) { result = "MEDIUM";} else{result = "LARGE"}; return result', longDimSV1) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER GROUP BY groovy('{"returnType":"STRING", "isSingleValue":true}', 'def result; if (arg0 < 0) { result = "NEGATIVE"; } else if (arg0 < 10) { result = "SMALL";} else if (arg0 < 50) { result = "MEDIUM";} else{result = "LARGE"}; return result', longDimSV1) ORDER BY count(*) DESC LIMIT 10
+SELECT groovy('{"returnType":"INT","isSingleValue":true}', 'arg0.toList().max()', intDimMV1) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER ORDER BY groovy('{"returnType":"INT","isSingleValue":true}', 'arg0.toList().max()', intDimMV1) LIMIT 10
 
 # Text Search
-SELECT stringDimSV1, textDim1 FROM FeatureTest1 WHERE text_match(textDim1, 'Java')
-SELECT stringDimSV1, textDim1 FROM FeatureTest1 WHERE text_match(textDim1, 'Java AND C++')
-SELECT stringDimSV1, textDim1 FROM FeatureTest1 WHERE text_match(textDim1, 'Java OR C++') AND longDimSV1 > 20 LIMIT 20
-SELECT stringDimSV1, textDim1 FROM FeatureTest1 WHERE text_match(textDim1, 'Java C++') AND longDimSV1 > 20 LIMIT 20
-SELECT stringDimSV1, textDim1 FROM FeatureTest1 WHERE text_match(textDim1, '"Java C++"') LIMIT 20
-SELECT stringDimSV1, textDim1 FROM FeatureTest1 WHERE text_match(textDim1, '"java c++" "golang python"') LIMIT 20
-SELECT stringDimSV1, textDim1 FROM FeatureTest1 WHERE text_match(textDim1, '"Java C++" AND (golang python)') LIMIT 20
-SELECT stringDimSV1, textDim1 FROM FeatureTest1 WHERE text_match(textDim1, '(Java OR C++) AND (golang python)') AND longDimSV1 > 20 LIMIT 20
-SELECT stringDimSV1, textDim1 FROM FeatureTest1 WHERE text_match(textDim1, 'go*') LIMIT 20
-SELECT stringDimSV1, textDim1 FROM FeatureTest1 WHERE text_match(textDim1, 'word go*') LIMIT 20
-SELECT stringDimSV1, textDim1 FROM FeatureTest1 WHERE text_match(textDim1, '/go.*g/') LIMIT 20
-SELECT stringDimSV1, count(stringDimSV1) FROM FeatureTest1 WHERE text_match(textDim1, 'Java') GROUP BY stringDimSV1 ORDER BY count(stringDimSV1) DESC LIMIT 20
+SELECT stringDimSV1, textDim1 FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER AND text_match(textDim1, 'Java')
+SELECT stringDimSV1, textDim1 FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER AND text_match(textDim1, 'Java AND C++')
+SELECT stringDimSV1, textDim1 FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER AND text_match(textDim1, 'Java OR C++') AND longDimSV1 > 20 LIMIT 20
+SELECT stringDimSV1, textDim1 FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER AND text_match(textDim1, 'Java C++') AND longDimSV1 > 20 LIMIT 20
+SELECT stringDimSV1, textDim1 FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER AND text_match(textDim1, '"Java C++"') LIMIT 20
+SELECT stringDimSV1, textDim1 FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER AND text_match(textDim1, '"java c++" "golang python"') LIMIT 20
+SELECT stringDimSV1, textDim1 FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER AND text_match(textDim1, '"Java C++" AND (golang python)') LIMIT 20
+SELECT stringDimSV1, textDim1 FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER AND text_match(textDim1, '(Java OR C++) AND (golang python)') AND longDimSV1 > 20 LIMIT 20
+SELECT stringDimSV1, textDim1 FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER AND text_match(textDim1, 'go*') LIMIT 20
+SELECT stringDimSV1, textDim1 FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER AND text_match(textDim1, 'word go*') LIMIT 20
+SELECT stringDimSV1, textDim1 FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER AND text_match(textDim1, '/go.*g/') LIMIT 20
+SELECT stringDimSV1, count(stringDimSV1) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER AND text_match(textDim1, 'Java') GROUP BY stringDimSV1 ORDER BY count(stringDimSV1) DESC LIMIT 20
 
 # Map
-SELECT stringDimSV1, mapValue(mapDim1__KEYS, 'k1', mapDim1__VALUES), mapValue(mapDim1__KEYS, 'k4', mapDim1__VALUES) FROM FeatureTest1 LIMIT 5
-SELECT stringDimSV1, mapValue(mapDim1__KEYS, 'k1', mapDim1__VALUES), mapValue(mapDim1__KEYS, 'k4', mapDim1__VALUES) FROM FeatureTest1 ORDER BY mapValue(mapDim1__KEYS, 'k1', mapDim1__VALUES) LIMIT 5
-SELECT max(mapValue(mapDim1__KEYS, 'k2', mapDim1__VALUES)), min(mapValue(mapDim1__KEYS, 'k3', mapDim1__VALUES)) FROM FeatureTest1
-SELECT max(mapValue(mapDim1__KEYS, 'k2', mapDim1__VALUES)), min(mapValue(mapDim1__KEYS, 'k3', mapDim1__VALUES)) FROM FeatureTest1 GROUP BY mapValue(mapDim1__KEYS, 'k1', mapDim1__VALUES) ORDER BY max(mapValue(mapDim1__KEYS, 'k2', mapDim1__VALUES)) LIMIT 5
-SELECT mapValue(mapDim1__KEYS, 'k1', mapDim1__VALUES), mapValue(mapDim1__KEYS, 'k2', mapDim1__VALUES) FROM FeatureTest1 WHERE mapValue(mapDim1__KEYS, 'k1', mapDim1__VALUES) <= 4  LIMIT 5
-SELECT mapValue(mapDim1__KEYS, 'k1', mapDim1__VALUES), mapValue(mapDim1__KEYS, 'k2', mapDim1__VALUES) FROM FeatureTest1 WHERE mapValue(mapDim1__KEYS, 'non-existing-key', mapDim1__VALUES) <= 4
-SELECT mapValue(mapDim1__KEYS, 'non-existing-key', mapDim1__VALUES) FROM FeatureTest1 WHERE mapDim1__KEYS = 'non-existing-key'
+SELECT stringDimSV1, mapValue(mapDim1__KEYS, 'k1', mapDim1__VALUES), mapValue(mapDim1__KEYS, 'k4', mapDim1__VALUES) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER LIMIT 5
+SELECT stringDimSV1, mapValue(mapDim1__KEYS, 'k1', mapDim1__VALUES), mapValue(mapDim1__KEYS, 'k4', mapDim1__VALUES) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER ORDER BY mapValue(mapDim1__KEYS, 'k1', mapDim1__VALUES) LIMIT 5
+SELECT max(mapValue(mapDim1__KEYS, 'k2', mapDim1__VALUES)), min(mapValue(mapDim1__KEYS, 'k3', mapDim1__VALUES)) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER
+SELECT max(mapValue(mapDim1__KEYS, 'k2', mapDim1__VALUES)), min(mapValue(mapDim1__KEYS, 'k3', mapDim1__VALUES)) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER GROUP BY mapValue(mapDim1__KEYS, 'k1', mapDim1__VALUES) ORDER BY max(mapValue(mapDim1__KEYS, 'k2', mapDim1__VALUES)) LIMIT 5
+SELECT mapValue(mapDim1__KEYS, 'k1', mapDim1__VALUES), mapValue(mapDim1__KEYS, 'k2', mapDim1__VALUES) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER AND mapValue(mapDim1__KEYS, 'k1', mapDim1__VALUES) <= 4  LIMIT 5
+SELECT mapValue(mapDim1__KEYS, 'k1', mapDim1__VALUES), mapValue(mapDim1__KEYS, 'k2', mapDim1__VALUES) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER AND mapValue(mapDim1__KEYS, 'non-existing-key', mapDim1__VALUES) <= 4
+SELECT mapValue(mapDim1__KEYS, 'non-existing-key', mapDim1__VALUES) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER AND mapDim1__KEYS = 'non-existing-key'
 
 # Json Map
-SELECT stringDimSV1, jsonExtractScalar(mapDim2json, '$.k1', 'INT'), jsonExtractScalar(mapDim2json, '$.k4', 'INT') FROM FeatureTest1 LIMIT 5
-SELECT stringDimSV1, jsonExtractScalar(mapDim2json, '$.k1', 'INT'), jsonExtractScalar(mapDim2json, '$.k4', 'INT') FROM FeatureTest1 ORDER BY jsonExtractScalar(mapDim2json, '$.k1', 'INT') LIMIT 5
-SELECT max(jsonExtractScalar(mapDim2json, '$.k2', 'INT')), min(jsonExtractScalar(mapDim2json, '$.k3', 'INT')) FROM FeatureTest1
-SELECT max(jsonExtractScalar(mapDim2json, '$.k2', 'INT')), min(jsonExtractScalar(mapDim2json, '$.k3', 'INT')) FROM FeatureTest1 GROUP BY jsonExtractScalar(mapDim2json, '$.k1', 'INT') ORDER BY max(jsonExtractScalar(mapDim2json, '$.k2', 'INT')) LIMIT 5
-SELECT jsonExtractScalar(mapDim2json, '$.k1', 'INT'), jsonExtractScalar(mapDim2json, '$.k2', 'INT') FROM FeatureTest1 WHERE jsonExtractScalar(mapDim2json, '$.k1', 'INT') <= 4  LIMIT 5
-SELECT jsonExtractScalar(mapDim2json, '$.non-existing-key', 'INT', '-1') FROM FeatureTest1
-SELECT jsonExtractScalar(mapDim2json, '$.non-existing-key', 'INT') FROM FeatureTest1 WHERE jsonExtractKey(mapDim2json, '$.*') in ("$['non-existing-key']")
+SELECT stringDimSV1, jsonExtractScalar(mapDim2json, '$.k1', 'INT'), jsonExtractScalar(mapDim2json, '$.k4', 'INT') FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER LIMIT 5
+SELECT stringDimSV1, jsonExtractScalar(mapDim2json, '$.k1', 'INT'), jsonExtractScalar(mapDim2json, '$.k4', 'INT') FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER ORDER BY jsonExtractScalar(mapDim2json, '$.k1', 'INT') LIMIT 5
+SELECT max(jsonExtractScalar(mapDim2json, '$.k2', 'INT')), min(jsonExtractScalar(mapDim2json, '$.k3', 'INT')) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER
+SELECT max(jsonExtractScalar(mapDim2json, '$.k2', 'INT')), min(jsonExtractScalar(mapDim2json, '$.k3', 'INT')) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER GROUP BY jsonExtractScalar(mapDim2json, '$.k1', 'INT') ORDER BY max(jsonExtractScalar(mapDim2json, '$.k2', 'INT')) LIMIT 5
+SELECT jsonExtractScalar(mapDim2json, '$.k1', 'INT'), jsonExtractScalar(mapDim2json, '$.k2', 'INT') FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER AND jsonExtractScalar(mapDim2json, '$.k1', 'INT') <= 4  LIMIT 5
+SELECT jsonExtractScalar(mapDim2json, '$.non-existing-key', 'INT', '-1') FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER
+SELECT jsonExtractScalar(mapDim2json, '$.non-existing-key', 'INT') FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER AND jsonExtractKey(mapDim2json, '$.*') in ('$[non-existing-key]')
 
 # Misc
-SELECT count(*) FROM FeatureTest1 WHERE regexp_like(textDim1, '^Java.*') GROUP BY longDimSV1
-SELECT count(*) FROM FeatureTest1 WHERE regexp_like(stringDimMV2, 'm2.*0') GROUP BY stringDimMV2 LIMIT 3
-SELECT stringDimSV1, longDimSV1, intDimMV1 FROM FeatureTest1 ORDER BY stringDimSV1 DESC, longDimSV1 LIMIT 3
-SELECT stringDimSV1, longDimSV1, intDimMV1 FROM FeatureTest1 ORDER BY stringDimSV1 DESC, longDimSV1 DESC LIMIT 3
-SELECT * FROM FeatureTest1 ORDER BY longDimSV1 DESC, longMetric1 LIMIT 3
+SELECT count(*) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER AND regexp_like(textDim1, '^Java.*') GROUP BY longDimSV1
+SELECT count(*) FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER AND regexp_like(stringDimMV2, 'm2.*0') GROUP BY stringDimMV2 LIMIT 3
+SELECT stringDimSV1, longDimSV1, intDimMV1 FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER ORDER BY stringDimSV1 DESC, longDimSV1 LIMIT 3
+SELECT stringDimSV1, longDimSV1, intDimMV1 FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER ORDER BY stringDimSV1 DESC, longDimSV1 DESC LIMIT 3
+SELECT * FROM FeatureTest1 WHERE __GENERATIONNUMBER__ = GENERATION_NUMBER ORDER BY longDimSV1 DESC, longMetric1 LIMIT 3

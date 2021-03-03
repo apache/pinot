@@ -24,6 +24,7 @@ import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import org.apache.pinot.integration.tests.ClusterTest;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,6 +44,7 @@ public class QueryOp extends BaseOp {
   private static final String NUM_DOCS_SCANNED_KEY = "numDocsScanned";
   private static final String TIME_USED_MS_KEY = "timeUsedMs";
   private static final String COMMENT_DELIMITER = "#";
+  private static final String GENERATION_NUMBER_PLACEHOLDER = "GENERATION_NUMBER";
   private String _queryFileName;
   private String _expectedResultsFileName;
 
@@ -72,17 +74,17 @@ public class QueryOp extends BaseOp {
   }
 
   @Override
-  boolean runOp() {
+  boolean runOp(int generationNumber) {
     System.out.println("Verifying queries in " + _queryFileName + " against results in " + _expectedResultsFileName);
     try {
-      return verifyQueries();
+      return verifyQueries(generationNumber);
     } catch (Exception e) {
       LOGGER.error("FAILED to verify queries in {}: {}", _queryFileName, e);
       return false;
     }
   }
 
-  boolean verifyQueries()
+  boolean verifyQueries(int generationNumber)
       throws Exception {
     boolean testPassed = false;
 
@@ -101,7 +103,7 @@ public class QueryOp extends BaseOp {
         if (shouldIgnore(query)) {
           continue;
         }
-
+        query = query.replaceAll(GENERATION_NUMBER_PLACEHOLDER, String.valueOf(generationNumber));
         JsonNode expectedJson = null;
         try {
           String expectedResultLine = expectedResultReader.readLine();

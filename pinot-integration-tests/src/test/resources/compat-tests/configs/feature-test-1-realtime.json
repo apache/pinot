@@ -35,7 +35,7 @@
     "enableDefaultStarTree": false,
     "enableDynamicStarTreeCreation": false,
     "loadMode": "MMAP",
-    "noDictionaryColumns": [],
+    "noDictionaryColumns": ["textDim1"],
     "nullHandlingEnabled": false,
     "segmentFormatVersion": "v3",
     "sortedColumn": [],
