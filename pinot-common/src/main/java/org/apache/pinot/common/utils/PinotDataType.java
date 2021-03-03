@@ -317,22 +317,24 @@ public enum PinotDataType {
   STRING {
     @Override
     public Integer toInteger(Object value) {
-      return Integer.parseInt((String) value);
+      return Integer.valueOf(((String) value).trim());
     }
 
     @Override
     public Long toLong(Object value) {
-      return Long.parseLong((String) value);
+      return Long.valueOf(((String) value).trim());
     }
 
     @Override
     public Float toFloat(Object value) {
-      return Float.parseFloat((String) value);
+      // NOTE: No need to trim here because Float.valueOf() will trim the string
+      return Float.valueOf((String) value);
     }
 
     @Override
     public Double toDouble(Object value) {
-      return Double.parseDouble((String) value);
+      // NOTE: No need to trim here because Double.valueOf() will trim the string
+      return Double.valueOf((String) value);
     }
 
     @Override
@@ -342,7 +344,7 @@ public enum PinotDataType {
 
     @Override
     public byte[] toBytes(Object value) {
-      return BytesUtils.toBytes((String) value);
+      return BytesUtils.toBytes(((String) value).trim());
     }
 
     @Override
