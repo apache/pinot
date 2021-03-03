@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics.yammer;
+package org.apache.pinot.plugin.metrics.yammer;
 
 import com.yammer.metrics.core.MetricsRegistryListener;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistryListener;

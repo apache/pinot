@@ -45,6 +45,7 @@
     <module>pinot-batch-ingestion</module>
     <module>pinot-stream-ingestion</module>
     <module>pinot-minion-tasks</module>
+    <module>pinot-metrics</module>
   </modules>
 
   <dependencies>

@@ -16,21 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics.yammer;
+package org.apache.pinot.plugin.metrics.yammer;
 
+import com.yammer.metrics.core.Counter;
 import com.yammer.metrics.core.Metric;
-import org.apache.pinot.spi.metrics.PinotMetric;
+import org.apache.pinot.spi.metrics.PinotCounter;
 
 
-public class YammerMetric implements PinotMetric {
-  private final Metric _metric;
+public class YammerCounter extends YammerMetric implements PinotCounter {
+  private final Counter _counter;
 
-  public YammerMetric(Metric metric) {
-    _metric = metric;
+  public YammerCounter(Counter counter) {
+    super(counter);
+    _counter = counter;
+  }
+
+  @Override
+  public Object getCounter() {
+    return _counter;
   }
 
   @Override
   public Metric getMetric() {
-    return _metric;
+    return _counter;
   }
 }
