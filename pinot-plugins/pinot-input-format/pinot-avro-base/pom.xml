@@ -74,6 +74,10 @@
                       <pattern>com.google.common.base</pattern>
                       <shadedPattern>shaded.com.google.common.base</shadedPattern>
                     </relocation>
+                    <relocation>
+                      <pattern>com.fasterxml.jackson</pattern>
+                      <shadedPattern>shaded.com.fasterxml.jackson</shadedPattern>
+                    </relocation>
                   </relocations>
                 </configuration>
               </execution>
