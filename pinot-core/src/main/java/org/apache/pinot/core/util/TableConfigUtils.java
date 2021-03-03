@@ -527,10 +527,6 @@ public final class TableConfigUtils {
 
       List<String> noDictionaryColumns = indexingConfigs.getNoDictionaryColumns();
       switch (fieldConfig.getEncodingType()) {
-        case RAW:
-          Preconditions.checkState(noDictionaryColumns != null && noDictionaryColumns.contains(columnName),
-              "FieldConfig encoding type is different from indexingConfig for column: " + columnName);
-          break;
         case DICTIONARY:
           if (noDictionaryColumns != null) {
             Preconditions.checkArgument(!noDictionaryColumns.contains(columnName),
