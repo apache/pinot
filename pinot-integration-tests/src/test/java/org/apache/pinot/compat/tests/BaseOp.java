@@ -64,10 +64,10 @@ public abstract class BaseOp {
     return _description;
   }
 
-  public  boolean run() {
+  public  boolean run(int generationNumber) {
     System.out.println("Running OpType " + _opType.toString() + ": " + getDescription());
-    return runOp();
+    return runOp(generationNumber);
   }
 
-  abstract boolean runOp();
+  abstract boolean runOp(int generationNumber);
 }

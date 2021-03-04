@@ -31,13 +31,13 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import javax.annotation.Nullable;
+import org.apache.commons.io.FileUtils;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.KafkaAdminClient;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 import org.apache.pinot.controller.helix.ControllerTest;
-import org.apache.pinot.integration.tests.ClusterTest;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
@@ -79,6 +79,7 @@ public class StreamOp extends BaseOp {
   private String _inputDataFileName;
   private String _tableConfigFileName;
   private String _recordReaderConfigFileName;
+  private int _generationNumber;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamOp.class);
   private static final String TOPIC_NAME = "topicName";
@@ -88,6 +89,7 @@ public class StreamOp extends BaseOp {
   private static final String NUM_SERVERS_QUERIED = "numServersQueried";
   private static final String NUM_SERVERS_RESPONEDED = "numServersResponded";
   private static final String TOTAL_DOCS = "totalDocs";
+  private static final String GENERATION_NUMBER_PLACEHOLDER = "__GENERATION_NUMBER__";
   private static final short KAFKA_REPLICATION_FACTOR = 1;
 
   public StreamOp() {
@@ -143,8 +145,9 @@ public class StreamOp extends BaseOp {
   }
 
   @Override
-  boolean runOp() {
-    switch(_op) {
+  boolean runOp(int generationNumber) {
+    _generationNumber = generationNumber;
+    switch (_op) {
       case CREATE:
         return createKafkaTopic();
       case PRODUCE:
@@ -160,7 +163,8 @@ public class StreamOp extends BaseOp {
       int partitions = Integer.parseInt(streamConfigMap.getProperty(NUM_PARTITIONS));
 
       final Map<String, Object> config = new HashMap<>();
-      config.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, ClusterDescriptor.DEFAULT_HOST + ":" + ClusterDescriptor.KAFKA_PORT);
+      config.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG,
+          ClusterDescriptor.DEFAULT_HOST + ":" + ClusterDescriptor.KAFKA_PORT);
       config.put(AdminClientConfig.CLIENT_ID_CONFIG, "Kafka2AdminClient-" + UUID.randomUUID().toString());
       config.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, 15000);
       AdminClient adminClient = KafkaAdminClient.create(config);
@@ -172,7 +176,6 @@ public class StreamOp extends BaseOp {
     }
     return true;
   }
-
 
   private boolean produceData() {
     try {
@@ -197,7 +200,15 @@ public class StreamOp extends BaseOp {
       StreamDataProducer producer =
           StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, publisherProps);
 
-      File csvFile = new File(_inputDataFileName);
+      // create a temp file to replace placeholder for input data file
+      File localTempDir = new File(FileUtils.getTempDirectory(), "pinot-compat-test-stream-op-" + UUID.randomUUID());
+      localTempDir.deleteOnExit();
+      File localReplacedCSVFile = new File(localTempDir, "replaced");
+      FileUtils.forceMkdir(localTempDir);
+      Utils.replaceContent(new File(_inputDataFileName), localReplacedCSVFile, GENERATION_NUMBER_PLACEHOLDER,
+          String.valueOf(_generationNumber));
+
+
       CSVRecordReaderConfig recordReaderConfig =
           JsonUtils.fileToObject(new File(_recordReaderConfigFileName), CSVRecordReaderConfig.class);
       Set<String> columnNames = new HashSet<>();
@@ -207,12 +218,14 @@ public class StreamOp extends BaseOp {
       String timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
       String schemaName = TableNameBuilder.extractRawTableName(tableName);
       String schemaString = ControllerTest.
-          sendGetRequest(ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL).forSchemaGet(schemaName));
+          sendGetRequest(
+              ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL).forSchemaGet(schemaName));
       Schema schema = JsonUtils.stringToObject(schemaString, Schema.class);
-      DateTimeFormatSpec dateTimeFormatSpec = new DateTimeFormatSpec(schema.getSpecForTimeColumn(timeColumn).getFormat());
+      DateTimeFormatSpec dateTimeFormatSpec =
+          new DateTimeFormatSpec(schema.getSpecForTimeColumn(timeColumn).getFormat());
 
       try (RecordReader csvRecordReader = RecordReaderFactory
-          .getRecordReader(FileFormat.CSV, csvFile, columnNames, recordReaderConfig)) {
+          .getRecordReader(FileFormat.CSV, localReplacedCSVFile, columnNames, recordReaderConfig)) {
         int count = 0;
         while (count < _numRows) {
           if (!csvRecordReader.hasNext()) {
@@ -231,7 +244,8 @@ public class StreamOp extends BaseOp {
           if (partitionColumn == null) {
             producer.produce(topicName, StringUtils.encodeUtf8(extractedJson.toString()));
           } else {
-            producer.produce(topicName, StringUtils.encodeUtf8(partitionColumn), StringUtils.encodeUtf8(extractedJson.toString()));
+            producer.produce(topicName, StringUtils.encodeUtf8(partitionColumn),
+                StringUtils.encodeUtf8(extractedJson.toString()));
           }
           count++;
         }
@@ -247,9 +261,10 @@ public class StreamOp extends BaseOp {
     }
   }
 
-  private long fetchExistingTotalDocs(String tableName) throws Exception  {
+  private long fetchExistingTotalDocs(String tableName)
+      throws Exception {
     String query = "SELECT count(*) FROM " + tableName;
-    JsonNode response = ClusterTest.postQuery(query, ClusterDescriptor.BROKER_URL, false, "sql");
+    JsonNode response = QueryProcessor.postSqlQuery(query);
     if (response == null) {
       String errorMsg = String.format("Failed to query Table: %s", tableName);
       LOGGER.error(errorMsg);
@@ -262,9 +277,8 @@ public class StreamOp extends BaseOp {
       throw new RuntimeException(errorMsg);
     }
 
-    if (response.has(NUM_SERVERS_QUERIED) &&
-        response.has(NUM_SERVERS_RESPONEDED) &&
-        response.get(NUM_SERVERS_QUERIED).asInt() > response.get(NUM_SERVERS_RESPONEDED).asInt()) {
+    if (response.has(NUM_SERVERS_QUERIED) && response.has(NUM_SERVERS_RESPONEDED)
+        && response.get(NUM_SERVERS_QUERIED).asInt() > response.get(NUM_SERVERS_RESPONEDED).asInt()) {
       String errorMsg = String.format("Failed when running query: %s; the response contains partial results", query);
       LOGGER.error(errorMsg);
       throw new RuntimeException(errorMsg);

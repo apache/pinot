@@ -27,9 +27,11 @@ public class CompatibilityOpsRunner {
   private static final String ROOT_DIR = "compat-tests";
 
   private final String _configFileName;
+  private int _generationNumber;
 
-  private CompatibilityOpsRunner(String configFileName) {
+  private CompatibilityOpsRunner(String configFileName, int generationNumber) {
     _configFileName = configFileName;
+    _generationNumber = generationNumber;
   }
 
   private boolean runOps() throws Exception {
@@ -42,7 +44,7 @@ public class CompatibilityOpsRunner {
 
     boolean passed = true;
     for (BaseOp op : operation.getOperations()) {
-      if (!op.run()) {
+      if (!op.run(_generationNumber)) {
         passed = false;
         System.out.println("Failure");
         break;
@@ -52,11 +54,11 @@ public class CompatibilityOpsRunner {
   }
 
   public static void main(String[] args) throws Exception {
-    if (args.length < 1 || args.length > 1) {
-      throw new IllegalArgumentException("Need exactly one file name as argument");
+    if (args.length != 2) {
+      throw new IllegalArgumentException("Need exactly one file name and one generation_number as arguments");
     }
 
-    CompatibilityOpsRunner runner = new CompatibilityOpsRunner(args[0]);
+    CompatibilityOpsRunner runner = new CompatibilityOpsRunner(args[0], Integer.valueOf(args[1]));
     int exitStatus = 1;
     if (runner.runOps()) {
       exitStatus = 0;
