@@ -883,6 +883,17 @@ public class TableConfigUtilsTest {
       // expected
     }
 
+    starTreeIndexConfig =
+        new StarTreeIndexConfig(Arrays.asList("multiValCol"), Arrays.asList("multiValCol"), Arrays.asList("SUM__multiValCol"), 1);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setStarTreeIndexConfigs(Arrays.asList(starTreeIndexConfig)).build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail for multi-value column name in StarTreeIndex config");
+    } catch (Exception e) {
+      // expected
+    }
+
     FieldConfig fieldConfig = new FieldConfig("myCol2", null, null, null);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setFieldConfigList(Arrays.asList(fieldConfig)).build();

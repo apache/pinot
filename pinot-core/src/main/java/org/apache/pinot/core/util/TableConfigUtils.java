@@ -371,6 +371,7 @@ public final class TableConfigUtils {
     }
     Map<String, String> columnNameToConfigMap = new HashMap<>();
     Set<String> noDictionaryColumnsSet = new HashSet<>();
+    String STAR_TREE_CONFIG_NAME = "StarTreeIndex Config";
 
     if (indexingConfig.getNoDictionaryColumns() != null) {
       for (String columnName : indexingConfig.getNoDictionaryColumns()) {
@@ -439,7 +440,7 @@ public final class TableConfigUtils {
       for (StarTreeIndexConfig starTreeIndexConfig : starTreeIndexConfigList) {
         // Dimension split order cannot be null
         for (String columnName : starTreeIndexConfig.getDimensionsSplitOrder()) {
-          columnNameToConfigMap.put(columnName, "StarTreeIndex Config");
+          columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
         }
         // Function column pairs cannot be null
         for (String functionColumnPair : starTreeIndexConfig.getFunctionColumnPairs()) {
@@ -452,13 +453,13 @@ public final class TableConfigUtils {
           }
           String columnName = columnPair.getColumn();
           if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {
-            columnNameToConfigMap.put(columnName, "StarTreeIndex Config");
+            columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
           }
         }
         List<String> skipDimensionList = starTreeIndexConfig.getSkipStarNodeCreationForDimensions();
         if (skipDimensionList != null) {
           for (String columnName : skipDimensionList) {
-            columnNameToConfigMap.put(columnName, "StarTreeIndex Config");
+            columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
           }
         }
       }
@@ -467,8 +468,13 @@ public final class TableConfigUtils {
     for (Map.Entry<String, String> entry : columnNameToConfigMap.entrySet()) {
       String columnName = entry.getKey();
       String configName = entry.getValue();
-      Preconditions.checkState(schema.getFieldSpecFor(columnName) != null,
+      FieldSpec columnFieldSpec = schema.getFieldSpecFor(columnName);
+      Preconditions.checkState(columnFieldSpec != null,
           "Column Name " + columnName + " defined in " + configName + " must be a valid column defined in the schema");
+      if (configName.equals(STAR_TREE_CONFIG_NAME)) {
+        Preconditions.checkState(columnFieldSpec.isSingleValueField(),
+            "Column Name " + columnName + " defined in " + configName + " must be a single value column");
+      }
     }
 
     // Range index semantic validation
