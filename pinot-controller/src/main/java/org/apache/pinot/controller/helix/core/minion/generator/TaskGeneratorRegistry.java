@@ -26,11 +26,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.spi.annotations.minion.TaskGenerator;
-import org.reflections.Reflections;
-import org.reflections.scanners.TypeAnnotationsScanner;
-import org.reflections.util.ClasspathHelper;
-import org.reflections.util.ConfigurationBuilder;
-import org.reflections.util.FilterBuilder;
+import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,12 +69,7 @@ public class TaskGeneratorRegistry {
   }
 
   public static Set<Class<?>> getTaskGeneratorClasses() {
-    Reflections reflections = new Reflections(
-        new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage("org.apache.pinot"))
-            .filterInputsBy(new FilterBuilder.Include(TASK_GENERATOR_PACKAGE_REGEX_PATTERN))
-            .setScanners(new TypeAnnotationsScanner()));
-    Set<Class<?>> classes = reflections.getTypesAnnotatedWith(TaskGenerator.class, true);
-    return classes;
+    return PinotReflectionUtils.getClassesThroughReflection(TASK_GENERATOR_PACKAGE_REGEX_PATTERN, TaskGenerator.class);
   }
 
   /**

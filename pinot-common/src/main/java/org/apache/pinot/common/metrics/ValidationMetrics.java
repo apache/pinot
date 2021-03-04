@@ -212,7 +212,7 @@ public class ValidationMetrics {
       final long value) {
     if (!_gaugeValues.containsKey(gaugeName)) {
       _gaugeValues.put(gaugeName, value);
-      _metricsRegistry.newGauge(metricName, gaugeFactory.buildGauge(gaugeName));
+      PinotMetricUtils.makeGauge(_metricsRegistry, metricName, gaugeFactory.buildGauge(gaugeName));
       _metricNames.add(metricName);
     } else {
       _gaugeValues.put(gaugeName, value);
@@ -224,7 +224,7 @@ public class ValidationMetrics {
    */
   public void unregisterAllMetrics() {
     for (PinotMetricName metricName : _metricNames) {
-      _metricsRegistry.removeMetric(metricName);
+      PinotMetricUtils.removeMetric(_metricsRegistry, metricName);
     }
 
     _metricNames.clear();

@@ -36,11 +36,7 @@ import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.metrics.PinotMetricName;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.metrics.PinotTimer;
-import org.reflections.Reflections;
-import org.reflections.scanners.TypeAnnotationsScanner;
-import org.reflections.util.ClasspathHelper;
-import org.reflections.util.ConfigurationBuilder;
-import org.reflections.util.FilterBuilder;
+import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,7 +65,7 @@ public class PinotMetricUtils {
    * @param metricsConfiguration The subset of the configuration containing the metrics-related keys
    */
   private static void initializePinotMetricsFactory(PinotConfiguration metricsConfiguration) {
-    Set<Class<?>> classes = getMetricsClasses();
+    Set<Class<?>> classes = getPinotMetricsFactoryClasses();
     for (Class<?> clazz : classes) {
       MetricsFactory annotation = clazz.getAnnotation(MetricsFactory.class);
       if (annotation.enabled()) {
@@ -84,12 +80,8 @@ public class PinotMetricUtils {
     }
   }
 
-  private static Set<Class<?>> getMetricsClasses() {
-    Reflections reflections = new Reflections(
-        new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage("org.apache.pinot"))
-            .filterInputsBy(new FilterBuilder.Include(METRICS_PACKAGE_REGEX_PATTERN))
-            .setScanners(new TypeAnnotationsScanner()));
-    return reflections.getTypesAnnotatedWith(MetricsFactory.class, true);
+  private static Set<Class<?>> getPinotMetricsFactoryClasses() {
+    return PinotReflectionUtils.getClassesThroughReflection(METRICS_PACKAGE_REGEX_PATTERN, MetricsFactory.class);
   }
 
   /**
@@ -193,8 +185,13 @@ public class PinotMetricUtils {
     return registry.newTimer(name, durationUnit, rateUnit);
   }
 
-  public static PinotMeter makePinotMeter(PinotMetricsRegistry registry, PinotMetricName name, String eventType, TimeUnit unit) {
+  public static PinotMeter makePinotMeter(PinotMetricsRegistry registry, PinotMetricName name, String eventType,
+      TimeUnit unit) {
     return registry.newMeter(name, eventType, unit);
+  }
+
+  public static void removeMetric(PinotMetricsRegistry registry, PinotMetricName name) {
+    registry.removeMetric(name);
   }
 
   public static PinotJmxReporter makePinotJmxReporter(PinotMetricsRegistry metricsRegistry) {
