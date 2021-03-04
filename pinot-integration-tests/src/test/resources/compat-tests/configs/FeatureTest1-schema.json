@@ -2,7 +2,7 @@
   "dimensionFieldSpecs": [
     {
       "dataType": "INT",
-      "name": "__GENERATIONNUMBER__"
+      "name": "generationNumber"
     },
     {
       "dataType": "STRING",

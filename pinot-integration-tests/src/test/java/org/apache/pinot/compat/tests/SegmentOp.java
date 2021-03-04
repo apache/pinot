@@ -66,7 +66,7 @@ public class SegmentOp extends BaseOp {
   private static final FileFormat DEFAULT_FILE_FORMAT = FileFormat.CSV;
   private static final int DEFAULT_MAX_SLEEP_TIME_MS = 30000;
   private static final int DEFAULT_SLEEP_INTERVAL_MS = 200;
-  private static final String GEN_NUM_PLACE_HOLDER = "GENERATION_NUMBER";
+  private static final String GEN_NUM_PLACE_HOLDER = "__GENERATION_NUMBER__";
 
   public enum Op {
     UPLOAD,

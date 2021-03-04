@@ -44,7 +44,7 @@ public class QueryOp extends BaseOp {
   private static final String NUM_DOCS_SCANNED_KEY = "numDocsScanned";
   private static final String TIME_USED_MS_KEY = "timeUsedMs";
   private static final String COMMENT_DELIMITER = "#";
-  private static final String GENERATION_NUMBER_PLACEHOLDER = "GENERATION_NUMBER";
+  private static final String GENERATION_NUMBER_PLACEHOLDER = "__GENERATION_NUMBER__";
   private String _queryFileName;
   private String _expectedResultsFileName;
 
