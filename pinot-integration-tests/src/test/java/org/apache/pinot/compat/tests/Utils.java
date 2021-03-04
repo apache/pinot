@@ -36,8 +36,7 @@ public class Utils {
    * @param replaced
    * @throws IOException
    */
-  public static void replaceContent(File originalDataFile, File replacedDataFile, String original,
-      String replaced)
+  public static void replaceContent(File originalDataFile, File replacedDataFile, String original, String replaced)
       throws IOException {
     Stream<String> lines = Files.lines(originalDataFile.toPath());
     List<String> replacedContent = lines.map(line -> line.replaceAll(original, replaced)).

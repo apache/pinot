@@ -89,7 +89,7 @@ public class StreamOp extends BaseOp {
   private static final String NUM_SERVERS_QUERIED = "numServersQueried";
   private static final String NUM_SERVERS_RESPONEDED = "numServersResponded";
   private static final String TOTAL_DOCS = "totalDocs";
-  private static final String GENERATION_NUMBER_PLACEHOLDER = "GENERATION_NUMBER";
+  private static final String GENERATION_NUMBER_PLACEHOLDER = "__GENERATION_NUMBER__";
   private static final short KAFKA_REPLICATION_FACTOR = 1;
 
   public StreamOp() {
