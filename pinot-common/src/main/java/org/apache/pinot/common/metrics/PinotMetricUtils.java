@@ -18,15 +18,16 @@
  */
 package org.apache.pinot.common.metrics;
 
+import com.google.common.base.Preconditions;
 import java.lang.reflect.Constructor;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
-import org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory;
 import org.apache.pinot.spi.annotations.metrics.MetricsFactory;
 import org.apache.pinot.spi.annotations.metrics.PinotMetricsFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -78,6 +79,8 @@ public class PinotMetricUtils {
         }
       }
     }
+    Preconditions.checkState(_pinotMetricsFactory != null,
+        "Failed to initialize PinotMetricsFactory. Please check if any pinot-metrics related jar is actually added to the classpath.");
   }
 
   private static Set<Class<?>> getPinotMetricsFactoryClasses() {
@@ -162,8 +165,8 @@ public class PinotMetricUtils {
 
   public static PinotMetricsRegistry getPinotMetricsRegistry() {
     if (_pinotMetricsFactory == null) {
-      // If no Pinot metrics factory gets registered, just initialize a Yammer metrics factory by default.
-      _pinotMetricsFactory = new YammerMetricsFactory();
+      // If init method didn't get called previously, just simply init with an empty hashmap. This is commonly used in tests.
+      init(new PinotConfiguration(Collections.emptyMap()));
     }
     return _pinotMetricsFactory.getPinotMetricsRegistry();
   }

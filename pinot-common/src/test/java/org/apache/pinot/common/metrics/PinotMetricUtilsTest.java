@@ -21,7 +21,6 @@ package org.apache.pinot.common.metrics;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.metrics.PinotMetricName;
@@ -34,20 +33,14 @@ public class PinotMetricUtilsTest {
 
   @Test
   public void testPinotMetricsRegistryFactory() {
-    // Initialize a PinotMetricsRegistry without calling init() method.
-    PinotMetricsRegistry pinotMetricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
-    Assert.assertNotNull(pinotMetricsRegistry);
-    Assert.assertEquals(pinotMetricsRegistry.getClass().getSimpleName(), "YammerMetricsRegistry");
-
     try {
-      // Initialize a PinotMetricsRegistry with calling init() method.
       Map<String, Object> properties = new HashMap<>();
       PinotConfiguration configuration = new PinotConfiguration(properties);
       PinotMetricUtils.init(configuration);
     } catch (Exception e) {
       Assert.fail("Fail to initialize PinotMetricsRegistry of yammer");
     }
-    pinotMetricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
+    PinotMetricsRegistry pinotMetricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
     Assert.assertNotNull(pinotMetricsRegistry);
     Assert.assertEquals(pinotMetricsRegistry.getClass().getSimpleName(), "YammerMetricsRegistry");
   }
@@ -70,8 +63,7 @@ public class PinotMetricUtilsTest {
   }
 
   @Test
-  public void testPinotMetricsRegistration()
-      throws InvalidConfigException {
+  public void testPinotMetricsRegistration() {
     listenerOneOkay = false;
     listenerTwoOkay = false;
 

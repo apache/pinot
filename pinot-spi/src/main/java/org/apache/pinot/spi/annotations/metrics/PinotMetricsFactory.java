@@ -36,7 +36,7 @@ public interface PinotMetricsFactory {
   void init(PinotConfiguration metricsConfiguration);
 
   /**
-   * Gets {@link PinotMetricsRegistry}.
+   * Gets {@link PinotMetricsRegistry}. There should be only one such instance in every {@link PinotMetricsRegistry}.
    */
   PinotMetricsRegistry getPinotMetricsRegistry();
 

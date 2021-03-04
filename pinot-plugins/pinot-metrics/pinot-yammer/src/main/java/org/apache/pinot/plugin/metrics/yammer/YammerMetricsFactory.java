@@ -30,6 +30,7 @@ import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
 @MetricsFactory
 public class YammerMetricsFactory implements PinotMetricsFactory {
+  private PinotMetricsRegistry _pinotMetricsRegistry = null;
 
   @Override
   public void init(PinotConfiguration metricsConfiguration) {
@@ -38,7 +39,10 @@ public class YammerMetricsFactory implements PinotMetricsFactory {
 
   @Override
   public PinotMetricsRegistry getPinotMetricsRegistry() {
-    return new YammerMetricsRegistry();
+    if (_pinotMetricsRegistry == null) {
+      _pinotMetricsRegistry = new YammerMetricsRegistry();
+    }
+    return _pinotMetricsRegistry;
   }
 
   @Override
