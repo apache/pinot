@@ -44,7 +44,6 @@ public class QueryOp extends BaseOp {
   private static final String NUM_DOCS_SCANNED_KEY = "numDocsScanned";
   private static final String TIME_USED_MS_KEY = "timeUsedMs";
   private static final String COMMENT_DELIMITER = "#";
-  private static final String GENERATION_NUMBER_PLACEHOLDER = "__GENERATION_NUMBER__";
   private String _queryFileName;
   private String _expectedResultsFileName;
 
@@ -119,7 +118,7 @@ public class QueryOp extends BaseOp {
         JsonNode actualJson = null;
         if (expectedJson != null) {
           try {
-            actualJson = QueryProcessor.postSqlQuery(query);
+            actualJson = ClusterTest.postSqlQuery(query, ClusterDescriptor.BROKER_URL);
           } catch (Exception e) {
             LOGGER.error("Comparison FAILED: Line: {} Exception caught while running query: '{}'", queryLineNum, query,
                 e);
