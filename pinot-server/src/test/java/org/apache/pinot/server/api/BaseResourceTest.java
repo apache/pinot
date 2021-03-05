@@ -19,6 +19,7 @@
 package org.apache.pinot.server.api;
 
 import java.io.File;
+import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -34,11 +35,13 @@ import org.apache.http.util.NetUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.TableDataManager;
 import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
 import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
+import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
@@ -55,15 +58,16 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
-import static org.mockito.Mockito.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 
 public abstract class BaseResourceTest {
   private static final String AVRO_DATA_PATH = "data/test_data-mv.avro";
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "BaseResourceTest");
   protected static final String TABLE_NAME = "testTable";
+  protected static final String LLC_SEGMENT_NAME = new LLCSegmentName(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), 1, 0, System.currentTimeMillis()).getSegmentName();
+  protected static final String SEGMENT_DOWNLOAD_URL = "testSegmentDownloadUrl";
 
   private final Map<String, TableDataManager> _tableDataManagerMap = new HashMap<>();
   protected final List<ImmutableSegment> _realtimeIndexSegments = new ArrayList<>();
@@ -93,14 +97,20 @@ public abstract class BaseResourceTest {
     when(serverInstance.getInstanceDataManager()).thenReturn(instanceDataManager);
     when(serverInstance.getInstanceDataManager().getSegmentFileDirectory())
         .thenReturn(FileUtils.getTempDirectoryPath());
+
+    // Mock the segment uploader
+    SegmentUploader segmentUploader = mock(SegmentUploader.class);
+    when(segmentUploader.uploadSegment(any(File.class), eq(new LLCSegmentName(LLC_SEGMENT_NAME)))).thenReturn(new URI(SEGMENT_DOWNLOAD_URL));
+    when(instanceDataManager.getSegmentUploader()).thenReturn(segmentUploader);
+
     // Add the default tables and segments.
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME);
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
 
     addTable(realtimeTableName);
     addTable(offlineTableName);
-    setUpSegment(realtimeTableName, "default", _realtimeIndexSegments);
-    setUpSegment(offlineTableName, "default", _offlineIndexSegments);
+    setUpSegment(realtimeTableName, null, "default", _realtimeIndexSegments);
+    setUpSegment(offlineTableName, null, "default", _offlineIndexSegments);
 
     _adminApiApplication = new AdminApiApplication(serverInstance, new AllowAllAccessFactory());
     _adminApiApplication.start(Collections.singletonList(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, "0.0.0.0",
@@ -127,16 +137,16 @@ public abstract class BaseResourceTest {
       throws Exception {
     List<ImmutableSegment> immutableSegments = new ArrayList<>();
     for (int i = 0; i < numSegments; i++) {
-      immutableSegments.add(setUpSegment(tableNameWithType, Integer.toString(_realtimeIndexSegments.size()), segments));
+      immutableSegments.add(setUpSegment(tableNameWithType, null, Integer.toString(_realtimeIndexSegments.size()), segments));
     }
     return immutableSegments;
   }
 
-  protected ImmutableSegment setUpSegment(String tableNameWithType, String segmentNamePostfix,
-      List<ImmutableSegment> segments)
+  protected ImmutableSegment setUpSegment(String tableNameWithType, String segmentName, String segmentNamePostfix, List<ImmutableSegment> segments)
       throws Exception {
     SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(_avroFile, INDEX_DIR, tableNameWithType);
+    config.setSegmentName(segmentName);
     config.setSegmentNamePostfix(segmentNamePostfix);
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(config);

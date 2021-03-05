@@ -30,6 +30,7 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
@@ -132,4 +133,9 @@ public interface InstanceDataManager {
    * Returns the Helix property store.
    */
   ZkHelixPropertyStore<ZNRecord> getPropertyStore();
+
+  /**
+   * Returns the segment uploader.
+   */
+  SegmentUploader getSegmentUploader();
 }

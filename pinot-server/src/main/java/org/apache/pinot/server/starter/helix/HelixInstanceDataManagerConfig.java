@@ -51,6 +51,8 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public static final String INSTANCE_SEGMENT_TAR_DIR = "segmentTarDir";
   // Key of segment directory
   public static final String INSTANCE_BOOTSTRAP_SEGMENT_DIR = "bootstrap.segment.dir";
+  // Key of segment store uri
+  public static final String SEGMENT_STORE_URI = "segment.store.uri";
   // Key of table data directory
   public static final String kEY_OF_TABLE_DATA_DIRECTORY = "directory";
   // Key of table data directory
@@ -147,6 +149,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public String getInstanceBootstrapSegmentDir() {
     return _instanceDataManagerConfiguration.getProperty(INSTANCE_BOOTSTRAP_SEGMENT_DIR);
+  }
+
+  @Override
+  public String getSegmentStoreUri() {
+    return _instanceDataManagerConfiguration.getProperty(SEGMENT_STORE_URI);
   }
 
   @Override
