@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.util.validator;
+package org.apache.pinot.core.util;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.github.fge.jackson.JsonLoader;
@@ -26,55 +26,53 @@ import com.github.fge.jsonschema.core.report.ProcessingMessage;
 import com.github.fge.jsonschema.core.report.ProcessingReport;
 import com.github.fge.jsonschema.main.JsonSchema;
 import com.github.fge.jsonschema.main.JsonSchemaFactory;
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 /**
-* Base implementation for validating JSON schemas
+* Validating JSON schema for [TableConfig,]
 * */
-abstract public class BasePinotConfigValidator implements PinotConfigValidator {
+public class PinotConfigSchemaValidator {
 
-  protected JsonSchema _schema;
-  protected ProcessingReport _report;
+  private static final String TABLE_CONFIG_SCHEMA = "/schemas/tableConfig.json";
+  private JsonSchema _schema;
+
+  private PinotConfigSchemaValidator(String path)
+      throws IOException, ProcessingException {
+    loadSchema(path);
+  }
+
+  public static PinotConfigSchemaValidator forTableConfig()
+      throws IOException, ProcessingException {
+    return new PinotConfigSchemaValidator(TABLE_CONFIG_SCHEMA);
+  }
 
   /**
    * Load schema from project resources
    * */
-  protected void loadSchema(String path)
+  private void loadSchema(String path)
       throws IOException, ProcessingException {
-    JsonNode node = JsonLoader.fromResource(path);
     JsonSchemaFactory factory = JsonSchemaFactory.byDefault();
-    _schema = factory.getJsonSchema(node);
+    _schema = factory.getJsonSchema(JsonLoader.fromResource(path));
   }
 
   /**
   * Validate passed jsonStr schema against the loaded schema from resources
   * */
-  @Override
-  public boolean validate(String jsonStr)
-      throws ProcessingException {
-    JsonNode node = null;
-    try {
-      node = JsonUtils.stringToJsonNode(jsonStr);
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
-    _report = _schema.validate(node);
-    return _report.isSuccess();
-  }
+  public List<String> validate(String jsonStr)
+      throws IOException, ProcessingException {
+    JsonNode node = JsonUtils.stringToJsonNode(jsonStr);
+    ProcessingReport report = _schema.validate(node);
 
-  /**
-   * Report validation messages if validation fail
-   * */
-  @Override
-  public List<String> getValidationMessages() {
     List<String> messages = new ArrayList<>();
-    for (ProcessingMessage processingMessage : _report) {
+    for (ProcessingMessage processingMessage : report) {
       if (processingMessage.getLogLevel() == LogLevel.ERROR)
         messages.add(processingMessage.getMessage());
     }
+
     return messages;
   }
 }
