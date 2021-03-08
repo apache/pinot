@@ -29,16 +29,16 @@ public class PinotDataTypeTest {
   private static final PinotDataType[] SOURCE_TYPES =
       {BYTE, CHARACTER, SHORT, INTEGER, LONG, FLOAT, DOUBLE, STRING, BYTE_ARRAY, CHARACTER_ARRAY, SHORT_ARRAY, INTEGER_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY};
   private static final Object[] SOURCE_VALUES =
-      {(byte) 123, (char) 123, (short) 123, 123, 123L, 123f, 123d, "123", new Object[]{(byte) 123}, new Object[]{(char) 123}, new Object[]{(short) 123}, new Object[]{123}, new Object[]{123L}, new Object[]{123f}, new Object[]{123d}, new Object[]{"123"}};
+      {(byte) 123, (char) 123, (short) 123, 123, 123L, 123f, 123d, " 123", new Object[]{(byte) 123}, new Object[]{(char) 123}, new Object[]{(short) 123}, new Object[]{123}, new Object[]{123L}, new Object[]{123f}, new Object[]{123d}, new Object[]{" 123"}};
   private static final PinotDataType[] DEST_TYPES =
       {INTEGER, LONG, FLOAT, DOUBLE, INTEGER_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY};
   private static final Object[] EXPECTED_DEST_VALUES =
       {123, 123L, 123f, 123d, new Object[]{123}, new Object[]{123L}, new Object[]{123f}, new Object[]{123d}};
   private static final String[] EXPECTED_STRING_VALUES =
       {Byte.toString((byte) 123), Character.toString((char) 123), Short.toString((short) 123), Integer.toString(
-          123), Long.toString(123L), Float.toString(123f), Double.toString(123d), "123", Byte.toString(
+          123), Long.toString(123L), Float.toString(123f), Double.toString(123d), " 123", Byte.toString(
           (byte) 123), Character.toString((char) 123), Short.toString((short) 123), Integer.toString(
-          123), Long.toString(123L), Float.toString(123f), Double.toString(123d), "123"};
+          123), Long.toString(123L), Float.toString(123f), Double.toString(123d), " 123"};
 
   @Test
   public void testNumberConversion() {
