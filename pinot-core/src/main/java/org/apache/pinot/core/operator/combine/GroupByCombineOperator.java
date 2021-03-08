@@ -54,7 +54,7 @@ import org.slf4j.LoggerFactory;
  *   - Try to extend BaseCombineOperator to reduce duplicate code
  */
 @SuppressWarnings("rawtypes")
-public class GroupByCombineOperator extends BaseOperator<IntermediateResultsBlock> {
+public class GroupByCombineOperator extends BaseCombineOperator { // BaseOperator<IntermediateResultsBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(GroupByCombineOperator.class);
   private static final String OPERATOR_NAME = "GroupByCombineOperator";
 
@@ -74,6 +74,7 @@ public class GroupByCombineOperator extends BaseOperator<IntermediateResultsBloc
 
   public GroupByCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService,
       long endTimeMs, int innerSegmentNumGroupsLimit) {
+    super(operators, queryContext, executorService, endTimeMs);
     _operators = operators;
     _queryContext = queryContext;
     _executorService = executorService;
@@ -235,6 +236,11 @@ public class GroupByCombineOperator extends BaseOperator<IntermediateResultsBloc
       // Deregister the main thread and wait for all threads done
       phaser.awaitAdvance(phaser.arriveAndDeregister());
     }
+  }
+
+  @Override
+  protected void mergeResultsBlocks(IntermediateResultsBlock mergedBlock, IntermediateResultsBlock blockToMerge) {
+
   }
 
   @Override
