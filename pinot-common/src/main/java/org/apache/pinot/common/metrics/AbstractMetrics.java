@@ -149,9 +149,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param timeUnit The log time duration time unit
    */
   private void addValueToTimer(String fullTimerName, final long duration, final TimeUnit timeUnit) {
-    final PinotMetricName metricName = PinotMetricUtils.generatePinotMetricName(_clazz, fullTimerName);
-    MetricsHelper.newTimer(_metricsRegistry, metricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS)
-        .update(duration, timeUnit);
+    final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz, fullTimerName);
+    PinotMetricUtils.makePinotTimer(_metricsRegistry, metricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS);
   }
 
   /**
@@ -179,10 +178,10 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
       final String fullMeterName;
       String meterName = meter.getMeterName();
       fullMeterName = _metricPrefix + meterName;
-      final PinotMetricName metricName = PinotMetricUtils.generatePinotMetricName(_clazz, fullMeterName);
+      final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz, fullMeterName);
 
       final PinotMeter newMeter =
-          MetricsHelper.newMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
+          PinotMetricUtils.makePinotMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
       newMeter.mark(unitCount);
       return newMeter;
     }
@@ -215,10 +214,10 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
       final String fullMeterName;
       String meterName = meter.getMeterName();
       fullMeterName = _metricPrefix + getTableName(tableName) + "." + meterName;
-      final PinotMetricName metricName = PinotMetricUtils.generatePinotMetricName(_clazz, fullMeterName);
+      final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz, fullMeterName);
 
       final PinotMeter newMeter =
-          MetricsHelper.newMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
+          PinotMetricUtils.makePinotMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
       newMeter.mark(unitCount);
       return newMeter;
     }
@@ -228,9 +227,9 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     final String fullMeterName;
     String meterName = meter.getMeterName();
     fullMeterName = _metricPrefix + getTableName(tableName) + "." + meterName;
-    final PinotMetricName metricName = PinotMetricUtils.generatePinotMetricName(_clazz, fullMeterName);
+    final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz, fullMeterName);
 
-    return MetricsHelper.newMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
+    return PinotMetricUtils.makePinotMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
   }
 
   /**
@@ -459,17 +458,16 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param valueCallback The callback function used to retrieve the value of the gauge
    */
   public void addCallbackGauge(final String metricName, final Callable<Long> valueCallback) {
-    MetricsHelper
-        .newGauge(_metricsRegistry, PinotMetricUtils.generatePinotMetricName(_clazz, _metricPrefix + metricName),
-            PinotMetricUtils.generatePinotGauge(avoid -> {
-              try {
-                return valueCallback.call();
-              } catch (Exception e) {
-                LOGGER.error("Caught exception", e);
-                Utils.rethrowException(e);
-                throw new AssertionError("Should not reach this");
-              }
-            }));
+    PinotMetricUtils.makeGauge(_metricsRegistry, PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName),
+        PinotMetricUtils.makePinotGauge(avoid -> {
+          try {
+            return valueCallback.call();
+          } catch (Exception e) {
+            LOGGER.error("Caught exception", e);
+            Utils.rethrowException(e);
+            throw new AssertionError("Should not reach this");
+          }
+        }));
   }
 
   protected abstract QP[] getQueryPhases();

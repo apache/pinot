@@ -115,5 +115,10 @@
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-yammer</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 </project>

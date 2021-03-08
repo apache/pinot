@@ -84,6 +84,11 @@
       <artifactId>pinot-spi</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-yammer</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>org.apache.httpcomponents</groupId>
       <artifactId>httpmime</artifactId>
     </dependency>
@@ -117,10 +122,6 @@
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>
       <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>com.yammer.metrics</groupId>
-      <artifactId>metrics-core</artifactId>
     </dependency>
     <dependency>
       <groupId>com.google.guava</groupId>

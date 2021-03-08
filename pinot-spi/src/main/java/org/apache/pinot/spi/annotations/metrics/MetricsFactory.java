@@ -16,21 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics.yammer;
+package org.apache.pinot.spi.annotations.metrics;
 
-import com.yammer.metrics.core.MetricsRegistryListener;
-import org.apache.pinot.spi.metrics.PinotMetricsRegistryListener;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 
-public class YammerMetricsRegistryListener implements PinotMetricsRegistryListener {
-  private final MetricsRegistryListener _metricsRegistryListener;
+/**
+ * Annotation for Pinot metrics.
+ *
+ * NOTE:
+ *   - The annotated class must implement the MinionEventObserverFactory interface
+ *   - The annotated class must be under the package of name 'org.apache.pinot.*.plugin.metrics.*' to be auto-registered.
+ */
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+public @interface MetricsFactory {
 
-  public YammerMetricsRegistryListener(MetricsRegistryListener metricsRegistryListener) {
-    _metricsRegistryListener = metricsRegistryListener;
-  }
-
-  @Override
-  public Object getMetricsRegistryListener() {
-    return _metricsRegistryListener;
-  }
+  boolean enabled() default true;
 }

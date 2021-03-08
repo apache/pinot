@@ -128,6 +128,12 @@
       <destName>plugins/pinot-minion-tasks/pinot-minion-builtin-tasks/pinot-minion-builtin-tasks-${project.version}-shaded.jar</destName>
     </file>
     <!-- End Include Pinot Minion Tasks Plugins-->
+    <!-- Start Include Pinot Metrics Plugins-->
+    <file>
+      <source>${pinot.root}/pinot-plugins/pinot-metrics/pinot-yammer/target/pinot-yammer-${project.version}-shaded.jar</source>
+      <destName>plugins/pinot-metrics/pinot-yammer/pinot-yammer-${project.version}-shaded.jar</destName>
+    </file>
+    <!-- End Include Pinot Metrics Plugins-->
     <!-- End Include Pinot Plugins-->
   </files>
   <fileSets>
