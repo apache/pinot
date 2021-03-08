@@ -292,8 +292,7 @@ public class JsonMatchPredicateTest extends BaseQueriesTest {
       IntermediateResultsBlock block1 = (IntermediateResultsBlock) operator1.nextBlock();
       Assert.fail("Expected query to fail with Exception.");
     } catch (RuntimeException re) {
-      Assert.assertEquals(re.toString(),
-          "java.lang.RuntimeException: Illegal Json Path: [$.name.first], when reading [daffy duck]");
+      // JSON parsing exception expected.
     }
 
     // JSON data is stored in columns of type STRING, so there is nothing preventing the column from storing bad json
