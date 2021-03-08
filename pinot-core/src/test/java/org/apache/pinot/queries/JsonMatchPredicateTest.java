@@ -290,7 +290,7 @@ public class JsonMatchPredicateTest extends BaseQueriesTest {
         "select count(*) FROM testTable WHERE json_extract_scalar(stringColumn, '$.name.first', 'INT') = 0");
     try {
       IntermediateResultsBlock block1 = (IntermediateResultsBlock) operator1.nextBlock();
-      Assert.assertTrue(false);
+      Assert.fail("Expected query to fail with Exception.");
     } catch (RuntimeException re) {
       Assert.assertEquals(re.toString(),
           "java.lang.RuntimeException: Illegal Json Path: [$.name.first], when reading [daffy duck]");
@@ -301,7 +301,7 @@ public class JsonMatchPredicateTest extends BaseQueriesTest {
     // query processing. However, when json_extract_scalar is used within the WHERE clause, we should return the
     // default value instead of throwing exception. This will allow the predicate to be evaluated to either true or
     // false and hence allow the query to complete successfully. Returning default value from json_extract_scalar is
-    // an undocumented feature. Ideally, json_extract_scalar should return NULL in when it encounters bad JSON. However,
+    // an undocumented feature. Ideally, json_extract_scalar should return NULL when it encounters bad JSON. However,
     // NULL support is currently pending, so this is the best we can do.
     Operator operator2 = getOperatorForSqlQuery(
         "select count(*) FROM testTable WHERE json_extract_scalar(stringColumn, '$.name.first', 'INT', 0) = 0");
@@ -309,7 +309,9 @@ public class JsonMatchPredicateTest extends BaseQueriesTest {
     IntermediateResultsBlock block2 = (IntermediateResultsBlock) operator2.nextBlock();
     Collection<Object[]> rows = block2.getSelectionResult();
 
-    Assert.assertEquals(block2.getAggregationResult().get(0), 9l);
+    // None of the values in stringColumn are valid JSON. Hence, json_extract_scalar should default to '0' for all rows
+    // and count returned by the query should be 9 (same as number of rows in the table).
+    Assert.assertEquals(block2.getAggregationResult().get(0), 9L);
   }
 
   @AfterClass
