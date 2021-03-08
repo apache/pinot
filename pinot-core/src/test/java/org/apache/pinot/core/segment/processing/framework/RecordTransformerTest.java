@@ -54,12 +54,12 @@ public class RecordTransformerTest {
     recordTransformer = RecordTransformerFactory.getRecordTransformer(config);
     assertEquals(recordTransformer.getClass(), TransformFunctionRecordTransformer.class);
 
-    transformFunctionMap.put("bar", "bad function");
+    transformFunctionMap.put("bar", "badFunction()");
     config = new RecordTransformerConfig.Builder().setTransformFunctionsMap(transformFunctionMap).build();
     try {
       RecordTransformerFactory.getRecordTransformer(config);
       fail("Should not create record transformer with invalid transform function");
-    } catch (IllegalArgumentException e) {
+    } catch (IllegalStateException e) {
       // expected
     }
   }
@@ -70,7 +70,8 @@ public class RecordTransformerTest {
     transformFunctionMap.put("foo", "toEpochDays(foo)");
     transformFunctionMap.put("bar", "Groovy({bar + \"_\" + zoo}, bar, zoo)");
     transformFunctionMap.put("dMv", "Groovy({dMv.findAll { it > 1}}, dMv)");
-    RecordTransformerConfig config = new RecordTransformerConfig.Builder().setTransformFunctionsMap(transformFunctionMap).build();
+    RecordTransformerConfig config =
+        new RecordTransformerConfig.Builder().setTransformFunctionsMap(transformFunctionMap).build();
     RecordTransformer recordTransformer = RecordTransformerFactory.getRecordTransformer(config);
     GenericRow row = new GenericRow();
     row.putValue("foo", 1587410614000L);
