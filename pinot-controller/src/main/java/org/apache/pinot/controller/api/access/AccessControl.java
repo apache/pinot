@@ -26,6 +26,9 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public interface AccessControl {
+  String WORKFLOW_NONE = "NONE";
+  String WORKFLOW_BASIC = "BASIC";
+  String WORKFLOW_OAUTH2 = "OAUTH2";
 
   /**
    * Return whether the client has data access to the given table.
@@ -54,7 +57,7 @@ public interface AccessControl {
   }
 
   /**
-   * Return whether the client has permission to access the epdpoints with are not table level
+   * Return whether the client has permission to access the endpoints with are not table level
    *
    * @param accessType type of the access
    * @param httpHeaders HTTP headers
@@ -63,5 +66,33 @@ public interface AccessControl {
    */
   default boolean hasAccess(AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
     return true;
+  }
+
+  /**
+   * Return workflow info for authenticating users. Not all workflows may be supported by the pinot UI implementation.
+   *
+   * @return workflow info for user authentication
+   */
+  default AuthWorkflowInfo getAuthWorkflowInfo() {
+    return new AuthWorkflowInfo(WORKFLOW_NONE);
+  }
+
+  /**
+   * Container for authentication workflow info. May be extended by implementations.
+   */
+  class AuthWorkflowInfo {
+    String workflow;
+
+    public AuthWorkflowInfo(String workflow) {
+      this.workflow = workflow;
+    }
+
+    public String getWorkflow() {
+      return workflow;
+    }
+
+    public void setWorkflow(String workflow) {
+      this.workflow = workflow;
+    }
   }
 }
