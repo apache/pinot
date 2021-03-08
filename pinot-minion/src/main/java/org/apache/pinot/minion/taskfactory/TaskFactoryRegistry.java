@@ -21,10 +21,12 @@ package org.apache.pinot.minion.taskfactory;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.task.Task;
 import org.apache.helix.task.TaskConfig;
 import org.apache.helix.task.TaskFactory;
 import org.apache.helix.task.TaskResult;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.MinionContext;
@@ -72,8 +74,10 @@ public class TaskFactoryRegistry {
               MinionMetrics minionMetrics = MinionContext.getInstance().getMinionMetrics();
 
               PinotTaskConfig pinotTaskConfig = PinotTaskConfig.fromHelixTaskConfig(_taskConfig);
-              pinotTaskConfig.getConfigs()
-                  .put(MinionConstants.AUTH_TOKEN, MinionContext.getInstance().getTaskAuthToken());
+              if (StringUtils.isBlank(pinotTaskConfig.getConfigs().get(MinionConstants.AUTH_TOKEN))) {
+                pinotTaskConfig.getConfigs()
+                    .put(MinionConstants.AUTH_TOKEN, MinionContext.getInstance().getTaskAuthToken());
+              }
 
               _eventObserver.notifyTaskStart(pinotTaskConfig);
               minionMetrics.addMeteredTableValue(taskType, MinionMeter.NUMBER_TASKS_EXECUTED, 1L);
