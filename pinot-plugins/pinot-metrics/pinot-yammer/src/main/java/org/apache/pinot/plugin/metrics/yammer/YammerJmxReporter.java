@@ -16,42 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics.yammer;
+package org.apache.pinot.plugin.metrics.yammer;
 
-import com.yammer.metrics.core.Gauge;
-import java.util.function.Function;
-import org.apache.pinot.spi.metrics.PinotGauge;
+import com.yammer.metrics.core.MetricsRegistry;
+import com.yammer.metrics.reporting.JmxReporter;
+import org.apache.pinot.spi.metrics.PinotJmxReporter;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
 
-public class YammerGauge<T> implements PinotGauge<T> {
+public class YammerJmxReporter implements PinotJmxReporter {
+  private final JmxReporter _jmxReporter;
 
-  private final Gauge<T> _gauge;
-
-  public YammerGauge(Gauge<T> gauge) {
-    _gauge = gauge;
-  }
-
-  public YammerGauge(Function<Void, T> condition) {
-    this(new Gauge<T>() {
-      @Override
-      public T value() {
-        return condition.apply(null);
-      }
-    });
+  public YammerJmxReporter(PinotMetricsRegistry metricsRegistry) {
+    _jmxReporter = new JmxReporter((MetricsRegistry) metricsRegistry.getMetricsRegistry());
   }
 
   @Override
-  public Object getGauge() {
-    return _gauge;
-  }
-
-  @Override
-  public Object getMetric() {
-    return _gauge;
-  }
-
-  @Override
-  public T value() {
-    return _gauge.value();
+  public void start() {
+    _jmxReporter.start();
   }
 }

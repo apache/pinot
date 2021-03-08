@@ -16,23 +16,37 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics.yammer;
+package org.apache.pinot.plugin.metrics.yammer;
 
-import com.yammer.metrics.core.MetricsRegistry;
-import com.yammer.metrics.reporting.JmxReporter;
-import org.apache.pinot.spi.metrics.PinotJmxReporter;
-import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import com.yammer.metrics.core.Meter;
+import org.apache.pinot.spi.metrics.PinotMeter;
 
 
-public class YammerJmxReporter implements PinotJmxReporter {
-  private final JmxReporter _jmxReporter;
+public class YammerMeter extends YammerMetered implements PinotMeter {
+  private final Meter _meter;
 
-  public YammerJmxReporter(PinotMetricsRegistry metricsRegistry) {
-    _jmxReporter = new JmxReporter((MetricsRegistry) metricsRegistry.getMetricsRegistry());
+  public YammerMeter(Meter meter) {
+    super(meter);
+    _meter = meter;
   }
 
   @Override
-  public void start() {
-    _jmxReporter.start();
+  public void mark() {
+    _meter.mark();
+  }
+
+  @Override
+  public void mark(long unitCount) {
+    _meter.mark(unitCount);
+  }
+
+  @Override
+  public long count() {
+    return _meter.count();
+  }
+
+  @Override
+  public Object getMetric() {
+    return _meter;
   }
 }

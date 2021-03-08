@@ -23,14 +23,14 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <artifactId>pinot-minion-tasks</artifactId>
+    <artifactId>pinot-metrics</artifactId>
     <groupId>org.apache.pinot</groupId>
     <version>0.7.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
 
-  <artifactId>pinot-minion-builtin-tasks</artifactId>
-  <name>Pinot Minion Built-In Tasks</name>
+  <artifactId>pinot-yammer</artifactId>
+  <name>Pinot Yammer Metrics</name>
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
@@ -59,8 +59,12 @@
   <dependencies>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-yammer</artifactId>
-      <scope>test</scope>
+      <artifactId>pinot-spi</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.yammer.metrics</groupId>
+      <artifactId>metrics-core</artifactId>
+      <version>2.2.0</version>
     </dependency>
   </dependencies>
 </project>

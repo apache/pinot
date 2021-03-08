@@ -30,6 +30,7 @@
     "enableDefaultStarTree": false,
     "enableDynamicStarTreeCreation": false,
     "loadMode": "MMAP",
+    "noDictionaryColumns": [],
     "nullHandlingEnabled": false,
     "sortedColumn": [],
     "streamConfigs": {}

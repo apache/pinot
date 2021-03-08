@@ -16,62 +16,72 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics.yammer;
+package org.apache.pinot.plugin.metrics.yammer;
 
-import com.yammer.metrics.core.Metered;
+import com.yammer.metrics.core.Timer;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.spi.metrics.PinotMetered;
+import org.apache.pinot.spi.metrics.PinotTimer;
 
 
-public abstract class YammerMetered implements PinotMetered {
-  private final Metered _metered;
+public class YammerTimer implements PinotTimer {
+  private final Timer _timer;
 
-  public YammerMetered(Metered metered) {
-    _metered = metered;
+  public YammerTimer(Timer timer) {
+    _timer = timer;
+  }
+
+  @Override
+  public void update(long duration, TimeUnit unit) {
+    _timer.update(duration, unit);
+  }
+
+  @Override
+  public Object getTimer() {
+    return _timer;
   }
 
   @Override
   public Object getMetered() {
-    return _metered;
-  }
-
-  @Override
-  public TimeUnit rateUnit() {
-    return _metered.rateUnit();
-  }
-
-  @Override
-  public String eventType() {
-    return _metered.eventType();
-  }
-
-  @Override
-  public long count() {
-    return _metered.count();
-  }
-
-  @Override
-  public double fifteenMinuteRate() {
-    return _metered.fifteenMinuteRate();
-  }
-
-  @Override
-  public double fiveMinuteRate() {
-    return _metered.fiveMinuteRate();
-  }
-
-  @Override
-  public double meanRate() {
-    return _metered.meanRate();
-  }
-
-  @Override
-  public double oneMinuteRate() {
-    return _metered.oneMinuteRate();
+    return _timer;
   }
 
   @Override
   public Object getMetric() {
-    return _metered;
+    return _timer;
+  }
+
+  @Override
+  public TimeUnit rateUnit() {
+    return _timer.rateUnit();
+  }
+
+  @Override
+  public String eventType() {
+    return _timer.eventType();
+  }
+
+  @Override
+  public long count() {
+    return _timer.count();
+  }
+
+  @Override
+  public double fifteenMinuteRate() {
+    return _timer.fifteenMinuteRate();
+  }
+
+  @Override
+  public double fiveMinuteRate() {
+    return _timer.fiveMinuteRate();
+  }
+
+  @Override
+  public double meanRate() {
+    return _timer.meanRate();
+  }
+
+  @Override
+  public double oneMinuteRate() {
+    return _timer.oneMinuteRate();
   }
 }

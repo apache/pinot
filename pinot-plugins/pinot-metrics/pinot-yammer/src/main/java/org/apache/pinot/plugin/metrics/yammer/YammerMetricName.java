@@ -16,35 +16,48 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics.yammer;
+package org.apache.pinot.plugin.metrics.yammer;
 
-import com.yammer.metrics.core.Metric;
 import com.yammer.metrics.core.MetricName;
-import com.yammer.metrics.core.MetricsRegistryListener;
-import org.apache.pinot.spi.metrics.PinotMetric;
 import org.apache.pinot.spi.metrics.PinotMetricName;
-import org.apache.pinot.spi.metrics.PinotMetricsRegistryListener;
 
 
-public class YammerMetricsRegistryListener implements PinotMetricsRegistryListener {
-  private final MetricsRegistryListener _metricsRegistryListener;
+public class YammerMetricName implements PinotMetricName {
+  private final MetricName _metricName;
 
-  public YammerMetricsRegistryListener(MetricsRegistryListener metricsRegistryListener) {
-    _metricsRegistryListener = metricsRegistryListener;
+  public YammerMetricName(Class<?> klass, String name) {
+    _metricName = new MetricName(klass, name);
+  }
+
+  public YammerMetricName(MetricName metricName) {
+    _metricName = metricName;
   }
 
   @Override
-  public void onMetricAdded(PinotMetricName name, PinotMetric metric) {
-    _metricsRegistryListener.onMetricAdded((MetricName) name.getMetricName(), (Metric) metric.getMetric());
+  public MetricName getMetricName() {
+    return _metricName;
   }
 
+  /**
+   * Overrides equals method by calling the equals from the actual metric name.
+   */
   @Override
-  public void onMetricRemoved(PinotMetricName name) {
-    _metricsRegistryListener.onMetricRemoved((MetricName) name.getMetricName());
+  public boolean equals(Object obj) {
+    if (this == obj) {
+      return true;
+    }
+    if (obj == null || getClass() != obj.getClass()) {
+      return false;
+    }
+    YammerMetricName that = (YammerMetricName) obj;
+    return _metricName.equals(that._metricName);
   }
 
+  /**
+   * Overrides hashCode method by calling the hashCode method from the actual metric name.
+   */
   @Override
-  public Object getMetricsRegistryListener() {
-    return _metricsRegistryListener;
+  public int hashCode() {
+    return _metricName.hashCode();
   }
 }

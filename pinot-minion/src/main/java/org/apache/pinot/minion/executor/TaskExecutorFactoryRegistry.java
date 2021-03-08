@@ -22,12 +22,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.annotations.minion.TaskExecutorFactory;
-import org.apache.pinot.spi.annotations.minion.TaskGenerator;
-import org.reflections.Reflections;
-import org.reflections.scanners.TypeAnnotationsScanner;
-import org.reflections.util.ClasspathHelper;
-import org.reflections.util.ConfigurationBuilder;
-import org.reflections.util.FilterBuilder;
+import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,12 +67,8 @@ public class TaskExecutorFactoryRegistry {
   }
 
   public static Set<Class<?>> getTaskExecutorFactoryClasses() {
-    Reflections reflections = new Reflections(
-        new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage("org.apache.pinot"))
-            .filterInputsBy(new FilterBuilder.Include(TASK_EXECUTOR_PACKAGE_REGEX_PATTERN))
-            .setScanners(new TypeAnnotationsScanner()));
-    Set<Class<?>> classes = reflections.getTypesAnnotatedWith(TaskExecutorFactory.class, true);
-    return classes;
+    return PinotReflectionUtils
+        .getClassesThroughReflection(TASK_EXECUTOR_PACKAGE_REGEX_PATTERN, TaskExecutorFactory.class);
   }
 
   /**

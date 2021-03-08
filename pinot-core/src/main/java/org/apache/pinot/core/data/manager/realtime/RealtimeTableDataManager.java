@@ -59,6 +59,7 @@ import org.apache.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.loader.LoaderUtils;
+import org.apache.pinot.core.segment.index.loader.V3RemoveIndexException;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager.RecordInfo;
@@ -268,56 +269,69 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     LoaderUtils.reloadFailureRecovery(indexDir);
 
     boolean isLLCSegment = SegmentName.isLowLevelConsumerSegmentName(segmentName);
-    LLCSegmentName llcSegmentName = null;
-    PartitionUpsertMetadataManager partitionUpsertMetadataManager = null;
-    if (isLLCSegment) {
-      llcSegmentName = new LLCSegmentName(segmentName);
-      if (_tableUpsertMetadataManager != null) {
-        partitionUpsertMetadataManager =
-            _tableUpsertMetadataManager.getOrCreatePartitionManager(llcSegmentName.getPartitionId());
-      }
-    }
-
-    if (indexDir.exists() && realtimeSegmentZKMetadata.getStatus() == Status.DONE) {
-      // Segment already exists on disk, and metadata has been committed. Treat it like an offline segment
-      addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema));
-    } else {
-      // Either we don't have the segment on disk or we have not committed in ZK. We should be starting the consumer
-      // for realtime segment here. If we wrote it on disk but could not get to commit to zk yet, we should replace the
-      // on-disk segment next time
-
-      if (!isValid(schema, tableConfig.getIndexingConfig())) {
-        _logger.error("Not adding segment {}", segmentName);
-        throw new RuntimeException("Mismatching schema/table config for " + _tableNameWithType);
-      }
-      VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(schema, segmentName);
-
-      InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(_propertyStore, _instanceId);
-
-      SegmentDataManager manager;
-      if (!isLLCSegment) {
-        manager = new HLRealtimeSegmentDataManager(realtimeSegmentZKMetadata, tableConfig, instanceZKMetadata, this,
-            _indexDir.getAbsolutePath(), indexLoadingConfig, schema, _serverMetrics);
-      } else {
-        LLCRealtimeSegmentZKMetadata llcSegmentMetadata = (LLCRealtimeSegmentZKMetadata) realtimeSegmentZKMetadata;
-        if (realtimeSegmentZKMetadata.getStatus().equals(Status.DONE)) {
-          // TODO Remove code duplication here and in LLRealtimeSegmentDataManager
-          downloadAndReplaceSegment(segmentName, llcSegmentMetadata, indexLoadingConfig, tableConfig);
+    if (indexDir.exists()) {
+      // Segment already exists on disk
+      if (realtimeSegmentZKMetadata.getStatus() == Status.DONE) {
+        // Metadata has been committed, load the local segment
+        try {
+          addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema));
           return;
+        } catch (Exception e) {
+          if (isLLCSegment) {
+            // For LLC and segments, delete the local copy and download a new copy from the controller
+            FileUtils.deleteQuietly(indexDir);
+            if (e instanceof V3RemoveIndexException) {
+              _logger.info("Unable to remove index from V3 format segment: {}, downloading a new copy", segmentName, e);
+            } else {
+              _logger.error("Caught exception while loading segment: {}, downloading a new copy", segmentName, e);
+            }
+          } else {
+            // For HLC segments, throw out the exception because there is no way to recover (controller does not have a
+            // copy of the segment)
+            throw e;
+          }
         }
-
-        // Generates only one semaphore for every partitionId
-        int partitionId = llcSegmentName.getPartitionId();
-        _partitionIdToSemaphoreMap.putIfAbsent(partitionId, new Semaphore(1));
-        manager =
-            new LLRealtimeSegmentDataManager(realtimeSegmentZKMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
-                indexLoadingConfig, schema, llcSegmentName, _partitionIdToSemaphoreMap.get(partitionId), _serverMetrics,
-                partitionUpsertMetadataManager);
+      } else {
+        // Metadata has not been committed, delete the local segment
+        FileUtils.deleteQuietly(indexDir);
       }
-      _logger.info("Initialize RealtimeSegmentDataManager - " + segmentName);
-      _segmentDataManagerMap.put(segmentName, manager);
-      _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1L);
     }
+
+    // Start a new consuming segment or download the segment from the controller
+
+    if (!isValid(schema, tableConfig.getIndexingConfig())) {
+      _logger.error("Not adding segment {}", segmentName);
+      throw new RuntimeException("Mismatching schema/table config for " + _tableNameWithType);
+    }
+    VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(schema, segmentName);
+
+    if (isLLCSegment) {
+      if (realtimeSegmentZKMetadata.getStatus() == Status.DONE) {
+        downloadAndReplaceSegment(segmentName, (LLCRealtimeSegmentZKMetadata) realtimeSegmentZKMetadata,
+            indexLoadingConfig, tableConfig);
+        return;
+      }
+
+      // Generates only one semaphore for every partitionId
+      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+      int partitionId = llcSegmentName.getPartitionId();
+      Semaphore semaphore = _partitionIdToSemaphoreMap.computeIfAbsent(partitionId, k -> new Semaphore(1));
+      PartitionUpsertMetadataManager partitionUpsertMetadataManager =
+          _tableUpsertMetadataManager != null ? _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionId)
+              : null;
+      segmentDataManager =
+          new LLRealtimeSegmentDataManager(realtimeSegmentZKMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
+              indexLoadingConfig, schema, llcSegmentName, semaphore, _serverMetrics, partitionUpsertMetadataManager);
+    } else {
+      InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(_propertyStore, _instanceId);
+      segmentDataManager =
+          new HLRealtimeSegmentDataManager(realtimeSegmentZKMetadata, tableConfig, instanceZKMetadata, this,
+              _indexDir.getAbsolutePath(), indexLoadingConfig, schema, _serverMetrics);
+    }
+
+    _logger.info("Initialized RealtimeSegmentDataManager - " + segmentName);
+    _segmentDataManagerMap.put(segmentName, segmentDataManager);
+    _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1L);
   }
 
   @Override

@@ -275,6 +275,11 @@
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-yammer</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-java-client</artifactId>
         <version>${project.version}</version>
       </dependency>
@@ -388,11 +393,6 @@
         <groupId>com.google.guava</groupId>
         <artifactId>guava</artifactId>
         <version>20.0</version>
-      </dependency>
-      <dependency>
-        <groupId>com.yammer.metrics</groupId>
-        <artifactId>metrics-core</artifactId>
-        <version>2.2.0</version>
       </dependency>
       <dependency>
         <groupId>commons-cli</groupId>

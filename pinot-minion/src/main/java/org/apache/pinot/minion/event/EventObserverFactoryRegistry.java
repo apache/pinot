@@ -23,11 +23,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 import org.apache.pinot.spi.annotations.minion.EventObserverFactory;
-import org.reflections.Reflections;
-import org.reflections.scanners.TypeAnnotationsScanner;
-import org.reflections.util.ClasspathHelper;
-import org.reflections.util.ConfigurationBuilder;
-import org.reflections.util.FilterBuilder;
+import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,10 +43,8 @@ public class EventObserverFactoryRegistry {
    */
   public EventObserverFactoryRegistry(MinionTaskZkMetadataManager zkMetadataManager) {
     long startTimeMs = System.currentTimeMillis();
-    Reflections reflections = new Reflections(
-        new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage("org.apache.pinot"))
-            .filterInputsBy(new FilterBuilder.Include(".*\\.event\\..*")).setScanners(new TypeAnnotationsScanner()));
-    Set<Class<?>> classes = reflections.getTypesAnnotatedWith(EventObserverFactory.class, true);
+    Set<Class<?>> classes =
+        PinotReflectionUtils.getClassesThroughReflection(".*\\.event\\..*", EventObserverFactory.class);
     for (Class<?> clazz : classes) {
       EventObserverFactory annotation = clazz.getAnnotation(EventObserverFactory.class);
       if (annotation.enabled()) {

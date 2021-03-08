@@ -33,7 +33,7 @@ public class JmxReporterMetricsRegistryRegistrationListener implements MetricsRe
   @Override
   public void onMetricsRegistryRegistered(PinotMetricsRegistry metricsRegistry) {
     LOGGER.info("Registering JmxReporterMetricsRegistryRegistrationListener");
-    PinotMetricUtils.generatePinotJmxReporter(metricsRegistry).start();
+    PinotMetricUtils.makePinotJmxReporter(metricsRegistry).start();
     LOGGER.info("Number of metrics in metricsRegistry: {}", metricsRegistry.allMetrics().size());
   }
 }

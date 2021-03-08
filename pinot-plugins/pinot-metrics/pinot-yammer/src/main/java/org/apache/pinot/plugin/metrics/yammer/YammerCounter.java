@@ -16,37 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics.yammer;
+package org.apache.pinot.plugin.metrics.yammer;
 
-import com.yammer.metrics.core.Meter;
-import org.apache.pinot.spi.metrics.PinotMeter;
+import com.yammer.metrics.core.Counter;
+import com.yammer.metrics.core.Metric;
+import org.apache.pinot.spi.metrics.PinotCounter;
 
 
-public class YammerMeter extends YammerMetered implements PinotMeter {
-  private final Meter _meter;
+public class YammerCounter extends YammerMetric implements PinotCounter {
+  private final Counter _counter;
 
-  public YammerMeter(Meter meter) {
-    super(meter);
-    _meter = meter;
+  public YammerCounter(Counter counter) {
+    super(counter);
+    _counter = counter;
   }
 
   @Override
-  public void mark() {
-    _meter.mark();
+  public Object getCounter() {
+    return _counter;
   }
 
   @Override
-  public void mark(long unitCount) {
-    _meter.mark(unitCount);
-  }
-
-  @Override
-  public long count() {
-    return _meter.count();
-  }
-
-  @Override
-  public Object getMetric() {
-    return _meter;
+  public Metric getMetric() {
+    return _counter;
   }
 }

@@ -16,15 +16,42 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics;
+package org.apache.pinot.plugin.metrics.yammer;
 
-import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import com.yammer.metrics.core.Gauge;
+import java.util.function.Function;
+import org.apache.pinot.spi.metrics.PinotGauge;
 
 
-/**
- * Interface to implement operations that occur whenever a new MetricsRegistry is registered with the PinotMetricUtils.
- *
- */
-public interface MetricsRegistryRegistrationListener {
-  void onMetricsRegistryRegistered(PinotMetricsRegistry metricsRegistry);
+public class YammerGauge<T> implements PinotGauge<T> {
+
+  private final Gauge<T> _gauge;
+
+  public YammerGauge(Gauge<T> gauge) {
+    _gauge = gauge;
+  }
+
+  public YammerGauge(Function<Void, T> condition) {
+    this(new Gauge<T>() {
+      @Override
+      public T value() {
+        return condition.apply(null);
+      }
+    });
+  }
+
+  @Override
+  public Object getGauge() {
+    return _gauge;
+  }
+
+  @Override
+  public Object getMetric() {
+    return _gauge;
+  }
+
+  @Override
+  public T value() {
+    return _gauge.value();
+  }
 }
