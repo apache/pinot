@@ -145,7 +145,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
           .generateTableConfigURI(pinotClusterSpec.getControllerURI(), _spec.getTableSpec().getTableName());
       _spec.getTableSpec().setTableConfigURI(tableConfigURI);
     }
-    _tableConfig = SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI());
+    _tableConfig = SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), spec.getAuthToken());
 
     final int jobParallelism = _spec.getSegmentCreationJobParallelism();
     int numThreads = JobUtils.getNumThreads(jobParallelism);
@@ -194,17 +194,6 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
     }
     File localTempDir = new File(FileUtils.getTempDirectory(), "pinot-" + UUID.randomUUID());
     try {
-      //create localTempDir for input and output
-      File localInputTempDir = new File(localTempDir, "input");
-      FileUtils.forceMkdir(localInputTempDir);
-      File localOutputTempDir = new File(localTempDir, "output");
-      FileUtils.forceMkdir(localOutputTempDir);
-
-      //Read TableConfig, Schema
-      Schema schema = SegmentGenerationUtils.getSchema(_spec.getTableSpec().getSchemaURI(), _spec.getAuthToken());
-      TableConfig tableConfig =
-          SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), _spec.getAuthToken());
-
       int numInputFiles = filteredFiles.size();
       _segmentCreationTaskCountDownLatch = new CountDownLatch(numInputFiles);
 

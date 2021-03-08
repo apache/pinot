@@ -94,6 +94,7 @@ public class SegmentGenerationUtils {
     }
   }
 
+  @Deprecated
   public static TableConfig getTableConfig(String tableConfigURIStr) {
     return getTableConfig(tableConfigURIStr, null);
   }
