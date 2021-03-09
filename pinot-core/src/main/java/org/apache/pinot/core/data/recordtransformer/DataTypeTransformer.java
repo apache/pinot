@@ -115,7 +115,7 @@ public class DataTypeTransformer implements RecordTransformer {
 
         record.putValue(column, value);
       } catch (Exception e) {
-        throw new RuntimeException("failed to transform column " + column, e);
+        throw new RuntimeException("Caught exception while transforming data type for column: " + column, e);
       }
     }
     return record;
